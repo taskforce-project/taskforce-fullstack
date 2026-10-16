@@ -69,6 +69,11 @@ export function agentArgs(config: RunnerConfig, claim: Claim, mcpConfigPath: str
     "--allowedTools", allowedTools(config.agent.extraAllowedTools, mode).join(","),
     "--mcp-config", mcpConfigPath,
     "--strict-mcp-config",
+    // Seuls les réglages de la personne (et ceux du runner, via --settings) sont lus, jamais ceux du dépôt
+    // cloné : en -p, Claude Code charge sinon `.claude/settings*.json` du dépôt sans demander, et un dépôt
+    // piégé pourrait y déclarer des hooks qui s'exécutent sur le poste, ou rediriger l'URL de l'API.
+    // Vérifié sur la CLI 2.1.293 : sans ce drapeau le hook du dépôt s'exécute, avec, seul celui du runner.
+    "--setting-sources", "user",
     "--settings", settingsPath,
     "--max-turns", String(config.agent.maxTurns),
   ];

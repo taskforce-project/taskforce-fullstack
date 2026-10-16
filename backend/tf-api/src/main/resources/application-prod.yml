@@ -198,6 +198,9 @@ integrations:
   # OAuth MCP 1-clic (TF-MCP-02) : le fournisseur redirige le navigateur vers ces bases PUBLIQUES.
   # On reutilise les URLs prod existantes (comme les callbacks GitHub/Slack) : aucune nouvelle var d'env.
   mcp:
+    # Garde anti-SSRF des URL de serveurs MCP (OSS-1.2). true = serveurs du réseau interne admis : réservé
+    # à une instance on-premise dont les administrateurs de workspace sont de confiance.
+    allow-private-network: ${MCP_ALLOW_PRIVATE_NETWORK:false}
     oauth:
       redirect-base: ${APP_API_URL:${APP_URL}}   # base publique du BACKEND (recoit le callback OAuth)
       app-base: ${FRONTEND_URL}                   # base du FRONT (retour utilisateur apres callback)
@@ -251,6 +254,11 @@ ai:
 
 # Actuator Production
 management:
+  server:
+    # Port de gestion séparé, jamais publié : métriques et Prometheus ne sont plus joignables par le port de
+    # l'API (8080), même si un hébergeur expose ce port directement. La supervision les lit sur ce port, par le
+    # réseau interne (relais socat de la VM1, cf. monitoring/vm1/docker-compose.exporters.yml).
+    port: ${MANAGEMENT_PORT:8081}
   endpoints:
     web:
       exposure:

@@ -19,19 +19,25 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.security.HumanChallengeService;
+import com.taskforce.tf_api.shared.security.OAuthTwoFactorChallenge;
 import com.taskforce.tf_api.util.TestDataBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -86,6 +92,11 @@ class AuthServiceTest {
     // ici (sinon `@InjectMocks` la laisse null → NPE dans `login`). Cf. l'avertissement ci-dessus.
     @Mock
     private TwoFactorService twoFactorService;
+
+    // Défi 2FA des connexions externes (OSS-1.1) : dépendance du constructeur, donc déclarée ici (cf.
+    // l'avertissement ci-dessus). Instance RÉELLE espionnée : les tests scellent et ouvrent de vrais défis.
+    @Spy
+    private OAuthTwoFactorChallenge oauthTwoFactorChallenge = new OAuthTwoFactorChallenge("test-secret");
 
     @InjectMocks
     private AuthService authService;
@@ -1037,6 +1048,115 @@ class AuthServiceTest {
                 .hasMessageContaining("Aucune inscription en attente");
 
             verify(userRepository, never()).save(any(User.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("Connexion externe et 2FA (OSS-1.1)")
+    class OAuthTwoFactorTests {
+
+        private final Map<String, Object> profil = Map.of(
+            "email", TEST_EMAIL, "given_name", "Ada", "family_name", "Lovelace",
+            "sub", TEST_KEYCLOAK_ID, "email_verified", true);
+        private final Map<String, Object> jetons = Map.of(
+            "access_token", "kc-access", "refresh_token", "kc-refresh",
+            "expires_in", 300, "refresh_expires_in", 1800);
+
+        private User existingUser(boolean twoFactor) {
+            User user = TestDataBuilder.buildUser(TEST_EMAIL, PlanType.FREE);
+            when(userRepository.findByEmail(TEST_EMAIL)).thenReturn(Optional.of(user));
+            when(twoFactorService.isEnabled(user.getId())).thenReturn(twoFactor);
+            return user;
+        }
+
+        @Test
+        @DisplayName("sans 2FA, délivre la session directement")
+        void completeOAuthLogin_withoutTwoFactor_returnsSession() {
+            User user = existingUser(false);
+
+            AuthResponse response = authService.completeOAuthLogin(profil, jetons);
+
+            assertThat(response.getAccessToken()).isEqualTo("kc-access");
+            assertThat(response.getRefreshToken()).isEqualTo("kc-refresh");
+            assertThat(response.getTwoFactorChallenge()).isNull();
+            verify(auditService).record(null, user.getId(), AuditService.USER_LOGIN);
+        }
+
+        @Test
+        @DisplayName("avec 2FA, ne délivre aucun jeton, seulement un défi")
+        void completeOAuthLogin_withTwoFactor_returnsChallengeOnly() {
+            existingUser(true);
+
+            AuthResponse response = authService.completeOAuthLogin(profil, jetons);
+
+            assertThat(response.getTwoFactorRequired()).isTrue();
+            assertThat(response.getTwoFactorChallenge()).isNotBlank();
+            assertThat(response.getAccessToken()).isNull();
+            assertThat(response.getRefreshToken()).isNull();
+            verifyNoInteractions(auditService);
+        }
+
+        @Test
+        @DisplayName("délivre la session une fois le code vérifié")
+        void completeOAuthTwoFactor_withValidCode_returnsSession() {
+            User user = existingUser(true);
+            String challenge = authService.completeOAuthLogin(profil, jetons).getTwoFactorChallenge();
+            when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+            AuthResponse response = authService.completeOAuthTwoFactor(challenge, "123456");
+
+            verify(twoFactorService).verifyOrThrow(user.getId(), "123456");
+            assertThat(response.getAccessToken()).isEqualTo("kc-access");
+            assertThat(response.getRefreshToken()).isEqualTo("kc-refresh");
+            assertThat(response.getUser().getEmail()).isEqualTo(TEST_EMAIL);
+            verify(auditService).record(null, user.getId(), AuditService.USER_LOGIN);
+        }
+
+        @Test
+        @DisplayName("refuse un code invalide sans délivrer de session")
+        void completeOAuthTwoFactor_withInvalidCode_throws() {
+            User user = existingUser(true);
+            String challenge = authService.completeOAuthLogin(profil, jetons).getTwoFactorChallenge();
+            when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+            doThrow(new BusinessException("invalid code")).when(twoFactorService).verifyOrThrow(user.getId(), "000000");
+
+            assertThatThrownBy(() -> authService.completeOAuthTwoFactor(challenge, "000000"))
+                .isInstanceOf(BusinessException.class);
+            verifyNoInteractions(auditService);
+        }
+
+        @ParameterizedTest(name = "refuse un code vide : « {0} »")
+        @NullAndEmptySource
+        @ValueSource(strings = {"   "})
+        void completeOAuthTwoFactor_withoutCode_throws(String code) {
+            User user = existingUser(true);
+            String challenge = authService.completeOAuthLogin(profil, jetons).getTwoFactorChallenge();
+            when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+            assertThatThrownBy(() -> authService.completeOAuthTwoFactor(challenge, code))
+                .isInstanceOf(BusinessException.class);
+            verify(twoFactorService, never()).verifyOrThrow(anyLong(), anyString());
+        }
+
+        @Test
+        @DisplayName("refuse un défi forgé sans toucher au 2FA")
+        void completeOAuthTwoFactor_withForgedChallenge_throws() {
+            assertThatThrownBy(() -> authService.completeOAuthTwoFactor("forged", "123456"))
+                .isInstanceOf(BusinessException.class);
+            verifyNoInteractions(twoFactorService, auditService);
+        }
+
+        @Test
+        @DisplayName("refuse un compte désactivé depuis l'émission du défi")
+        void completeOAuthTwoFactor_withDisabledAccount_throws() {
+            User user = existingUser(true);
+            String challenge = authService.completeOAuthLogin(profil, jetons).getTwoFactorChallenge();
+            user.setIsActive(false);
+            when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+            assertThatThrownBy(() -> authService.completeOAuthTwoFactor(challenge, "123456"))
+                .isInstanceOf(BusinessException.class);
+            verify(twoFactorService, never()).verifyOrThrow(anyLong(), anyString());
         }
     }
 }

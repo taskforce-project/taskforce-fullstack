@@ -251,10 +251,13 @@ public class UserService {
             .build();
     }
 
+    /** Recherche parmi les personnes qui partagent un workspace avec l'appelant (OSS-1.7), 10 résultats au plus. */
     @Transactional(readOnly = true)
-    public List<UserSearchResult> searchUsers(String q) {
-        if (q == null || q.isBlank()) return List.of();
-        return userRepository.searchByQuery(q.trim(), PageRequest.of(0, 10))
+    public List<UserSearchResult> searchUsers(String q, String callerEmail) {
+        if (q == null || q.isBlank() || callerEmail == null) return List.of();
+        Long callerId = userRepository.findByEmail(callerEmail).map(User::getId).orElse(null);
+        if (callerId == null) return List.of();
+        return userRepository.searchCoMembers(q.trim(), callerId, PageRequest.of(0, 10))
             .stream()
             .map(u -> new UserSearchResult(u.getId(), u.getEmail(), u.getDisplayName(), u.getAvatarUrl()))
             .toList();

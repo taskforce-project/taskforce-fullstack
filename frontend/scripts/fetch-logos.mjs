@@ -159,7 +159,8 @@ const BRANDS = [
   { key: "pipedream", search: "Pipedream" },
   // Modèles IA
   { key: "openai", search: "OpenAI" },
-  { key: "anthropic", search: "Anthropic" },
+  // Pas d'Anthropic : ses conditions interdisent d'utiliser son logo sans permission (ADR-013). La marque
+  // est nommée en texte (NAME_ONLY dans components/ui/brand-logo.tsx), le fichier n'est jamais vendorisé.
   { key: "gemini", search: "Gemini", match: "Google Gemini" },
   { key: "mistral", search: "Mistral" },
   { key: "huggingface", search: "Hugging Face", match: "Hugging Face" },

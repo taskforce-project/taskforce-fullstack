@@ -23,6 +23,7 @@ import com.taskforce.tf_api.core.service.PlanFeatureService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -105,10 +106,14 @@ public class WorkspaceMcpService {
 
     /**
      * Exécute un outil externe (approbation humaine d'une écriture, ou lecture explicite). {@code
-     * toolRef} = nom namespacé {@code <connecteur>__<outil>}. L'autorisation workspace + le gate plan
-     * sont faits en amont par le contrôleur.
+     * toolRef} = nom namespacé {@code <connecteur>__<outil>}. L'appartenance au workspace est vérifiée en
+     * amont par le contrôleur.
+     *
+     * <p>OSS-1.5 : un outil qui modifie des données (sans indice {@code readOnlyHint}, donc traité comme une
+     * écriture) n'est exécuté que si {@code canWrite} (propriétaire ou administrateur du workspace). L'outil
+     * doit aussi figurer dans l'allow-list du connecteur quand elle existe, comme pour la liste affichée.</p>
      */
-    public String execute(Long workspaceId, String toolRef, Map<String, Object> args) {
+    public String execute(Long workspaceId, String toolRef, Map<String, Object> args, boolean canWrite) {
         int sep = toolRef == null ? -1 : toolRef.indexOf(NS);
         if (sep <= 0) throw new BusinessException("Référence d'outil invalide : " + toolRef);
         String connectorKey = toolRef.substring(0, sep);
@@ -119,8 +124,21 @@ public class WorkspaceMcpService {
         McpClient.ServerRef ref = toServerRef(conn);
         if (ref == null) throw new BusinessException("Le connecteur " + connectorKey + " n'est pas un serveur MCP (mcpUrl manquant)");
 
+        Set<String> allow = allowList(conn);
+        if (!allow.isEmpty() && !allow.contains(toolName)) {
+            throw new ForbiddenException("This tool is not enabled for this workspace: " + toolName);
+        }
+
         McpClient.Session session = client.initialize(ref);
         try {
+            McpClient.ToolDef def = client.listTools(session).stream()
+                .filter(t -> t.name().equals(toolName))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("MCP tool not found: " + toolName));
+            if (!def.readOnly() && !canWrite) {
+                throw new ForbiddenException(
+                    "Only workspace owners and admins can run an action that changes data in an external tool.");
+            }
             return client.callTool(session, toolName, args);
         } finally {
             client.close(session);
@@ -135,6 +153,8 @@ public class WorkspaceMcpService {
     @Transactional
     public void connectServer(Workspace ws, String connectorKey, String mcpUrl, String mcpToken, String mcpAllow) {
         if (mcpUrl == null || mcpUrl.isBlank()) throw new BusinessException("Champ requis : mcpUrl");
+        // Refus immédiat d'une URL vers le réseau interne (OSS-1.2) ; le client revérifie avant chaque appel.
+        client.assertAllowed(mcpUrl.trim());
         Map<String, String> config = new LinkedHashMap<>();
         config.put(CONFIG_URL, mcpUrl.trim());
         if (mcpToken != null && !mcpToken.isBlank()) config.put(CONFIG_TOKEN, mcpToken.trim());

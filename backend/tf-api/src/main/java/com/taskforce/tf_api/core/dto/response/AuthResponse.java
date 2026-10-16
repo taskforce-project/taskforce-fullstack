@@ -29,4 +29,10 @@ public class AuthResponse {
      * dans ce cas AUCUN token n'est émis, le front affiche l'étape « code » et rejoue le login avec `totp`.
      */
     private Boolean twoFactorRequired;
+
+    /**
+     * Connexion externe avec 2FA actif : défi scellé à renvoyer avec le code TOTP
+     * ({@code POST /api/auth/oauth/2fa}). Opaque pour le navigateur, il ne contient aucun jeton lisible.
+     */
+    private String twoFactorChallenge;
 }

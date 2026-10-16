@@ -3,7 +3,6 @@ package com.taskforce.tf_api.shared.security;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -23,6 +22,9 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    // Aucun réglage ne désactive l'authentification. L'ancien `keycloak.enabled=false` ouvrait toutes les routes
+    // sans jeton : une seule variable mal posée chez un hébergeur suffisait (OSS-1.4). Les tests simulent le jeton.
 
     /** Adresse INTERNE de Keycloak (réseau Docker) — sert à récupérer les clés (JWKS), appel serveur. */
     @Value("${keycloak.url:http://localhost:8080}")
@@ -65,7 +67,6 @@ public class SecurityConfig {
      * (nécessaire à la connexion externe), la coïncidence a cessé et toute l'authentification tombait.</p>
      */
     @Bean
-    @ConditionalOnProperty(name = "keycloak.enabled", havingValue = "true", matchIfMissing = true)
     public JwtDecoder jwtDecoder() {
         String issuer = keycloakPublicUrl + "/realms/" + keycloakRealm;
         String jwkSetUri = keycloakUrl + "/realms/" + keycloakRealm + "/protocol/openid-connect/certs";
@@ -92,7 +93,11 @@ public class SecurityConfig {
         // Webhook Stripe : requête serveur-à-serveur signée (pas de JWT). La signature est
         // vérifiée dans StripeWebhookController via constructEvent. Sans ça : 401 → BILL-03 KO.
         "/api/webhooks/stripe",
+        // En prod, l'actuator vit sur le port de gestion (management.server.port), jamais publié : sur le port
+        // de l'API ces chemins répondent 404. Seules les sondes /livez et /readyz restent sur le port de l'API.
         "/actuator/**",
+        "/livez",
+        "/readyz",
         "/swagger-ui/**",
         "/v3/api-docs/**",
         "/api-docs/**",
@@ -129,22 +134,6 @@ public class SecurityConfig {
     }
 
     /**
-     * Configuration de sécurité SANS OAuth2/Keycloak (dev local).
-     */
-    @Bean
-    @ConditionalOnProperty(name = "keycloak.enabled", havingValue = "false")
-    public SecurityFilterChain securityFilterChainWithoutOAuth(HttpSecurity http) throws Exception {
-        applySecurityHeaders(http);
-        http
-            .cors(Customizer.withDefaults())
-            .authorizeHttpRequests(authz -> authz.anyRequest().permitAll())
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
-
-        return http.build();
-    }
-
-    /**
      * Filter chain PRIORITAIRE pour « mes invitations » (user-centric → JWT obligatoire).
      *
      * <p>{@code GET /api/invitations/mine} n'a qu'<b>un seul segment</b> après {@code /api/invitations/},
@@ -156,7 +145,6 @@ public class SecurityConfig {
      */
     @Bean
     @Order(0)
-    @ConditionalOnProperty(name = "keycloak.enabled", havingValue = "true", matchIfMissing = true)
     public SecurityFilterChain myInvitationsFilterChain(HttpSecurity http) throws Exception {
         applySecurityHeaders(http);
         http
@@ -175,7 +163,6 @@ public class SecurityConfig {
      */
     @Bean
     @Order(1)
-    @ConditionalOnProperty(name = "keycloak.enabled", havingValue = "true", matchIfMissing = true)
     public SecurityFilterChain publicEndpointsFilterChain(HttpSecurity http) throws Exception {
         applySecurityHeaders(http);
         http
@@ -195,7 +182,6 @@ public class SecurityConfig {
      */
     @Bean
     @Order(2)
-    @ConditionalOnProperty(name = "keycloak.enabled", havingValue = "true", matchIfMissing = true)
     public SecurityFilterChain protectedEndpointsFilterChain(HttpSecurity http) throws Exception {
         applySecurityHeaders(http);
         http

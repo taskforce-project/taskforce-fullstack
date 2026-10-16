@@ -1,51 +1,19 @@
-## 📋 Description
+## What and why
 
-<!-- Décrivez clairement les changements apportés par cette PR -->
+<!-- What does this pull request change, and why? Link the issue if there is one. -->
 
-## 🏷️ Type de changement
+## How it was tested
 
-<!-- Cochez la case appropriée -->
+<!-- Commands you ran and what you checked by hand. -->
 
-- [ ] 🐛 Bug fix (`release:patch`)
-- [ ] ✨ New feature (`release:minor`)
-- [ ] 💥 Breaking change (`release:major`)
-- [ ] 📚 Documentation
-- [ ] ♻️ Refactoring
-- [ ] 🧪 Tests
-- [ ] ⚙️ CI/CD
+## Release label
 
-## 📦 Version
+Add exactly one release label for each service this pull request changes (CI checks it):
+`backend:release:{major|minor|patch}`, `frontend:release:{major|minor|patch}`, `landing:release:{major|minor|patch}`.
 
-<!-- ⚠️ OBLIGATOIRE : Ajoutez un label de version -->
+## Checklist
 
-**Labels requis :**
-- `release:patch` - Corrections de bugs (v1.0.0 → v1.0.1)
-- `release:minor` - Nouvelles fonctionnalités (v1.0.0 → v1.1.0)
-- `release:major` - Breaking changes (v1.0.0 → v2.0.0)
-
-**Branche `dev` :** Le tag sera automatiquement suffixé avec `-rcX`  
-**Branche `main` :** Le tag sera la version finale sans RC
-
-## ✅ Checklist
-
-- [ ] Mon code suit les conventions du projet
-- [ ] J'ai ajouté les labels appropriés (`release:*`, `type:*`, `priority:*`)
-- [ ] J'ai testé localement mes changements
-- [ ] J'ai mis à jour la documentation si nécessaire
-- [ ] Les tests passent en local
-- [ ] J'ai vérifié qu'il n'y a pas de conflits
-
-## 🔗 Issues liées
-
-<!-- Référencez les issues concernées -->
-
-Closes #
-Relates to #
-
-## 📸 Screenshots (si applicable)
-
-<!-- Ajoutez des captures d'écran si pertinent -->
-
-## 📝 Notes additionnelles
-
-<!-- Informations complémentaires pour les reviewers -->
+- [ ] Tests added or updated, and passing locally
+- [ ] No secrets, credentials or personal data in the diff
+- [ ] Database changes go through a new Flyway migration
+- [ ] User-facing text is in English

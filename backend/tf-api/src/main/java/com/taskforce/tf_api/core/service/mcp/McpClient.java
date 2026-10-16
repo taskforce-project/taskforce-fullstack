@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.security.SsrfGuard;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -37,12 +38,15 @@ public class McpClient {
     private final HttpClient http;
     private final ObjectMapper objectMapper;
     private final Duration readTimeout;
+    private final boolean allowPrivateNetwork;
 
     public McpClient(ObjectMapper objectMapper,
                      @Value("${integrations.mcp.connect-timeout-ms:10000}") long connectTimeoutMs,
-                     @Value("${integrations.mcp.read-timeout-ms:60000}") long readTimeoutMs) {
+                     @Value("${integrations.mcp.read-timeout-ms:60000}") long readTimeoutMs,
+                     @Value("${integrations.mcp.allow-private-network:false}") boolean allowPrivateNetwork) {
         this.objectMapper = objectMapper;
         this.readTimeout = Duration.ofMillis(readTimeoutMs);
+        this.allowPrivateNetwork = allowPrivateNetwork;
         this.http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofMillis(connectTimeoutMs))
             .build();
@@ -171,7 +175,24 @@ public class McpClient {
         return root.toString();
     }
 
+    /**
+     * Refuse une URL de serveur MCP qui vise le réseau interne du serveur (garde anti-SSRF, OSS-1.2) :
+     * bouclage, adresses privées, métadonnées cloud, réseau Tailscale, noms de service Docker. Appelée à
+     * l'enregistrement (refus immédiat) et avant chaque requête (URL corrompue en base, rebinding DNS).
+     * Une instance on-premise qui veut joindre ses propres serveurs MCP internes l'ouvre en connaissance
+     * de cause : {@code integrations.mcp.allow-private-network=true}.
+     */
+    public void assertAllowed(String url) {
+        if (allowPrivateNetwork) return;
+        try {
+            SsrfGuard.assertPublicHttpUrl(url);
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException("MCP server refused: " + ex.getMessage());
+        }
+    }
+
     private HttpResponse<String> send(String url, String token, String sessionId, String body) {
+        assertAllowed(url);
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url))
             .timeout(readTimeout)
             .header("Content-Type", "application/json")

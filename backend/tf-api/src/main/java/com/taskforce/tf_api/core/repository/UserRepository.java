@@ -53,17 +53,24 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findActiveUsersByPlanType(@Param("planType") String planType);
 
     /**
-     * Recherche d'utilisateurs par email ou displayName (insensible à la casse).
-     * Limité à 10 résultats via Pageable.
+     * Recherche par email ou displayName (insensible à la casse), limitée aux personnes qui partagent au
+     * moins un workspace avec l'appelant (OSS-1.7). L'ancienne recherche portait sur toute l'instance et
+     * révélait les adresses de comptes étrangers. Inviter quelqu'un d'autre passe par son adresse complète
+     * (invitation par e-mail). Nombre de résultats borné par le Pageable.
      */
     @Query("""
         SELECT u FROM User u
         WHERE u.isActive = true
           AND (LOWER(u.email) LIKE LOWER(CONCAT('%', :q, '%'))
                OR LOWER(u.displayName) LIKE LOWER(CONCAT('%', :q, '%')))
+          AND EXISTS (
+              SELECT 1 FROM WorkspaceMember mine, WorkspaceMember theirs
+              WHERE mine.user.id = :callerId
+                AND theirs.workspace = mine.workspace
+                AND theirs.user = u)
         ORDER BY u.email ASC
         """)
-    List<User> searchByQuery(@Param("q") String q, Pageable pageable);
+    List<User> searchCoMembers(@Param("q") String q, @Param("callerId") Long callerId, Pageable pageable);
 
     /** Comptes dont la suppression planifiée a dépassé le délai de grâce (à purger). */
     List<User> findByDeletionScheduledAtBefore(java.time.LocalDateTime cutoff);

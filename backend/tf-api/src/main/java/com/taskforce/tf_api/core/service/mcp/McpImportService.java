@@ -64,7 +64,8 @@ public class McpImportService {
         if (targetName == null || targetName.isBlank()) throw new BusinessException("Nom du projet cible requis");
 
         String issuesTool = findIssuesTool(ws.getId(), connectorKey);
-        String raw = workspaceMcp.execute(ws.getId(), connectorKey + "__" + issuesTool, Map.of());
+        // L'import est réservé aux gestionnaires (contrôleur, authorizeManager) : écriture admise.
+        String raw = workspaceMcp.execute(ws.getId(), connectorKey + "__" + issuesTool, Map.of(), true);
         List<NormalizedIssue> issues = normalize(raw);
 
         ProjectResponse project = projectService.createProject(ws.getSlug(), userId, projectRequest(targetName));

@@ -131,6 +131,17 @@ describe("agent : frontière de sécurité de l'exécution locale", () => {
     assert.equal(args[args.indexOf("--model") + 1], "claude-sonnet-5"); // modèle choisi à la délégation
   });
 
+  it("ignore les réglages du dépôt cloné (hooks, URL d'API) : seuls ceux de la personne et du runner", () => {
+    const args = agentArgs(config(), claim, "/tmp/mcp.json", "/tmp/settings.json");
+    assert.equal(args[args.indexOf("--setting-sources") + 1], "user");
+    assert.equal(args[args.indexOf("--settings") + 1], "/tmp/settings.json");
+  });
+
+  it("isole aussi les réglages du dépôt en mode sans dépôt", () => {
+    const args = agentArgs(config(), claim, "/tmp/mcp.json", "/tmp/s.json", "repoless");
+    assert.equal(args[args.indexOf("--setting-sources") + 1], "user");
+  });
+
   it("le modèle de la configuration prime sur celui de la délégation", () => {
     const args = agentArgs(config({ model: "opus" }), claim, "/tmp/mcp.json", "/tmp/settings.json");
     assert.equal(args[args.indexOf("--model") + 1], "opus");

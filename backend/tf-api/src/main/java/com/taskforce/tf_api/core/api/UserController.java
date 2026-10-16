@@ -145,15 +145,15 @@ public class UserController {
     }
 
     /**
-     * Recherche d'utilisateurs par email ou displayName (insensible à la casse).
-     * GET /api/users/search?q=xxx  — retourne max 10 résultats.
+     * Recherche d'utilisateurs par email ou displayName (insensible à la casse), parmi les personnes qui
+     * partagent un workspace avec l'appelant. GET /api/users/search?q=xxx  — retourne max 10 résultats.
      */
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<UserSearchResult>>> searchUsers(
         @RequestParam String q,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        List<UserSearchResult> results = userService.searchUsers(q);
+        List<UserSearchResult> results = userService.searchUsers(q, jwt.getClaimAsString("email"));
         return ResponseEntity.ok(ApiResponse.success("Résultats de recherche", results));
     }
 
