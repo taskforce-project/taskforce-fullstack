@@ -25,6 +25,7 @@ import com.taskforce.tf_api.core.service.PlanFeatureService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -130,15 +131,65 @@ class WorkspaceMcpServiceTest {
 
     @Test
     @DisplayName("execute() rouvre une session et appelle l'outil par son nom d'origine (non namespacé)")
-    void execute_delegates_with_original_name() {
+    void execute_delegates_with_original_name() throws Exception {
         when(repository.findByWorkspaceIdAndConnectorKey(1L, "linear")).thenReturn(Optional.of(mcpConnector()));
         when(client.initialize(any())).thenReturn(session);
+        when(client.listTools(session)).thenReturn(List.of(def("create_issue")));
         when(client.callTool(eq(session), eq("create_issue"), any())).thenReturn("DONE");
 
-        String result = service.execute(1L, "linear__create_issue", Map.of("title", "Bug"));
+        String result = service.execute(1L, "linear__create_issue", Map.of("title", "Bug"), true);
 
         assertThat(result).isEqualTo("DONE");
         verify(client).callTool(eq(session), eq("create_issue"), any());
+    }
+
+    @Test
+    @DisplayName("execute() refuse une écriture à un simple membre, sans appeler l'outil (OSS-1.5)")
+    void execute_refuses_write_without_manager_role() throws Exception {
+        when(repository.findByWorkspaceIdAndConnectorKey(1L, "linear")).thenReturn(Optional.of(mcpConnector()));
+        when(client.initialize(any())).thenReturn(session);
+        when(client.listTools(session)).thenReturn(List.of(def("create_issue")));
+
+        assertThatThrownBy(() -> service.execute(1L, "linear__create_issue", Map.of("title", "Bug"), false))
+            .isInstanceOf(ForbiddenException.class);
+        verify(client, never()).callTool(any(), any(), any());
+        verify(client).close(session);
+    }
+
+    @Test
+    @DisplayName("execute() laisse un simple membre lancer un outil en lecture seule")
+    void execute_allows_read_only_for_member() throws Exception {
+        when(repository.findByWorkspaceIdAndConnectorKey(1L, "linear")).thenReturn(Optional.of(mcpConnector()));
+        when(client.initialize(any())).thenReturn(session);
+        when(client.listTools(session)).thenReturn(List.of(
+            new McpClient.ToolDef("list_issues", "lecture", objectMapper.readTree("{\"type\":\"object\"}"), true)));
+        when(client.callTool(eq(session), eq("list_issues"), any())).thenReturn("[]");
+
+        assertThat(service.execute(1L, "linear__list_issues", Map.of(), false)).isEqualTo("[]");
+    }
+
+    @Test
+    @DisplayName("execute() refuse un outil hors de l'allow-list du connecteur, sans ouvrir de session")
+    void execute_refuses_tool_outside_allow_list() {
+        ConnectorConnection conn = ConnectorConnection.builder().connectorKey("linear")
+            .config("{\"mcpUrl\":\"http://x/mcp\",\"mcpAllow\":\"list_issues\"}").build();
+        when(repository.findByWorkspaceIdAndConnectorKey(1L, "linear")).thenReturn(Optional.of(conn));
+
+        assertThatThrownBy(() -> service.execute(1L, "linear__delete_issue", Map.of(), true))
+            .isInstanceOf(ForbiddenException.class);
+        verify(client, never()).initialize(any());
+    }
+
+    @Test
+    @DisplayName("execute() signale un outil inconnu du serveur")
+    void execute_unknown_tool() throws Exception {
+        when(repository.findByWorkspaceIdAndConnectorKey(1L, "linear")).thenReturn(Optional.of(mcpConnector()));
+        when(client.initialize(any())).thenReturn(session);
+        when(client.listTools(session)).thenReturn(List.of(def("create_issue")));
+
+        assertThatThrownBy(() -> service.execute(1L, "linear__missing", Map.of(), true))
+            .isInstanceOf(ResourceNotFoundException.class);
+        verify(client, never()).callTool(any(), any(), any());
     }
 
     @Test

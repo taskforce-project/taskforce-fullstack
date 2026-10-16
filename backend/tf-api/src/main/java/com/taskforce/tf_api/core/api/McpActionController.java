@@ -64,7 +64,9 @@ public class McpActionController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         Workspace ws = authorizeIntegrations(slug, jwt);
-        String output = workspaceMcp.execute(ws.getId(), body.toolRef(), body.arguments());
+        // Écriture dans un outil externe réservée aux propriétaires et administrateurs (OSS-1.5).
+        boolean canWrite = authorizationService.isManager(ws.getId(), resolveUserId(jwt));
+        String output = workspaceMcp.execute(ws.getId(), body.toolRef(), body.arguments(), canWrite);
         return ResponseEntity.ok(ApiResponse.success(new McpActionResult(body.toolRef(), output)));
     }
 
