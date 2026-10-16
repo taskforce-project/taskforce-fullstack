@@ -61,7 +61,7 @@ class McpImportServiceTest {
     @DisplayName("import : trouve list_issues, normalise via LLM, crée le projet + les issues")
     void imports_project() {
         connectorWithTools("list_issues", "save_issue");
-        when(workspaceMcp.execute(eq(10L), eq("linear__list_issues"), any())).thenReturn("<données brutes Linear>");
+        when(workspaceMcp.execute(eq(10L), eq("linear__list_issues"), any(), eq(true))).thenReturn("<données brutes Linear>");
         when(llm.isConfigured()).thenReturn(true);
         when(llm.chatCompletion(eq("m"), anyString(), anyString(), eq(true))).thenReturn(
             "{\"issues\":[{\"title\":\"Bug login\",\"description\":\"casse\",\"priority\":\"HIGH\"},{\"title\":\"Feature X\"}]}");
@@ -95,7 +95,7 @@ class McpImportServiceTest {
     @DisplayName("import : normalisation illisible → projet créé mais vide (found=0)")
     void empty_when_unparseable() {
         connectorWithTools("list_issues");
-        when(workspaceMcp.execute(eq(10L), eq("linear__list_issues"), any())).thenReturn("bla");
+        when(workspaceMcp.execute(eq(10L), eq("linear__list_issues"), any(), eq(true))).thenReturn("bla");
         when(llm.isConfigured()).thenReturn(true);
         when(llm.chatCompletion(anyString(), anyString(), anyString(), eq(true))).thenReturn("pas du json");
         when(projectService.createProject(eq("acme"), eq(7L), any()))

@@ -4,10 +4,10 @@
 
 <!-- BADGES:START -->
 ![Version](https://img.shields.io/badge/Version-0.2.0--rc1-blue.svg)
-![License](https://img.shields.io/badge/License-Fair_Use-green.svg)
+![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)
 ![Java](https://img.shields.io/badge/Java-21-orange.svg)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.6-brightgreen.svg)
-![Next.js](https://img.shields.io/badge/Next.js-16.3.4-black.svg)
+![Next.js](https://img.shields.io/badge/Next.js-16.3.6-black.svg)
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-38bdf8.svg)
 ![Keycloak](https://img.shields.io/badge/Keycloak-26.0.6-blue.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)
@@ -170,7 +170,13 @@ docker compose -f docker-compose.prod.yml up -d
 
 ## 📄 Licence
 
-Projet sous licence **Fair Use** - voir [LICENSE](./LICENSE). Le nom « TaskForce » est protégé. Pour tout usage commercial : **contact@taskforce-project.fr**.
+TaskForce est un logiciel libre, distribué sous licence **GNU Affero General Public License v3.0** ([AGPL-3.0](./LICENSE)).
+Vous pouvez l'utiliser, le modifier et l'héberger, y compris en entreprise. Si vous proposez une version modifiée à
+des utilisateurs à travers un réseau, vous devez leur donner accès au code source de vos modifications, sous la même
+licence.
+
+Le nom et le logo « TaskForce » ne sont pas couverts par cette licence : si vous distribuez une version modifiée,
+donnez-lui un autre nom.
 
 ---
 

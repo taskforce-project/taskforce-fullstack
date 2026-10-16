@@ -10,6 +10,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -30,7 +32,10 @@ class McpClientTest {
     private String url;
     private volatile boolean emitSession = true;   // le serveur émet-il un mcp-session-id ? (stateful)
     private volatile boolean unauthorized = false; // le serveur répond-il 401 à l'initialize ?
-    private final McpClient client = new McpClient(new ObjectMapper(), 2000L, 5000L);
+    // Le serveur embarqué écoute sur 127.0.0.1 : ce client admet le réseau privé. La garde anti-SSRF est
+    // testée à part, sur un client qui le refuse (comportement par défaut).
+    private final McpClient client = new McpClient(new ObjectMapper(), 2000L, 5000L, true);
+    private final McpClient guarded = new McpClient(new ObjectMapper(), 2000L, 5000L, false);
 
     @BeforeEach
     void start() throws IOException {
@@ -134,5 +139,42 @@ class McpClientTest {
         assertThatThrownBy(() -> client.initialize(new McpClient.ServerRef("srv", url, null)))
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining("401");
+    }
+
+    @ParameterizedTest(name = "refuse une URL vers le réseau interne : {0}")
+    @ValueSource(strings = {
+        "http://127.0.0.1:8080/mcp",
+        "http://localhost/mcp",
+        "http://169.254.169.254/latest/meta-data",
+        "http://10.0.0.5/mcp",
+        "http://192.168.1.10/mcp",
+        "http://100.122.50.25:8080/mcp",
+        "http://[::1]/mcp",
+        "file:///etc/passwd",
+        "ftp://8.8.8.8/mcp"
+    })
+    void refusesInternalUrls(String target) {
+        assertThatThrownBy(() -> guarded.assertAllowed(target)).isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    @DisplayName("admet une adresse publique (garde anti-SSRF)")
+    void acceptsPublicAddress() {
+        guarded.assertAllowed("https://8.8.8.8/mcp");
+    }
+
+    @Test
+    @DisplayName("ne contacte pas un serveur interne quand le réseau privé n'est pas admis")
+    void guardedClientNeverCallsInternalServer() {
+        assertThatThrownBy(() -> guarded.initialize(new McpClient.ServerRef("srv", url, null)))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining("MCP server refused");
+    }
+
+    @Test
+    @DisplayName("une instance on-premise peut admettre ses serveurs internes")
+    void privateNetworkAllowedWhenOptedIn() {
+        client.assertAllowed("http://127.0.0.1:8080/mcp");
+        client.assertAllowed("http://10.0.0.5/mcp");
     }
 }

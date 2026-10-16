@@ -27,7 +27,9 @@ import com.taskforce.tf_api.core.model.OtpVerification;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.WorkspaceService;
+import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.security.HumanChallengeService;
+import com.taskforce.tf_api.shared.security.OAuthTwoFactorChallenge;
 
 import com.nimbusds.jwt.JWTParser;
 
@@ -57,6 +59,7 @@ public class AuthService {
     private final AuditService auditService;
     private final HumanChallengeService humanChallengeService;
     private final TwoFactorService twoFactorService;
+    private final OAuthTwoFactorChallenge oauthTwoFactorChallenge;
 
     @Value("${stripe.success-url}")
     private String stripeSuccessUrl;
@@ -750,10 +753,52 @@ public class AuthService {
             .refreshExpiresIn(intOf(jetons.get("refresh_expires_in")))
             .build();
 
+        // 2FA actif : le code d'autorisation du fournisseur est déjà consommé, impossible de le rejouer après
+        // la saisie du code. Les jetons sont scellés dans un défi illisible côté navigateur, et la session
+        // n'est délivrée que par completeOAuthTwoFactor, une fois le code vérifié. Avant ce garde, une
+        // connexion GitHub ou Google contournait le 2FA (OSS-1.1).
+        if (twoFactorService.isEnabled(user.getId())) {
+            log.info("2FA requis pour la connexion externe de : {}", email);
+            String challenge = oauthTwoFactorChallenge.seal(new OAuthTwoFactorChallenge.Pending(
+                user.getId(), kcToken.getAccessToken(), kcToken.getRefreshToken(),
+                kcToken.getExpiresIn(), kcToken.getRefreshExpiresIn(), firstName, lastName));
+            return AuthResponse.builder().twoFactorRequired(true).twoFactorChallenge(challenge).build();
+        }
+
         auditService.record(null, user.getId(), AuditService.USER_LOGIN);
         log.info("Connexion externe réussie pour : {}", email);
 
         return buildAuthResponse(user, kcToken, firstName, lastName);
+    }
+
+    /**
+     * Connexion externe, étape du second facteur : ouvre le défi scellé par {@link #completeOAuthLogin},
+     * vérifie le code TOTP, puis délivre la session.
+     */
+    @Transactional
+    public AuthResponse completeOAuthTwoFactor(String challenge, String totp) {
+        OAuthTwoFactorChallenge.Pending pending = oauthTwoFactorChallenge.open(challenge);
+        User user = userRepository.findById(pending.userId())
+            .orElseThrow(() -> new BusinessException("This sign-in has expired. Please sign in again."));
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new BusinessException("This account is disabled.");
+        }
+        if (totp == null || totp.isBlank()) {
+            throw new BusinessException("Enter the code from your authenticator app.");
+        }
+        twoFactorService.verifyOrThrow(user.getId(), totp);
+
+        KeycloakTokenResponse kcToken = KeycloakTokenResponse.builder()
+            .accessToken(pending.accessToken())
+            .refreshToken(pending.refreshToken())
+            .tokenType("Bearer")
+            .expiresIn(pending.expiresIn())
+            .refreshExpiresIn(pending.refreshExpiresIn())
+            .build();
+
+        auditService.record(null, user.getId(), AuditService.USER_LOGIN);
+        log.info("Connexion externe réussie après 2FA pour : {}", user.getEmail());
+        return buildAuthResponse(user, kcToken, pending.firstName(), pending.lastName());
     }
 
     private static String str(Object value) {

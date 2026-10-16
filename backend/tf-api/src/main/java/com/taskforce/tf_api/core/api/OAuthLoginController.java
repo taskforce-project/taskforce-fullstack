@@ -26,13 +26,15 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Connexion via un fournisseur externe — flux d'autorisation.
  *
- * <p>Deux points d'entrée, tous deux publics (ils précèdent l'authentification, par définition) :
+ * <p>Trois points d'entrée, tous publics (ils précèdent l'authentification, par définition) :
  * <ol>
  *   <li>{@code GET /api/auth/oauth/{provider}/authorize} — renvoie l'URL vers laquelle envoyer le
  *       navigateur. Le client ne construit pas cette URL lui-même : elle contient l'état anti-CSRF,
  *       que seul le serveur peut signer.</li>
  *   <li>{@code POST /api/auth/oauth/callback} — reçoit le code d'autorisation récupéré par la page de
  *       rappel, l'échange contre des jetons, et renvoie une session TaskForce.</li>
+ *   <li>{@code POST /api/auth/oauth/2fa} : second facteur quand le 2FA est actif. Le rappel ne rend alors
+ *       qu'un défi scellé ; ce point d'entrée l'échange, avec le code TOTP, contre la session.</li>
  * </ol>
  *
  * <p><b>Pourquoi l'échange est un POST venant du navigateur, et non une redirection serveur.</b>
@@ -100,16 +102,8 @@ public class OAuthLoginController {
         }
 
         try {
-            AuthResponse reponse = authService.completeOAuthLogin(profil, jetons);
-            // Le refresh token part en cookie HttpOnly (jamais dans le corps), comme le login classique.
-            String refresh = reponse.getRefreshToken();
-            if (refresh == null || refresh.isBlank()) {
-                return ResponseEntity.ok(ApiResponse.success("Connexion réussie", reponse));
-            }
-            reponse.setRefreshToken(null);
-            return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, refreshCookie.set(refresh).toString())
-                .body(ApiResponse.success("Connexion réussie", reponse));
+            // 2FA actif : la réponse ne porte qu'un défi scellé, aucun jeton (cf. completeOAuthTwoFactor).
+            return withSession(authService.completeOAuthLogin(profil, jetons));
         } catch (Exception e) {
             log.error("Finalisation de la connexion externe impossible : {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -117,6 +111,33 @@ public class OAuthLoginController {
         }
     }
 
+    /** Second facteur d'une connexion externe : défi scellé + code TOTP contre une session TaskForce. */
+    @PostMapping("/2fa")
+    public ResponseEntity<ApiResponse<AuthResponse>> twoFactor(@RequestBody TwoFactorRequest request) {
+        try {
+            return withSession(authService.completeOAuthTwoFactor(request.challenge(), request.totp()));
+        } catch (Exception e) {
+            log.warn("Second facteur de connexion externe refusé : {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    /** Le refresh token part en cookie HttpOnly (jamais dans le corps), comme le login classique. */
+    private ResponseEntity<ApiResponse<AuthResponse>> withSession(AuthResponse reponse) {
+        String refresh = reponse.getRefreshToken();
+        if (refresh == null || refresh.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.success("Connexion réussie", reponse));
+        }
+        reponse.setRefreshToken(null);
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, refreshCookie.set(refresh).toString())
+            .body(ApiResponse.success("Connexion réussie", reponse));
+    }
+
     /** Charge utile du rappel. `redirectUri` doit être identique à celle envoyée à l'autorisation. */
     public record CallbackRequest(String code, String state, String redirectUri) { }
+
+    /** Charge utile du second facteur : le défi rendu par le rappel, et le code de l'application TOTP. */
+    public record TwoFactorRequest(String challenge, String totp) { }
 }

@@ -1,6 +1,7 @@
 {
   "name": "taskforce-scenario",
   "version": "1.0.0",
+  "license": "AGPL-3.0-only",
   "private": true,
   "type": "module",
   "description": "Joue la vie d'un projet TaskForce via la vraie API REST — alimente le Brain OS par le vrai chemin de code.",

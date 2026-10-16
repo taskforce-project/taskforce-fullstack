@@ -228,8 +228,8 @@ services:
     networks:
       - taskforce-network
     healthcheck:
-      # L'actuator n'a PAS de préfixe /api (aucun context-path) → chemin = /actuator/health (curl installé au build).
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health >/dev/null 2>&1 || exit 1"]
+      # Sonde de disponibilité sur le port de l'API (l'actuator complet est sur le port de gestion 8081, interne).
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/readyz >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -307,6 +307,8 @@ services:
         # Site vitrine : autre origine que l'application (www.<domaine> face à app.<domaine>).
         # Cible du logo et de « Retour au site » sur les pages d'authentification.
         NEXT_PUBLIC_SITE_URL: ${SITE_PUBLIC_URL}
+        # Clé de projet PostHog (analytics derrière consentement) ; vide = aucun envoi.
+        NEXT_PUBLIC_POSTHOG_KEY: ${POSTHOG_KEY:-}
     container_name: taskforce-frontend-prod
     environment:
       NODE_ENV: production

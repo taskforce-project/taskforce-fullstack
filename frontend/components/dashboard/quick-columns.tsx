@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
-import { fr } from "date-fns/locale"
 import { Plus } from "lucide-react"
 
 import { SectionCard } from "@/components/ui/section-card"
@@ -184,7 +183,7 @@ function RecentColumn({ slug }: { readonly slug: string }) {
             <>
               <span className="min-w-0 flex-1 truncate text-sm text-foreground">{n.title}</span>
               <span className="shrink-0 text-[11px] text-muted-foreground">
-                {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true, locale: fr })}
+                {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
               </span>
             </>
           )

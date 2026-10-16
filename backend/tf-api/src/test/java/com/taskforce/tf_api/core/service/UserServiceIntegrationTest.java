@@ -9,8 +9,14 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import com.taskforce.tf_api.core.dto.request.UpdateUserRequest;
+import com.taskforce.tf_api.core.dto.response.UserSearchResult;
+import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import com.taskforce.tf_api.util.AbstractIntegrationTest;
 
@@ -29,6 +35,8 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private UserService userService;
     @Autowired private UserRepository userRepository;
+    @Autowired private WorkspaceRepository workspaceRepository;
+    @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
 
     @MockitoBean private KeycloakService keycloakService;
     @MockitoBean private com.taskforce.tf_api.modules.ged.service.MinioService minioService;
@@ -82,13 +90,21 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("searchUsers retrouve un utilisateur par terme")
-    void should_search_users() {
-        userRepository.save(User.builder()
+    @DisplayName("searchUsers ne trouve que les personnes qui partagent un workspace avec l'appelant (OSS-1.7)")
+    void should_search_only_co_members() {
+        User coMember = userRepository.save(User.builder()
             .keycloakId("kc-findme").email("findme@it.dev").displayName("findme").isActive(true).build());
+        userRepository.save(User.builder()
+            .keycloakId("kc-stranger").email("findme-stranger@it.dev").displayName("findme stranger").isActive(true).build());
+        Workspace ws = workspaceRepository.save(Workspace.builder().name("Shared").slug("shared-it").owner(user).build());
+        workspaceMemberRepository.save(WorkspaceMember.builder().workspace(ws).user(user).role(WorkspaceRole.OWNER).build());
+        workspaceMemberRepository.save(WorkspaceMember.builder().workspace(ws).user(coMember).role(WorkspaceRole.MEMBER).build());
 
-        assertThat(userService.searchUsers("findme")).isNotEmpty();
-        assertThat(userService.searchUsers("  ")).isEmpty(); // requête vide
+        assertThat(userService.searchUsers("findme", "owner@it.dev"))
+            .extracting(UserSearchResult::email)
+            .containsExactly("findme@it.dev");
+        assertThat(userService.searchUsers("  ", "owner@it.dev")).isEmpty(); // requête vide
+        assertThat(userService.searchUsers("findme", "nobody@it.dev")).isEmpty(); // appelant inconnu
     }
 
     @Test

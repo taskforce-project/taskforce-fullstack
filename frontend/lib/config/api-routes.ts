@@ -17,6 +17,8 @@ export const AUTH_ROUTES = {
   OAUTH_AUTHORIZE: (provider: string) => `/api/auth/oauth/${provider}/authorize`,
   /** Connexion externe : échange du code d'autorisation contre une session TaskForce. */
   OAUTH_CALLBACK: "/api/auth/oauth/callback",
+  /** Connexion externe avec 2FA actif : défi scellé + code TOTP contre une session TaskForce. */
+  OAUTH_TWO_FACTOR: "/api/auth/oauth/2fa",
   SELECT_PLAN: "/api/auth/select-plan",
   VERIFY_OTP: "/api/auth/verify-otp",
   RESEND_OTP: "/api/auth/resend-otp",

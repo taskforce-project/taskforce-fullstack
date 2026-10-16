@@ -9,7 +9,7 @@ import { Rate } from "k6/metrics";
 //   BASE_URL=https://app.taskforce-project.fr VUS=1000 k6 run load-test.js   # edge (attend des 429 CF)
 //   BASE_URL=http://100.122.50.25:8080 VUS=1000 k6 run load-test.js          # origine VM1 (via Tailscale)
 
-const BASE_URL = __ENV.BASE_URL || "https://app.taskforce-project.fr";
+const BASE_URL = __ENV.BASE_URL || "http://localhost:3000";
 const PATH = __ENV.PATH || "/";
 const VUS = Number(__ENV.VUS || 500);
 

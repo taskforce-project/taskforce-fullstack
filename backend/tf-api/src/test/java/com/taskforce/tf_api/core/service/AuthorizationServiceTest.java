@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -178,6 +179,29 @@ class AuthorizationServiceTest {
             when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(WS_ID, USER_ID)).thenReturn(false);
 
             assertThat(service.isMember(WS_ID, USER_ID)).isFalse();
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("isManager")
+    class IsManager {
+
+        @ParameterizedTest(name = "{0} -> {1}")
+        @CsvSource({"OWNER, true", "ADMIN, true", "MEMBER, false"})
+        @DisplayName("vrai seulement pour OWNER et ADMIN")
+        void should_reflect_role(WorkspaceRole role, boolean expected) {
+            stubMember(role);
+
+            assertThat(service.isManager(WS_ID, USER_ID)).isEqualTo(expected);
+        }
+
+        @Test
+        @DisplayName("faux pour un non-membre (sans lever d'exception)")
+        void should_return_false_when_not_member() {
+            when(workspaceMemberRepository.findByWorkspaceIdAndUserId(WS_ID, USER_ID)).thenReturn(Optional.empty());
+
+            assertThat(service.isManager(WS_ID, USER_ID)).isFalse();
         }
     }
 }

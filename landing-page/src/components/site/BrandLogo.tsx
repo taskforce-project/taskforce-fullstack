@@ -14,7 +14,6 @@ import { cn } from "@/lib/utils";
 /** Marques ayant deux variantes sur disque (`<key>-light.svg` / `<key>-dark.svg`). */
 const THEMED = new Set([
   "1password",
-  "anthropic",
   "aws",
   "clerk",
   "copilot",

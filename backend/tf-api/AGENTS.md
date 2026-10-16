@@ -99,10 +99,9 @@ CREATE INDEX idx_invoices_user_id ON invoices(user_id);
 
 ## Security & Authentication
 
-**Keycloak Toggle:**
-- `keycloak.enabled=false` → Permits all (dev mode)
-- `keycloak.enabled=true` → Full OAuth2/JWT validation (default)
-- Config in `SecurityConfig.java` with `@ConditionalOnProperty`
+**No authentication toggle:**
+- Every protected route always requires a valid Keycloak JWT. The old `keycloak.enabled=false` switch, which
+  opened every route, was removed (OSS-1.4). Tests mock the token instead.
 
 **Public Endpoints:** `/api/auth/**`, `/api/stripe/**`, `/actuator/**`, `/swagger-ui/**`
 
@@ -128,7 +127,7 @@ CREATE INDEX idx_invoices_user_id ON invoices(user_id);
 ## Key Files Reference
 
 - **Entry Point:** `TfApiApplication.java` (loads `.env.{profile}` via Dotenv)
-- **Security:** `shared/security/SecurityConfig.java` (dual OAuth2/non-OAuth config)
+- **Security:** `shared/security/SecurityConfig.java` (public, invitation and protected filter chains)
 - **Error Handling:** `shared/exception/GlobalExceptionHandler.java`
 - **Base Entity:** `shared/audit/AuditableEntity.java`
 - **Response Wrapper:** `shared/dto/ApiResponse.java`

@@ -76,6 +76,11 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+      # /livez et /readyz servis aussi par le port de l'API : les sondes des conteneurs gardent un chemin
+      # stable même quand l'actuator passe sur un port de gestion séparé (profil prod).
+      probes:
+        enabled: true
+        add-additional-paths: true
   health:
     livenessstate:
       enabled: true
