@@ -571,6 +571,27 @@ describe('authService - couverture OAuth / challenge / fallbacks / garde-fous', 
     await expect(authService.oauthCallback({ code: 'c', state: 's', redirectUri: 'r' })).rejects.toThrow('bad-code');
   });
 
+  it("oauthCallback ne persiste rien quand le 2FA est requis (OSS-1.1)", async () => {
+    const data = { twoFactorRequired: true, twoFactorChallenge: 'sealed' };
+    vi.mocked(client.apiClient.post).mockResolvedValue({ data: { data } } as any);
+    await expect(authService.oauthCallback({ code: 'c', state: 's', redirectUri: 'r' })).resolves.toEqual(data);
+    expect(localStorageMock.setItem).not.toHaveBeenCalled();
+  });
+
+  it('oauthTwoFactor échange défi + code contre la session et la persiste', async () => {
+    const data = { user: { id: '1', email: 'a@b.co', firstName: 'A', lastName: 'B', role: 'USER' }, accessToken: 'at', expiresIn: 3600 };
+    vi.mocked(client.apiClient.post).mockResolvedValue({ data: { data } } as any);
+    await expect(authService.oauthTwoFactor({ challenge: 'sealed', totp: '123456' })).resolves.toEqual(data);
+    expect(client.apiClient.post).toHaveBeenCalledWith(AUTH_ROUTES.OAUTH_TWO_FACTOR, { challenge: 'sealed', totp: '123456' });
+    expect(localStorageMock.setItem).toHaveBeenCalledWith('accessToken', 'at');
+  });
+
+  it('oauthTwoFactor propage une erreur', async () => {
+    vi.mocked(client.apiClient.post).mockRejectedValue(new Error('bad-totp'));
+    await expect(authService.oauthTwoFactor({ challenge: 'sealed', totp: '000000' })).rejects.toThrow('bad-totp');
+    expect(localStorageMock.setItem).not.toHaveBeenCalled();
+  });
+
   it('selectPlan propage une erreur', async () => {
     vi.mocked(client.apiClient.post).mockRejectedValue(new Error('plan-fail'));
     await expect(authService.selectPlan('a@b.co', 'BUSINESS')).rejects.toThrow('plan-fail');

@@ -106,7 +106,7 @@ class AuthUserControllersWebMvcTest {
     @Test
     @DisplayName("GET /users/search → 200")
     void user_search_200() throws Exception {
-        when(userService.searchUsers(anyString())).thenReturn(List.of());
+        when(userService.searchUsers(anyString(), any())).thenReturn(List.of());
         mockMvc.perform(get("/api/users/search").param("q", "al").with(jwt().jwt(b -> b.claim("email", EMAIL))))
             .andExpect(status().isOk());
     }

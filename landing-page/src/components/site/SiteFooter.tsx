@@ -95,7 +95,7 @@ export function SiteFooter() {
       {/* Barre basse */}
       <div className="border-t">
         <div className="container-rail text-muted-foreground flex flex-col items-start justify-between gap-3 py-5 text-[12.5px] sm:flex-row sm:items-center">
-          <p>&copy; {new Date().getFullYear()} TaskForce · v{APP_VERSION} · All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} TaskForce · v{APP_VERSION} · Open source (AGPL-3.0)</p>
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <li>
               {/* /status pas encore construite : indicateur en texte, non cliquable. */}

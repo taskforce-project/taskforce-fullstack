@@ -44,13 +44,13 @@ services:
     ports:
       - "100.122.50.25:8081:8080"   # Tailscale uniquement
 
-  # Relais TCP : 9101 (tailnet) → taskforce-backend-prod:8080 (réseau interne). L'actuator est public
-  # (SecurityConfig : /actuator/**), donc pas de jeton nécessaire pour /actuator/prometheus.
+  # Relais TCP : 9101 (tailnet) → taskforce-backend-prod:8081, le port de gestion du backend (profil prod).
+  # Ce port n'est jamais publié : l'actuator n'est joignable que par le réseau interne, d'où le relais.
   actuator-proxy:
     image: alpine/socat:1.8.0.1
     container_name: tf-actuator-proxy
     restart: unless-stopped
-    command: TCP-LISTEN:9101,fork,reuseaddr TCP:taskforce-backend-prod:8080
+    command: TCP-LISTEN:9101,fork,reuseaddr TCP:taskforce-backend-prod:8081
     ports:
       - "100.122.50.25:9101:9101"   # Tailscale uniquement
     networks:

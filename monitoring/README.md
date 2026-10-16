@@ -7,7 +7,7 @@ Keycloak + Postgres + MinIO) tourne à ~175 Mio libres et ne reçoit que des exp
    ┌─ VM2 (frontend, 100.120.222.10) ──────────────┐        ┌─ VM1 (backend, 100.122.50.25) ─┐
    │  Grafana :3001  ← Prometheus :9090             │        │  node-exporter  :9100          │
    │       ↑ menu de dashboards      │  scrape ─────┼─Tailscale┼─→ cadvisor      :8081          │
-   │  node-exporter · cadvisor       ↓              │        │  socat 9101 → backend:8080     │
+   │  node-exporter · cadvisor       ↓              │        │  socat 9101 → backend:8081     │
    └────────────────────────────────────────────────┘        └────────────────────────────────┘
 ```
 
@@ -90,8 +90,9 @@ Dashboard : Grafana → dossier **TaskForce** → **« TaskForce - Produit »**.
 
 ## Notes
 
-- **Le backend expose déjà `/actuator/prometheus`** (Micrometer) ; `/actuator/**` est public
-  (`SecurityConfig`). Le relais `socat` évite de republier le port 8080 du backend / de le recréer.
+- **Le backend expose `/actuator/prometheus`** (Micrometer) sur son **port de gestion 8081** (profil prod,
+  `management.server.port`), jamais publié ; le port de l'API (8080) ne sert plus que `/livez` et `/readyz`.
+  Le relais `socat` joint ce port par le réseau interne, sans republier quoi que ce soit.
 - Retention Prometheus : 15 jours (`--storage.tsdb.retention.time`).
 - Pour exposer Grafana publiquement plus tard : ajouter un hostname au tunnel Cloudflare de la VM2
   vers `http://tf-grafana:3000` — **pas** un port ouvert sur Internet.

@@ -7,7 +7,6 @@ export type BrandLogoKind = "single" | "themed" | "mono"
 export const BRAND_LOGOS: Record<string, BrandLogoKind> = {
   "1password": "themed",
   "adobe": "single",
-  "anthropic": "themed",
   "asana": "single",
   "auth0": "single",
   "aws": "themed",

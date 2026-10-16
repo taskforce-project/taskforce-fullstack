@@ -39,7 +39,7 @@ scrape_configs:
         labels: { vm: vm1-backend }
 
   # ---- Backend Spring Boot (Micrometer / Actuator) via relais socat sur la VM1 ----
-  # Le backend n'expose pas 8080 sur l'hôte ; un socat sur la VM1 relaie 9101 → backend:8080.
+  # Le backend ne publie aucun port sur l'hôte ; un socat sur la VM1 relaie 9101 → backend:8081 (port de gestion).
   - job_name: taskforce-backend
     metrics_path: /actuator/prometheus
     static_configs:
