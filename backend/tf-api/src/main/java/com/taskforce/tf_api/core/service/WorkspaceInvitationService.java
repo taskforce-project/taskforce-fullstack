@@ -52,7 +52,6 @@ public class WorkspaceInvitationService {
     private final UserRepository userRepository;
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
-    private final ProjectService projectService;
     private final AuthorizationService authorizationService;
     private final EmailService emailService;
 
@@ -80,12 +79,6 @@ public class WorkspaceInvitationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable dans ce workspace"));
         final ProjectRole projectRole = project == null ? null
             : (request.getProjectRole() != null ? request.getProjectRole() : ProjectRole.MEMBER);
-
-        // Plafond « façon GitHub » : projet privé + Free = collaborateurs limités. L'invitation ne
-        // doit pas contourner la règle qui vivait dans l'ajout direct — on la vérifie dès l'invitation.
-        if (project != null) {
-            projectService.assertProjectSeatAvailable(project);
-        }
 
         // Déjà membre ? — la cible détermine la garde (projet vs workspace).
         userRepository.findByEmail(email).ifPresent(u -> {
@@ -276,8 +269,6 @@ public class WorkspaceInvitationService {
         Project project = invitation.getProject();
         if (project != null
             && !projectMemberRepository.existsByProjectIdAndUserId(project.getId(), user.getId())) {
-            // Le siège est réellement consommé ici : on re-vérifie le plafond au moment d'accepter.
-            projectService.assertProjectSeatAvailable(project);
             projectMemberRepository.save(ProjectMember.builder()
                 .project(project)
                 .user(user)

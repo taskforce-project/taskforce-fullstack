@@ -15,13 +15,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.mockito.ArgumentCaptor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.taskforce.tf_api.core.enums.PlanFeature;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.ConnectorConnection;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
-import com.taskforce.tf_api.core.repository.WorkspaceRepository;
-import com.taskforce.tf_api.core.service.PlanFeatureService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.shared.exception.BusinessException;
@@ -47,8 +43,6 @@ import static org.mockito.Mockito.when;
 class WorkspaceMcpServiceTest {
 
     @Mock private ConnectorConnectionRepository repository;
-    @Mock private WorkspaceRepository workspaceRepository;
-    @Mock private PlanFeatureService planFeatureService;
     @Mock private McpClient client;
     @Mock private McpTokenService tokenService; // OAuth (TF-MCP-02) : non-OAuth par défaut en test (isOAuth=false)
 
@@ -60,14 +54,8 @@ class WorkspaceMcpServiceTest {
 
     @BeforeEach
     void setup() {
-        service = new WorkspaceMcpService(repository, workspaceRepository, planFeatureService, client, objectMapper, tokenService);
+        service = new WorkspaceMcpService(repository, client, objectMapper, tokenService);
         ReflectionTestUtils.setField(service, "cacheTtlMs", 60_000L);
-    }
-
-    /** Stub du gate : propriétaire BUSINESS → intégrations autorisées. */
-    private void entitled() {
-        when(workspaceRepository.findOwnerPlanBySlug("acme")).thenReturn(Optional.of(PlanType.BUSINESS));
-        when(planFeatureService.has(PlanType.BUSINESS, PlanFeature.INTEGRATIONS)).thenReturn(true);
     }
 
     private ConnectorConnection mcpConnector() {
@@ -82,7 +70,6 @@ class WorkspaceMcpServiceTest {
     @Test
     @DisplayName("découvre les outils d'un serveur MCP et les namespace <connecteur>__<outil>")
     void discovers_and_namespaces() throws Exception {
-        entitled();
         when(repository.findByWorkspaceId(1L)).thenReturn(List.of(mcpConnector()));
         when(client.initialize(any())).thenReturn(session);
         when(client.listTools(session)).thenReturn(List.of(def("create_issue")));
@@ -94,19 +81,8 @@ class WorkspaceMcpServiceTest {
     }
 
     @Test
-    @DisplayName("gate : plan sans intégrations (FREE) → aucun outil externe, pas de handshake")
-    void free_plan_no_external_tools() {
-        when(workspaceRepository.findOwnerPlanBySlug("acme")).thenReturn(Optional.of(PlanType.FREE));
-        when(planFeatureService.has(PlanType.FREE, PlanFeature.INTEGRATIONS)).thenReturn(false);
-
-        assertThat(service.toolsFor(ctx)).isEmpty();
-        verify(repository, never()).findByWorkspaceId(any());
-    }
-
-    @Test
     @DisplayName("ignore les connecteurs sans mcpUrl (ne sont pas des serveurs MCP)")
     void skips_non_mcp_connectors() {
-        entitled();
         ConnectorConnection plain = ConnectorConnection.builder()
             .connectorKey("stripe").config("{\"apiKey\":\"sk_test\"}").build();
         when(repository.findByWorkspaceId(1L)).thenReturn(List.of(plain));
@@ -118,7 +94,6 @@ class WorkspaceMcpServiceTest {
     @Test
     @DisplayName("cache TTL : deux appels → un seul handshake serveur")
     void caches_within_ttl() throws Exception {
-        entitled();
         when(repository.findByWorkspaceId(1L)).thenReturn(List.of(mcpConnector()));
         when(client.initialize(any())).thenReturn(session);
         when(client.listTools(session)).thenReturn(List.of(def("create_issue")));
@@ -195,7 +170,6 @@ class WorkspaceMcpServiceTest {
     @Test
     @DisplayName("serveur MCP en échec → ignoré, liste vide (n'interrompt pas l'agent)")
     void failing_server_is_skipped() {
-        entitled();
         when(repository.findByWorkspaceId(1L)).thenReturn(List.of(mcpConnector()));
         when(client.initialize(any())).thenThrow(new BusinessException("down"));
 
@@ -205,7 +179,6 @@ class WorkspaceMcpServiceTest {
     @Test
     @DisplayName("allow-list (mcpAllow) : seuls les outils autorisés sont exposés")
     void allow_list_filters_tools() throws Exception {
-        entitled();
         ConnectorConnection conn = ConnectorConnection.builder()
             .connectorKey("linear")
             .config("{\"mcpUrl\":\"http://x/mcp\",\"mcpAllow\":\"create_issue\"}").build();

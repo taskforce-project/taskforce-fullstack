@@ -9,7 +9,6 @@ import org.springframework.context.annotation.Import;
 
 import com.taskforce.tf_api.core.dto.request.CreateWorkspaceRequest;
 import com.taskforce.tf_api.core.dto.response.WorkspaceResponse;
-import com.taskforce.tf_api.core.dto.response.WorkspaceUsageResponse;
 import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.User;
@@ -150,28 +149,14 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
-        @DisplayName("bloque la création au-delà de la limite FREE (2 workspaces) → IllegalStateException")
-        void should_enforce_free_workspace_limit() {
+        @DisplayName("aucun plafond de workspaces : un compte sans abonnement en crée autant qu'il veut (ADR-016)")
+        void should_not_cap_workspaces() {
             workspaceService.createNewWorkspace(owner.getId(), req("WS 1"));
             workspaceService.createNewWorkspace(owner.getId(), req("WS 2"));
-
-            assertThatThrownBy(() -> workspaceService.createNewWorkspace(owner.getId(), req("WS 3")))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Limite de workspaces");
-        }
-
-        @Test
-        @DisplayName("un compte PRO dépasse la limite FREE (3e workspace accepté)")
-        void should_allow_pro_beyond_free_limit() {
-            User pro = userRepository.save(User.builder()
-                .keycloakId("kc-pro").email("pro@it.dev").displayName("Pro")
-                .isActive(true).planType(PlanType.BUSINESS).build());
-
-            workspaceService.createNewWorkspace(pro.getId(), req("P1"));
-            workspaceService.createNewWorkspace(pro.getId(), req("P2"));
-            WorkspaceResponse third = workspaceService.createNewWorkspace(pro.getId(), req("P3"));
+            WorkspaceResponse third = workspaceService.createNewWorkspace(owner.getId(), req("WS 3"));
 
             assertThat(third).isNotNull();
+            assertThat(workspaceRepository.countByOwnerId(owner.getId())).isEqualTo(3);
         }
 
         @Test
@@ -196,26 +181,6 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
 
             verify(brainSeedingService).seedBrain(any(Workspace.class),
                 eq(com.taskforce.tf_api.core.enums.BrainTemplateType.BLANK), eq(owner.getEmail()));
-        }
-    }
-
-    // =========================================================================
-    @Nested
-    @DisplayName("getUsage")
-    class Usage {
-
-        @Test
-        @DisplayName("renvoie le plan, l'usage et les limites du plan (FREE : membres illimités / 2 workspaces)")
-        void should_report_usage_and_limits() {
-            WorkspaceResponse ws = workspaceService.createNewWorkspace(owner.getId(), req("Usage WS"));
-
-            WorkspaceUsageResponse usage = workspaceService.getUsage(ws.getSlug(), owner.getId());
-
-            assertThat(usage.getPlan()).isEqualTo(PlanType.FREE.name());
-            assertThat(usage.getMembersUsed()).isEqualTo(1);
-            assertThat(usage.getMembersLimit()).isEqualTo(-1); // membres illimités (tarification par membre)
-            assertThat(usage.getWorkspacesUsed()).isEqualTo(1);
-            assertThat(usage.getWorkspacesLimit()).isEqualTo(2);
         }
     }
 

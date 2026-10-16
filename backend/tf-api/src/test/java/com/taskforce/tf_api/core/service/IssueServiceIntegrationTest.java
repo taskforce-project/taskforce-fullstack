@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueRequest;
@@ -61,7 +60,7 @@ import static org.mockito.Mockito.verify;
  * (IDOR statut hors projet, non-membre → 403).</p>
  */
 @DisplayName("IssueService (intégration Postgres)")
-@Import({IssueService.class, ProjectVisibilityGuard.class, PlanFeatureService.class})
+@Import({IssueService.class, ProjectVisibilityGuard.class})
 class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private IssueService issueService;
@@ -111,9 +110,6 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
                 && s.getCategory() == IssueStatusCategory.COMPLETED)
             .findFirst().orElseThrow();
 
-        // Bean issueService partagé entre tests : rétention d'historique désactivée par défaut
-        // (le test dédié HistoryRetention la règle explicitement), sinon la valeur fuiterait d'un test à l'autre.
-        ReflectionTestUtils.setField(issueService, "historyRetentionLimit", Integer.MAX_VALUE);
     }
 
     private CreateIssueRequest createRequest(String title, Long assigneeId) {
@@ -1334,28 +1330,18 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
     // =========================================================================
     @Nested
-    @DisplayName("rétention d'historique par plan (UNLIMITED_HISTORY)")
-    class HistoryRetention {
+    @DisplayName("historique d'activité complet (aucun plafond de plan)")
+    class FullHistory {
 
         @Test
-        @DisplayName("sans UNLIMITED_HISTORY (FREE) : activité bornée aux N dernières ; BUSINESS voit tout")
-        void activity_retention_gated_by_plan() {
-            ReflectionTestUtils.setField(issueService, "historyRetentionLimit", 1);
-            owner.setPlanType(com.taskforce.tf_api.core.enums.PlanType.FREE);
-            userRepository.save(owner);
-
+        @DisplayName("un compte sans abonnement voit tout l'historique d'une issue (ADR-016)")
+        void activity_is_never_truncated() {
             Long id = newIssueId("Historique"); // 1 activité : CREATED
             UpdateIssueRequest u1 = new UpdateIssueRequest(); u1.setTitle("v2");
             issueService.updateIssue(SLUG, project.getId(), id, u1, owner.getId());
             UpdateIssueRequest u2 = new UpdateIssueRequest(); u2.setPriority(IssuePriority.URGENT);
             issueService.updateIssue(SLUG, project.getId(), id, u2, owner.getId());
 
-            // FREE (pas d'UNLIMITED_HISTORY) → borné à la dernière entrée.
-            assertThat(issueService.listActivity(SLUG, project.getId(), id, owner.getId())).hasSize(1);
-
-            // BUSINESS → historique complet (> 1).
-            owner.setPlanType(com.taskforce.tf_api.core.enums.PlanType.BUSINESS);
-            userRepository.save(owner);
             assertThat(issueService.listActivity(SLUG, project.getId(), id, owner.getId())).hasSizeGreaterThan(1);
         }
     }

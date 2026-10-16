@@ -14,14 +14,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.taskforce.tf_api.core.enums.PlanFeature;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.UserRepository;
-import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthorizationService;
-import com.taskforce.tf_api.core.service.PlanFeatureService;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.mcp.McpImportService;
 import com.taskforce.tf_api.core.service.mcp.McpOAuthService;
@@ -38,9 +34,9 @@ import lombok.RequiredArgsConstructor;
  * <i>propose</i> une écriture externe (statut {@code pending} dans les {@code toolCalls}), l'utilisateur
  * la <i>valide</i> depuis l'UI, qui appelle cet endpoint pour l'exécuter réellement.
  *
- * <p>Autorisation : membre du workspace + plan propriétaire couvrant {@link PlanFeature#INTEGRATIONS}
- * (BUSINESS+). L'outil est ré-résolu côté serveur depuis les connecteurs du workspace — le client ne
- * fait qu'échoer la référence proposée + ses arguments.
+ * <p>Autorisation : membre du workspace ; les écritures externes sont réservées aux propriétaires et
+ * administrateurs (OSS-1.5). L'outil est ré-résolu côté serveur depuis les connecteurs du workspace — le
+ * client ne fait qu'échoer la référence proposée + ses arguments.
  */
 @RestController
 @RequestMapping("/api/workspaces/{slug}/mcp")
@@ -50,8 +46,6 @@ public class McpActionController {
     private final WorkspaceMcpService  workspaceMcp;
     private final UserRepository       userRepository;
     private final BrainAccessGuard     access;
-    private final WorkspaceRepository  workspaceRepository;
-    private final PlanFeatureService   planFeatureService;
     private final AuthorizationService authorizationService;
     private final McpOAuthService      mcpOAuthService;
     private final McpImportService     mcpImportService;
@@ -63,7 +57,7 @@ public class McpActionController {
         @Valid @RequestBody McpActionRequest body,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        Workspace ws = authorizeIntegrations(slug, jwt);
+        Workspace ws = authorizeMember(slug, jwt);
         // Écriture dans un outil externe réservée aux propriétaires et administrateurs (OSS-1.5).
         boolean canWrite = authorizationService.isManager(ws.getId(), resolveUserId(jwt));
         String output = workspaceMcp.execute(ws.getId(), body.toolRef(), body.arguments(), canWrite);
@@ -76,7 +70,7 @@ public class McpActionController {
         @PathVariable String slug,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        Workspace ws = authorizeIntegrations(slug, jwt);
+        Workspace ws = authorizeMember(slug, jwt);
         return ResponseEntity.ok(ApiResponse.success(workspaceMcp.serverStatuses(ws.getId())));
     }
 
@@ -87,7 +81,7 @@ public class McpActionController {
         @PathVariable String connectorKey,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        Workspace ws = authorizeIntegrations(slug, jwt);
+        Workspace ws = authorizeMember(slug, jwt);
         return ResponseEntity.ok(ApiResponse.success(workspaceMcp.serverTools(ws.getId(), connectorKey)));
     }
 
@@ -141,17 +135,14 @@ public class McpActionController {
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
-    /** Membre du workspace + plan propriétaire couvrant les intégrations (BUSINESS+), sinon 409. */
-    private Workspace authorizeIntegrations(String slug, Jwt jwt) {
-        Workspace ws = access.resolveAndAuthorize(slug, resolveUserId(jwt));
-        PlanType plan = workspaceRepository.findOwnerPlanBySlug(slug).orElse(PlanType.FREE);
-        planFeatureService.requireFeature(plan, PlanFeature.INTEGRATIONS);
-        return ws;
+    /** Membre du workspace (sinon 403). Plus de garde de plan : chaque instance a toutes les fonctionnalités (ADR-016). */
+    private Workspace authorizeMember(String slug, Jwt jwt) {
+        return access.resolveAndAuthorize(slug, resolveUserId(jwt));
     }
 
-    /** Config serveur MCP = action de gestion : membre + INTEGRATIONS + rôle OWNER/ADMIN (sinon 403). */
+    /** Config serveur MCP = action de gestion : membre + rôle OWNER/ADMIN (sinon 403). */
     private Workspace authorizeManager(String slug, Jwt jwt) {
-        Workspace ws = authorizeIntegrations(slug, jwt);
+        Workspace ws = authorizeMember(slug, jwt);
         authorizationService.requireManager(ws.getId(), resolveUserId(jwt));
         return ws;
     }

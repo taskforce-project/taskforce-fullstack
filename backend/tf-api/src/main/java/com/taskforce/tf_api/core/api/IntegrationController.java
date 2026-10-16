@@ -33,12 +33,9 @@ import com.taskforce.tf_api.core.dto.response.SlackChannelResponse;
 import com.taskforce.tf_api.core.dto.response.SlackSyncResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
-import com.taskforce.tf_api.core.enums.PlanFeature;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthorizationService;
-import com.taskforce.tf_api.core.service.PlanFeatureService;
 import com.taskforce.tf_api.core.service.GitHubIntegrationService;
 import com.taskforce.tf_api.core.service.PlaneClient.PlaneProject;
 import com.taskforce.tf_api.core.service.PlaneIntegrationService;
@@ -62,14 +59,7 @@ public class IntegrationController {
     private final ConnectorConnectionService connectorConnectionService;
     private final UserRepository           userRepository;
     private final WorkspaceRepository      workspaceRepository;
-    private final PlanFeatureService       planFeatureService;
     private final AuthorizationService     authorizationService;
-
-    /** Les intégrations sont une feature Business+ : exige que le COMPTE (propriétaire) la couvre (→ 409). */
-    private void requireIntegrations(String slug) {
-        PlanType plan = workspaceRepository.findOwnerPlanBySlug(slug).orElse(PlanType.FREE);
-        planFeatureService.requireFeature(plan, PlanFeature.INTEGRATIONS);
-    }
 
     /** Config d'intégration = action de gestion : exige OWNER/ADMIN du workspace (sinon 403). */
     private void requireManager(String slug, Jwt jwt) {
@@ -102,7 +92,6 @@ public class IntegrationController {
         @RequestBody(required = false) ConnectConnectorRequest request,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        requireIntegrations(slug);
         requireManager(slug, jwt);
         connectorConnectionService.connect(
             slug, resolveUser(jwt).getId(), key,
@@ -170,7 +159,6 @@ public class IntegrationController {
         @RequestParam(required = false) String returnTo,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        requireIntegrations(slug);
         requireManager(slug, jwt);
         User user = resolveUser(jwt);
         URI authorizeUrl = gitHubService.buildAuthorizeUrl(slug, user, returnTo);
@@ -250,7 +238,6 @@ public class IntegrationController {
         @PathVariable String slug,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        requireIntegrations(slug);
         requireManager(slug, jwt);
         User user = resolveUser(jwt);
         URI authorizeUrl = slackService.buildAuthorizeUrl(slug, user);

@@ -25,8 +25,6 @@ import com.taskforce.tf_api.core.dto.response.WorkloadResponse;
 import com.taskforce.tf_api.core.model.Cycle;
 import com.taskforce.tf_api.core.model.CycleIssue;
 import com.taskforce.tf_api.core.model.Issue;
-import com.taskforce.tf_api.core.enums.PlanFeature;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.model.WorkspaceMember;
@@ -63,7 +61,6 @@ public class AnalyticsService {
     private final AiMeter                    aiMeter;
     private final ObjectMapper               objectMapper;
     private final AuthorizationService       authorizationService;
-    private final PlanFeatureService         planFeatureService;
     private final UserRepository             userRepository;
     private final JdbcTemplate               jdbcTemplate;
     private final ProjectVisibilityGuard     visibilityGuard;
@@ -76,28 +73,6 @@ public class AnalyticsService {
         Workspace ws = findWorkspace(slug);
         authorizationService.requireMember(ws.getId(), userId);
         return ws;
-    }
-
-    /** Gating d'une fonctionnalité selon le plan du COMPTE (propriétaire du workspace) → 409 si non couvert. */
-    private void requireFeature(String slug, PlanFeature feature) {
-        PlanType plan = workspaceRepository.findOwnerPlanBySlug(slug).orElse(PlanType.FREE);
-        planFeatureService.requireFeature(plan, feature);
-    }
-
-    /** Réponse "upgrade" quand le plan ne couvre pas les AI insights (PROD-4.4). */
-    private List<AiInsightResponse> upgradeInsights() {
-        return List.of(AiInsightResponse.builder()
-            .agent("Taskforce")
-            .agentColor("#a78bfa")
-            .category("Upgrade")
-            .urgency("low")
-            .confidence(100)
-            .action("Voir les forfaits")
-            // « Pro » ne nomme aucun plan réel (FREE/BASIC/BUSINESS/ENTERPRISE) — cf. TF-PLAN-PRO-GHOST.
-            // Chemin mort en pratique : AI_INSIGHTS est accordé dès FREE (PlanFeatureService.MATRIX).
-            .insight("Les insights IA ne sont pas inclus dans votre forfait actuel.")
-            .mode("upgrade")
-            .build());
     }
 
     // -------------------------------------------------------------------------
@@ -247,7 +222,6 @@ public class AnalyticsService {
     @Transactional(readOnly = true)
     public List<MemberCapacityResponse> getCapacity(String slug, Long userId, Long projectId) {
         Workspace ws = requireWorkspaceMember(slug, userId);
-        requireFeature(slug, PlanFeature.ADVANCED_ANALYTICS);
         List<Long> projectIds = resolveProjectIds(ws.getId(), userId, projectId);
 
         // Build map: userId → open issue count
@@ -283,7 +257,6 @@ public class AnalyticsService {
     @Transactional(readOnly = true)
     public WorkloadResponse getWorkload(String slug, Long userId, Integer days) {
         Workspace ws = requireWorkspaceMember(slug, userId);
-        requireFeature(slug, PlanFeature.ADVANCED_ANALYTICS);
 
         // Fenêtre [from, to) bornée 1..30 jours (défaut 14).
         int window = days == null ? WORKLOAD_DEFAULT_DAYS
@@ -377,12 +350,6 @@ public class AnalyticsService {
     public List<AiInsightResponse> generateInsights(String slug, Long userId) {
       // Résolution + autz HORS du try : un 404/403 ne doit pas être avalé par le fallback.
       Workspace ws = requireWorkspaceMember(slug, userId);
-
-      // Feature gating (PROD-4.4) : les AI insights sont une fonctionnalité PRO+.
-      PlanType plan = userRepository.findById(userId).map(User::getPlanType).orElse(PlanType.FREE);
-      if (!planFeatureService.has(plan, PlanFeature.AI_INSIGHTS)) {
-        return upgradeInsights();
-      }
 
       try {
         List<Long> projectIds = getProjectIds(ws.getId(), userId);

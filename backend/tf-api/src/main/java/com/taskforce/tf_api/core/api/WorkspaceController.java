@@ -22,7 +22,6 @@ import com.taskforce.tf_api.core.dto.request.UpdateWorkspaceRequest;
 import com.taskforce.tf_api.core.dto.response.AuditLogResponse;
 import com.taskforce.tf_api.core.dto.response.WorkspaceMemberResponse;
 import com.taskforce.tf_api.core.dto.response.WorkspaceResponse;
-import com.taskforce.tf_api.core.dto.response.WorkspaceUsageResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.WorkspaceService;
@@ -111,18 +110,6 @@ public class WorkspaceController {
         WorkspaceResponse ws = workspaceService.getWorkspaceBySlug(slug, userId);
         WorkspaceResponse response = workspaceService.updateWorkspace(ws.getId(), userId, request);
         return ResponseEntity.ok(ApiResponse.success("Workspace mis à jour", response));
-    }
-
-    /**
-     * GET /api/workspaces/:slug/usage — usage vs limites du plan (PROD-4.2, anti-drift).
-     */
-    @GetMapping("/{slug}/usage")
-    public ResponseEntity<ApiResponse<WorkspaceUsageResponse>> getUsage(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable String slug
-    ) {
-        Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success("Usage récupéré", workspaceService.getUsage(slug, userId)));
     }
 
     /**

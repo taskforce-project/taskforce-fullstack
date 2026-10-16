@@ -18,9 +18,7 @@ import com.taskforce.tf_api.core.dto.request.UpdateMemberRoleRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateWorkspaceRequest;
 import com.taskforce.tf_api.core.dto.response.WorkspaceMemberResponse;
 import com.taskforce.tf_api.core.dto.response.WorkspaceResponse;
-import com.taskforce.tf_api.core.dto.response.WorkspaceUsageResponse;
 import com.taskforce.tf_api.core.enums.BrainTemplateType;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.dto.response.AuditLogResponse;
@@ -53,8 +51,6 @@ public class WorkspaceService {
     private final ApplicationEventPublisher events; // Brain OS : fiche de contexte de l'espace (cf. BrainIngestionListener)
 
     // Limites de workspaces par plan (les membres sont illimités : tarification par membre/mois)
-    private static final long MAX_WORKSPACES_FREE = 2;
-    private static final long MAX_WORKSPACES_BASIC = 5;
 
     // -------------------------------------------------------------------------
     // Création automatique à l'inscription
@@ -147,11 +143,6 @@ public class WorkspaceService {
         User owner = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
-        // Quota fondé sur les workspaces POSSÉDÉS, pas sur les adhésions : être invité chez d'autres
-        // ne doit pas empêcher de créer les siens (cf. distinction perso / partagés, façon orgs GitHub).
-        long count = workspaceRepository.countByOwnerId(userId);
-        checkWorkspaceLimit(owner.getPlanType(), count);
-
         String slug = generateUniqueSlug(request.getName());
         Workspace workspace = Workspace.builder()
             .name(request.getName())
@@ -197,68 +188,6 @@ public class WorkspaceService {
             log.warn("Gabarit de brain inconnu '{}', repli sur BLANK", raw);
             return BrainTemplateType.BLANK;
         }
-    }
-
-    /** Membres illimités sur tous les plans (tarification par membre/mois, pas de plafond). */
-    private long memberLimitFor(PlanType plan) {
-        return Long.MAX_VALUE;
-    }
-
-    /** Limite de workspaces par plan (Long.MAX_VALUE = illimité). Switch exhaustif = MAJ forcée si un tier est ajouté. */
-    private long workspaceLimitFor(PlanType plan) {
-        return switch (plan) {
-            case FREE -> MAX_WORKSPACES_FREE;
-            case BASIC -> MAX_WORKSPACES_BASIC;
-            case BUSINESS, ENTERPRISE -> Long.MAX_VALUE;
-        };
-    }
-
-    private void checkMemberLimit(PlanType plan, long current) {
-        long limit = memberLimitFor(plan);
-        if (current >= limit) {
-            throw new IllegalStateException(
-                "Limite de membres atteinte pour ce plan (" + limit + " max). "
-                + "Passez à un plan supérieur pour inviter plus de membres.");
-        }
-    }
-
-    private void checkWorkspaceLimit(PlanType plan, long current) {
-        long limit = workspaceLimitFor(plan);
-        if (current >= limit) {
-            throw new IllegalStateException(
-                "Limite de workspaces atteinte pour votre plan (" + limit + " max)");
-        }
-    }
-
-    /**
-     * Usage vs limites pour un workspace (PROD-4.2). Source de vérité unique côté back
-     * (le front consomme cet endpoint au lieu de dupliquer les limites). -1 = illimité.
-     */
-    @Transactional(readOnly = true)
-    public WorkspaceUsageResponse getUsage(String slug, Long requestingUserId) {
-        Workspace workspace = workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
-        assertIsMember(workspace, requestingUserId);
-
-        User requester = userRepository.findById(requestingUserId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
-
-        PlanType ownerPlan = workspace.getOwner().getPlanType();
-        long membersUsed     = workspaceMemberRepository.findByWorkspaceId(workspace.getId()).size();
-        // Usage = workspaces possédés (cohérent avec le quota de création ci-dessus).
-        long workspacesUsed  = workspaceRepository.countByOwnerId(requestingUserId);
-
-        return WorkspaceUsageResponse.builder()
-            .plan(ownerPlan != null ? ownerPlan.name() : PlanType.FREE.name())
-            .membersUsed(membersUsed)
-            .membersLimit(unlimitedToMinusOne(memberLimitFor(ownerPlan)))
-            .workspacesUsed(workspacesUsed)
-            .workspacesLimit(unlimitedToMinusOne(workspaceLimitFor(requester.getPlanType())))
-            .build();
-    }
-
-    private long unlimitedToMinusOne(long limit) {
-        return limit == Long.MAX_VALUE ? -1 : limit;
     }
 
     /**
@@ -358,9 +287,6 @@ public class WorkspaceService {
         if (workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, invitee.getId())) {
             throw new IllegalStateException("Cet utilisateur est déjà membre du workspace");
         }
-
-        long memberCount = workspaceMemberRepository.findByWorkspaceId(workspaceId).size();
-        checkMemberLimit(workspace.getOwner().getPlanType(), memberCount);
 
         User inviter = userRepository.findById(requestingUserId)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));

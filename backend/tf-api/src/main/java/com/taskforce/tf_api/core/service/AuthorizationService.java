@@ -46,8 +46,6 @@ public class AuthorizationService {
         return requireRole(workspaceId, userId, WorkspaceRole.OWNER, WorkspaceRole.ADMIN);
     }
 
-    // NB : le gating par plan (features payantes) vit dans PlanFeatureService (PROD-4.4).
-
     /** true si l'utilisateur est OWNER ou ADMIN du workspace (sans lever d'exception). */
     public boolean isManager(Long workspaceId, Long userId) {
         return workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
