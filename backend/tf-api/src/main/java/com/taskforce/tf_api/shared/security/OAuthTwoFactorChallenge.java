@@ -1,6 +1,6 @@
 package com.taskforce.tf_api.shared.security;
 
-import java.nio.ByteBuffer;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -97,8 +97,11 @@ public class OAuthTwoFactorChallenge {
             cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(TAG_BITS, iv));
             cipher.updateAAD(AAD);
             byte[] sealed = cipher.doFinal(clear);
-            byte[] out = ByteBuffer.allocate(iv.length + sealed.length).put(iv).put(sealed).array();
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(out);
+            // Concaténation IV || chiffré sans calcul de longueur (alerte CodeQL java/uncontrolled-arithmetic).
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            out.writeBytes(iv);
+            out.writeBytes(sealed);
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(out.toByteArray());
         } catch (Exception ex) {
             throw new IllegalStateException("Échec du scellement du défi 2FA", ex);
         }
