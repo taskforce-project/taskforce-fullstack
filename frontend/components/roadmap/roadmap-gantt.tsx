@@ -9,6 +9,7 @@ import {
   ZoomOut,
   CalendarRange,
 } from "lucide-react"
+import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -25,6 +26,7 @@ import type { Cycle as ApiCycle } from "@/lib/api/cycle-service"
 import type { Project } from "@/lib/api/project-service"
 import { getScheduledIssues } from "@/lib/api/issue-service"
 import type { Issue as ApiIssue } from "@/lib/api/issue-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -247,8 +249,8 @@ export function RoadmapGantt({ slug, projectId }: { readonly slug: string; reado
         title:     p.name,
         type:      "project",
         project:   { name: p.name, emoji: p.identifier.slice(0, 2), color: seriesColor(p.id) },
-        startDate: p.createdAt.slice(0, 10),
-        endDate:   p.updatedAt.slice(0, 10),
+        startDate: format(parseServerDate(p.createdAt), "yyyy-MM-dd"),
+        endDate:   format(parseServerDate(p.updatedAt), "yyyy-MM-dd"),
         progress:  p.totalIssues > 0 ? Math.round((p.totalIssues - p.openIssues) / p.totalIssues * 100) : 0,
         color:     seriesColor(p.id),
       }))
