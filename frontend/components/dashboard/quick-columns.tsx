@@ -13,6 +13,7 @@ import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { listMyIssuesQuiet } from "@/lib/api/dashboard-card-service"
 import type { Issue } from "@/lib/api/issue-service"
 import { listNotifications, type NotificationResponse } from "@/lib/api/notification-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 const MAX_ROWS = 5
 
@@ -118,7 +119,7 @@ function MyQueueColumn({ slug }: { readonly slug: string }) {
 
   const open = (issues ?? [])
     .filter((i) => !i.archived && i.status.category !== "COMPLETED" && i.status.category !== "CANCELLED")
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .sort((a, b) => parseServerDate(b.updatedAt).getTime() - parseServerDate(a.updatedAt).getTime())
     .slice(0, MAX_ROWS)
 
   return (
@@ -183,7 +184,7 @@ function RecentColumn({ slug }: { readonly slug: string }) {
             <>
               <span className="min-w-0 flex-1 truncate text-sm text-foreground">{n.title}</span>
               <span className="shrink-0 text-[11px] text-muted-foreground">
-                {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                {formatDistanceToNow(parseServerDate(n.createdAt), { addSuffix: true })}
               </span>
             </>
           )

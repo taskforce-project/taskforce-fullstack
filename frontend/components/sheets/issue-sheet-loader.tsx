@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 
 import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
 import { getIssue, type Issue, type IssuePriority } from "@/lib/api/issue-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 /** Cible d'ouverture : une issue, identifiée par son projet. */
 export interface IssueSheetTarget {
@@ -62,7 +63,7 @@ export function toSheetIssue(issue: Issue): SheetIssue {
     archived:    issue.archived,
     dueDate:     formatDate(issue.dueDate),
     storyPoints: null,
-    createdAt:   formatDate(issue.createdAt) ?? issue.createdAt,
+    createdAt:   parseServerDate(issue.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
   }
 }
 

@@ -47,6 +47,7 @@ import { getSystemStatus, type SystemStatus } from "@/lib/api/status-service"
 import { apiClient } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
 import { cn } from "@/lib/utils"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 export type SettingsSection =
   | "profile"
@@ -357,7 +358,7 @@ function AccountPanel() {
     setDeleting(true)
     try {
       const scheduledPurgeAt = await deleteMyAccount()
-      const when = new Date(scheduledPurgeAt)
+      const when = parseServerDate(scheduledPurgeAt)
       const label = Number.isNaN(when.getTime())
         ? null
         : when.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })
@@ -396,7 +397,7 @@ function AccountPanel() {
   const scheduled = Boolean(purgeAt)
   const purgeLabel = (() => {
     if (!purgeAt) return null
-    const d = new Date(purgeAt)
+    const d = parseServerDate(purgeAt)
     return Number.isNaN(d.getTime())
       ? null
       : d.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })
@@ -1142,7 +1143,7 @@ function StatusPanel() {
                   {l.entityType ? `${l.entityType}${l.entityId ? ` #${l.entityId}` : ""}` : (l.details ?? "-")}
                 </span>
                 <span className="shrink-0 text-[10px] text-muted-foreground/70">
-                  {new Date(l.createdAt).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}
+                  {parseServerDate(l.createdAt).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}
                 </span>
               </div>
             ))

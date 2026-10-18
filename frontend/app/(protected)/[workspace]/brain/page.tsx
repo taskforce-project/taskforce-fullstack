@@ -15,6 +15,7 @@ import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { uploadBrainFile, type KnowledgeNode } from "@/lib/api/brain-service"
 import { toast } from "sonner"
 import { getErrorMessage } from "@/lib/api/client"
+import { parseServerDate } from "@/lib/utils/server-date"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -517,7 +518,7 @@ function NodeDetail({
                 <p className="text-sm italic text-muted-foreground">Empty node.</p>
               )}
               <p className="mt-8 text-xs text-muted-foreground">
-                Updated {new Date(node.updatedAt).toLocaleString()} · tip:{" "}
+                Updated {parseServerDate(node.updatedAt).toLocaleString()} · tip:{" "}
                 <code className="rounded bg-muted px-1">[[Note title]]</code> to link,{" "}
                 <code className="rounded bg-muted px-1">#tag</code> to categorize.
               </p>

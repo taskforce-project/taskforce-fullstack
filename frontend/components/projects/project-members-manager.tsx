@@ -30,6 +30,7 @@ import { toast } from "sonner"
 import { listProjectMembers, removeProjectMember } from "@/lib/api/project-service"
 import type { ProjectMember, ProjectRole } from "@/lib/api/project-service"
 import { useUserStore } from "@/lib/store/user-store"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 // ---------------------------------------------------------------------------
 // Config
@@ -46,7 +47,7 @@ const PAGE_SIZE = 8
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    return parseServerDate(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
   } catch {
     return iso
   }

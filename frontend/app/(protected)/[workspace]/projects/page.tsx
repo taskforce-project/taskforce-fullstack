@@ -56,6 +56,7 @@ import { useProjectStore } from "@/lib/store/project-store"
 import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { getProjectsHealthHistory, getWorkspaceProjectsActivity } from "@/lib/api/project-service"
 import type { Project } from "@/lib/api/project-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 /** Activité par projet : `projectId` → nombre d'issues créées par jour (série continue). */
 type ActivityMap = ReadonlyMap<number, readonly number[]>
@@ -88,12 +89,12 @@ function deriveHealth(project: Project): HealthLevel {
 function deriveVelocity(project: Project): number | null {
   if (project.totalIssues === 0) return null
   const completedIssues = project.totalIssues - project.openIssues
-  const ageWeeks = Math.max(1, (Date.now() - new Date(project.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 7))
+  const ageWeeks = Math.max(1, (Date.now() - parseServerDate(project.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 7))
   const rate = completedIssues / ageWeeks
   const target = (project.totalIssues / 10) * 2
   if (target === 0) return null
   const pct = Math.round(((rate - target) / target) * 100)
-  const daysSinceUpdate = (Date.now() - new Date(project.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+  const daysSinceUpdate = (Date.now() - parseServerDate(project.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
   if (daysSinceUpdate > 7 && pct > 0) return 0
   return Math.max(-99, Math.min(99, pct))
 }
@@ -102,7 +103,7 @@ function deriveRiskSignal(project: Project): string | null {
   const health = deriveHealth(project)
   if (health === "healthy" || health === "paused") return null
   const ratio = project.totalIssues > 0 ? project.openIssues / project.totalIssues : 0
-  const daysSinceUpdate = (Date.now() - new Date(project.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+  const daysSinceUpdate = (Date.now() - parseServerDate(project.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
   if (ratio > 0.85) return `${Math.round(ratio * 100)}% of issues still open`
   if (daysSinceUpdate > 14) return `No updates in ${Math.round(daysSinceUpdate)} days`
   if (daysSinceUpdate > 7) return "No updates in 7+ days"
@@ -563,7 +564,7 @@ export default function ProjectsPage() {
     const healthOrder: Record<HealthLevel, number> = { critical: 0, "at-risk": 1, healthy: 2, paused: 3 }
     const comparators: Record<SortKey, (a: Project, b: Project) => number> = {
       health: (a, b) => healthOrder[deriveHealth(a)] - healthOrder[deriveHealth(b)],
-      recent: (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      recent: (a, b) => parseServerDate(b.updatedAt).getTime() - parseServerDate(a.updatedAt).getTime(),
       name: (a, b) => a.name.localeCompare(b.name),
       progress: (a, b) => progressPct(b) - progressPct(a),
       open: (a, b) => b.openIssues - a.openIssues,
