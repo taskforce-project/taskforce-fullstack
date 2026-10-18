@@ -53,7 +53,7 @@ describe('workspace-service', () => {
 
   describe('createWorkspace', () => {
     it('POST le payload de création', async () => {
-      const payload = { name: 'Acme', brainTemplate: 'SAAS' };
+      const payload = { name: 'Acme', activity: 'We build a CRM' };
       const created = { id: 1, slug: SLUG, name: 'Acme' } as any;
       vi.mocked(apiClient.post).mockResolvedValue(envelope(created));
 

@@ -18,7 +18,6 @@ import com.taskforce.tf_api.core.dto.request.UpdateMemberRoleRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateWorkspaceRequest;
 import com.taskforce.tf_api.core.dto.response.WorkspaceMemberResponse;
 import com.taskforce.tf_api.core.dto.response.WorkspaceResponse;
-import com.taskforce.tf_api.core.enums.BrainTemplateType;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.dto.response.AuditLogResponse;
@@ -86,8 +85,8 @@ public class WorkspaceService {
 
         workspaceMemberRepository.save(ownerMember);
 
-        // Brain OS vierge (16 domaines) amorcé automatiquement à l'inscription.
-        brainSeedingService.seedBrain(workspace, BrainTemplateType.BLANK, owner.getEmail());
+        // Brain OS amorcé automatiquement à l'inscription.
+        brainSeedingService.seedBrain(workspace, owner.getEmail());
 
         return workspace;
     }
@@ -162,8 +161,8 @@ public class WorkspaceService {
             .build();
         workspaceMemberRepository.save(ownerMember);
 
-        // Amorçage du Brain OS selon le gabarit choisi (BLANK par défaut).
-        brainSeedingService.seedBrain(workspace, parseBrainTemplate(request.getBrainTemplate()), owner.getEmail());
+        // Amorçage du Brain OS (containment : Brain OS > espace > projets > notes).
+        brainSeedingService.seedBrain(workspace, owner.getEmail());
 
         // Contexte metier renseigne des la creation -> fiche de contexte dans le Brain OS (apres commit).
         if (hasText(request.getActivity())) {
@@ -175,19 +174,6 @@ public class WorkspaceService {
 
     private static boolean hasText(String s) {
         return s != null && !s.isBlank();
-    }
-
-    /** Parse le gabarit de brain demandé ; tolère null/invalide → BLANK. */
-    private BrainTemplateType parseBrainTemplate(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return BrainTemplateType.BLANK;
-        }
-        try {
-            return BrainTemplateType.valueOf(raw.trim().toUpperCase());
-        } catch (IllegalArgumentException ex) {
-            log.warn("Gabarit de brain inconnu '{}', repli sur BLANK", raw);
-            return BrainTemplateType.BLANK;
-        }
     }
 
     /**

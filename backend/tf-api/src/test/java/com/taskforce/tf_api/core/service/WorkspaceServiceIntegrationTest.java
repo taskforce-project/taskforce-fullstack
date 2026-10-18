@@ -77,8 +77,8 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
     class CreateAtRegistration {
 
         @Test
-        @DisplayName("utilise le prénom Keycloak comme base du nom et amorce un brain BLANK")
-        void should_build_name_from_first_name_and_seed_blank() {
+        @DisplayName("utilise le prénom Keycloak comme base du nom et amorce le brain")
+        void should_build_name_from_first_name_and_seed_brain() {
             Workspace ws = workspaceService.createWorkspace(owner, "Alice");
 
             assertThat(ws.getId()).isNotNull();
@@ -89,8 +89,7 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
                 .findByWorkspaceIdAndUserId(ws.getId(), owner.getId()).orElseThrow();
             assertThat(member.getRole()).isEqualTo(WorkspaceRole.OWNER);
 
-            verify(brainSeedingService).seedBrain(any(Workspace.class),
-                eq(com.taskforce.tf_api.core.enums.BrainTemplateType.BLANK), eq(owner.getEmail()));
+            verify(brainSeedingService).seedBrain(any(Workspace.class), eq(owner.getEmail()));
         }
 
         @Test
@@ -144,7 +143,7 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
                 .findByWorkspaceIdAndUserId(persisted.getId(), owner.getId()).orElseThrow();
             assertThat(member.getRole()).isEqualTo(WorkspaceRole.OWNER);
 
-            verify(brainSeedingService).seedBrain(any(Workspace.class), any(), eq(owner.getEmail()));
+            verify(brainSeedingService).seedBrain(any(Workspace.class), eq(owner.getEmail()));
         }
 
         @Test
@@ -159,27 +158,11 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
-        @DisplayName("gabarit de brain valide (saas, insensible à la casse) est transmis au seeding")
-        void should_parse_valid_brain_template() {
-            CreateWorkspaceRequest r = req("Templated");
-            r.setBrainTemplate("saas");
+        @DisplayName("un nouveau workspace amorce son brain")
+        void should_seed_brain_for_new_workspace() {
+            workspaceService.createNewWorkspace(owner.getId(), req("Seeded"));
 
-            workspaceService.createNewWorkspace(owner.getId(), r);
-
-            verify(brainSeedingService).seedBrain(any(Workspace.class),
-                eq(com.taskforce.tf_api.core.enums.BrainTemplateType.SAAS), eq(owner.getEmail()));
-        }
-
-        @Test
-        @DisplayName("gabarit de brain inconnu retombe sur BLANK")
-        void should_fallback_brain_template_when_unknown() {
-            CreateWorkspaceRequest r = req("Bad Template");
-            r.setBrainTemplate("does-not-exist");
-
-            workspaceService.createNewWorkspace(owner.getId(), r);
-
-            verify(brainSeedingService).seedBrain(any(Workspace.class),
-                eq(com.taskforce.tf_api.core.enums.BrainTemplateType.BLANK), eq(owner.getEmail()));
+            verify(brainSeedingService).seedBrain(any(Workspace.class), eq(owner.getEmail()));
         }
     }
 

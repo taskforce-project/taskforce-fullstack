@@ -582,13 +582,6 @@ export const CONSTANTS_EN = {
     workspaceActivity: "What does your company / team do?",
     workspaceActivityPlaceholder: "e.g. We build a CRM for independent craftspeople",
     workspaceActivityHint: "One sentence. It feeds your Brain OS so the AI understands your context.",
-    brainTemplate: "Brain OS - starter template",
-    templateBlank: "Blank (16 domains)",
-    templateSaas: "SaaS (expert)",
-    templateEcommerce: "E-commerce (expert)",
-    templateMarketplace: "Marketplace (expert)",
-    templateAgentic: "Agentic product (expert)",
-    templateHint: "Pre-fills the knowledge memory (ADRs, SOPs, decisions…) based on your activity.",
     creating: "Creating…",
   },
 } as const

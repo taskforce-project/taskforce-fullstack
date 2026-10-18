@@ -91,13 +91,11 @@ class AiControllersWebMvcTest {
     }
 
     @Test
-    @DisplayName("GET brain overview / nodes → 200")
+    @DisplayName("GET brain overview → 200")
     void knowledge_gets_200() throws Exception {
         when(knowledgeService.getOverview(anyString(), anyLong())).thenReturn(null);
-        when(knowledgeService.listNodes(anyString(), anyLong(), any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/workspaces/acme/brain").with(auth())).andExpect(status().isOk());
-        mockMvc.perform(get("/api/workspaces/acme/brain/nodes").with(auth())).andExpect(status().isOk());
     }
 
     @Test

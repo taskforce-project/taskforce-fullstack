@@ -324,9 +324,6 @@ public class BrainIngestionService {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("cycleId", facts.cycleId());
         metadata.put("projectIdentifier", facts.projectIdentifier());
-        // Appartenance projet (liste = une note peut être transverse à plusieurs projets ; ici le
-        // cycle n'en a qu'un). Le graphe s'en sert pour dessiner les régions — cf. BrainGraph.
-        metadata.put("projects", List.of(cycle.getProject().getId()));
         metadata.put("generatedBy", "ingestion-auto");
         metadata.put("mode", synthesis != null ? "generated" : "facts-only");
         metadata.put("closed", closed);
@@ -371,8 +368,7 @@ public class BrainIngestionService {
      * Fiche de contexte d'un projet dans le Brain OS, ecrite a sa creation. Contrairement a la retro
      * de cycle, <b>aucun appel LLM</b> : le contexte est la description ecrite par l'equipe, on ne
      * paraphrase pas un texte deja fourni (gratuit, instantane). Upsert idempotent (un node par
-     * projet, {@code refType=PROJECT}) ; le node <b>ancre la region du projet</b> dans le graphe via
-     * {@code metadata.projects} (cf. BrainGraph / regions par projet).
+     * projet, {@code refType=PROJECT}).
      */
     @Transactional
     public void writeProjectNode(String slug, Long workspaceId, Long userId, Long projectId) {
@@ -393,9 +389,6 @@ public class BrainIngestionService {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("projectId", project.getId());
         metadata.put("projectIdentifier", project.getIdentifier());
-        // Appartenance projet (liste : une note peut etre transverse a plusieurs projets ; ici un seul).
-        // C'est ce champ qui ancre la region du projet dans le graphe (cf. BrainGraph).
-        metadata.put("projects", List.of(project.getId()));
         metadata.put("generatedBy", "ingestion-auto");
         metadata.put("mode", "facts-only");
 
@@ -449,10 +442,10 @@ public class BrainIngestionService {
                 .domain(note.domain())
                 .title(title)
                 .content("# " + title + "\n\n" + note.body())
-                .refId(project.getId()) // meme galaxie que le projet dans le graphe (refId), sans refType
+                .refId(project.getId()) // rattachée au projet (refId), sans refType
                 .parentNodeId(projectNodeId)
                 .tags(List.of("projet", "ingestion-auto"))
-                .metadata(Map.of("generatedBy", "ingestion-auto", "projects", List.of(project.getId())))
+                .metadata(Map.of("generatedBy", "ingestion-auto"))
                 .build());
         }
     }
@@ -460,8 +453,7 @@ public class BrainIngestionService {
     /**
      * Fiche de contexte metier de l'espace de travail (« que fait l'entreprise / equipe ? »), ecrite a
      * l'onboarding / a la creation. Aucun LLM (c'est le texte de l'equipe). Upsert idempotent
-     * ({@code refType=WORKSPACE}). Node <b>transverse</b> (pas de {@code metadata.projects}) : il se pose
-     * dans la « Base commune » au centre du graphe. Rien a ecrire si l'activite est vide.
+     * ({@code refType=WORKSPACE}). Rien a ecrire si l'activite est vide.
      */
     @Transactional
     public void writeWorkspaceNode(String slug, Long workspaceId, Long userId) {

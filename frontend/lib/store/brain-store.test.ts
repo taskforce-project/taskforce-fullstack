@@ -10,15 +10,13 @@ vi.mock('../api/brain-service', () => ({
   updateNode: vi.fn(),
   deleteNode: vi.fn(),
   searchBrain: vi.fn(),
-  createEdge: vi.fn(),
-  deleteEdge: vi.fn(),
 }));
 
 const node = (id: number, title = `N${id}`): KnowledgeNode =>
   ({ id, uuid: `u${id}`, type: 'NOTE', domain: 'Produit', domainCode: 'PRD', title, content: null, contentUrl: null, status: 'ACTIVE', versionLabel: 'v1', refType: null, refId: null }) as KnowledgeNode;
 
 const overview = (nodes: KnowledgeNode[]): BrainOverview =>
-  ({ brainId: 1, workspaceId: 1, templateType: null, versionLabel: 'v1', totalNodes: nodes.length, nodesByDomain: {}, nodes, edges: [] }) as BrainOverview;
+  ({ brainId: 1, workspaceId: 1, versionLabel: 'v1', totalNodes: nodes.length, nodesByDomain: {}, nodes, edges: [] }) as BrainOverview;
 
 const reset = () =>
   act(() => {
@@ -172,29 +170,5 @@ describe('brain-store', () => {
     expect(useBrainStore.getState().searchQuery).toBe('');
     expect(useBrainStore.getState().searchResults).toBeNull();
     expect(useBrainStore.getState().searching).toBe(false);
-  });
-
-  it('linkNodes crée l’arête puis recharge le graphe', async () => {
-    vi.mocked(svc.createEdge).mockResolvedValue(undefined as never);
-    vi.mocked(svc.getBrainOverview).mockResolvedValue(overview([node(1), node(2)]));
-
-    await act(async () => {
-      await useBrainStore.getState().linkNodes('ws', 1, 2, 'RELATES_TO');
-    });
-
-    expect(svc.createEdge).toHaveBeenCalledWith('ws', 1, 2, 'RELATES_TO');
-    expect(svc.getBrainOverview).toHaveBeenCalledWith('ws');
-  });
-
-  it('unlink supprime l’arête puis recharge le graphe', async () => {
-    vi.mocked(svc.deleteEdge).mockResolvedValue(undefined);
-    vi.mocked(svc.getBrainOverview).mockResolvedValue(overview([]));
-
-    await act(async () => {
-      await useBrainStore.getState().unlink('ws', 5);
-    });
-
-    expect(svc.deleteEdge).toHaveBeenCalledWith('ws', 5);
-    expect(svc.getBrainOverview).toHaveBeenCalledWith('ws');
   });
 });

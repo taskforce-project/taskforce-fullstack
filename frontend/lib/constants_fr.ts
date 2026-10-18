@@ -583,13 +583,6 @@ export const CONSTANTS_FR: TranslationKeys = {
     workspaceActivity: "Que fait ton entreprise / équipe ?",
     workspaceActivityPlaceholder: "ex. On construit un CRM pour les artisans",
     workspaceActivityHint: "Une phrase. Elle nourrit ton Brain OS pour que l'IA comprenne ton contexte.",
-    brainTemplate: "Brain OS - gabarit de départ",
-    templateBlank: "Vierge (16 domaines)",
-    templateSaas: "SaaS (expert)",
-    templateEcommerce: "E-commerce (expert)",
-    templateMarketplace: "Marketplace (expert)",
-    templateAgentic: "Produit agentique (expert)",
-    templateHint: "Pré-remplit la mémoire de connaissance (ADR, SOP, décisions…) selon ton activité.",
     creating: "Création…",
   },
 } as const

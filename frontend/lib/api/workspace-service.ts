@@ -52,8 +52,6 @@ export interface CreateWorkspacePayload {
   description?: string;
   /** Contexte metier (« que fait l'entreprise / equipe ? ») - alimente le Brain OS. */
   activity?: string;
-  /** Gabarit d'amorçage du Brain OS : BLANK | SAAS | ECOMMERCE | MARKETPLACE | AGENTIC. */
-  brainTemplate?: string;
 }
 
 export interface InviteMemberPayload {
