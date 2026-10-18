@@ -152,15 +152,15 @@ navigation:
           - page: Intégrations
             path: ./pages/integrations.md
             slug: integrations
-      - section: Compte & offres
+      - section: Compte
         skip-slug: true
         contents:
           - page: Profil & sécurité
             path: ./pages/profil-et-securite.md
             slug: profil-et-securite
-          - page: Offres, facturation & IA
-            path: ./pages/offres-et-ia.md
-            slug: offres-et-ia
+          - page: IA et consommation
+            path: ./pages/ia-et-consommation.md
+            slug: ia-et-consommation
   - tab: api
     layout:
       - section: Guide développeur

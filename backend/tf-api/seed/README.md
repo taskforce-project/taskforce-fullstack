@@ -16,12 +16,9 @@
 - **3 cycles** WEB (terminé / **actif** pour le burndown / brouillon) + issues du sprint actif.
 - **Notifications** (inbox admin) : assigned/mention/commented/dueSoon/overdue/statusChanged/overload, mix lu/non-lu.
 - **Favoris projet**, **pages** (doc projet), **invitations en attente** (email sans compte).
-- **Abonnement PRO** (admin) + **historique** Stripe → page Billing peuplée *sans Stripe réel*.
-- **Demandes Enterprise** (sales).
 - **3 équipes** + association projets · **historique d'assignations** (score Smart Assign).
 
 > ⚠️ Requiert les migrations **V41→V48** appliquées (rebuild backend récent).
-> Le flux Stripe *réel* (checkout depuis la landing / portail) nécessite tes **vraies clés Stripe** (config `.env`) — le seed ne couvre que l'affichage de l'abonnement.
 
 ## Lancer
 

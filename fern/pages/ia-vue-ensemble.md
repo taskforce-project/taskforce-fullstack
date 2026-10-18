@@ -32,12 +32,12 @@ un traitement, ou lire vos données.
 
 ## Ce que ça consomme
 
-L'IA est **incluse dans toutes les offres** — elle n'est pas réservée à un forfait supérieur. Son
-usage se mesure en **tokens** : chaque sollicitation de Cortex consomme une part de votre enveloppe.
-Vous suivez cette consommation dans l'application (carte **Usage Cortex** du Dashboard, indicateur
-dans le panneau IA), et les **offres supérieures relèvent le plafond** pour passer à l'échelle.
+L'IA est **incluse pour tout le monde**, sans forfait à débloquer. Son usage se mesure en **tokens** :
+chaque sollicitation de Cortex en consomme. Vous suivez cette consommation dans l'application (carte
+**Usage Cortex** du Dashboard, indicateur dans le panneau IA). Par défaut il n'y a pas de plafond ; une
+instance adossée à une API payante peut en fixer un.
 
-→ [Offres, facturation & IA](/guides/offres-et-ia)
+→ [IA et consommation](/guides/ia-et-consommation)
 
 <Tip>
   Certaines aides sont **offertes** et n'entament pas votre enveloppe — par exemple la **suggestion de

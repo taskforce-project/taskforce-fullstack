@@ -184,19 +184,16 @@ services:
       # (DELIVERY_LOCAL_RUNNER_ENABLED=true) : valeur durable, reprise à chaque rebuild, sans override hors dépôt.
       DELIVERY_LOCAL_RUNNER_ENABLED: ${DELIVERY_LOCAL_RUNNER_ENABLED:-false}
 
-      # Paiement — le conteneur ne reçoit QUE les variables listées ici (--env-file ne sert qu'à
-      # l'interpolation compose). Les price-ids et la clé publique DOIVENT donc être plumbés
-      # explicitement, sinon StripeService.getPriceIdForPlan lit "" → checkout KO (cf. QA-47/billing).
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
-      STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY}
-      STRIPE_PRICE_ID_BASIC: ${STRIPE_PRICE_ID_BASIC}
-      STRIPE_PRICE_ID_BUSINESS: ${STRIPE_PRICE_ID_BUSINESS}
-      STRIPE_PRICE_ID_BASIC_YEARLY: ${STRIPE_PRICE_ID_BASIC_YEARLY}
-      STRIPE_PRICE_ID_BUSINESS_YEARLY: ${STRIPE_PRICE_ID_BUSINESS_YEARLY}
+      # Plafonds IA (0 = désactivé, défaut). Le conteneur ne reçoit QUE les variables listées ici
+      # (--env-file ne sert qu'à l'interpolation compose) : une instance adossée à une API payante
+      # (Groq...) les règle dans .env.prod.
+      AI_MONTHLY_TOKENS_PER_ACCOUNT: ${AI_MONTHLY_TOKENS_PER_ACCOUNT:-0}
+      AI_RATE_GLOBAL_TPM: ${AI_RATE_GLOBAL_TPM:-0}
+      AI_RATE_ACCOUNT_TPM: ${AI_RATE_ACCOUNT_TPM:-0}
+      AI_RATE_ACCOUNT_RPM: ${AI_RATE_ACCOUNT_RPM:-0}
 
       # Integration OAuth GitHub (Connect GitHub a un workspace : ingestion Brain + delegation Copilot).
-      # Meme regle que Stripe : plumbe explicitement, sinon integrations.github.client-id lit "" -> 404.
+      # Meme regle : plumbe explicitement, sinon integrations.github.client-id lit "" -> 404.
       # Defaut vide (`:`) pour ne pas crasher le boot si non renseigne.
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}

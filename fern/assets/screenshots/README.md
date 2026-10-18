@@ -77,7 +77,6 @@ Chaque capture illustre une page de la doc Fern. **Convention** : place le fichi
 | id | Page | Où / quoi capturer |
 | --- | --- | --- |
 | `parametres-profil` | Profil & sécurité | le panneau Paramètres (navigation latérale + section Profil) |
-| `facturation` | Offres, facturation & IA | Paramètres → Facturation (forfait courant + mise à niveau) |
 
 ---
 
