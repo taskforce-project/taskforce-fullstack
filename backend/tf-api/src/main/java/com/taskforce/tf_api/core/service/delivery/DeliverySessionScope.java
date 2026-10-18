@@ -14,7 +14,9 @@ import java.util.Set;
  *   <li>en <b>lecture</b>, une liste fermée de sous-arbres utiles au travail (projets, Brain OS, mes
  *       issues, analytics) ;</li>
  *   <li>en <b>écriture</b>, les issues du projet du run et rien d'autre ;</li>
- *   <li><b>jamais de suppression</b> : la décision destructive reste humaine (spec D6).</li>
+ *   <li><b>jamais de suppression</b> : la décision destructive reste humaine (spec D6) ;</li>
+ *   <li>le serveur MCP de l'instance ({@code mcp}), où chaque outil est rejugé ici sur son équivalent REST
+ *       ({@code McpServerService}).</li>
  * </ul>
  *
  * <p>Liste <b>d'autorisation</b>, pas d'interdiction : tout chemin absent est refusé, y compris les futurs
@@ -28,6 +30,9 @@ public final class DeliverySessionScope {
 
     /** Lectures portées par un POST (recherche sémantique : le corps est une requête, rien n'est écrit). */
     private static final Set<String> READ_ONLY_POSTS = Set.of("brain/search");
+
+    /** Serveur MCP de l'instance (OSS-5.2) : POST pour les messages, GET pour le refus du flux SSE (405). */
+    private static final String MCP = "mcp";
 
     private static final Set<String> READ_METHODS = Set.of("GET", "HEAD");
     private static final Set<String> WRITE_METHODS = Set.of("POST", "PATCH", "PUT");
@@ -57,6 +62,9 @@ public final class DeliverySessionScope {
         String rest = path.substring(base.length());
         String verb = method.toUpperCase();
 
+        if (MCP.equals(rest)) {
+            return "POST".equals(verb) || "GET".equals(verb);
+        }
         if (READ_METHODS.contains(verb)) {
             return READ_PREFIXES.stream().anyMatch(prefix -> isUnder(rest, prefix));
         }

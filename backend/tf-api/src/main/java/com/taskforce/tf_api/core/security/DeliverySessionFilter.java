@@ -57,6 +57,12 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
     /** En-tête qui désigne le run dont la requête emprunte la session. */
     public static final String RUN_HEADER = "X-TaskForce-Delivery-Run";
 
+    /** Claims du principal délégué : run, runner, et la portée (workspace, projet) que le serveur MCP rejuge. */
+    public static final String RUN_CLAIM = "tf_delivery_run";
+    public static final String RUNNER_CLAIM = "tf_delivery_runner";
+    public static final String WORKSPACE_CLAIM = "tf_delivery_workspace";
+    public static final String PROJECT_CLAIM = "tf_delivery_project";
+
     /** Endpoints machine du runner : authentifiés par son identité propre, sans délégation. */
     public static final String RUNNER_API_PREFIX = "/api/delivery/runner/";
 
@@ -116,8 +122,10 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
             .header("alg", "none")
             .claim("email", session.ownerEmail())
             .claim("preferred_username", session.ownerEmail())
-            .claim("tf_delivery_run", session.runId())
-            .claim("tf_delivery_runner", session.runnerClientId());
+            .claim(RUN_CLAIM, session.runId())
+            .claim(RUNNER_CLAIM, session.runnerClientId())
+            .claim(WORKSPACE_CLAIM, session.workspaceSlug())
+            .claim(PROJECT_CLAIM, session.projectId());
         if (machine.getIssuedAt() != null) {
             builder.issuedAt(machine.getIssuedAt());
         }
