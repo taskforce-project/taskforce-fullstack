@@ -15,7 +15,7 @@ import { useEffect } from "react"
 /**
  * Intro de connexion - langage « produit premium » (ElevenLabs / Linear), pas un loader.
  *
- * Principe : la **matière** (le dégradé Labs) est déjà là au repos autour du logo, puis **s'étale**
+ * Principe : la **matière** (l'aplat bleu de la marque) est déjà là au repos autour du logo, puis **s'étale**
  * jusqu'à recouvrir l'écran, et l'app - montée <b>dessous</b> - est révélée par un cut propre. Pas
  * d'écran isolé, pas de coupure blanche : `matière → expansion → recouvrement → app`.
  *
@@ -23,9 +23,9 @@ import { useEffect } from "react"
  * - Le contour **ne scale pas** : on anime le **rayon d'un masque radial** (`mask-image`), donc le
  *   volume *s'étale* au lieu qu'une image soit agrandie.
  * - Le **bord** est rendu organique par un filtre SVG `feTurbulence` + `feDisplacementMap` posé sur le
- *   wrapper : il déforme le bord du masque ET la texture de quelques pixels.
- * - La **texture a son propre mouvement** : la turbulence est animée en boucle lente (SMIL),
- *   indépendamment de l'expansion - les vagues glissent, elles ne sont pas « étirées ».
+ *   wrapper : il déforme le bord du masque de quelques pixels.
+ * - Le **bord a son propre mouvement** : la turbulence est animée en boucle lente (SMIL),
+ *   indépendamment de l'expansion - le contour ondule, il n'est pas « étiré ».
  * - **Expansion continue** : une seule course en **courbe S** (ease-in-out ~10/80/10) - démarrage
  *   doux, rush au milieu, décélération en fin (« plongée dans l'eau ») ; le volume dépasse les 4 bords.
  * - Le **logo est absorbé** : baisse d'opacité + léger flou (pas de fade brutal, pas de scale).
@@ -149,16 +149,12 @@ export function LoginIntro({
           </defs>
         </svg>
 
-        {/* Le volume : le dégradé Labs, dont le displacement rend le bord organique, révélé par le
-            masque radial qui grandit. `multiply` sur fond clair pour la profondeur d'encre ; `screen`
-            en dark pour qu'il rayonne au lieu de s'éteindre. */}
+        {/* Le volume : l'aplat bleu de la marque, dont le displacement rend le bord organique, révélé
+            par le masque radial qui grandit. */}
         <div className="pointer-events-none absolute inset-0" style={{ filter: "url(#tf-liquid)" }}>
           <m.div
-            className="absolute inset-0 mix-blend-multiply dark:mix-blend-screen"
+            className="absolute inset-0 bg-primary"
             style={{
-              backgroundImage: "url('/assets/tour/labs-wave.jpg')",
-              backgroundSize: "cover",
-              backgroundPosition: "center",
               WebkitMaskImage: maskImage,
               maskImage,
             }}
@@ -173,7 +169,7 @@ export function LoginIntro({
             width={240}
             height={160}
             priority
-            className="h-[14vmin] max-h-[130px] w-auto dark:invert"
+            className="h-[14vmin] max-h-[130px] w-auto invert"
           />
         </m.div>
       </m.div>

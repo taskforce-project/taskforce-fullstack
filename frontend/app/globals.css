@@ -579,8 +579,8 @@ textarea:not([disabled]) { cursor: text; }
      AUTH - ecran scinde, sans défilement
      ─────────────────────────────────────────────────────────────────────────
      Parti pris (revu) : ecran scinde facon SaaS. A GAUCHE un panneau de marque
-     (fond sombre, grain recree en interne via feTurbulence, capture reelle de
-     l'app) ; a DROITE le formulaire, sur fond de theme. Le panneau gauche cede
+     (papier doux, filet, capture reelle de l'app) ; a DROITE le formulaire, sur
+     fond de theme. Le panneau gauche cede
      la place sous 1024px (le formulaire prend toute la largeur). Hauteur
      verrouillée à 100svh (`svh` et non `vh` : sur mobile la barre d'URL
      rétractable fausse `vh` et réintroduit un défilement).
@@ -606,53 +606,20 @@ textarea:not([disabled]) { cursor: text; }
     overflow: hidden;
   }
 
-  /* ── Panneau de marque (gauche) : masqué sous 1024px. Fond = la vague du Lab (couleurs de marque),
-     floutee, + un striped noise par-dessus. Texte sombre (le fond est clair). ── */
+  /* ── Panneau de marque (gauche) : masqué sous 1024px. Papier doux et filet à droite, comme les
+     surfaces secondaires de la direction artistique ; suit le thème. ── */
   .auth-aside {
     position: relative;
     display: none;
     overflow: hidden;
-    isolation: isolate;
-    color: #1d1d1f;
-    background: #f2eef1;          /* repli proche de la vague avant chargement de l'image */
+    color: var(--foreground);
+    background: var(--paper-soft);
+    border-right: 1px solid var(--border);
   }
   @media (min-width: 1024px) { .auth-aside { display: flex; } }
 
-  /* La vague du Lab en fond, floutee (« le lab en fond, un blur au dessus »). Deborde pour masquer
-     les bords flous ; scale pour remplir apres le blur. */
-  .auth-aside::before {
-    content: "";
-    position: absolute;
-    inset: -60px;
-    z-index: 0;
-    background: url("/assets/tour/labs-wave.jpg") center / cover no-repeat;
-    filter: blur(46px) saturate(1.18);
-    transform: scale(1.18);
-  }
-  /* Voile clair (haut -> bas) : garde le titre lisible sans repasser au bleu nuit. */
-  .auth-aside::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    background: linear-gradient(180deg, rgba(248, 246, 248, 0.78) 0%, rgba(248, 246, 248, 0.34) 42%, rgba(248, 246, 248, 0) 100%);
-  }
-
-  /* Noise seul (grain feTurbulence desature), en multiply par-dessus la vague. Pas de rayures. */
-  .auth-aside-noise {
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    pointer-events: none;
-    opacity: 0.55;
-    mix-blend-mode: multiply;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-size: 150px 150px;
-  }
-
   .auth-aside-content {
     position: relative;
-    z-index: 3;
     display: flex;
     flex-direction: column;
     width: 100%;
@@ -664,16 +631,16 @@ textarea:not([disabled]) { cursor: text; }
   .auth-aside-copy { max-width: 30rem; }
   .auth-aside-title {
     font-size: clamp(1.7rem, 2.4vw, 2.3rem);
-    font-weight: 650;
+    font-weight: 550;
     line-height: 1.14;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.035em;
     text-wrap: balance;
   }
   .auth-aside-subtitle {
     margin-top: 0.9rem;
     font-size: 1rem;
     line-height: 1.55;
-    color: rgba(29, 29, 31, 0.66);
+    color: var(--muted-foreground);
   }
   /* La capture flotte en bas et deborde le bord bas (clippee par le panneau) : fenetre d'app posee. */
   .auth-aside-shot { margin-top: auto; display: flex; justify-content: center; }
@@ -681,10 +648,9 @@ textarea:not([disabled]) { cursor: text; }
     width: 100%;
     max-width: 46rem;
     height: auto;
-    border: 1px solid rgba(0, 0, 0, 0.10);
+    border: 1px solid var(--border);
     border-bottom: none;
-    border-radius: 12px 12px 0 0;
-    box-shadow: 0 -14px 46px rgba(24, 20, 40, 0.20);
+    box-shadow: var(--shadow-window);
     transform: translateY(6px);
   }
 
@@ -763,7 +729,7 @@ textarea:not([disabled]) { cursor: text; }
     border: 1px solid var(--border);
     background: var(--card);
     font-size: 0.8125rem;
-    font-weight: 500;
+    font-weight: 450;
     color: var(--label-primary);
     white-space: nowrap;
     transition: background 140ms ease, border-color 140ms ease;
@@ -814,8 +780,8 @@ textarea:not([disabled]) { cursor: text; }
   /* ── Titres ── */
   .auth-title {
     font-size: 1.375rem;
-    font-weight: 600;
-    letter-spacing: -0.02em;
+    font-weight: 550;
+    letter-spacing: -0.025em;
     line-height: 1.2;
     color: var(--label-primary);
   }
@@ -830,7 +796,7 @@ textarea:not([disabled]) { cursor: text; }
   .auth-label {
     display: block;
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 450;
     color: var(--label-secondary);
     margin-bottom: 0.25rem;
   }
@@ -871,13 +837,13 @@ textarea:not([disabled]) { cursor: text; }
     width: 100%;
     height: 2.375rem;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 450;
   }
 
   /* ── Liens ── */
   .auth-link {
     color: var(--label-secondary);
-    font-weight: 500;
+    font-weight: 450;
     transition: color 140ms ease;
   }
   .auth-link:hover { color: var(--label-primary); }
