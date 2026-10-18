@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { CopyableCode } from "@/components/settings/copyable-code"
+import { EventPicker } from "@/components/settings/event-picker"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -18,7 +19,7 @@ import { cn } from "@/lib/utils"
 import { getErrorMessage, getErrorStatus } from "@/lib/api/client"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { parseServerDate } from "@/lib/utils/server-date"
-import { WEBHOOK_EVENTS, type Webhook, type WebhookDelivery } from "@/lib/api/integration-service"
+import type { Webhook, WebhookDelivery } from "@/lib/api/integration-service"
 
 function ago(date: string): string {
   return formatDistanceToNow(parseServerDate(date), { addSuffix: true })
@@ -29,34 +30,6 @@ function lastDelivery(w: Webhook): string {
   if (!w.lastFiredAt) return "No delivery yet"
   const result = w.lastStatus == null ? "no response" : `HTTP ${w.lastStatus}`
   return `Last delivery: ${result}, ${ago(w.lastFiredAt)}`
-}
-
-/** Puces d'événements : aucune sélection = tous les événements. */
-function EventPicker({ value, onChange }: Readonly<{ value: string[]; onChange: (next: string[]) => void }>) {
-  function toggle(event: string) {
-    onChange(value.includes(event) ? value.filter((e) => e !== event) : [...value, event])
-  }
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {WEBHOOK_EVENTS.map((event) => (
-        <button
-          key={event}
-          type="button"
-          onClick={() => toggle(event)}
-          aria-pressed={value.includes(event)}
-          className={cn(
-            "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
-            value.includes(event)
-              ? "border-primary/50 bg-primary/10 text-primary"
-              : "border-border text-muted-foreground hover:border-primary/30",
-          )}
-        >
-          {event}
-        </button>
-      ))}
-      <span className="text-[11px] text-muted-foreground">{value.length === 0 ? "All events" : ""}</span>
-    </div>
-  )
 }
 
 /** Secret de signature montré une seule fois, après création ou renouvellement. */

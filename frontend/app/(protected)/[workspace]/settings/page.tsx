@@ -28,6 +28,7 @@ import { useIntegrationStore } from "@/lib/store/integration-store"
 import { getGitHubRepos, getGitHubRepoIssues, syncGitHub, syncSlack, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { IntegrationsCatalog } from "@/components/integrations/integrations-catalog"
 import { WebhooksPanel } from "@/components/settings/webhooks-panel"
+import { EventPicker } from "@/components/settings/event-picker"
 import { AgentsPanel } from "@/components/settings/agents-panel"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { ProfileOverview } from "@/components/profile/profile-overview"
@@ -1264,6 +1265,7 @@ function IntegrationsPanel() {
   // Slack channel form
   const [channelId,   setChannelId]   = useState("")
   const [channelName, setChannelName] = useState("")
+  const [channelEvents, setChannelEvents] = useState<string[]>(["issue.created"])
   const [addingChannel, setAddingChannel] = useState(false)
   const [syncingChannel, setSyncingChannel] = useState<string | null>(null)
 
@@ -1301,7 +1303,7 @@ function IntegrationsPanel() {
     if (!channelId.trim() || !channelName.trim()) return
     setAddingChannel(true)
     try {
-      await addSlackChannel(slug, { channelId: channelId.trim(), channelName: channelName.trim(), eventTypes: ["issue.created"] })
+      await addSlackChannel(slug, { channelId: channelId.trim(), channelName: channelName.trim(), eventTypes: channelEvents })
       setChannelId("")
       setChannelName("")
       toast.success("Slack channel added")
@@ -1390,7 +1392,7 @@ function IntegrationsPanel() {
                 <div key={ch.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
                   <div>
                     <p className="text-sm font-medium text-foreground">#{ch.channelName}</p>
-                    <p className="text-xs text-muted-foreground">{ch.eventTypes.join(", ")}</p>
+                    <p className="text-xs text-muted-foreground">{ch.eventTypes.length === 0 ? "All events" : ch.eventTypes.join(", ")}</p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <Button
@@ -1434,6 +1436,7 @@ function IntegrationsPanel() {
                   {addingChannel ? "Adding…" : "Add"}
                 </Button>
               </div>
+              <EventPicker value={channelEvents} onChange={setChannelEvents} />
             </div>
           </div>
         </SectionCard>
