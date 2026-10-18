@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
@@ -30,10 +31,14 @@ public class ClaudeCodeProvider implements DeliveryAgentProvider {
 
     private final LocalRunnerSettings settings;
     private final DeliveryRunRepository runRepository;
+    /** Absent quand le runner local est désactivé (bean conditionnel). */
+    private final ObjectProvider<RunnerProvisioningService> provisioning;
 
-    public ClaudeCodeProvider(LocalRunnerSettings settings, DeliveryRunRepository runRepository) {
+    public ClaudeCodeProvider(LocalRunnerSettings settings, DeliveryRunRepository runRepository,
+                              ObjectProvider<RunnerProvisioningService> provisioning) {
         this.settings = settings;
         this.runRepository = runRepository;
+        this.provisioning = provisioning;
     }
 
     @Override public String key()          { return KEY; }
@@ -44,6 +49,19 @@ public class ClaudeCodeProvider implements DeliveryAgentProvider {
     @Override public boolean pullBased()   { return true; }
     @Override public Duration claimTimeout() { return settings.claimTimeout(); }
     @Override public List<String> models() { return List.of("claude-opus-5", "claude-sonnet-5"); }
+
+    /** Prêt quand la personne qui délègue a créé son runner local : c'est lui qui prendra la tâche. */
+    @Override
+    public String unavailableReason(DeliveryContext context) {
+        if (!settings.enabled()) {
+            return "Claude Code isn't enabled on this instance. An administrator turns it on with DELIVERY_LOCAL_RUNNER_ENABLED=true.";
+        }
+        RunnerProvisioningService service = provisioning.getIfAvailable();
+        if (service != null && context.userId() != null && !service.hasRunner(context.userId())) {
+            return "Set up your local runner first (Settings > Agents), then start it on your machine.";
+        }
+        return null;
+    }
 
     @Override
     public DeliveryPoll poll(String externalRef, Long workspaceId) {

@@ -30,6 +30,16 @@ public interface DeliveryAgentProvider {
     List<String> models();
 
     /**
+     * Ce qui manque pour que ce provider prenne une tâche déléguée dans ce contexte (OSS-5.7), dans la langue de
+     * l'interface, ou {@code null} s'il est prêt. Un agent qui n'est pas prêt n'est ni proposé par Smart Assign ni
+     * accepté à la délégation : la personne apprend tout de suite quoi faire, au lieu d'attendre un run qui
+     * n'aboutira pas. Défaut : prêt dès qu'il est disponible sur l'instance.
+     */
+    default String unavailableReason(DeliveryContext context) {
+        return available() ? null : displayName() + " isn't enabled on this instance.";
+    }
+
+    /**
      * {@code true} pour un provider <b>« pull »</b> : l'exécution a lieu sur une machine que le backend ne
      * peut pas joindre (runner local, ADR-013). Le run n'est alors pas dispatché : il reste {@code QUEUED}
      * jusqu'à ce qu'un runner le réclame, puis le runner poste lui-même le résultat.

@@ -47,4 +47,38 @@ class RunnerProvisioningServiceTest {
             .containsEntry("id.token.claim", "false")
             .containsEntry("userinfo.token.claim", "false");
     }
+
+    // ── présence d'un runner (lot 5, OSS-5.7) ───────────────────────────────
+
+    private static RunnerProvisioningService service(org.keycloak.admin.client.Keycloak keycloak) {
+        return new RunnerProvisioningService(keycloak,
+            new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15), "taskforce");
+    }
+
+    @Test
+    void laPresenceDUnRunnerEstLueUneFoisParMinute() {
+        org.keycloak.admin.client.Keycloak keycloak = org.mockito.Mockito.mock(org.keycloak.admin.client.Keycloak.class,
+            org.mockito.Mockito.RETURNS_DEEP_STUBS);
+        org.mockito.Mockito.when(keycloak.realm("taskforce").clients().findByClientId("tf-runner-u7"))
+            .thenReturn(java.util.List.of(new ClientRepresentation()));
+        org.mockito.Mockito.when(keycloak.realm("taskforce").clients().findByClientId("tf-runner-u8"))
+            .thenReturn(java.util.List.of());
+        RunnerProvisioningService service = service(keycloak);
+
+        assertThat(service.hasRunner(7L)).isTrue();
+        assertThat(service.hasRunner(7L)).isTrue();
+        assertThat(service.hasRunner(8L)).isFalse();
+
+        org.mockito.Mockito.verify(keycloak.realm("taskforce").clients(), org.mockito.Mockito.times(1)).findByClientId("tf-runner-u7");
+    }
+
+    @Test
+    void keycloakInjoignableNeBloquePasUneDelegation() {
+        org.keycloak.admin.client.Keycloak keycloak = org.mockito.Mockito.mock(org.keycloak.admin.client.Keycloak.class,
+            org.mockito.Mockito.RETURNS_DEEP_STUBS);
+        org.mockito.Mockito.when(keycloak.realm("taskforce").clients().findByClientId("tf-runner-u7"))
+            .thenThrow(new jakarta.ws.rs.ProcessingException("connection refused"));
+
+        assertThat(service(keycloak).hasRunner(7L)).isTrue();
+    }
 }

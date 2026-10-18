@@ -7,6 +7,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.taskforce.tf_api.core.dto.response.DeliveryProviderResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.DeliveryRun;
@@ -16,6 +17,7 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
+import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
@@ -44,6 +46,7 @@ public class DeliveryService {
     private final DeliveryAgentProviderRegistry registry;
     private final ProjectVisibilityGuard visibilityGuard;
     private final BrainAccessGuard access;
+    private final ProjectRepository projectRepository;
 
     /**
      * Crée un run de délégation (QUEUED) pour une issue vers un provider disponible. Écriture sur
@@ -60,6 +63,11 @@ public class DeliveryService {
         }
         if (!provider.available()) {
             throw new BusinessException("This provider isn't available yet: " + providerKey);
+        }
+        Project project = issue.getProject();
+        String notReady = provider.unavailableReason(new DeliveryContext(userId, project.getWorkspace(), project));
+        if (notReady != null) {
+            throw new BusinessException(notReady);
         }
 
         String resolvedModel = (model != null && !model.isBlank())
@@ -128,6 +136,24 @@ public class DeliveryService {
             r.getStartedBy() != null ? r.getStartedBy().getId() : null,
             r.getCreatedAt(),
             r.getUpdatedAt());
+    }
+
+    /**
+     * Agents de la délégation pour cette personne : chacun avec ce qui lui manque dans ce workspace et, si
+     * {@code projectId} est donné, pour ce projet (OSS-5.7).
+     */
+    @Transactional(readOnly = true)
+    public List<DeliveryProviderResponse> listProviders(String slug, Long projectId, Long userId) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        Project project = projectId == null ? null : projectRepository.findById(projectId)
+            .filter(p -> p.getWorkspace() != null && ws.getId().equals(p.getWorkspace().getId()))
+            .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+        DeliveryContext context = new DeliveryContext(userId, ws, project);
+        return registry.all().stream().map(p -> {
+            String reason = p.unavailableReason(context);
+            return new DeliveryProviderResponse(p.key(), p.displayName(), p.logoKey(), p.available(), p.models(),
+                reason == null, reason);
+        }).toList();
     }
 
     /** Charge une issue en la scopant au workspace du chemin (cross-tenant -> 404, pas 403). */

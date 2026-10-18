@@ -22,7 +22,6 @@ import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.delivery.DeliveryActivityService;
-import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProviderRegistry;
 import com.taskforce.tf_api.core.service.delivery.DeliveryRunner;
 import com.taskforce.tf_api.core.service.delivery.DeliveryService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
@@ -46,22 +45,23 @@ public class DeliveryController {
     private static final String RUNNING = DeliveryRunStatus.RUNNING.name();
     private static final String QUEUED  = DeliveryRunStatus.QUEUED.name();
 
-    private final DeliveryAgentProviderRegistry registry;
     private final DeliveryService deliveryService;
     private final DeliveryRunner deliveryRunner;
     private final DeliveryActivityService activityService;
     private final UserRepository userRepository;
 
-    /** GET /api/workspaces/{slug}/delivery/providers — providers disponibles pour la délégation. */
+    /**
+     * GET /api/workspaces/{slug}/delivery/providers?projectId= : agents de la délégation, chacun prêt ou non pour la
+     * personne connectée (et pour ce projet si {@code projectId} est donné), avec ce qui manque.
+     */
     @GetMapping("/providers")
     public ResponseEntity<ApiResponse<List<DeliveryProviderResponse>>> listProviders(
-        @PathVariable String slug
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @RequestParam(name = "projectId", required = false) Long projectId
     ) {
-        List<DeliveryProviderResponse> providers = registry.all().stream()
-            .map(p -> new DeliveryProviderResponse(
-                p.key(), p.displayName(), p.logoKey(), p.available(), p.models()))
-            .toList();
-        return ResponseEntity.ok(ApiResponse.success("Providers retrieved", providers));
+        return ResponseEntity.ok(ApiResponse.success("Providers retrieved",
+            deliveryService.listProviders(slug, projectId, resolveUserId(jwt))));
     }
 
     /**
