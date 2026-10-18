@@ -11,21 +11,26 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.taskforce.tf_api.core.dto.response.DeliveryRunActivityResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.delivery.DeliveryActivityService;
 import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProvider;
 import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProviderRegistry;
 import com.taskforce.tf_api.core.service.delivery.DeliveryRunner;
 import com.taskforce.tf_api.core.service.delivery.DeliveryService;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -53,6 +58,7 @@ class DeliveryControllerWebMvcTest {
     @MockitoBean private DeliveryAgentProviderRegistry registry;
     @MockitoBean private DeliveryService deliveryService;
     @MockitoBean private DeliveryRunner deliveryRunner;
+    @MockitoBean private DeliveryActivityService activityService;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;             // WorkspaceAccessInterceptor
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository; // WorkspaceAccessInterceptor
@@ -163,5 +169,42 @@ class DeliveryControllerWebMvcTest {
 
         verify(deliveryRunner, never()).refresh(anyLong());
         verify(deliveryService, times(1)).listRuns(anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("GET /runs/{id}/activity : chronologie après N et demandes du run")
+    void activity_200() throws Exception {
+        var a = auth();
+        when(activityService.activity("acme", 100L, 3, 7L)).thenReturn(new DeliveryRunActivityResponse(
+            List.of(new DeliveryRunActivityResponse.Event(4, "tool", "Bash", "npm test", null)),
+            List.of(new DeliveryRunActivityResponse.Approval(9L, "Bash", "npm install lodash", "PENDING", null, null, null, null, true))));
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/runs/100/activity").param("after", "3").with(a))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.events[0].seq").value(4))
+            .andExpect(jsonPath("$.data.approvals[0].canDecide").value(true));
+    }
+
+    @ParameterizedTest(name = "POST approval : {0} -> autorisé={1}")
+    @CsvSource({"ALLOW, true", "DENY, false"})
+    void decide_200(String decision, boolean allow) throws Exception {
+        var a = auth();
+
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/approvals/9").with(a)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"decision\":\"" + decision + "\"}"))
+            .andExpect(status().isOk());
+
+        verify(activityService).decide("acme", 100L, 9L, allow, 7L);
+    }
+
+    @Test
+    @DisplayName("POST approval : décision inconnue refusée (400)")
+    void decide_rejects_unknown_decision() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/approvals/9")
+                .with(jwt().jwt(b -> b.claim("email", EMAIL)))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"decision\":\"MAYBE\"}"))
+            .andExpect(status().isBadRequest());
+
+        verify(activityService, never()).decide(any(), any(), any(), anyBoolean(), any());
     }
 }

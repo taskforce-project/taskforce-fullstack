@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.taskforce.tf_api.core.config.DeliverySessionFilterConfig;
+import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerClaimResponse;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
@@ -37,6 +38,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -149,5 +151,59 @@ class DeliveryRunnerControllerWebMvcTest {
         mockMvc.perform(post("/api/workspaces/acme/projects/12/issues").with(runner())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"x\"}"))
             .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("POST /events : la chronologie du run est transmise au service")
+    void events_are_saved() throws Exception {
+        mockMvc.perform(post("/api/delivery/runner/runs/100/events").with(runner())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"events\":[{\"kind\":\"tool\",\"tool\":\"Bash\",\"text\":\"npm test\"}]}"))
+            .andExpect(status().isOk());
+
+        verify(localRunnerService).appendEvents(eq(100L), any(RunnerIdentity.class), any());
+    }
+
+    @ParameterizedTest(name = "POST /events : corps invalide refusé (400) : {0}")
+    @ValueSource(strings = {
+        "{\"events\":[]}",
+        "{\"events\":[{\"kind\":\"shell\",\"text\":\"x\"}]}",
+        "{\"events\":[{\"kind\":\"text\"}]}",
+    })
+    void events_reject_invalid_body(String body) throws Exception {
+        mockMvc.perform(post("/api/delivery/runner/runs/100/events").with(runner())
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isBadRequest());
+
+        verify(localRunnerService, never()).appendEvents(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("validations : le runner ouvre une demande puis lit la décision")
+    void approvals_round_trip() throws Exception {
+        LocalDateTime expires = LocalDateTime.now().plusMinutes(10);
+        when(localRunnerService.requestApproval(eq(100L), any(RunnerIdentity.class), any()))
+            .thenReturn(new RunnerApprovalResponse(9L, "PENDING", expires));
+        when(localRunnerService.approvalStatus(eq(100L), eq(9L), any(RunnerIdentity.class)))
+            .thenReturn(new RunnerApprovalResponse(9L, "ALLOWED", expires));
+
+        mockMvc.perform(post("/api/delivery/runner/runs/100/approvals").with(runner())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"tool\":\"Bash\",\"summary\":\"npm install lodash\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.approvalId").value(9))
+            .andExpect(jsonPath("$.data.status").value("PENDING"));
+        mockMvc.perform(get("/api/delivery/runner/runs/100/approvals/9").with(runner()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("ALLOWED"));
+    }
+
+    @Test
+    @DisplayName("validations : un utilisateur ne peut pas jouer le runner (403)")
+    void approvals_refuse_a_user_token() throws Exception {
+        mockMvc.perform(post("/api/delivery/runner/runs/100/approvals").with(user())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"tool\":\"Bash\",\"summary\":\"x\"}"))
+            .andExpect(status().isForbidden());
+
+        verify(localRunnerService, never()).requestApproval(any(), any(), any());
     }
 }

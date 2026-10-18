@@ -4,13 +4,17 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.taskforce.tf_api.core.dto.request.RunnerApprovalRequest;
+import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
+import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerClaimResponse;
 import com.taskforce.tf_api.core.service.delivery.LocalRunnerService;
 import com.taskforce.tf_api.core.service.delivery.LocalRunnerSettings;
@@ -61,5 +65,38 @@ public class DeliveryRunnerController {
     ) {
         localRunnerService.complete(runId, identityResolver.resolve(jwt), request);
         return ResponseEntity.ok(ApiResponse.success("Result saved", null));
+    }
+
+    /** POST /api/delivery/runner/runs/{runId}/events : suite de la chronologie en direct du run (OSS-5.3). */
+    @PostMapping("/runs/{runId}/events")
+    public ResponseEntity<ApiResponse<Void>> events(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long runId,
+        @Valid @RequestBody RunnerEventsRequest request
+    ) {
+        localRunnerService.appendEvents(runId, identityResolver.resolve(jwt), request);
+        return ResponseEntity.ok(ApiResponse.success("Events saved", null));
+    }
+
+    /** POST /api/delivery/runner/runs/{runId}/approvals : l'agent demande une action hors de son socle (OSS-5.4). */
+    @PostMapping("/runs/{runId}/approvals")
+    public ResponseEntity<ApiResponse<RunnerApprovalResponse>> requestApproval(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long runId,
+        @Valid @RequestBody RunnerApprovalRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("Approval requested",
+            localRunnerService.requestApproval(runId, identityResolver.resolve(jwt), request)));
+    }
+
+    /** GET /api/delivery/runner/runs/{runId}/approvals/{approvalId} : décision, lue jusqu'à ce qu'elle tombe. */
+    @GetMapping("/runs/{runId}/approvals/{approvalId}")
+    public ResponseEntity<ApiResponse<RunnerApprovalResponse>> approvalStatus(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long runId,
+        @PathVariable Long approvalId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("Approval status",
+            localRunnerService.approvalStatus(runId, approvalId, identityResolver.resolve(jwt))));
     }
 }
