@@ -1795,7 +1795,8 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
  * Route `/settings` - la page standalone a été RETIRÉE (redondante avec le modal Settings, monté
  * globalement dans `app-shell` et ouvrable depuis n'importe quel CTA via `useSettingsStore`). Cette
  * route se contente désormais d'OUVRIR le modal par-dessus le dashboard, en préservant le deep-link
- * `?section=` et le retour OAuth GitHub/Slack (toast + ouverture directe sur « Integrations »).
+ * `?section=` et le retour OAuth GitHub, Slack et serveurs MCP (toast + ouverture directe sur
+ * « Integrations »). Le toast se fait ici : l'URL est remplacée avant que le catalogue ne la lise.
  * Les briques (`SECTIONS`, `SettingsNav`, `SettingsPanels`, panneaux) restent exportées ci-dessus
  * et sont réutilisées par le modal.
  */
@@ -1810,9 +1811,12 @@ export default function SettingsPage() {
     const section = searchParams.get("section")
     const github = searchParams.get("github")
     const slack = searchParams.get("slack")
+    const mcp = searchParams.get("mcp")
     if (github === "connected") toast.success("GitHub connected successfully!")
     if (slack === "connected") toast.success("Slack connected successfully!")
-    const target = github || slack
+    if (mcp === "connected") toast.success("MCP server connected")
+    if (mcp === "error") toast.error("The MCP server connection failed. Try again, or connect it with a token.")
+    const target = github || slack || mcp
       ? "integrations"
       : section && SECTIONS.some((s) => s.key === section)
         ? section
