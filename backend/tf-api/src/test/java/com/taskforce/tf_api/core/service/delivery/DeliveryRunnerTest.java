@@ -25,6 +25,7 @@ import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.IssueStatusRepository;
+import com.taskforce.tf_api.core.service.NotificationService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -35,6 +36,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -50,6 +52,7 @@ class DeliveryRunnerTest {
     @Mock private DeliveryAgentProviderRegistry registry;
     @Mock private IssueStatusRepository issueStatusRepository;
     @Mock private IssueRepository issueRepository;
+    @Mock private NotificationService notificationService;
 
     @InjectMocks private DeliveryRunner runner;
 
@@ -174,11 +177,14 @@ class DeliveryRunnerTest {
         assertThat(run.getSummary()).isEqualTo("PR opened");
         assertThat(run.getResultUrl()).isEqualTo("https://github.com/o/r/pull/1");
         verify(issueRepository).save(issue);
+        // La personne qui a délégué est prévenue (OSS-5.5), une seule fois.
+        verify(notificationService).notifyAgentRunFinished(issue, null, "The agent", true, "PR opened");
 
         // Second résultat sur un run terminé : ignoré (le premier fait foi).
         runner.complete(31L, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "late failure"));
         assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.DONE);
         assertThat(run.getError()).isNull();
+        verifyNoMoreInteractions(notificationService);
     }
 
     /** (libellé, provider « pull » ?, délai de réclamation en min, âge du run en min, lignes closes par l'UPDATE, clos ?) */

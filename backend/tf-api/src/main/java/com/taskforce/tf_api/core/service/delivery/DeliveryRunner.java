@@ -17,6 +17,7 @@ import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.IssueStatusRepository;
+import com.taskforce.tf_api.core.service.NotificationService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,13 +40,15 @@ public class DeliveryRunner {
 
     private static final String STATUS_IN_REVIEW = "In review by AI";
     private static final String STATUS_BLOCKED   = "Blocked";
-    private static final String COLOR_IN_REVIEW  = "#8b5cf6"; // violet
-    private static final String COLOR_BLOCKED     = "#ef4444"; // rouge
+    // Palette de la direction artistique (V93) : rose pour la revue d'un agent, rouge pour le blocage.
+    private static final String COLOR_IN_REVIEW  = "#f99bc3";
+    private static final String COLOR_BLOCKED     = "#e14322";
 
     private final DeliveryRunRepository runRepository;
     private final DeliveryAgentProviderRegistry registry;
     private final IssueStatusRepository issueStatusRepository;
     private final IssueRepository issueRepository;
+    private final NotificationService notificationService;
 
     @Async
     @Transactional
@@ -155,8 +158,10 @@ public class DeliveryRunner {
             return false; // réclamé entre-temps : le runner a gagné
         }
         // La mise à jour vide le contexte de persistance : on relit le run avant de déplacer son issue.
-        runRepository.findById(runId)
-            .ifPresent(expired -> moveIssueTo(expired, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED));
+        runRepository.findById(runId).ifPresent(expired -> {
+            moveIssueTo(expired, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
+            notifyFinished(expired);
+        });
         log.info("Delivery run {} clos : aucun runner ne l'a réclamé en {} min", runId, timeout.toMinutes());
         return true;
     }
@@ -192,11 +197,13 @@ public class DeliveryRunner {
                 run.setSummary(poll.summary());
                 run.setResultUrl(poll.resultUrl());
                 moveIssueTo(run, STATUS_IN_REVIEW, IssueStatusCategory.STARTED, COLOR_IN_REVIEW);
+                notifyFinished(run);
             }
             case FAILED -> {
                 run.setStatus(DeliveryRunStatus.FAILED);
                 run.setError(poll.error());
                 moveIssueTo(run, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
+                notifyFinished(run);
             }
             default -> run.setStatus(DeliveryRunStatus.RUNNING); // encore en cours (poll ultérieur)
         }
@@ -207,6 +214,23 @@ public class DeliveryRunner {
         run.setError(error);
         moveIssueTo(run, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
         runRepository.save(run);
+        notifyFinished(run);
+    }
+
+    /**
+     * Prévient la personne qui a délégué que son run est terminé ou en échec (OSS-5.5), avec le résumé ou l'erreur.
+     * Best-effort : une notification manquée ne doit pas défaire la clôture du run.
+     */
+    private void notifyFinished(DeliveryRun run) {
+        try {
+            DeliveryAgentProvider provider = registry.get(run.getProviderKey());
+            String agent = provider != null ? provider.displayName() : "The agent";
+            boolean done = run.getStatus() == DeliveryRunStatus.DONE;
+            notificationService.notifyAgentRunFinished(run.getIssue(), run.getStartedBy(), agent, done,
+                done ? run.getSummary() : run.getError());
+        } catch (Exception e) {
+            log.warn("Delivery run {} : notification de fin non envoyée : {}", run.getId(), e.getMessage());
+        }
     }
 
     /**

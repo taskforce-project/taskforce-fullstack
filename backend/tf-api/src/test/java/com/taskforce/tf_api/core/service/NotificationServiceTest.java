@@ -343,4 +343,45 @@ class NotificationServiceTest {
                 anyString(), anyString(), anyString(), anyString(), any(), anyString(), anyString());
         }
     }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("agent de code (lot 5)")
+    class AgentNotifications {
+
+        @org.junit.jupiter.params.ParameterizedTest(name = "{0}")
+        @org.junit.jupiter.params.provider.CsvSource(delimiter = '|', value = {
+            "approval | agentApproval | warning | Fix bug: Claude Code asks to run Bash",
+            "done     | agentDone     | info    | Fix bug: Claude Code finished, ready for your review",
+            "failed   | agentFailed   | warning | Fix bug: Claude Code failed",
+        })
+        void notifies_the_delegator(String which, String type, String urgency, String title) {
+            User delegator = user(40L, "ada");
+            when(notificationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            switch (which) {
+                case "approval" -> service.notifyAgentApproval(issue(null, null), delegator, "Bash", "npm install lodash");
+                case "done" -> service.notifyAgentRunFinished(issue(null, null), delegator, "Claude Code", true, "PR opened");
+                default -> service.notifyAgentRunFinished(issue(null, null), delegator, "Claude Code", false, "Tests failed");
+            }
+
+            org.mockito.ArgumentCaptor<Notification> saved = org.mockito.ArgumentCaptor.forClass(Notification.class);
+            verify(notificationRepository).save(saved.capture());
+            assertThat(saved.getValue().getType()).isEqualTo(type);
+            assertThat(saved.getValue().getUrgency()).isEqualTo(urgency);
+            assertThat(saved.getValue().getTitle()).isEqualTo(title).doesNotContain("\u2014");
+            assertThat(saved.getValue().getRecipient()).isEqualTo(delegator);
+            assertThat(saved.getValue().getIssueUrl()).isEqualTo("/acme/projects/5/issues/9");
+            verify(messagingTemplate).convertAndSend(eq("/topic/notifications.40"), any(Object.class));
+        }
+
+        @Test
+        @DisplayName("sans personne à prévenir (compte supprimé) : rien")
+        void skips_without_delegator() {
+            service.notifyAgentApproval(issue(null, null), null, "Bash", "x");
+            service.notifyAgentRunFinished(issue(null, null), null, "Claude Code", true, "x");
+
+            verify(notificationRepository, never()).save(any());
+        }
+    }
 }
