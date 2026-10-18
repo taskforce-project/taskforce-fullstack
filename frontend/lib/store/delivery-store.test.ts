@@ -25,13 +25,13 @@ function makeRun(overrides: Partial<DeliveryRun> = {}): DeliveryRun {
 }
 
 const PROVIDERS: DeliveryProvider[] = [
-  { key: 'claude-code', displayName: 'Claude Code', logoKey: 'anthropic', available: true, models: ['claude-sonnet-5'] },
+  { key: 'claude-code', displayName: 'Claude Code', logoKey: 'anthropic', available: true, models: ['claude-sonnet-5'], ready: true, reason: null },
 ];
 
 describe('delivery-store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    act(() => useDeliveryStore.setState({ providers: [], providersLoading: false, runs: {}, workspaceRuns: [], runner: null, activity: {} }));
+    act(() => useDeliveryStore.setState({ providers: [], projectProviders: {}, providersLoading: false, runs: {}, workspaceRuns: [], runner: null, activity: {} }));
   });
 
   it('fetchProviders loads the providers', async () => {
@@ -180,5 +180,25 @@ describe('delivery-store', () => {
     let ok = true;
     await act(async () => { ok = await useDeliveryStore.getState().decideApproval('acme', 100, 9, false); });
     expect(ok).toBe(false);
+  });
+
+  // ---- agents par projet (lot 5) ----
+
+  it('fetchProjectProviders keeps the list of each project apart', async () => {
+    const notReady = [{ ...PROVIDERS[0]!, ready: false, reason: 'Set up your local runner first' }];
+    vi.mocked(svc.getDeliveryProviders).mockResolvedValueOnce(PROVIDERS).mockResolvedValueOnce(notReady);
+    await act(async () => { await useDeliveryStore.getState().fetchProjectProviders('acme', 12); });
+    await act(async () => { await useDeliveryStore.getState().fetchProjectProviders('acme', 13); });
+    expect(svc.getDeliveryProviders).toHaveBeenNthCalledWith(1, 'acme', 12);
+    expect(useDeliveryStore.getState().projectProviders[12]?.[0]?.ready).toBe(true);
+    expect(useDeliveryStore.getState().projectProviders[13]?.[0]?.reason).toBe('Set up your local runner first');
+    expect(useDeliveryStore.getState().providers).toEqual([]);
+  });
+
+  it('fetchProjectProviders returns [] on failure', async () => {
+    vi.mocked(svc.getDeliveryProviders).mockRejectedValue(new Error('x'));
+    let res = PROVIDERS;
+    await act(async () => { res = await useDeliveryStore.getState().fetchProjectProviders('acme', 12); });
+    expect(res).toEqual([]);
   });
 });

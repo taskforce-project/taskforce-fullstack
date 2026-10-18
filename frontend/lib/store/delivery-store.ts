@@ -21,8 +21,10 @@ import {
 // ---------------------------------------------------------------------------
 
 interface DeliveryState {
-  /** Providers délégables du workspace (chargés à la demande). */
+  /** Agents de la délégation pour le workspace (chargés à la demande). */
   providers: DeliveryProvider[];
+  /** Agents par projet : prêts ou non selon le projet (dépôt lié pour Copilot). */
+  projectProviders: Record<number, DeliveryProvider[]>;
   providersLoading: boolean;
   /** Dernier run par issueId (`null` = chargé mais aucune délégation). */
   runs: Record<number, DeliveryRun | null>;
@@ -34,6 +36,7 @@ interface DeliveryState {
   activity: Record<number, DeliveryRunActivity>;
 
   fetchProviders: (slug: string) => Promise<DeliveryProvider[]>;
+  fetchProjectProviders: (slug: string, projectId: number) => Promise<DeliveryProvider[]>;
   fetchRun: (slug: string, issueId: number) => Promise<DeliveryRun | null>;
   fetchWorkspaceRuns: (slug: string) => Promise<DeliveryRun[]>;
   delegate: (slug: string, issueId: number, providerKey: string, model?: string) => Promise<DeliveryRun | null>;
@@ -48,6 +51,7 @@ interface DeliveryState {
 
 export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   providers: [],
+  projectProviders: {},
   providersLoading: false,
   runs: {},
   workspaceRuns: [],
@@ -62,6 +66,16 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
       return providers;
     } catch {
       set({ providersLoading: false });
+      return [];
+    }
+  },
+
+  fetchProjectProviders: async (slug, projectId) => {
+    try {
+      const providers = await getDeliveryProviders(slug, projectId);
+      set((state) => ({ projectProviders: { ...state.projectProviders, [projectId]: providers } }));
+      return providers;
+    } catch {
       return [];
     }
   },

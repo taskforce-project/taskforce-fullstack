@@ -33,7 +33,8 @@ export const AUTH_ROUTES = {
  */
 export const DELIVERY_ROUTES = {
   /** Providers délégables (aujourd'hui Claude Code) pour le picker. */
-  PROVIDERS: (slug: string) => `/api/workspaces/${slug}/delivery/providers`,
+  PROVIDERS: (slug: string, projectId?: number) =>
+    `/api/workspaces/${slug}/delivery/providers${projectId ? `?projectId=${projectId}` : ""}`,
   /** Délègue une issue à un agent (POST). */
   DELEGATE: (slug: string, issueId: number) => `/api/workspaces/${slug}/delivery/issues/${issueId}/delegate`,
   /** Dernier run de délégation d'une issue (GET). */

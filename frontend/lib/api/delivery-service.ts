@@ -6,18 +6,23 @@
 import { apiClient } from "./client";
 import { DELIVERY_ROUTES } from "../config/api-routes";
 
-/** Provider d'agent de livraison exposé au picker. `available=false` = affiché « à venir ». */
+/**
+ * Agent de la délégation. `available=false` = coupé sur l'instance ; `ready=false` = pas encore utilisable par la
+ * personne connectée (ou sur ce projet), `reason` dit quoi faire.
+ */
 export interface DeliveryProvider {
   key: string;
   displayName: string;
   logoKey: string;
   available: boolean;
   models: string[];
+  ready: boolean;
+  reason: string | null;
 }
 
-/** Liste les providers délégables du workspace (aujourd'hui Claude Code). */
-export async function getDeliveryProviders(slug: string): Promise<DeliveryProvider[]> {
-  const res = await apiClient.get<{ data: DeliveryProvider[] }>(DELIVERY_ROUTES.PROVIDERS(slug));
+/** Agents de la délégation pour la personne connectée, et pour ce projet si `projectId` est donné. */
+export async function getDeliveryProviders(slug: string, projectId?: number): Promise<DeliveryProvider[]> {
+  const res = await apiClient.get<{ data: DeliveryProvider[] }>(DELIVERY_ROUTES.PROVIDERS(slug, projectId));
   return res.data.data;
 }
 

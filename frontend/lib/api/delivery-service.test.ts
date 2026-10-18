@@ -116,4 +116,13 @@ describe('delivery-service', () => {
 
     expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DECIDE(SLUG, 100, 9), { decision });
   });
+
+  it('GET les agents pour un projet donné', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope([]));
+
+    await getDeliveryProviders(SLUG, 12);
+
+    expect(apiClient.get).toHaveBeenCalledWith('/api/workspaces/acme/delivery/providers?projectId=12');
+    expect(DELIVERY_ROUTES.PROVIDERS(SLUG)).toBe('/api/workspaces/acme/delivery/providers');
+  });
 });
