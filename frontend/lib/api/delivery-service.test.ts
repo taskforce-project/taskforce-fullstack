@@ -6,6 +6,8 @@ import {
   listWorkspaceRuns,
   getRunnerStatus,
   provisionRunner,
+  getRunActivity,
+  decideApproval,
 } from './delivery-service';
 import { apiClient } from './client';
 import { DELIVERY_ROUTES } from '../config/api-routes';
@@ -94,5 +96,24 @@ describe('delivery-service', () => {
 
     expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.RUNNER);
     expect(res).toEqual(creds);
+  });
+
+  it('GET l’activité d’un run après un événement, sans toast (lecture en boucle)', async () => {
+    const activity = { events: [{ seq: 3, kind: 'tool', tool: 'Bash', text: 'npm test', at: null }], approvals: [] };
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(activity));
+
+    const result = await getRunActivity(SLUG, 100, 2);
+
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.ACTIVITY(SLUG, 100, 2), { silentError: true });
+    expect(DELIVERY_ROUTES.ACTIVITY(SLUG, 100, 2)).toBe('/api/workspaces/acme/delivery/runs/100/activity?after=2');
+    expect(result).toEqual(activity);
+  });
+
+  it.each([[true, 'ALLOW'], [false, 'DENY']])('POST la décision (autorisé=%s -> %s)', async (allow, decision) => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
+
+    await decideApproval(SLUG, 100, 9, allow);
+
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DECIDE(SLUG, 100, 9), { decision });
   });
 });

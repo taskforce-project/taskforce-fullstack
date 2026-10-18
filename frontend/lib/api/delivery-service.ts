@@ -70,6 +70,46 @@ export async function listWorkspaceRuns(slug: string): Promise<DeliveryRun[]> {
   return res.data.data ?? [];
 }
 
+/** Un événement de la chronologie d'un run du runner local (lot 5). */
+export interface DeliveryRunEvent {
+  seq: number;
+  kind: "start" | "text" | "tool" | "error" | "denied";
+  tool: string | null;
+  text: string;
+  at: string | null;
+}
+
+export type DeliveryApprovalStatus = "PENDING" | "ALLOWED" | "DENIED" | "EXPIRED";
+
+/** Demande de validation d'une action de l'agent. `canDecide` : c'est à la personne connectée de répondre. */
+export interface DeliveryRunApproval {
+  id: number;
+  tool: string;
+  summary: string;
+  status: DeliveryApprovalStatus;
+  createdAt: string | null;
+  expiresAt: string | null;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  canDecide: boolean;
+}
+
+export interface DeliveryRunActivity {
+  events: DeliveryRunEvent[];
+  approvals: DeliveryRunApproval[];
+}
+
+/** Chronologie d'un run après l'événement `after`, et ses demandes. Lu en boucle pendant le run : jamais de toast. */
+export async function getRunActivity(slug: string, runId: number, after: number): Promise<DeliveryRunActivity> {
+  const res = await apiClient.get<{ data: DeliveryRunActivity }>(DELIVERY_ROUTES.ACTIVITY(slug, runId, after), { silentError: true });
+  return res.data.data;
+}
+
+/** Autorise ou refuse une action demandée par l'agent. */
+export async function decideApproval(slug: string, runId: number, approvalId: number, allow: boolean): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.DECIDE(slug, runId, approvalId), { decision: allow ? "ALLOW" : "DENY" });
+}
+
 /** Runner local de l'utilisateur (ADR-013), tel que le serveur le connaît. Ne contient jamais de secret. */
 export interface RunnerStatus {
   /** Une identité de runner est déjà provisionnée pour cet utilisateur. */

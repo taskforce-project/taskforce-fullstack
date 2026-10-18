@@ -40,11 +40,30 @@ export const DELIVERY_ROUTES = {
   RUN: (slug: string, issueId: number) => `/api/workspaces/${slug}/delivery/issues/${issueId}/run`,
   /** Runs de délégation du workspace (GET) - vue « workflow » (agents en parallèle). */
   RUNS: (slug: string) => `/api/workspaces/${slug}/delivery/runs`,
+  /** Chronologie en direct d'un run après l'événement `after`, et ses demandes de validation (GET, lot 5). */
+  ACTIVITY: (slug: string, runId: number, after: number) =>
+    `/api/workspaces/${slug}/delivery/runs/${runId}/activity?after=${after}`,
+  /** Autorise ou refuse une action de l'agent (POST, réservé à la personne qui a délégué). */
+  DECIDE: (slug: string, runId: number, approvalId: number) =>
+    `/api/workspaces/${slug}/delivery/runs/${runId}/approvals/${approvalId}`,
+  /** Serveur MCP de l'instance pour ce workspace (adresse à donner à Claude Code, pas appelée par le front). */
+  MCP_SERVER: (slug: string) => `/api/workspaces/${slug}/mcp`,
   /**
    * Runner local de l'utilisateur connecté (ADR-013) : GET = état, jamais de secret ; POST = provisionner ou
    * régénérer le secret. Sans slug : l'identité d'un runner est liée à la personne, pas au workspace.
    */
   RUNNER: "/api/delivery/runners",
+} as const;
+
+/**
+ * Jetons personnels de la personne connectée (lot 5) : ils ne servent qu'au serveur MCP de l'instance.
+ * Backend: @RequestMapping("/api/users/me/tokens")
+ */
+export const ACCESS_TOKEN_ROUTES = {
+  /** GET = liste (jamais de valeur), POST = création (la valeur n'est rendue qu'ici). */
+  TOKENS: "/api/users/me/tokens",
+  /** DELETE = révocation, effet immédiat. */
+  TOKEN: (tokenId: number) => `/api/users/me/tokens/${tokenId}`,
 } as const;
 
 /**

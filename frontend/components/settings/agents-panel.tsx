@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 
 import { BrandLogo } from "@/components/ui/brand-logo"
+import { ClaudeCodeMcpSetup } from "@/components/settings/claude-code-mcp-setup"
 import { LocalRunnerSetup } from "@/components/settings/local-runner-setup"
 import { Badge } from "@/components/ui/badge"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
@@ -49,6 +50,8 @@ export function AgentsPanel() {
 
               {/* Runner local : identité machine en libre-service (ADR-013) */}
               {p.key === "claude-code" && p.available && <LocalRunnerSetup />}
+              {/* Mode interactif : le Claude Code de la personne sur le serveur MCP de l'instance (lot 5) */}
+              {p.key === "claude-code" && slug && <ClaudeCodeMcpSetup slug={slug} />}
             </div>
           ))}
           {providers.length === 0 && (
