@@ -380,7 +380,7 @@ public class IssueService {
         slackService.notifyEvent(
             project.getWorkspace().getId(),
             "issue.created",
-            "🆕 New issue *" + project.getIdentifier() + "-" + issue.getSequenceNumber() + "* : " + issue.getTitle()
+            "🆕 New issue *" + project.getIdentifier() + "-" + issue.getSequenceNumber() + "*: " + issue.getTitle()
         );
 
         return created;
