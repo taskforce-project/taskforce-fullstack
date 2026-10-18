@@ -55,8 +55,7 @@ export const USER_ROUTES = {
   ME: "/api/users/me",
   AVATAR: "/api/users/me/avatar",
   DATA_REQUEST: "/api/users/me/data-request",
-  /** Sécurité (métier Keycloak) : reset mot de passe + 2FA. */
-  PASSWORD_RESET: "/api/users/me/password/reset",
+  /** Sécurité : 2FA TOTP gérée par l'app. */
   TWO_FACTOR: "/api/users/me/2fa",
   TWO_FACTOR_SETUP: "/api/users/me/2fa/setup",
   TWO_FACTOR_CONFIRM: "/api/users/me/2fa/confirm",

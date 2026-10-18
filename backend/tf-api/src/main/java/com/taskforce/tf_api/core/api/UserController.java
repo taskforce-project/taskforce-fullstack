@@ -104,14 +104,7 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("Avatar mis à jour", response));
     }
 
-    // ---- Sécurité : mot de passe + 2FA (UI TaskForce, métier Keycloak) --------------------------
-
-    /** Déclenche l'email « réinitialiser le mot de passe » (flux Keycloak). POST /api/users/me/password/reset */
-    @PostMapping("/me/password/reset")
-    public ResponseEntity<ApiResponse<Void>> requestPasswordReset(@AuthenticationPrincipal Jwt jwt) {
-        userService.requestPasswordReset(identityResolver.resolveEmail(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Email de réinitialisation envoyé", null));
-    }
+    // ---- Sécurité : 2FA (TOTP géré par l'app ; le mot de passe se réinitialise via /auth/forgot-password) ----
 
     /** Statut du 2FA (TOTP, géré par l'app). GET /api/users/me/2fa → { data: true|false } */
     @GetMapping("/me/2fa")

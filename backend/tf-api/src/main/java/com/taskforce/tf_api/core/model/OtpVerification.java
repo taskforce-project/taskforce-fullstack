@@ -30,7 +30,6 @@ import lombok.Setter;
  * Cette table stocke les codes OTP à 6 chiffres envoyés par email pour:
  * - Vérifier l'adresse email lors de l'inscription
  * - Réinitialiser le mot de passe
- * - Authentification à deux facteurs (2FA)
  */
 @Entity
 @Table(name = "otp_verification", indexes = {
@@ -72,7 +71,7 @@ public class OtpVerification {
     private String otpCode;
 
     /**
-     * Type d'OTP (EMAIL_VERIFICATION, PASSWORD_RESET, TWO_FACTOR_AUTH)
+     * Type d'OTP (EMAIL_VERIFICATION, PASSWORD_RESET)
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "otp_type", nullable = false, length = 30)

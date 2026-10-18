@@ -12,10 +12,5 @@ public enum OtpType {
     /**
      * Code OTP pour réinitialiser le mot de passe
      */
-    PASSWORD_RESET,
-
-    /**
-     * Code OTP pour l'authentification à deux facteurs (2FA)
-     */
-    TWO_FACTOR_AUTH
+    PASSWORD_RESET
 }

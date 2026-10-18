@@ -277,10 +277,8 @@ public class GlobalExceptionHandler {
 
     /**
      * Échec d'un appel au fournisseur d'identité (Keycloak) via son client JAX-RS — le seul client
-     * {@code jakarta.ws.rs} de l'app. Typiquement l'envoi d'un email d'action (reset mot de passe,
-     * configuration 2FA) via {@code executeActionsEmail} quand <b>le SMTP du realm Keycloak n'est pas
-     * configuré</b> (Keycloak renvoie alors un 500). Sans ce handler, cela remontait en <b>500 « erreur
-     * inattendue »</b> effrayant ; on renvoie un <b>502</b> clair et actionnable.
+     * {@code jakarta.ws.rs} de l'app (API d'administration : comptes, mots de passe, profils). Sans ce
+     * handler, cela remontait en <b>500 « erreur inattendue »</b> ; on renvoie un <b>502</b> clair.
      */
     @ExceptionHandler(WebApplicationException.class)
     public ResponseEntity<ErrorResponse> handleIdentityProviderError(
@@ -293,7 +291,7 @@ public class GlobalExceptionHandler {
         ErrorResponse error = ErrorResponse.of(
                 HttpStatus.BAD_GATEWAY.value(),
                 "Bad Gateway",
-                "Le service d'authentification n'a pas pu envoyer l'email (SMTP indisponible). Réessaie plus tard.",
+                "The identity service is unavailable. Please try again later.",
                 request.getRequestURI()
         );
 
