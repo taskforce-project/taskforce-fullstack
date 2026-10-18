@@ -342,11 +342,11 @@
 				<artifactId>thymeleaf-spring6</artifactId>
 				<version>3.1.5.RELEASE</version>
 			</dependency>
-			<!-- 1 CVE CRITICAL. -->
+			<!-- 1 CVE CRITICAL et 1 HIGH sur 1.84 (GHSA-9pwp-9qqc-pr26, GHSA-qp49-qgx5-5m26). -->
 			<dependency>
 				<groupId>org.bouncycastle</groupId>
 				<artifactId>bcprov-jdk18on</artifactId>
-				<version>1.84</version>
+				<version>1.85</version>
 			</dependency>
 			<!-- 1 CVE HIGH. -->
 			<dependency>
