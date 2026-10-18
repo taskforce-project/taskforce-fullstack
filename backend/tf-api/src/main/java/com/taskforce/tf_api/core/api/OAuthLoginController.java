@@ -70,11 +70,11 @@ public class OAuthLoginController {
         String p = provider == null ? "" : provider.toLowerCase();
         if (!FOURNISSEURS.contains(p)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Fournisseur non pris en charge : " + provider));
+                .body(ApiResponse.error("Unsupported provider: " + provider));
         }
 
         String authUrl = oauthLoginService.buildAuthorizationUrl(p, redirectUri);
-        return ResponseEntity.ok(ApiResponse.success("URL d'autorisation générée",
+        return ResponseEntity.ok(ApiResponse.success("Authorization URL generated",
             Map.of("authUrl", authUrl)));
     }
 
@@ -86,19 +86,19 @@ public class OAuthLoginController {
             // expiré) : détailler renseignerait un attaquant sur l'état de sa tentative.
             log.warn("Rappel de connexion externe refusé : état anti-CSRF invalide.");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Connexion expirée ou invalide. Merci de recommencer."));
+                .body(ApiResponse.error("The sign-in expired or is invalid. Please start again."));
         }
 
         Map<String, Object> jetons = oauthLoginService.exchangeCode(request.code(), request.redirectUri());
         if (jetons == null || jetons.get("access_token") == null) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Échec de la connexion externe. Merci de recommencer."));
+                .body(ApiResponse.error("External sign-in failed. Please start again."));
         }
 
         Map<String, Object> profil = oauthLoginService.fetchUserInfo(String.valueOf(jetons.get("access_token")));
         if (profil == null) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Profil illisible auprès du fournisseur d'identité."));
+                .body(ApiResponse.error("The identity provider returned an unreadable profile."));
         }
 
         try {
@@ -127,12 +127,12 @@ public class OAuthLoginController {
     private ResponseEntity<ApiResponse<AuthResponse>> withSession(AuthResponse reponse) {
         String refresh = reponse.getRefreshToken();
         if (refresh == null || refresh.isBlank()) {
-            return ResponseEntity.ok(ApiResponse.success("Connexion réussie", reponse));
+            return ResponseEntity.ok(ApiResponse.success("Signed in", reponse));
         }
         reponse.setRefreshToken(null);
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, refreshCookie.set(refresh).toString())
-            .body(ApiResponse.success("Connexion réussie", reponse));
+            .body(ApiResponse.success("Signed in", reponse));
     }
 
     /** Charge utile du rappel. `redirectUri` doit être identique à celle envoyée à l'autorisation. */

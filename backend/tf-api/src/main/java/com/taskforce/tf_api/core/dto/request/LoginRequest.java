@@ -17,11 +17,11 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class LoginRequest {
 
-    @NotBlank(message = "L'email est obligatoire")
-    @Email(message = "Format d'email invalide")
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
     private String email;
 
-    @NotBlank(message = "Le mot de passe est obligatoire")
+    @NotBlank(message = "The password is required")
     private String password;
 
     /** Code TOTP (2FA) — optionnel : n'est requis que si l'utilisateur a activé le 2FA. */

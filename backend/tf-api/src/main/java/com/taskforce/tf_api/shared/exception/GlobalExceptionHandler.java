@@ -227,7 +227,7 @@ public class GlobalExceptionHandler {
         ErrorResponse error = ErrorResponse.of(
                 HttpStatus.CONFLICT.value(),
                 "Conflict",
-                "Cette ressource existe déjà ou entre en conflit avec une autre.",
+                "This resource already exists or conflicts with another one.",
                 request.getRequestURI()
         );
 
@@ -248,7 +248,7 @@ public class GlobalExceptionHandler {
         ErrorResponse error = ErrorResponse.of(
                 HttpStatus.NOT_FOUND.value(),
                 "Not Found",
-                "Ressource introuvable.",
+                "Resource not found.",
                 request.getRequestURI()
         );
 

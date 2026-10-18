@@ -138,7 +138,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
 
         assertThatThrownBy(() -> userService.uploadAvatar("owner@it.dev", empty))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("vide");
+            .hasMessageContaining("empty");
     }
 
     @Test
@@ -173,7 +173,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
 
         assertThatThrownBy(() -> userService.uploadAvatar("owner@it.dev", file))
             .isInstanceOf(RuntimeException.class)
-            .hasMessageContaining("Échec de l'upload avatar");
+            .hasMessageContaining("Avatar upload failed");
     }
 
     // =========================================================================

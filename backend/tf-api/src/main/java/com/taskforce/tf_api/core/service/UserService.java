@@ -48,7 +48,7 @@ public class UserService {
     @Transactional
     public UserResponse completeOnboarding(String email, String jobTitle) {
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (jobTitle != null && !jobTitle.isBlank()) {
             user.setJobTitle(jobTitle.strip());
         }
@@ -66,7 +66,7 @@ public class UserService {
     @Transactional
     public UserResponse getByEmail(String email) {
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         UserRepresentation keycloakUser = keycloakService.getUserById(user.getKeycloakId());
 
@@ -98,7 +98,7 @@ public class UserService {
     @Transactional
     public UserResponse updateUserByEmail(String email, UpdateUserRequest request) {
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         // Patch partiel champs DB
         if (request.getDisplayName() != null) {
@@ -134,14 +134,14 @@ public class UserService {
     @Transactional
     public UserResponse uploadAvatar(String email, MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("Fichier avatar vide");
+            throw new IllegalArgumentException("The avatar file is empty");
         }
         if (file.getSize() > 3 * 1024 * 1024) {
             throw new IllegalArgumentException("Avatar trop volumineux — max 3 Mo");
         }
 
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         String objectKey = "avatars/" + user.getId() + "/avatar";
 
@@ -158,7 +158,7 @@ public class UserService {
                 minioService.upload(objectKey, new ByteArrayInputStream(original), original.length, file.getContentType());
             }
         } catch (Exception e) {
-            throw new RuntimeException("Échec de l'upload avatar : " + e.getMessage(), e);
+            throw new RuntimeException("Avatar upload failed: " + e.getMessage(), e);
         }
 
         String proxyUrl = "/api/files/avatars/" + user.getId();

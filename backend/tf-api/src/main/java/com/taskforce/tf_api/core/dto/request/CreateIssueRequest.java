@@ -12,8 +12,8 @@ import lombok.Data;
 @Data
 public class CreateIssueRequest {
 
-    @NotBlank(message = "Le titre est obligatoire")
-    @Size(max = 500, message = "Le titre ne peut pas dépasser 500 caractères")
+    @NotBlank(message = "The title is required")
+    @Size(max = 500, message = "The title can't exceed 500 characters")
     private String title;
 
     private String description;

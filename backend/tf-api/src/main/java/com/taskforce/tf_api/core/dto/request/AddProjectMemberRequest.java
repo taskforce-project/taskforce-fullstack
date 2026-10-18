@@ -13,10 +13,10 @@ import lombok.Data;
 @Data
 public class AddProjectMemberRequest {
 
-    @NotBlank(message = "L'email est obligatoire")
-    @Email(message = "Format d'email invalide")
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
     private String email;
 
-    @NotNull(message = "Le rôle est obligatoire")
+    @NotNull(message = "The role is required")
     private ProjectRole role;
 }

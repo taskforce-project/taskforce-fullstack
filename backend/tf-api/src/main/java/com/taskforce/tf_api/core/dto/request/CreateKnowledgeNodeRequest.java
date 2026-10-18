@@ -18,13 +18,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CreateKnowledgeNodeRequest {
 
-    @NotNull(message = "Le type est obligatoire")
+    @NotNull(message = "The type is required")
     private String type;        // NodeType
 
-    @NotNull(message = "Le domaine est obligatoire")
+    @NotNull(message = "The domain is required")
     private String domain;      // NodeDomain
 
-    @NotBlank(message = "Le titre est obligatoire")
+    @NotBlank(message = "The title is required")
     @Size(max = 300)
     private String title;
 

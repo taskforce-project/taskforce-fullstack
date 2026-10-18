@@ -14,16 +14,16 @@ import lombok.Data;
 @Data
 public class ApplyRedistributionRequest {
 
-    @NotEmpty(message = "Au moins un déplacement est requis")
+    @NotEmpty(message = "At least one move is required")
     @Valid
     private List<Move> moves;
 
     @Data
     public static class Move {
-        @NotNull(message = "issueId est requis")
+        @NotNull(message = "issueId is required")
         private Long issueId;
 
-        @NotNull(message = "toUserId est requis")
+        @NotNull(message = "toUserId is required")
         private Long toUserId;
     }
 }

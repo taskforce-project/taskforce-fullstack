@@ -175,7 +175,7 @@ class DeliverySessionFilterTest {
     void refused_session_is_denied() throws Exception {
         authenticate(runnerJwt());
         when(localRunnerService.openSession(eq(100L), any(RunnerIdentity.class)))
-            .thenThrow(new ForbiddenException("Session de délégation invalide"));
+            .thenThrow(new ForbiddenException("Invalid delegation session"));
 
         MockHttpServletResponse response = run("GET", "/api/workspaces/acme/projects", "100");
 

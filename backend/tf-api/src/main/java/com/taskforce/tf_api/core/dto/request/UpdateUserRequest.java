@@ -14,15 +14,15 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 public class UpdateUserRequest {
 
-    @Size(max = 100, message = "Le prénom ne peut pas dépasser 100 caractères")
+    @Size(max = 100, message = "The first name can't exceed 100 characters")
     private String firstName;
 
-    @Size(max = 100, message = "Le nom ne peut pas dépasser 100 caractères")
+    @Size(max = 100, message = "The name can't exceed 100 characters")
     private String lastName;
 
-    @Size(max = 150, message = "Le nom d'affichage ne peut pas dépasser 150 caractères")
+    @Size(max = 150, message = "The display name can't exceed 150 characters")
     private String displayName;
 
-    @Size(max = 500, message = "L'URL de l'avatar ne peut pas dépasser 500 caractères")
+    @Size(max = 500, message = "The avatar URL can't exceed 500 characters")
     private String avatarUrl;
 }

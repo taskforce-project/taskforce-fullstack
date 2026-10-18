@@ -42,14 +42,14 @@ public class DeliveryRunnerController {
     @PostMapping("/claim")
     public ResponseEntity<ApiResponse<RunnerClaimResponse>> claim(@AuthenticationPrincipal Jwt jwt) {
         RunnerClaimResponse claim = localRunnerService.claim(identityResolver.resolve(jwt)).orElse(null);
-        return ResponseEntity.ok(ApiResponse.success(claim != null ? "Run réclamé" : "Aucun run en attente", claim));
+        return ResponseEntity.ok(ApiResponse.success(claim != null ? "Run claimed" : "No run is waiting", claim));
     }
 
     /** POST /api/delivery/runner/runs/{runId}/heartbeat : signe de vie pendant l'exécution. */
     @PostMapping("/runs/{runId}/heartbeat")
     public ResponseEntity<ApiResponse<Void>> heartbeat(@AuthenticationPrincipal Jwt jwt, @PathVariable Long runId) {
         localRunnerService.heartbeat(runId, identityResolver.resolve(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Signe de vie reçu", null));
+        return ResponseEntity.ok(ApiResponse.success("Heartbeat received", null));
     }
 
     /** POST /api/delivery/runner/runs/{runId}/result : résultat final (DONE + résumé + lien, ou FAILED). */
@@ -60,6 +60,6 @@ public class DeliveryRunnerController {
         @Valid @RequestBody RunnerResultRequest request
     ) {
         localRunnerService.complete(runId, identityResolver.resolve(jwt), request);
-        return ResponseEntity.ok(ApiResponse.success("Résultat enregistré", null));
+        return ResponseEntity.ok(ApiResponse.success("Result saved", null));
     }
 }

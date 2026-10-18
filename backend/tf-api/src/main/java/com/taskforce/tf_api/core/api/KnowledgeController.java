@@ -54,7 +54,7 @@ public class KnowledgeController {
         @PathVariable String slug
     ) {
         Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success("Brain récupéré",
+        return ResponseEntity.ok(ApiResponse.success("Brain retrieved",
             knowledgeService.getOverview(slug, userId)));
     }
 
@@ -67,7 +67,7 @@ public class KnowledgeController {
         @Valid @RequestBody SearchBrainRequest request
     ) {
         Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success("Résultats",
+        return ResponseEntity.ok(ApiResponse.success("Results",
             brainSearchService.search(slug, userId, request.getQuery(), request.getTopK(), request.getDomain())));
     }
 
@@ -80,7 +80,7 @@ public class KnowledgeController {
         @Valid @RequestBody CreateKnowledgeNodeRequest request
     ) {
         Long userId = resolveUserId(jwt);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Node créé",
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Page created",
             knowledgeService.createNode(slug, userId, request)));
     }
 
@@ -92,7 +92,7 @@ public class KnowledgeController {
         @Valid @RequestBody UpdateKnowledgeNodeRequest request
     ) {
         Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success("Node mis à jour",
+        return ResponseEntity.ok(ApiResponse.success("Page updated",
             knowledgeService.updateNode(slug, nodeId, userId, request)));
     }
 
@@ -104,7 +104,7 @@ public class KnowledgeController {
         @Valid @RequestBody MoveNodeRequest request
     ) {
         Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success("Node déplacé",
+        return ResponseEntity.ok(ApiResponse.success("Page moved",
             knowledgeService.moveNode(slug, nodeId, userId, request)));
     }
 
@@ -116,7 +116,7 @@ public class KnowledgeController {
     ) {
         Long userId = resolveUserId(jwt);
         knowledgeService.deleteNode(slug, nodeId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Node supprimé", null));
+        return ResponseEntity.ok(ApiResponse.success("Page deleted", null));
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ public class KnowledgeController {
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

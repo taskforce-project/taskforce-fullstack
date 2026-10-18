@@ -102,7 +102,7 @@ public class WorkspaceService {
     @Transactional(readOnly = true)
     public WorkspaceResponse getWorkspaceBySlug(String slug, Long userId) {
         Workspace workspace = workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         assertIsMember(workspace, userId);
         return toResponse(workspace);
     }
@@ -129,7 +129,7 @@ public class WorkspaceService {
     @Transactional
     public WorkspaceResponse createNewWorkspace(Long userId, CreateWorkspaceRequest request) {
         User owner = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         String slug = generateUniqueSlug(request.getName());
         Workspace workspace = Workspace.builder()
@@ -171,12 +171,12 @@ public class WorkspaceService {
     @Transactional(readOnly = true)
     public List<AuditLogResponse> listAuditLogs(String slug, Long requestingUserId) {
         Workspace workspace = workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         WorkspaceMember member = workspaceMemberRepository
             .findByWorkspaceIdAndUserId(workspace.getId(), requestingUserId)
-            .orElseThrow(() -> new ForbiddenException("Accès refusé au workspace"));
+            .orElseThrow(() -> new ForbiddenException("Access denied to this workspace"));
         if (member.getRole() != WorkspaceRole.OWNER && member.getRole() != WorkspaceRole.ADMIN) {
-            throw new ForbiddenException("Le journal d'audit est réservé aux administrateurs");
+            throw new ForbiddenException("Only admins can read the audit log");
         }
         return auditService.listForWorkspace(workspace.getId(), 100).stream()
             .map(AuditLogResponse::from)
@@ -190,7 +190,7 @@ public class WorkspaceService {
     @Transactional(readOnly = true)
     public List<WorkspaceMemberResponse> getMembers(Long workspaceId, Long requestingUserId) {
         Workspace workspace = workspaceRepository.findById(workspaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
 
         assertIsMember(workspace, requestingUserId);
 
@@ -211,7 +211,7 @@ public class WorkspaceService {
     public WorkspaceResponse updateWorkspace(Long workspaceId, Long requestingUserId,
                                              UpdateWorkspaceRequest request) {
         Workspace workspace = workspaceRepository.findById(workspaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
 
         assertCanManage(workspace, requestingUserId);
 
@@ -251,24 +251,24 @@ public class WorkspaceService {
     public WorkspaceMemberResponse inviteMember(Long workspaceId, Long requestingUserId,
                                                 InviteMemberRequest request) {
         Workspace workspace = workspaceRepository.findById(workspaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
 
         assertCanManage(workspace, requestingUserId);
 
         User invitee = userRepository.findByEmail(request.getEmail())
             .orElseThrow(() -> new ResourceNotFoundException(
-                "Aucun compte trouvé pour l'email : " + request.getEmail()));
+                "No account found for the email: " + request.getEmail()));
 
         if (workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, invitee.getId())) {
-            throw new IllegalStateException("Cet utilisateur est déjà membre du workspace");
+            throw new IllegalStateException("This user is already a member of the workspace");
         }
 
         User inviter = userRepository.findById(requestingUserId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         WorkspaceRole role = request.getRole() != null ? request.getRole() : WorkspaceRole.MEMBER;
         if (role == WorkspaceRole.OWNER) {
-            throw new IllegalStateException("Impossible d'inviter quelqu'un en tant que OWNER");
+            throw new IllegalStateException("Someone can't be invited as OWNER");
         }
 
         WorkspaceMember member = WorkspaceMember.builder()
@@ -289,24 +289,24 @@ public class WorkspaceService {
     public WorkspaceMemberResponse updateMemberRole(Long workspaceId, Long requestingUserId,
                                                     Long memberId, UpdateMemberRoleRequest request) {
         Workspace workspace = workspaceRepository.findById(workspaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
 
         // Seul le OWNER peut changer les rôles
         assertIsOwner(workspace, requestingUserId);
 
         WorkspaceMember member = workspaceMemberRepository.findById(memberId)
-            .orElseThrow(() -> new ResourceNotFoundException("Membre introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Member not found"));
 
         if (!member.getWorkspace().getId().equals(workspaceId)) {
-            throw new IllegalArgumentException("Ce membre n'appartient pas à ce workspace");
+            throw new IllegalArgumentException("This member doesn't belong to this workspace");
         }
 
         if (member.getRole() == WorkspaceRole.OWNER) {
-            throw new IllegalStateException("Impossible de changer le rôle du propriétaire");
+            throw new IllegalStateException("The owner's role can't be changed");
         }
 
         if (request.getRole() == WorkspaceRole.OWNER) {
-            throw new IllegalStateException("Impossible d'attribuer le rôle OWNER via cette opération");
+            throw new IllegalStateException("The OWNER role can't be granted this way");
         }
 
         member.setRole(request.getRole());
@@ -323,7 +323,7 @@ public class WorkspaceService {
     @Transactional
     public void deleteWorkspace(Long workspaceId, Long requestingUserId) {
         Workspace workspace = workspaceRepository.findById(workspaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         assertIsOwner(workspace, requestingUserId);
         auditService.record(null, requestingUserId, AuditService.WORKSPACE_DELETED,
             "Workspace", String.valueOf(workspaceId), Map.of("name", workspace.getName()));
@@ -338,31 +338,31 @@ public class WorkspaceService {
     @Transactional
     public void removeMember(Long workspaceId, Long requestingUserId, Long memberId) {
         Workspace workspace = workspaceRepository.findById(workspaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
 
         WorkspaceMember target = workspaceMemberRepository.findById(memberId)
-            .orElseThrow(() -> new ResourceNotFoundException("Membre introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Member not found"));
 
         if (!target.getWorkspace().getId().equals(workspaceId)) {
-            throw new IllegalArgumentException("Ce membre n'appartient pas à ce workspace");
+            throw new IllegalArgumentException("This member doesn't belong to this workspace");
         }
 
         if (target.getRole() == WorkspaceRole.OWNER) {
-            throw new IllegalStateException("Impossible de retirer le propriétaire du workspace");
+            throw new IllegalStateException("The workspace owner can't be removed");
         }
 
         // Vérifier que le demandeur peut gérer ce membre
         WorkspaceMember requester = workspaceMemberRepository
             .findByWorkspaceIdAndUserId(workspaceId, requestingUserId)
-            .orElseThrow(() -> new IllegalStateException("Vous n'êtes pas membre de ce workspace"));
+            .orElseThrow(() -> new IllegalStateException("You're not a member of this workspace"));
 
         if (requester.getRole() == WorkspaceRole.MEMBER) {
-            throw new IllegalStateException("Vous n'avez pas les droits pour retirer un membre");
+            throw new IllegalStateException("You don't have the rights to remove a member");
         }
 
         // Un ADMIN ne peut pas retirer un autre ADMIN
         if (requester.getRole() == WorkspaceRole.ADMIN && target.getRole() == WorkspaceRole.ADMIN) {
-            throw new IllegalStateException("Un administrateur ne peut pas retirer un autre administrateur");
+            throw new IllegalStateException("An admin can't remove another admin");
         }
 
         workspaceMemberRepository.delete(target);
@@ -411,27 +411,27 @@ public class WorkspaceService {
         boolean isMember = workspaceMemberRepository
             .existsByWorkspaceIdAndUserId(workspace.getId(), userId);
         if (!isMember) {
-            throw new IllegalStateException("Vous n'avez pas accès à ce workspace");
+            throw new IllegalStateException("You don't have access to this workspace");
         }
     }
 
     private void assertCanManage(Workspace workspace, Long userId) {
         WorkspaceMember member = workspaceMemberRepository
             .findByWorkspaceIdAndUserId(workspace.getId(), userId)
-            .orElseThrow(() -> new IllegalStateException("Vous n'avez pas accès à ce workspace"));
+            .orElseThrow(() -> new IllegalStateException("You don't have access to this workspace"));
 
         if (member.getRole() == WorkspaceRole.MEMBER) {
-            throw new IllegalStateException("Vous n'avez pas les droits pour cette action");
+            throw new IllegalStateException("You don't have the rights for this action");
         }
     }
 
     private void assertIsOwner(Workspace workspace, Long userId) {
         WorkspaceMember member = workspaceMemberRepository
             .findByWorkspaceIdAndUserId(workspace.getId(), userId)
-            .orElseThrow(() -> new IllegalStateException("Vous n'avez pas accès à ce workspace"));
+            .orElseThrow(() -> new IllegalStateException("You don't have access to this workspace"));
 
         if (member.getRole() != WorkspaceRole.OWNER) {
-            throw new IllegalStateException("Seul le propriétaire peut effectuer cette action");
+            throw new IllegalStateException("Only the owner can do this");
         }
     }
 

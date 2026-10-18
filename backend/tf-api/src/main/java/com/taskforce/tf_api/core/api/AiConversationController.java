@@ -41,7 +41,7 @@ public class AiConversationController {
 
     private Ctx ctx(String slug, Jwt jwt) {
         User user = userRepository.findByEmail(jwt.getClaimAsString("email"))
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         Workspace ws = access.resolveAndAuthorize(slug, user.getId());
         return new Ctx(ws.getId(), user.getId());
     }

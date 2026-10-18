@@ -35,7 +35,7 @@ public class RunnerAuthController {
     public ResponseEntity<ApiResponse<RunnerTokenResponse>> token(@Valid @RequestBody RunnerTokenRequest request) {
         try {
             RunnerTokenResponse token = tokenService.issue(request.clientId(), request.clientSecret());
-            return ResponseEntity.ok(ApiResponse.success("Jeton de runner émis", token));
+            return ResponseEntity.ok(ApiResponse.success("Runner token issued", token));
         } catch (InvalidRunnerCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(e.getMessage()));
         }

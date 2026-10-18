@@ -106,16 +106,16 @@ public class SmartAssignService {
     @Transactional
     public SmartAssignResponse recommend(String workspaceSlug, Long projectId, Long issueId, Long requestingUserId) {
         Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         assertWorkspaceMember(workspace.getId(), requestingUserId);
 
         Project project = projectRepository.findById(projectId)
             .filter(p -> p.getWorkspace().getId().equals(workspace.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         Issue issue = issueRepository.findById(issueId)
             .filter(i -> i.getProject().getId().equals(project.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Issue introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
 
         List<String> issueLabels = issue.getLabels().stream()
             .map(l -> l.getName().toLowerCase())
@@ -145,12 +145,12 @@ public class SmartAssignService {
     public SmartAssignResponse preview(String workspaceSlug, Long projectId,
                                        Long requestingUserId, SmartAssignPreviewRequest request) {
         Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         assertWorkspaceMember(workspace.getId(), requestingUserId);
 
         Project project = projectRepository.findById(projectId)
             .filter(p -> p.getWorkspace().getId().equals(workspace.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         List<String> issueLabels = request.getLabels() == null ? List.of()
             : request.getLabels().stream()
@@ -177,12 +177,12 @@ public class SmartAssignService {
     public List<BulkSmartAssignItemResponse> bulkRecommend(String workspaceSlug, Long projectId,
                                                            Long requestingUserId, List<Long> issueIds) {
         Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         assertWorkspaceMember(workspace.getId(), requestingUserId);
 
         Project project = projectRepository.findById(projectId)
             .filter(p -> p.getWorkspace().getId().equals(workspace.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         if (issueIds == null || issueIds.isEmpty()) {
             return List.of();
@@ -310,7 +310,7 @@ public class SmartAssignService {
         return SmartAssignResponse.builder()
             .recommended(recommended)
             .alternatives(alternatives)
-            .strategy(!useAi ? "java-rules (heuristique, sans IA)"
+            .strategy(!useAi ? "java-rules (heuristic, no AI)"
                 : fallbackUsed ? "java-fallback" : "java-rules + ai-semantic + ai-history")
             .fallbackUsed(fallbackUsed)
             .build();
@@ -421,7 +421,7 @@ public class SmartAssignService {
 
     private void assertWorkspaceMember(Long workspaceId, Long userId) {
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, userId)) {
-            throw new ResourceNotFoundException("Accès refusé au workspace");
+            throw new ResourceNotFoundException("Access denied to this workspace");
         }
     }
 
@@ -815,7 +815,7 @@ public class SmartAssignService {
                     factors.add("Strong delivery history");
                 }
                 if (growthBonus > 0) {
-                    factors.add("🌱 Tâche stretch (montée en compétence)");
+                    factors.add("🌱 Stretch task (growing a skill)");
                 }
 
                 String groqReason = reasons.get(u.getId());

@@ -17,6 +17,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UpdateMemberRoleRequest {
 
-    @NotNull(message = "Le rôle est obligatoire")
+    @NotNull(message = "The role is required")
     private WorkspaceRole role;
 }

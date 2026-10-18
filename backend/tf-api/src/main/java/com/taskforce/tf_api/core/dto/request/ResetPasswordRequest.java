@@ -18,16 +18,16 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ResetPasswordRequest {
 
-    @NotBlank(message = "L'email est obligatoire")
-    @Email(message = "Format d'email invalide")
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
     private String email;
 
-    @NotBlank(message = "Le code OTP est obligatoire")
-    @Size(min = 6, max = 6, message = "Le code doit contenir 6 caractères")
-    @Pattern(regexp = "^[0-9]{6}$", message = "Le code doit être composé de 6 chiffres")
+    @NotBlank(message = "The OTP code is required")
+    @Size(min = 6, max = 6, message = "The code must be 6 characters")
+    @Pattern(regexp = "^[0-9]{6}$", message = "The code must be 6 digits")
     private String otpCode;
 
-    @NotBlank(message = "Le nouveau mot de passe est obligatoire")
-    @Size(min = 8, message = "Le mot de passe doit contenir au moins 8 caractères")
+    @NotBlank(message = "The new password is required")
+    @Size(min = 8, message = "The password must contain at least 8 characters")
     private String newPassword;
 }

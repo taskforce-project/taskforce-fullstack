@@ -14,15 +14,15 @@ import lombok.Data;
 @Data
 public class CreateDashboardCardRequest {
 
-    @NotBlank(message = "Le type de carte est obligatoire")
-    @Size(max = 40, message = "Le type de carte ne peut pas dépasser 40 caractères")
+    @NotBlank(message = "The card type is required")
+    @Size(max = 40, message = "The card type can't exceed 40 characters")
     private String cardType;
 
-    @Size(max = 200, message = "Le titre ne peut pas dépasser 200 caractères")
+    @Size(max = 200, message = "The title can't exceed 200 characters")
     private String title;
 
     private Map<String, Object> config;
 
-    @Size(max = 10, message = "La période ne peut pas dépasser 10 caractères")
+    @Size(max = 10, message = "The period can't exceed 10 characters")
     private String timeRange;
 }

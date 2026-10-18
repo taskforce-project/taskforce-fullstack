@@ -355,7 +355,7 @@ class SmartAssignServiceTest {
             // usual=2 → stretch 4 ∈ [3,5] ; MEDIUM (pas urgent) ; dispo 100 ; skill react adjacent
             SmartAssignResponse res = previewGrowth(12L, IssuePriority.MEDIUM, 4, 2.0);
 
-            assertThat(res.getRecommended().getFactors()).anyMatch(f -> f.contains("stretch"));
+            assertThat(res.getRecommended().getFactors()).anyMatch(f -> f.toLowerCase().contains("stretch"));
         }
 
         @Test
@@ -458,7 +458,7 @@ class SmartAssignServiceTest {
 
             assertThatThrownBy(() -> service.preview(SLUG, PROJECT_ID, REQUESTER, previewRequest(IssuePriority.MEDIUM)))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Accès refusé");
+                .hasMessageContaining("Access denied");
             verify(projectRepository, never()).findById(anyLong());
         }
     }

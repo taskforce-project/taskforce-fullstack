@@ -42,19 +42,19 @@ public class RunnerProvisioningController {
     @GetMapping
     public ResponseEntity<ApiResponse<RunnerStatusResponse>> status(@AuthenticationPrincipal Jwt jwt) {
         RunnerStatusResponse status = provisioningService.status(currentUser(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Statut du runner récupéré", status));
+        return ResponseEntity.ok(ApiResponse.success("Runner status retrieved", status));
     }
 
     /** POST /api/delivery/runners — provisionne (ou régénère le secret de) le runner de l'utilisateur. */
     @PostMapping
     public ResponseEntity<ApiResponse<RunnerProvisionResponse>> provision(@AuthenticationPrincipal Jwt jwt) {
         RunnerProvisionResponse runner = provisioningService.provision(currentUser(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Runner provisionné", runner));
+        return ResponseEntity.ok(ApiResponse.success("Runner provisioned", runner));
     }
 
     private User currentUser(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         return userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 }

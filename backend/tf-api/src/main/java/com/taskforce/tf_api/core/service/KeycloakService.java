@@ -94,7 +94,7 @@ public class KeycloakService {
             String error = response.readEntity(String.class);
             response.close();
             log.error("Erreur lors de la création de l'utilisateur Keycloak : {}", error);
-            throw new RuntimeException("Erreur lors de la création de l'utilisateur : " + error);
+            throw new RuntimeException("Error creating the user: " + error);
         }
     }
 
@@ -128,7 +128,7 @@ public class KeycloakService {
         List<UserRepresentation> users = realmResource.users().search(email, true);
 
         if (users.isEmpty()) {
-            throw new RuntimeException("Utilisateur non trouvé : " + email);
+            throw new RuntimeException("User not found: " + email);
         }
 
         return users.get(0);

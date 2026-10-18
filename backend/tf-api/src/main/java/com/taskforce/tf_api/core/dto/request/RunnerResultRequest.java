@@ -14,13 +14,13 @@ import jakarta.validation.constraints.Size;
  * @param error     message d'échec (attendu quand FAILED)
  */
 public record RunnerResultRequest(
-    @NotBlank @Pattern(regexp = "DONE|FAILED", message = "status doit valoir DONE ou FAILED")
+    @NotBlank @Pattern(regexp = "DONE|FAILED", message = "status must be DONE or FAILED")
     String status,
 
     @Size(max = 8000)
     String summary,
 
-    @Size(max = 1000) @Pattern(regexp = "^https?://\\S+$", message = "resultUrl doit être une URL http(s)")
+    @Size(max = 1000) @Pattern(regexp = "^https?://\\S+$", message = "resultUrl must be an http(s) URL")
     String resultUrl,
 
     @Size(max = 4000)

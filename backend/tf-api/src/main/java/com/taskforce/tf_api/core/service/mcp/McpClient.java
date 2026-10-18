@@ -88,7 +88,7 @@ public class McpClient {
         // Un statut d'erreur (ex. 401 token invalide) doit remonter clairement, plutôt que de se
         // déguiser en « serveur sans session ».
         if (res.statusCode() / 100 != 2) {
-            throw new BusinessException("Handshake MCP refusé (" + ref.connectorKey()
+            throw new BusinessException("MCP handshake refused (" + ref.connectorKey()
                 + ", HTTP " + res.statusCode() + ")");
         }
         // Vérifie qu'initialize a renvoyé un résultat JSON-RPC exploitable (sinon protocole KO).
@@ -214,10 +214,10 @@ public class McpClient {
         try {
             root = objectMapper.readTree(json);
         } catch (Exception ex) {
-            throw new BusinessException("Réponse MCP illisible (" + context + ", HTTP " + res.statusCode() + ")");
+            throw new BusinessException("Unreadable MCP response (" + context + ", HTTP " + res.statusCode() + ")");
         }
         if (root.has("error") && !root.path("error").isNull()) {
-            throw new BusinessException("Erreur MCP (" + context + ") : " + root.path("error").path("message").asText());
+            throw new BusinessException("MCP error (" + context + "): " + root.path("error").path("message").asText());
         }
         return root.path("result");
     }

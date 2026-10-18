@@ -49,8 +49,6 @@ class EmailServiceTest {
         ReflectionTestUtils.setField(emailService, "fromEmail", "noreply@taskforce.com");
         ReflectionTestUtils.setField(emailService, "fromName", "TaskForce");
         ReflectionTestUtils.setField(emailService, "appUrl", "http://localhost:3000");
-        ReflectionTestUtils.setField(emailService, "supportUrl", "http://localhost:3000/support");
-        ReflectionTestUtils.setField(emailService, "contactUrl", "http://localhost:3000/contact");
         
         // Créer un vrai MimeMessage pour les tests (lenient pour éviter les unnecessary stubbing)
         mimeMessage = new MimeMessage((Session) null);
@@ -111,7 +109,7 @@ class EmailServiceTest {
             // When/Then
             assertThatThrownBy(() -> emailService.sendOtpEmail(toEmail, "123456", "John"))
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Erreur lors de l'envoi de l'email");
+                    .hasMessageContaining("Error sending the email");
         }
     }
 
@@ -206,7 +204,7 @@ class EmailServiceTest {
             // When/Then
             assertThatThrownBy(() -> emailService.sendResetPasswordEmail(toEmail, "123", "Eve"))
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Erreur lors de l'envoi de l'email");
+                    .hasMessageContaining("Error sending the email");
         }
     }
 

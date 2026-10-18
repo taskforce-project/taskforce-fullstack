@@ -55,7 +55,7 @@ public class UserController {
         String email = identityResolver.resolveEmail(jwt);
         log.debug("GET /api/users/me — email={}", email);
         UserResponse response = userService.getByEmail(email);
-        return ResponseEntity.ok(ApiResponse.success("Utilisateur récupéré", response));
+        return ResponseEntity.ok(ApiResponse.success("User retrieved", response));
     }
 
     /**
@@ -70,7 +70,7 @@ public class UserController {
         String email = identityResolver.resolveEmail(jwt);
         log.debug("PATCH /api/users/me — email={}", email);
         UserResponse response = userService.updateUserByEmail(email, request);
-        return ResponseEntity.ok(ApiResponse.success("Profil mis à jour", response));
+        return ResponseEntity.ok(ApiResponse.success("Profile updated", response));
     }
 
     /**
@@ -85,7 +85,7 @@ public class UserController {
         String email = identityResolver.resolveEmail(jwt);
         log.info("POST /api/users/me/onboarding — email={}", email);
         UserResponse response = userService.completeOnboarding(email, request.getJobTitle());
-        return ResponseEntity.ok(ApiResponse.success("Onboarding terminé", response));
+        return ResponseEntity.ok(ApiResponse.success("Onboarding completed", response));
     }
 
     /**
@@ -100,7 +100,7 @@ public class UserController {
         String email = identityResolver.resolveEmail(jwt);
         log.debug("POST /api/users/me/avatar — email={}", email);
         UserResponse response = userService.uploadAvatar(email, file);
-        return ResponseEntity.ok(ApiResponse.success("Avatar mis à jour", response));
+        return ResponseEntity.ok(ApiResponse.success("Avatar updated", response));
     }
 
     // ---- Sécurité : 2FA (TOTP géré par l'app ; le mot de passe se réinitialise via /auth/forgot-password) ----
@@ -109,14 +109,14 @@ public class UserController {
     @GetMapping("/me/2fa")
     public ResponseEntity<ApiResponse<Boolean>> getTwoFactor(@AuthenticationPrincipal Jwt jwt) {
         boolean enabled = twoFactorService.isEnabled(identityResolver.resolveEmail(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Statut 2FA", enabled));
+        return ResponseEntity.ok(ApiResponse.success("Two-factor authentication status", enabled));
     }
 
     /** Démarre l'activation : renvoie le secret + l'URI otpauth (à encoder en QR). POST /api/users/me/2fa/setup */
     @PostMapping("/me/2fa/setup")
     public ResponseEntity<ApiResponse<TwoFactorSetupResponse>> setupTwoFactor(@AuthenticationPrincipal Jwt jwt) {
         TwoFactorSetupResponse res = twoFactorService.setup(identityResolver.resolveEmail(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Configuration 2FA générée", res));
+        return ResponseEntity.ok(ApiResponse.success("Two-factor setup generated", res));
     }
 
     /** Confirme l'activation avec un premier code TOTP. POST /api/users/me/2fa/confirm */
@@ -126,14 +126,14 @@ public class UserController {
         @Valid @RequestBody TwoFactorConfirmRequest request
     ) {
         twoFactorService.confirm(identityResolver.resolveEmail(jwt), request.getCode());
-        return ResponseEntity.ok(ApiResponse.success("2FA activé", null));
+        return ResponseEntity.ok(ApiResponse.success("Two-factor authentication enabled", null));
     }
 
     /** Désactive le 2FA (supprime le secret). DELETE /api/users/me/2fa */
     @DeleteMapping("/me/2fa")
     public ResponseEntity<ApiResponse<Void>> disableTwoFactor(@AuthenticationPrincipal Jwt jwt) {
         twoFactorService.disable(identityResolver.resolveEmail(jwt));
-        return ResponseEntity.ok(ApiResponse.success("2FA désactivé", null));
+        return ResponseEntity.ok(ApiResponse.success("Two-factor authentication disabled", null));
     }
 
     /**
@@ -146,7 +146,7 @@ public class UserController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         List<UserSearchResult> results = userService.searchUsers(q, jwt.getClaimAsString("email"));
-        return ResponseEntity.ok(ApiResponse.success("Résultats de recherche", results));
+        return ResponseEntity.ok(ApiResponse.success("Search results", results));
     }
 
 }

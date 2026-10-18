@@ -90,7 +90,7 @@ public class RunnerProvisioningService {
         try {
             realmResource.roles().get(roleName).toRepresentation();
         } catch (NotFoundException e) {
-            realmResource.roles().create(new RoleRepresentation(roleName, "Runner local de délégation (ADR-013)", false));
+            realmResource.roles().create(new RoleRepresentation(roleName, "Local delegation runner (ADR-013)", false));
             log.info("Rôle Keycloak '{}' créé", roleName);
         }
     }
@@ -103,7 +103,7 @@ public class RunnerProvisioningService {
         if (existing.isEmpty()) {
             try (Response response = realmResource.clients().create(rep)) {
                 if (response.getStatus() >= 300) {
-                    throw new IllegalStateException("Création du client runner refusée (HTTP " + response.getStatus() + ")");
+                    throw new IllegalStateException("The identity provider refused to create the runner client (HTTP " + response.getStatus() + ")");
                 }
             }
             uuid = realmResource.clients().findByClientId(clientId).get(0).getId();
@@ -144,7 +144,7 @@ public class RunnerProvisioningService {
         rep.setStandardFlowEnabled(false);
         rep.setImplicitFlowEnabled(false);
         rep.setDirectAccessGrantsEnabled(false);
-        rep.setDescription("Runner local (ADR-013) - propriétaire : " + ownerEmail);
+        rep.setDescription("Local runner (ADR-013), owner: " + ownerEmail);
         return rep;
     }
 

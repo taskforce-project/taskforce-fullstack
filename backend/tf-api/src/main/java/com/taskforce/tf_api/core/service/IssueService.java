@@ -245,7 +245,7 @@ public class IssueService {
     @Transactional(readOnly = true)
     public List<IssueResponse> getScheduledIssues(String slug, Long userId) {
         var ws = workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         assertWorkspaceMember(ws.getId(), userId);
         // Visibilité projet privé : on ne renvoie que les issues des projets visibles par l'utilisateur.
         boolean admin = visibilityGuard.isWorkspaceAdmin(ws.getId(), userId);
@@ -262,7 +262,7 @@ public class IssueService {
     @Transactional(readOnly = true)
     public List<IssueResponse> listMyIssues(String slug, Long userId) {
         var ws = workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         assertWorkspaceMember(ws.getId(), userId);
         // Pas de filtre de visibilité : une issue ASSIGNÉE à l'utilisateur implique qu'il y a accès
         // (on ne lui cache pas son propre travail, même sur un projet privé).
@@ -298,10 +298,10 @@ public class IssueService {
         if (request.getStatusId() != null) {
             status = issueStatusRepository.findById(request.getStatusId())
                 .filter(s -> s.getProject().getId().equals(project.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Statut introuvable"));
+                .orElseThrow(() -> new ResourceNotFoundException("Status not found"));
         } else {
             status = issueStatusRepository.findByProjectIdAndIsDefaultTrue(project.getId())
-                .orElseThrow(() -> new BusinessException("Aucun statut par défaut configuré pour ce projet"));
+                .orElseThrow(() -> new BusinessException("This project has no default status"));
         }
 
         // Type
@@ -309,7 +309,7 @@ public class IssueService {
         if (request.getTypeId() != null) {
             type = issueTypeRepository.findById(request.getTypeId())
                 .filter(t -> t.getProject().getId().equals(project.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Type introuvable"));
+                .orElseThrow(() -> new ResourceNotFoundException("Type not found"));
         }
 
         // Assignee
@@ -375,7 +375,7 @@ public class IssueService {
         slackService.notifyEvent(
             project.getWorkspace().getId(),
             "issue.created",
-            "🆕 Nouvelle issue *" + project.getIdentifier() + "-" + issue.getSequenceNumber() + "* : " + issue.getTitle()
+            "🆕 New issue *" + project.getIdentifier() + "-" + issue.getSequenceNumber() + "* : " + issue.getTitle()
         );
 
         return created;
@@ -420,9 +420,9 @@ public class IssueService {
     /** Charge l'issue et vérifie que {@code userId} en est bien l'assigné (sinon 403). */
     private Issue resolveAssignmentTarget(Long issueId, Long userId) {
         Issue issue = issueRepository.findById(issueId)
-            .orElseThrow(() -> new ResourceNotFoundException("Issue introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
         if (issue.getAssignee() == null || !issue.getAssignee().getId().equals(userId)) {
-            throw new ForbiddenException("Cette assignation ne vous concerne pas");
+            throw new ForbiddenException("This assignment isn't yours");
         }
         return issue;
     }
@@ -457,7 +457,7 @@ public class IssueService {
         if (request.getStatusId() != null) {
             IssueStatus newStatus = issueStatusRepository.findById(request.getStatusId())
                 .filter(s -> s.getProject().getId().equals(project.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Statut introuvable"));
+                .orElseThrow(() -> new ResourceNotFoundException("Status not found"));
             if (!newStatus.getId().equals(issue.getStatus().getId())) {
                 String old = issue.getStatus().getName();
                 issue.setStatus(newStatus);
@@ -480,7 +480,7 @@ public class IssueService {
         if (request.getTypeId() != null) {
             IssueType newType = issueTypeRepository.findById(request.getTypeId())
                 .filter(t -> t.getProject().getId().equals(project.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Type introuvable"));
+                .orElseThrow(() -> new ResourceNotFoundException("Type not found"));
             String old = issue.getType() != null ? issue.getType().getName() : null;
             issue.setType(newType);
             logActivity(issue, actor, IssueActivityType.TYPE_CHANGED, old, newType.getName());
@@ -559,7 +559,7 @@ public class IssueService {
         }
         try {
             slackService.notifyEvent(issue.getProject().getWorkspace().getId(), "issue.updated",
-                "✏️ Issue *" + issue.getProject().getIdentifier() + "-" + issue.getSequenceNumber() + "* mise à jour : " + issue.getTitle());
+                "✏️ Issue *" + issue.getProject().getIdentifier() + "-" + issue.getSequenceNumber() + "* updated: " + issue.getTitle());
         } catch (Exception e) {
             log.warn("Notification Slack 'issue.updated' échouée (non bloquant) : {}", e.getMessage());
         }
@@ -608,7 +608,7 @@ public class IssueService {
                                                      Long userId, UpdateChecklistItemRequest request) {
         assertWritableChecklistScope(slug, projectId, issueId, userId);
         IssueChecklistItem item = checklistRepository.findByIdAndIssueId(itemId, issueId)
-            .orElseThrow(() -> new ResourceNotFoundException("Item de checklist introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Checklist item not found"));
         if (request.getContent() != null && !request.getContent().isBlank()) {
             item.setContent(request.getContent().trim());
         }
@@ -625,7 +625,7 @@ public class IssueService {
     public void deleteChecklistItem(String slug, Long projectId, Long issueId, Long itemId, Long userId) {
         assertWritableChecklistScope(slug, projectId, issueId, userId);
         IssueChecklistItem item = checklistRepository.findByIdAndIssueId(itemId, issueId)
-            .orElseThrow(() -> new ResourceNotFoundException("Item de checklist introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Checklist item not found"));
         checklistRepository.delete(item);
     }
 
@@ -671,10 +671,10 @@ public class IssueService {
     public void deleteWorklog(String slug, Long projectId, Long issueId, Long worklogId, Long userId) {
         assertWritableChecklistScope(slug, projectId, issueId, userId);
         IssueWorklog worklog = worklogRepository.findByIdAndIssueId(worklogId, issueId)
-            .orElseThrow(() -> new ResourceNotFoundException("Entrée de temps introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Time entry not found"));
         // Seul l'auteur de l'entrée peut la supprimer (cohérent avec les commentaires).
         if (!worklog.getUser().getId().equals(userId)) {
-            throw new BusinessException("Vous ne pouvez supprimer que vos propres entrées de temps");
+            throw new BusinessException("You can only delete your own time entries");
         }
         worklogRepository.delete(worklog);
     }
@@ -692,7 +692,7 @@ public class IssueService {
         Long   workspaceId = project.getWorkspace().getId();
         issueRepository.delete(issue);
         publishIssueEvent("deleted", project.getId(), issueId, null);
-        slackService.notifyEvent(workspaceId, "issue.deleted", "🗑️ Issue *" + issueRef + "* supprimée : " + issueTitle);
+        slackService.notifyEvent(workspaceId, "issue.deleted", "🗑️ Issue *" + issueRef + "* deleted: " + issueTitle);
         log.info("Issue {} supprimée du projet {}", issueId, projectId);
     }
 
@@ -762,7 +762,7 @@ public class IssueService {
         Project project = resolveWritableProject(workspaceSlug, projectId, userId);
 
         if (issueStatusRepository.existsByProjectIdAndName(project.getId(), request.getName())) {
-            throw new BusinessException("Un statut '" + request.getName() + "' existe déjà dans ce projet");
+            throw new BusinessException("A status '" + request.getName() + "' already exists in this project");
         }
 
         IssueStatusCategory category = IssueStatusCategory.valueOf(request.getCategory().toUpperCase());
@@ -780,7 +780,7 @@ public class IssueService {
 
         IssueStatus status = issueStatusRepository.findById(statusId)
             .filter(s -> s.getProject().getId().equals(project.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Statut introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Status not found"));
 
         if (request.getName() != null) status.setName(request.getName());
         if (request.getColor() != null) status.setColor(request.getColor());
@@ -799,9 +799,9 @@ public class IssueService {
         Project project = resolveWritableProject(workspaceSlug, projectId, userId);
         IssueStatus status = issueStatusRepository.findById(statusId)
             .filter(s -> s.getProject().getId().equals(project.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Statut introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Status not found"));
         if (status.isDefault()) {
-            throw new BusinessException("Impossible de supprimer le statut par défaut");
+            throw new BusinessException("The default status can't be deleted");
         }
         issueStatusRepository.delete(status);
     }
@@ -818,7 +818,7 @@ public class IssueService {
         for (ReorderStatusesRequest.StatusPosition sp : request.getStatuses()) {
             IssueStatus status = issueStatusRepository.findById(sp.getId())
                 .filter(s -> s.getProject().getId().equals(project.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Statut introuvable : " + sp.getId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Status not found: " + sp.getId()));
             status.setPosition(sp.getPosition());
             issueStatusRepository.save(status);
         }
@@ -873,7 +873,7 @@ public class IssueService {
         logActivity(issue, author, IssueActivityType.COMMENT_ADDED, null, null);
         notificationService.notifyCommented(issue, author, comment);
         slackService.notifyEvent(project.getWorkspace().getId(), "comment.created",
-            "💬 Nouveau commentaire de " + author.getDisplayName() + " sur *" + project.getIdentifier() + "-" + issue.getSequenceNumber() + "*");
+            "💬 New comment from " + author.getDisplayName() + " on *" + project.getIdentifier() + "-" + issue.getSequenceNumber() + "*");
 
         // Mentions : @email ou @partie-locale-email, résolues contre les membres du workspace
         List<User> mentioned = resolveMentions(request.getContent(), project.getWorkspace().getId());
@@ -916,10 +916,10 @@ public class IssueService {
 
         IssueComment comment = commentRepository.findById(commentId)
             .filter(c -> c.getIssue().getId().equals(issueId))
-            .orElseThrow(() -> new ResourceNotFoundException("Commentaire introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
         if (!comment.getAuthor().getId().equals(userId)) {
-            throw new BusinessException("Vous ne pouvez modifier que vos propres commentaires");
+            throw new BusinessException("You can only edit your own comments");
         }
         comment.setContent(request.getContent());
         comment.setEdited(true);
@@ -933,9 +933,9 @@ public class IssueService {
 
         IssueComment comment = commentRepository.findById(commentId)
             .filter(c -> c.getIssue().getId().equals(issueId))
-            .orElseThrow(() -> new ResourceNotFoundException("Commentaire introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
         if (!comment.getAuthor().getId().equals(userId)) {
-            throw new BusinessException("Vous ne pouvez supprimer que vos propres commentaires");
+            throw new BusinessException("You can only delete your own comments");
         }
         commentRepository.delete(comment);
         logActivity(issue, resolveUser(userId), IssueActivityType.COMMENT_DELETED, null, null);
@@ -981,11 +981,11 @@ public class IssueService {
         try {
             type = IssueRelationType.valueOf(request.getRelationType());
         } catch (IllegalArgumentException e) {
-            throw new BusinessException("Type de relation invalide : " + request.getRelationType());
+            throw new BusinessException("Invalid relation type: " + request.getRelationType());
         }
 
         if (relationRepository.existsBySourceIdAndTargetIdAndRelationType(source.getId(), target.getId(), type)) {
-            throw new BusinessException("Cette relation existe déjà");
+            throw new BusinessException("This relation already exists");
         }
 
         User actor = resolveUser(userId);
@@ -1004,7 +1004,7 @@ public class IssueService {
         Project project = resolveWritableProject(workspaceSlug, projectId, userId);
         IssueRelation relation = relationRepository.findById(relationId)
             .filter(r -> r.getSource().getId().equals(issueId) || r.getTarget().getId().equals(issueId))
-            .orElseThrow(() -> new ResourceNotFoundException("Relation introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Relation not found"));
         relationRepository.delete(relation);
     }
 
@@ -1015,23 +1015,23 @@ public class IssueService {
     private Project resolveProject(String workspaceSlug, Long projectId) {
         return workspaceRepository.findBySlug(workspaceSlug)
             .flatMap(ws -> projectRepository.findByIdAndWorkspaceId(projectId, ws.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
     }
 
     private Issue resolveIssue(Long issueId, Long projectId) {
         return issueRepository.findById(issueId)
             .filter(i -> i.getProject().getId().equals(projectId))
-            .orElseThrow(() -> new ResourceNotFoundException("Issue introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
     }
 
     private User resolveUser(Long userId) {
         return userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
     private void assertWorkspaceMember(Long workspaceId, Long userId) {
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, userId)) {
-            throw new BusinessException("Accès refusé");
+            throw new BusinessException("Access denied");
         }
     }
 
@@ -1058,7 +1058,7 @@ public class IssueService {
     @Transactional
     protected int incrementAndGetSequence(Long projectId) {
         IssueSequenceCounter counter = sequenceCounterRepository.findByProjectIdForUpdate(projectId)
-            .orElseThrow(() -> new BusinessException("Compteur de séquence introuvable pour ce projet"));
+            .orElseThrow(() -> new BusinessException("This project's sequence counter is missing"));
         int next = counter.getLastNumber() + 1;
         counter.setLastNumber(next);
         sequenceCounterRepository.save(counter);

@@ -110,7 +110,7 @@ public final class HmacSigner {
             mac.init(new SecretKeySpec(key, ALGO));
             return mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
-            throw new IllegalStateException("Signature impossible", e);
+            throw new IllegalStateException("Signing failed", e);
         }
     }
 }

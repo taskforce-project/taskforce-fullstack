@@ -52,7 +52,7 @@ public class GdprService {
     @Transactional
     public Map<String, Object> exportMyData(Long userId) {
         User u = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         Map<String, Object> profile = new LinkedHashMap<>();
         profile.put("id", u.getId());
@@ -134,7 +134,7 @@ public class GdprService {
     @Transactional
     public LocalDateTime deleteMyAccount(Long userId) {
         User u = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (u.getDeletionScheduledAt() == null) {
             u.setDeletionScheduledAt(LocalDateTime.now());
             userRepository.save(u);
@@ -155,7 +155,7 @@ public class GdprService {
     @Transactional
     public void deleteMyAccountImmediately(Long userId) {
         User u = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (u.getDeletionScheduledAt() == null) {
             u.setDeletionScheduledAt(LocalDateTime.now());
             userRepository.save(u);
@@ -170,7 +170,7 @@ public class GdprService {
     @Transactional
     public void restoreMyAccount(Long userId) {
         User u = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (u.getDeletionScheduledAt() != null) {
             u.setDeletionScheduledAt(null);
             userRepository.save(u);

@@ -74,7 +74,7 @@ public class ConnectorConnectionService {
     public void disconnect(String slug, Long userId, String key) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         if (!repository.existsByWorkspaceIdAndConnectorKey(ws.getId(), key)) {
-            throw new ResourceNotFoundException("Connecteur non connecté: " + key);
+            throw new ResourceNotFoundException("Connector not connected: " + key);
         }
         repository.deleteByWorkspaceIdAndConnectorKey(ws.getId(), key);
     }
@@ -83,12 +83,12 @@ public class ConnectorConnectionService {
 
     private ConnectorDescriptor requireGenericConnector(String key) {
         if (DEDICATED.contains(key)) {
-            throw new BusinessException("Ce connecteur se connecte via son flux dédié");
+            throw new BusinessException("This connector connects through its own flow");
         }
         ConnectorDescriptor descriptor = catalog.byKey(key)
-            .orElseThrow(() -> new ResourceNotFoundException("Connecteur inconnu: " + key));
+            .orElseThrow(() -> new ResourceNotFoundException("Unknown connector: " + key));
         if (descriptor.status() != ConnectorStatus.AVAILABLE) {
-            throw new BusinessException("Ce connecteur n'est pas encore disponible");
+            throw new BusinessException("This connector isn't available yet");
         }
         return descriptor;
     }
@@ -100,7 +100,7 @@ public class ConnectorConnectionService {
         for (ConnectorField field : descriptor.fields()) {
             String value = in.getOrDefault(field.key(), "").trim();
             if (field.required() && value.isEmpty()) {
-                throw new BusinessException("Champ requis manquant : " + field.label());
+                throw new BusinessException("Missing required field: " + field.label());
             }
             if (!value.isEmpty()) clean.put(field.key(), value);
         }

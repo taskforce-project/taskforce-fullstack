@@ -51,7 +51,7 @@ public interface DeliveryAgentProvider {
      * un handle. Défaut : non exécutable (un provider « pull » ne dispatche rien).
      */
     default DeliveryDispatch dispatch(AgentBrief brief) {
-        throw new UnsupportedOperationException(key() + " n'est pas encore exécutable");
+        throw new UnsupportedOperationException(key() + " can't run yet");
     }
 
     /**
@@ -61,6 +61,6 @@ public interface DeliveryAgentProvider {
      * {@link DeliveryDispatch#immediateResult()} et n'ont pas besoin de {@code poll}).
      */
     default DeliveryPoll poll(String externalRef, Long workspaceId) {
-        throw new UnsupportedOperationException(key() + " n'est pas encore exécutable");
+        throw new UnsupportedOperationException(key() + " can't run yet");
     }
 }

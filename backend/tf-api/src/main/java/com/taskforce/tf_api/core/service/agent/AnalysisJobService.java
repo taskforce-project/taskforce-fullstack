@@ -88,7 +88,7 @@ public class AnalysisJobService {
         Project project = projectRepository.findByIdAndWorkspaceId(projectId, ws.getId())
             .orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         AnalysisDepth resolved = depth != null ? depth : AnalysisDepth.QUICK;
         AnalysisJob job = jobRepository.save(AnalysisJob.builder()

@@ -57,7 +57,7 @@ public class OtpService {
         );
 
         if (recentAttempts >= MAX_OTP_ATTEMPTS_PER_HOUR) {
-            throw new RuntimeException("Trop de tentatives. Veuillez réessayer dans une heure.");
+            throw new RuntimeException("Too many attempts. Please try again in an hour.");
         }
 
         // Expirer tous les OTP en attente pour cet email

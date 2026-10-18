@@ -41,7 +41,7 @@ public class RunnerTokenService {
     /** Échec d'émission : un seul type, un seul message, quelle que soit la cause (pas d'oracle). */
     public static class InvalidRunnerCredentialsException extends RuntimeException {
         public InvalidRunnerCredentialsException() {
-            super("Identifiants du runner invalides");
+            super("Invalid runner credentials");
         }
     }
 

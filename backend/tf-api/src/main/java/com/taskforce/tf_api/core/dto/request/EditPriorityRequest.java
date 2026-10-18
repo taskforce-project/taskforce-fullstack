@@ -10,9 +10,9 @@ import lombok.Data;
 @Data
 public class EditPriorityRequest {
 
-    @Size(max = 500, message = "Le titre ne peut pas dépasser 500 caractères")
+    @Size(max = 500, message = "The title can't exceed 500 characters")
     private String title;
 
-    @Size(max = 2000, message = "La justification ne peut pas dépasser 2000 caractères")
+    @Size(max = 2000, message = "The rationale can't exceed 2000 characters")
     private String rationale;
 }

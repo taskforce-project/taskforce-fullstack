@@ -58,7 +58,7 @@ public class DeliveryRunner {
         try {
             DeliveryAgentProvider provider = registry.get(run.getProviderKey());
             if (provider == null) {
-                throw new IllegalStateException("Provider inconnu : " + run.getProviderKey());
+                throw new IllegalStateException("Unknown provider: " + run.getProviderKey());
             }
             if (provider.pullBased()) {
                 // Runner local (ADR-013) : rien à dispatcher, le backend ne peut pas joindre le poste de

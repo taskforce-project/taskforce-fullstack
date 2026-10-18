@@ -56,7 +56,7 @@ public class DeliveryController {
             .map(p -> new DeliveryProviderResponse(
                 p.key(), p.displayName(), p.logoKey(), p.available(), p.models()))
             .toList();
-        return ResponseEntity.ok(ApiResponse.success("Providers récupérés", providers));
+        return ResponseEntity.ok(ApiResponse.success("Providers retrieved", providers));
     }
 
     /**
@@ -75,7 +75,7 @@ public class DeliveryController {
         DeliveryRunResponse run = deliveryService.delegate(
             slug, issueId, request.getProviderKey(), request.getModel(), userId);
         deliveryRunner.execute(run.id()); // async, une fois le run committé
-        return ResponseEntity.ok(ApiResponse.success("Tâche déléguée", run));
+        return ResponseEntity.ok(ApiResponse.success("Task delegated", run));
     }
 
     /**
@@ -96,7 +96,7 @@ public class DeliveryController {
             deliveryRunner.refresh(run.id()); // transaction propre
             run = deliveryService.latestRun(slug, issueId, userId).orElse(run);
         }
-        return ResponseEntity.ok(ApiResponse.success("Run récupéré", run));
+        return ResponseEntity.ok(ApiResponse.success("Run retrieved", run));
     }
 
     /**
@@ -116,13 +116,13 @@ public class DeliveryController {
             queued.forEach(deliveryRunner::refresh);
             runs = deliveryService.listRuns(slug, userId);
         }
-        return ResponseEntity.ok(ApiResponse.success("Runs récupérés", runs));
+        return ResponseEntity.ok(ApiResponse.success("Runs retrieved", runs));
     }
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         return userRepository.findByEmail(email)
             .map(User::getId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 }

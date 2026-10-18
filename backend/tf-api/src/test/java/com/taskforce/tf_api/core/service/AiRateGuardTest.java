@@ -65,7 +65,7 @@ class AiRateGuardTest {
         when(ops.get(startsWith("ai:tpm:g:"))).thenReturn("8000"); // == globalTpm
         assertThatThrownBy(() -> guard.assertWithinRate(99L))
             .isInstanceOf(AiRateLimitedException.class)
-            .hasMessageContaining("satur");
+            .hasMessageContaining("busy");
     }
 
     @Test

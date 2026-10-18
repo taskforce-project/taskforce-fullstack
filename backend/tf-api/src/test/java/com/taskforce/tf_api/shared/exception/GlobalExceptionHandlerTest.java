@@ -37,10 +37,10 @@ class GlobalExceptionHandlerTest {
     @DisplayName("ResourceNotFoundException → 404 Not Found")
     void not_found_404() {
         ResponseEntity<ErrorResponse> r = handler.handleResourceNotFoundException(
-            new ResourceNotFoundException("Workspace introuvable"), req());
+            new ResourceNotFoundException("Workspace not found"), req());
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(r.getBody()).isNotNull();
-        assertThat(r.getBody().getMessage()).contains("introuvable");
+        assertThat(r.getBody().getMessage()).contains("not found");
         assertThat(r.getBody().getPath()).isEqualTo("/api/test");
     }
 
@@ -72,7 +72,7 @@ class GlobalExceptionHandlerTest {
     @DisplayName("ForbiddenException → 403 Forbidden")
     void forbidden_403() {
         ResponseEntity<ErrorResponse> r = handler.handleForbiddenException(
-            new ForbiddenException("Accès refusé"), req());
+            new ForbiddenException("Access denied"), req());
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 

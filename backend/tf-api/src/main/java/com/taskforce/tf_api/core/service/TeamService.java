@@ -57,7 +57,7 @@ public class TeamService {
     public TeamResponse createTeam(String slug, Long creatorId, CreateTeamRequest request) {
         Workspace workspace = resolveWorkspace(slug);
         User creator = userRepository.findById(creatorId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         Team team = Team.builder()
             .workspace(workspace)
@@ -125,11 +125,11 @@ public class TeamService {
         Team team = resolveTeam(slug, teamId);
 
         if (teamMemberRepository.existsByTeamIdAndUserId(teamId, request.getUserId())) {
-            throw new IllegalStateException("Cet utilisateur est déjà membre de cette équipe");
+            throw new IllegalStateException("This user is already a member of this team");
         }
 
         User user = userRepository.findById(request.getUserId())
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         TeamMember member = TeamMember.builder()
             .team(team)
@@ -145,7 +145,7 @@ public class TeamService {
     public void removeMember(String slug, Long teamId, Long userId) {
         resolveTeam(slug, teamId);
         if (!teamMemberRepository.existsByTeamIdAndUserId(teamId, userId)) {
-            throw new ResourceNotFoundException("Ce membre n'appartient pas à cette équipe");
+            throw new ResourceNotFoundException("This member doesn't belong to this team");
         }
         teamMemberRepository.deleteByTeamIdAndUserId(teamId, userId);
     }
@@ -156,15 +156,15 @@ public class TeamService {
 
     private Workspace resolveWorkspace(String slug) {
         return workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
     }
 
     private Team resolveTeam(String slug, Long teamId) {
         Workspace workspace = resolveWorkspace(slug);
         Team team = teamRepository.findById(teamId)
-            .orElseThrow(() -> new ResourceNotFoundException("Équipe introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Team not found"));
         if (!team.getWorkspace().getId().equals(workspace.getId())) {
-            throw new ResourceNotFoundException("Équipe introuvable dans ce workspace");
+            throw new ResourceNotFoundException("Team not found in this workspace");
         }
         return team;
     }

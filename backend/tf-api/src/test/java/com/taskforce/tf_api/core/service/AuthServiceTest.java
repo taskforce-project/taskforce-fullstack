@@ -127,7 +127,7 @@ class AuthServiceTest {
             assertThat(response).isNotNull();
             assertThat(response.isOtpSent()).isTrue();
             assertThat(response.getEmail()).isEqualTo(TEST_EMAIL);
-            assertThat(response.getMessage()).contains("code de vérification");
+            assertThat(response.getMessage()).contains("verification code");
 
             verify(keycloakService).createUser(
                 TEST_EMAIL,
@@ -187,7 +187,7 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.register(registerRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("déjà vérifié");
+                .hasMessageContaining("already verified");
 
             verify(otpService, never()).generateAndSendOtp(anyString(), anyString(), any(), any(), anyString());
         }
@@ -201,7 +201,7 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.register(registerRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("déjà utilisé");
+                .hasMessageContaining("already in use");
 
             verify(keycloakService, never()).createUser(anyString(), anyString(), anyString(), anyString());
         }
@@ -213,11 +213,11 @@ class AuthServiceTest {
             // Keycloak et l'envoi de courriels. La contrôler après aurait laissé passer le coût
             // qu'elle est censée éviter.
             when(humanChallengeService.verify(any()))
-                .thenReturn("Formulaire soumis trop rapidement. Réessayez.");
+                .thenReturn("The form was submitted too quickly. Please try again.");
 
             assertThatThrownBy(() -> authService.register(registerRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("trop rapidement");
+                .hasMessageContaining("too quickly");
 
             verify(userRepository, never()).existsByEmail(anyString());
             verify(keycloakService, never()).createUser(anyString(), anyString(), anyString(), anyString());
@@ -266,7 +266,7 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.register(registerRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("déjà vérifié");
+                .hasMessageContaining("already verified");
         }
 
         @Test
@@ -344,7 +344,7 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.verifyOtpAndCompleteRegistration(verifyRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("invalide ou expiré");
+                .hasMessageContaining("Invalid or expired");
 
             verify(userRepository, never()).save(any(User.class));
         }
@@ -407,7 +407,7 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("vérifier votre email");
+                .hasMessageContaining("verify your email");
 
             verify(userRepository, never()).findByKeycloakId(anyString());
         }
@@ -425,7 +425,7 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("désactivé");
+                .hasMessageContaining("disabled");
         }
 
         @Test
@@ -457,7 +457,7 @@ class AuthServiceTest {
         @DisplayName("devrait lancer exception si credentials invalides")
         void login_shouldThrowException_whenInvalidCredentials() {
             // Given
-            doThrow(new RuntimeException("Email ou mot de passe incorrect"))
+            doThrow(new RuntimeException("Invalid email or password"))
                 .when(keycloakAuthService).authenticate(TEST_EMAIL, "WrongPassword");
 
             loginRequest = TestDataBuilder.buildLoginRequest(TEST_EMAIL, "WrongPassword");
@@ -465,7 +465,7 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Email ou mot de passe incorrect");
+                .hasMessageContaining("Invalid email or password");
 
             verify(userRepository, never()).findByKeycloakId(anyString());
         }
@@ -508,12 +508,12 @@ class AuthServiceTest {
             when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
             when(userRepository.findByKeycloakId(TEST_KEYCLOAK_ID)).thenReturn(Optional.of(user));
             when(twoFactorService.isEnabled(user.getId())).thenReturn(true);
-            doThrow(new BusinessException("Code d'authentification invalide"))
+            doThrow(new BusinessException("Invalid authentication code"))
                 .when(twoFactorService).verifyOrThrow(user.getId(), "000000");
 
             assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("invalide");
+                .hasMessageContaining("Invalid authentication code");
         }
     }
 
@@ -543,7 +543,7 @@ class AuthServiceTest {
             // Then
             assertThat(response).isNotNull();
             assertThat(response.isOtpSent()).isTrue();
-            assertThat(response.getMessage()).contains("nouveau code");
+            assertThat(response.getMessage()).contains("new verification code");
 
             verify(otpService).generateAndSendOtp(
                 eq(TEST_EMAIL),
@@ -564,7 +564,7 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.resendOtp(TEST_EMAIL))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("déjà vérifié");
+                .hasMessageContaining("already verified");
 
             verify(otpService, never()).generateAndSendOtp(anyString(), anyString(), any(), any(), anyString());
         }
@@ -613,7 +613,7 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.forgotPassword(TEST_EMAIL))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Aucun compte");
+                .hasMessageContaining("No account");
 
             verify(otpService, never()).generateAndSendOtp(anyString(), anyString(), any(), any(), anyString());
         }
@@ -659,7 +659,7 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.resetPassword(TEST_EMAIL, "WRONGCODE", "NewPassword123!"))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("invalide ou expiré");
+                .hasMessageContaining("Invalid or expired");
 
             verify(keycloakService, never()).updatePassword(anyString(), anyString());
         }

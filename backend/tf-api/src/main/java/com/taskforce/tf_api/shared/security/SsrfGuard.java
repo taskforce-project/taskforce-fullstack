@@ -36,16 +36,16 @@ public final class SsrfGuard {
         try {
             uri = URI.create(raw.trim());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("URL invalide");
+            throw new IllegalArgumentException("Invalid URL");
         }
         final String scheme = uri.getScheme();
         if (scheme == null
                 || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
-            throw new IllegalArgumentException("Seules les URL http(s) sont autorisées");
+            throw new IllegalArgumentException("Only http(s) URLs are allowed");
         }
         String host = uri.getHost();
         if (host == null || host.isBlank()) {
-            throw new IllegalArgumentException("Hôte de l'URL manquant ou invalide");
+            throw new IllegalArgumentException("The URL host is missing or invalid");
         }
         // Littéral IPv6 : retirer les crochets ([::1] → ::1) pour la résolution.
         if (host.startsWith("[") && host.endsWith("]") && host.length() > 2) {
@@ -61,11 +61,11 @@ public final class SsrfGuard {
         try {
             addresses = InetAddress.getAllByName(asciiHost);
         } catch (UnknownHostException e) {
-            throw new IllegalArgumentException("Hôte de l'URL introuvable");
+            throw new IllegalArgumentException("The URL host can't be resolved");
         }
         for (InetAddress addr : addresses) {
             if (isBlocked(addr)) {
-                throw new IllegalArgumentException("URL vers une adresse interne interdite (SSRF)");
+                throw new IllegalArgumentException("URLs that point to an internal address are not allowed (SSRF)");
             }
         }
     }

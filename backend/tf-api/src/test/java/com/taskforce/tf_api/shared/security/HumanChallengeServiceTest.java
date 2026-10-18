@@ -61,11 +61,11 @@ class HumanChallengeServiceTest {
     @ParameterizedTest(name = "vérifié à T+{0}s → refusé ({1})")
     @DisplayName("refuse en deçà du délai humain et au-delà de la validité")
     @CsvSource({
-        "0,    trop rapidement",   // soumission instantanée : signature d'un automate
-        "1,    trop rapidement",
-        "2,    trop rapidement",
-        "3601, expirée",           // une seconde après l'heure
-        "86400, expirée",
+        "0,    too quickly",   // soumission instantanée : signature d'un automate
+        "1,    too quickly",
+        "2,    too quickly",
+        "3601, expired",       // une seconde après l'heure
+        "86400, expired",
     })
     void rejects_outside_the_window(long seconds, String motifAttendu) {
         String token = tokenIssuedAtT0();
@@ -81,7 +81,7 @@ class HumanChallengeServiceTest {
         // Émis à T0, vérifié à T0 − 10 s : incohérence d'horloge ou jeton fabriqué.
         String token = tokenIssuedAtT0();
 
-        assertThat(at(Duration.ofSeconds(-10)).verify(token)).containsIgnoringCase("expirée");
+        assertThat(at(Duration.ofSeconds(-10)).verify(token)).containsIgnoringCase("expired");
     }
 
     @ParameterizedTest(name = "jeton = « {0} » → refusé")
@@ -104,7 +104,7 @@ class HumanChallengeServiceTest {
         String tokenEtranger = autreServeur.issue();
 
         assertThat(at(Duration.ofSeconds(30)).verify(tokenEtranger))
-            .containsIgnoringCase("invalide");
+            .containsIgnoringCase("invalid");
     }
 
     @Test
@@ -115,7 +115,7 @@ class HumanChallengeServiceTest {
         // On rajeunit le jeton pour prolonger sa validité : la signature ne suit pas.
         String falsifie = parts[0] + "." + T0.plus(Duration.ofHours(5)).toEpochMilli() + "." + parts[2];
 
-        assertThat(at(Duration.ofHours(5)).verify(falsifie)).containsIgnoringCase("invalide");
+        assertThat(at(Duration.ofHours(5)).verify(falsifie)).containsIgnoringCase("invalid");
     }
 
     @Test

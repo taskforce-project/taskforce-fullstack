@@ -93,20 +93,20 @@ public class KeycloakAuthService {
                 log.info("Authentification réussie pour : {}", email);
                 return tokenResponse;
             } else {
-                throw new RuntimeException("Échec de l'authentification Keycloak");
+                throw new RuntimeException("Authentication with the identity provider failed");
             }
 
         } catch (HttpClientErrorException.Unauthorized e) {
             log.error("Échec d'authentification pour {} : credentials invalides", email);
-            throw new RuntimeException("Email ou mot de passe incorrect");
+            throw new RuntimeException("Invalid email or password");
 
         } catch (HttpClientErrorException e) {
             log.error("Erreur HTTP lors de l'authentification : {}", e.getMessage());
-            throw new RuntimeException("Erreur lors de l'authentification : " + e.getMessage());
+            throw new RuntimeException("Authentication error: " + e.getMessage());
 
         } catch (Exception e) {
             log.error("Erreur lors de l'authentification Keycloak : {}", e.getMessage());
-            throw new RuntimeException("Erreur lors de l'authentification");
+            throw new RuntimeException("Authentication error");
         }
     }
 
@@ -148,12 +148,12 @@ public class KeycloakAuthService {
                     .refreshExpiresIn(((Number) body.get("refresh_expires_in")).intValue())
                     .build();
             } else {
-                throw new RuntimeException("Échec du rafraîchissement du token");
+                throw new RuntimeException("Token refresh failed");
             }
 
         } catch (Exception e) {
             log.error("Erreur lors du rafraîchissement du token : {}", e.getMessage());
-            throw new RuntimeException("Token de rafraîchissement invalide");
+            throw new RuntimeException("Invalid refresh token");
         }
     }
 

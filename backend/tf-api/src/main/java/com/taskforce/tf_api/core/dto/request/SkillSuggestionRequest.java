@@ -14,10 +14,10 @@ import lombok.Data;
 @Data
 public class SkillSuggestionRequest {
 
-    @NotBlank(message = "Le rôle est requis pour proposer des compétences")
-    @Size(max = 150, message = "Le rôle ne peut dépasser 150 caractères")
+    @NotBlank(message = "A role is needed to suggest skills")
+    @Size(max = 150, message = "The role can't exceed 150 characters")
     private String role;
 
-    @Size(max = 50, message = "50 compétences déjà sélectionnées maximum")
+    @Size(max = 50, message = "50 selected skills at most")
     private List<String> existingSkills;
 }

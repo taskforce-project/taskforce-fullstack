@@ -70,9 +70,9 @@ public class RetentionScheduler {
      */
     @Scheduled(cron = "${taskforce.retention.cron:0 30 3 * * *}")
     public void applyRetentionPolicies() {
-        int otps        = purge("codes OTP expirés",       otpService::cleanupExpiredOtps);
-        int states      = purge("states OAuth expirés",    this::purgeOauthStates);
-        int invitations = purge("invitations sans suite",  this::purgeStaleInvitations);
+        int otps        = purge("expired OTP codes",       otpService::cleanupExpiredOtps);
+        int states      = purge("expired OAuth states",    this::purgeOauthStates);
+        int invitations = purge("unanswered invitations",  this::purgeStaleInvitations);
 
         log.info("Rétention appliquée : {} OTP, {} states OAuth, {} invitations supprimés",
             otps, states, invitations);

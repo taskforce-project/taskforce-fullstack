@@ -256,7 +256,7 @@ class WorkspaceInvitationServiceIntegrationTest extends AbstractIntegrationTest 
             assertThatThrownBy(() -> service.createInvitation(SLUG, owner.getId(),
                     projectReq(dev.getEmail(), project.getId(), ProjectRole.MEMBER)))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("déjà membre du projet");
+                .hasMessageContaining("already a member of the project");
         }
     }
 }

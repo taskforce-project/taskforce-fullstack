@@ -56,10 +56,10 @@ public class DeliveryService {
 
         DeliveryAgentProvider provider = registry.get(providerKey);
         if (provider == null) {
-            throw new BusinessException("Provider inconnu : " + providerKey);
+            throw new BusinessException("Unknown provider: " + providerKey);
         }
         if (!provider.available()) {
-            throw new BusinessException("Ce provider n'est pas encore disponible : " + providerKey);
+            throw new BusinessException("This provider isn't available yet: " + providerKey);
         }
 
         String resolvedModel = (model != null && !model.isBlank())
@@ -133,10 +133,10 @@ public class DeliveryService {
     /** Charge une issue en la scopant au workspace du chemin (cross-tenant -> 404, pas 403). */
     private Issue scopedIssue(String slug, Long issueId) {
         Issue issue = issueRepository.findById(issueId)
-            .orElseThrow(() -> new ResourceNotFoundException("Issue introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
         if (issue.getProject() == null || issue.getProject().getWorkspace() == null
             || !slug.equals(issue.getProject().getWorkspace().getSlug())) {
-            throw new ResourceNotFoundException("Issue introuvable");
+            throw new ResourceNotFoundException("Issue not found");
         }
         return issue;
     }

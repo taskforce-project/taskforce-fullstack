@@ -45,7 +45,7 @@ public class NotificationController {
     ) {
         Long userId = resolveUserId(jwt);
         List<NotificationResponse> notifications = notificationService.listNotifications(slug, userId);
-        return ResponseEntity.ok(ApiResponse.success("Notifications récupérées", notifications));
+        return ResponseEntity.ok(ApiResponse.success("Notifications retrieved", notifications));
     }
 
     /**
@@ -60,7 +60,7 @@ public class NotificationController {
     ) {
         Long userId = resolveUserId(jwt);
         NotificationResponse response = notificationService.markAsRead(id, userId);
-        return ResponseEntity.ok(ApiResponse.success("Notification marquée comme lue", response));
+        return ResponseEntity.ok(ApiResponse.success("Notification marked as read", response));
     }
 
     /**
@@ -75,7 +75,7 @@ public class NotificationController {
     ) {
         Long userId = resolveUserId(jwt);
         NotificationResponse response = notificationService.acknowledge(id, userId);
-        return ResponseEntity.ok(ApiResponse.success("Notification acquittée", response));
+        return ResponseEntity.ok(ApiResponse.success("Notification acknowledged", response));
     }
 
     /**
@@ -89,7 +89,7 @@ public class NotificationController {
     ) {
         Long userId = resolveUserId(jwt);
         notificationService.markAllAsRead(slug, userId);
-        return ResponseEntity.ok(ApiResponse.success("Toutes les notifications marquées comme lues", null));
+        return ResponseEntity.ok(ApiResponse.success("All notifications marked as read", null));
     }
 
     /**
@@ -103,7 +103,7 @@ public class NotificationController {
     ) {
         Long userId = resolveUserId(jwt);
         notificationService.acknowledgeAll(slug, userId);
-        return ResponseEntity.ok(ApiResponse.success("Toutes les notifications acquittées", null));
+        return ResponseEntity.ok(ApiResponse.success("All notifications acknowledged", null));
     }
 
     // -------------------------------------------------------------------------
@@ -111,7 +111,7 @@ public class NotificationController {
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

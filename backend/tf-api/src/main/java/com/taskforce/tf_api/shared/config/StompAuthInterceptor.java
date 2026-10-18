@@ -75,7 +75,7 @@ public class StompAuthInterceptor implements ChannelInterceptor {
         String authorization = accessor.getFirstNativeHeader("Authorization");
         if (authorization == null || !authorization.startsWith("Bearer ")) {
             log.warn("STOMP CONNECT refusé : aucun token Bearer");
-            throw new MessageDeliveryException("Authentification requise");
+            throw new MessageDeliveryException("Authentication required");
         }
 
         Jwt jwt;
@@ -83,7 +83,7 @@ public class StompAuthInterceptor implements ChannelInterceptor {
             jwt = jwtDecoder.decode(authorization.substring(7));
         } catch (Exception ex) {
             log.warn("STOMP CONNECT refusé : token invalide — {}", ex.getMessage());
-            throw new MessageDeliveryException("Token invalide");
+            throw new MessageDeliveryException("Invalid token");
         }
 
         // Passe par le resolver plutôt que jwt.getClaimAsString("email") : en profil dev un token sans
@@ -93,7 +93,7 @@ public class StompAuthInterceptor implements ChannelInterceptor {
             email = identityResolver.resolveEmail(jwt);
         } catch (Exception ex) {
             log.warn("STOMP CONNECT refusé : identité illisible — {}", ex.getMessage());
-            throw new MessageDeliveryException("Identité illisible");
+            throw new MessageDeliveryException("Unreadable identity");
         }
 
         return userRepository.findByEmail(email)
@@ -103,7 +103,7 @@ public class StompAuthInterceptor implements ChannelInterceptor {
             })
             .orElseThrow(() -> {
                 log.warn("STOMP CONNECT refusé : utilisateur {} introuvable", email);
-                return new MessageDeliveryException("Utilisateur inconnu");
+                return new MessageDeliveryException("Unknown user");
             });
     }
 
@@ -128,29 +128,29 @@ public class StompAuthInterceptor implements ChannelInterceptor {
         String principal = accessor.getUser() != null ? accessor.getUser().getName() : null;
         if (principal == null) {
             log.warn("STOMP SUBSCRIBE refusé sur {} : session non authentifiée", destination);
-            throw new MessageDeliveryException("Authentification requise");
+            throw new MessageDeliveryException("Authentication required");
         }
         long userId;
         try {
             userId = Long.parseLong(principal);
         } catch (NumberFormatException ex) {
-            throw new MessageDeliveryException("Identité illisible");
+            throw new MessageDeliveryException("Unreadable identity");
         }
 
         if (destination.startsWith(USER_TOPIC_PREFIX)) {
             if (!principal.equals(destination.substring(USER_TOPIC_PREFIX.length()))) {
                 log.warn("STOMP SUBSCRIBE refusé : user {} a tenté de lire les notifications d'un autre", principal);
-                throw new MessageDeliveryException("Accès refusé à ce canal");
+                throw new MessageDeliveryException("Access to this channel is denied");
             }
         } else if (destination.startsWith(PROJECT_TOPIC_PREFIX)) {
             if (!realtimeAuth.canSubscribeProject(userId, parseId(destination, PROJECT_TOPIC_PREFIX))) {
                 log.warn("STOMP SUBSCRIBE refusé : user {} sans accès au canal {}", userId, destination);
-                throw new MessageDeliveryException("Accès refusé à ce canal");
+                throw new MessageDeliveryException("Access to this channel is denied");
             }
         } else if (destination.startsWith(ANALYSIS_TOPIC_PREFIX)) {
             if (!realtimeAuth.canSubscribeWorkspace(userId, parseId(destination, ANALYSIS_TOPIC_PREFIX))) {
                 log.warn("STOMP SUBSCRIBE refusé : user {} sans accès au canal {}", userId, destination);
-                throw new MessageDeliveryException("Accès refusé à ce canal");
+                throw new MessageDeliveryException("Access to this channel is denied");
             }
         }
         // Autres canaux : la session authentifiée suffit (aucun flux cross-tenant connu au-delà de ces 3).
@@ -161,7 +161,7 @@ public class StompAuthInterceptor implements ChannelInterceptor {
         try {
             return Long.parseLong(destination.substring(prefix.length()));
         } catch (NumberFormatException ex) {
-            throw new MessageDeliveryException("Canal invalide");
+            throw new MessageDeliveryException("Invalid channel");
         }
     }
 }

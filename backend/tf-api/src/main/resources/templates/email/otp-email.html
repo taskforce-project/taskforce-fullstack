@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Code de vérification - TaskForce</title>
+    <title>Verification code - TaskForce</title>
     <style>
         * {
             margin: 0;
@@ -156,36 +156,30 @@
         </div>
 
         <div class="content">
-            <div class="greeting">Bonjour <span th:text="${firstName}">Prénom</span>,</div>
+            <div class="greeting">Hi <span th:text="${firstName}">there</span>,</div>
 
             <div class="message">
-                Merci de votre inscription sur TaskForce. Pour finaliser la création de votre compte,
-                veuillez utiliser le code de vérification ci-dessous.
+                Thanks for signing up for TaskForce. To finish creating your account, enter the
+                verification code below.
             </div>
 
             <div class="otp-card">
-                <div class="otp-label">Code de vérification</div>
+                <div class="otp-label">Verification code</div>
                 <div class="otp-code" th:text="${otpCode}">123456</div>
             </div>
 
             <div class="info-box">
-                ⏱️ Ce code expire dans <strong>15 minutes</strong>. Si vous n'avez pas demandé ce code, ignorez cet
-                email.
+                ⏱️ This code expires in <strong>15 minutes</strong>. If you didn't ask for it, you can ignore
+                this email.
             </div>
 
             <div class="security-note">
-                🔒 Pour votre sécurité, ne partagez jamais ce code. Notre équipe ne vous demandera jamais
-                votre code de vérification par email ou téléphone.
+                🔒 Never share this code. Nobody will ever ask you for it by email or phone.
             </div>
         </div>
 
         <div class="footer">
-            <p class="footer-text">© 2026 TaskForce. Tous droits réservés.</p>
-            <div class="footer-links">
-                <a href="#" class="footer-link">Centre d'aide</a>
-                <a href="#" class="footer-link">Confidentialité</a>
-                <a href="#" class="footer-link">Contact</a>
-            </div>
+            <p class="footer-text">Sent by TaskForce, open-source project management.</p>
         </div>
     </div>
 </body>

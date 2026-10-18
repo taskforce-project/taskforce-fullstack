@@ -53,7 +53,7 @@ public class RunnerIdentityResolver {
             && ("service-account-" + clientId).equalsIgnoreCase(username)
             && owner != null && !owner.isBlank();
         if (!valid) {
-            throw new ForbiddenException("Jeton de runner invalide");
+            throw new ForbiddenException("Invalid runner token");
         }
         return new RunnerIdentity(clientId, owner.trim().toLowerCase(Locale.ROOT));
     }

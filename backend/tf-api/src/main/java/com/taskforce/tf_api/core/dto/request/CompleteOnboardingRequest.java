@@ -10,6 +10,6 @@ import lombok.Data;
 @Data
 public class CompleteOnboardingRequest {
 
-    @Size(max = 150, message = "Le rôle ne peut dépasser 150 caractères")
+    @Size(max = 150, message = "The role can't exceed 150 characters")
     private String jobTitle;
 }

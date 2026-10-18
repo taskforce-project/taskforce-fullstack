@@ -65,7 +65,7 @@ public class IntegrationController {
     private void requireManager(String slug, Jwt jwt) {
         Long wsId = workspaceRepository.findBySlug(slug)
             .map(Workspace::getId)
-            .orElseThrow(() -> new ResourceNotFoundException("Espace de travail introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         authorizationService.requireManager(wsId, resolveUser(jwt).getId());
     }
 
@@ -96,7 +96,7 @@ public class IntegrationController {
         connectorConnectionService.connect(
             slug, resolveUser(jwt).getId(), key,
             request != null ? request.getConfig() : null);
-        return ResponseEntity.ok(ApiResponse.success("Connecteur connecté", null));
+        return ResponseEntity.ok(ApiResponse.success("Connector connected", null));
     }
 
     @DeleteMapping("/api/workspaces/{slug}/integrations/connectors/{key}")
@@ -107,7 +107,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         connectorConnectionService.disconnect(slug, resolveUser(jwt).getId(), key);
-        return ResponseEntity.ok(ApiResponse.success("Connecteur déconnecté", null));
+        return ResponseEntity.ok(ApiResponse.success("Connector disconnected", null));
     }
 
     // ====================================================================
@@ -143,7 +143,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         GitHubSyncResponse result = gitHubService.sync(slug, resolveUser(jwt).getId(), repo);
-        return ResponseEntity.ok(ApiResponse.success("Synchronisation GitHub terminée", result));
+        return ResponseEntity.ok(ApiResponse.success("GitHub sync completed", result));
     }
 
     /**
@@ -183,7 +183,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         gitHubService.disconnect(slug);
-        return ResponseEntity.ok(ApiResponse.success("GitHub déconnecté", null));
+        return ResponseEntity.ok(ApiResponse.success("GitHub disconnected", null));
     }
 
     // ====================================================================
@@ -200,7 +200,7 @@ public class IntegrationController {
         User user = resolveUser(jwt);
         GitHubLinkResponse link = gitHubService.addLink(slug, issueId, req, user);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Lien GitHub ajouté", link));
+            .body(ApiResponse.success("GitHub link added", link));
     }
 
     @GetMapping("/api/workspaces/{slug}/integrations/github/issues/{issueId}/links")
@@ -219,7 +219,7 @@ public class IntegrationController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         gitHubService.deleteLink(slug, linkId, resolveUser(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Lien GitHub supprimé", null));
+        return ResponseEntity.ok(ApiResponse.success("GitHub link removed", null));
     }
 
     // ====================================================================
@@ -262,7 +262,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         slackService.disconnect(slug);
-        return ResponseEntity.ok(ApiResponse.success("Slack déconnecté", null));
+        return ResponseEntity.ok(ApiResponse.success("Slack disconnected", null));
     }
 
     // ====================================================================
@@ -278,7 +278,7 @@ public class IntegrationController {
         requireManager(slug, jwt);
         SlackChannelResponse channel = slackService.addChannel(slug, req);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Canal Slack ajouté", channel));
+            .body(ApiResponse.success("Slack channel added", channel));
     }
 
     @GetMapping("/api/workspaces/{slug}/integrations/slack/channels")
@@ -296,7 +296,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         slackService.deleteChannel(slug, channelId);
-        return ResponseEntity.ok(ApiResponse.success("Canal Slack supprimé", null));
+        return ResponseEntity.ok(ApiResponse.success("Slack channel removed", null));
     }
 
     /** Ingere l'historique d'un canal Slack dans le Brain OS (dedupe, embedde). Reserve OWNER/ADMIN. */
@@ -308,7 +308,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         SlackSyncResponse result = slackService.sync(slug, resolveUser(jwt).getId(), channel);
-        return ResponseEntity.ok(ApiResponse.success("Synchronisation Slack terminée", result));
+        return ResponseEntity.ok(ApiResponse.success("Slack sync completed", result));
     }
 
     // ====================================================================
@@ -330,7 +330,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         PlaneStatusResponse status = planeService.connect(slug, resolveUser(jwt).getId(), request);
-        return ResponseEntity.ok(ApiResponse.success("Plane connecté", status));
+        return ResponseEntity.ok(ApiResponse.success("Plane connected", status));
     }
 
     @GetMapping("/api/workspaces/{slug}/integrations/plane/projects")
@@ -348,7 +348,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         PlaneSyncResponse result = planeService.sync(slug, resolveUser(jwt).getId(), projectId);
-        return ResponseEntity.ok(ApiResponse.success("Synchronisation Plane terminée", result));
+        return ResponseEntity.ok(ApiResponse.success("Plane sync completed", result));
     }
 
     @DeleteMapping("/api/workspaces/{slug}/integrations/plane")
@@ -357,7 +357,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         planeService.disconnect(slug, resolveUser(jwt).getId());
-        return ResponseEntity.ok(ApiResponse.success("Plane déconnecté", null));
+        return ResponseEntity.ok(ApiResponse.success("Plane disconnected", null));
     }
 
     // ====================================================================
@@ -367,6 +367,6 @@ public class IntegrationController {
     private User resolveUser(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         return userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 }

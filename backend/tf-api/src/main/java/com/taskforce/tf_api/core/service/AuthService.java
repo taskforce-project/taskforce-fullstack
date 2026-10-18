@@ -81,7 +81,7 @@ public class AuthService {
 
         // Vérifier si l'email existe déjà dans notre DB (utilisateur complètement enregistré)
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Cet email est déjà utilisé. Veuillez vous connecter.");
+            throw new RuntimeException("This email is already in use. Please sign in.");
         }
 
         String keycloakId;
@@ -95,7 +95,7 @@ public class AuthService {
             
             // Si l'email est déjà vérifié, l'utilisateur doit se connecter
             if (Boolean.TRUE.equals(keycloakUser.isEmailVerified())) {
-                throw new RuntimeException("Cet email est déjà vérifié. Veuillez vous connecter.");
+                throw new RuntimeException("This email is already verified. Please sign in.");
             }
             
             // L'utilisateur existe mais n'est pas encore vérifié → renvoyer OTP (idempotent)
@@ -121,7 +121,7 @@ public class AuthService {
                     
                     // Vérifier si l'email est vérifié
                     if (Boolean.TRUE.equals(keycloakUser.isEmailVerified())) {
-                        throw new RuntimeException("Cet email est déjà vérifié. Veuillez vous connecter.");
+                        throw new RuntimeException("This email is already verified. Please sign in.");
                     }
                     
                     keycloakId = keycloakUser.getId();
@@ -148,7 +148,7 @@ public class AuthService {
             request.getEmail());
 
         return RegisterResponse.builder()
-            .message("Un code de vérification a été envoyé à votre adresse email")
+            .message("A verification code has been sent to your email address")
             .email(request.getEmail())
             .otpSent(true)
             .otpExpiresInMinutes(15)
@@ -168,7 +168,7 @@ public class AuthService {
         OtpVerification otpVerification = otpService.verifyOtpAndGetDetails(request.getEmail(), request.getOtpCode());
 
         if (otpVerification == null) {
-            throw new RuntimeException("Code de vérification invalide ou expiré");
+            throw new RuntimeException("Invalid or expired verification code");
         }
 
         // Récupérer l'utilisateur depuis Keycloak
@@ -202,7 +202,7 @@ public class AuthService {
         // mot de passe, absent à ce stade). Le compte est prêt ; le front redirige vers /login.
         return VerifyOtpResponse.builder()
             .verified(true)
-            .message("Email vérifié avec succès. Vous pouvez maintenant vous connecter.")
+            .message("Email verified. You can now sign in.")
             .authData(null)
             .build();
     }
@@ -228,14 +228,14 @@ public class AuthService {
             log.info("Authentification Keycloak réussie pour : {}", request.getEmail());
         } catch (RuntimeException e) {
             log.error("Échec d'authentification Keycloak pour {} : {}", request.getEmail(), e.getMessage());
-            throw new RuntimeException("Email ou mot de passe incorrect");
+            throw new RuntimeException("Invalid email or password");
         }
 
         // Récupérer l'utilisateur depuis Keycloak
         UserRepresentation keycloakUser = keycloakService.getUserByEmail(request.getEmail());
 
         if (!keycloakUser.isEmailVerified()) {
-            throw new RuntimeException("Veuillez vérifier votre email avant de vous connecter");
+            throw new RuntimeException("Please verify your email before signing in");
         }
 
         // Récupérer ou créer l'utilisateur dans notre DB
@@ -257,7 +257,7 @@ public class AuthService {
             });
 
         if (!user.getIsActive()) {
-            throw new RuntimeException("Ce compte est désactivé");
+            throw new RuntimeException("This account is disabled");
         }
 
         // 2FA géré par l'app : le mot de passe est bon. Si le 2FA est actif, on exige un code TOTP
@@ -292,7 +292,7 @@ public class AuthService {
         UserRepresentation keycloakUser = keycloakService.getUserByEmail(email);
 
         if (keycloakUser.isEmailVerified()) {
-            throw new RuntimeException("Cet email est déjà vérifié");
+            throw new RuntimeException("This email is already verified");
         }
 
         // Générer et envoyer un nouveau code OTP
@@ -305,7 +305,7 @@ public class AuthService {
         );
 
         return RegisterResponse.builder()
-            .message("Un nouveau code de vérification a été envoyé")
+            .message("A new verification code has been sent")
             .email(email)
             .otpSent(true)
             .otpExpiresInMinutes(15)
@@ -323,7 +323,7 @@ public class AuthService {
 
         // Vérifier que l'utilisateur existe dans Keycloak
         if (!keycloakService.emailExists(email)) {
-            throw new RuntimeException("Aucun compte associé à cet email");
+            throw new RuntimeException("No account uses this email");
         }
 
         UserRepresentation keycloakUser = keycloakService.getUserByEmail(email);
@@ -354,7 +354,7 @@ public class AuthService {
         boolean isValid = otpService.verifyOtpWithType(email, otpCode, OtpType.PASSWORD_RESET);
 
         if (!isValid) {
-            throw new RuntimeException("Code de vérification invalide ou expiré");
+            throw new RuntimeException("Invalid or expired verification code");
         }
 
         // Récupérer l'utilisateur Keycloak
@@ -380,10 +380,10 @@ public class AuthService {
 
         String email = extractClaim(kcToken.getAccessToken(), "email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+            .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (!user.getIsActive()) {
-            throw new RuntimeException("Ce compte est désactivé");
+            throw new RuntimeException("This account is disabled");
         }
 
         log.info("Token rafraîchi pour : {}", user.getEmail());
@@ -445,8 +445,8 @@ public class AuthService {
             // Un compte GitHub peut n'exposer aucune adresse publique. Sans adresse nous ne pouvons
             // ni rattacher un compte existant, ni en créer un cohérent : mieux vaut le dire.
             throw new RuntimeException(
-                "Votre compte externe ne fournit pas d'adresse e-mail. "
-                + "Rendez-la visible chez le fournisseur, ou utilisez l'inscription classique.");
+                "Your external account doesn't share an email address. "
+                + "Make it visible at the provider, or sign up with email and password.");
         }
 
         // Fix M7 (TF-SEC-OAUTH-VERIFY) : refuser une connexion externe dont le fournisseur déclare l'e-mail
@@ -460,8 +460,8 @@ public class AuthService {
             Boolean.FALSE.equals(verifiedClaim) || "false".equalsIgnoreCase(str(verifiedClaim));
         if (explicitlyUnverified) {
             throw new RuntimeException(
-                "L'adresse e-mail de votre compte externe n'est pas vérifiée. "
-                + "Vérifiez-la chez le fournisseur, puis réessayez.");
+                "The email address of your external account isn't verified. "
+                + "Verify it at the provider, then try again.");
         }
 
         boolean creation = userRepository.findByEmail(email).isEmpty();
@@ -478,7 +478,7 @@ public class AuthService {
         });
 
         if (!user.getIsActive()) {
-            throw new RuntimeException("Ce compte est désactivé");
+            throw new RuntimeException("This account is disabled");
         }
 
         // Rattrapage : un compte créé par mot de passe (donc sans photo) qui se connecte ensuite par
@@ -595,7 +595,7 @@ public class AuthService {
         try {
             return JWTParser.parse(jwt).getJWTClaimsSet().getStringClaim(claim);
         } catch (ParseException e) {
-            throw new RuntimeException("Token invalide");
+            throw new RuntimeException("Invalid token");
         }
     }
 

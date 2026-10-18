@@ -73,7 +73,7 @@ public class AuthController {
             "turnstileSiteKey", turnstileSiteKey == null ? "" : turnstileSiteKey,
             "turnstileRequired", turnstileService.isEnabled()
         );
-        return ResponseEntity.ok(ApiResponse.success("Défi émis", payload));
+        return ResponseEntity.ok(ApiResponse.success("Challenge issued", payload));
     }
 
     /**
@@ -104,7 +104,7 @@ public class AuthController {
             RegisterResponse response = authService.register(request);
 
             return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Inscription réussie. Veuillez vérifier votre email.", response));
+                .body(ApiResponse.success("Account created. Please verify your email.", response));
 
         } catch (Exception e) {
             log.error("Erreur lors de l'inscription : {}", e.getMessage());
@@ -128,7 +128,7 @@ public class AuthController {
             VerifyOtpResponse response = authService.verifyOtpAndCompleteRegistration(request);
 
             return ResponseEntity.ok(
-                ApiResponse.success("Email vérifié avec succès", response)
+                ApiResponse.success("Email verified", response)
             );
 
         } catch (Exception e) {
@@ -152,7 +152,7 @@ public class AuthController {
             RegisterResponse response = authService.resendOtp(request.getEmail());
 
             return ResponseEntity.ok(
-                ApiResponse.success("Code de vérification renvoyé", response)
+                ApiResponse.success("Verification code resent", response)
             );
 
         } catch (Exception e) {
@@ -174,7 +174,7 @@ public class AuthController {
 
         try {
             AuthResponse response = authService.login(request);
-            return withRefreshCookie(response, "Connexion réussie");
+            return withRefreshCookie(response, "Signed in");
 
         } catch (Exception e) {
             log.error("Erreur lors de la connexion : {}", e.getMessage());
@@ -213,7 +213,7 @@ public class AuthController {
             authService.forgotPassword(request.getEmail());
 
             return ResponseEntity.ok(
-                ApiResponse.<Void>success("Un code de vérification a été envoyé à votre adresse email", null)
+                ApiResponse.<Void>success("A verification code has been sent to your email address", null)
             );
 
         } catch (Exception e) {
@@ -237,7 +237,7 @@ public class AuthController {
             authService.resetPassword(request.getEmail(), request.getOtpCode(), request.getNewPassword());
 
             return ResponseEntity.ok(
-                ApiResponse.<Void>success("Mot de passe réinitialisé avec succès", null)
+                ApiResponse.<Void>success("Password reset", null)
             );
 
         } catch (Exception e) {
@@ -271,7 +271,7 @@ public class AuthController {
 
         try {
             AuthResponse response = authService.refreshToken(refresh);
-            return withRefreshCookie(response, "Token rafraîchi avec succès");
+            return withRefreshCookie(response, "Token refreshed");
 
         } catch (Exception e) {
             log.error("Erreur lors du rafraîchissement du token : {}", e.getMessage());
@@ -298,7 +298,7 @@ public class AuthController {
 
             return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.clear().toString())
-                .body(ApiResponse.<Void>success("Déconnexion réussie", null));
+                .body(ApiResponse.<Void>success("Signed out", null));
 
         } catch (Exception e) {
             log.error("Erreur lors de la déconnexion : {}", e.getMessage());

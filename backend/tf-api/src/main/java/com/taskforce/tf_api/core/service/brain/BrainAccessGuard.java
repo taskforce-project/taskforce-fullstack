@@ -31,9 +31,9 @@ public class BrainAccessGuard {
     /** Résout le workspace et vérifie que l'utilisateur en est membre. */
     public Workspace resolveAndAuthorize(String slug, Long userId) {
         Workspace ws = workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(ws.getId(), userId)) {
-            throw new ForbiddenException("Accès refusé : vous n'êtes pas membre de cet espace de travail");
+            throw new ForbiddenException("Access denied: you're not a member of this workspace");
         }
         return ws;
     }
@@ -43,9 +43,9 @@ public class BrainAccessGuard {
         Workspace ws = resolveAndAuthorize(slug, userId);
         WorkspaceRole role = workspaceMemberRepository.findByWorkspaceIdAndUserId(ws.getId(), userId)
             .map(m -> m.getRole())
-            .orElseThrow(() -> new ForbiddenException("Accès refusé"));
+            .orElseThrow(() -> new ForbiddenException("Access denied"));
         if (role != WorkspaceRole.OWNER && role != WorkspaceRole.ADMIN) {
-            throw new ForbiddenException("Action réservée au propriétaire/administrateur de l'espace");
+            throw new ForbiddenException("Only the workspace owner or an admin can do this");
         }
         return ws;
     }
@@ -53,6 +53,6 @@ public class BrainAccessGuard {
     /** Charge un node en s'assurant qu'il appartient bien au workspace donné. */
     public KnowledgeNode requireNode(Long nodeId, Long workspaceId) {
         return nodeRepository.findByIdAndWorkspaceId(nodeId, workspaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Node introuvable: " + nodeId));
+            .orElseThrow(() -> new ResourceNotFoundException("Page not found: " + nodeId));
     }
 }

@@ -126,7 +126,7 @@ class IssueControllerWebMvcTest {
     void get_unknown_returns_404() throws Exception {
         stubUser();
         when(issueService.getIssue(anyString(), anyLong(), anyLong(), anyLong()))
-            .thenThrow(new ResourceNotFoundException("Issue introuvable"));
+            .thenThrow(new ResourceNotFoundException("Issue not found"));
 
         mockMvc.perform(get(BASE + "/999").with(jwt().jwt(b -> b.claim("email", EMAIL))))
             .andExpect(status().isNotFound());

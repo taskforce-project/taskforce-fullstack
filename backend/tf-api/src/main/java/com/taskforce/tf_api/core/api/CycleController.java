@@ -49,7 +49,7 @@ public class CycleController {
     ) {
         Long userId = resolveUserId(jwt);
         List<CycleResponse> cycles = cycleService.listCycles(slug, projectId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Cycles récupérés", cycles));
+        return ResponseEntity.ok(ApiResponse.success("Cycles retrieved", cycles));
     }
 
     @PostMapping
@@ -62,7 +62,7 @@ public class CycleController {
         Long userId = resolveUserId(jwt);
         CycleResponse cycle = cycleService.createCycle(slug, projectId, request, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Cycle créé", cycle));
+            .body(ApiResponse.success("Cycle created", cycle));
     }
 
     @GetMapping("/{cycleId}")
@@ -74,7 +74,7 @@ public class CycleController {
     ) {
         Long userId = resolveUserId(jwt);
         CycleResponse cycle = cycleService.getCycle(slug, projectId, cycleId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Cycle récupéré", cycle));
+        return ResponseEntity.ok(ApiResponse.success("Cycle retrieved", cycle));
     }
 
     @PatchMapping("/{cycleId}")
@@ -87,7 +87,7 @@ public class CycleController {
     ) {
         Long userId = resolveUserId(jwt);
         CycleResponse cycle = cycleService.updateCycle(slug, projectId, cycleId, request, userId);
-        return ResponseEntity.ok(ApiResponse.success("Cycle mis à jour", cycle));
+        return ResponseEntity.ok(ApiResponse.success("Cycle updated", cycle));
     }
 
     @DeleteMapping("/{cycleId}")
@@ -99,7 +99,7 @@ public class CycleController {
     ) {
         Long userId = resolveUserId(jwt);
         cycleService.deleteCycle(slug, projectId, cycleId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Cycle supprimé", null));
+        return ResponseEntity.ok(ApiResponse.success("Cycle deleted", null));
     }
 
     // =========================================================================
@@ -115,7 +115,7 @@ public class CycleController {
     ) {
         Long userId = resolveUserId(jwt);
         List<IssueResponse> issues = cycleService.listCycleIssues(slug, projectId, cycleId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Issues du cycle récupérées", issues));
+        return ResponseEntity.ok(ApiResponse.success("Cycle issues retrieved", issues));
     }
 
     @PostMapping("/{cycleId}/issues")
@@ -129,7 +129,7 @@ public class CycleController {
         Long userId = resolveUserId(jwt);
         cycleService.addIssueToCycle(slug, projectId, cycleId, request, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Issue ajoutée au cycle", null));
+            .body(ApiResponse.success("Issue added to the cycle", null));
     }
 
     @DeleteMapping("/{cycleId}/issues/{issueId}")
@@ -142,7 +142,7 @@ public class CycleController {
     ) {
         Long userId = resolveUserId(jwt);
         cycleService.removeIssueFromCycle(slug, projectId, cycleId, issueId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Issue retirée du cycle", null));
+        return ResponseEntity.ok(ApiResponse.success("Issue removed from the cycle", null));
     }
 
     // =========================================================================
@@ -152,7 +152,7 @@ public class CycleController {
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

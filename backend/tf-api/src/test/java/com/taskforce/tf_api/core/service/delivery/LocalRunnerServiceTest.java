@@ -209,7 +209,7 @@ class LocalRunnerServiceTest {
 
         assertThatThrownBy(() -> service.openSession(100L, RUNNER))
             .isInstanceOf(ForbiddenException.class)
-            .hasMessage("Session de délégation invalide"); // même message quelle que soit la cause
+            .hasMessage("Invalid delegation session"); // même message quelle que soit la cause
     }
 
     @Test
@@ -219,7 +219,7 @@ class LocalRunnerServiceTest {
 
         assertThatThrownBy(() -> service.openSession(404L, RUNNER))
             .isInstanceOf(ForbiddenException.class)
-            .hasMessage("Session de délégation invalide");
+            .hasMessage("Invalid delegation session");
     }
 
     // ── heartbeat / résultat ─────────────────────────────────────────────────

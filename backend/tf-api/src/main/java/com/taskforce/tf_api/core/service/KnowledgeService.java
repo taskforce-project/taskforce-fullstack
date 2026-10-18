@@ -191,7 +191,7 @@ public class KnowledgeService {
      */
     private Long resolveParentForMove(Long nodeId, Long newParentId, Long workspaceId) {
         if (newParentId.equals(nodeId)) {
-            throw new IllegalArgumentException("Une page ne peut pas etre sa propre parente");
+            throw new IllegalArgumentException("A page can't be its own parent");
         }
         KnowledgeNode parent = access.requireNode(newParentId, workspaceId);
         // Remonte la chaine des ancetres du nouveau parent : si on retombe sur la page, c'est un cycle.
@@ -199,7 +199,7 @@ public class KnowledgeService {
         int guard = 0;
         while (cursor != null && guard++ < 10_000) {
             if (cursor.equals(nodeId)) {
-                throw new IllegalArgumentException("Deplacement invalide : cela creerait un cycle dans l'arbre");
+                throw new IllegalArgumentException("Invalid move: it would create a loop in the tree");
             }
             KnowledgeNode ancestor = nodeRepository.findByIdAndWorkspaceId(cursor, workspaceId).orElse(null);
             cursor = ancestor != null ? ancestor.getParentNodeId() : null;

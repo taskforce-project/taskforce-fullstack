@@ -52,7 +52,7 @@ public class MemberLeaveController {
     ) {
         Long requesterId = resolveUserId(jwt);
         List<MemberLeaveResponse> leaves = memberLeaveService.listLeaves(slug, userId, requesterId);
-        return ResponseEntity.ok(ApiResponse.success("Indisponibilités récupérées", leaves));
+        return ResponseEntity.ok(ApiResponse.success("Time off retrieved", leaves));
     }
 
     /**
@@ -69,7 +69,7 @@ public class MemberLeaveController {
         Long requesterId = resolveUserId(jwt);
         MemberLeaveResponse created = memberLeaveService.createLeave(slug, userId, requesterId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Indisponibilité créée", created));
+            .body(ApiResponse.success("Time off created", created));
     }
 
     /**
@@ -85,7 +85,7 @@ public class MemberLeaveController {
     ) {
         Long requesterId = resolveUserId(jwt);
         memberLeaveService.deleteLeave(slug, userId, leaveId, requesterId);
-        return ResponseEntity.ok(ApiResponse.success("Indisponibilité supprimée", null));
+        return ResponseEntity.ok(ApiResponse.success("Time off deleted", null));
     }
 
     // -------------------------------------------------------------------------
@@ -95,7 +95,7 @@ public class MemberLeaveController {
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

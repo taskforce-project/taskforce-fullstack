@@ -135,10 +135,10 @@ public class SlackIntegrationService {
         // 0. Résoudre + valider le state
         OAuthState oauthState = oauthStateRepository.findById(state)
             .filter(s -> s.getProvider() == IntegrationProvider.SLACK)
-            .orElseThrow(() -> new BusinessException("État OAuth invalide"));
+            .orElseThrow(() -> new BusinessException("Invalid OAuth state"));
         if (oauthState.getExpiresAt().isBefore(LocalDateTime.now())) {
             oauthStateRepository.delete(oauthState);
-            throw new BusinessException("État OAuth expiré, relancez la connexion");
+            throw new BusinessException("The OAuth state expired: start the connection again");
         }
         Workspace workspace = oauthState.getWorkspace();
 
@@ -439,7 +439,7 @@ public class SlackIntegrationService {
     private String requireToken(Long workspaceId) {
         return integrationRepository.findByWorkspaceIdAndProvider(workspaceId, IntegrationProvider.SLACK)
             .map(Integration::getAccessToken)
-            .orElseThrow(() -> new BusinessException("Slack n'est pas connecté pour ce workspace"));
+            .orElseThrow(() -> new BusinessException("Slack isn't connected for this workspace"));
     }
 
     private String str(Object o) {
