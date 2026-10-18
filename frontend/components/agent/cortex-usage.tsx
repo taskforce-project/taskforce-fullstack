@@ -21,10 +21,10 @@ const pctOf = (used: number, total: number) =>
 function Bar({ pct, tone = "blue" }: { pct: number; tone?: "blue" | "amber" | "rose" }) {
   const color =
     tone === "rose"
-      ? "bg-rose-500"
+      ? "bg-shape-red"
       : tone === "amber"
-        ? "bg-amber-500"
-        : "bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300"
+        ? "bg-shape-yellow"
+        : "bg-primary"
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
       <div className={cn("h-full rounded-full transition-[width] duration-500", color)} style={{ width: `${pct}%` }} />
@@ -41,7 +41,7 @@ function Ring({ pct }: { pct: number }) {
       <circle cx="8" cy="8" r={r} fill="none" strokeWidth="2" className="stroke-muted" />
       <circle
         cx="8" cy="8" r={r} fill="none" strokeWidth="2" strokeLinecap="round"
-        className={cn(pct >= 90 ? "stroke-rose-500" : pct >= 70 ? "stroke-amber-500" : "stroke-blue-500 dark:stroke-blue-400")}
+        className={cn(pct >= 90 ? "stroke-shape-red" : pct >= 70 ? "stroke-shape-yellow" : "stroke-primary")}
         strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100}
       />
     </svg>

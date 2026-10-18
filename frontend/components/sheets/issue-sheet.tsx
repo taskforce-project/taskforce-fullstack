@@ -33,6 +33,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { PRIORITY_DOT } from "@/lib/palette"
 import { AssigneeMenu } from "@/components/smart-assign/assignee-menu"
 import { DelegateAgentControl } from "@/components/sheets/delegate-agent-control"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
@@ -75,7 +76,7 @@ export interface SheetIssue {
   statusId: number
   statusName: string
   statusCategory: IssueStatusCategory
-  assignee: { initials: string; color: string; name: string; userId: number; email?: string | null; avatarUrl?: string | null } | null
+  assignee: { name: string; userId: number; email?: string | null; avatarUrl?: string | null } | null
   assigneeId: number | null
   labels: IssueLabel[]
   dueDate: string | null
@@ -91,18 +92,18 @@ export interface SheetIssue {
 // ---------------------------------------------------------------------------
 
 const PRIORITY_CONFIG: Record<IssuePriority, { dot: string; label: string }> = {
-  URGENT:  { dot: "bg-red-400",               label: "Urgent" },
-  HIGH:    { dot: "bg-orange-400",             label: "High" },
-  MEDIUM:  { dot: "bg-yellow-400",             label: "Medium" },
-  LOW:     { dot: "bg-slate-400",              label: "Low" },
-  NONE:    { dot: "bg-muted-foreground/30",    label: "None" },
+  URGENT:  { dot: PRIORITY_DOT.URGENT, label: "Urgent" },
+  HIGH:    { dot: PRIORITY_DOT.HIGH,   label: "High" },
+  MEDIUM:  { dot: PRIORITY_DOT.MEDIUM, label: "Medium" },
+  LOW:     { dot: PRIORITY_DOT.LOW,    label: "Low" },
+  NONE:    { dot: PRIORITY_DOT.NONE,   label: "None" },
 }
 
 const STATUS_CATEGORY_CONFIG: Record<IssueStatusCategory, { icon: React.ReactNode; label: string; color: string }> = {
   BACKLOG:   { icon: <CircleDot className="size-3.5" />,    label: "Backlog",     color: "text-muted-foreground" },
   UNSTARTED: { icon: <CircleDot className="size-3.5" />,    label: "Todo",        color: "text-muted-foreground" },
-  STARTED:   { icon: <RefreshCw className="size-3.5" />,    label: "In Progress", color: "text-blue-400" },
-  COMPLETED: { icon: <CheckCircle2 className="size-3.5" />, label: "Done",        color: "text-emerald-400" },
+  STARTED:   { icon: <RefreshCw className="size-3.5" />,    label: "In Progress", color: "text-ink-blue" },
+  COMPLETED: { icon: <CheckCircle2 className="size-3.5" />, label: "Done",        color: "text-ink-green" },
   CANCELLED: { icon: <X className="size-3.5" />,            label: "Cancelled",   color: "text-muted-foreground" },
 }
 
@@ -110,15 +111,6 @@ function getStatusCfg(category: IssueStatusCategory) {
   return STATUS_CATEGORY_CONFIG[category] ?? STATUS_CATEGORY_CONFIG.BACKLOG
 }
 
-const AVATAR_COLORS = [
-  "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
-  "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
-]
-function memberColor(id: number): string { return AVATAR_COLORS[id % AVATAR_COLORS.length] }
-function memberInitials(m: ProjectMember): string {
-  if (m.displayName) return m.displayName.slice(0, 2).toUpperCase()
-  return m.email.slice(0, 2).toUpperCase()
-}
 function formatCommentTime(iso: string): string {
   try {
     // Le backend renvoie un LocalDateTime UTC sans offset ("...T12:00:00") : sans "Z",
@@ -271,8 +263,8 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
                 <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 text-muted-foreground">{link.linkType}</Badge>
                 {link.status && (
                   <Badge variant="outline" className={cn("text-xs px-1.5 py-0 h-4",
-                    link.status === "OPEN"   ? "text-emerald-400 border-emerald-500/20 bg-emerald-500/10" :
-                    link.status === "MERGED" ? "text-purple-400 border-purple-500/20 bg-purple-500/10" :
+                    link.status === "OPEN"   ? "text-ink-green border-shape-green/20 bg-shape-green/10" :
+                    link.status === "MERGED" ? "text-ink-pink border-shape-pink/20 bg-shape-pink/10" :
                     "text-muted-foreground"
                   )}>{link.status}</Badge>
                 )}
@@ -482,7 +474,7 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
                       <span className="text-xs text-muted-foreground">{formatCommentTime(c.createdAt)}</span>
                       {c.isEdited && <span className="text-[10px] italic text-muted-foreground/60">(edited)</span>}
                       {isMe && (
-                        <button type="button" onClick={() => onDelete(c.id)} title="Delete comment" className="ml-auto rounded p-0.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400">
+                        <button type="button" onClick={() => onDelete(c.id)} title="Delete comment" className="ml-auto rounded p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
                           <Trash2 className="size-3" />
                         </button>
                       )}
@@ -654,7 +646,7 @@ export function AttachmentsTab({ issueId, projectId, workspaceSlug }: Readonly<A
                 <button
                   type="button"
                   onClick={() => void handleDelete(a)}
-                  className="p-1 rounded hover:bg-red-500/10 transition-colors text-muted-foreground hover:text-red-400"
+                  className="p-1 rounded hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
                   title="Delete"
                 >
                   <Trash2 className="size-3.5" />
@@ -826,7 +818,7 @@ function ChecklistTab({
       {items.length > 0 && (
         <div className="flex items-center gap-2">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full transition-all bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300" style={{ width: `${pct}%` }} />
+            <div className="h-full rounded-full transition-all bg-primary" style={{ width: `${pct}%` }} />
           </div>
           <span className="text-[10px] text-muted-foreground">{doneCount}/{items.length}</span>
         </div>
@@ -843,7 +835,7 @@ function ChecklistTab({
             aria-label={item.done ? "Uncheck" : "Check"}
             className={cn(
               "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
-              item.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-border hover:border-foreground/40"
+              item.done ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-foreground/40"
             )}
           >
             {item.done && <CheckIcon className="size-3" />}
@@ -1248,7 +1240,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   // Use real statuses from store if loaded, fallback to category-based config
   const displayStatuses: ApiIssueStatus[] = storeStatuses
   // Couleur réelle de la colonne courante (reflète la couleur personnalisée du board)
-  const currentStatusColor = displayStatuses.find((s) => s.id === statusId)?.color ?? "#94a3b8"
+  const currentStatusColor = displayStatuses.find((s) => s.id === statusId)?.color ?? "#736e67"
 
   async function callUpdate(payload: Parameters<typeof updateIssue>[3]): Promise<boolean> {
     if (!workspaceSlug || !projectId) return false
@@ -1430,7 +1422,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
           </DropdownMenu>
 
           {pinned && (
-            <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-500">
+            <span className="flex items-center gap-1 rounded-full bg-shape-yellow/10 px-2 py-0.5 text-[10px] font-medium text-ink-yellow">
               <Pin className="size-3" /> Pinned
             </span>
           )}
@@ -1632,7 +1624,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                     const m = projectMembers.find((x) => x.userId === userId)
                     if (!m) return
                     const name = m.displayName ?? m.email
-                    setAssignee({ initials: memberInitials(m), color: memberColor(m.userId), name, userId: m.userId, email: m.email, avatarUrl: m.avatarUrl })
+                    setAssignee({ name, userId: m.userId, email: m.email, avatarUrl: m.avatarUrl })
                     await callUpdate({ assigneeId: m.userId })
                     toast.success(`Assigned to ${name}`)
                   }}
@@ -1785,10 +1777,10 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                 value={dueIso}
                 onChange={saveDueDate}
                 placeholder="-"
-                className={cn(isOverdue && "border-red-500/40 text-red-400 hover:text-red-400")}
+                className={cn(isOverdue && "border-destructive/40 text-destructive hover:text-destructive")}
               />
               {isOverdue && (
-                <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-red-400">
+                <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-destructive">
                   <AlertTriangle className="size-3" /> Overdue
                 </span>
               )}

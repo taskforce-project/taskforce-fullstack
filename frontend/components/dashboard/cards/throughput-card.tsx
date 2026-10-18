@@ -73,7 +73,7 @@ export function ThroughputCard({ slug, card, globalRange, refreshToken }: Dashbo
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: CHART_MARGIN_TOP, right: 0, left: 0, bottom: 0 }}>
             <defs>
-              <AreaGradient id={gradientId} color="#3b82f6" />
+              <AreaGradient id={gradientId} color="var(--chart-1)" />
             </defs>
             <YAxis hide domain={[baseline, domainMax]} />
             <Tooltip
@@ -91,12 +91,12 @@ export function ThroughputCard({ slug, card, globalRange, refreshToken }: Dashbo
               type="monotone"
               dataKey="resolved"
               name="Resolved"
-              stroke="#3b82f6"
+              stroke="var(--chart-1)"
               strokeWidth={2}
               fill={`url(#${gradientId})`}
               fillOpacity={1}
               dot={false}
-              activeDot={{ r: 3, fill: "#3b82f6" }}
+              activeDot={{ r: 3, fill: "var(--chart-1)" }}
               isAnimationActive={false}
               baseValue={baseline}
             />

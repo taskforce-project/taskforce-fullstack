@@ -42,7 +42,7 @@ export function DelegateAgentControl({
         </span>
       ) : run.status === "DONE" ? (
         <>
-          <span className="flex items-center gap-1.5 font-medium text-emerald-500">
+          <span className="flex items-center gap-1.5 font-medium text-ink-green">
             <CircleCheck className="size-3.5" /> Agent done - ready for your review
           </span>
           {run.summary && <p className="text-muted-foreground">{run.summary}</p>}
@@ -58,7 +58,7 @@ export function DelegateAgentControl({
           )}
         </>
       ) : (
-        <span className="flex items-center gap-1.5 text-red-500">
+        <span className="flex items-center gap-1.5 text-destructive">
           <TriangleAlert className="size-3.5" /> Agent failed{run.error ? ` - ${run.error}` : ""}
         </span>
       )}

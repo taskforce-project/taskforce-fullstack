@@ -12,7 +12,7 @@ import { CardError, CardSkeleton } from "../card-states"
 /** Ligne de delta façon page Analytics : +N vs mois dernier, vert/rouge/neutre. */
 function DeltaLine({ delta, suffix }: { readonly delta: number; readonly suffix: string }) {
   const DeltaIcon = delta === 0 ? Minus : delta > 0 ? TrendingUp : TrendingDown
-  const cls = delta === 0 ? "text-muted-foreground" : delta > 0 ? "text-emerald-500" : "text-rose-500"
+  const cls = delta === 0 ? "text-muted-foreground" : delta > 0 ? "text-ink-green" : "text-destructive"
   return (
     <div className={cn("flex items-center gap-1 text-xs font-medium tabular-nums", cls)}>
       <DeltaIcon className="size-3.5" />

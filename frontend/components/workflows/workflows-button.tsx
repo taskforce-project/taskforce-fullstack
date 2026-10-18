@@ -66,7 +66,7 @@ export function WorkflowsButton() {
     >
       <Layers className="size-4" />
       {activeCount > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-bold tabular-nums text-white">
+        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold tabular-nums text-primary-foreground">
           {activeCount}
         </span>
       )}

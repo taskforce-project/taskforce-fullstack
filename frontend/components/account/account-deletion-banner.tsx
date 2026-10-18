@@ -47,10 +47,10 @@ export function AccountDeletionBanner() {
   }
 
   return (
-    <div className="shrink-0 border-b border-amber-500/40 bg-amber-500/5">
+    <div className="shrink-0 border-b border-shape-yellow/40 bg-shape-yellow/5">
       <div className="flex flex-col items-start gap-2 px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between md:px-6">
         <div className="flex items-start gap-2.5">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-ink-yellow" aria-hidden />
           <p className="text-foreground">
             Your account is scheduled for deletion
             {label ? <> on <span className="font-semibold">{label}</span></> : null}. Restore it
@@ -62,7 +62,7 @@ export function AccountDeletionBanner() {
           variant="outline"
           onClick={handleRestore}
           disabled={restoring}
-          className="h-8 shrink-0 gap-2 border-amber-500/50 text-xs"
+          className="h-8 shrink-0 gap-2 border-shape-yellow/50 text-xs"
         >
           {restoring ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <RotateCcw className="size-3.5" aria-hidden />}
           Restore account

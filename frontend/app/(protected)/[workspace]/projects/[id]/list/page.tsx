@@ -14,6 +14,7 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { cn } from "@/lib/utils"
+import { PRIORITY_DOT } from "@/lib/palette"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
 import { InlineIssueFilters } from "@/components/issues/issue-filters"
@@ -26,19 +27,6 @@ import type { Issue, IssueStatus, IssueStatusCategory } from "@/lib/api/issue-se
 // ---------------------------------------------------------------------------
 
 type IssuePriority = "URGENT" | "HIGH" | "MEDIUM" | "LOW" | "NONE"
-
-const PRIORITY_DOT: Record<IssuePriority, string> = {
-  URGENT: "bg-red-400",
-  HIGH:   "bg-orange-400",
-  MEDIUM: "bg-yellow-400",
-  LOW:    "bg-slate-400",
-  NONE:   "bg-muted-foreground/30",
-}
-
-const AVATAR_COLORS = [
-  "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
-  "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
-]
 
 function getCategoryIcon(category: IssueStatusCategory, color: string) {
   switch (category) {
@@ -71,7 +59,7 @@ function toSheetIssue(issue: Issue): SheetIssue {
     statusName:     issue.status.name,
     statusCategory: issue.status.category,
     assignee:       issue.assignee
-      ? { initials: issue.assignee.email.slice(0, 2).toUpperCase(), color: AVATAR_COLORS[issue.assignee.id % AVATAR_COLORS.length], name: issue.assignee.displayName ?? issue.assignee.email, email: issue.assignee.email, userId: issue.assignee.id }
+      ? { name: issue.assignee.displayName ?? issue.assignee.email, email: issue.assignee.email, userId: issue.assignee.id }
       : null,
     assigneeId:     issue.assignee?.id ?? null,
     labels:         issue.labels,
@@ -103,7 +91,7 @@ function IssueRow({ issue, onOpen, onToggleDone }: { readonly issue: Issue; read
         type="button"
         onClick={(e) => { e.stopPropagation(); onToggleDone(issue) }}
         title={isDone ? "Reopen task" : "Mark as done"}
-        className={cn("shrink-0 rounded transition-colors", isDone ? "text-emerald-500" : "text-muted-foreground hover:text-emerald-500")}
+        className={cn("shrink-0 rounded transition-colors", isDone ? "text-ink-green" : "text-muted-foreground hover:text-ink-green")}
       >
         {isDone ? <CheckCircle2 className="size-3.5" /> : getCategoryIcon(issue.status.category, issue.status.color)}
       </button>

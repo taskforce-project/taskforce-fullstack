@@ -101,8 +101,8 @@ export default function InvitationLandingPage() {
   if (emailMismatch) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
-        <div className="flex size-12 items-center justify-center rounded-full bg-amber-500/10">
-          <UserX className="size-6 text-amber-500" />
+        <div className="flex size-12 items-center justify-center rounded-full bg-shape-yellow/10">
+          <UserX className="size-6 text-ink-yellow" />
         </div>
         <h1 className="text-lg font-semibold">This isn&apos;t the right account</h1>
         <p className="max-w-sm text-sm text-muted-foreground">

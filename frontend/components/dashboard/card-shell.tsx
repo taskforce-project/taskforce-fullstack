@@ -146,7 +146,7 @@ export function CardShell({
             </DropdownMenuSub>
 
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 text-xs text-rose-500 focus:text-rose-500" onClick={onRemove}>
+            <DropdownMenuItem className="gap-2 text-xs text-destructive focus:text-destructive" onClick={onRemove}>
               <Trash2 className="size-3.5" /> Remove
             </DropdownMenuItem>
           </DropdownMenuContent>

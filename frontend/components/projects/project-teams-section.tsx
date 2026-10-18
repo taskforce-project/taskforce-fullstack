@@ -276,7 +276,7 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
                         <div key={m.userId} className="flex items-center gap-2.5 rounded-md px-1 py-1">
                           <UserAvatar email={m.displayName} name={m.displayName} avatarUrl={m.avatarUrl} className="size-6" fallbackClassName="text-[9px]" />
                           <span className="flex-1 truncate text-sm text-foreground">{m.displayName}</span>
-                          {m.role === "LEAD" && <Badge variant="secondary" className="gap-1 text-[10px]"><Crown className="size-3 text-amber-500" /> Lead</Badge>}
+                          {m.role === "LEAD" && <Badge variant="secondary" className="gap-1 text-[10px]"><Crown className="size-3 text-ink-yellow" /> Lead</Badge>}
                           <button
                             type="button"
                             onClick={() => removeMember(team, m.userId)}

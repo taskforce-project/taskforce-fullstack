@@ -11,6 +11,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { PRIORITY_DOT } from "@/lib/palette"
 import type { Issue, IssuePriority } from "@/lib/api/issue-service"
 import {
   type IssueFilterState,
@@ -21,10 +22,10 @@ import {
 } from "@/lib/issue-filters"
 
 const PRIORITY_META: { value: IssuePriority; label: string; dot: string }[] = [
-  { value: "URGENT", label: "Urgent",  dot: "bg-red-400" },
-  { value: "HIGH",   label: "High",    dot: "bg-orange-400" },
-  { value: "MEDIUM", label: "Medium",  dot: "bg-yellow-400" },
-  { value: "LOW",    label: "Low",     dot: "bg-slate-400" },
+  { value: "URGENT", label: "Urgent",  dot: PRIORITY_DOT.URGENT },
+  { value: "HIGH",   label: "High",    dot: PRIORITY_DOT.HIGH },
+  { value: "MEDIUM", label: "Medium",  dot: PRIORITY_DOT.MEDIUM },
+  { value: "LOW",    label: "Low",     dot: PRIORITY_DOT.LOW },
   { value: "NONE",   label: "None",    dot: "bg-muted-foreground/30" },
 ]
 

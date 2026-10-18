@@ -64,17 +64,12 @@ import type { Issue, IssueStatus, IssueStatusCategory, IssuePriority } from "@/l
 // Helpers
 // ---------------------------------------------------------------------------
 
-const AVATAR_COLORS = [
-  "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
-  "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
-]
-
 const CATEGORY_OPTIONS: { value: IssueStatusCategory; label: string; color: string }[] = [
-  { value: "BACKLOG",   label: "Backlog",    color: "#94a3b8" },
-  { value: "UNSTARTED", label: "Not started", color: "#6366f1" },
-  { value: "STARTED",   label: "In progress",   color: "#f59e0b" },
-  { value: "COMPLETED", label: "Done",    color: "#10b981" },
-  { value: "CANCELLED", label: "Cancelled",     color: "#ef4444" },
+  { value: "BACKLOG",   label: "Backlog",    color: "#736e67" },
+  { value: "UNSTARTED", label: "Not started", color: "#2f6bf6" },
+  { value: "STARTED",   label: "In progress",   color: "#ffaa0d" },
+  { value: "COMPLETED", label: "Done",    color: "#418b5c" },
+  { value: "CANCELLED", label: "Cancelled",     color: "#e14322" },
 ]
 
 function getCategoryIcon(category: IssueStatusCategory, color: string, size = "size-3.5") {
@@ -108,7 +103,7 @@ function toSheetIssue(issue: Issue): SheetIssue {
     statusName:     issue.status.name,
     statusCategory: issue.status.category,
     assignee:       issue.assignee
-      ? { initials: issue.assignee.email.slice(0, 2).toUpperCase(), color: AVATAR_COLORS[issue.assignee.id % AVATAR_COLORS.length], name: issue.assignee.displayName ?? issue.assignee.email, userId: issue.assignee.id, email: issue.assignee.email }
+      ? { name: issue.assignee.displayName ?? issue.assignee.email, userId: issue.assignee.id, email: issue.assignee.email }
       : null,
     assigneeId:     issue.assignee?.id ?? null,
     labels:         issue.labels,
@@ -126,9 +121,9 @@ function toSheetIssue(issue: Issue): SheetIssue {
 
 /** Chip de priorite : teinte douce par niveau (rien pour NONE). */
 const PRIORITY_CHIP: Record<IssuePriority, { label: string; cls: string } | null> = {
-  URGENT: { label: "Urgent", cls: "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300" },
-  HIGH:   { label: "High",   cls: "bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300" },
-  MEDIUM: { label: "Medium", cls: "bg-yellow-50 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-300" },
+  URGENT: { label: "Urgent", cls: "bg-tint-red text-ink-red" },
+  HIGH:   { label: "High",   cls: "bg-tint-yellow text-ink-yellow" },
+  MEDIUM: { label: "Medium", cls: "bg-tint-blue text-ink-blue" },
   LOW:    { label: "Low",    cls: "bg-muted text-muted-foreground" },
   NONE:   null,
 }
@@ -168,7 +163,7 @@ function DueChip({ due }: { readonly due?: string | null }) {
   if (!label) return null
   return (
     <span className={cn("inline-flex items-center gap-1 text-[11px] tabular-nums",
-      isDueSoon(due) ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground")}>
+      isDueSoon(due) ? "text-ink-yellow" : "text-muted-foreground")}>
       <CalendarDays className="size-3 shrink-0" strokeWidth={2.25} />
       {label}
     </span>
@@ -228,7 +223,7 @@ function IssueCard({
 
       {/* Titre */}
       <p className="text-sm font-medium leading-snug tracking-[-0.005em] text-foreground line-clamp-2">
-        {issue.pinned && <Pin className="mr-1 -mt-0.5 inline size-3 fill-amber-500 text-amber-500" aria-label="Pinned" />}
+        {issue.pinned && <Pin className="mr-1 -mt-0.5 inline size-3 fill-shape-yellow text-shape-yellow" aria-label="Pinned" />}
         {issue.title}
       </p>
 
@@ -511,7 +506,7 @@ function AddColumnPopover({
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [category, setCategory] = useState<IssueStatusCategory>("UNSTARTED")
-  const [color, setColor] = useState("#6366f1")
+  const [color, setColor] = useState("#2f6bf6")
   const [loading, setLoading] = useState(false)
   const { createStatus } = useIssueStore()
 
@@ -529,7 +524,7 @@ function AddColumnPopover({
     }
     setName("")
     setCategory("UNSTARTED")
-    setColor("#6366f1")
+    setColor("#2f6bf6")
     setOpen(false)
   }
 
@@ -648,10 +643,10 @@ export default function ProjectBoardPage() {
         // Fallback : seed côté front si le backend n'a rien retourné
         if (loaded.length === 0) {
           const defaults: Array<{ name: string; category: IssueStatusCategory; color: string }> = [
-            { name: "Backlog",     category: "BACKLOG",   color: "#94a3b8" },
-            { name: "Todo",        category: "UNSTARTED", color: "#6366f1" },
-            { name: "In Progress", category: "STARTED",   color: "#f59e0b" },
-            { name: "Done",        category: "COMPLETED", color: "#10b981" },
+            { name: "Backlog",     category: "BACKLOG",   color: "#736e67" },
+            { name: "Todo",        category: "UNSTARTED", color: "#2f6bf6" },
+            { name: "In Progress", category: "STARTED",   color: "#ffaa0d" },
+            { name: "Done",        category: "COMPLETED", color: "#418b5c" },
           ]
           for (const s of defaults) {
             await createStatus(workspace, projectId, s)

@@ -27,9 +27,9 @@ import { ChartExplorer } from "@/components/analytics/chart-explorer"
 const ALL_PROJECTS = "all"
 
 const SEVERITY_META: Record<"critical" | "warning" | "info", { wrap: string; icon: React.ElementType; iconColor: string }> = {
-  critical: { wrap: "border-rose-500/30 bg-rose-500/[0.07]",  icon: Flame,         iconColor: "text-rose-500" },
-  warning:  { wrap: "border-amber-500/30 bg-amber-500/[0.07]", icon: AlertTriangle, iconColor: "text-amber-500" },
-  info:     { wrap: "border-blue-500/30 bg-blue-500/[0.07]",   icon: Brain,         iconColor: "text-blue-500" },
+  critical: { wrap: "border-destructive/30 bg-destructive/[0.07]",  icon: Flame,         iconColor: "text-destructive" },
+  warning:  { wrap: "border-shape-yellow/30 bg-shape-yellow/[0.07]", icon: AlertTriangle, iconColor: "text-ink-yellow" },
+  info:     { wrap: "border-primary/30 bg-primary/[0.07]",   icon: Brain,         iconColor: "text-ink-blue" },
 }
 
 const URGENCY_SEVERITY: Record<AiInsight["urgency"], "critical" | "warning" | "info"> = {
@@ -51,7 +51,7 @@ interface KpiMetric {
 function KpiCell({ metric }: { readonly metric: KpiMetric }) {
   const positive = metric.delta > 0
   const isGood = metric.deltaInverse ? !positive : positive
-  const deltaClass = metric.delta === 0 ? "text-muted-foreground" : isGood ? "text-emerald-500" : "text-rose-500"
+  const deltaClass = metric.delta === 0 ? "text-muted-foreground" : isGood ? "text-ink-green" : "text-destructive"
   const DeltaIcon = metric.delta === 0 ? Minus : positive ? TrendingUp : TrendingDown
 
   return (
@@ -83,7 +83,7 @@ function InsightRow({ insight }: { readonly insight: AiInsight }) {
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-foreground">{insight.action}</span>
-          <Badge variant="secondary" className="h-5 px-1.5 text-[11px] font-normal" style={{ color: insight.agentColor }}>
+          <Badge variant="secondary" className="h-5 px-1.5 text-[11px] font-normal">
             {insight.agent}
           </Badge>
         </div>

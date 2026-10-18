@@ -18,8 +18,8 @@ const loaderStyles = cva("relative", {
       current: "text-current",
       primary: "text-primary",
       secondary: "text-muted-foreground",
-      success: "text-emerald-500",
-      warning: "text-amber-500",
+      success: "text-ink-green",
+      warning: "text-ink-yellow",
       danger: "text-destructive",
     },
     size: {

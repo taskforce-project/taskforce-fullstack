@@ -497,7 +497,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                         <BrandLogo slug={t.key} name={t.name} className="size-7" />
                         <span className="text-[12.5px] font-medium text-foreground">{t.name}</span>
                         {t.connected ? (
-                          <span className="text-[10px] font-medium text-emerald-600">Connected</span>
+                          <span className="text-[10px] font-medium text-ink-green">Connected</span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary">
                             {connectingKey === t.key ? (
