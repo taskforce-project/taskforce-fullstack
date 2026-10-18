@@ -27,16 +27,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByKeycloakId(String keycloakId);
 
     /**
-     * Trouve un utilisateur par son ID client Stripe
-     */
-    Optional<User> findByStripeCustomerId(String stripeCustomerId);
-
-    /**
-     * Trouve un utilisateur par son ID d'abonnement Stripe
-     */
-    Optional<User> findByStripeSubscriptionId(String stripeSubscriptionId);
-
-    /**
      * Vérifie si un email existe déjà
      */
     boolean existsByEmail(String email);
@@ -45,12 +35,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * Vérifie si un ID Keycloak existe déjà
      */
     boolean existsByKeycloakId(String keycloakId);
-
-    /**
-     * Trouve tous les utilisateurs actifs avec un plan spécifique
-     */
-    @Query("SELECT u FROM User u WHERE u.planType = :planType AND u.isActive = true")
-    Optional<User> findActiveUsersByPlanType(@Param("planType") String planType);
 
     /**
      * Recherche par email ou displayName (insensible à la casse), limitée aux personnes qui partagent au

@@ -86,7 +86,8 @@ BEGIN
     -- 1. Reset du workspace démo (cascade : projets, issues, équipes, profils…)
     -- ----------------------------------------------------------------
     DELETE FROM workspaces WHERE slug = 'taskforce-demo';
-    -- Données non rattachées au workspace (purge re-run dédiée)
+    -- Données non rattachées au workspace, posées par les versions du seed d'avant le retrait de la
+    -- facturation et du module commercial (ADR-016) : purgées pour qu'un re-seed reparte propre.
     DELETE FROM subscription_history WHERE stripe_event_id LIKE 'seed_%';
     DELETE FROM enterprise_inquiries WHERE email LIKE '%@seedlead.example';
 
@@ -472,25 +473,6 @@ BEGIN
     INSERT INTO workspace_invitations (workspace_id, invited_by, email, role, token, status, expires_at) VALUES
         (v_ws, v_admin, 'nouvelle.recrue@example.com', 'MEMBER', 'seed-invite-token-001', 'PENDING', NOW() + INTERVAL '7 days'),
         (v_ws, v_admin, 'consultant.ext@example.com',  'ADMIN',  'seed-invite-token-002', 'PENDING', NOW() + INTERVAL '14 days');
-
-    -- 17. Abonnement Stripe (admin PRO) + historique — pour la page Billing (sans Stripe réel)
-    UPDATE users SET stripe_customer_id = 'cus_seed_admin' WHERE id = v_admin;
-    INSERT INTO subscriptions (user_id, plan_type, status, stripe_customer_id, stripe_subscription_id, stripe_price_id,
-                               amount, currency, billing_interval, current_period_start, current_period_end, started_at)
-    VALUES (v_admin, 'BUSINESS', 'ACTIVE'::plan_status, 'cus_seed_admin', 'sub_seed_admin', 'price_seed_pro',
-            12.00, 'EUR', 'month', NOW() - INTERVAL '10 days', NOW() + INTERVAL '20 days', NOW() - INTERVAL '40 days')
-    ON CONFLICT (user_id) DO UPDATE SET plan_type = EXCLUDED.plan_type, status = EXCLUDED.status,
-        stripe_customer_id = EXCLUDED.stripe_customer_id, stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-        current_period_start = EXCLUDED.current_period_start, current_period_end = EXCLUDED.current_period_end;
-
-    INSERT INTO subscription_history (user_id, plan_type, plan_status, stripe_subscription_id, stripe_event_id, stripe_invoice_id, amount_paid, currency, event_type, event_data, period_start, period_end) VALUES
-        (v_admin, 'BUSINESS', 'ACTIVE'::plan_status, 'sub_seed_admin', 'seed_evt_checkout', NULL,        NULL,  'EUR', 'checkout.session.completed', '{"seed":true}'::jsonb, NOW() - INTERVAL '40 days', NOW() - INTERVAL '10 days'),
-        (v_admin, 'BUSINESS', 'ACTIVE'::plan_status, 'sub_seed_admin', 'seed_evt_invoice1', 'in_seed_1', 12.00, 'EUR', 'invoice.payment_succeeded', '{"seed":true}'::jsonb, NOW() - INTERVAL '10 days', NOW() + INTERVAL '20 days');
-
-    -- 18. Demandes Enterprise (sales/admin)
-    INSERT INTO enterprise_inquiries (full_name, email, team_size, message, status) VALUES
-        ('Claire Dubois', 'claire.dubois@seedlead.example', '51-200', 'Nous cherchons une solution pour 80 personnes avec SSO.', 'NEW'),
-        ('Yann Leroy',    'yann.leroy@seedlead.example',    '11-50',  'Intéressé par le plan Enterprise, un rappel serait apprécié.', 'CONTACTED');
 
     -- ================================================================
     -- 19. VOLUME — ~90 issues étalées sur ~9 semaines (par projet).

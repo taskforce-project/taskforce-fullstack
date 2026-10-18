@@ -17,9 +17,7 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
-import com.taskforce.tf_api.core.service.AuthService;
 import com.taskforce.tf_api.core.service.GdprService;
-import com.taskforce.tf_api.core.service.StripeService;
 import com.taskforce.tf_api.core.service.WorkspaceInvitationService;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
@@ -35,22 +33,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Tests de tranche web (paiement / RGPD / invitations — priorité critique) via {@code @WebMvcTest}.
- * Contrats HTTP : GDPR export/delete (auth + 401), invitations create/preview, billing portal (Stripe mocké),
- * vérification de session Stripe (endpoint public). Services mockés.
+ * Tests de tranche web (RGPD et invitations, priorité critique) via {@code @WebMvcTest}.
+ * Contrats HTTP : GDPR export/delete (auth + 401), invitations create/preview. Services mockés.
  */
-@WebMvcTest({GdprController.class, InvitationController.class, BillingController.class, StripeController.class})
+@WebMvcTest({GdprController.class, InvitationController.class})
 @Import(SecurityConfig.class)
 @ActiveProfiles("test")
-@DisplayName("Payment/Data controllers (@WebMvcTest)")
-class PaymentAndDataControllersWebMvcTest {
+@DisplayName("RGPD + invitations controllers (@WebMvcTest)")
+class GdprAndInvitationControllersWebMvcTest {
 
     @Autowired private MockMvc mockMvc;
 
     @MockitoBean private GdprService gdprService;
     @MockitoBean private WorkspaceInvitationService invitationService;
-    @MockitoBean private StripeService stripeService;
-    @MockitoBean private AuthService authService;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository;
@@ -114,62 +109,6 @@ class PaymentAndDataControllersWebMvcTest {
         when(invitationService.preview(anyString())).thenReturn(null);
 
         mockMvc.perform(get("/api/invitations/some-token").with(auth()))
-            .andExpect(status().isOk());
-    }
-
-    // ---- Paiement -----------------------------------------------------------
-    @Test
-    @DisplayName("POST /api/billing/portal (auth) → 200 + URL portail Stripe")
-    void billing_portal_200() throws Exception {
-        // Le client Stripe est porte par la table `users` (getStripeCustomerId), pas par une entite
-        // Subscription : l'utilisateur doit avoir un customerId reel (non `cus_seed`) pour ouvrir le
-        // portail. Sinon BillingController leve IllegalStateException -> 409 (cf. GlobalExceptionHandler).
-        when(userRepository.findByEmail(EMAIL))
-            .thenReturn(Optional.of(User.builder().id(7L).email(EMAIL).stripeCustomerId("cus_123").build()));
-        when(stripeService.createBillingPortalSession(anyString(), anyString()))
-            .thenReturn("https://billing.stripe.test/session");
-
-        mockMvc.perform(post("/api/billing/portal").with(auth())
-                .contentType(MediaType.APPLICATION_JSON).content("{}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.success").value(true));
-    }
-
-    @Test
-    @DisplayName("POST /api/billing/change-plan (auth) → 200 + nouveau forfait (change de prix in-app)")
-    void billing_change_plan_200() throws Exception {
-        // Changement de forfait in-app : nécessite un client Stripe réel (porté par `users`). Le back
-        // remplace le prix de l'abonnement actif (proration) puis reflète le plan aussitôt dans la réponse.
-        when(userRepository.findByEmail(EMAIL))
-            .thenReturn(Optional.of(User.builder().id(7L).email(EMAIL).stripeCustomerId("cus_123").build()));
-        when(stripeService.getPriceIdForPlan("BASIC", "month")).thenReturn("price_basic");
-        when(workspaceMemberRepository.countDistinctMembersByOwnerId(7L)).thenReturn(3L);
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        mockMvc.perform(post("/api/billing/change-plan").with(auth())
-                .contentType(MediaType.APPLICATION_JSON).content("{\"planType\":\"BASIC\"}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.planType").value("BASIC"));
-    }
-
-    @Test
-    @DisplayName("POST /api/billing/change-plan sans client Stripe (plan gratuit) → 409")
-    void billing_change_plan_free_409() throws Exception {
-        // Depuis FREE (aucun customer Stripe), rien à modifier → 409 clair (le front passe par /checkout).
-        stubUser(); // utilisateur sans stripeCustomerId
-
-        mockMvc.perform(post("/api/billing/change-plan").with(auth())
-                .contentType(MediaType.APPLICATION_JSON).content("{\"planType\":\"BASIC\"}"))
-            .andExpect(status().isConflict());
-    }
-
-    @Test
-    @DisplayName("GET /api/stripe/verify-session (public) → 200")
-    void stripe_verify_session_200() throws Exception {
-        when(authService.completeRegistrationAfterPayment(anyString())).thenReturn(null);
-
-        mockMvc.perform(get("/api/stripe/verify-session").param("session_id", "cs_test_1"))
             .andExpect(status().isOk());
     }
 }

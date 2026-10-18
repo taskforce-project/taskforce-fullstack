@@ -13,13 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.taskforce.tf_api.core.enums.PlanFeature;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.ConnectorConnection;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
-import com.taskforce.tf_api.core.service.PlanFeatureService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.shared.exception.BusinessException;
@@ -40,9 +37,9 @@ import lombok.extern.slf4j.Slf4j;
  * {@code initialize}+{@code tools/list} par serveur ; le résultat est <b>mis en cache (TTL court)</b>.
  * Un serveur en échec est <b>ignoré</b> (log) sans casser l'agent.
  *
- * <p><b>Gating</b> : les outils externes ne sont exposés que si le plan du <b>propriétaire</b> du
- * workspace couvre {@link PlanFeature#INTEGRATIONS} (BUSINESS+). {@link #execute} sert le bouton
- * d'approbation humaine des écritures externes (l'agent <i>propose</i>, l'utilisateur <i>valide</i>).
+ * <p>Les outils externes sont exposés à tout workspace, sans condition de plan (ADR-016). {@link #execute}
+ * sert le bouton d'approbation humaine des écritures externes (l'agent <i>propose</i>, l'utilisateur
+ * <i>valide</i>) ; les écritures sont réservées aux propriétaires et administrateurs (OSS-1.5).
  */
 @Service
 @RequiredArgsConstructor
@@ -69,8 +66,6 @@ public class WorkspaceMcpService {
                               com.fasterxml.jackson.databind.JsonNode inputSchema, boolean readOnly) {}
 
     private final ConnectorConnectionRepository repository;
-    private final WorkspaceRepository workspaceRepository;
-    private final PlanFeatureService planFeatureService;
     private final McpClient client;
     private final ObjectMapper objectMapper;
     private final McpTokenService tokenService; // OAuth (TF-MCP-02) : access token géré + refresh auto
@@ -94,7 +89,7 @@ public class WorkspaceMcpService {
         if (cached != null && cached.expiresAt() > now) {
             return cached.tools();
         }
-        List<AgentTool> tools = entitled(ctx.slug()) ? discover(wsId) : List.of();
+        List<AgentTool> tools = discover(wsId);
         cache.put(wsId, new Cached(now + cacheTtlMs, tools));
         return tools;
     }
@@ -187,11 +182,6 @@ public class WorkspaceMcpService {
         }
     }
 
-    /** Le propriétaire du workspace a-t-il un plan couvrant les intégrations (BUSINESS+) ? */
-    private boolean entitled(String slug) {
-        PlanType plan = workspaceRepository.findOwnerPlanBySlug(slug).orElse(PlanType.FREE);
-        return planFeatureService.has(plan, PlanFeature.INTEGRATIONS);
-    }
 
     private List<AgentTool> discover(Long workspaceId) {
         List<AgentTool> tools = new ArrayList<>();

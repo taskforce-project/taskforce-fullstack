@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
-import Link from "next/link"
-import { Send, Sparkles, MessageSquare, ChevronDown, Plus, Trash2, ArrowUpRight, Plug } from "lucide-react"
+import { Send, Sparkles, MessageSquare, ChevronDown, Plus, Trash2, Plug } from "lucide-react"
 import {
   Message, Steps, Reasoning, Tool, Sources, ThinkingBar, FeedbackBar, PromptSuggestion, TokenMeter,
   type ToolStatus,
@@ -52,10 +51,10 @@ function messagesToTurns(messages: ConversationMessage[]): Turn[] {
 }
 
 /**
- * Plafond de tokens IA atteint (HTTP 409) - carte d'**information** (pas d'erreur) avec un **CTA**
- * clair vers la page d'abonnement. Rendue en tour assistant pour rester dans le fil.
+ * Plafond mensuel de tokens IA de l'instance atteint (HTTP 409) - carte d'**information** (pas
+ * d'erreur). Rendue en tour assistant pour rester dans le fil.
  */
-function QuotaNotice({ slug }: Readonly<{ slug: string }>) {
+function QuotaNotice() {
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-primary/25 bg-primary/5 p-3">
       <div className="flex items-center gap-2">
@@ -65,18 +64,9 @@ function QuotaNotice({ slug }: Readonly<{ slug: string }>) {
         <p className="text-sm font-medium text-foreground">Monthly AI limit reached</p>
       </div>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        You&apos;ve used all of Cortex&apos;s tokens for this month on your current plan.
-        Upgrade to keep chatting and unlock a larger monthly allowance.
+        Cortex has used this instance&apos;s monthly token allowance. It resets on the first day of
+        next month, and an administrator can raise it.
       </p>
-      {slug && (
-        <Link
-          href={`/${slug}/billing`}
-          className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
-        >
-          Upgrade plan
-          <ArrowUpRight className="size-3.5" />
-        </Link>
-      )}
     </div>
   )
 }
@@ -329,7 +319,7 @@ export function AgentChat() {
               <Message key={t.id} role="user" content={t.text} />
             ) : t.kind === "quota" ? (
               <Message key={t.id} role="assistant">
-                <QuotaNotice slug={slug} />
+                <QuotaNotice />
               </Message>
             ) : (
               <Message key={t.id} role="assistant">

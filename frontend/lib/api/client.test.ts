@@ -113,14 +113,6 @@ describe('API Client', () => {
       expect(config.headers.Authorization).toBeUndefined();
     });
 
-    it('traite /api/sales/ comme public', () => {
-      localStorage.setItem('accessToken', 'tok-123');
-
-      const config = onRequest({ url: '/api/sales/contact', headers: {} });
-
-      expect(config.headers.Authorization).toBeUndefined();
-    });
-
     it('propage une erreur de préparation de requête', async () => {
       const err = new Error('config invalide');
       await expect(onRequestError(err)).rejects.toThrow('config invalide');

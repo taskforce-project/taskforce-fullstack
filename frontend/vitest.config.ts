@@ -68,12 +68,6 @@ export default defineConfig({
           branches: 35,
           statements: 35,
         },
-        'lib/api/stripe-service.ts': {
-          lines: 78,
-          functions: 70,
-          branches: 85,
-          statements: 78,
-        },
         // Composants métier auth (funcs plus bas : beaucoup de handlers UI non tous exercés)
         'components/auth/**/*.tsx': {
           lines: 78,

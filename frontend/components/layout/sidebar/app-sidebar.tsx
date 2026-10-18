@@ -70,7 +70,6 @@ type NavItem = {
   /** Feature en cours de finition → petite fiole bleue (info) dans la sidebar + bandeau « Lab » sur la page. */
   readonly lab?: boolean
   readonly requiresRole?: readonly string[]
-  readonly requiresPlan?: readonly string[]
   readonly items?: readonly {
     readonly key: string
     readonly url: string
@@ -181,13 +180,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const isActive = (url: string) => {
     const full = withSlug(url)
     return pathname === full || pathname.startsWith(`${full}/`)
-  }
-
-  const canAccess = (item: NavItem) => {
-    if (item.requiresPlan && user?.planType) {
-      if (!item.requiresPlan.includes(user.planType)) return false
-    }
-    return true
   }
 
   const renderItem = (item: NavItem) => {
@@ -334,7 +326,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarGroup>
           <SidebarGroupLabel>Command</SidebarGroupLabel>
           <SidebarMenu>
-            {NAV_COMMAND.filter(canAccess).map(renderItem)}
+            {NAV_COMMAND.map(renderItem)}
           </SidebarMenu>
         </SidebarGroup>
 
@@ -342,7 +334,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarGroup>
           <SidebarGroupLabel>Work</SidebarGroupLabel>
           <SidebarMenu>
-            {NAV_WORK.filter(canAccess).map(renderItem)}
+            {NAV_WORK.map(renderItem)}
           </SidebarMenu>
         </SidebarGroup>
 
@@ -350,7 +342,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarGroup>
           <SidebarGroupLabel>People</SidebarGroupLabel>
           <SidebarMenu>
-            {NAV_PEOPLE.filter(canAccess).map(renderItem)}
+            {NAV_PEOPLE.map(renderItem)}
           </SidebarMenu>
         </SidebarGroup>
 
@@ -372,7 +364,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {/* Settings / Help */}
         <SidebarGroup>
           <SidebarMenu>
-            {NAV_BOTTOM.filter(canAccess).map(renderItem)}
+            {NAV_BOTTOM.map(renderItem)}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>

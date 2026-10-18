@@ -213,7 +213,7 @@ describe('SignupForm - Step 1: Information Form', () => {
   });
 
   describe('Successful Submission', () => {
-    it('should store data and redirect to plan selection on valid form', async () => {
+    it('should store data and go to verification on valid form', async () => {
       const user = userEvent.setup();
       
       render(<SignupForm />);
@@ -228,7 +228,7 @@ describe('SignupForm - Step 1: Information Form', () => {
       await user.click(submitButton);
 
       // `challengeToken` s'ajoute à la charge stockée : le jeton de vérification humaine est émis au
-      // chargement de cette étape mais consommé à l'étape 3, il doit donc transiter par la session.
+      // chargement de cette étape mais consommé à l'étape 2, il doit donc transiter par la session.
       // Vide ici, la requête de défi n'étant pas simulée dans ce test.
       await waitFor(() => {
         expect(mockSetRegisterData).toHaveBeenCalledWith({
@@ -236,7 +236,6 @@ describe('SignupForm - Step 1: Information Form', () => {
           lastName: 'Doe',
           email: 'test@example.com',
           password: 'StrongP@ssw0rd!',
-          planType: 'FREE',
           challengeToken: '',
           turnstileToken: '',
         });

@@ -50,10 +50,6 @@ const TAG_MAP = {
   "mcp-action-controller": "MCP actions",
   "integration-controller": "Integrations",
   "webhook-controller": "Webhooks",
-  "billing-controller": "Billing",
-  "stripe-controller": "Stripe",
-  "stripe-webhook-controller": "Stripe webhooks",
-  "sales-controller": "Sales",
   "gdpr-controller": "GDPR",
   "attachment-controller": "Attachments",
   "file-controller": "Files",
@@ -71,7 +67,7 @@ const TAG_ORDER = [
   "AI assistant", "AI analysis (workflows)", "Skill suggestions", "Brain OS", "Brain OS attachments", "AI usage",
   "Dashboard", "Analytics",
   "Integrations", "Webhooks", "MCP actions",
-  "Billing", "Stripe", "Stripe webhooks", "Sales", "GDPR",
+  "GDPR",
   "Files", "Attachments", "Feedback", "Client logs", "Status",
 ];
 
@@ -91,7 +87,6 @@ const TAG_DESC = {
   "Brain OS": "Base de connaissance de l'espace (graphe).",
   "Analytics": "Indicateurs : débit, vélocité, charge, burndown.",
   "Integrations": "Connexion des outils externes (GitHub, Slack…).",
-  "Billing": "Forfaits et facturation.",
 };
 
 const prettify = (kebab) =>
@@ -109,17 +104,13 @@ for (const p of Object.keys(spec.paths ?? {})) {
 }
 
 // 1b. Retirer les endpoints INTERNES de la doc publique (décision sécu : ne pas exposer la surface
-// qui n'est pas destinée aux consommateurs de l'API). Télémétrie, feedback, ventes, RGPD in-app et
-// tout le cluster paiement sortent ; la gestion de webhooks (feature API légitime) RESTE.
+// qui n'est pas destinée aux consommateurs de l'API). Télémétrie, feedback et RGPD in-app sortent ;
+// la gestion de webhooks (feature API légitime) RESTE.
 // Filtrage sur les tags BRUTS springdoc (« xxx-controller »), donc AVANT le renommage.
 const HIDE = new Set([
   "client-log-controller",
   "feedback-controller",
-  "sales-controller",
   "gdpr-controller",
-  "billing-controller",
-  "stripe-controller",
-  "stripe-webhook-controller",
   // Endpoints MACHINE du runner local de délégation (ADR-013) : réservés à un compte de service
   // Keycloak, sans intérêt pour un consommateur de l'API. La spec vient du backend DEV, où ils existent.
   "delivery-runner-controller",

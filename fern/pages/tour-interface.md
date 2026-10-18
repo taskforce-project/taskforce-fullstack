@@ -45,9 +45,9 @@ partagés.
 
 - **Nouveau projet** — crée une opération sans quitter votre écran.
 - **Paramètres** — ouvre les réglages dans une grande fenêtre (profil, préférences, sécurité,
-  facturation…). → [Profil & sécurité](/guides/profil-et-securite)
+  intégrations…). → [Profil & sécurité](/guides/profil-et-securite)
 - **Aide** — ouvre cette documentation.
-- Votre **compte** (nom, email, forfait) est ancré tout en bas.
+- Votre **compte** (nom, email) est ancré tout en bas.
 
 ## La barre du haut
 

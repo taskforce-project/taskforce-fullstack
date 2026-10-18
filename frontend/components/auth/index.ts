@@ -1,7 +1,7 @@
 // Login
 export { LoginForm } from "./login/login-form";
 
-// Register (2 étapes : compte → vérification ; plan choisi en Free, upgrade in-app)
+// Register (2 étapes : compte → vérification)
 export { SignupForm as RegisterInfoForm } from "./register/register-info-form";
 export { OTPForm as RegisterVerificationForm } from "./register/verification/verification-form";
 

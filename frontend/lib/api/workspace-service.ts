@@ -105,21 +105,6 @@ export async function inviteMember(slug: string, payload: InviteMemberPayload): 
   return response.data.data;
 }
 
-/** Usage vs limites du plan (PROD-4.2, source de vérité back). `-1` = illimité. */
-export interface WorkspaceUsage {
-  plan: string;
-  membersUsed: number;
-  membersLimit: number;
-  workspacesUsed: number;
-  workspacesLimit: number;
-}
-
-export async function getWorkspaceUsage(slug: string): Promise<WorkspaceUsage> {
-  // Enrichissement (badges d'usage) : échec silencieux - pas de toast si la métrique n'est pas dispo.
-  const response = await apiClient.get<{ data: WorkspaceUsage }>(WORKSPACE_ROUTES.USAGE(slug), { silentError: true });
-  return response.data.data;
-}
-
 /** Entrée du journal d'audit (RGPD C11.1 / sécurité C21, OWNER/ADMIN). */
 export interface AuditLogEntry {
   id: number;

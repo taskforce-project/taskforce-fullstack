@@ -16,13 +16,13 @@ describe('settings-store', () => {
 
   it('openSettings sans argument ouvre le modal sans changer de section', () => {
     act(() => {
-      useSettingsStore.setState({ section: 'billing' });
+      useSettingsStore.setState({ section: 'usage' });
       useSettingsStore.getState().openSettings();
     });
 
     expect(useSettingsStore.getState().open).toBe(true);
     // Réouvrir depuis un CTA générique ne doit pas ramener l'utilisateur sur « profile ».
-    expect(useSettingsStore.getState().section).toBe('billing');
+    expect(useSettingsStore.getState().section).toBe('usage');
   });
 
   it('openSettings avec une section ouvre directement dessus (deep-link)', () => {

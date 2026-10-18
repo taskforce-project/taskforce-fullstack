@@ -59,7 +59,7 @@ Avant d'explorer le dépôt, vérifier si la documentation d'architecture existe
 
 1. `.ai/api-contracts.md`
 2. `.ai/architecture-map.md`
-3. `API_SPECIFICATION.md`
+3. La spec OpenAPI générée par springdoc (`/api-docs`)
 4. Documentation projet existante
 5. Exploration du code source (dernier recours)
 

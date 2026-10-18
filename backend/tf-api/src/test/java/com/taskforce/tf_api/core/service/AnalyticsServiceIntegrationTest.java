@@ -39,7 +39,7 @@ import static org.mockito.Mockito.doThrow;
  * Tests d'intégration (B-T7) — {@link AnalyticsService} contre un vrai Postgres.
  *
  * <p>Service chargé via {@code @Import} ; repos + {@code JdbcTemplate} réels ; les collaborateurs
- * non-DB sont mockés ({@code AuthorizationService} → membre OK, {@code PlanFeatureService} → gating,
+ * non-DB sont mockés ({@code AuthorizationService} → membre OK,
  * {@code LlmClient}/{@code AiMeter}/{@code ObjectMapper} inutilisés hors du test d'insights). Valide le
  * calcul KPIs (SQL réel de {@code countCompletedBetween}), la structure du throughput (8 buckets
  * semaine) et l'<b>enforcement du gating</b> sur les analytics avancées.</p>
@@ -63,7 +63,6 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private IssueStatusRepository issueStatusRepository;
 
     @MockitoBean private AuthorizationService authorizationService;   // requireMember → no-op (membre OK)
-    @MockitoBean private PlanFeatureService planFeatureService;        // gating PRO
     @MockitoBean private LlmClient llm;                                // l'INTERFACE, pas une impl concrète
     @MockitoBean private AiMeter aiMeter;                              // rendu transparent dans le test d'insights
     @MockitoBean private ObjectMapper objectMapper;                   // inutilisé (pas de parsing ici)
@@ -117,18 +116,6 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
         List<ThroughputPointResponse> points = analyticsService.getThroughput(SLUG, owner.getId(), null, "WEEK");
 
         assertThat(points).hasSize(8);
-    }
-
-    @Test
-    @DisplayName("getCapacity applique le gating PRO (PlanFeatureService refuse → propagé)")
-    void capacity_enforces_plan_gating() {
-        // Le débit/burndown sont désormais gratuits (Free) ; le gating ADVANCED_ANALYTICS ne
-        // s'applique plus qu'aux vues avancées (capacité, charge). On y vérifie donc la propagation.
-        doThrow(new BusinessException("Fonctionnalité réservée au plan Pro"))
-            .when(planFeatureService).requireFeature(any(), any());
-
-        assertThatThrownBy(() -> analyticsService.getCapacity(SLUG, owner.getId(), null))
-            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -240,17 +227,8 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("generateInsights sans plan PRO renvoie l'invite d'upgrade (non vide)")
-    void insights_upgrade_when_not_pro() {
-        // planFeatureService.has(...) → false par défaut (mock) → upgradeInsights()
-        var insights = analyticsService.generateInsights(SLUG, owner.getId());
-        assertThat(insights).isNotEmpty();
-    }
-
-    @Test
     @DisplayName("generateInsights parse le JSON du LLM en 3 insights, étiquetés generated")
     void insights_parsed_from_llm_json() throws Exception {
-        org.mockito.Mockito.when(planFeatureService.has(any(), any())).thenReturn(true);
         // AiMeter rendu transparent : il exécute le travail sans gate ni comptage (testés ailleurs).
         org.mockito.Mockito.when(aiMeter.metered(any(), any()))
             .thenAnswer(i -> ((AiMeter.AiCall<?>) i.getArgument(1)).call());
@@ -277,7 +255,6 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("generateInsights retombe sur le repli si le JSON n'a pas d'insights, et l'ÉTIQUETTE")
     void insights_fallback_on_empty_json() throws Exception {
-        org.mockito.Mockito.when(planFeatureService.has(any(), any())).thenReturn(true);
         org.mockito.Mockito.when(aiMeter.metered(any(), any()))
             .thenAnswer(i -> ((AiMeter.AiCall<?>) i.getArgument(1)).call());
         org.mockito.Mockito.when(llm.chatCompletion(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), any()))
@@ -296,7 +273,6 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("generateInsights : le LLM en échec ne remonte pas d'erreur, il rend un repli étiqueté")
     void insights_fallback_when_llm_throws() throws Exception {
-        org.mockito.Mockito.when(planFeatureService.has(any(), any())).thenReturn(true);
         org.mockito.Mockito.when(aiMeter.metered(any(), any()))
             .thenThrow(new IllegalStateException("quota atteint"));
 

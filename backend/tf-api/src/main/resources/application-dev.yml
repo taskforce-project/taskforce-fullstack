@@ -141,24 +141,6 @@ keycloak:
     # JWK Set : Clés publiques pour vérifier les signatures JWT
     certs: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/certs
 
-# Stripe Configuration
-stripe:
-  api-key: ${STRIPE_SECRET_KEY:sk_test_your_stripe_key_here}
-  publishable-key: ${STRIPE_PUBLIC_KEY:pk_test_your_publishable_key_here}
-  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_your_webhook_secret_here}
-  plans:
-    basic:
-      price-id: ${STRIPE_PRICE_ID_BASIC:price_basic_test}
-      yearly-price-id: ${STRIPE_PRICE_ID_BASIC_YEARLY:}
-    business:
-      price-id: ${STRIPE_PRICE_ID_BUSINESS:price_business_test}
-      yearly-price-id: ${STRIPE_PRICE_ID_BUSINESS_YEARLY:}
-    enterprise:
-      price-id: ${STRIPE_ENTERPRISE_PRICE_ID:price_enterprise_test}
-  checkout:
-    success-url: ${STRIPE_SUCCESS_URL:http://localhost:3000/payment/success}
-    cancel-url: ${STRIPE_CANCEL_URL:http://localhost:3000/payment/cancel}
-
 # Application Configuration
 app:
   name: ${APP_NAME:TaskForce}

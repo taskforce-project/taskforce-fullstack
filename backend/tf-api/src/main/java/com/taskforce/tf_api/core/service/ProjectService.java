@@ -79,7 +79,6 @@ public class ProjectService {
      * Plafond « façon GitHub » : nombre max de collaborateurs sur un projet PRIVÉ en forfait Free
      * (créateur inclus). Les projets publics et les forfaits payants sont illimités.
      */
-    private static final long FREE_PRIVATE_PROJECT_MEMBER_LIMIT = 5;
 
     // -------------------------------------------------------------------------
     // Lecture
@@ -474,8 +473,6 @@ public class ProjectService {
             throw new BusinessException("Cet utilisateur est déjà membre du projet");
         }
 
-        // Plafond « façon GitHub » : projet privé + forfait Free = collaborateurs limités.
-        enforcePrivateProjectSeatLimit(project);
 
         User requester = resolveUser(requestingUserId);
         ProjectMember member = ProjectMember.builder()
@@ -519,9 +516,6 @@ public class ProjectService {
             throw new BusinessException("Cette équipe est déjà associée au projet");
         }
 
-        // Plafond « façon GitHub » : associer une équipe pleine à un projet privé Free ne doit pas
-        // contourner la limite de collaborateurs (les membres de l'équipe comptent).
-        enforcePrivateProjectSeatLimitForTeam(project, teamId);
 
         projectTeamRepository.save(ProjectTeam.builder().project(project).team(team).build());
         return ProjectTeamResponse.from(team, teamMemberRepository.countByTeamId(teamId));
@@ -725,77 +719,6 @@ public class ProjectService {
             .filter(wm -> wm.getRole().name().equals("OWNER") || wm.getRole().name().equals("ADMIN"))
             .orElseThrow(() -> new BusinessException(
                 "Droits insuffisants pour gérer ce projet"));
-    }
-
-    /**
-     * Plafond « façon GitHub » : sur le forfait Free, un projet PRIVÉ est limité à
-     * {@value #FREE_PRIVATE_PROJECT_MEMBER_LIMIT} collaborateurs (créateur inclus).
-     * Les projets publics et les forfaits payants (BASIC/BUSINESS/ENTERPRISE) sont illimités.
-     * Lève une {@link IllegalStateException} (→ 409) pour déclencher l'upsell côté front,
-     * en miroir du plafond de workspaces de {@code WorkspaceService}.
-     */
-    /**
-     * Réutilisable (invitations projet) : rejette si ajouter un collaborateur dépasserait le plafond
-     * Free du projet privé. Même règle que l'ajout direct — l'invitation ne doit pas la contourner.
-     */
-    public void assertProjectSeatAvailable(Project project) {
-        enforcePrivateProjectSeatLimit(project);
-    }
-
-    private void enforcePrivateProjectSeatLimit(Project project) {
-        if (skipSeatLimit(project)) {
-            return;
-        }
-        if (effectiveCollaboratorIds(project).size() >= FREE_PRIVATE_PROJECT_MEMBER_LIMIT) {
-            throw seatLimitExceeded();
-        }
-    }
-
-    /**
-     * Variante pour l'association d'une ÉQUIPE : ses membres deviennent collaborateurs du projet.
-     * On rejette si l'attachement pousse le total de collaborateurs DISTINCTS au-delà du plafond —
-     * sinon on contourne la limite Free en passant par une équipe (cf. QA PROJ-03).
-     */
-    private void enforcePrivateProjectSeatLimitForTeam(Project project, Long teamId) {
-        if (skipSeatLimit(project)) {
-            return;
-        }
-        Set<Long> ids = effectiveCollaboratorIds(project);
-        teamMemberRepository.findByTeamId(teamId)
-            .forEach(tm -> { if (tm.getUser() != null) ids.add(tm.getUser().getId()); });
-        if (ids.size() > FREE_PRIVATE_PROJECT_MEMBER_LIMIT) {
-            throw seatLimitExceeded();
-        }
-    }
-
-    /** Projet public OU workspace payant = collaborateurs illimités (pas de plafond). */
-    private boolean skipSeatLimit(Project project) {
-        if (project.isPublic()) {
-            return true;
-        }
-        User owner = project.getWorkspace().getOwner();
-        return owner != null && owner.isPaid();
-    }
-
-    /**
-     * Collaborateurs EFFECTIFS et DISTINCTS : membres directs + membres de toutes les équipes
-     * associées, dédupliqués. C'est ce total qui est plafonné (sinon l'ajout via équipe contourne la limite).
-     */
-    private Set<Long> effectiveCollaboratorIds(Project project) {
-        Set<Long> ids = new HashSet<>();
-        projectMemberRepository.findByProjectId(project.getId())
-            .forEach(pm -> { if (pm.getUser() != null) ids.add(pm.getUser().getId()); });
-        projectTeamRepository.findByProjectId(project.getId())
-            .forEach(pt -> teamMemberRepository.findByTeamId(pt.getTeam().getId())
-                .forEach(tm -> { if (tm.getUser() != null) ids.add(tm.getUser().getId()); }));
-        return ids;
-    }
-
-    private IllegalStateException seatLimitExceeded() {
-        return new IllegalStateException(
-            "Les projets privés sont limités à " + FREE_PRIVATE_PROJECT_MEMBER_LIMIT
-            + " collaborateurs sur le forfait Free. Rendez ce projet public, "
-            + "ou passez à un forfait payant pour inviter sans limite.");
     }
 
     // -------------------------------------------------------------------------

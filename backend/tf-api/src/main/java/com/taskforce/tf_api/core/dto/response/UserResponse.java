@@ -1,7 +1,5 @@
 package com.taskforce.tf_api.core.dto.response;
 
-import com.taskforce.tf_api.core.enums.PlanStatus;
-import com.taskforce.tf_api.core.enums.PlanType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,11 +26,6 @@ public class UserResponse {
     private String jobTitle;
     /** Vrai si l'utilisateur a déjà franchi l'onboarding — le front s'en sert pour (ne pas) l'afficher. */
     private Boolean onboardingCompleted;
-    private PlanType planType;
-    private PlanStatus planStatus;
-    private LocalDateTime subscriptionStartDate;
-    private LocalDateTime subscriptionEndDate;
-    private LocalDateTime trialEndDate;
     private Boolean isActive;
     private LocalDateTime createdAt;
     /** Non nul si le compte est planifié pour suppression : date de PURGE effective (début de grâce +

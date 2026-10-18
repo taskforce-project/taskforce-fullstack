@@ -11,7 +11,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -49,8 +48,6 @@ import com.taskforce.tf_api.core.enums.IssueActivityType;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueRelationType;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
-import com.taskforce.tf_api.core.enums.PlanFeature;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.event.IssueCompletedEvent;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueActivity;
@@ -109,16 +106,8 @@ public class IssueService {
     private final IssueWorklogRepository        worklogRepository;
     private final SlackIntegrationService       slackService;
     private final ProjectVisibilityGuard        visibilityGuard;
-    private final PlanFeatureService            planFeatureService;
     private final ApplicationEventPublisher     events;
     private final AiGenerationService           aiGenerationService; // data flywheel : finalise les recos smart-assign
-
-    /** Plafond d'issues du forfait Free (par workspace). Payant = illimité. */
-    private static final long FREE_ISSUE_LIMIT = 250;
-
-    /** Rétention d'historique d'activité sans {@code UNLIMITED_HISTORY} : N dernières entrées (payant = illimité). */
-    @Value("${issue.history.retention-limit:100}")
-    private int historyRetentionLimit;
 
     public IssueService(
         IssueRepository issueRepository,
@@ -139,7 +128,6 @@ public class IssueService {
         IssueWorklogRepository worklogRepository,
         SlackIntegrationService slackService,
         ProjectVisibilityGuard visibilityGuard,
-        PlanFeatureService planFeatureService,
         ApplicationEventPublisher events,
         AiGenerationService aiGenerationService
     ) {
@@ -161,7 +149,6 @@ public class IssueService {
         this.worklogRepository = worklogRepository;
         this.slackService = slackService;
         this.visibilityGuard = visibilityGuard;
-        this.planFeatureService = planFeatureService;
         this.events = events;
         this.aiGenerationService = aiGenerationService;
     }
@@ -308,7 +295,6 @@ public class IssueService {
     public IssueResponse createIssue(String workspaceSlug, Long projectId,
                                      CreateIssueRequest request, Long reporterId) {
         Project project = resolveWritableProject(workspaceSlug, projectId, reporterId);
-        enforceIssueLimit(project); // plafond 250 issues sur le forfait Free
 
         User reporter = resolveUser(reporterId);
 
@@ -981,12 +967,6 @@ public class IssueService {
         visibilityGuard.assertCanView(project, userId); // projet privé : membres invités + OWNER/ADMIN
         resolveIssue(issueId, project.getId());
         List<IssueActivity> activities = activityRepository.findByIssueIdOrderByCreatedAtAsc(issueId);
-        // Rétention d'historique par plan : UNLIMITED_HISTORY (BUSINESS+) = tout ; sinon on ne renvoie que
-        // les N entrées les plus récentes (le compte payant conserve l'historique complet).
-        PlanType plan = workspaceRepository.findOwnerPlanBySlug(workspaceSlug).orElse(PlanType.FREE);
-        if (!planFeatureService.has(plan, PlanFeature.UNLIMITED_HISTORY) && activities.size() > historyRetentionLimit) {
-            activities = activities.subList(activities.size() - historyRetentionLimit, activities.size());
-        }
         return activities.stream().map(this::toActivityResponse).toList();
     }
 
@@ -1088,23 +1068,6 @@ public class IssueService {
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
         visibilityGuard.assertCanWrite(project, userId);
         resolveIssue(issueId, project.getId());
-    }
-
-    /**
-     * Plafond d'issues du forfait Free ({@value #FREE_ISSUE_LIMIT} par workspace) — payant = illimité.
-     * Lève une {@link IllegalStateException} (→ 409) pour déclencher l'upsell.
-     */
-    private void enforceIssueLimit(Project project) {
-        User owner = project.getWorkspace().getOwner();
-        if (owner == null || owner.isPaid()) {
-            return; // forfait payant = issues illimitées
-        }
-        long count = issueRepository.countByWorkspaceId(project.getWorkspace().getId());
-        if (count >= FREE_ISSUE_LIMIT) {
-            throw new IllegalStateException(
-                "Limite de " + FREE_ISSUE_LIMIT + " issues atteinte sur le forfait Free. "
-                + "Passez à un forfait payant pour des issues illimitées.");
-        }
     }
 
     @Transactional

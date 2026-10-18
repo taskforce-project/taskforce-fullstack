@@ -115,7 +115,7 @@ app:
   api-url: ${APP_API_URL:${APP_URL}}
 
 # ── Blocs ajoutés le 18/08/2026 (1er déploiement VM) : absents du profil prod alors que le code les
-#    lit (MailConfig / MinioConfig / StripeConfig / OtpService) → le backend ne DÉMARRAIT PAS sans eux.
+#    lit (MailConfig / MinioConfig / OtpService) → le backend ne DÉMARRAIT PAS sans eux.
 #    Valeurs renseignées via .env.prod. ──
 # Email transactionnel (OTP, invitations, réinitialisation). Vide = SMTP inactif.
 mail:
@@ -141,24 +141,6 @@ minio:
   access-key: ${MINIO_ROOT_USER}
   secret-key: ${MINIO_ROOT_PASSWORD}
   bucket: ${MINIO_BUCKET:taskforce-attachments}
-
-# Paiement Stripe (vide = facturation inactive, l'app démarre quand même).
-stripe:
-  api-key: ${STRIPE_SECRET_KEY:}
-  publishable-key: ${STRIPE_PUBLIC_KEY:}
-  webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
-  plans:
-    basic:
-      price-id: ${STRIPE_PRICE_ID_BASIC:}
-      yearly-price-id: ${STRIPE_PRICE_ID_BASIC_YEARLY:}
-    business:
-      price-id: ${STRIPE_PRICE_ID_BUSINESS:}
-      yearly-price-id: ${STRIPE_PRICE_ID_BUSINESS_YEARLY:}
-    enterprise:
-      price-id: ${STRIPE_ENTERPRISE_PRICE_ID:}
-  # Le code lit stripe.success-url / stripe.cancel-url À PLAT (StripeConfig @Value), pas sous stripe.checkout.
-  success-url: ${STRIPE_SUCCESS_URL:${APP_URL}/settings/billing?success=true}
-  cancel-url: ${STRIPE_CANCEL_URL:${APP_URL}/settings/billing?canceled=true}
 
 # OTP (codes à usage unique). En prod, l'échec d'envoi BLOQUE l'inscription (pas de fallback log).
 otp:
@@ -243,14 +225,14 @@ server:
   http2:
     enabled: true
 
-# Garde-debit IA par minute (AiRateGuard) - PROD. global-tpm = TPM Groq partage (tier courant).
-# account-rpm = requetes/minute/compte (throttle beta : ~5 users a 1 req/min tiennent dans le budget).
-# Tout overridable par variable d'env (AI_RATE_*). 0 = fenetre desactivee.
+# Garde-debit IA par minute (AiRateGuard). Désactivé par défaut (0) : le profil prod est aussi celui des
+# instances auto-hébergées, souvent sur un modèle local. Une instance adossée à une API à quota (Groq...)
+# le règle par variable d'env (AI_RATE_GLOBAL_TPM, AI_RATE_ACCOUNT_TPM, AI_RATE_ACCOUNT_RPM).
 ai:
   rate:
-    global-tpm: ${AI_RATE_GLOBAL_TPM:8000}
-    account-tpm: ${AI_RATE_ACCOUNT_TPM:6000}
-    account-rpm: ${AI_RATE_ACCOUNT_RPM:1}
+    global-tpm: ${AI_RATE_GLOBAL_TPM:0}
+    account-tpm: ${AI_RATE_ACCOUNT_TPM:0}
+    account-rpm: ${AI_RATE_ACCOUNT_RPM:0}
 
 # Actuator Production
 management:

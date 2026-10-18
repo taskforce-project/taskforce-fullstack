@@ -85,31 +85,21 @@ export default function LegalNoticesPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">7. Billing and subscriptions</h2>
-            <ul className="list-disc pl-5 space-y-1.5">
-              <li>Subscriptions are billed monthly or annually via Stripe.</li>
-              <li>Prices are displayed inclusive of applicable taxes.</li>
-              <li>You may cancel at any time; access continues until the end of the billing period.</li>
-              <li>Refunds are not issued for partial billing periods unless required by applicable law.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">8. Limitation of liability</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-3">7. Limitation of liability</h2>
             <p>
               To the maximum extent permitted by law, TaskForce shall not be liable for indirect, incidental, or consequential damages arising from use of the service, including loss of data, revenue, or business opportunities. Our total liability shall not exceed the amount paid by you in the 12 months preceding the claim.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">9. Governing law</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-3">8. Governing law</h2>
             <p>
               These terms are governed by French law. Any dispute shall be subject to the exclusive jurisdiction of the courts of Paris, France.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">10. Contact</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-3">9. Contact</h2>
             <p>
               For any legal or compliance question:{" "}
               <a href="mailto:contact@taskforce-project.fr" className="text-foreground underline underline-offset-2">

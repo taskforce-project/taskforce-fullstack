@@ -67,6 +67,12 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
+# IA : plafond mensuel de tokens par compte, réglé par l'instance. 0 = illimité (défaut, ADR-016).
+# Une instance publique ou adossée à une API payante (Groq, OpenAI...) pose sa limite ici.
+ai:
+  quota:
+    monthly-tokens-per-account: ${AI_MONTHLY_TOKENS_PER_ACCOUNT:0}
+
 # Actuator Configuration
 management:
   endpoints:

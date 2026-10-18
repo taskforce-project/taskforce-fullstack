@@ -1,5 +1,7 @@
 # Architecture Map — TaskForce Fullstack
 
+> ⚠️ **18/10/2026** : la facturation (Stripe), le module `sales` et les limites de plan sont retirés (ADR-016, lot 2 du plan open source). Les mentions qui en restent ci-dessous sont historiques ; ce fichier sera purgé au lot 8 (OSS-8.4).
+
 > **Brain-OS document** · Generated 2026-06-05 · Read-only knowledge artifact for AI agents.
 > Purpose: give any agent a complete mental model of the system in one read, so it can locate
 > code and reason about impact without re-scanning the whole repository.

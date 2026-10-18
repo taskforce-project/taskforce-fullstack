@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import com.taskforce.tf_api.core.enums.PlanStatus;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.IssueWorklogRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -60,8 +59,6 @@ public class GdprService {
         profile.put("email", u.getEmail());
         profile.put("displayName", u.getDisplayName());
         profile.put("avatarUrl", u.getAvatarUrl());
-        profile.put("planType", u.getPlanType());
-        profile.put("planStatus", u.getPlanStatus());
         profile.put("createdAt", u.getCreatedAt());
         profile.put("updatedAt", u.getUpdatedAt());
 
@@ -230,14 +227,16 @@ public class GdprService {
         // invited_by/created_by portent l'id user (pas d'AuditorAware) → pointent vers le tombstone, pas de PII.
         jdbcTemplate.update("DELETE FROM workspace_invitations WHERE email = ?", u.getEmail());
 
+        // Identifiants Stripe hérités de l'ancienne facturation hébergée (retirée, ADR-016) : colonnes
+        // conservées sans usage, effacées ici pour qu'aucune référence de paiement ne survive à la purge.
+        jdbcTemplate.update(
+            "UPDATE users SET stripe_customer_id = NULL, stripe_subscription_id = NULL WHERE id = ?", userId);
+
         // Anonymiser le row résiduel (tombstone) : gardé UNIQUEMENT pour l'intégrité référentielle des
         // contenus laissés ailleurs (issues, commentaires) ; plus aucune donnée perso, accès coupé.
         u.setEmail("deleted-" + u.getId() + "@anonymized.invalid");
         u.setDisplayName(null);
         u.setAvatarUrl(null);
-        u.setStripeCustomerId(null);
-        u.setStripeSubscriptionId(null);
-        u.setPlanStatus(PlanStatus.CANCELED);
         u.setIsActive(false);
         u.setDeletionScheduledAt(null); // purge effectuée
         userRepository.save(u);

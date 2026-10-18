@@ -12,7 +12,7 @@ Ils déterminent ce qu'une personne peut faire **dans tout l'espace**.
 
 | Rôle | Ce qu'il permet |
 | --- | --- |
-| **Propriétaire** *(Owner)* | Contrôle total de l'espace, dont la **facturation** et les réglages sensibles. |
+| **Propriétaire** *(Owner)* | Contrôle total de l'espace, dont les réglages sensibles. |
 | **Admin** | Administre l'espace : membres, opérations, intégrations, réglages. |
 | **Membre** | Participe au travail de l'espace (selon la visibilité des opérations). |
 

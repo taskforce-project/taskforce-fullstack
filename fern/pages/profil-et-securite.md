@@ -50,6 +50,6 @@ côté compte.
 
 <Tip>
   Les réglages du groupe **Espace de travail** (général, **Usage Cortex**, intégrations, statut) sont
-  décrits dans leurs guides respectifs — voir [Offres, facturation & IA](/guides/offres-et-ia) et
+  décrits dans leurs guides respectifs — voir [IA et consommation](/guides/ia-et-consommation) et
   [Intégrations](/guides/integrations).
 </Tip>

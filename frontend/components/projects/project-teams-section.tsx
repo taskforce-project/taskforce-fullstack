@@ -107,16 +107,8 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
         setLinkedIds((prev) => new Set(prev).add(team.id))
         toast.success("Linked")
       }
-    } catch (err) {
-      // 409 = plafond Free du projet privé (collaborateurs via équipe compris) → message clair + upsell.
-      const e = err as { response?: { status?: number; data?: { message?: string } } }
-      if (e?.response?.status === 409) {
-        toast.error(e.response?.data?.message ?? "Collaborator limit reached on this private project (Free plan).", {
-          description: "Make the project public, or upgrade to a paid plan to link without limits.",
-        })
-      } else {
-        toast.error("Action failed")
-      }
+    } catch {
+      toast.error("Action failed")
     }
   }
 

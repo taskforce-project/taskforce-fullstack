@@ -15,9 +15,8 @@ minutes.
     L'inscription se fait en **trois étapes** — *Votre compte → Vérification → C'est prêt*.
 
     <Info>
-      Tout le monde démarre sur le forfait **Free**. Le choix d'un forfait payant est un *upgrade*
-      qui se fait plus tard, dans l'application (**Paramètres → Facturation**). Voir
-      [Offres, facturation & IA](/guides/offres-et-ia).
+      Aucun forfait à choisir : toutes les fonctionnalités, IA comprise, sont disponibles dès
+      l'inscription. Voir [IA et consommation](/guides/ia-et-consommation).
     </Info>
 
     {/* SCREENSHOT: premiers-pas-signup — page /auth/register, formulaire d'inscription (FR) */}
