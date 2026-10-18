@@ -40,19 +40,6 @@ public class UserService {
     @Value("${taskforce.account.deletion-grace-days:30}")
     private int graceDays;
 
-    @Transactional
-    public void processDataRequest(String email, String requestType) {
-        User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
-        if ("DELETION".equalsIgnoreCase(requestType)) {
-            user.setIsActive(false);
-            userRepository.save(user);
-            log.info("Compte désactivé suite à demande RGPD — email={}", email);
-        }
-        String firstName = keycloakService.getUserById(user.getKeycloakId()).getFirstName();
-        emailService.sendDataRequestEmail(user.getEmail(), firstName, requestType);
-    }
-
     /**
      * Clôt le parcours d'onboarding : enregistre le rôle déclaré et lève le drapeau
      * {@code onboarding_completed} pour que le front cesse d'afficher le wizard.

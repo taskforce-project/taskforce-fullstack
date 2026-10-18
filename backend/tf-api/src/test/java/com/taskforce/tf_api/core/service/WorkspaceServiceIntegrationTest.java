@@ -295,13 +295,6 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
-        @DisplayName("getWorkspaceByUserId renvoie le workspace de l'utilisateur")
-        void should_get_by_user_id() {
-            createWs();
-            assertThat(workspaceService.getWorkspaceByUserId(owner.getId())).isNotNull();
-        }
-
-        @Test
         @DisplayName("inviteMember en tant qu'OWNER est refusé")
         void should_reject_invite_as_owner() {
             Long wsId = createWs();

@@ -54,7 +54,6 @@ export const DELIVERY_ROUTES = {
 export const USER_ROUTES = {
   ME: "/api/users/me",
   AVATAR: "/api/users/me/avatar",
-  DATA_REQUEST: "/api/users/me/data-request",
   /** Sécurité : 2FA TOTP gérée par l'app. */
   TWO_FACTOR: "/api/users/me/2fa",
   TWO_FACTOR_SETUP: "/api/users/me/2fa/setup",
@@ -105,7 +104,6 @@ export const WORKSPACE_ROUTES = {
   // Journalisation des erreurs client (E25) - logs serveur classiques
   CLIENT_LOG: "/api/logs/client",
   // Rétrocompatibilité
-  CURRENT: "/api/workspaces/current",
 } as const;
 
 /**
@@ -172,7 +170,6 @@ export const PROJECT_ROUTES = {
   TEAMS:   (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/teams`,
   TEAM:    (slug: string, id: number, teamId: number) => `/api/workspaces/${slug}/projects/${id}/teams/${teamId}`,
   // Activité quotidienne (QA2-32)
-  ACTIVITY: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/activity`,
 } as const;
 
 /**
@@ -313,7 +310,6 @@ export const AI_ROUTES = {
  */
 export const NOTIFICATION_ROUTES = {
   LIST:            (slug: string) => `/api/workspaces/${slug}/notifications`,
-  UNREAD_COUNT:    (slug: string) => `/api/workspaces/${slug}/notifications/unread-count`,
   MARK_READ:       (slug: string, id: number) => `/api/workspaces/${slug}/notifications/${id}/read`,
   MARK_ALL_READ:   (slug: string) => `/api/workspaces/${slug}/notifications/read-all`,
   ACKNOWLEDGE:     (slug: string, id: number) => `/api/workspaces/${slug}/notifications/${id}/acknowledge`,

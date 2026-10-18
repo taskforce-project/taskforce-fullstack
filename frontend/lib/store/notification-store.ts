@@ -7,7 +7,6 @@ import { create } from "zustand";
 import type { NotificationResponse } from "../api/notification-service";
 import {
   listNotifications,
-  countUnread as countUnreadApi,
   markAsRead as markAsReadApi,
   markAllAsRead as markAllAsReadApi,
   acknowledge as acknowledgeApi,
@@ -104,7 +103,6 @@ interface NotificationState {
   /** Insère en tête une notification reçue en temps réel (STOMP). Dédup par id. */
   pushSignal: (notification: NotificationResponse) => void;
   /** Charge uniquement le compteur non-lu (ex. badge header) */
-  fetchUnreadCount: (slug: string) => Promise<void>;
   /** Marque une notification comme lue (API + optimistic) */
   markAsRead: (slug: string, id: string) => Promise<void>;
   /** Marque toutes comme lues (API + optimistic). Renvoie `false` si l'appel échoue (échec détectable côté appelant). */
@@ -145,15 +143,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         lastSyncAt:  Date.now(),
       };
     });
-  },
-
-  fetchUnreadCount: async (slug) => {
-    try {
-      const count = await countUnreadApi(slug);
-      set({ unreadCount: count });
-    } catch {
-      // Silencieux - le badge n'est pas bloquant
-    }
   },
 
   markAsRead: async (slug, id) => {

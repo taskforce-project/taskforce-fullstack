@@ -24,7 +24,6 @@ import com.taskforce.tf_api.core.dto.request.UpdateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
 import com.taskforce.tf_api.core.dto.request.ProjectRepoLinkRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateProjectRequest;
-import com.taskforce.tf_api.core.dto.response.ProjectActivityPointResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectActivitySeriesResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectHealthPointResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
@@ -169,23 +168,6 @@ public class ProjectController {
         Long userId = resolveUserId(jwt);
         List<ProjectActivitySeriesResponse> series = projectService.getWorkspaceActivity(slug, userId, days);
         return ResponseEntity.ok(ApiResponse.success("Activité des opérations récupérée", series));
-    }
-
-    /**
-     * GET /api/workspaces/{slug}/projects/{id}/activity?days=14
-     * Activité quotidienne du projet (issues créées/jour) — alimente la sparkline (QA2-32).
-     */
-    @GetMapping("/{id}/activity")
-    public ResponseEntity<ApiResponse<List<ProjectActivityPointResponse>>> getProjectActivity(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable String slug,
-        @PathVariable Long id,
-        @RequestParam(name = "days", defaultValue = "14") int days
-    ) {
-        Long userId = resolveUserId(jwt);
-        List<ProjectActivityPointResponse> activity =
-            projectService.getProjectActivity(slug, id, userId, days);
-        return ResponseEntity.ok(ApiResponse.success("Activité récupérée", activity));
     }
 
     /**

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   listNotifications,
-  countUnread,
   markAsRead,
   markAllAsRead,
   acknowledge,
@@ -42,15 +41,6 @@ describe('notification-service', () => {
     expect(result).toEqual(notifs);
   });
 
-  it('countUnread: GET unread-count route and returns count', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue(envelope(7));
-
-    const result = await countUnread(slug);
-
-    expect(apiClient.get).toHaveBeenCalledWith(NOTIFICATION_ROUTES.UNREAD_COUNT(slug), { silentError: true });
-    expect(result).toBe(7);
-  });
-
   it('markAsRead: PATCH mark-read route and returns notification', async () => {
     const notif = { id, read: true };
     vi.mocked(apiClient.patch).mockResolvedValue(envelope(notif));
@@ -87,8 +77,4 @@ describe('notification-service', () => {
     expect(apiClient.patch).toHaveBeenCalledWith(NOTIFICATION_ROUTES.ACKNOWLEDGE_ALL(slug));
   });
 
-  it('countUnread: propagates errors', async () => {
-    vi.mocked(apiClient.get).mockRejectedValue(new Error('boom'));
-    await expect(countUnread(slug)).rejects.toThrow('boom');
-  });
 });

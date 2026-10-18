@@ -114,11 +114,6 @@ public class AnalysisJobService {
             .map(this::toResponse).toList();
     }
 
-    @Transactional(readOnly = true)
-    public AnalysisJobResponse get(String slug, Long jobId, Long userId) {
-        return toResponse(requireJob(slug, jobId, userId));
-    }
-
     /**
      * Réponse humaine à la question du modèle (HITL) : le workflow repasse en RUNNING.
      * Le contrôleur relance le runner après le commit.

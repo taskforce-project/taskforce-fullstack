@@ -108,28 +108,6 @@ describe('notification-store', () => {
     expect(useNotificationStore.getState().unreadCount).toBe(1);
   });
 
-  it('fetchUnreadCount sets the count', async () => {
-    vi.mocked(svc.countUnread).mockResolvedValue(7);
-
-    await act(async () => {
-      await useNotificationStore.getState().fetchUnreadCount('acme');
-    });
-
-    expect(svc.countUnread).toHaveBeenCalledWith('acme');
-    expect(useNotificationStore.getState().unreadCount).toBe(7);
-  });
-
-  it('fetchUnreadCount is silent on failure', async () => {
-    act(() => useNotificationStore.setState({ unreadCount: 3 }));
-    vi.mocked(svc.countUnread).mockRejectedValue(new Error('x'));
-
-    await act(async () => {
-      await useNotificationStore.getState().fetchUnreadCount('acme');
-    });
-
-    expect(useNotificationStore.getState().unreadCount).toBe(3);
-  });
-
   it('markAsRead flips read optimistically and decrements unreadCount', async () => {
     act(() =>
       useNotificationStore.setState({

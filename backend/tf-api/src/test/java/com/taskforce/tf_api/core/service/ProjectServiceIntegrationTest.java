@@ -297,14 +297,6 @@ class ProjectServiceIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
-        @DisplayName("getProjectActivity renvoie des points d'activité (parcourt la fenêtre de jours)")
-        void should_get_project_activity() {
-            ProjectResponse project = projectService.createProject(SLUG, owner.getId(), req("Act", "ACT"));
-
-            assertThat(projectService.getProjectActivity(SLUG, project.getId(), owner.getId(), 14)).isNotEmpty();
-        }
-
-        @Test
         @DisplayName("updateProject applique tous les champs (desc/status/public/icon/couleur/growth)")
         void should_update_all_fields() {
             ProjectResponse created = projectService.createProject(SLUG, owner.getId(), req("Full", "FUL"));

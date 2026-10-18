@@ -115,35 +115,6 @@ public class EmailService {
     }
 
     /**
-     * Envoie une confirmation de demande RGPD (accès aux données ou suppression de compte)
-     */
-    public void sendDataRequestEmail(String toEmail, String firstName, String requestType) {
-        try {
-            boolean isDeletion = "DELETION".equalsIgnoreCase(requestType);
-            String subject = isDeletion
-                ? String.format("[%s] Confirmation de suppression de compte", fromName)
-                : String.format("[%s] Confirmation de demande d'accès aux données", fromName);
-
-            String actionLine = isDeletion
-                ? "Votre compte a été désactivé et vos données seront supprimées dans 30 jours conformément au RGPD."
-                : "Nous avons bien reçu votre demande. Vous recevrez une copie de vos données dans un délai de 30 jours.";
-            String requestTypeLabel = isDeletion ? "Suppression de compte" : "Accès aux données";
-
-            Context context = new Context();
-            context.setVariable("firstName", firstName);
-            context.setVariable("actionLine", actionLine);
-            context.setVariable("requestTypeLabel", requestTypeLabel);
-
-            String htmlContent = templateEngine.process("email/data-request-email", context);
-
-            sendHtmlEmail(toEmail, subject, htmlContent);
-            log.info("Email de demande RGPD ({}) envoyé à : {}", requestType, toEmail);
-        } catch (Exception e) {
-            log.error("Erreur lors de l'envoi de l'email RGPD à {}: {}", toEmail, e.getMessage());
-        }
-    }
-
-    /**
      * Envoie une invitation à rejoindre un workspace (PROD-3.5). Best-effort :
      * en cas d'échec SMTP on logue sans propager (l'invitation reste créée en DB).
      */

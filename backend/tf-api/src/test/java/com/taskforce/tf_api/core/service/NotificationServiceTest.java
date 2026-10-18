@@ -194,30 +194,6 @@ class NotificationServiceTest {
 
     // =========================================================================
     @Nested
-    @DisplayName("countUnread / résolution workspace")
-    class CountUnread {
-
-        @Test
-        @DisplayName("délègue au repository et renvoie le nombre de non-lues")
-        void should_return_unread_count() {
-            when(workspaceRepository.findBySlug(SLUG)).thenReturn(Optional.of(workspace));
-            when(notificationRepository.countByRecipientIdAndWorkspaceIdAndReadFalse(7L, 1L)).thenReturn(4L);
-
-            assertThat(service.countUnread(SLUG, 7L)).isEqualTo(4L);
-        }
-
-        @Test
-        @DisplayName("lève ResourceNotFoundException si le workspace est introuvable")
-        void should_throw_when_workspace_missing() {
-            when(workspaceRepository.findBySlug(SLUG)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> service.countUnread(SLUG, 7L))
-                .isInstanceOf(ResourceNotFoundException.class);
-        }
-    }
-
-    // =========================================================================
-    @Nested
     @DisplayName("list / acknowledge / notify (autres)")
     class More {
 

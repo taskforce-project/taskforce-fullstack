@@ -231,56 +231,6 @@ class EmailServiceTest {
     }
 
     @Nested
-    @DisplayName("Send Data Request Email (RGPD)")
-    class SendDataRequestEmailTests {
-
-        @Test
-        @DisplayName("devrait envoyer email de suppression de compte (DELETION)")
-        void sendDataRequestEmail_deletion_shouldSendEmail() {
-            // Given
-            when(templateEngine.process(eq("email/data-request-email"), any(Context.class)))
-                    .thenReturn("<html><body>RGPD</body></html>");
-            doNothing().when(mailSender).send(any(MimeMessage.class));
-
-            // When
-            emailService.sendDataRequestEmail("test@example.com", "Grace", "DELETION");
-
-            // Then
-            verify(mailSender).send(any(MimeMessage.class));
-        }
-
-        @Test
-        @DisplayName("devrait envoyer email d'accès aux données (ACCESS)")
-        void sendDataRequestEmail_access_shouldSendEmail() {
-            // Given
-            when(templateEngine.process(eq("email/data-request-email"), any(Context.class)))
-                    .thenReturn("<html><body>RGPD</body></html>");
-            doNothing().when(mailSender).send(any(MimeMessage.class));
-
-            // When
-            emailService.sendDataRequestEmail("test@example.com", "Heidi", "ACCESS");
-
-            // Then
-            verify(mailSender).send(any(MimeMessage.class));
-        }
-
-        @Test
-        @DisplayName("devrait avaler l'exception d'envoi sans la propager (best-effort)")
-        void sendDataRequestEmail_withMailError_shouldNotThrow() {
-            // Given
-            when(templateEngine.process(eq("email/data-request-email"), any(Context.class)))
-                    .thenReturn("<html><body>RGPD</body></html>");
-            doThrow(new RuntimeException("SMTP down"))
-                    .when(mailSender).send(any(MimeMessage.class));
-
-            // When/Then : best-effort → aucune exception propagée
-            emailService.sendDataRequestEmail("test@example.com", "Ivan", "DELETION");
-
-            verify(mailSender).send(any(MimeMessage.class));
-        }
-    }
-
-    @Nested
     @DisplayName("Send Workspace Invitation Email")
     class SendWorkspaceInvitationEmailTests {
 

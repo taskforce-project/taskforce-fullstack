@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
 import com.taskforce.tf_api.core.dto.response.ChatTurnResponse;
@@ -56,69 +55,6 @@ public class AssistantController {
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
         return user.getId();
-    }
-
-    // -------------------------------------------------------------------------
-    // SSE endpoint — retourne la réponse LLM sous forme de Server-Sent Events
-    // -------------------------------------------------------------------------
-
-    @PostMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter chatStream(
-        @PathVariable String slug,
-        @Valid @RequestBody AssistantRequest body,
-        @AuthenticationPrincipal Jwt jwt
-    ) {
-        SseEmitter emitter = new SseEmitter(60_000L); // 60s timeout
-
-        // Exécution dans un thread séparé pour ne pas bloquer le Tomcat worker
-        Long userId = resolveUserId(jwt);
-        Thread.ofVirtual().start(() -> {
-            try {
-                String response = agentService.run(slug, userId, body.message()).answer();
-
-                // Simuler un streaming par mots (chunks de ~5 mots)
-                String[] words = response.split("(?<=\\s)|(?=\\s)");
-                StringBuilder chunk = new StringBuilder();
-                int wordCount = 0;
-
-                for (String word : words) {
-                    chunk.append(word);
-                    wordCount++;
-                    if (wordCount % 5 == 0) {
-                        emitter.send(SseEmitter.event()
-                            .name("chunk")
-                            .data(chunk.toString()));
-                        chunk.setLength(0);
-                    }
-                }
-
-                // Dernier chunk restant
-                if (!chunk.isEmpty()) {
-                    emitter.send(SseEmitter.event()
-                        .name("chunk")
-                        .data(chunk.toString()));
-                }
-
-                // Signal de fin
-                emitter.send(SseEmitter.event()
-                    .name("done")
-                    .data("[DONE]"));
-                emitter.complete();
-
-            } catch (Exception ex) {
-                log.error("Assistant SSE error — workspace={}: {}", slug, ex.getMessage());
-                try {
-                    emitter.send(SseEmitter.event()
-                        .name("error")
-                        .data(ex.getMessage()));
-                } catch (Exception ignored) {
-                    // client disconnected
-                }
-                emitter.completeWithError(ex);
-            }
-        });
-
-        return emitter;
     }
 
     // -------------------------------------------------------------------------

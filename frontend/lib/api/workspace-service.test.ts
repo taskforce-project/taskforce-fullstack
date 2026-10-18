@@ -10,7 +10,6 @@ import {
   updateMemberRole,
   removeMember,
   deleteWorkspace,
-  getCurrentWorkspace,
 } from './workspace-service';
 import { apiClient } from './client';
 import { WORKSPACE_ROUTES } from '../config/api-routes';
@@ -164,15 +163,4 @@ describe('workspace-service', () => {
     });
   });
 
-  describe('getCurrentWorkspace', () => {
-    it('GET le workspace courant', async () => {
-      const ws = { id: 1, slug: SLUG } as any;
-      vi.mocked(apiClient.get).mockResolvedValue(envelope(ws));
-
-      const result = await getCurrentWorkspace();
-
-      expect(apiClient.get).toHaveBeenCalledWith(WORKSPACE_ROUTES.CURRENT);
-      expect(result).toEqual(ws);
-    });
-  });
 });

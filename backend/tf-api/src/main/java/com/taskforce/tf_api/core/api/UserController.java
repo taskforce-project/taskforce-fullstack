@@ -1,7 +1,6 @@
 package com.taskforce.tf_api.core.api;
 
 import com.taskforce.tf_api.core.dto.request.CompleteOnboardingRequest;
-import com.taskforce.tf_api.core.dto.request.DataRequestRequest;
 import com.taskforce.tf_api.core.dto.request.TwoFactorConfirmRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateUserRequest;
 import com.taskforce.tf_api.core.dto.response.TwoFactorSetupResponse;
@@ -150,18 +149,4 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("Résultats de recherche", results));
     }
 
-    /**
-     * Soumet une demande RGPD (accès aux données ou suppression de compte).
-     * POST /api/users/me/data-request
-     */
-    @PostMapping("/me/data-request")
-    public ResponseEntity<ApiResponse<Void>> dataRequest(
-        @Valid @RequestBody DataRequestRequest request,
-        @AuthenticationPrincipal Jwt jwt
-    ) {
-        String email = identityResolver.resolveEmail(jwt);
-        log.info("POST /api/users/me/data-request — email={} type={}", email, request.type());
-        userService.processDataRequest(email, request.type());
-        return ResponseEntity.ok(ApiResponse.success("Votre demande a été enregistrée", null));
-    }
 }

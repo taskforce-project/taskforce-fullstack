@@ -76,16 +76,6 @@ public class AnalysisController {
             analysisJobService.list(slug, resolveUserId(jwt))));
     }
 
-    @GetMapping("/analysis/{jobId}")
-    public ResponseEntity<ApiResponse<AnalysisJobResponse>> get(
-        @PathVariable String slug,
-        @PathVariable Long jobId,
-        @AuthenticationPrincipal Jwt jwt
-    ) {
-        return ResponseEntity.ok(ApiResponse.success("Workflow récupéré",
-            analysisJobService.get(slug, jobId, resolveUserId(jwt))));
-    }
-
     /** Répond à la question du modèle (HITL) → le workflow reprend là où il s'était arrêté. */
     @PostMapping("/analysis/{jobId}/answer")
     public ResponseEntity<ApiResponse<AnalysisJobResponse>> answer(

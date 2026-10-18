@@ -144,9 +144,3 @@ export async function deleteWorkspace(slug: string): Promise<void> {
   await apiClient.delete(WORKSPACE_ROUTES.BY_SLUG(slug));
 }
 
-/** Rétrocompatibilité - récupère le workspace courant (owner lookup) */
-export async function getCurrentWorkspace(): Promise<Workspace> {
-  const response = await apiClient.get<{ data: Workspace }>(WORKSPACE_ROUTES.CURRENT);
-  return response.data.data;
-}
-

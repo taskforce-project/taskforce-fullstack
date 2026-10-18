@@ -49,20 +49,6 @@ public class NotificationController {
     }
 
     /**
-     * GET /api/workspaces/{slug}/notifications/unread-count
-     * Retourne le nombre de notifications non lues.
-     */
-    @GetMapping("/unread-count")
-    public ResponseEntity<ApiResponse<Long>> countUnread(
-        @PathVariable String slug,
-        @AuthenticationPrincipal Jwt jwt
-    ) {
-        Long userId = resolveUserId(jwt);
-        long count = notificationService.countUnread(slug, userId);
-        return ResponseEntity.ok(ApiResponse.success("Compteur non-lus", count));
-    }
-
-    /**
      * PATCH /api/workspaces/{slug}/notifications/{id}/read
      * Marque une notification comme lue.
      */

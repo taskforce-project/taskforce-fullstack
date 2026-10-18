@@ -96,17 +96,6 @@ public class WorkspaceService {
     // -------------------------------------------------------------------------
 
     /**
-     * Retourne le workspace de l'utilisateur (workspace dont il est le propriétaire).
-     */
-    @Transactional(readOnly = true)
-    public WorkspaceResponse getWorkspaceByUserId(Long userId) {
-        Workspace workspace = workspaceRepository.findByOwnerId(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
-
-        return toResponse(workspace);
-    }
-
-    /**
      * Retourne un workspace par son slug.
      * L'utilisateur doit être membre.
      */

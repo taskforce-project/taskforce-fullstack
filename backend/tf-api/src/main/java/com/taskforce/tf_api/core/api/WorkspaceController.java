@@ -202,23 +202,6 @@ public class WorkspaceController {
     }
 
     // -------------------------------------------------------------------------
-    // Rétrocompatibilité
-    // -------------------------------------------------------------------------
-
-    /**
-     * GET /api/workspaces/current — rétrocompatibilité
-     * Retourne le premier workspace de l'utilisateur.
-     */
-    @GetMapping("/current")
-    public ResponseEntity<ApiResponse<WorkspaceResponse>> getCurrent(
-        @AuthenticationPrincipal Jwt jwt
-    ) {
-        Long userId = resolveUserId(jwt);
-        WorkspaceResponse response = workspaceService.getWorkspaceByUserId(userId);
-        return ResponseEntity.ok(ApiResponse.success("Workspace récupéré", response));
-    }
-
-    // -------------------------------------------------------------------------
     // Helper
     // -------------------------------------------------------------------------
 

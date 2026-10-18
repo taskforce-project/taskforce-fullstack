@@ -115,34 +115,6 @@ public class ProjectService {
     }
 
     /**
-     * Activité quotidienne d'un projet (QA2-32) sur les `days` derniers jours.
-     * Série continue : chaque jour de la fenêtre est présent (count = 0 si rien).
-     */
-    @Transactional(readOnly = true)
-    public List<ProjectActivityPointResponse> getProjectActivity(String workspaceSlug, Long projectId,
-                                                                 Long requestingUserId, int days) {
-        Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
-        Project project = resolveViewableProject(projectId, workspace, requestingUserId);
-
-        int window = Math.min(Math.max(days, 1), 90);
-        java.time.LocalDate today = java.time.LocalDate.now();
-        java.time.LocalDate from = today.minusDays(window - 1L);
-
-        java.util.Map<String, Long> counts = new java.util.HashMap<>();
-        for (Object[] row : issueRepository.countCreatedByDay(project.getId(), from.atStartOfDay())) {
-            counts.put((String) row[0], ((Number) row[1]).longValue());
-        }
-
-        List<ProjectActivityPointResponse> series = new java.util.ArrayList<>(window);
-        for (int i = 0; i < window; i++) {
-            java.time.LocalDate day = from.plusDays(i);
-            String key = day.toString(); // ISO 'YYYY-MM-DD'
-            series.add(new ProjectActivityPointResponse(key, counts.getOrDefault(key, 0L)));
-        }
-        return series;
-    }
-
-    /**
      * Activité quotidienne de TOUS les projets visibles du workspace, en un seul appel.
      *
      * <p>La page Operations affiche une sparkline par projet. Interrogée projet par projet, elle

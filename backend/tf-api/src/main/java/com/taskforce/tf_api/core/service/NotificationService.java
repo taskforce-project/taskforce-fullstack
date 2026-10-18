@@ -62,15 +62,6 @@ public class NotificationService {
         return page.stream().map(this::toResponse).toList();
     }
 
-    /**
-     * Compte les notifications non lues d'un utilisateur dans un workspace.
-     */
-    @Transactional(readOnly = true)
-    public long countUnread(String workspaceSlug, Long userId) {
-        Workspace workspace = resolveWorkspace(workspaceSlug);
-        return notificationRepository.countByRecipientIdAndWorkspaceIdAndReadFalse(userId, workspace.getId());
-    }
-
     // =========================================================================
     // Actions
     // =========================================================================
