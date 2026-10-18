@@ -369,7 +369,7 @@ public class SlackIntegrationService {
                     node.setMetadata(metadata);
                     node.setUpdatedBy(String.valueOf(userId));
                     nodeRepository.save(node);
-                    brainSearch.embedNode(node);
+                    brainSearch.markForReindex(node.getId());
                     updated++;
                 }
             } else {

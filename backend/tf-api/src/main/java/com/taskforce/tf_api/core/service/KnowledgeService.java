@@ -156,7 +156,7 @@ public class KnowledgeService {
 
         KnowledgeNode saved = nodeRepository.save(node);
         links.syncFromContent(saved, req.getTags()); // #tags + [[wikilinks]] → arêtes auto
-        search.embedNode(saved); // index sémantique (best-effort)
+        // Vecteur calculé en tâche de fond (BrainEmbeddingIndexer), jamais pendant la requête.
         return BrainMapper.toNodeResponse(saved);
     }
 
@@ -180,7 +180,7 @@ public class KnowledgeService {
 
         KnowledgeNode saved = nodeRepository.save(node);
         links.syncFromContent(saved, req.getTags()); // re-sync #tags + [[wikilinks]]
-        search.embedNode(saved); // recalcul de l'embedding après édition
+        search.markForReindex(saved.getId()); // vecteur recalculé en tâche de fond
         return BrainMapper.toNodeResponse(saved);
     }
 

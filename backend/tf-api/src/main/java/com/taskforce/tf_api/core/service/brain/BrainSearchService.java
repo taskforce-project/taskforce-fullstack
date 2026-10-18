@@ -2,13 +2,17 @@ package com.taskforce.tf_api.core.service.brain;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.taskforce.tf_api.core.dto.response.KnowledgeSearchHit;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
@@ -20,190 +24,172 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Recherche sémantique et indexation vectorielle du Brain OS (pgvector).
- * Responsabilité unique : embeddings (calcul/stockage) + retrieval par similarité cosine.
+ * Recherche dans le Brain OS : sémantique (pgvector) quand un modèle d'embeddings est disponible, plein
+ * texte (PostgreSQL) sinon. L'IA est un plus, pas une condition : sans fournisseur, la recherche marche.
+ *
+ * <p><b>Aucune transaction n'englobe l'appel au modèle.</b> Le calcul du vecteur de la requête (HTTP vers
+ * l'ai-service, jusqu'à 60 s sur un modèle local) se fait avant ; seules la lecture et la mise en forme des
+ * notes trouvées se font dans une transaction courte. Les vecteurs des notes sont calculés en tâche de fond
+ * par {@link BrainEmbeddingIndexer}, jamais pendant une requête de l'utilisateur.</p>
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class BrainSearchService {
 
+    private static final Pattern WORD = Pattern.compile("[\\p{L}\\p{N}]{2,}");
+    private static final int MAX_TERMS = 8;
+
     private final KnowledgeNodeRepository nodeRepository;
     private final EmbeddingClient         embeddingClient;
     private final JdbcTemplate            jdbcTemplate;
     private final BrainAccessGuard        access;
-    /** Écrit chaque vecteur dans SA transaction — cf. {@link BrainEmbeddingWriter} : sans ça, un
-     *  vecteur refusé avortait la transaction de l'appelant et tuait la recherche qui suit. */
-    private final BrainEmbeddingWriter    embeddingWriter;
+    private final TransactionTemplate     transactionTemplate;
 
-    private static final int BACKFILL_BATCH = 200;
+    /** Une note trouvée et son score (0..1). */
+    private record Hit(long id, double score) {}
+
+    /** Une note retrouvée avec son score de similarité (0..1). */
+    public record ScoredNode(KnowledgeNode node, double score) {}
 
     // =========================================================================
     // Recherche (exposée au controller)
     // =========================================================================
 
-    @Transactional
     public List<KnowledgeSearchHit> search(String slug, Long userId, String query, Integer topK, String domain) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         int limit = Math.max(1, Math.min(topK != null ? topK : 8, 50));
+        String domainFilter = (domain != null && !domain.isBlank()) ? BrainEnums.domain(domain).name() : null;
 
-        backfillMissingEmbeddings(ws.getId());
+        List<Hit> hits = rank(ws.getId(), query, limit, domainFilter);
+        if (hits.isEmpty()) return List.of();
 
-        float[] qvec = embeddingClient.embed(query);
-        if (qvec == null) return List.of(); // ai-service indisponible → pas d'erreur
-        String qLit = EmbeddingClient.toVectorLiteral(qvec);
-
-        StringBuilder sql = new StringBuilder(
-            "SELECT id, 1 - (embedding <=> CAST(? AS vector)) AS score "
-            + "FROM knowledge_nodes "
-            + "WHERE workspace_id = ? AND status = 'ACTIVE' AND embedding IS NOT NULL ");
-        List<Object> args = new ArrayList<>();
-        args.add(qLit);
-        args.add(ws.getId());
-        if (domain != null && !domain.isBlank()) {
-            sql.append("AND domain = ? ");
-            args.add(BrainEnums.domain(domain).name());
-        }
-        sql.append("ORDER BY embedding <=> CAST(? AS vector) ASC LIMIT ?");
-        args.add(qLit);
-        args.add(limit);
-
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql.toString(), args.toArray());
-        if (rows.isEmpty()) return List.of();
-
-        Map<Long, Double> scoreById = new LinkedHashMap<>();
-        for (Map<String, Object> row : rows) {
-            scoreById.put(((Number) row.get("id")).longValue(), ((Number) row.get("score")).doubleValue());
-        }
-        Map<Long, KnowledgeNode> nodesById = new HashMap<>();
-        nodeRepository.findAllById(scoreById.keySet()).forEach(n -> nodesById.put(n.getId(), n));
-
-        List<KnowledgeSearchHit> hits = new ArrayList<>();
-        scoreById.forEach((id, score) -> {
-            KnowledgeNode n = nodesById.get(id);
-            if (n != null) hits.add(KnowledgeSearchHit.builder()
-                .node(BrainMapper.toNodeResponse(n)).score(score).build());
+        return transactionTemplate.execute(status -> {
+            Map<Long, KnowledgeNode> byId = loadNodes(hits);
+            List<KnowledgeSearchHit> out = new ArrayList<>();
+            for (Hit hit : hits) {
+                KnowledgeNode n = byId.get(hit.id());
+                if (n != null) out.add(KnowledgeSearchHit.builder()
+                    .node(BrainMapper.toNodeResponse(n)).score(hit.score()).build());
+            }
+            return out;
         });
-        return hits;
     }
 
     /**
-     * Retrieval interne pour l'assistant IA (sans contrôle d'accès : l'appelant a déjà
-     * autorisé le workspace).
+     * Notes pertinentes pour l'assistant IA (sans contrôle d'accès : l'appelant a déjà autorisé le workspace).
      */
-    @Transactional
     public List<KnowledgeNode> retrieveRelevant(Long workspaceId, String query, int topK) {
-        backfillMissingEmbeddings(workspaceId);
-        float[] qvec = embeddingClient.embed(query);
-        if (qvec == null) return List.of();
-        String qLit = EmbeddingClient.toVectorLiteral(qvec);
-        int limit = Math.max(1, Math.min(topK, 20));
-
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-            "SELECT id FROM knowledge_nodes WHERE workspace_id = ? AND status = 'ACTIVE' "
-            + "AND embedding IS NOT NULL ORDER BY embedding <=> CAST(? AS vector) ASC LIMIT ?",
-            workspaceId, qLit, limit);
-        List<Long> ids = rows.stream().map(r -> ((Number) r.get("id")).longValue()).toList();
-        if (ids.isEmpty()) return List.of();
-
-        Map<Long, KnowledgeNode> byId = new HashMap<>();
-        nodeRepository.findAllById(ids).forEach(n -> byId.put(n.getId(), n));
-        return ids.stream().map(byId::get).filter(n -> n != null).toList();
+        return retrieveRelevantScored(workspaceId, query, topK).stream().map(ScoredNode::node).toList();
     }
 
-    /** Un node retrouvé avec son score de similarité cosinus (0..1). */
-    public record ScoredNode(KnowledgeNode node, double score) {}
-
     /**
-     * Comme {@link #retrieveRelevant} mais expose le score cosinus (pour l'affichage « déjà vu ? »).
+     * Comme {@link #retrieveRelevant} mais expose le score (pour l'affichage « déjà vu ? »).
      * Sans contrôle d'accès : l'appelant a déjà autorisé le workspace.
      */
-    @Transactional
     public List<ScoredNode> retrieveRelevantScored(Long workspaceId, String query, int topK) {
-        backfillMissingEmbeddings(workspaceId);
-        float[] qvec = embeddingClient.embed(query);
-        if (qvec == null) return List.of();
-        String qLit = EmbeddingClient.toVectorLiteral(qvec);
-        int limit = Math.max(1, Math.min(topK, 20));
-
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-            "SELECT id, 1 - (embedding <=> CAST(? AS vector)) AS score FROM knowledge_nodes "
-            + "WHERE workspace_id = ? AND status = 'ACTIVE' AND embedding IS NOT NULL "
-            + "ORDER BY embedding <=> CAST(? AS vector) ASC LIMIT ?",
-            qLit, workspaceId, qLit, limit);
-        if (rows.isEmpty()) return List.of();
-
-        Map<Long, Double> scoreById = new LinkedHashMap<>();
-        for (Map<String, Object> row : rows) {
-            scoreById.put(((Number) row.get("id")).longValue(), ((Number) row.get("score")).doubleValue());
-        }
-        Map<Long, KnowledgeNode> byId = new HashMap<>();
-        nodeRepository.findAllById(scoreById.keySet()).forEach(n -> byId.put(n.getId(), n));
-
+        List<Hit> hits = rank(workspaceId, query, Math.max(1, Math.min(topK, 20)), null);
+        if (hits.isEmpty()) return List.of();
+        Map<Long, KnowledgeNode> byId = transactionTemplate.execute(status -> loadNodes(hits));
         List<ScoredNode> out = new ArrayList<>();
-        scoreById.forEach((id, score) -> {
-            KnowledgeNode n = byId.get(id);
-            if (n != null) out.add(new ScoredNode(n, score));
-        });
+        for (Hit hit : hits) {
+            KnowledgeNode n = byId.get(hit.id());
+            if (n != null) out.add(new ScoredNode(n, hit.score()));
+        }
         return out;
     }
 
     // =========================================================================
-    // Indexation (appelée par KnowledgeService à l'écriture)
+    // Réindexation (appelée à l'écriture d'une note)
     // =========================================================================
 
     /**
-     * Embedde et stocke le vecteur d'un node (best-effort — et pour de vrai : l'écriture a sa propre
-     * transaction, donc un échec ici ne fait pas tomber l'écriture du node qui nous appelle).
+     * Marque une note à réindexer après une modification de son contenu : son vecteur, devenu faux, est
+     * effacé, et {@link BrainEmbeddingIndexer} le recalcule en tâche de fond. S'exécute dans la transaction
+     * de l'appelant (une écriture SQL, aucun appel réseau).
      */
-    public void embedNode(KnowledgeNode node) {
-        float[] vec = embeddingClient.embed(embeddingText(node.getTitle(), node.getContent()));
-        if (vec == null) return;
-        try {
-            embeddingWriter.write(node.getId(), EmbeddingClient.toVectorLiteral(vec));
-        } catch (Exception ex) {
-            log.warn("Impossible d'écrire l'embedding du node {}: {}", node.getId(), ex.getMessage());
+    public void markForReindex(Long nodeId) {
+        jdbcTemplate.update(
+            "UPDATE knowledge_nodes SET embedding = NULL, embedding_model = NULL WHERE id = ?", nodeId);
+    }
+
+    // =========================================================================
+    // Classement
+    // =========================================================================
+
+    /** Sémantique si un modèle d'embeddings répond et a déjà indexé des notes de ce workspace, sinon plein texte. */
+    private List<Hit> rank(Long workspaceId, String query, int limit, String domain) {
+        String model = embeddingClient.currentModel();
+        if (model != null) {
+            float[] qvec = embeddingClient.embed(query);
+            if (qvec != null) {
+                List<Hit> semantic = semanticHits(workspaceId, model, qvec, limit, domain);
+                if (!semantic.isEmpty()) return semantic;
+            }
         }
+        return textHits(workspaceId, query, limit, domain);
+    }
+
+    private List<Hit> semanticHits(Long workspaceId, String model, float[] qvec, int limit, String domain) {
+        String qLit = EmbeddingClient.toVectorLiteral(qvec);
+        StringBuilder sql = new StringBuilder(
+            "SELECT id, 1 - (embedding <=> CAST(? AS vector)) AS score FROM knowledge_nodes "
+            + "WHERE workspace_id = ? AND status = 'ACTIVE' AND embedding IS NOT NULL AND embedding_model = ? ");
+        List<Object> args = new ArrayList<>(List.of(qLit, workspaceId, model));
+        if (domain != null) {
+            sql.append("AND domain = ? ");
+            args.add(domain);
+        }
+        sql.append("ORDER BY embedding <=> CAST(? AS vector) ASC LIMIT ?");
+        args.add(qLit);
+        args.add(limit);
+        return toHits(jdbcTemplate.queryForList(sql.toString(), args.toArray()));
     }
 
     /**
-     * Indexe les embeddings manquants (seeds, anciens nodes). Borné ({@value #BACKFILL_BATCH}/appel) ;
-     * rendu peu coûteux par l'index partiel {@code idx_knodes_missing_embedding} (V53) qui évite
-     * tout scan complet quand rien ne manque.
+     * Plein texte PostgreSQL (configuration {@code simple} : indépendante de la langue), sur le titre et le
+     * contenu. Chaque mot de la requête compte, en préfixe ({@code mot:*}) ; le score est normalisé dans
+     * [0, 1) ({@code ts_rank} option 32). Les mots ne gardent que lettres et chiffres : rien ne peut casser
+     * la syntaxe de {@code to_tsquery}.
      */
-    public void backfillMissingEmbeddings(Long workspaceId) {
-        List<Map<String, Object>> missing = jdbcTemplate.queryForList(
-            "SELECT id, title, content FROM knowledge_nodes "
-            + "WHERE workspace_id = ? AND embedding IS NULL LIMIT " + BACKFILL_BATCH, workspaceId);
-        if (missing.isEmpty()) return;
+    private List<Hit> textHits(Long workspaceId, String query, int limit, String domain) {
+        List<String> terms = terms(query);
+        if (terms.isEmpty()) return List.of();
+        String tsquery = String.join(" | ", terms.stream().map(t -> t + ":*").toList());
 
-        List<String> texts = missing.stream()
-            .map(r -> embeddingText((String) r.get("title"), (String) r.get("content")))
-            .toList();
-        List<float[]> vectors = embeddingClient.embedBatch(texts);
-        if (vectors == null || vectors.size() != missing.size()) return;
-
-        int written = 0;
-        for (int i = 0; i < missing.size(); i++) {
-            Long id = ((Number) missing.get(i).get("id")).longValue();
-            try {
-                // Transaction dédiée par node : un vecteur refusé ne doit pas avorter celle de
-                // l'appelant (la recherche vectorielle qui suit mourrait en 25P02).
-                embeddingWriter.write(id, EmbeddingClient.toVectorLiteral(vectors.get(i)));
-                written++;
-            } catch (Exception ex) {
-                log.warn("Backfill embedding échoué pour node {}: {}", id, ex.getMessage());
-            }
+        String document = "to_tsvector('simple', coalesce(title, '') || ' ' || coalesce(content, ''))";
+        StringBuilder sql = new StringBuilder(
+            "SELECT id, ts_rank(" + document + ", to_tsquery('simple', ?), 32) AS score FROM knowledge_nodes "
+            + "WHERE workspace_id = ? AND status = 'ACTIVE' AND " + document + " @@ to_tsquery('simple', ?) ");
+        List<Object> args = new ArrayList<>(List.of(tsquery, workspaceId, tsquery));
+        if (domain != null) {
+            sql.append("AND domain = ? ");
+            args.add(domain);
         }
-        log.info("Backfill embeddings : {}/{} nodes indexés (workspace {})",
-            written, missing.size(), workspaceId);
+        sql.append("ORDER BY score DESC, id DESC LIMIT ?");
+        args.add(limit);
+        return toHits(jdbcTemplate.queryForList(sql.toString(), args.toArray()));
     }
 
-    /** Texte indexé = titre + contenu (tronqué pour rester raisonnable). */
-    private String embeddingText(String title, String content) {
-        String t = title != null ? title : "";
-        String c = content != null ? content : "";
-        String combined = (t + "\n" + c).strip();
-        return combined.length() > 4000 ? combined.substring(0, 4000) : combined;
+    /** Mots de la requête (lettres et chiffres, deux caractères au moins), en minuscules, sans doublon. */
+    static List<String> terms(String query) {
+        Set<String> out = new LinkedHashSet<>();
+        if (query != null) {
+            Matcher m = WORD.matcher(query.toLowerCase(Locale.ROOT));
+            while (m.find() && out.size() < MAX_TERMS) out.add(m.group());
+        }
+        return List.copyOf(out);
+    }
+
+    private static List<Hit> toHits(List<Map<String, Object>> rows) {
+        return rows.stream()
+            .map(r -> new Hit(((Number) r.get("id")).longValue(), ((Number) r.get("score")).doubleValue()))
+            .toList();
+    }
+
+    private Map<Long, KnowledgeNode> loadNodes(List<Hit> hits) {
+        Map<Long, KnowledgeNode> byId = new HashMap<>();
+        nodeRepository.findAllById(hits.stream().map(Hit::id).toList()).forEach(n -> byId.put(n.getId(), n));
+        return byId;
     }
 }
