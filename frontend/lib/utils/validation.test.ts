@@ -94,31 +94,31 @@ describe('validation.ts - Utility Functions', () => {
     it('should reject password without uppercase', () => {
       const result = validatePassword('weak@pass123');
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Le mot de passe doit contenir au moins une majuscule');
+      expect(result.errors).toContain('Password must contain at least one uppercase letter');
     });
 
     it('should reject password without lowercase', () => {
       const result = validatePassword('WEAK@PASS123');
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Le mot de passe doit contenir au moins une minuscule');
+      expect(result.errors).toContain('Password must contain at least one lowercase letter');
     });
 
     it('should reject password without number', () => {
       const result = validatePassword('WeakPass@');
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Le mot de passe doit contenir au moins un chiffre');
+      expect(result.errors).toContain('Password must contain at least one digit');
     });
 
     it('should reject password without special character', () => {
       const result = validatePassword('WeakPass123');
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Le mot de passe doit contenir au moins un caractère spécial');
+      expect(result.errors).toContain('Password must contain at least one special character');
     });
 
     it('should reject password too short', () => {
       const result = validatePassword('Weak@1');
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Le mot de passe doit contenir au moins 8 caractères');
+      expect(result.errors).toContain('Password must contain at least 8 characters');
     });
 
     it('should return multiple errors for very weak password', () => {
@@ -188,7 +188,7 @@ describe('validation.ts - Utility Functions', () => {
       const longInput = 'A'.repeat(256);
       const result = validateInput(longInput, 255);
       expect(result.isValid).toBe(false);
-      expect(result.error).toContain('ne peut pas dépasser 255 caractères');
+      expect(result.error).toContain("can't exceed 255 characters");
     });
 
     it('should accept input under max length', () => {

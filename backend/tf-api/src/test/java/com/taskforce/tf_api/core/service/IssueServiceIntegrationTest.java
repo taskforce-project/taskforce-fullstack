@@ -76,7 +76,6 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
     @MockitoBean private SimpMessagingTemplate messagingTemplate;
     @MockitoBean private NotificationService notificationService;
     @MockitoBean private SlackIntegrationService slackService;  // push Slack sur issue.created (no-op en test)
-    @MockitoBean private AiGenerationService aiGenerationService;  // data flywheel : capture des recos (no-op en test)
 
     @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager em;
 
@@ -199,7 +198,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThatThrownBy(() -> issueService.createIssue(SLUG, project.getId(), createRequest("x", null), stranger.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Accès refusé");
+                .hasMessageContaining("Access denied");
         }
     }
 
@@ -463,7 +462,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             // doublon → BusinessException (chemin existsBy…RelationType contre l'enum Postgres natif)
             assertThatThrownBy(() -> issueService.addRelation(SLUG, project.getId(), source, req, owner.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("existe déjà");
+                .hasMessageContaining("already exists");
         }
     }
 
@@ -640,7 +639,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThatThrownBy(() -> issueService.addRelation(SLUG, project.getId(), source, req, owner.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Type de relation invalide");
+                .hasMessageContaining("Invalid relation type");
         }
 
         @Test
@@ -691,7 +690,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             assertThatThrownBy(() -> issueService.updateComment(
                     SLUG, project.getId(), id, c.getId(), upd, other.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("vos propres commentaires");
+                .hasMessageContaining("your own comments");
         }
 
         @Test
@@ -713,7 +712,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             assertThatThrownBy(() -> issueService.deleteWorklog(
                     SLUG, project.getId(), id, w.getId(), other.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("vos propres entrées");
+                .hasMessageContaining("your own time entries");
         }
 
         @Test
@@ -726,7 +725,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThatThrownBy(() -> issueService.createStatus(SLUG, project.getId(), create, owner.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("existe déjà");
+                .hasMessageContaining("already exists");
         }
 
         @Test
@@ -739,7 +738,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             assertThatThrownBy(() -> issueService.deleteStatus(
                     SLUG, project.getId(), defaultStatus.getId(), owner.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("statut par défaut");
+                .hasMessageContaining("default status");
         }
 
         @Test
@@ -750,7 +749,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThatThrownBy(() -> issueService.getScheduledIssues(SLUG, stranger.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Accès refusé");
+                .hasMessageContaining("Access denied");
         }
 
         @Test
@@ -1281,7 +1280,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             assertThatThrownBy(() -> issueService.createIssue(
                     SLUG, project.getId(), createRequest("nope", null), viewer.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("lecture seule");
+                .hasMessageContaining("read-only");
         }
 
         @Test

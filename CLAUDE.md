@@ -67,7 +67,7 @@ Lire `.ai/P0-fix-plan.md` ou `taskforce-docs/produit/README.md`. Calculer la pro
 - Import client HTTP : `import { apiClient } from "@/lib/api/client"` (export nommé).
 - Lire les réponses via `response.data.data` (enveloppe `ApiResponse<T>`).
 - État : un store Zustand par domaine (`lib/store/*.ts`) ; pas de fetch direct depuis les composants.
-- TypeScript strict : pas de `any`. Traductions dans `constants_fr.ts` + `constants_en.ts`.
+- TypeScript strict : pas de `any`. Textes de l'interface dans `constants_en.ts` (produit monolingue, anglais).
 - Temps réel : passer par `lib/hooks/use-stomp.ts` (STOMP/SockJS).
 - Ne pas réintroduire de données mock.
 

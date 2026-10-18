@@ -269,7 +269,7 @@ export const authService = {
       // Seul `message` est consommé ici : la charge utile `data` reste volontairement non typée
       // (`unknown`) pour signaler qu'elle n'est pas exploitée côté client.
       const response = await apiClient.post<{ success: boolean; message: string; data: unknown }>(AUTH_ROUTES.FORGOT_PASSWORD, { email });
-      return { message: response.data.message || "Email envoyé" };
+      return { message: response.data.message || "Email sent" };
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
@@ -290,7 +290,7 @@ export const authService = {
         otpCode, 
         newPassword 
       });
-      return { message: response.data.message || "Mot de passe réinitialisé" };
+      return { message: response.data.message || "Password reset" };
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }

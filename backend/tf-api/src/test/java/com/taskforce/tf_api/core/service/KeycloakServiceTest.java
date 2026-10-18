@@ -127,7 +127,7 @@ class KeycloakServiceTest {
                     keycloakService.createUser("test@example.com", "pass", "John", "Doe")
             )
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Erreur lors de la création de l'utilisateur");
+                    .hasMessageContaining("Error creating the user");
 
             verify(response).close();
         }
@@ -214,7 +214,7 @@ class KeycloakServiceTest {
             // When/Then
             assertThatThrownBy(() -> keycloakService.getUserByEmail(email))
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Utilisateur non trouvé");
+                    .hasMessageContaining("User not found");
         }
     }
 

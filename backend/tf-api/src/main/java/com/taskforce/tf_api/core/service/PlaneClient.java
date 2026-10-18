@@ -124,7 +124,7 @@ public class PlaneClient {
             return resp.getBody() != null ? resp.getBody() : Map.of();
         } catch (Exception ex) {
             log.warn("Appel Plane échoué ({}): {}", url, ex.getMessage());
-            throw new BusinessException("Appel à Plane échoué (clé API ou workspace invalide ?)");
+            throw new BusinessException("The call to Plane failed (invalid API key or workspace?)");
         }
     }
 

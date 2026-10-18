@@ -102,7 +102,7 @@ function IssueRow({ issue, onOpen, onToggleDone }: { readonly issue: Issue; read
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onToggleDone(issue) }}
-        title={isDone ? "Rouvrir la tâche" : "Marquer comme terminée"}
+        title={isDone ? "Reopen task" : "Mark as done"}
         className={cn("shrink-0 rounded transition-colors", isDone ? "text-emerald-500" : "text-muted-foreground hover:text-emerald-500")}
       >
         {isDone ? <CheckCircle2 className="size-3.5" /> : getCategoryIcon(issue.status.category, issue.status.color)}

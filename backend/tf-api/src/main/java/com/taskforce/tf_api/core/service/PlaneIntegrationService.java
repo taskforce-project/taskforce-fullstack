@@ -110,7 +110,7 @@ public class PlaneIntegrationService {
         int created = 0, updated = 0;
         for (PlaneWorkItem item : items) {
             if (item.id() == null) continue;
-            String title = truncate("[Plane] " + safe(item.name(), "Sans titre"), 300);
+            String title = truncate("[Plane] " + safe(item.name(), "Untitled"), 300);
             String content = buildContent(item);
             Map<String, Object> metadata = metadata(item, projectId);
 
@@ -172,7 +172,7 @@ public class PlaneIntegrationService {
 
     private Integration require(Workspace ws) {
         return integrationRepository.findByWorkspaceIdAndProvider(ws.getId(), IntegrationProvider.PLANE)
-            .orElseThrow(() -> new BusinessException("Plane n'est pas connecté pour ce workspace"));
+            .orElseThrow(() -> new BusinessException("Plane isn't connected for this workspace"));
     }
 
     private String planeWorkspace(Integration integ) {
@@ -182,9 +182,9 @@ public class PlaneIntegrationService {
     private String buildContent(PlaneWorkItem item) {
         StringBuilder sb = new StringBuilder();
         sb.append(item.description() != null && !item.description().isBlank()
-            ? item.description().trim() : "_(sans description)_");
-        sb.append("\n\n> État : ").append(safe(item.state(), "—"))
-          .append(" · Priorité : ").append(safe(item.priority(), "—"));
+            ? item.description().trim() : "_(no description)_");
+        sb.append("\n\n> Status: ").append(safe(item.state(), "—"))
+          .append(" · Priority: ").append(safe(item.priority(), "—"));
         if (item.sequenceId() != null) sb.append(" · Plane #").append(item.sequenceId());
         return sb.toString();
     }

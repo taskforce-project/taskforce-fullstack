@@ -90,11 +90,11 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
             RunnerIdentity runner = identityResolver.resolve(token.getToken());
             session = localRunnerService.openSession(parseRunId(request.getHeader(RUN_HEADER)), runner);
         } catch (ForbiddenException e) {
-            deny(response, path, "session refusée");
+            deny(response, path, "session refused");
             return;
         }
         if (!DeliverySessionScope.allows(request.getMethod(), path, session.workspaceSlug(), session.projectId())) {
-            deny(response, path, "hors périmètre (run " + session.runId() + ")");
+            deny(response, path, "out of scope (run " + session.runId() + ")");
             return;
         }
 
@@ -132,12 +132,12 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
 
     private Long parseRunId(String header) {
         if (header == null || header.isBlank() || header.length() > 19) {
-            throw new ForbiddenException("En-tête de session absent");
+            throw new ForbiddenException("Missing session header");
         }
         try {
             return Long.valueOf(header.trim());
         } catch (NumberFormatException e) {
-            throw new ForbiddenException("En-tête de session illisible");
+            throw new ForbiddenException("Unreadable session header");
         }
     }
 
@@ -154,6 +154,6 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        response.getWriter().write("{\"success\":false,\"message\":\"Accès refusé : hors de la session de délégation\"}");
+        response.getWriter().write("{\"success\":false,\"message\":\"Access denied: outside the delegation session\"}");
     }
 }

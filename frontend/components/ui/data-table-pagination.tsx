@@ -60,7 +60,7 @@ export function DataTablePagination({
             {/* `aria-label` indispensable : le libellé voisin est un simple <span>, jamais associé
                 au contrôle - et il disparaît sous le point de rupture `sm`. Sans lui, un lecteur
                 d'écran annonce un bouton anonyme (axe : `button-name`, critique). */}
-            <SelectTrigger className="h-7 w-[4.25rem] text-xs" aria-label="Lignes par page">
+            <SelectTrigger className="h-7 w-[4.25rem] text-xs" aria-label="Rows per page">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

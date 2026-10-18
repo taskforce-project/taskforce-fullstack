@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SearchBrainRequest {
 
-    @NotBlank(message = "La requête est obligatoire")
+    @NotBlank(message = "The query is required")
     @Size(max = 1000)
     private String query;
 

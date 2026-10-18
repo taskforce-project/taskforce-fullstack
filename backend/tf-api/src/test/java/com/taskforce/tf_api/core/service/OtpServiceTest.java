@@ -102,7 +102,7 @@ class OtpServiceTest {
             assertThatThrownBy(() -> otpService.generateAndSendOtp(
                     email, "Test", OtpType.EMAIL_VERIFICATION, null, "keycloak-123"))
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Trop de tentatives");
+                    .hasMessageContaining("Too many attempts");
 
             verify(otpRepository, never()).save(any());
             verify(emailService, never()).sendOtpEmail(any(), any(), any());

@@ -78,7 +78,7 @@ function PanelColumn({ panel, side }: { readonly panel: PanelDescriptor; readonl
       {/* Poignée de redimensionnement - pilule discrète qui s'éclaire au survol (façon Claude). */}
       <button
         type="button"
-        aria-label="Redimensionner le panneau"
+        aria-label="Resize the panel"
         onPointerDown={startResize}
         className={cn(
           "group absolute top-0 z-10 flex h-full w-3 cursor-col-resize items-center justify-center bg-transparent",
@@ -97,7 +97,7 @@ function PanelColumn({ panel, side }: { readonly panel: PanelDescriptor; readonl
           <button
             type="button"
             onClick={() => closePanel(panel.id)}
-            aria-label="Fermer le panneau"
+            aria-label="Close the panel"
             className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <X className="size-4" />

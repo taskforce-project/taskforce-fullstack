@@ -42,7 +42,7 @@ public class TfApiApplication {
 					.systemProperties()
 					.load();
 
-			System.out.println("✅ Fichier " + envFile + " chargé avec succès pour le profil: " + profile);
+			System.out.println("✅ Fichier " + envFile + " loaded for the profile: " + profile);
 
 			// Appliquer les variables d'environnement dans les propriétés système
 			dotenv.entries().forEach(entry -> {
@@ -52,8 +52,8 @@ public class TfApiApplication {
 			});
 
 		} catch (Exception e) {
-			System.err.println("⚠️ Erreur lors du chargement du fichier .env: " + e.getMessage());
-			System.err.println("⚠️ L'application va démarrer avec les variables d'environnement système uniquement");
+			System.err.println("Warning: couldn't load the .env file: " + e.getMessage());
+			System.err.println("Warning: the application starts with the system environment variables only");
 		}
 	}
 }

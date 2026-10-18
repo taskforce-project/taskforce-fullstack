@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 public class CreateChecklistItemRequest {
 
-    @NotBlank(message = "Le contenu est requis")
-    @Size(max = 500, message = "500 caractères maximum")
+    @NotBlank(message = "The content is required")
+    @Size(max = 500, message = "500 characters at most")
     private String content;
 }

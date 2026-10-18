@@ -8,7 +8,6 @@ describe('PreferencesStore - Zustand Store', () => {
     const { getState } = usePreferencesStore;
     act(() => {
       getState().setTheme('light');
-      getState().setLanguage('fr');
       getState().setReducedMotion(false);
       getState().setFontSize('normal');
       getState().setHighContrast(false);
@@ -60,46 +59,6 @@ describe('PreferencesStore - Zustand Store', () => {
         result.current.toggleTheme();
       });
       expect(result.current.theme).toBe('light');
-    });
-  });
-
-  describe('Language Management', () => {
-    it('should have default language as french', () => {
-      const { result } = renderHook(() => usePreferencesStore());
-      expect(result.current.language).toBe('fr');
-    });
-
-    it('should update language when setLanguage is called', () => {
-      const { result } = renderHook(() => usePreferencesStore());
-      
-      act(() => {
-        result.current.setLanguage('en');
-      });
-
-      expect(result.current.language).toBe('en');
-    });
-
-    it('should update translations when language changes', () => {
-      const { result } = renderHook(() => usePreferencesStore());
-      
-      const frTranslations = result.current.t;
-      
-      act(() => {
-        result.current.setLanguage('en');
-      });
-
-      const enTranslations = result.current.t;
-      
-      // Translations should be different objects
-      expect(enTranslations).not.toBe(frTranslations);
-    });
-
-    it('should provide getTranslations utility function', () => {
-      const { result } = renderHook(() => usePreferencesStore());
-      
-      const translations = result.current.getTranslations();
-      expect(translations).toBeDefined();
-      expect(typeof translations).toBe('object');
     });
   });
 
@@ -201,13 +160,11 @@ describe('PreferencesStore - Zustand Store', () => {
       
       act(() => {
         result1.current.setTheme('dark');
-        result1.current.setLanguage('en');
       });
 
       const { result: result2 } = renderHook(() => usePreferencesStore());
       
       expect(result2.current.theme).toBe('dark');
-      expect(result2.current.language).toBe('en');
     });
   });
 
@@ -217,14 +174,12 @@ describe('PreferencesStore - Zustand Store', () => {
       
       act(() => {
         result.current.setTheme('dark');
-        result.current.setLanguage('en');
         result.current.setFontSize('large');
         result.current.setReducedMotion(true);
         result.current.setHighContrast(true);
       });
 
       expect(result.current.theme).toBe('dark');
-      expect(result.current.language).toBe('en');
       expect(result.current.fontSize).toBe('large');
       expect(result.current.reducedMotion).toBe(true);
       expect(result.current.highContrast).toBe(true);

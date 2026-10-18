@@ -60,7 +60,7 @@ export const useDashboardCardsStore = create<DashboardCardsState>((set, get) => 
       const cards = await listDashboardCards(slug);
       set({ cards: [...cards].sort(byPosition), isLoading: false });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors du chargement des cartes";
+      const message = err instanceof Error ? err.message : "Couldn't load the cards";
       set({ isLoading: false, error: message });
     }
   },

@@ -459,7 +459,7 @@ public class AnalyticsService {
 
     private Workspace findWorkspace(String slug) {
         return workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable: " + slug));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + slug));
     }
 
     /**
@@ -478,7 +478,7 @@ public class AnalyticsService {
         List<Long> viewable = getProjectIds(workspaceId, userId);
         if (projectId != null) {
             if (!viewable.contains(projectId)) {
-                throw new ResourceNotFoundException("Projet introuvable");
+                throw new ResourceNotFoundException("Project not found");
             }
             return List.of(projectId);
         }

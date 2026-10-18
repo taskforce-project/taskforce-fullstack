@@ -44,7 +44,7 @@ public class IntegrationCatalogService {
         Workspace ws = workspaceRepository.findBySlug(slug)
             .orElseThrow(() -> new ResourceNotFoundException("Workspace", "slug", slug));
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(ws.getId(), userId)) {
-            throw new ForbiddenException("Accès refusé au workspace");
+            throw new ForbiddenException("Access denied to this workspace");
         }
 
         // État de connexion réel = flux dédiés (GitHub/Slack/Plane via `integrations`)

@@ -71,7 +71,7 @@ public class NotificationPreferenceService {
             Long userId, UpdateNotificationPreferencesRequest request) {
 
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         for (UpdateNotificationPreferencesRequest.Item item : request.getPreferences()) {
             Optional<NotificationEvent> resolved = NotificationEvent.fromKey(item.getEventKey());

@@ -112,7 +112,7 @@ CREATE INDEX idx_invoices_user_id ON invoices(user_id);
 **1. Keycloak (User Management):**
 - Admin client in `core/service/KeycloakService.java`
 - Users created in Keycloak via `keycloak.realm-url`
-- JWT tokens validated via `spring.security.oauth2.resourceserver.jwt.issuer-uri`
+- JWT tokens validated by the decoder of `SecurityConfig` (public issuer, internal JWKS, read from `keycloak.*`)
 
 **2. Email (OTP & Notifications):**
 - JavaMailSender in `EmailService.java`

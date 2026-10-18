@@ -58,7 +58,7 @@ public class MemberLeaveService {
         assertCanManage(requester, requesterId, targetUserId);
 
         if (request.getEndDate().isBefore(request.getStartDate())) {
-            throw new BusinessException("La date de fin doit être postérieure ou égale à la date de début");
+            throw new BusinessException("The end date must be on or after the start date");
         }
 
         MemberLeave leave = MemberLeave.builder()
@@ -83,7 +83,7 @@ public class MemberLeaveService {
         MemberLeave leave = memberLeaveRepository.findById(leaveId)
             .filter(l -> l.getWorkspaceId().equals(workspace.getId())
                 && l.getUserId().equals(targetUserId))
-            .orElseThrow(() -> new ResourceNotFoundException("Indisponibilité introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Time off not found"));
 
         memberLeaveRepository.delete(leave);
     }
@@ -94,17 +94,17 @@ public class MemberLeaveService {
 
     private Workspace resolveWorkspace(String slug) {
         return workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
     }
 
     private WorkspaceMember requireMember(Long workspaceId, Long userId) {
         return workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
-            .orElseThrow(() -> new ForbiddenException("Accès refusé au workspace"));
+            .orElseThrow(() -> new ForbiddenException("Access denied to this workspace"));
     }
 
     private void requireTargetMember(Long workspaceId, Long userId) {
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, userId)) {
-            throw new ResourceNotFoundException("Membre introuvable dans ce workspace");
+            throw new ResourceNotFoundException("Member not found in this workspace");
         }
     }
 
@@ -114,7 +114,7 @@ public class MemberLeaveService {
             || requester.getRole() == WorkspaceRole.ADMIN;
         if (!isSelf && !isManager) {
             throw new ForbiddenException(
-                "Seul le membre concerné ou un administrateur peut gérer ces indisponibilités");
+                "Only the member or an admin can manage this time off");
         }
     }
 }

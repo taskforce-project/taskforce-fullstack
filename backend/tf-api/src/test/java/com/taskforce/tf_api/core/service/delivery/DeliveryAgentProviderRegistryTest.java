@@ -6,10 +6,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
-import com.taskforce.tf_api.core.repository.IntegrationRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests unitaires de {@link DeliveryAgentProviderRegistry} (TF-AGENT-DELIVERY) :
@@ -20,22 +20,19 @@ class DeliveryAgentProviderRegistryTest {
 
     @Test
     void indexes_all_providers_and_resolves_by_key() {
-        IntegrationRepository integrations = mock(IntegrationRepository.class);
         // Runner local désactivé (défaut) : Claude Code reste « à venir ».
         LocalRunnerSettings runnerOff = new LocalRunnerSettings(false, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15);
+        DeliveryAgentProvider other = mock(DeliveryAgentProvider.class);
+        when(other.key()).thenReturn("other-agent");
         var reg = new DeliveryAgentProviderRegistry(List.of(
-            new ClaudeCodeProvider(runnerOff, mock(DeliveryRunRepository.class)),
-            new CopilotProvider(integrations), new CursorProvider(integrations)));
+            new ClaudeCodeProvider(runnerOff, mock(DeliveryRunRepository.class)), other));
 
-        assertThat(reg.all()).hasSize(3);
+        assertThat(reg.all()).hasSize(2);
         assertThat(reg.all().get(0).key()).isEqualTo("claude-code"); // ordre conservé
-        assertThat(reg.get("github-copilot").displayName()).isEqualTo("GitHub Copilot");
-        assertThat(reg.get("github-copilot").available()).isTrue();   // Copilot exécutable (inférence GitHub)
+        assertThat(reg.get("other-agent")).isSameAs(other);
+        assertThat(reg.get("claude-code").displayName()).isEqualTo("Claude Code");
         assertThat(reg.get("claude-code").available()).isFalse();     // "à venir" tant que le runner local est désactivé
-        assertThat(reg.get("claude-code").pullBased()).isTrue();      // seul provider « pull » (ADR-013)
-        assertThat(reg.get("cursor").pullBased()).isFalse();
-        assertThat(reg.get("cursor").available()).isTrue();           // Cursor exécutable (background agent)
-        assertThat(reg.get("cursor").logoKey()).isEqualTo("cursor");
+        assertThat(reg.get("claude-code").pullBased()).isTrue();      // provider « pull » (ADR-013)
         assertThat(reg.get("inconnu")).isNull();
         assertThat(reg.get(null)).isNull();
     }

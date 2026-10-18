@@ -77,12 +77,12 @@ public class McpOAuthService {
         String redirectUri = redirectBase + "/api/mcp/oauth/callback";
 
         if (auth.registrationEndpoint() == null) {
-            throw new BusinessException("Ce serveur ne supporte pas l'enregistrement dynamique (DCR) : "
+            throw new BusinessException("This server doesn't support dynamic client registration (DCR): "
                 + "connexion 1-clic indisponible, utilise l'URL + token.");
         }
         JsonNode reg = client.postJson(auth.registrationEndpoint(), dcrBody(redirectUri));
         String clientId = reg.path("client_id").asText(null);
-        if (clientId == null || clientId.isBlank()) throw new BusinessException("DCR sans client_id");
+        if (clientId == null || clientId.isBlank()) throw new BusinessException("The DCR response has no client_id");
         String clientSecret = reg.path("client_secret").asText(null);
 
         String verifier = urlSafe(48);

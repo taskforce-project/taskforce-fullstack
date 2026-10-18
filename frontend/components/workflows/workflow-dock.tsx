@@ -218,7 +218,7 @@ function SectionLabel({ children, count }: Readonly<{ children: ReactNode; count
 /**
  * Contenu du panneau « Workflows IA » (le header/resize/close sont fournis par PanelDock).
  * Deux familles de travail IA, dans l'ordre où on les cherche : les <b>délégations</b> à un agent (une
- * issue confiée à Claude Code, Cursor...), historique compris, puis les <b>analyses</b> de projet, qui
+ * issue confiée à Claude Code), historique compris, puis les <b>analyses</b> de projet, qui
  * tournent en arrière-plan (statut en direct, détail via {@link AgentPlan}, et le HITL).
  * Les données sont chargées et rafraîchies par {@link WorkflowsButton}, monté en permanence.
  */

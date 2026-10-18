@@ -153,7 +153,7 @@ class BrainIngestionServiceTest {
 
         CycleFacts facts = service.collectCycleFacts(CYCLE_ID);
 
-        assertThat(facts.delivered().get(0).assignee()).isEqualTo("Non assignée");
+        assertThat(facts.delivered().get(0).assignee()).isEqualTo("Unassigned");
         assertThat(facts.byType()).containsEntry("Sans type", 1);
         assertThat(facts.pointsPlanned()).isZero();
     }
@@ -289,7 +289,7 @@ class BrainIngestionServiceTest {
         assertThat(req.getDomain()).isEqualTo("HISTORIQUE");
         assertThat(req.getRefType()).isEqualTo("CYCLE");
         assertThat(req.getRefId()).isEqualTo(CYCLE_ID);
-        assertThat(req.getTitle()).isEqualTo("Rétro — Sprint 3 (WEB)");
+        assertThat(req.getTitle()).isEqualTo("Retro: Sprint 3 (WEB)");
         assertThat(req.getTags()).contains("cycle", "retro", "ingestion-auto");
         assertThat(req.getMetadata()).containsEntry("mode", "generated").containsEntry("completionRate", 75);
     }
@@ -311,7 +311,7 @@ class BrainIngestionServiceTest {
         verify(knowledgeService, never()).createNode(anyString(), any(), any());
         ArgumentCaptor<UpdateKnowledgeNodeRequest> captor = ArgumentCaptor.forClass(UpdateKnowledgeNodeRequest.class);
         verify(knowledgeService).updateNode(eq("taskforce-demo"), eq(999L), eq(1L), captor.capture());
-        assertThat(captor.getValue().getTitle()).isEqualTo("Rétro — Sprint 3 (WEB)");
+        assertThat(captor.getValue().getTitle()).isEqualTo("Retro: Sprint 3 (WEB)");
     }
 
     @Test
@@ -323,9 +323,9 @@ class BrainIngestionServiceTest {
         service.writeCycleNode("taskforce-demo", WS, 1L, CYCLE_ID, null, false);
 
         CreateKnowledgeNodeRequest req = captureCreate();
-        assertThat(req.getTitle()).isEqualTo("Cycle en cours — Sprint 3 (WEB)");
+        assertThat(req.getTitle()).isEqualTo("Cycle in progress: Sprint 3 (WEB)");
         assertThat(req.getMetadata()).containsEntry("closed", false).containsEntry("mode", "facts-only");
-        assertThat(req.getContent()).contains("Cycle en cours — ce relevé se met à jour");
+        assertThat(req.getContent()).contains("Cycle in progress: this summary updates");
     }
 
     // =========================================================================
@@ -333,7 +333,7 @@ class BrainIngestionServiceTest {
     // =========================================================================
 
     @Test
-    @DisplayName("Le contenu porte les faits et se raccroche au graphe (wikilink + tags)")
+    @DisplayName("Le contenu porte les faits et se raccroche au réseau (wikilink + tags)")
     void should_render_facts_in_obsidian_format() {
         givenSprint();
         givenNoExistingNode();
@@ -342,12 +342,12 @@ class BrainIngestionServiceTest {
 
         String content = captureCreate().getContent();
         assertThat(content)
-            .contains("4 issues — 3 livrées, 1 non livrées")
-            .contains("**Complétion** : 75 %")
+            .contains("4 issues: 3 delivered, 1 not delivered")
+            .contains("**Completion**: 75%")
             .contains("`WEB-1`")
-            .contains("[[16 · Historique des actions]]")   // rejoint le hub de domaine
+            .contains(" - Done & shipped]]")   // rejoint la note « Done & shipped » du projet
             .contains("#cycle #retro #ingestion-auto")
-            .contains("_Synthèse IA indisponible — seuls les faits sont consignés._");
+            .contains("_AI summary unavailable: only the facts are recorded._");
     }
 
     @Test
@@ -374,8 +374,8 @@ class BrainIngestionServiceTest {
         service.writeCycleNode("taskforce-demo", WS, 1L, CYCLE_ID, "### Lecture\n- 75 %", true);
 
         assertThat(captureCreate().getContent())
-            .contains("> [!tip] Propositions à valider")
-            .contains("jamais actées automatiquement");
+            .contains("> [!tip] Suggestions to review")
+            .contains("never applied automatically");
     }
 
     @Test
@@ -391,7 +391,7 @@ class BrainIngestionServiceTest {
 
         service.writeCycleNode("taskforce-demo", WS, 1L, CYCLE_ID, null, true);
 
-        assertThat(captureCreate().getContent()).contains("… et 5 autres (liste plafonnée à 50)");
+        assertThat(captureCreate().getContent()).contains("… and 5 more (list capped at 50)");
     }
 
     // =========================================================================
@@ -434,10 +434,8 @@ class BrainIngestionServiceTest {
         assertThat(folder.getRefType()).isEqualTo("PROJECT");
         assertThat(folder.getRefId()).isEqualTo(PROJECT_ID);
         assertThat(folder.getTitle()).isEqualTo("Refonte Web"); // le dossier porte le nom du projet
-        assertThat(folder.getTags()).contains("project", "contexte", "ingestion-auto");
+        assertThat(folder.getTags()).contains("project", "context", "ingestion-auto");
         assertThat(folder.getContent()).contains("Refonte du site public");
-        // metadata.projects ancre la region du projet dans le graphe (Phase 4ter)
-        assertThat(folder.getMetadata()).containsEntry("projects", List.of(PROJECT_ID));
         // Notes du projet creees en plus, nichees sous le dossier (niveau PROJET).
         assertThat(captor.getAllValues().size()).isGreaterThan(1);
         assertThat(captor.getAllValues()).anySatisfy(c ->
@@ -495,7 +493,7 @@ class BrainIngestionServiceTest {
 
         service.writeProjectNode("taskforce-demo", WS, 1L, PROJECT_ID);
 
-        assertThat(captureFirstCreate().getContent()).contains("(non renseignee)");
+        assertThat(captureFirstCreate().getContent()).contains("(none)");
     }
 
     /** Projet mocke rattache a {@link #projectRepository} ; description variable (peut etre null). */
@@ -530,7 +528,7 @@ class BrainIngestionServiceTest {
         assertThat(req.getRefId()).isEqualTo(WS);
         assertThat(req.getTitle()).isEqualTo("Acme"); // le dossier porte le nom de l'espace
         assertThat(req.getContent()).contains("On construit un CRM pour artisans");
-        assertThat(req.getTags()).contains("contexte", "entreprise", "ingestion-auto");
+        assertThat(req.getTags()).contains("context", "company", "ingestion-auto");
         // Node d'espace : pas d'appartenance projet -> pas de metadata.projects.
         assertThat(req.getMetadata()).doesNotContainKey("projects");
     }

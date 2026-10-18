@@ -27,7 +27,7 @@ public class AuthorizationService {
     public WorkspaceMember requireMember(Long workspaceId, Long userId) {
         return workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
             .orElseThrow(() -> new ForbiddenException(
-                "Accès refusé : vous n'êtes pas membre de cet espace de travail"));
+                "Access denied: you're not a member of this workspace"));
     }
 
     /** Exige que l'utilisateur soit membre ET porte l'un des rôles autorisés, sinon 403. */
@@ -38,7 +38,7 @@ public class AuthorizationService {
                 return member;
             }
         }
-        throw new ForbiddenException("Permission insuffisante pour cette action");
+        throw new ForbiddenException("You don't have the permission for this action");
     }
 
     /** Exige un rôle de gestion (OWNER ou ADMIN), sinon 403. */

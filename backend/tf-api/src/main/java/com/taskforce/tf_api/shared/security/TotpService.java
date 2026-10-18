@@ -77,7 +77,7 @@ public class TotpService {
             int otp = bin % (int) Math.pow(10, DIGITS);
             return String.format("%0" + DIGITS + "d", otp);
         } catch (Exception e) {
-            throw new IllegalStateException("Échec du calcul TOTP", e);
+            throw new IllegalStateException("TOTP computation failed", e);
         }
     }
 

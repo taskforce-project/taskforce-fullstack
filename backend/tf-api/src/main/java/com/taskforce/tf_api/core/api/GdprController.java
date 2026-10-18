@@ -35,7 +35,7 @@ public class GdprController {
     @GetMapping("/export")
     public ResponseEntity<ApiResponse<Map<String, Object>>> exportMyData(@AuthenticationPrincipal Jwt jwt) {
         Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success("Données exportées", gdprService.exportMyData(userId)));
+        return ResponseEntity.ok(ApiResponse.success("Data exported", gdprService.exportMyData(userId)));
     }
 
     /**
@@ -52,11 +52,11 @@ public class GdprController {
         Long userId = resolveUserId(jwt);
         if (immediate) {
             gdprService.deleteMyAccountImmediately(userId);
-            return ResponseEntity.ok(ApiResponse.success("Compte supprimé définitivement",
+            return ResponseEntity.ok(ApiResponse.success("Account permanently deleted",
                 Map.of("immediate", true)));
         }
         java.time.LocalDateTime purgeAt = gdprService.deleteMyAccount(userId);
-        return ResponseEntity.ok(ApiResponse.success("Suppression planifiée",
+        return ResponseEntity.ok(ApiResponse.success("Deletion scheduled",
             Map.of("scheduledPurgeAt", purgeAt)));
     }
 
@@ -64,13 +64,13 @@ public class GdprController {
     @PostMapping("/account/restore")
     public ResponseEntity<ApiResponse<Void>> restoreMyAccount(@AuthenticationPrincipal Jwt jwt) {
         gdprService.restoreMyAccount(resolveUserId(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Compte restauré", null));
+        return ResponseEntity.ok(ApiResponse.success("Account restored", null));
     }
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

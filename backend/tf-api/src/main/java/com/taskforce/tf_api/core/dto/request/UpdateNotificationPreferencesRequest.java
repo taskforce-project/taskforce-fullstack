@@ -15,21 +15,21 @@ import lombok.Data;
 @Data
 public class UpdateNotificationPreferencesRequest {
 
-    @NotNull(message = "Liste de préférences requise")
-    @Size(max = 20, message = "Trop de préférences")
+    @NotNull(message = "A list of preferences is required")
+    @Size(max = 20, message = "Too many preferences")
     @Valid
     private List<Item> preferences;
 
     @Data
     public static class Item {
 
-        @NotBlank(message = "eventKey requis")
+        @NotBlank(message = "eventKey is required")
         private String eventKey;
 
-        @NotNull(message = "inApp requis")
+        @NotNull(message = "inApp is required")
         private Boolean inApp;
 
-        @NotNull(message = "email requis")
+        @NotNull(message = "email is required")
         private Boolean email;
     }
 }

@@ -7,18 +7,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.taskforce.tf_api.core.dto.response.DeliveryKeyStatus;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
-import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.DeliveryRun;
-import com.taskforce.tf_api.core.model.Integration;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
-import com.taskforce.tf_api.core.repository.IntegrationRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
@@ -48,7 +44,6 @@ public class DeliveryService {
     private final DeliveryAgentProviderRegistry registry;
     private final ProjectVisibilityGuard visibilityGuard;
     private final BrainAccessGuard access;
-    private final IntegrationRepository integrationRepository;
 
     /**
      * Crée un run de délégation (QUEUED) pour une issue vers un provider disponible. Écriture sur
@@ -61,10 +56,10 @@ public class DeliveryService {
 
         DeliveryAgentProvider provider = registry.get(providerKey);
         if (provider == null) {
-            throw new BusinessException("Provider inconnu : " + providerKey);
+            throw new BusinessException("Unknown provider: " + providerKey);
         }
         if (!provider.available()) {
-            throw new BusinessException("Ce provider n'est pas encore disponible : " + providerKey);
+            throw new BusinessException("This provider isn't available yet: " + providerKey);
         }
 
         String resolvedModel = (model != null && !model.isBlank())
@@ -110,55 +105,6 @@ public class DeliveryService {
             .stream().map(this::toResponse).toList();
     }
 
-    // =========================================================================
-    // Clés API de délégation du workspace (Anthropic B1, Cursor... - chiffrées)
-    // =========================================================================
-
-    /**
-     * Connecte (ou remplace) une clé API de délégation du workspace. Réservé OWNER/ADMIN (secret d'espace,
-     * cf. RBAC intégrations). La clé est stockée <b>chiffrée</b> ({@code Integration.accessToken}) et n'est
-     * jamais renvoyée en clair - elle est vérifiée à la première délégation vers ce provider.
-     */
-    @Transactional
-    public DeliveryKeyStatus connectKey(String slug, Long userId, IntegrationProvider provider, String apiKey) {
-        Workspace ws = access.resolveAndAuthorizeOwner(slug, userId);
-        Integration integ = integrationRepository
-            .findByWorkspaceIdAndProvider(ws.getId(), provider)
-            .orElseGet(Integration::new);
-        integ.setWorkspace(ws);
-        integ.setProvider(provider);
-        integ.setAccessToken(apiKey.trim());
-        integ.setInstalledBy(userRepository.findById(userId).orElse(null));
-        integrationRepository.save(integ);
-        log.info("Cle {} connectee au workspace {} (delegation)", provider, ws.getId());
-        return keyStatus(ws, provider);
-    }
-
-    /** État de la connexion d'une clé de délégation (tout membre du workspace). */
-    @Transactional(readOnly = true)
-    public DeliveryKeyStatus keyStatus(String slug, Long userId, IntegrationProvider provider) {
-        return keyStatus(access.resolveAndAuthorize(slug, userId), provider);
-    }
-
-    /** Déconnecte une clé de délégation du workspace. Réservé OWNER/ADMIN. */
-    @Transactional
-    public void disconnectKey(String slug, Long userId, IntegrationProvider provider) {
-        Workspace ws = access.resolveAndAuthorizeOwner(slug, userId);
-        integrationRepository.deleteByWorkspaceIdAndProvider(ws.getId(), provider);
-        log.info("Cle {} deconnectee du workspace {}", provider, ws.getId());
-    }
-
-    private DeliveryKeyStatus keyStatus(Workspace ws, IntegrationProvider provider) {
-        return integrationRepository.findByWorkspaceIdAndProvider(ws.getId(), provider)
-            .map(i -> new DeliveryKeyStatus(true, keyHint(i.getAccessToken())))
-            .orElseGet(() -> new DeliveryKeyStatus(false, null));
-    }
-
-    /** Indice non sensible : les 4 derniers caractères seulement (jamais la clé entière). */
-    private String keyHint(String key) {
-        return (key == null || key.length() < 4) ? null : "..." + key.substring(key.length() - 4);
-    }
-
     /** Mappe le run en DTO DANS la transaction (les accès paresseux issue/startedBy y sont sûrs). */
     private DeliveryRunResponse toResponse(DeliveryRun r) {
         Issue issue = r.getIssue();
@@ -187,10 +133,10 @@ public class DeliveryService {
     /** Charge une issue en la scopant au workspace du chemin (cross-tenant -> 404, pas 403). */
     private Issue scopedIssue(String slug, Long issueId) {
         Issue issue = issueRepository.findById(issueId)
-            .orElseThrow(() -> new ResourceNotFoundException("Issue introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
         if (issue.getProject() == null || issue.getProject().getWorkspace() == null
             || !slug.equals(issue.getProject().getWorkspace().getSlug())) {
-            throw new ResourceNotFoundException("Issue introuvable");
+            throw new ResourceNotFoundException("Issue not found");
         }
         return issue;
     }

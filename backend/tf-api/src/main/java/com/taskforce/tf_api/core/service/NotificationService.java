@@ -62,15 +62,6 @@ public class NotificationService {
         return page.stream().map(this::toResponse).toList();
     }
 
-    /**
-     * Compte les notifications non lues d'un utilisateur dans un workspace.
-     */
-    @Transactional(readOnly = true)
-    public long countUnread(String workspaceSlug, Long userId) {
-        Workspace workspace = resolveWorkspace(workspaceSlug);
-        return notificationRepository.countByRecipientIdAndWorkspaceIdAndReadFalse(userId, workspace.getId());
-    }
-
     // =========================================================================
     // Actions
     // =========================================================================
@@ -81,10 +72,10 @@ public class NotificationService {
     @Transactional
     public NotificationResponse markAsRead(Long notificationId, Long userId) {
         Notification notif = notificationRepository.findById(notificationId)
-            .orElseThrow(() -> new ResourceNotFoundException("Notification introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
 
         if (!notif.getRecipient().getId().equals(userId)) {
-            throw new ResourceNotFoundException("Notification introuvable");
+            throw new ResourceNotFoundException("Notification not found");
         }
 
         notif.setRead(true);
@@ -97,10 +88,10 @@ public class NotificationService {
     @Transactional
     public NotificationResponse acknowledge(Long notificationId, Long userId) {
         Notification notif = notificationRepository.findById(notificationId)
-            .orElseThrow(() -> new ResourceNotFoundException("Notification introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
 
         if (!notif.getRecipient().getId().equals(userId)) {
-            throw new ResourceNotFoundException("Notification introuvable");
+            throw new ResourceNotFoundException("Notification not found");
         }
 
         notif.setRead(true);
@@ -391,7 +382,7 @@ public class NotificationService {
 
     private Workspace resolveWorkspace(String slug) {
         return workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable : " + slug));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + slug));
     }
 
     // =========================================================================

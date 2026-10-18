@@ -64,7 +64,7 @@ public class AnalysisController {
             slug, request.getProjectId(), resolveUserId(jwt), request.getDepth());
 
         analysisJobRunner.run(job.id());
-        return ResponseEntity.ok(ApiResponse.success("Analyse lancée", job));
+        return ResponseEntity.ok(ApiResponse.success("Analysis started", job));
     }
 
     @GetMapping("/analysis")
@@ -72,18 +72,8 @@ public class AnalysisController {
         @PathVariable String slug,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Workflows récupérés",
+        return ResponseEntity.ok(ApiResponse.success("Workflows retrieved",
             analysisJobService.list(slug, resolveUserId(jwt))));
-    }
-
-    @GetMapping("/analysis/{jobId}")
-    public ResponseEntity<ApiResponse<AnalysisJobResponse>> get(
-        @PathVariable String slug,
-        @PathVariable Long jobId,
-        @AuthenticationPrincipal Jwt jwt
-    ) {
-        return ResponseEntity.ok(ApiResponse.success("Workflow récupéré",
-            analysisJobService.get(slug, jobId, resolveUserId(jwt))));
     }
 
     /** Répond à la question du modèle (HITL) → le workflow reprend là où il s'était arrêté. */
@@ -97,7 +87,7 @@ public class AnalysisController {
         AnalysisJobResponse job = analysisJobService.answer(slug, jobId, resolveUserId(jwt), request.getAnswer());
 
         analysisJobRunner.run(jobId);
-        return ResponseEntity.ok(ApiResponse.success("Analyse relancée", job));
+        return ResponseEntity.ok(ApiResponse.success("Analysis restarted", job));
     }
 
     /** Retire le workflow du dock (l'historique est conservé). */
@@ -108,7 +98,7 @@ public class AnalysisController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         analysisJobService.dismiss(slug, jobId, resolveUserId(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Workflow retiré", null));
+        return ResponseEntity.ok(ApiResponse.success("Workflow removed", null));
     }
 
     // ---------------------------------------------------------------------
@@ -122,7 +112,7 @@ public class AnalysisController {
         @PathVariable Long projectId,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Décision récupérée",
+        return ResponseEntity.ok(ApiResponse.success("Decision retrieved",
             analysisJobService.latestBrief(slug, projectId, resolveUserId(jwt))));
     }
 
@@ -133,7 +123,7 @@ public class AnalysisController {
         @PathVariable Long priorityId,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Issue créée",
+        return ResponseEntity.ok(ApiResponse.success("Issue created",
             analysisJobService.accept(slug, priorityId, resolveUserId(jwt))));
     }
 
@@ -143,7 +133,7 @@ public class AnalysisController {
         @PathVariable Long priorityId,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Priorité épinglée",
+        return ResponseEntity.ok(ApiResponse.success("Priority pinned",
             analysisJobService.pin(slug, priorityId, resolveUserId(jwt))));
     }
 
@@ -153,7 +143,7 @@ public class AnalysisController {
         @PathVariable Long priorityId,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Priorité écartée",
+        return ResponseEntity.ok(ApiResponse.success("Priority dismissed",
             analysisJobService.dismissPriority(slug, priorityId, resolveUserId(jwt))));
     }
 
@@ -164,14 +154,14 @@ public class AnalysisController {
         @Valid @RequestBody EditPriorityRequest request,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Priorité mise à jour",
+        return ResponseEntity.ok(ApiResponse.success("Priority updated",
             analysisJobService.edit(slug, priorityId, resolveUserId(jwt), request)));
     }
 
     private Long resolveUserId(Jwt jwt) {
         String email = identityResolver.resolveEmail(jwt);
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

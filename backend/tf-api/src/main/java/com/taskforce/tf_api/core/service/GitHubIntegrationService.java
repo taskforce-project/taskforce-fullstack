@@ -151,10 +151,10 @@ public class GitHubIntegrationService {
         // 0. Résoudre + valider le state (workspace fiable, pas un slug devinable)
         OAuthState oauthState = oauthStateRepository.findById(state)
             .filter(s -> s.getProvider() == IntegrationProvider.GITHUB)
-            .orElseThrow(() -> new BusinessException("État OAuth invalide"));
+            .orElseThrow(() -> new BusinessException("Invalid OAuth state"));
         if (oauthState.getExpiresAt().isBefore(LocalDateTime.now())) {
             oauthStateRepository.delete(oauthState);
-            throw new BusinessException("État OAuth expiré, relancez la connexion");
+            throw new BusinessException("The OAuth state expired: start the connection again");
         }
         Workspace workspace = oauthState.getWorkspace();
 
@@ -273,10 +273,10 @@ public class GitHubIntegrationService {
     @Transactional
     public void deleteLink(String workspaceSlug, Long linkId, User requester) {
         IssueGitHubLink link = issueGitHubLinkRepository.findById(linkId)
-            .orElseThrow(() -> new ResourceNotFoundException("Lien GitHub introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("GitHub link not found"));
         Issue issue = link.getIssue();
         if (!issue.getProject().getWorkspace().getSlug().equals(workspaceSlug)) {
-            throw new ResourceNotFoundException("Lien GitHub introuvable"); // cross-tenant → 404
+            throw new ResourceNotFoundException("GitHub link not found"); // cross-tenant → 404
         }
         visibilityGuard.assertCanWrite(issue.getProject(), requester.getId());
         issueGitHubLinkRepository.delete(link);
@@ -342,12 +342,12 @@ public class GitHubIntegrationService {
                 new ParameterizedTypeReference<Map<String, Object>>() {});
             String fullName = resp.getBody() != null ? str(resp.getBody().get("full_name")) : null;
             if (fullName == null || fullName.isBlank()) {
-                throw new BusinessException("Création du dépôt GitHub échouée (réponse inattendue)");
+                throw new BusinessException("Creating the GitHub repository failed (unexpected response)");
             }
             return fullName;
         } catch (HttpClientErrorException e) {
             // 422 = nom déjà pris / invalide ; 403 = permission. Message clair au lieu d'un 500 opaque.
-            throw new BusinessException("GitHub a refusé la création du dépôt '" + name + "' : " + e.getStatusText());
+            throw new BusinessException("GitHub refused to create the repository '" + name + "' : " + e.getStatusText());
         }
     }
 
@@ -361,7 +361,7 @@ public class GitHubIntegrationService {
             restTemplate.exchange("https://api.github.com/repos/" + repoFullName, HttpMethod.GET,
                 new HttpEntity<>(headers), new ParameterizedTypeReference<Map<String, Object>>() {});
         } catch (HttpClientErrorException e) {
-            throw new BusinessException("Dépôt GitHub introuvable ou inaccessible : " + repoFullName);
+            throw new BusinessException("GitHub repository not found or not accessible: " + repoFullName);
         }
     }
 
@@ -371,7 +371,7 @@ public class GitHubIntegrationService {
         return integrationRepository
             .findByWorkspaceIdAndProvider(workspace.getId(), IntegrationProvider.GITHUB)
             .map(Integration::getAccessToken)
-            .orElseThrow(() -> new BusinessException("GitHub n'est pas connecté pour ce workspace"));
+            .orElseThrow(() -> new BusinessException("GitHub isn't connected for this workspace"));
     }
 
     private List<Map<String, Object>> githubGetList(String token, String url) {
@@ -406,7 +406,7 @@ public class GitHubIntegrationService {
         String token = integrationRepository
             .findByWorkspaceIdAndProvider(workspace.getId(), IntegrationProvider.GITHUB)
             .map(Integration::getAccessToken)
-            .orElseThrow(() -> new BusinessException("GitHub n'est pas connecte pour ce workspace"));
+            .orElseThrow(() -> new BusinessException("GitHub isn't connected for this workspace"));
 
         List<Map<String, Object>> issues = githubGetList(token,
             "https://api.github.com/repos/" + repoFullName + "/issues?state=all&per_page=100&sort=updated");
@@ -417,7 +417,7 @@ public class GitHubIntegrationService {
             Integer number = issue.get("number") instanceof Number n ? n.intValue() : null;
             if (number == null) continue;
             String externalId = repoFullName + "#" + number;
-            String title = truncate("[GitHub] " + safe(str(issue.get("title")), "Sans titre"), 300);
+            String title = truncate("[GitHub] " + safe(str(issue.get("title")), "Untitled"), 300);
             String content = buildIssueContent(repoFullName, number, issue);
             Map<String, Object> metadata = issueMetadata(repoFullName, number, issue);
 
@@ -469,7 +469,7 @@ public class GitHubIntegrationService {
         String author = user != null ? str(user.get("login")) : null;
         String url = str(issue.get("html_url"));
         StringBuilder sb = new StringBuilder();
-        sb.append(body != null && !body.isBlank() ? truncate(body.trim(), MAX_BODY) : "_(pas de description)_");
+        sb.append(body != null && !body.isBlank() ? truncate(body.trim(), MAX_BODY) : "_(no description)_");
         sb.append("\n\n> ").append(isPr ? "Pull request" : "Issue").append(' ')
           .append(repoFullName).append(" #").append(number)
           .append(" · Etat : ").append(safe(str(issue.get("state")), "n/a"));

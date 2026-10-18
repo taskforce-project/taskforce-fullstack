@@ -70,13 +70,13 @@ public class WorkspaceInvitationService {
         String email = request.getEmail().trim().toLowerCase();
         WorkspaceRole role = request.getRole() != null ? request.getRole() : WorkspaceRole.MEMBER;
         if (role == WorkspaceRole.OWNER) {
-            throw new BusinessException("Impossible d'inviter quelqu'un en tant que OWNER");
+            throw new BusinessException("Someone can't be invited as OWNER");
         }
 
         // Contexte projet optionnel : à l'acceptation, l'invité rejoint aussi ce projet.
         final Project project = request.getProjectId() == null ? null
             : projectRepository.findByIdAndWorkspaceId(request.getProjectId(), workspace.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable dans ce workspace"));
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found in this workspace"));
         final ProjectRole projectRole = project == null ? null
             : (request.getProjectRole() != null ? request.getProjectRole() : ProjectRole.MEMBER);
 
@@ -84,11 +84,11 @@ public class WorkspaceInvitationService {
         userRepository.findByEmail(email).ifPresent(u -> {
             if (project != null) {
                 if (projectMemberRepository.existsByProjectIdAndUserId(project.getId(), u.getId())) {
-                    throw new BusinessException("Cet utilisateur est déjà membre du projet");
+                    throw new BusinessException("This user is already a member of the project");
                 }
                 // Un membre du workspace PEUT être invité à un projet — il devra accepter.
             } else if (workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspace.getId(), u.getId())) {
-                throw new BusinessException("Cet utilisateur est déjà membre du workspace");
+                throw new BusinessException("This user is already a member of the workspace");
             }
         });
 
@@ -121,7 +121,7 @@ public class WorkspaceInvitationService {
             ? (invitation.getInvitedBy().getDisplayName() != null
                 ? invitation.getInvitedBy().getDisplayName()
                 : invitation.getInvitedBy().getEmail())
-            : "Un membre";
+            : "A member";
         String acceptUrl = appUrl + "/invitations/" + invitation.getToken();
         emailService.sendWorkspaceInvitationEmail(email, inviterName, workspace.getName(), acceptUrl);
 
@@ -147,9 +147,9 @@ public class WorkspaceInvitationService {
         authorizationService.requireManager(workspace.getId(), requesterId);
 
         WorkspaceInvitation invitation = invitationRepository.findById(invitationId)
-            .orElseThrow(() -> new ResourceNotFoundException("Invitation introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Invitation not found"));
         if (!invitation.getWorkspace().getId().equals(workspace.getId())) {
-            throw new BusinessException("Cette invitation n'appartient pas à ce workspace");
+            throw new BusinessException("This invitation doesn't belong to this workspace");
         }
         invitation.setStatus(InvitationStatus.REVOKED);
         invitationRepository.save(invitation);
@@ -184,21 +184,21 @@ public class WorkspaceInvitationService {
     @Transactional
     public void acceptInvitation(String token, Long userId) {
         WorkspaceInvitation invitation = invitationRepository.findByToken(token)
-            .orElseThrow(() -> new ResourceNotFoundException("Invitation introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Invitation not found"));
 
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (!user.getEmail().equalsIgnoreCase(invitation.getEmail())) {
-            throw new BusinessException("Cette invitation ne correspond pas à votre adresse email");
+            throw new BusinessException("This invitation doesn't match your email address");
         }
         if (invitation.getStatus() != InvitationStatus.PENDING) {
-            throw new BusinessException("Cette invitation n'est plus valide");
+            throw new BusinessException("This invitation is no longer valid");
         }
         if (invitation.isExpired()) {
             invitation.setStatus(InvitationStatus.EXPIRED);
             invitationRepository.save(invitation);
-            throw new BusinessException("Cette invitation a expiré");
+            throw new BusinessException("This invitation has expired");
         }
 
         joinWorkspace(invitation, user);
@@ -214,7 +214,7 @@ public class WorkspaceInvitationService {
     @Transactional(readOnly = true)
     public List<IncomingInvitationResponse> listMyPendingInvitations(Long userId) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return invitationRepository
             .findByEmailIgnoreCaseAndStatus(user.getEmail(), InvitationStatus.PENDING)
             .stream()
@@ -231,20 +231,20 @@ public class WorkspaceInvitationService {
     @Transactional
     public void acceptMyInvitation(Long userId, Long invitationId) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         WorkspaceInvitation invitation = invitationRepository.findById(invitationId)
-            .orElseThrow(() -> new ResourceNotFoundException("Invitation introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Invitation not found"));
 
         if (!user.getEmail().equalsIgnoreCase(invitation.getEmail())) {
-            throw new BusinessException("Cette invitation ne vous est pas adressée");
+            throw new BusinessException("This invitation isn't addressed to you");
         }
         if (invitation.getStatus() != InvitationStatus.PENDING) {
-            throw new BusinessException("Cette invitation n'est plus valide");
+            throw new BusinessException("This invitation is no longer valid");
         }
         if (invitation.isExpired()) {
             invitation.setStatus(InvitationStatus.EXPIRED);
             invitationRepository.save(invitation);
-            throw new BusinessException("Cette invitation a expiré");
+            throw new BusinessException("This invitation has expired");
         }
 
         joinWorkspace(invitation, user);
@@ -285,6 +285,6 @@ public class WorkspaceInvitationService {
 
     private Workspace resolveWorkspace(String slug) {
         return workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
     }
 }

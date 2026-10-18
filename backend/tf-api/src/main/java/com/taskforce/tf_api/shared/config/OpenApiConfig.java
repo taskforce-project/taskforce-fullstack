@@ -22,7 +22,7 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("Taskforce API")
                         .version("1.0.0")
-                        .description("API REST modulaire pour l'ERP Taskforce")
+                        .description("REST API of TaskForce, the open-source project management and AI delivery platform")
                         .contact(new Contact()
                                 .name("Taskforce Team")
                                 .email("support@taskforce.com"))

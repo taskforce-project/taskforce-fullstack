@@ -13,12 +13,12 @@ import lombok.Data;
 public class LogWorkRequest {
 
     /** Temps passé en minutes (max 24h = 1440). */
-    @NotNull(message = "Le temps (minutes) est obligatoire")
-    @Min(value = 1, message = "Le temps doit être positif")
-    @Max(value = 1440, message = "Maximum 1440 minutes (24h) par entrée")
+    @NotNull(message = "The time (minutes) is required")
+    @Min(value = 1, message = "The time must be positive")
+    @Max(value = 1440, message = "1440 minutes (24 h) at most per entry")
     private Integer minutes;
 
-    @Size(max = 500, message = "La description ne peut pas dépasser 500 caractères")
+    @Size(max = 500, message = "The description can't exceed 500 characters")
     private String description;
 
     /** Date du travail (ISO yyyy-MM-dd). Optionnel → aujourd'hui par défaut. */

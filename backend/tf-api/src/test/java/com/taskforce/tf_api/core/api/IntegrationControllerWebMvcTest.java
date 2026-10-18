@@ -104,7 +104,7 @@ class IntegrationControllerWebMvcTest {
     @Test
     @DisplayName("DELETE github (disconnect) par un non-gestionnaire (MEMBER) → 403")
     void disconnect_forbidden_for_non_manager() throws Exception {
-        doThrow(new ForbiddenException("Permission insuffisante pour cette action"))
+        doThrow(new ForbiddenException("You don't have the permission for this action"))
             .when(authorizationService).requireManager(anyLong(), anyLong());
 
         mockMvc.perform(delete("/api/workspaces/acme/integrations/github").with(auth()))

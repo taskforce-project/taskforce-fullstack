@@ -9,7 +9,7 @@ import lombok.Data;
 @Data
 public class LaunchAnalysisRequest {
 
-    @NotNull(message = "Le projet est obligatoire")
+    @NotNull(message = "The project is required")
     private Long projectId;
 
     /** QUICK par défaut ; DEEP active le raisonnement long et la clarification (HITL). */

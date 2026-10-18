@@ -75,7 +75,7 @@ export const SECTIONS: SectionConfig[] = [
   { key: "notifications", label: "Notifications",  icon: <Bell className="h-4 w-4" />,       group: "Personal" },
   { key: "security",      label: "Security",       icon: <Key className="h-4 w-4" />,        group: "Personal" },
   { key: "workspace",     label: "General",        icon: <Globe className="h-4 w-4" />,      group: "Workspace" },
-  { key: "usage",         label: "Usage Cortex",   icon: <Gauge className="h-4 w-4" />,       group: "Workspace" },
+  { key: "usage",         label: "Cortex usage",   icon: <Gauge className="h-4 w-4" />,       group: "Workspace" },
   { key: "integrations",  label: "Integrations",   icon: <Webhook className="h-4 w-4" />,    group: "Workspace" },
   { key: "agents",        label: "Agents",         icon: <Bot className="h-4 w-4" />,        group: "Workspace" },
   { key: "status",        label: "Status",         icon: <Activity className="h-4 w-4" />,    group: "Workspace" },
@@ -807,7 +807,7 @@ function NotificationsPanel() {
 function SecurityPanel() {
   // Le métier auth est piloté par Keycloak via son API admin - l'utilisateur ne voit jamais Keycloak.
   // Reset mot de passe → parcours brandé de l'app (`/auth/forgot-password` : code par email templaté,
-  // puis nouveau mot de passe). 2FA (TOTP) → encore la page Keycloak (à internaliser : secret + QR côté app).
+  // puis nouveau mot de passe). 2FA (TOTP) → gérée par l'app (secret + QR, V79).
   const router = useRouter()
   const [twoFa, setTwoFa] = useState<boolean | null>(null)
   const [busy, setBusy] = useState(false)
@@ -839,7 +839,7 @@ function SecurityPanel() {
     <div className="flex flex-col gap-4">
       <SectionCard
         title="Authentication & security"
-        description="Your sign-in is secured by Keycloak. Manage your password and two-factor authentication here."
+        description="Manage your password and two-factor authentication."
       >
         <div className="flex flex-col divide-y divide-border/50">
           {/* Mot de passe */}

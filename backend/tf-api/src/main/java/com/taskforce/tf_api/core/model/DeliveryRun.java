@@ -50,7 +50,7 @@ public class DeliveryRun extends AuditableEntity {
     @JoinColumn(name = "issue_id", nullable = false)
     private Issue issue;
 
-    /** Clé du provider délégué ("claude-code", "stub"...). */
+    /** Clé du provider délégué ("claude-code"). */
     @Column(name = "provider_key", nullable = false, length = 40)
     private String providerKey;
 

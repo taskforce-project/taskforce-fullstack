@@ -15,25 +15,25 @@ import lombok.Data;
 @Data
 public class UpsertMemberSkillsRequest {
 
-    @Size(max = 50, message = "50 compétences maximum")
+    @Size(max = 50, message = "50 skills at most")
     private List<String> skills;
 
-    @Size(max = 2000, message = "Le profil ne peut dépasser 2000 caractères")
+    @Size(max = 2000, message = "The profile can't exceed 2000 characters")
     private String profileText;
 
     /** Capacité déclarée en heures/semaine (PROD-1.8 Phase 2). Optionnel. */
-    @Min(value = 0, message = "La capacité ne peut être négative")
-    @Max(value = 168, message = "La capacité ne peut dépasser 168 h/semaine")
+    @Min(value = 0, message = "Capacity can't be negative")
+    @Max(value = 168, message = "Capacity can't exceed 168 h/week")
     private Integer capacityHoursPerWeek;
 
     /** Séniorité : JUNIOR | MID | SENIOR | LEAD. Optionnel. */
-    @Pattern(regexp = "JUNIOR|MID|SENIOR|LEAD", message = "Séniorité invalide")
+    @Pattern(regexp = "JUNIOR|MID|SENIOR|LEAD", message = "Invalid seniority")
     private String seniority;
 
     /** Membre volontairement « en développement » (PROD-1.8 Phase 3 Inc C). */
     private Boolean growthEnabled;
 
     /** Compétences cibles vers lesquelles faire progresser le membre. */
-    @Size(max = 50, message = "50 compétences cibles maximum")
+    @Size(max = 50, message = "50 target skills at most")
     private List<String> growthTargetSkills;
 }

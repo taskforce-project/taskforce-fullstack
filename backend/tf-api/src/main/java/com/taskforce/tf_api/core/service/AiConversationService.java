@@ -30,7 +30,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AiConversationService {
 
-    private static final String DEFAULT_TITLE = "Nouvelle conversation";
+    private static final String DEFAULT_TITLE = "New conversation";
     /** Nb de messages d'historique injectés dans le prompt (mémoire multi-tours, avant compression). */
     private static final int HISTORY_LIMIT = 10;
     /** Seuil (en nb de messages) au-delà duquel on compresse les anciens échanges dans un résumé. */

@@ -13,16 +13,13 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.taskforce.tf_api.core.dto.request.CreateKnowledgeEdgeRequest;
 import com.taskforce.tf_api.core.dto.request.CreateKnowledgeNodeRequest;
 import com.taskforce.tf_api.core.dto.request.MoveNodeRequest;
 import com.taskforce.tf_api.core.dto.request.SearchBrainRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateKnowledgeNodeRequest;
 import com.taskforce.tf_api.core.dto.response.BrainOverviewResponse;
-import com.taskforce.tf_api.core.dto.response.KnowledgeEdgeResponse;
 import com.taskforce.tf_api.core.dto.response.KnowledgeNodeResponse;
 import com.taskforce.tf_api.core.dto.response.KnowledgeSearchHit;
 import com.taskforce.tf_api.core.model.User;
@@ -36,7 +33,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Brain OS — graphe de connaissance d'un workspace.
+ * Brain OS — pages de connaissance d'un workspace.
  * Routes scopées par slug : /api/workspaces/{slug}/brain/*
  * L'accès membre est garanti par WorkspaceAccessInterceptor + re-vérifié au niveau service.
  */
@@ -49,7 +46,7 @@ public class KnowledgeController {
     private final BrainSearchService brainSearchService;
     private final UserRepository     userRepository;
 
-    // ── Vue d'ensemble (graphe complet) ──────────────────────────────────────
+    // ── Vue d'ensemble (pages + liens) ───────────────────────────────────────
 
     @GetMapping
     public ResponseEntity<ApiResponse<BrainOverviewResponse>> getOverview(
@@ -57,7 +54,7 @@ public class KnowledgeController {
         @PathVariable String slug
     ) {
         Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success("Brain récupéré",
+        return ResponseEntity.ok(ApiResponse.success("Brain retrieved",
             knowledgeService.getOverview(slug, userId)));
     }
 
@@ -70,48 +67,11 @@ public class KnowledgeController {
         @Valid @RequestBody SearchBrainRequest request
     ) {
         Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success("Résultats",
+        return ResponseEntity.ok(ApiResponse.success("Results",
             brainSearchService.search(slug, userId, request.getQuery(), request.getTopK(), request.getDomain())));
     }
 
-    // ── Re-seed (OWNER/ADMIN) ─────────────────────────────────────────────────
-
-    @PostMapping("/reseed")
-    public ResponseEntity<ApiResponse<Void>> reseed(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable String slug,
-        @RequestBody ReseedRequest request
-    ) {
-        Long userId = resolveUserId(jwt);
-        knowledgeService.reseed(slug, userId, request.template());
-        return ResponseEntity.ok(ApiResponse.success("Brain réamorcé", null));
-    }
-
-    public record ReseedRequest(String template) {}
-
     // ── Nodes ────────────────────────────────────────────────────────────────
-
-    @GetMapping("/nodes")
-    public ResponseEntity<ApiResponse<List<KnowledgeNodeResponse>>> listNodes(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable String slug,
-        @RequestParam(required = false) String domain
-    ) {
-        Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success("Nodes récupérés",
-            knowledgeService.listNodes(slug, userId, domain)));
-    }
-
-    @GetMapping("/nodes/{nodeId}")
-    public ResponseEntity<ApiResponse<KnowledgeNodeResponse>> getNode(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable String slug,
-        @PathVariable Long nodeId
-    ) {
-        Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success("Node récupéré",
-            knowledgeService.getNode(slug, nodeId, userId)));
-    }
 
     @PostMapping("/nodes")
     public ResponseEntity<ApiResponse<KnowledgeNodeResponse>> createNode(
@@ -120,7 +80,7 @@ public class KnowledgeController {
         @Valid @RequestBody CreateKnowledgeNodeRequest request
     ) {
         Long userId = resolveUserId(jwt);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Node créé",
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Page created",
             knowledgeService.createNode(slug, userId, request)));
     }
 
@@ -132,7 +92,7 @@ public class KnowledgeController {
         @Valid @RequestBody UpdateKnowledgeNodeRequest request
     ) {
         Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success("Node mis à jour",
+        return ResponseEntity.ok(ApiResponse.success("Page updated",
             knowledgeService.updateNode(slug, nodeId, userId, request)));
     }
 
@@ -144,7 +104,7 @@ public class KnowledgeController {
         @Valid @RequestBody MoveNodeRequest request
     ) {
         Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success("Node déplacé",
+        return ResponseEntity.ok(ApiResponse.success("Page moved",
             knowledgeService.moveNode(slug, nodeId, userId, request)));
     }
 
@@ -156,31 +116,7 @@ public class KnowledgeController {
     ) {
         Long userId = resolveUserId(jwt);
         knowledgeService.deleteNode(slug, nodeId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Node supprimé", null));
-    }
-
-    // ── Edges ─────────────────────────────────────────────────────────────────
-
-    @PostMapping("/edges")
-    public ResponseEntity<ApiResponse<KnowledgeEdgeResponse>> createEdge(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable String slug,
-        @Valid @RequestBody CreateKnowledgeEdgeRequest request
-    ) {
-        Long userId = resolveUserId(jwt);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Relation créée",
-            knowledgeService.createEdge(slug, userId, request)));
-    }
-
-    @DeleteMapping("/edges/{edgeId}")
-    public ResponseEntity<ApiResponse<Void>> deleteEdge(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable String slug,
-        @PathVariable Long edgeId
-    ) {
-        Long userId = resolveUserId(jwt);
-        knowledgeService.deleteEdge(slug, edgeId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Relation supprimée", null));
+        return ResponseEntity.ok(ApiResponse.success("Page deleted", null));
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────
@@ -188,7 +124,7 @@ public class KnowledgeController {
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

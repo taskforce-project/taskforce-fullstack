@@ -304,49 +304,6 @@
   background: var(--sidebar);
 }
 
-/* Identité « Labs » - alignée sur le site : l'ICÔNE prend un dégradé sur le TRAIT (pêche→rose→bleu, sans
-   violet), et les labels Labs sont en texte dégradé. Le dégradé SVG est déclaré par <LabsGradientDefs/>
-   (monté dans AppShell) ; ces classes le référencent. */
-.tf-labs-icon { stroke: url(#tf-labs-grad); }
-.tf-labs-gtext {
-  background-image: linear-gradient(135deg, #ff6f91, #7db8ff);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* Bandeau « Labs » façon sandbox Stripe : géré par `LabShell` (bandeau bleu en haut + app aux coins
-   arrondis). La sidebar shadcn est `fixed` (relative au viewport) → elle ignore le décalage : on la
-   fait descendre SOUS le bandeau + on arrondit son coin haut-gauche, cohérent avec l'app à droite.
-   2.25rem = hauteur du bandeau (`h-9` dans LabShell) ; 1rem = `rounded-2xl` de l'app. */
-/* Le SidebarProvider impose `min-h-svh` (100svh). Sur une page Labs le conteneur ne fait que
-   `100svh - bandeau` → l'app déborde de 36px sous le conteneur (bas rogné) et le moindre reflow
-   (ex. ouverture d'un panneau) « fait remonter » le contenu. On lève ce plancher. */
-.tf-lab-shell [data-slot="sidebar-wrapper"] {
-  min-height: 0;
-}
-
-.tf-lab-shell [data-slot="sidebar-container"] {
-  top: 2.25rem;
-  height: calc(100svh - 2.25rem);
-}
-.tf-lab-shell [data-slot="sidebar-inner"] {
-  overflow: hidden;
-  border-top-left-radius: 1rem;
-}
-
-/* Lignes « Labs » du Ctrl+K : la même vague, en accent à droite (voile à gauche pour garder icône +
-   libellé lisibles). Sur `--popover` (fond du modal de recherche). */
-.lab-cmd-row {
-  background-image:
-    linear-gradient(to right, var(--popover) 0%, var(--popover) 42%, color-mix(in srgb, var(--popover) 48%, transparent) 100%),
-    url("/assets/tour/labs-wave.jpg");
-  background-size: cover;
-  background-position: right center;
-  background-repeat: no-repeat;
-}
-
-
 /* ── Accessibilité (réglages Apparence) ────────────────────────────────────── */
 /* Taille du texte : on échelle la RACINE → tout le texte en rem suit (Tailwind = rem). */
 html.font-large   { font-size: 112.5%; } /* ~18px base */

@@ -1,14 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   getBrainOverview,
-  listNodes,
-  getNode,
   createNode,
   updateNode,
   deleteNode,
   uploadBrainFile,
-  createEdge,
-  deleteEdge,
   searchBrain,
 } from './brain-service';
 import { apiClient } from './client';
@@ -47,38 +43,6 @@ describe('brain-service', () => {
     it('propage l’erreur', async () => {
       vi.mocked(apiClient.get).mockRejectedValue(new Error('boom'));
       await expect(getBrainOverview(SLUG)).rejects.toThrow('boom');
-    });
-  });
-
-  describe('listNodes', () => {
-    it('GET les nodes sans params quand domain absent', async () => {
-      const nodes = [{ id: 1, title: 'N1' }] as any;
-      vi.mocked(apiClient.get).mockResolvedValue(envelope(nodes));
-
-      const result = await listNodes(SLUG);
-
-      expect(apiClient.get).toHaveBeenCalledWith(BRAIN_ROUTES.NODES(SLUG), { params: undefined });
-      expect(result).toEqual(nodes);
-    });
-
-    it('GET les nodes filtrés par domain', async () => {
-      vi.mocked(apiClient.get).mockResolvedValue(envelope([]));
-
-      await listNodes(SLUG, 'PRODUCT');
-
-      expect(apiClient.get).toHaveBeenCalledWith(BRAIN_ROUTES.NODES(SLUG), { params: { domain: 'PRODUCT' } });
-    });
-  });
-
-  describe('getNode', () => {
-    it('GET un node par id', async () => {
-      const node = { id: 5, title: 'N5' } as any;
-      vi.mocked(apiClient.get).mockResolvedValue(envelope(node));
-
-      const result = await getNode(SLUG, 5);
-
-      expect(apiClient.get).toHaveBeenCalledWith(BRAIN_ROUTES.NODE(SLUG, 5));
-      expect(result).toEqual(node);
     });
   });
 
@@ -146,46 +110,6 @@ describe('brain-service', () => {
       const result = await uploadBrainFile(SLUG, file);
 
       expect(result.url).toBe('https://cdn/x.png');
-    });
-  });
-
-  describe('createEdge', () => {
-    it('POST le corps { fromNodeId, toNodeId, relationType, weight }', async () => {
-      const edge = { id: 1, fromNodeId: 1, toNodeId: 2, relationType: 'RELATES_TO', weight: 0.5, auto: false };
-      vi.mocked(apiClient.post).mockResolvedValue(envelope(edge));
-
-      const result = await createEdge(SLUG, 1, 2, 'RELATES_TO', 0.5);
-
-      expect(apiClient.post).toHaveBeenCalledWith(BRAIN_ROUTES.EDGES(SLUG), {
-        fromNodeId: 1,
-        toNodeId: 2,
-        relationType: 'RELATES_TO',
-        weight: 0.5,
-      });
-      expect(result).toEqual(edge);
-    });
-
-    it('envoie weight undefined quand omis', async () => {
-      vi.mocked(apiClient.post).mockResolvedValue(envelope({} as any));
-
-      await createEdge(SLUG, 1, 2, 'BLOCKS');
-
-      expect(apiClient.post).toHaveBeenCalledWith(BRAIN_ROUTES.EDGES(SLUG), {
-        fromNodeId: 1,
-        toNodeId: 2,
-        relationType: 'BLOCKS',
-        weight: undefined,
-      });
-    });
-  });
-
-  describe('deleteEdge', () => {
-    it('DELETE une arête', async () => {
-      vi.mocked(apiClient.delete).mockResolvedValue(envelope(null));
-
-      await deleteEdge(SLUG, 3);
-
-      expect(apiClient.delete).toHaveBeenCalledWith(BRAIN_ROUTES.EDGE(SLUG, 3));
     });
   });
 

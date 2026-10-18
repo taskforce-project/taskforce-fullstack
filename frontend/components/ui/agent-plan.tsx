@@ -153,7 +153,7 @@ export function AgentPlan({ tasks }: Readonly<{ tasks: PlanTask[] }>) {
                                     <p className="py-1">{subtask.description}</p>
                                     {subtask.tools && subtask.tools.length > 0 && (
                                       <div className="mb-1 mt-0.5 flex flex-wrap items-center gap-1.5">
-                                        <span className="font-medium text-muted-foreground">Outils :</span>
+                                        <span className="font-medium text-muted-foreground">Tools:</span>
                                         {subtask.tools.map((tool) => (
                                           <span key={tool} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{tool}</span>
                                         ))}

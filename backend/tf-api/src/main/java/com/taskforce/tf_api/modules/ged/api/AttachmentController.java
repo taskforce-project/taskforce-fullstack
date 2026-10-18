@@ -49,7 +49,7 @@ public class AttachmentController {
         Long userId = resolveUserId(jwt);
         AttachmentResponse response = attachmentService.upload(slug, projectId, issueId, file, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Fichier uploadé", response));
+                .body(ApiResponse.success("File uploaded", response));
     }
 
     @GetMapping
@@ -63,7 +63,7 @@ public class AttachmentController {
         // autorisation au-delà de « être authentifié ».
         Long userId = resolveUserId(jwt);
         List<AttachmentResponse> attachments = attachmentService.listByIssue(slug, projectId, issueId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Pièces jointes récupérées", attachments));
+        return ResponseEntity.ok(ApiResponse.success("Attachments retrieved", attachments));
     }
 
     @DeleteMapping("/{attachmentId}")
@@ -76,13 +76,13 @@ public class AttachmentController {
     ) {
         Long userId = resolveUserId(jwt);
         attachmentService.delete(slug, projectId, issueId, attachmentId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Pièce jointe supprimée", null));
+        return ResponseEntity.ok(ApiResponse.success("Attachment deleted", null));
     }
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

@@ -87,7 +87,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         List<IssueResponse> issues = issueService.listIssues(slug, projectId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Issues récupérées", issues));
+        return ResponseEntity.ok(ApiResponse.success("Issues retrieved", issues));
     }
 
     /** GET .../issues/{issueId}/cycles — cycles auxquels l'issue est rattachée (sélecteur du sheet, CYC-03b). */
@@ -99,7 +99,7 @@ public class IssueController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success("Cycles de l'issue récupérés",
+        return ResponseEntity.ok(ApiResponse.success("Issue cycles retrieved",
             cycleService.listCyclesForIssue(slug, projectId, issueId, userId)));
     }
 
@@ -120,7 +120,7 @@ public class IssueController {
         int safeSize = Math.min(Math.max(size, 1), 100);
         var pageable = org.springframework.data.domain.PageRequest.of(Math.max(page, 0), safeSize);
         PageResponse<IssueResponse> result = issueService.listIssuesPaged(slug, projectId, userId, pageable);
-        return ResponseEntity.ok(ApiResponse.success("Issues récupérées", result));
+        return ResponseEntity.ok(ApiResponse.success("Issues retrieved", result));
     }
 
     @PostMapping
@@ -133,7 +133,7 @@ public class IssueController {
         Long userId = resolveUserId(jwt);
         IssueResponse issue = issueService.createIssue(slug, projectId, request, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Issue créée", issue));
+            .body(ApiResponse.success("Issue created", issue));
     }
 
     @GetMapping("/{issueId}")
@@ -145,7 +145,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         IssueResponse issue = issueService.getIssue(slug, projectId, issueId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Issue récupérée", issue));
+        return ResponseEntity.ok(ApiResponse.success("Issue retrieved", issue));
     }
 
     // =========================================================================
@@ -164,7 +164,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         IssueSpecDraft draft = issueAiService.generateSpec(slug, projectId, issueId, userId, deep);
-        return ResponseEntity.ok(ApiResponse.success("Brouillon généré", draft));
+        return ResponseEntity.ok(ApiResponse.success("Draft generated", draft));
     }
 
     /** Approuve le brouillon (éventuellement édité) → persiste un node SPEC lié à l'issue. */
@@ -179,7 +179,7 @@ public class IssueController {
         Long userId = resolveUserId(jwt);
         KnowledgeNodeResponse node = issueAiService.approveSpec(slug, projectId, issueId, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Spec enregistrée dans le Brain OS", node));
+            .body(ApiResponse.success("Spec saved to Brain OS", node));
     }
 
     @PatchMapping("/{issueId}")
@@ -192,7 +192,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         IssueResponse issue = issueService.updateIssue(slug, projectId, issueId, request, userId);
-        return ResponseEntity.ok(ApiResponse.success("Issue mise à jour", issue));
+        return ResponseEntity.ok(ApiResponse.success("Issue updated", issue));
     }
 
     @DeleteMapping("/{issueId}")
@@ -204,7 +204,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         issueService.deleteIssue(slug, projectId, issueId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Issue supprimée", null));
+        return ResponseEntity.ok(ApiResponse.success("Issue deleted", null));
     }
 
     @PatchMapping("/{issueId}/archive")
@@ -216,7 +216,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         IssueResponse issue = issueService.setArchived(slug, projectId, issueId, true, userId);
-        return ResponseEntity.ok(ApiResponse.success("Issue archivée", issue));
+        return ResponseEntity.ok(ApiResponse.success("Issue archived", issue));
     }
 
     @PatchMapping("/{issueId}/unarchive")
@@ -228,7 +228,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         IssueResponse issue = issueService.setArchived(slug, projectId, issueId, false, userId);
-        return ResponseEntity.ok(ApiResponse.success("Issue désarchivée", issue));
+        return ResponseEntity.ok(ApiResponse.success("Issue restored", issue));
     }
 
     @PatchMapping("/{issueId}/pin")
@@ -241,7 +241,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         IssueResponse issue = issueService.setPinned(slug, projectId, issueId, request.pinned(), userId);
-        return ResponseEntity.ok(ApiResponse.success(request.pinned() ? "Issue épinglée" : "Issue dépinglée", issue));
+        return ResponseEntity.ok(ApiResponse.success(request.pinned() ? "Issue pinned" : "Issue unpinned", issue));
     }
 
     /** Corps minimal du PATCH /pin */
@@ -259,7 +259,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         List<IssueStatusResponse> statuses = issueService.listStatuses(slug, projectId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Statuts récupérés", statuses));
+        return ResponseEntity.ok(ApiResponse.success("Statuses retrieved", statuses));
     }
 
     @PostMapping("/statuses")
@@ -272,7 +272,7 @@ public class IssueController {
         Long userId = resolveUserId(jwt);
         IssueStatusResponse status = issueService.createStatus(slug, projectId, request, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Statut créé", status));
+            .body(ApiResponse.success("Status created", status));
     }
 
     @PatchMapping("/statuses/{statusId}")
@@ -285,7 +285,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         IssueStatusResponse status = issueService.updateStatus(slug, projectId, statusId, request, userId);
-        return ResponseEntity.ok(ApiResponse.success("Statut mis à jour", status));
+        return ResponseEntity.ok(ApiResponse.success("Status updated", status));
     }
 
     @DeleteMapping("/statuses/{statusId}")
@@ -297,7 +297,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         issueService.deleteStatus(slug, projectId, statusId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Statut supprimé", null));
+        return ResponseEntity.ok(ApiResponse.success("Status deleted", null));
     }
 
     /**
@@ -313,7 +313,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         List<IssueStatusResponse> statuses = issueService.reorderStatuses(slug, projectId, request, userId);
-        return ResponseEntity.ok(ApiResponse.success("Statuts réordonnés", statuses));
+        return ResponseEntity.ok(ApiResponse.success("Statuses reordered", statuses));
     }
 
     // =========================================================================
@@ -328,7 +328,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         List<IssueTypeResponse> types = issueService.listTypes(slug, projectId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Types récupérés", types));
+        return ResponseEntity.ok(ApiResponse.success("Types retrieved", types));
     }
 
     // =========================================================================
@@ -344,7 +344,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         List<IssueCommentResponse> comments = issueService.listComments(slug, projectId, issueId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Commentaires récupérés", comments));
+        return ResponseEntity.ok(ApiResponse.success("Comments retrieved", comments));
     }
 
     @PostMapping("/{issueId}/comments")
@@ -358,7 +358,7 @@ public class IssueController {
         Long userId = resolveUserId(jwt);
         IssueCommentResponse comment = issueService.addComment(slug, projectId, issueId, request, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Commentaire ajouté", comment));
+            .body(ApiResponse.success("Comment added", comment));
     }
 
     @PatchMapping("/{issueId}/comments/{commentId}")
@@ -372,7 +372,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         IssueCommentResponse comment = issueService.updateComment(slug, projectId, issueId, commentId, request, userId);
-        return ResponseEntity.ok(ApiResponse.success("Commentaire mis à jour", comment));
+        return ResponseEntity.ok(ApiResponse.success("Comment updated", comment));
     }
 
     @DeleteMapping("/{issueId}/comments/{commentId}")
@@ -385,7 +385,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         issueService.deleteComment(slug, projectId, issueId, commentId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Commentaire supprimé", null));
+        return ResponseEntity.ok(ApiResponse.success("Comment deleted", null));
     }
 
     // =========================================================================
@@ -401,7 +401,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         List<IssueActivityResponse> activities = issueService.listActivity(slug, projectId, issueId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Activité récupérée", activities));
+        return ResponseEntity.ok(ApiResponse.success("Activity retrieved", activities));
     }
 
     // =========================================================================
@@ -417,7 +417,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         SmartAssignResponse result = smartAssignService.recommend(slug, projectId, issueId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Recommandation Smart Assign générée", result));
+        return ResponseEntity.ok(ApiResponse.success("Smart Assign recommendation generated", result));
     }
 
     @PostMapping("/smart-assign/preview")
@@ -429,7 +429,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         SmartAssignResponse result = smartAssignService.preview(slug, projectId, userId, request);
-        return ResponseEntity.ok(ApiResponse.success("Suggestion Smart Assign (prévisualisation) générée", result));
+        return ResponseEntity.ok(ApiResponse.success("Smart Assign suggestion (preview) generated", result));
     }
 
     @PostMapping("/smart-assign/bulk")
@@ -442,7 +442,7 @@ public class IssueController {
         Long userId = resolveUserId(jwt);
         List<BulkSmartAssignItemResponse> result =
             smartAssignService.bulkRecommend(slug, projectId, userId, request.getIssueIds());
-        return ResponseEntity.ok(ApiResponse.success("Recommandations Smart Assign (lot) générées", result));
+        return ResponseEntity.ok(ApiResponse.success("Smart Assign recommendations (batch) generated", result));
     }
 
     // =========================================================================
@@ -458,7 +458,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         List<IssueResponse> children = issueService.listChildren(slug, projectId, issueId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Sous-tâches récupérées", children));
+        return ResponseEntity.ok(ApiResponse.success("Sub-issues retrieved", children));
     }
 
     // =========================================================================
@@ -474,7 +474,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
-            "Checklist récupérée", issueService.listChecklist(slug, projectId, issueId, userId)));
+            "Checklist retrieved", issueService.listChecklist(slug, projectId, issueId, userId)));
     }
 
     @PostMapping("/{issueId}/checklist")
@@ -487,7 +487,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         ChecklistItemResponse item = issueService.addChecklistItem(slug, projectId, issueId, userId, request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Item ajouté", item));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Item added", item));
     }
 
     @PatchMapping("/{issueId}/checklist/{itemId}")
@@ -501,7 +501,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         ChecklistItemResponse item = issueService.updateChecklistItem(slug, projectId, issueId, itemId, userId, request);
-        return ResponseEntity.ok(ApiResponse.success("Item mis à jour", item));
+        return ResponseEntity.ok(ApiResponse.success("Item updated", item));
     }
 
     @DeleteMapping("/{issueId}/checklist/{itemId}")
@@ -514,7 +514,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         issueService.deleteChecklistItem(slug, projectId, issueId, itemId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Item supprimé", null));
+        return ResponseEntity.ok(ApiResponse.success("Item deleted", null));
     }
 
     // =========================================================================
@@ -530,7 +530,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
-            "Temps récupéré", issueService.listWorklogs(slug, projectId, issueId, userId)));
+            "Time entries retrieved", issueService.listWorklogs(slug, projectId, issueId, userId)));
     }
 
     @PostMapping("/{issueId}/worklogs")
@@ -543,7 +543,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         WorklogResponse worklog = issueService.addWorklog(slug, projectId, issueId, userId, request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Temps enregistré", worklog));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Time logged", worklog));
     }
 
     @DeleteMapping("/{issueId}/worklogs/{worklogId}")
@@ -556,7 +556,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         issueService.deleteWorklog(slug, projectId, issueId, worklogId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Entrée supprimée", null));
+        return ResponseEntity.ok(ApiResponse.success("Entry deleted", null));
     }
 
     // =========================================================================
@@ -572,7 +572,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         List<IssueRelationResponse> relations = issueService.listRelations(slug, projectId, issueId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Relations récupérées", relations));
+        return ResponseEntity.ok(ApiResponse.success("Relations retrieved", relations));
     }
 
     @PostMapping("/{issueId}/relations")
@@ -586,7 +586,7 @@ public class IssueController {
         Long userId = resolveUserId(jwt);
         IssueRelationResponse relation = issueService.addRelation(slug, projectId, issueId, request, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Relation créée", relation));
+            .body(ApiResponse.success("Relation created", relation));
     }
 
     @DeleteMapping("/{issueId}/relations/{relationId}")
@@ -599,7 +599,7 @@ public class IssueController {
     ) {
         Long userId = resolveUserId(jwt);
         issueService.deleteRelation(slug, projectId, issueId, relationId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Relation supprimée", null));
+        return ResponseEntity.ok(ApiResponse.success("Relation deleted", null));
     }
 
     // =========================================================================
@@ -610,7 +610,7 @@ public class IssueController {
         String email = identityResolver.resolveEmail(jwt);
 
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

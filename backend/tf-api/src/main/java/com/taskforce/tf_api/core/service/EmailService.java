@@ -35,12 +35,6 @@ public class EmailService {
     @Value("${app.url:http://localhost:3000}")
     private String appUrl;
 
-    @Value("${app.support-url:http://localhost:3000/support}")
-    private String supportUrl;
-
-    @Value("${app.contact-url:http://localhost:3000/contact}")
-    private String contactUrl;
-
     /**
      * Envoie un code OTP par email
      */
@@ -54,14 +48,14 @@ public class EmailService {
             
             sendHtmlEmail(
                 toEmail, 
-                String.format("[%s] Votre code de vérification", fromName),
+                String.format("[%s] Your verification code", fromName),
                 htmlContent
             );
             
             log.info("OTP email envoyé avec succès à : {}", toEmail);
         } catch (Exception e) {
             log.error("Erreur lors de l'envoi de l'email OTP à {}: {}", toEmail, e.getMessage());
-            throw new RuntimeException("Erreur lors de l'envoi de l'email", e);
+            throw new RuntimeException("Error sending the email", e);
         }
     }
 
@@ -73,14 +67,12 @@ public class EmailService {
             Context context = new Context();
             context.setVariable("firstName", firstName);
             context.setVariable("appUrl", appUrl);
-            context.setVariable("supportUrl", supportUrl);
-            context.setVariable("contactUrl", contactUrl);
             
             String htmlContent = templateEngine.process("email/welcome-email", context);
             
             sendHtmlEmail(
                 toEmail,
-                String.format("Bienvenue sur %s !", fromName),
+                String.format("Welcome to %s!", fromName),
                 htmlContent
             );
             
@@ -103,43 +95,14 @@ public class EmailService {
             
             sendHtmlEmail(
                 toEmail,
-                String.format("[%s] Réinitialisation de votre mot de passe", fromName),
+                String.format("[%s] Reset your password", fromName),
                 htmlContent
             );
             
             log.info("Email de réinitialisation envoyé à : {}", toEmail);
         } catch (Exception e) {
             log.error("Erreur lors de l'envoi de l'email de réinitialisation à {}: {}", toEmail, e.getMessage());
-            throw new RuntimeException("Erreur lors de l'envoi de l'email", e);
-        }
-    }
-
-    /**
-     * Envoie une confirmation de demande RGPD (accès aux données ou suppression de compte)
-     */
-    public void sendDataRequestEmail(String toEmail, String firstName, String requestType) {
-        try {
-            boolean isDeletion = "DELETION".equalsIgnoreCase(requestType);
-            String subject = isDeletion
-                ? String.format("[%s] Confirmation de suppression de compte", fromName)
-                : String.format("[%s] Confirmation de demande d'accès aux données", fromName);
-
-            String actionLine = isDeletion
-                ? "Votre compte a été désactivé et vos données seront supprimées dans 30 jours conformément au RGPD."
-                : "Nous avons bien reçu votre demande. Vous recevrez une copie de vos données dans un délai de 30 jours.";
-            String requestTypeLabel = isDeletion ? "Suppression de compte" : "Accès aux données";
-
-            Context context = new Context();
-            context.setVariable("firstName", firstName);
-            context.setVariable("actionLine", actionLine);
-            context.setVariable("requestTypeLabel", requestTypeLabel);
-
-            String htmlContent = templateEngine.process("email/data-request-email", context);
-
-            sendHtmlEmail(toEmail, subject, htmlContent);
-            log.info("Email de demande RGPD ({}) envoyé à : {}", requestType, toEmail);
-        } catch (Exception e) {
-            log.error("Erreur lors de l'envoi de l'email RGPD à {}: {}", toEmail, e.getMessage());
+            throw new RuntimeException("Error sending the email", e);
         }
     }
 
@@ -159,7 +122,7 @@ public class EmailService {
 
             sendHtmlEmail(
                 toEmail,
-                String.format("[%s] Vous êtes invité à rejoindre %s", fromName, workspaceName),
+                String.format("[%s] You're invited to join %s", fromName, workspaceName),
                 htmlContent
             );
             log.info("Email d'invitation workspace envoyé à : {}", toEmail);
@@ -200,19 +163,6 @@ public class EmailService {
             log.info("Notification email envoyé à : {}", toEmail);
         } catch (Exception e) {
             log.error("Échec de l'envoi de la notification email à {} : {}", toEmail, e.getMessage());
-        }
-    }
-
-    /**
-     * Envoi générique d'une notification interne (ex : retours produit). Best-effort :
-     * en cas d'échec on logue sans propager (ne casse jamais l'action métier appelante).
-     */
-    public void sendInternalNotification(String toEmail, String subject, String htmlContent) {
-        try {
-            sendHtmlEmail(toEmail, subject, htmlContent);
-            log.info("Notification interne envoyée à : {}", toEmail);
-        } catch (Exception e) {
-            log.error("Échec de l'envoi de la notification interne à {} : {}", toEmail, e.getMessage());
         }
     }
 

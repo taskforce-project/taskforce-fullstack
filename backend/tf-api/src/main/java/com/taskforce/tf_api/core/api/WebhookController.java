@@ -48,7 +48,7 @@ public class WebhookController {
         User user = resolveUser(jwt);
         WebhookResponse webhook = webhookService.create(slug, req, user);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Webhook créé", webhook));
+            .body(ApiResponse.success("Webhook created", webhook));
     }
 
     @PutMapping("/{webhookId}")
@@ -59,7 +59,7 @@ public class WebhookController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         Long userId = resolveUser(jwt).getId();
-        return ResponseEntity.ok(ApiResponse.success("Webhook mis à jour", webhookService.update(slug, webhookId, req, userId)));
+        return ResponseEntity.ok(ApiResponse.success("Webhook updated", webhookService.update(slug, webhookId, req, userId)));
     }
 
     @DeleteMapping("/{webhookId}")
@@ -69,12 +69,12 @@ public class WebhookController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         webhookService.delete(slug, webhookId, resolveUser(jwt).getId());
-        return ResponseEntity.ok(ApiResponse.success("Webhook supprimé", null));
+        return ResponseEntity.ok(ApiResponse.success("Webhook deleted", null));
     }
 
     private User resolveUser(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         return userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 }

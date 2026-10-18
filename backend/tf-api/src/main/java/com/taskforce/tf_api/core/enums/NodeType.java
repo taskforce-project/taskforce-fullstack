@@ -14,6 +14,5 @@ public enum NodeType {
     SPEC,         // Spécification
     NOTE,         // Note libre
     README,       // Sommaire d'un domaine
-    TEMPLATE,     // Gabarit réutilisable
     ACTION_OODA   // Boucle Observe-Orient-Decide-Act
 }

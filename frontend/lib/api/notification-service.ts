@@ -45,12 +45,6 @@ export async function listNotifications(slug: string): Promise<NotificationRespo
   return response.data.data;
 }
 
-/** Nombre de notifications non lues */
-export async function countUnread(slug: string): Promise<number> {
-  const response = await apiClient.get<{ data: number }>(NOTIFICATION_ROUTES.UNREAD_COUNT(slug), { silentError: true });
-  return response.data.data;
-}
-
 /** Marque une notification comme lue */
 export async function markAsRead(slug: string, id: number): Promise<NotificationResponse> {
   const response = await apiClient.patch<{ data: NotificationResponse }>(NOTIFICATION_ROUTES.MARK_READ(slug, id));

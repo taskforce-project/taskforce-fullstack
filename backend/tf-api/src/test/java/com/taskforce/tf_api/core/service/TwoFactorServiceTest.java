@@ -150,7 +150,7 @@ class TwoFactorServiceTest {
         // 7ᵉ : bloquée AVANT vérification (message différent)
         assertThatThrownBy(() -> service.verifyOrThrow(UID, "000000"))
             .isInstanceOf(BusinessException.class)
-            .hasMessageContaining("Patientez");
+            .hasMessageContaining("Wait a minute");
     }
 
     @Test

@@ -9,7 +9,7 @@ import lombok.Data;
 @Data
 public class UpdateChecklistItemRequest {
 
-    @Size(max = 500, message = "500 caractères maximum")
+    @Size(max = 500, message = "500 characters at most")
     private String content;
 
     private Boolean done;

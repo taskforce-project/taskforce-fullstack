@@ -6,9 +6,9 @@ import { AuthStepper, REGISTER_STEPS } from "./auth-stepper";
 // (importActual évite le hoisting de vi.mock) pour que « Compte »/« Vérification » et l'aria restent
 // en français dans ce test.
 vi.mock("@/lib/store/preferences-store", async () => {
-  const { CONSTANTS_FR } = await vi.importActual<typeof import("@/lib/constants_fr")>("@/lib/constants_fr");
+  const { CONSTANTS_EN } = await vi.importActual<typeof import("@/lib/constants_en")>("@/lib/constants_en");
   return {
-    usePreferencesStore: () => ({ t: CONSTANTS_FR }),
+    usePreferencesStore: () => ({ t: CONSTANTS_EN }),
   };
 });
 
@@ -19,8 +19,8 @@ vi.mock("@/lib/store/preferences-store", async () => {
 describe("AuthStepper", () => {
   it("affiche le libellé d'un mot de chacune des deux étapes", () => {
     render(<AuthStepper current={1} />);
-    expect(screen.getByText("Compte")).toBeInTheDocument();
-    expect(screen.getByText("Vérification")).toBeInTheDocument();
+    expect(screen.getByText("Account")).toBeInTheDocument();
+    expect(screen.getByText("Verification")).toBeInTheDocument();
   });
 
   it("expose la progression aux technologies d'assistance", () => {
@@ -30,7 +30,7 @@ describe("AuthStepper", () => {
     expect(bar).toHaveAttribute("aria-valuenow", "2");
     expect(bar).toHaveAttribute("aria-valuemin", "1");
     expect(bar).toHaveAttribute("aria-valuemax", "2");
-    expect(bar).toHaveAttribute("aria-valuetext", "Étape 2 sur 2 : Vérification");
+    expect(bar).toHaveAttribute("aria-valuetext", "Step 2 of 2: Verification");
   });
 
   it("marque l'étape franchie, l'étape courante et celles à venir", () => {

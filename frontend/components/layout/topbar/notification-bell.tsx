@@ -80,7 +80,7 @@ export function NotificationBell() {
               }}
               className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
             >
-              <CheckCheck className="size-3" /> Tout marquer lu
+              <CheckCheck className="size-3" /> Mark all as read
             </button>
           )}
         </div>
@@ -119,7 +119,7 @@ export function NotificationBell() {
 
         <div className="border-t border-border p-1.5">
           <Button asChild variant="ghost" size="sm" className="w-full justify-center text-xs" onClick={() => setOpen(false)}>
-            <Link href={slug ? `/${slug}/inbox` : "/inbox"}>Voir toutes les notifications</Link>
+            <Link href={slug ? `/${slug}/inbox` : "/inbox"}>View all notifications</Link>
           </Button>
         </div>
       </PopoverContent>

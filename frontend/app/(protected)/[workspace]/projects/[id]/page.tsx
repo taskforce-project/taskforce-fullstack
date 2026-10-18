@@ -757,9 +757,9 @@ export default function ProjectBoardPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Export complet du projet</DropdownMenuLabel>
-              <DropdownMenuItem onSelect={() => void exportProject("csv")}>CSV (issues + détails)</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void exportProject("json")}>JSON (complet)</DropdownMenuItem>
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Full project export</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => void exportProject("csv")}>CSV (issues and details)</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void exportProject("json")}>JSON (full)</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <BulkAssignDialog slug={workspace} projectId={projectId} issues={issues} />

@@ -191,7 +191,7 @@ class LocalRunnerServiceTest {
             Arguments.of("run délégué par quelqu'un d'autre", DeliveryRunStatus.RUNNING, "tf-runner-pierre", someoneElse, recent, "claude-code"),
             Arguments.of("délégant supprimé", DeliveryRunStatus.RUNNING, "tf-runner-pierre", null, recent, "claude-code"),
             Arguments.of("délégant désactivé", DeliveryRunStatus.RUNNING, "tf-runner-pierre", inactiveOwner, recent, "claude-code"),
-            Arguments.of("run d'un autre provider", DeliveryRunStatus.RUNNING, "tf-runner-pierre", "owner", recent, "cursor"),
+            Arguments.of("run d'un autre provider", DeliveryRunStatus.RUNNING, "tf-runner-pierre", "owner", recent, "other-agent"),
             Arguments.of("session expirée (TTL dépassé)", DeliveryRunStatus.RUNNING, "tf-runner-pierre", "owner",
                 LocalDateTime.now().minusMinutes(121), "claude-code"),
             Arguments.of("claim sans horodatage", DeliveryRunStatus.RUNNING, "tf-runner-pierre", "owner", null, "claude-code")
@@ -209,7 +209,7 @@ class LocalRunnerServiceTest {
 
         assertThatThrownBy(() -> service.openSession(100L, RUNNER))
             .isInstanceOf(ForbiddenException.class)
-            .hasMessage("Session de délégation invalide"); // même message quelle que soit la cause
+            .hasMessage("Invalid delegation session"); // même message quelle que soit la cause
     }
 
     @Test
@@ -219,7 +219,7 @@ class LocalRunnerServiceTest {
 
         assertThatThrownBy(() -> service.openSession(404L, RUNNER))
             .isInstanceOf(ForbiddenException.class)
-            .hasMessage("Session de délégation invalide");
+            .hasMessage("Invalid delegation session");
     }
 
     // ── heartbeat / résultat ─────────────────────────────────────────────────

@@ -15,7 +15,7 @@ import lombok.Data;
 @Data
 public class SmartAssignPreviewRequest {
 
-    @NotBlank(message = "Le titre est requis pour une suggestion")
+    @NotBlank(message = "A title is needed for a suggestion")
     @Size(max = 500)
     private String title;
 

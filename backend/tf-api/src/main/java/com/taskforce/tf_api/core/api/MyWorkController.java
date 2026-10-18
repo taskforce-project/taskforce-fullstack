@@ -55,7 +55,7 @@ public class MyWorkController {
     ) {
         Long userId = resolveUserId(jwt);
         List<IssueResponse> issues = issueService.listMyIssues(slug, userId);
-        return ResponseEntity.ok(ApiResponse.success("Mes issues récupérées", issues));
+        return ResponseEntity.ok(ApiResponse.success("My issues retrieved", issues));
     }
 
     /**
@@ -69,7 +69,7 @@ public class MyWorkController {
     ) {
         Long userId = resolveUserId(jwt);
         List<MyWorkCycleResponse> cycles = cycleService.listWorkspaceCycles(slug, userId);
-        return ResponseEntity.ok(ApiResponse.success("Mes cycles récupérés", cycles));
+        return ResponseEntity.ok(ApiResponse.success("My cycles retrieved", cycles));
     }
 
     /**
@@ -83,13 +83,13 @@ public class MyWorkController {
     ) {
         Long userId = resolveUserId(jwt);
         List<MyWorkPageResponse> pages = pageService.listWorkspacePages(slug, userId);
-        return ResponseEntity.ok(ApiResponse.success("Mes pages récupérées", pages));
+        return ResponseEntity.ok(ApiResponse.success("My pages retrieved", pages));
     }
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

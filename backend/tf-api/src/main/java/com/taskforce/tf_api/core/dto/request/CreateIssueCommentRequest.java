@@ -7,6 +7,6 @@ import lombok.Data;
 @Data
 public class CreateIssueCommentRequest {
 
-    @NotBlank(message = "Le contenu est obligatoire")
+    @NotBlank(message = "The content is required")
     private String content;
 }

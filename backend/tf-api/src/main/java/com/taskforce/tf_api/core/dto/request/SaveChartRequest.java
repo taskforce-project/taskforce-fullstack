@@ -13,8 +13,8 @@ import lombok.Data;
 @Data
 public class SaveChartRequest {
 
-    @NotBlank(message = "Le titre est obligatoire")
-    @Size(max = 200, message = "Le titre ne peut pas dépasser 200 caractères")
+    @NotBlank(message = "The title is required")
+    @Size(max = 200, message = "The title can't exceed 200 characters")
     private String title;
 
     private Map<String, Object> spec;

@@ -12,6 +12,6 @@ import lombok.Data;
 @Data
 public class BulkSmartAssignRequest {
 
-    @NotEmpty(message = "Au moins une issue est requise")
+    @NotEmpty(message = "At least one issue is required")
     private List<Long> issueIds;
 }

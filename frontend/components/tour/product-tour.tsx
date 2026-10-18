@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { X, ArrowRight, ArrowLeft, Sparkles, Layers, Activity, Compass, Zap, FlaskConical, Lock } from "lucide-react";
+import { X, ArrowRight, ArrowLeft, Sparkles, Layers, Activity, Compass } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { useTourStore } from "@/lib/store/tour-store";
  * l'app). Piloté au clavier, rendu en portal.</p>
  *
  * <p>Monté une fois dans {@code AppShell} ; rend {@code null} tant que le store n'est pas actif. Déclenché
- * 1× (cf. {@code hasSeen} persisté) au 1ᵉʳ dashboard, rejouable depuis l'aide.</p>
+ * 1× (cf. {@code hasSeen} persisté) au 1ᵉʳ dashboard, rejouable depuis Ctrl+K.</p>
  */
 
 interface TourPoint {
@@ -76,22 +76,6 @@ const STEPS: readonly TourStep[] = [
     title: "Your live analytics",
     body: "Operation health, throughput, risks: your team's pulse, on real data and in real time.",
     target: '[data-tour="analytics"]',
-  },
-  {
-    hero: true,
-    bg: "/assets/tour/labs-wave.jpg",
-    title: "Visual cues",
-    body: "Three cues to orient you at a glance in the app.",
-    points: [
-      {
-        icon: FlaskConical,
-        iconClassName: "text-violet-500",
-        title: "Labs",
-        text: "A purple flask = advanced feature, still being polished (Intelligence, Brain OS).",
-      },
-      { icon: Zap, title: "Key action", text: "Blue marks the primary action on every screen." },
-      { icon: Lock, title: "Coming soon", text: "A padlock marks an upcoming entry." },
-    ],
   },
 ];
 

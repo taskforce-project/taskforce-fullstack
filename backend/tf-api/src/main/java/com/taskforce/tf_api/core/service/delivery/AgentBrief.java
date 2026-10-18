@@ -5,7 +5,7 @@ package com.taskforce.tf_api.core.service.delivery;
  * Contexte minimal ; le contexte riche (Brain OS, outils) sera enrichi ensuite (cf. spec §3.5).
  *
  * @param issueId       issue déléguée
- * @param workspaceId   workspace de l'issue (pour retrouver ses secrets connectés, ex. clé Anthropic), ou null
+ * @param workspaceId   workspace de l'issue (pour retrouver ses secrets connectés), ou null
  * @param title         titre de la tâche
  * @param description   description / spec (peut être null)
  * @param repoFullName  dépôt de code où travailler ("owner/name"), ou null

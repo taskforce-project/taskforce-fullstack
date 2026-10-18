@@ -14,8 +14,8 @@ import lombok.Data;
 @Data
 public class CreateInvitationRequest {
 
-    @NotBlank(message = "L'email est obligatoire")
-    @Email(message = "Email invalide")
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email")
     private String email;
 
     /** Rôle cible dans le workspace (défaut MEMBER). */

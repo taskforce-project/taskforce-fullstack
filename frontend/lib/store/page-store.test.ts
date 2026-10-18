@@ -55,7 +55,7 @@ describe('page-store', () => {
     });
 
     expect(usePageStore.getState().loading).toBe(false);
-    expect(usePageStore.getState().error).toBe('Impossible de charger les pages');
+    expect(usePageStore.getState().error).toBe("Couldn't load the pages");
   });
 
   it('fetchPage loads the current page', async () => {
@@ -77,7 +77,7 @@ describe('page-store', () => {
       await usePageStore.getState().fetchPage('ws', 'proj1', '1');
     });
 
-    expect(usePageStore.getState().error).toBe('Impossible de charger la page');
+    expect(usePageStore.getState().error).toBe("Couldn't load the page");
     expect(usePageStore.getState().loading).toBe(false);
   });
 

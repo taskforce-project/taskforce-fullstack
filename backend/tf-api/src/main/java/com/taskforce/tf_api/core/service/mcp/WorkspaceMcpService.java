@@ -110,14 +110,14 @@ public class WorkspaceMcpService {
      */
     public String execute(Long workspaceId, String toolRef, Map<String, Object> args, boolean canWrite) {
         int sep = toolRef == null ? -1 : toolRef.indexOf(NS);
-        if (sep <= 0) throw new BusinessException("Référence d'outil invalide : " + toolRef);
+        if (sep <= 0) throw new BusinessException("Invalid tool reference: " + toolRef);
         String connectorKey = toolRef.substring(0, sep);
         String toolName = toolRef.substring(sep + NS.length());
 
         ConnectorConnection conn = repository.findByWorkspaceIdAndConnectorKey(workspaceId, connectorKey)
-            .orElseThrow(() -> new ResourceNotFoundException("Connecteur MCP non connecté : " + connectorKey));
+            .orElseThrow(() -> new ResourceNotFoundException("MCP connector not connected: " + connectorKey));
         McpClient.ServerRef ref = toServerRef(conn);
-        if (ref == null) throw new BusinessException("Le connecteur " + connectorKey + " n'est pas un serveur MCP (mcpUrl manquant)");
+        if (ref == null) throw new BusinessException("The connector " + connectorKey + " is not an MCP server (mcpUrl missing)");
 
         Set<String> allow = allowList(conn);
         if (!allow.isEmpty() && !allow.contains(toolName)) {
@@ -147,7 +147,7 @@ public class WorkspaceMcpService {
      */
     @Transactional
     public void connectServer(Workspace ws, String connectorKey, String mcpUrl, String mcpToken, String mcpAllow) {
-        if (mcpUrl == null || mcpUrl.isBlank()) throw new BusinessException("Champ requis : mcpUrl");
+        if (mcpUrl == null || mcpUrl.isBlank()) throw new BusinessException("Required field: mcpUrl");
         // Refus immédiat d'une URL vers le réseau interne (OSS-1.2) ; le client revérifie avant chaque appel.
         client.assertAllowed(mcpUrl.trim());
         Map<String, String> config = new LinkedHashMap<>();
@@ -166,7 +166,7 @@ public class WorkspaceMcpService {
     @Transactional
     public void disconnectServer(Long workspaceId, String connectorKey) {
         if (!repository.existsByWorkspaceIdAndConnectorKey(workspaceId, connectorKey)) {
-            throw new ResourceNotFoundException("Serveur MCP non connecté : " + connectorKey);
+            throw new ResourceNotFoundException("MCP server not connected: " + connectorKey);
         }
         repository.deleteByWorkspaceIdAndConnectorKey(workspaceId, connectorKey);
         invalidate(workspaceId);
@@ -246,9 +246,9 @@ public class WorkspaceMcpService {
      */
     public List<McpToolInfo> serverTools(Long workspaceId, String connectorKey) {
         ConnectorConnection conn = repository.findByWorkspaceIdAndConnectorKey(workspaceId, connectorKey)
-            .orElseThrow(() -> new ResourceNotFoundException("Connecteur MCP non connecté : " + connectorKey));
+            .orElseThrow(() -> new ResourceNotFoundException("MCP connector not connected: " + connectorKey));
         McpClient.ServerRef ref = toServerRef(conn);
-        if (ref == null) throw new BusinessException("Le connecteur " + connectorKey + " n'est pas un serveur MCP (mcpUrl manquant)");
+        if (ref == null) throw new BusinessException("The connector " + connectorKey + " is not an MCP server (mcpUrl missing)");
         Set<String> allow = allowList(conn);
         McpClient.Session session = client.initialize(ref);
         try {

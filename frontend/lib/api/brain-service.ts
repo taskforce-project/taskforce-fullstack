@@ -40,7 +40,6 @@ export interface KnowledgeEdge {
 export interface BrainOverview {
   brainId: number | null
   workspaceId: number
-  templateType: string | null
   versionLabel: string
   totalNodes: number
   nodesByDomain: Record<string, number>
@@ -82,20 +81,6 @@ export interface UpdateNodeInput {
 /** Vue d'ensemble du brain (nodes + edges + comptage par domaine). */
 export async function getBrainOverview(slug: string): Promise<BrainOverview> {
   const res = await apiClient.get<{ data: BrainOverview }>(BRAIN_ROUTES.OVERVIEW(slug))
-  return res.data.data
-}
-
-/** Liste les nodes, optionnellement filtrés par domaine. */
-export async function listNodes(slug: string, domain?: string): Promise<KnowledgeNode[]> {
-  const res = await apiClient.get<{ data: KnowledgeNode[] }>(BRAIN_ROUTES.NODES(slug), {
-    params: domain ? { domain } : undefined,
-  })
-  return res.data.data
-}
-
-/** Récupère un node par son id. */
-export async function getNode(slug: string, nodeId: number): Promise<KnowledgeNode> {
-  const res = await apiClient.get<{ data: KnowledgeNode }>(BRAIN_ROUTES.NODE(slug, nodeId))
   return res.data.data
 }
 
@@ -151,28 +136,6 @@ export async function uploadBrainFile(slug: string, file: File): Promise<BrainFi
   const base = process.env.NEXT_PUBLIC_API_URL ?? ""
   // Le backend renvoie un chemin relatif (/api/files/brain/…) → on préfixe l'host public.
   return { ...data, url: data.url.startsWith("http") ? data.url : `${base}${data.url}` }
-}
-
-/** Crée une relation (arête) orientée entre deux nodes. */
-export async function createEdge(
-  slug: string,
-  fromNodeId: number,
-  toNodeId: number,
-  relationType: string,
-  weight?: number,
-): Promise<KnowledgeEdge> {
-  const res = await apiClient.post<{ data: KnowledgeEdge }>(BRAIN_ROUTES.EDGES(slug), {
-    fromNodeId,
-    toNodeId,
-    relationType,
-    weight,
-  })
-  return res.data.data
-}
-
-/** Supprime une relation. */
-export async function deleteEdge(slug: string, edgeId: number): Promise<void> {
-  await apiClient.delete(BRAIN_ROUTES.EDGE(slug, edgeId))
 }
 
 /** Recherche sémantique (pgvector). Renvoie les nodes classés par similarité. */

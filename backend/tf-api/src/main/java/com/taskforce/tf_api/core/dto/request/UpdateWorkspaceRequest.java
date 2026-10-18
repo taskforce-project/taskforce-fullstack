@@ -15,15 +15,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UpdateWorkspaceRequest {
 
-    @Size(min = 1, max = 100, message = "Le nom doit faire entre 1 et 100 caractères")
+    @Size(min = 1, max = 100, message = "The name must be 1 to 100 characters long")
     private String name;
 
-    @Size(max = 500, message = "La description ne peut pas dépasser 500 caractères")
+    @Size(max = 500, message = "The description can't exceed 500 characters")
     private String description;
 
-    @Size(max = 500, message = "L'activité ne peut pas dépasser 500 caractères")
+    @Size(max = 500, message = "The activity can't exceed 500 characters")
     private String activity;
 
-    @Size(max = 1000, message = "L'URL du logo ne peut pas dépasser 1000 caractères")
+    @Size(max = 1000, message = "The logo URL can't exceed 1000 characters")
     private String logoUrl;
 }

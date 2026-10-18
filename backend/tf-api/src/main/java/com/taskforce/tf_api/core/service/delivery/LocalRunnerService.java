@@ -39,7 +39,7 @@ public class LocalRunnerService {
 
     /** Nombre de candidats examinés par claim (les runs dont le délégant a perdu ses droits sont écartés). */
     private static final int CLAIM_BATCH = 5;
-    private static final String REFUSED = "Session de délégation invalide";
+    private static final String REFUSED = "Invalid delegation session";
 
     private final DeliveryRunRepository runRepository;
     private final UserRepository userRepository;
@@ -135,7 +135,7 @@ public class LocalRunnerService {
 
         boolean done = "DONE".equals(result.status());
         if (done && (result.summary() == null || result.summary().isBlank())) {
-            throw new BusinessException("Un résultat DONE doit porter un résumé");
+            throw new BusinessException("A DONE result must include a summary");
         }
         DeliveryPoll poll = done
             ? new DeliveryPoll(DeliveryRunStatus.DONE, result.summary().trim(), result.resultUrl(), null)

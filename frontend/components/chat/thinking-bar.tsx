@@ -7,10 +7,10 @@ import { TextShimmerWave } from "@/components/ui/text-shimmer-wave"
 
 /** Phases de réflexion de Cortex, défilées pendant la génération (donne un déroulé « vivant »). */
 const PHASES = [
-  "Compréhension de la demande…",
-  "Recherche dans le Brain OS…",
-  "Raisonnement…",
-  "Rédaction de la réponse…",
+  "Understanding the request…",
+  "Searching Brain OS…",
+  "Reasoning…",
+  "Writing the answer…",
 ]
 
 /**
@@ -44,7 +44,7 @@ export function ThinkingBar({
       <Loader variant="spin" size="sm" className="text-primary" />
       {/* Pas de `key` : la vague CONTINUE quand la phase change (sinon reset visible). `repeatDelay`
           court → animation quasi-continue (le défaut fait une longue pause selon la longueur). */}
-      <TextShimmerWave as="span" transition={{ repeatDelay: 0.2 }}>{text}</TextShimmerWave>
+      <TextShimmerWave transition={{ repeatDelay: 0.2 }}>{text}</TextShimmerWave>
     </span>
   )
 }

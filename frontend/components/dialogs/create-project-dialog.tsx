@@ -271,7 +271,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
       const url = await startMcpOAuth(slug, tool.key, tool.mcpSuggestedUrl, `/${slug}?import=${tool.key}`)
       window.location.href = url // redirection vers le consentement du service (la page quitte)
     } catch {
-      toast.error("Couldn't start the connection - it may require a Business plan")
+      toast.error("Couldn't start the connection. Please try again.")
       setConnectingKey(null)
     }
   }

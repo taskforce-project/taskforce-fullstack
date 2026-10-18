@@ -3,18 +3,11 @@
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import {
-  Brain, Plus, Trash2, Save, X, FileText, Search, Sparkles, Network, Link2,
+  Brain, Plus, Trash2, Save, X, FileText, Search, Sparkles, Link2,
   ChevronRight, Tag as TagIcon, PanelLeftClose, PanelLeftOpen, Eye, EyeOff,
 } from "lucide-react"
 
 import { useBrainStore } from "@/lib/store/brain-store"
-import { useProjectStore } from "@/lib/store/project-store"
-import dynamic from "next/dynamic"
-
-const BrainGraph = dynamic(
-  () => import("@/components/brain/brain-graph").then((m) => m.BrainGraph),
-  { ssr: false, loading: () => <div className="h-full w-full bg-muted/20" /> },
-)
 import { MarkdownEditor } from "@/components/brain/markdown-editor"
 import { PageTree } from "@/components/brain/page-tree"
 import { Markdown } from "@/components/ui/lightweight-markdown"
@@ -38,7 +31,7 @@ import {
 // Listes d'enums miroir du backend (NodeType / NodeDomain).
 const NODE_TYPES = [
   "ADR", "DECISION", "RUNBOOK", "SOP", "FINDING", "CHANGELOG",
-  "DOC", "SPEC", "NOTE", "README", "TEMPLATE", "ACTION_OODA",
+  "DOC", "SPEC", "NOTE", "README", "ACTION_OODA",
 ] as const
 
 const DOMAINS: { value: string; code: string; label: string }[] = [
@@ -73,12 +66,9 @@ export default function BrainPage() {
     overview, loading, error, selectedNodeId, fetchOverview, selectNode, removeNode, moveNode,
     searchResults, searching, search, clearSearch,
   } = useBrainStore()
-  const projects = useProjectStore((s) => s.projects)
-  const fetchProjects = useProjectStore((s) => s.fetchProjects)
 
   const [createOpen, setCreateOpen] = useState(false)
   const [queryText, setQueryText] = useState("")
-  const [view, setView] = useState<"editor" | "graph">("editor")
   const [activeTag, setActiveTag] = useState<string | null>(null)
   // Preselection du dialog de creation : domaine + page parente (arbre facon Notion).
   const [createPreset, setCreatePreset] = useState<{ domain?: string; parentId?: number | null }>({})
@@ -102,16 +92,11 @@ export default function BrainPage() {
     const raw = searchParams.get("node")
     if (!raw) return
     const id = Number(raw)
-    if (Number.isFinite(id)) { selectNode(id); setView("editor") }
+    if (Number.isFinite(id)) selectNode(id)
     const url = new URL(window.location.href)
     url.searchParams.delete("node")
     router.replace(url.pathname + url.search, { scroll: false })
   }, [searchParams, selectNode, router])
-
-  // Les projets nomment et colorent les régions du graphe (metadata.projects → région).
-  useEffect(() => {
-    if (slug) void fetchProjects(slug)
-  }, [slug, fetchProjects])
 
   // Nodes visibles : le noyau (system : règles/AGENTS) est masqué sauf si l'utilisateur l'affiche.
   const visibleNodes = useMemo(() => {
@@ -163,30 +148,11 @@ export default function BrainPage() {
             <h1 className="text-lg font-semibold leading-none">Brain OS</h1>
             <p className="mt-1 text-xs text-muted-foreground">
               {overview?.totalNodes ?? 0} nodes
-              {overview?.templateType ? ` · template ${overview.templateType}` : ""}
               {overview?.versionLabel ? ` · ${overview.versionLabel}` : ""}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-md border p-0.5">
-            <button
-              onClick={() => setView("editor")}
-              className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${
-                view === "editor" ? "bg-accent font-medium" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <FileText className="size-3.5" /> Editor
-            </button>
-            <button
-              onClick={() => setView("graph")}
-              className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${
-                view === "graph" ? "bg-accent font-medium" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Network className="size-3.5" /> Graph
-            </button>
-          </div>
           <Button size="sm" onClick={() => { setCreatePreset({}); setCreateOpen(true) }}>
             <Plus className="size-4" /> New page
           </Button>
@@ -236,7 +202,7 @@ export default function BrainPage() {
                     {searching ? "Searching…" : `${searchResults.length} result(s)`}
                   </div>
                   {searchResults.map((hit) => (
-                    <button key={hit.node.id} onClick={() => { selectNode(hit.node.id); setView("editor") }}
+                    <button key={hit.node.id} onClick={() => selectNode(hit.node.id)}
                       className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent ${
                         selectedNodeId === hit.node.id ? "bg-accent font-medium" : ""
                       }`}>
@@ -269,7 +235,7 @@ export default function BrainPage() {
                     domains={DOMAINS}
                     selectedNodeId={selectedNodeId}
                     activeTag={activeTag}
-                    onSelect={(id) => { selectNode(id); setView("editor") }}
+                    onSelect={(id) => selectNode(id)}
                     onNewPage={handleNewPage}
                     onMove={handleMovePage}
                   />
@@ -312,19 +278,9 @@ export default function BrainPage() {
           </div>
         </aside>
 
-        {/* ── Éditeur central (ou graphe plein) ── */}
+        {/* ── Éditeur central ── */}
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {view === "graph" ? (
-            <BrainGraph
-              nodes={visibleNodes}
-              edges={overview?.edges ?? []}
-              projects={projects}
-              selectedNodeId={selectedNodeId}
-              onSelect={(id) => { selectNode(id); setView("editor") }}
-              activeTag={activeTag}
-              onSelectTag={(t) => setActiveTag((cur) => (cur === t ? null : t))}
-            />
-          ) : selected ? (
+          {selected ? (
             <NodeDetail
               key={selected.id}
               slug={slug}
@@ -396,56 +352,6 @@ export default function BrainPage() {
 }
 
 // ─── Détail / édition d'un node ───────────────────────────────────────────────
-
-// ─── Niveau "planète" : la note ouverte, ses tags en lunes (orbite). ──────────
-const MOON_PALETTE = ["#e0a93b", "#2bb3a3", "#d8588a", "#3fae57", "#3f86e8", "#e05858", "#8d72e0", "#d27c34"]
-function moonColor(key: string): string {
-  let h = 0
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0
-  return MOON_PALETTE[h % MOON_PALETTE.length]
-}
-
-function PlanetHeader({ node }: { node: KnowledgeNode }) {
-  const tags = node.tags ?? []
-  const cx = 200, cy = 105, orbit = 74
-  const planetColor = node.refType === "PROJECT" && node.refId != null ? moonColor(`p${node.refId}`) : "#6366f1"
-  return (
-    <div className="mb-5 flex justify-center">
-      <svg viewBox="0 0 400 210" className="h-48 w-full max-w-md text-foreground">
-        <defs>
-          <radialGradient id="planet-glow">
-            <stop offset="0%" stopColor={planetColor} stopOpacity="0.5" />
-            <stop offset="100%" stopColor={planetColor} stopOpacity="0" />
-          </radialGradient>
-        </defs>
-        {tags.length > 0 && (
-          <circle cx={cx} cy={cy} r={orbit} fill="none" stroke="currentColor" strokeOpacity="0.22"
-            strokeWidth="1" strokeDasharray="2 6"
-            className="animate-[spin_30s_linear_infinite]" style={{ transformBox: "fill-box", transformOrigin: "center" }} />
-        )}
-        <circle cx={cx} cy={cy} r={48} fill="url(#planet-glow)" className="animate-pulse" />
-        <circle cx={cx} cy={cy} r={27} fill={planetColor} />
-        <circle cx={cx - 9} cy={cy - 9} r={10} fill="#ffffff" opacity="0.18" />
-        <text x={cx} y={cy + 4} textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="700">{node.type}</text>
-        {tags.map((t, i) => {
-          const a = -Math.PI / 2 + (i / tags.length) * Math.PI * 2
-          const mx = cx + Math.cos(a) * orbit, my = cy + Math.sin(a) * orbit
-          return (
-            <g key={t}>
-              <circle cx={mx} cy={my} r={6} fill={moonColor(t)} stroke="currentColor" strokeOpacity="0.15" strokeWidth="1" />
-              <text x={mx} y={my - 11} textAnchor="middle" fontSize="9" fill="currentColor" fillOpacity="0.75">#{t}</text>
-            </g>
-          )
-        })}
-        {tags.length === 0 && (
-          <text x={cx} y={cy + 56} textAnchor="middle" fontSize="9" fill="currentColor" fillOpacity="0.5">
-            no moons - add #tags to link this planet
-          </text>
-        )}
-      </svg>
-    </div>
-  )
-}
 
 function NodeDetail({
   slug,
@@ -586,7 +492,6 @@ function NodeDetail({
                   <span className="truncate font-medium text-foreground/70">{node.title}</span>
                 </nav>
               )}
-              <PlanetHeader node={node} />
               {/* Titre editable inline (Notion) : clic -> on tape -> Entree/blur sauve, Echap annule. */}
               <input
                 value={title}
@@ -625,7 +530,7 @@ function NodeDetail({
   )
 }
 
-// ─── Relations d'un node (graphe) ─────────────────────────────────────────────
+// ─── Relations d'un node (liens formés par les #tags et les [[wikilinks]]) ─────
 
 function RelationsPanel({ node }: { node: KnowledgeNode }) {
   const overview = useBrainStore((s) => s.overview)

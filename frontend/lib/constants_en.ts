@@ -33,7 +33,6 @@ export const CONSTANTS_EN = {
     export: "Export",
     required: "Required",
     optional: "Optional",
-    comingSoon: "Coming soon",
     learnMore: "Learn more",
   },
 
@@ -59,7 +58,6 @@ export const CONSTANTS_EN = {
     // Authentication - Register
     register: {
       title: "Create your account",
-      subtitle: "Start your free trial today",
       alreadyHaveAccount: "Already have an account?",
       signInLink: "Sign in",
       
@@ -121,19 +119,6 @@ export const CONSTANTS_EN = {
           manufacturing: "Manufacturing",
           other: "Other",
         },
-      },
-
-      // Step 3: Confirmation
-      step3: {
-        title: "You're all set!",
-        subtitle: "Review your information and start your free trial",
-        reviewTitle: "Review your details",
-        personalInfo: "Personal information",
-        organizationInfo: "Organization",
-        freeTrialTitle: "Free trial included",
-        freeTrialDescription: "Start with a 14-day free trial. No credit card required.",
-        createAccountButton: "Create account",
-        startTrialButton: "Start free trial",
       },
 
       // Progress Indicator
@@ -335,7 +320,6 @@ export const CONSTANTS_EN = {
     settings: "Settings",
     help: "Help",
     createProject: "New Project",
-    comingSoon: "Soon",
     sub: {
       myAll: "All my queues",
       myIssues: "Issues",
@@ -529,33 +513,6 @@ export const CONSTANTS_EN = {
     saved: "Saved!",
   },
 
-  help: {
-    title: "Help & Docs",
-    subtitle: "Find answers, guides, and resources.",
-    searchPlaceholder: "Search docs, guides, FAQs…",
-    categories: "Categories",
-    gettingStarted: "Getting Started",
-    gettingStartedDesc: "Set up your workspace, invite your team, create your first project.",
-    projects: "Projects & Issues",
-    projectsDesc: "Learn how to organize work with projects, issues, cycles, and backlogs.",
-    integrations: "Integrations",
-    integrationsDesc: "Connect Taskforce with GitHub, Slack, Jira, and more.",
-    security: "Security & Permissions",
-    securityDesc: "Manage roles, SSO, audit logs, and data retention policies.",
-    contactSupport: "Contact support",
-    contactSupportDesc: "Can't find what you're looking for? Our team is here to help.",
-    openChat: "Open chat",
-    sendEmail: "Send email",
-    popularArticles: "Popular articles",
-    articles: {
-      a1: "How to create your first issue",
-      a2: "Setting up cycles and sprints",
-      a3: "Using the kanban board",
-      a4: "Inviting team members",
-      a5: "Configuring notifications",
-    },
-  },
-
   // App shell - footer, top bar, workspace switcher (rendered on every authenticated screen).
   shell: {
     // Footer
@@ -568,8 +525,6 @@ export const CONSTANTS_EN = {
     openCommandPalette: "Open command palette",
     askAi: "Ask AI",
     openAiAssistant: "Open the AI assistant",
-    experimental: "Experimental",
-    giveFeedback: "Give feedback",
     // Workspace switcher
     workspaces: "Workspaces",
     yourWorkspaces: "Your workspaces",
@@ -582,13 +537,6 @@ export const CONSTANTS_EN = {
     workspaceActivity: "What does your company / team do?",
     workspaceActivityPlaceholder: "e.g. We build a CRM for independent craftspeople",
     workspaceActivityHint: "One sentence. It feeds your Brain OS so the AI understands your context.",
-    brainTemplate: "Brain OS - starter template",
-    templateBlank: "Blank (16 domains)",
-    templateSaas: "SaaS (expert)",
-    templateEcommerce: "E-commerce (expert)",
-    templateMarketplace: "Marketplace (expert)",
-    templateAgentic: "Agentic product (expert)",
-    templateHint: "Pre-fills the knowledge memory (ADRs, SOPs, decisions…) based on your activity.",
     creating: "Creating…",
   },
 } as const

@@ -21,13 +21,13 @@ export function FeedbackBar({
   const btn = "flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
   return (
     <div className={cn("flex items-center gap-0.5", className)}>
-      <button type="button" onClick={copy} className={btn} aria-label="Copier">
+      <button type="button" onClick={copy} className={btn} aria-label="Copy">
         {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
       </button>
-      <button type="button" onClick={() => send("up")} className={cn(btn, vote === "up" && "text-emerald-500")} aria-label="Utile">
+      <button type="button" onClick={() => send("up")} className={cn(btn, vote === "up" && "text-emerald-500")} aria-label="Helpful">
         <ThumbsUp className="size-3.5" />
       </button>
-      <button type="button" onClick={() => send("down")} className={cn(btn, vote === "down" && "text-destructive")} aria-label="Pas utile">
+      <button type="button" onClick={() => send("down")} className={cn(btn, vote === "down" && "text-destructive")} aria-label="Not helpful">
         <ThumbsDown className="size-3.5" />
       </button>
     </div>

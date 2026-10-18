@@ -84,9 +84,9 @@ public class SkillSuggestionService {
      */
     public List<String> suggest(String slug, String role, List<String> existing, Long requesterId) {
         Workspace workspace = workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspace.getId(), requesterId)) {
-            throw new ForbiddenException("Accès refusé au workspace");
+            throw new ForbiddenException("Access denied to this workspace");
         }
         List<String> already = existing == null ? List.of() : existing;
         Long workspaceId = workspace.getId();

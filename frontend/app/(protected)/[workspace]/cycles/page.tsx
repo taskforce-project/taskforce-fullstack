@@ -144,7 +144,7 @@ function CycleCard({ cycle, slug, reload }: Readonly<{ cycle: Cycle; slug: strin
   }
 
   function handleViewIssues() {
-    router.push(`/${slug}/projects/${cycle.project.id}/issues`)
+    router.push(`/${slug}/projects/${cycle.project.id}/cycles/${cycle.id}`)
   }
 
   function statusLabel(): string {

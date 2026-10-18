@@ -115,34 +115,6 @@ public class ProjectService {
     }
 
     /**
-     * Activité quotidienne d'un projet (QA2-32) sur les `days` derniers jours.
-     * Série continue : chaque jour de la fenêtre est présent (count = 0 si rien).
-     */
-    @Transactional(readOnly = true)
-    public List<ProjectActivityPointResponse> getProjectActivity(String workspaceSlug, Long projectId,
-                                                                 Long requestingUserId, int days) {
-        Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
-        Project project = resolveViewableProject(projectId, workspace, requestingUserId);
-
-        int window = Math.min(Math.max(days, 1), 90);
-        java.time.LocalDate today = java.time.LocalDate.now();
-        java.time.LocalDate from = today.minusDays(window - 1L);
-
-        java.util.Map<String, Long> counts = new java.util.HashMap<>();
-        for (Object[] row : issueRepository.countCreatedByDay(project.getId(), from.atStartOfDay())) {
-            counts.put((String) row[0], ((Number) row[1]).longValue());
-        }
-
-        List<ProjectActivityPointResponse> series = new java.util.ArrayList<>(window);
-        for (int i = 0; i < window; i++) {
-            java.time.LocalDate day = from.plusDays(i);
-            String key = day.toString(); // ISO 'YYYY-MM-DD'
-            series.add(new ProjectActivityPointResponse(key, counts.getOrDefault(key, 0L)));
-        }
-        return series;
-    }
-
-    /**
      * Activité quotidienne de TOUS les projets visibles du workspace, en un seul appel.
      *
      * <p>La page Operations affiche une sparkline par projet. Interrogée projet par projet, elle
@@ -461,16 +433,16 @@ public class ProjectService {
 
         User invitee = userRepository.findByEmail(request.getEmail())
             .orElseThrow(() -> new ResourceNotFoundException(
-                "Aucun compte trouvé pour l'email : " + request.getEmail()));
+                "No account found for the email: " + request.getEmail()));
 
         // L'invité doit déjà être membre du workspace
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspace.getId(), invitee.getId())) {
             throw new BusinessException(
-                "L'utilisateur doit d'abord être membre du workspace pour rejoindre ce projet");
+                "The user must be a member of the workspace before joining this project");
         }
 
         if (projectMemberRepository.existsByProjectIdAndUserId(projectId, invitee.getId())) {
-            throw new BusinessException("Cet utilisateur est déjà membre du projet");
+            throw new BusinessException("This user is already a member of the project");
         }
 
 
@@ -508,12 +480,12 @@ public class ProjectService {
         assertCanManageProject(project, workspace, requestingUserId);
 
         Team team = teamRepository.findById(teamId)
-            .orElseThrow(() -> new ResourceNotFoundException("Équipe introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Team not found"));
         if (!team.getWorkspace().getId().equals(workspace.getId())) {
-            throw new BusinessException("Cette équipe n'appartient pas à ce workspace");
+            throw new BusinessException("This team doesn't belong to this workspace");
         }
         if (projectTeamRepository.existsByProjectIdAndTeamId(projectId, teamId)) {
-            throw new BusinessException("Cette équipe est déjà associée au projet");
+            throw new BusinessException("This team is already attached to the project");
         }
 
 
@@ -529,7 +501,7 @@ public class ProjectService {
         assertCanManageProject(project, workspace, requestingUserId);
 
         if (!projectTeamRepository.existsByProjectIdAndTeamId(projectId, teamId)) {
-            throw new ResourceNotFoundException("Cette équipe n'est pas associée au projet");
+            throw new ResourceNotFoundException("This team isn't attached to the project");
         }
         projectTeamRepository.deleteByProjectIdAndTeamId(projectId, teamId);
     }
@@ -545,10 +517,10 @@ public class ProjectService {
         Project project = resolveProject(projectId, workspace.getId());
 
         ProjectMember target = projectMemberRepository.findById(memberId)
-            .orElseThrow(() -> new ResourceNotFoundException("Membre introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Member not found"));
 
         if (!target.getProject().getId().equals(projectId)) {
-            throw new IllegalArgumentException("Ce membre n'appartient pas à ce projet");
+            throw new IllegalArgumentException("This member doesn't belong to this project");
         }
 
         boolean isSelf = target.getUser().getId().equals(requestingUserId);
@@ -590,7 +562,7 @@ public class ProjectService {
         assertCanManageProject(project, workspace, requestingUserId);
 
         if (projectLabelRepository.existsByProjectIdAndName(projectId, request.getName())) {
-            throw new BusinessException("Un label avec ce nom existe déjà dans ce projet");
+            throw new BusinessException("A label with this name already exists in this project");
         }
 
         ProjectLabel label = ProjectLabel.builder()
@@ -614,14 +586,14 @@ public class ProjectService {
         assertCanManageProject(project, workspace, requestingUserId);
 
         ProjectLabel label = projectLabelRepository.findById(labelId)
-            .orElseThrow(() -> new ResourceNotFoundException("Label introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Label not found"));
 
         if (!label.getProject().getId().equals(projectId)) {
-            throw new IllegalArgumentException("Ce label n'appartient pas à ce projet");
+            throw new IllegalArgumentException("This label doesn't belong to this project");
         }
         if (request.getName() != null && !request.getName().equals(label.getName())) {
             if (projectLabelRepository.existsByProjectIdAndName(projectId, request.getName())) {
-                throw new BusinessException("Un label avec ce nom existe déjà dans ce projet");
+                throw new BusinessException("A label with this name already exists in this project");
             }
             label.setName(request.getName());
         }
@@ -645,10 +617,10 @@ public class ProjectService {
         assertCanManageProject(project, workspace, requestingUserId);
 
         ProjectLabel label = projectLabelRepository.findById(labelId)
-            .orElseThrow(() -> new ResourceNotFoundException("Label introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Label not found"));
 
         if (!label.getProject().getId().equals(projectId)) {
-            throw new IllegalArgumentException("Ce label n'appartient pas à ce projet");
+            throw new IllegalArgumentException("This label doesn't belong to this project");
         }
 
         projectLabelRepository.delete(label);
@@ -660,10 +632,10 @@ public class ProjectService {
 
     private Workspace resolveWorkspaceAndAssertMember(String slug, Long userId) {
         Workspace workspace = workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable : " + slug));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + slug));
 
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspace.getId(), userId)) {
-            throw new BusinessException("Vous n'êtes pas membre de ce workspace");
+            throw new BusinessException("You're not a member of this workspace");
         }
 
         return workspace;
@@ -671,7 +643,7 @@ public class ProjectService {
 
     private Project resolveProject(Long projectId, Long workspaceId) {
         return projectRepository.findByIdAndWorkspaceId(projectId, workspaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
     }
 
     /** Résout un projet ET vérifie que l'utilisateur a le droit de le VOIR (visibilité projet privé). */
@@ -699,7 +671,7 @@ public class ProjectService {
 
     private User resolveUser(Long userId) {
         return userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
     /**
@@ -718,7 +690,7 @@ public class ProjectService {
         workspaceMemberRepository.findByWorkspaceIdAndUserId(workspace.getId(), userId)
             .filter(wm -> wm.getRole().name().equals("OWNER") || wm.getRole().name().equals("ADMIN"))
             .orElseThrow(() -> new BusinessException(
-                "Droits insuffisants pour gérer ce projet"));
+                "You don't have the rights to manage this project"));
     }
 
     // -------------------------------------------------------------------------

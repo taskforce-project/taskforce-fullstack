@@ -41,7 +41,7 @@ export function UserAvatar({
   imageClassName,
 }: UserAvatarProps) {
   const seedEmail = email ?? ""
-  const label = name ?? email ?? "Utilisateur"
+  const label = name ?? email ?? "User"
   const initials = getInitials({ email, name, firstName, lastName })
 
   return (

@@ -47,7 +47,7 @@ export function TokenMeter({ value, label = "tokens", className, showIcon = true
   return (
     <span className={cn("inline-flex items-center gap-1 tabular-nums", className)}>
       {showIcon && <Coins className="size-3 shrink-0 opacity-70" />}
-      <span>{display.toLocaleString("fr-FR")}</span>
+      <span>{display.toLocaleString("en-US")}</span>
       {label && <span className="opacity-70">{label}</span>}
     </span>
   )

@@ -32,7 +32,7 @@ export const AUTH_ROUTES = {
  * Backend: @RequestMapping("/api/workspaces/{slug}/delivery")
  */
 export const DELIVERY_ROUTES = {
-  /** Providers délégables (Claude Code / Copilot / Cursor...) pour le picker. */
+  /** Providers délégables (aujourd'hui Claude Code) pour le picker. */
   PROVIDERS: (slug: string) => `/api/workspaces/${slug}/delivery/providers`,
   /** Délègue une issue à un agent (POST). */
   DELEGATE: (slug: string, issueId: number) => `/api/workspaces/${slug}/delivery/issues/${issueId}/delegate`,
@@ -40,8 +40,6 @@ export const DELIVERY_ROUTES = {
   RUN: (slug: string, issueId: number) => `/api/workspaces/${slug}/delivery/issues/${issueId}/run`,
   /** Runs de délégation du workspace (GET) - vue « workflow » (agents en parallèle). */
   RUNS: (slug: string) => `/api/workspaces/${slug}/delivery/runs`,
-  /** Clé API de délégation d'un provider (GET état / POST connecter / DELETE déconnecter) - `provider` = "anthropic" | "cursor". */
-  KEY: (slug: string, provider: string) => `/api/workspaces/${slug}/delivery/${provider}`,
   /**
    * Runner local de l'utilisateur connecté (ADR-013) : GET = état, jamais de secret ; POST = provisionner ou
    * régénérer le secret. Sans slug : l'identité d'un runner est liée à la personne, pas au workspace.
@@ -56,9 +54,7 @@ export const DELIVERY_ROUTES = {
 export const USER_ROUTES = {
   ME: "/api/users/me",
   AVATAR: "/api/users/me/avatar",
-  DATA_REQUEST: "/api/users/me/data-request",
-  /** Sécurité (métier Keycloak) : reset mot de passe + 2FA. */
-  PASSWORD_RESET: "/api/users/me/password/reset",
+  /** Sécurité : 2FA TOTP gérée par l'app. */
   TWO_FACTOR: "/api/users/me/2fa",
   TWO_FACTOR_SETUP: "/api/users/me/2fa/setup",
   TWO_FACTOR_CONFIRM: "/api/users/me/2fa/confirm",
@@ -73,14 +69,6 @@ export const USER_ROUTES = {
  */
 export const STATUS_ROUTES = {
   SYSTEM: "/api/status",
-} as const;
-
-/**
- * Retours utilisateur (« Give feedback »).
- * Backend: @RequestMapping("/api/feedback")
- */
-export const FEEDBACK_ROUTES = {
-  SUBMIT: "/api/feedback",
 } as const;
 
 /**
@@ -116,7 +104,6 @@ export const WORKSPACE_ROUTES = {
   // Journalisation des erreurs client (E25) - logs serveur classiques
   CLIENT_LOG: "/api/logs/client",
   // Rétrocompatibilité
-  CURRENT: "/api/workspaces/current",
 } as const;
 
 /**
@@ -183,7 +170,6 @@ export const PROJECT_ROUTES = {
   TEAMS:   (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/teams`,
   TEAM:    (slug: string, id: number, teamId: number) => `/api/workspaces/${slug}/projects/${id}/teams/${teamId}`,
   // Activité quotidienne (QA2-32)
-  ACTIVITY: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/activity`,
 } as const;
 
 /**
@@ -324,7 +310,6 @@ export const AI_ROUTES = {
  */
 export const NOTIFICATION_ROUTES = {
   LIST:            (slug: string) => `/api/workspaces/${slug}/notifications`,
-  UNREAD_COUNT:    (slug: string) => `/api/workspaces/${slug}/notifications/unread-count`,
   MARK_READ:       (slug: string, id: number) => `/api/workspaces/${slug}/notifications/${id}/read`,
   MARK_ALL_READ:   (slug: string) => `/api/workspaces/${slug}/notifications/read-all`,
   ACKNOWLEDGE:     (slug: string, id: number) => `/api/workspaces/${slug}/notifications/${id}/acknowledge`,
@@ -452,8 +437,6 @@ export const BRAIN_ROUTES = {
   NODES:       (slug: string) => `/api/workspaces/${slug}/brain/nodes`,
   NODE:        (slug: string, nodeId: number) => `/api/workspaces/${slug}/brain/nodes/${nodeId}`,
   NODE_MOVE:   (slug: string, nodeId: number) => `/api/workspaces/${slug}/brain/nodes/${nodeId}/move`,
-  EDGES:       (slug: string) => `/api/workspaces/${slug}/brain/edges`,
-  EDGE:        (slug: string, edgeId: number) => `/api/workspaces/${slug}/brain/edges/${edgeId}`,
   FILES:       (slug: string) => `/api/workspaces/${slug}/brain/files`,
 } as const;
 

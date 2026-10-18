@@ -24,7 +24,6 @@ import com.taskforce.tf_api.core.dto.request.UpdateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
 import com.taskforce.tf_api.core.dto.request.ProjectRepoLinkRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateProjectRequest;
-import com.taskforce.tf_api.core.dto.response.ProjectActivityPointResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectActivitySeriesResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectHealthPointResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
@@ -73,7 +72,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         List<ProjectResponse> projects = projectService.listProjects(slug, userId);
-        return ResponseEntity.ok(ApiResponse.success("Projets récupérés", projects));
+        return ResponseEntity.ok(ApiResponse.success("Projects retrieved", projects));
     }
 
     /**
@@ -89,7 +88,7 @@ public class ProjectController {
         Long userId = resolveUserId(jwt);
         ProjectResponse project = projectService.createProject(slug, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Projet créé", project));
+            .body(ApiResponse.success("Project created", project));
     }
 
     /**
@@ -106,7 +105,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         ProjectRepoResponse repo = projectRepoService.linkRepo(slug, id, userId, request);
-        return ResponseEntity.ok(ApiResponse.success("Dépôt lié au projet", repo));
+        return ResponseEntity.ok(ApiResponse.success("Repository linked to the project", repo));
     }
 
     /** DELETE /api/workspaces/{slug}/projects/{id}/repo — délie le dépôt du projet. */
@@ -118,7 +117,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         ProjectRepoResponse repo = projectRepoService.unlinkRepo(slug, id, userId);
-        return ResponseEntity.ok(ApiResponse.success("Dépôt délié", repo));
+        return ResponseEntity.ok(ApiResponse.success("Repository unlinked", repo));
     }
 
     /**
@@ -133,7 +132,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         ProjectResponse project = projectService.getProject(slug, id, userId);
-        return ResponseEntity.ok(ApiResponse.success("Projet récupéré", project));
+        return ResponseEntity.ok(ApiResponse.success("Project retrieved", project));
     }
 
     /**
@@ -151,7 +150,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         List<ProjectHealthPointResponse> history = projectService.getHealthHistory(slug, userId, days);
-        return ResponseEntity.ok(ApiResponse.success("Historique de santé récupéré", history));
+        return ResponseEntity.ok(ApiResponse.success("Health history retrieved", history));
     }
 
     /**
@@ -168,24 +167,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         List<ProjectActivitySeriesResponse> series = projectService.getWorkspaceActivity(slug, userId, days);
-        return ResponseEntity.ok(ApiResponse.success("Activité des opérations récupérée", series));
-    }
-
-    /**
-     * GET /api/workspaces/{slug}/projects/{id}/activity?days=14
-     * Activité quotidienne du projet (issues créées/jour) — alimente la sparkline (QA2-32).
-     */
-    @GetMapping("/{id}/activity")
-    public ResponseEntity<ApiResponse<List<ProjectActivityPointResponse>>> getProjectActivity(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable String slug,
-        @PathVariable Long id,
-        @RequestParam(name = "days", defaultValue = "14") int days
-    ) {
-        Long userId = resolveUserId(jwt);
-        List<ProjectActivityPointResponse> activity =
-            projectService.getProjectActivity(slug, id, userId, days);
-        return ResponseEntity.ok(ApiResponse.success("Activité récupérée", activity));
+        return ResponseEntity.ok(ApiResponse.success("Operations activity retrieved", series));
     }
 
     /**
@@ -201,7 +183,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         ProjectResponse project = projectService.updateProject(slug, id, userId, request);
-        return ResponseEntity.ok(ApiResponse.success("Projet mis à jour", project));
+        return ResponseEntity.ok(ApiResponse.success("Project updated", project));
     }
 
     /**
@@ -216,7 +198,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         ProjectResponse project = projectService.archiveProject(slug, id, userId);
-        return ResponseEntity.ok(ApiResponse.success("Projet archivé", project));
+        return ResponseEntity.ok(ApiResponse.success("Project archived", project));
     }
 
     /**
@@ -231,7 +213,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         ProjectResponse project = projectService.favoriteProject(slug, id, userId);
-        return ResponseEntity.ok(ApiResponse.success("Projet ajouté aux favoris", project));
+        return ResponseEntity.ok(ApiResponse.success("Project added to favorites", project));
     }
 
     /**
@@ -246,7 +228,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         ProjectResponse project = projectService.unfavoriteProject(slug, id, userId);
-        return ResponseEntity.ok(ApiResponse.success("Projet retiré des favoris", project));
+        return ResponseEntity.ok(ApiResponse.success("Project removed from favorites", project));
     }
 
     /**
@@ -261,7 +243,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         projectService.deleteProject(slug, id, userId);
-        return ResponseEntity.ok(ApiResponse.success("Projet supprimé", null));
+        return ResponseEntity.ok(ApiResponse.success("Project deleted", null));
     }
 
     // -------------------------------------------------------------------------
@@ -279,7 +261,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         List<ProjectMemberResponse> members = projectService.listMembers(slug, id, userId);
-        return ResponseEntity.ok(ApiResponse.success("Membres récupérés", members));
+        return ResponseEntity.ok(ApiResponse.success("Members retrieved", members));
     }
 
     /**
@@ -295,7 +277,7 @@ public class ProjectController {
         Long userId = resolveUserId(jwt);
         ProjectMemberResponse member = projectService.addMember(slug, id, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Membre ajouté", member));
+            .body(ApiResponse.success("Member added", member));
     }
 
     /**
@@ -310,7 +292,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         projectService.removeMember(slug, id, userId, memberId);
-        return ResponseEntity.ok(ApiResponse.success("Membre retiré", null));
+        return ResponseEntity.ok(ApiResponse.success("Member removed", null));
     }
 
     // -------------------------------------------------------------------------
@@ -326,7 +308,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
-            "Équipes du projet", projectService.listProjectTeams(slug, id, userId)));
+            "Project teams", projectService.listProjectTeams(slug, id, userId)));
     }
 
     /** POST /api/workspaces/{slug}/projects/{id}/teams */
@@ -340,7 +322,7 @@ public class ProjectController {
         Long userId = resolveUserId(jwt);
         ProjectTeamResponse team = projectService.attachTeam(slug, id, request.getTeamId(), userId);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Équipe associée", team));
+            .body(ApiResponse.success("Team attached", team));
     }
 
     /** DELETE /api/workspaces/{slug}/projects/{id}/teams/{teamId} */
@@ -353,7 +335,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         projectService.detachTeam(slug, id, teamId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Équipe dissociée", null));
+        return ResponseEntity.ok(ApiResponse.success("Team detached", null));
     }
 
     // -------------------------------------------------------------------------
@@ -371,7 +353,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         List<ProjectLabelResponse> labels = projectService.listLabels(slug, id, userId);
-        return ResponseEntity.ok(ApiResponse.success("Labels récupérés", labels));
+        return ResponseEntity.ok(ApiResponse.success("Labels retrieved", labels));
     }
 
     /**
@@ -387,7 +369,7 @@ public class ProjectController {
         Long userId = resolveUserId(jwt);
         ProjectLabelResponse label = projectService.createLabel(slug, id, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Label créé", label));
+            .body(ApiResponse.success("Label created", label));
     }
 
     /**
@@ -403,7 +385,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         ProjectLabelResponse label = projectService.updateLabel(slug, id, labelId, userId, request);
-        return ResponseEntity.ok(ApiResponse.success("Label modifié", label));
+        return ResponseEntity.ok(ApiResponse.success("Label updated", label));
     }
 
     /**
@@ -418,7 +400,7 @@ public class ProjectController {
     ) {
         Long userId = resolveUserId(jwt);
         projectService.deleteLabel(slug, id, labelId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Label supprimé", null));
+        return ResponseEntity.ok(ApiResponse.success("Label deleted", null));
     }
 
     // -------------------------------------------------------------------------
@@ -428,7 +410,7 @@ public class ProjectController {
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

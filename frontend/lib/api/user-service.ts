@@ -55,14 +55,7 @@ export async function searchUsers(q: string): Promise<UserSearchResult[]> {
   return response.data.data;
 }
 
-// ---- Sécurité (métier Keycloak : reset mot de passe + 2FA TOTP) --------------------------------
-
-/** Déclenche l'email « réinitialiser le mot de passe » (flux Keycloak). */
-export async function requestPasswordReset(): Promise<void> {
-  // silentError : le panneau Security affiche son propre message clair - pas de double toast
-  // (le back peut renvoyer 502 si le SMTP du realm Keycloak n'est pas configuré).
-  await apiClient.post(USER_ROUTES.PASSWORD_RESET, undefined, { silentError: true });
-}
+// ---- Sécurité : 2FA TOTP gérée par l'app ----------------------------------------------------------
 
 /** Ce que renvoie le démarrage de l'activation 2FA : de quoi afficher un QR (ou saisir à la main). */
 export interface TwoFactorSetup {

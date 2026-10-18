@@ -69,7 +69,7 @@ export const useCycleStore = create<CycleState>((set, get) => ({
       set({ cycles, isLoading: false });
       return cycles;
     } catch (err) {
-      set({ isLoading: false, error: extractError(err, "Erreur lors du chargement des cycles") });
+      set({ isLoading: false, error: extractError(err, "Couldn't load the cycles") });
       return [];
     }
   },
@@ -80,7 +80,7 @@ export const useCycleStore = create<CycleState>((set, get) => ({
       set((state) => ({ cycles: [cycle, ...state.cycles] }));
       return cycle;
     } catch (err) {
-      set({ error: extractError(err, "Erreur lors de la création du cycle") });
+      set({ error: extractError(err, "Couldn't create the cycle") });
       return null;
     }
   },
@@ -92,7 +92,7 @@ export const useCycleStore = create<CycleState>((set, get) => ({
       set({ activeCycle: cycle, isLoading: false });
       return cycle;
     } catch (err) {
-      set({ isLoading: false, error: extractError(err, "Erreur lors du chargement du cycle") });
+      set({ isLoading: false, error: extractError(err, "Couldn't load the cycle") });
       return null;
     }
   },
@@ -106,7 +106,7 @@ export const useCycleStore = create<CycleState>((set, get) => ({
       }));
       return cycle;
     } catch (err) {
-      set({ error: extractError(err, "Erreur lors de la mise à jour du cycle") });
+      set({ error: extractError(err, "Couldn't update the cycle") });
       return null;
     }
   },
@@ -120,7 +120,7 @@ export const useCycleStore = create<CycleState>((set, get) => ({
       }));
       return true;
     } catch (err) {
-      set({ error: extractError(err, "Erreur lors de la suppression du cycle") });
+      set({ error: extractError(err, "Couldn't delete the cycle") });
       return false;
     }
   },
@@ -132,7 +132,7 @@ export const useCycleStore = create<CycleState>((set, get) => ({
       set({ cycleIssues: issues, isLoading: false });
       return issues;
     } catch (err) {
-      set({ isLoading: false, error: extractError(err, "Erreur lors du chargement des issues du cycle") });
+      set({ isLoading: false, error: extractError(err, "Couldn't load the cycle's issues") });
       return [];
     }
   },
@@ -144,7 +144,7 @@ export const useCycleStore = create<CycleState>((set, get) => ({
       await get().fetchCycleIssues(slug, projectId, cycleId);
       return true;
     } catch (err) {
-      set({ error: extractError(err, "Erreur lors de l'ajout de l'issue au cycle") });
+      set({ error: extractError(err, "Couldn't add the issue to the cycle") });
       return false;
     }
   },
@@ -155,7 +155,7 @@ export const useCycleStore = create<CycleState>((set, get) => ({
       set((state) => ({ cycleIssues: state.cycleIssues.filter((i) => i.id !== issueId) }));
       return true;
     } catch (err) {
-      set({ error: extractError(err, "Erreur lors du retrait de l'issue du cycle") });
+      set({ error: extractError(err, "Couldn't remove the issue from the cycle") });
       return false;
     }
   },

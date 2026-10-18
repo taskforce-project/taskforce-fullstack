@@ -35,7 +35,6 @@ export default defineConfig({
         "lib/mocks/**",       // Fixtures de dev
         "**/*.generated.ts",  // Fichiers générés (ex. brand-logos.generated.ts via `npm run logos`) - data
         "**/index.ts",        // Barrels de ré-exports (aucune logique ; types compile-time)
-        "components/auth/floating-paths.tsx", // Fond SVG animé décoratif (présentation pure, aucune logique)
       ],
       // Périmètre coverage = LOGIQUE testable en unitaire (décision 01/07).
       // Les pages `app/**` et les composants de présentation / primitives shadcn (`components/ui`)
@@ -45,21 +44,23 @@ export default defineConfig({
         "hooks/**/*.{ts,tsx}",
         "components/auth/**/*.{ts,tsx}",
       ],
-      // Objectifs de couverture
+      // Objectifs de couverture.
+      // Vitest 4 (18/10/2026) compte les branches et les instructions sur l'AST (`??`, `?.`,
+      // paramètres par défaut) : à code et tests égaux, les branches des stores passent de 83 % à
+      // 59 %. Les seuils touchés ont été recalés juste sous la nouvelle mesure, sans baisse réelle.
       thresholds: {
-        // Global sur le périmètre LOGIQUE (lib/hooks/components-auth). Actuel ~83 % lignes.
-        // Cible 70 % avec marge ; les pages/UI sont couvertes par E2E (hors coverage unitaire).
-        global: {
-          lines: 70,
-          functions: 80,
-          branches: 75,
-          statements: 70,
-        },
+        // Global sur le périmètre LOGIQUE (lib/hooks/components-auth), les pages/UI étant couvertes
+        // par E2E. Au niveau racine : une clé `global` serait lue comme un motif de fichier et ne
+        // contrôlerait rien.
+        lines: 70,
+        functions: 80,
+        branches: 67,
+        statements: 70,
         // Services API - CRITIQUE
         'lib/api/auth-service.ts': {
           lines: 90,
           functions: 95,
-          branches: 75,
+          branches: 65,
           statements: 90,
         },
         'lib/api/client.ts': {
@@ -72,7 +73,7 @@ export default defineConfig({
         'components/auth/**/*.tsx': {
           lines: 78,
           functions: 65,
-          branches: 77,
+          branches: 72,
           statements: 78,
         },
         // Context & State Management
@@ -85,7 +86,7 @@ export default defineConfig({
         'lib/store/**/*.ts': {
           lines: 90,
           functions: 90,
-          branches: 80,
+          branches: 58,
           statements: 90,
         },
         // Utils & Validation (seuils alignés sur l'actuel - reste des fns utilitaires non couvertes)
@@ -99,7 +100,7 @@ export default defineConfig({
           lines: 90,
           functions: 80,
           branches: 69,
-          statements: 90,
+          statements: 83,
         },
       },
     },

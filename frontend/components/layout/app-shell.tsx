@@ -12,9 +12,7 @@ import { PanelDock } from "@/components/layout/panel-dock"
 import { AppFooter } from "@/components/layout/app-footer"
 import { SettingsModal } from "@/components/settings/settings-modal"
 import { CreateProjectModal } from "@/components/dialogs/create-project-modal"
-import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
 import { ProductTour } from "@/components/tour/product-tour"
-import { LabsGradientDefs } from "@/components/ui/labs-gradient-defs"
 import { PendingInvitationsBanner } from "@/components/invitations/pending-invitations-banner"
 
 interface AppShellProps {
@@ -62,13 +60,9 @@ export function AppShell({ children }: AppShellProps) {
       {/* Modals globaux - ouvrables depuis n'importe quel CTA */}
       <SettingsModal />
       <CreateProjectModal />
-      <FeedbackDialog />
 
       {/* Tour produit (coach-marks) - rendu conditionnel via son store ; cible les data-tour du dashboard */}
       <ProductTour />
-
-      {/* Dégradé SVG de l'identité Labs - référencé par les icônes `tf-labs-icon` (sidebar, topbar, Ctrl+K) */}
-      <LabsGradientDefs />
     </SidebarProvider>
   )
 }

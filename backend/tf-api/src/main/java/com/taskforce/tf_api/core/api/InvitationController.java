@@ -53,7 +53,7 @@ public class InvitationController {
         Long userId = resolveUserId(jwt);
         InvitationResponse invitation = invitationService.createInvitation(slug, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Invitation envoyée", invitation));
+            .body(ApiResponse.success("Invitation sent", invitation));
     }
 
     @GetMapping("/workspaces/{slug}/invitations")
@@ -63,7 +63,7 @@ public class InvitationController {
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
-            "Invitations en attente", invitationService.listPending(slug, userId)));
+            "Pending invitations", invitationService.listPending(slug, userId)));
     }
 
     @DeleteMapping("/workspaces/{slug}/invitations/{invitationId}")
@@ -74,7 +74,7 @@ public class InvitationController {
     ) {
         Long userId = resolveUserId(jwt);
         invitationService.revokeInvitation(slug, userId, invitationId);
-        return ResponseEntity.ok(ApiResponse.success("Invitation annulée", null));
+        return ResponseEntity.ok(ApiResponse.success("Invitation cancelled", null));
     }
 
     // ---- Par token ----------------------------------------------------------
@@ -94,7 +94,7 @@ public class InvitationController {
     ) {
         Long userId = resolveUserId(jwt);
         invitationService.acceptInvitation(token, userId);
-        return ResponseEntity.ok(ApiResponse.success("Invitation acceptée", null));
+        return ResponseEntity.ok(ApiResponse.success("Invitation accepted", null));
     }
 
     // ---- Mes invitations reçues (in-app, sans token) ------------------------
@@ -106,7 +106,7 @@ public class InvitationController {
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
-            "Invitations reçues", invitationService.listMyPendingInvitations(userId)));
+            "Received invitations", invitationService.listMyPendingInvitations(userId)));
     }
 
     /** L'utilisateur courant accepte explicitement une de ses invitations (par identifiant). */
@@ -117,13 +117,13 @@ public class InvitationController {
     ) {
         Long userId = resolveUserId(jwt);
         invitationService.acceptMyInvitation(userId, invitationId);
-        return ResponseEntity.ok(ApiResponse.success("Invitation acceptée", null));
+        return ResponseEntity.ok(ApiResponse.success("Invitation accepted", null));
     }
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

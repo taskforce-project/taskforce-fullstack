@@ -51,7 +51,7 @@ public class PageController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         List<PageResponse> pages = pageService.listPages(slug, projectId, resolveUserId(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Pages récupérées", pages));
+        return ResponseEntity.ok(ApiResponse.success("Pages retrieved", pages));
     }
 
     @PostMapping
@@ -62,7 +62,7 @@ public class PageController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         PageResponse page = pageService.createPage(slug, projectId, resolveUserId(jwt), request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Page créée", page));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Page created", page));
     }
 
     @GetMapping("/{pageId}")
@@ -73,7 +73,7 @@ public class PageController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         PageResponse page = pageService.getPage(slug, projectId, pageId, resolveUserId(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Page récupérée", page));
+        return ResponseEntity.ok(ApiResponse.success("Page retrieved", page));
     }
 
     @PatchMapping("/{pageId}")
@@ -85,7 +85,7 @@ public class PageController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         PageResponse page = pageService.updatePage(slug, projectId, pageId, resolveUserId(jwt), request);
-        return ResponseEntity.ok(ApiResponse.success("Page mise à jour", page));
+        return ResponseEntity.ok(ApiResponse.success("Page updated", page));
     }
 
     @DeleteMapping("/{pageId}")
@@ -96,7 +96,7 @@ public class PageController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         pageService.deletePage(slug, projectId, pageId, resolveUserId(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Page supprimée", null));
+        return ResponseEntity.ok(ApiResponse.success("Page deleted", null));
     }
 
     // =========================================================================
@@ -108,7 +108,7 @@ public class PageController {
     private Long resolveUserId(Jwt jwt) {
         String email = identityResolver.resolveEmail(jwt);
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

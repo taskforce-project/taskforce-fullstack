@@ -1,5 +1,5 @@
 /**
- * Store Zustand du Brain OS (knowledge graph d'un workspace).
+ * Store Zustand du Brain OS (pages de connaissance d'un workspace).
  * Charge la vue d'ensemble (nodes + edges + comptage par domaine) et gère le CRUD nodes.
  */
 import { create } from "zustand"
@@ -10,8 +10,6 @@ import {
   moveNode as moveNodeApi,
   deleteNode as deleteNodeApi,
   searchBrain as searchBrainApi,
-  createEdge as createEdgeApi,
-  deleteEdge as deleteEdgeApi,
   type BrainOverview,
   type KnowledgeNode,
   type KnowledgeSearchHit,
@@ -39,8 +37,6 @@ interface BrainState {
   removeNode: (slug: string, nodeId: number) => Promise<void>
   search: (slug: string, query: string) => Promise<void>
   clearSearch: () => void
-  linkNodes: (slug: string, fromNodeId: number, toNodeId: number, relationType: string) => Promise<void>
-  unlink: (slug: string, edgeId: number) => Promise<void>
 }
 
 export const useBrainStore = create<BrainState>((set, get) => ({
@@ -58,7 +54,7 @@ export const useBrainStore = create<BrainState>((set, get) => ({
       const overview = await getBrainOverview(slug)
       set({ overview, loading: false })
     } catch {
-      set({ error: "Impossible de charger le Brain OS", loading: false })
+      set({ error: "Couldn't load Brain OS", loading: false })
     }
   },
 
@@ -104,19 +100,9 @@ export const useBrainStore = create<BrainState>((set, get) => ({
       const results = await searchBrainApi(slug, q)
       set({ searchResults: results, searching: false })
     } catch {
-      set({ searchResults: [], searching: false, error: "Recherche indisponible" })
+      set({ searchResults: [], searching: false, error: "Search is unavailable" })
     }
   },
 
   clearSearch: () => set({ searchQuery: "", searchResults: null, searching: false }),
-
-  linkNodes: async (slug, fromNodeId, toNodeId, relationType) => {
-    await createEdgeApi(slug, fromNodeId, toNodeId, relationType)
-    await get().fetchOverview(slug)
-  },
-
-  unlink: async (slug, edgeId) => {
-    await deleteEdgeApi(slug, edgeId)
-    await get().fetchOverview(slug)
-  },
 }))

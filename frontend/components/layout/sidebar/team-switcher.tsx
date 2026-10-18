@@ -28,13 +28,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { WorkspaceAvatar } from "@/components/ui/workspace-avatar"
@@ -53,7 +46,6 @@ export function WorkspaceSwitcher() {
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [newName, setNewName] = React.useState("")
   const [newActivity, setNewActivity] = React.useState("")
-  const [newTemplate, setNewTemplate] = React.useState("BLANK")
   const [creating, setCreating] = React.useState(false)
 
   const workspacesLoaded = useWorkspaceStore((s) => s.workspacesLoaded)
@@ -75,7 +67,6 @@ export function WorkspaceSwitcher() {
     const workspace = await createWorkspace({
       name: newName.trim(),
       activity: newActivity.trim() || undefined,
-      brainTemplate: newTemplate,
     })
     setCreating(false)
     // createWorkspace avale l'erreur et renvoie null : sans ce toast, un echec ne donnait AUCUN
@@ -84,7 +75,6 @@ export function WorkspaceSwitcher() {
       setDialogOpen(false)
       setNewName("")
       setNewActivity("")
-      setNewTemplate("BLANK")
       router.push(`/${workspace.slug}/dashboard`)
     } else {
       toast.error("Couldn't create the workspace. Please try again.")
@@ -210,24 +200,6 @@ export function WorkspaceSwitcher() {
                 maxLength={500}
               />
               <p className="text-xs text-muted-foreground">{t.shell.workspaceActivityHint}</p>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="workspace-template">{t.shell.brainTemplate}</Label>
-              <Select value={newTemplate} onValueChange={setNewTemplate}>
-                <SelectTrigger id="workspace-template">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="BLANK">{t.shell.templateBlank}</SelectItem>
-                  <SelectItem value="SAAS">{t.shell.templateSaas}</SelectItem>
-                  <SelectItem value="ECOMMERCE">{t.shell.templateEcommerce}</SelectItem>
-                  <SelectItem value="MARKETPLACE">{t.shell.templateMarketplace}</SelectItem>
-                  <SelectItem value="AGENTIC">{t.shell.templateAgentic}</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {t.shell.templateHint}
-              </p>
             </div>
           </div>
           <DialogFooter>

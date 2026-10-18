@@ -84,7 +84,7 @@ export default function DashboardPage() {
 
   // Tour produit : au 1ᵉʳ dashboard (jamais vu), on le lance après un court délai - le temps que la
   // grille se peigne pour que les cibles `data-tour` existent. `hasSeen` (persisté) évite tout
-  // re-déclenchement. Rejeu depuis l'aide via `?tour=1` (forcé même si déjà vu), puis on nettoie l'URL.
+  // re-déclenchement. Rejeu depuis Ctrl+K via `?tour=1` (forcé même si déjà vu), puis on nettoie l'URL.
   const tourHasSeen = useTourStore((s) => s.hasSeen)
   const tourActive = useTourStore((s) => s.isActive)
   const tourDismissed = useTourStore((s) => s.dismissed)
@@ -148,7 +148,7 @@ export default function DashboardPage() {
         {cardsError && cards.length === 0 ? (
           // Jamais de spinner infini : message court + réessai.
           <div className="flex flex-col items-center justify-center gap-2.5 rounded-xl border border-border py-12 text-center">
-            <p className="text-sm text-muted-foreground">Couldn't load your cards.</p>
+            <p className="text-sm text-muted-foreground">Couldn&apos;t load your cards.</p>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void fetchCards(slug)}>
               <RefreshCw className="size-3.5" /> Retry
             </Button>

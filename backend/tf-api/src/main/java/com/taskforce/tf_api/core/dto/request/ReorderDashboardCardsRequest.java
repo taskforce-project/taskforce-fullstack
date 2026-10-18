@@ -12,6 +12,6 @@ import lombok.Data;
 @Data
 public class ReorderDashboardCardsRequest {
 
-    @NotNull(message = "La liste des ids est obligatoire")
+    @NotNull(message = "The list of ids is required")
     private List<Long> orderedIds;
 }

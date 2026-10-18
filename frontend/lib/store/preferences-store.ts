@@ -1,9 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { CONSTANTS_EN } from "../constants_en";
-import { CONSTANTS_FR } from "../constants_fr";
 
-export type Language = "en" | "fr";
 export type Theme = "light" | "dark";
 
 interface PreferencesState {
@@ -12,10 +10,8 @@ interface PreferencesState {
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
 
-  // Language
-  language: Language;
-  setLanguage: (language: Language) => void;
-  t: typeof CONSTANTS_EN | typeof CONSTANTS_FR; // Translations object (FR/EN - formes structurellement identiques)
+  // Textes de l'interface (produit monolingue, anglais)
+  t: typeof CONSTANTS_EN;
 
   // Accessibility
   reducedMotion: boolean;
@@ -34,14 +30,7 @@ interface PreferencesState {
   // Mode daltonien (option, en plus du contraste élevé) - filtre de correction appliqué au contenu.
   colorblindMode: "none" | "protanopia" | "deuteranopia" | "tritanopia";
   setColorblindMode: (mode: "none" | "protanopia" | "deuteranopia" | "tritanopia") => void;
-
-  // Utility function to get translations
-  getTranslations: () => typeof CONSTANTS_EN | typeof CONSTANTS_FR;
 }
-
-const getTranslations = (language: Language) => {
-  return language === "en" ? CONSTANTS_EN : CONSTANTS_FR;
-};
 
 export const usePreferencesStore = create<PreferencesState>()(
   persist(
@@ -61,15 +50,7 @@ export const usePreferencesStore = create<PreferencesState>()(
         get().setTheme(newTheme);
       },
 
-      // Language
-      language: "en",
-      setLanguage: (language) => {
-        set({ 
-          language,
-          t: getTranslations(language),
-        });
-      },
-      t: CONSTANTS_EN, // Default to English
+      t: CONSTANTS_EN,
 
       // Accessibility
       reducedMotion: false,
@@ -123,15 +104,12 @@ export const usePreferencesStore = create<PreferencesState>()(
         }
       },
 
-      // Utility
-      getTranslations: () => getTranslations(get().language),
     }),
     {
       name: "taskforce-preferences",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         theme: state.theme,
-        language: state.language,
         reducedMotion: state.reducedMotion,
         fontSize: state.fontSize,
         highContrast: state.highContrast,
@@ -159,11 +137,7 @@ export const usePreferencesStore = create<PreferencesState>()(
               document.documentElement.classList.add(`cb-${state.colorblindMode}`);
             }
           }
-          // App verrouillée en anglais (v1 = produit monolingue). On IGNORE délibérément la langue
-          // persistée : un navigateur ayant stocké "fr" via l'ancien sélecteur (retiré) afficherait
-          // sinon une UI à moitié traduite - auth + footer en français, le reste en anglais. Les
-          // constantes FR restent dans l'arbre pour une future passe i18n.
-          state.language = "en";
+          // Les textes ne sont pas persistés : une ancienne clé « language » restée en stockage est ignorée.
           state.t = CONSTANTS_EN;
         }
       },
