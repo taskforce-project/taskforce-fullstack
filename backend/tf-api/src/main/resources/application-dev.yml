@@ -164,7 +164,6 @@ integrations:
     connect-timeout-ms: ${MCP_CONNECT_TIMEOUT_MS:10000}
     read-timeout-ms: ${MCP_READ_TIMEOUT_MS:60000}
     tools-cache-ttl-ms: ${MCP_TOOLS_CACHE_TTL_MS:60000}   # cache tools/list par workspace
-    confirm-writes: ${MCP_CONFIRM_WRITES:true}            # écritures externes proposées (validation humaine)
     tool-tier: ${MCP_TOOL_TIER:fast}                      # tier LLM des tours avec outils externes (fast|standard|deep)
     allow-private-network: ${MCP_ALLOW_PRIVATE_NETWORK:false} # true = serveurs MCP du réseau interne admis (on-premise)
 # Runner local de délégation (ADR-013) : Claude Code exécuté sur le poste de l'utilisateur.
