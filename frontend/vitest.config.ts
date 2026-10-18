@@ -35,7 +35,6 @@ export default defineConfig({
         "lib/mocks/**",       // Fixtures de dev
         "**/*.generated.ts",  // Fichiers générés (ex. brand-logos.generated.ts via `npm run logos`) - data
         "**/index.ts",        // Barrels de ré-exports (aucune logique ; types compile-time)
-        "components/auth/floating-paths.tsx", // Fond SVG animé décoratif (présentation pure, aucune logique)
       ],
       // Périmètre coverage = LOGIQUE testable en unitaire (décision 01/07).
       // Les pages `app/**` et les composants de présentation / primitives shadcn (`components/ui`)
