@@ -267,6 +267,23 @@ public class WorkspaceMcpService {
         return key;
     }
 
+    /**
+     * Supprime les connexions sans serveur MCP : identifiants saisis dans le formulaire générique retiré au lot 6
+     * (OSS-6.1), qu'aucun code ne lisait. Toute connexion enregistrée depuis porte un {@code mcpUrl}. Une config
+     * illisible (chiffrée avec une autre clé, corrompue) est gardée : le convertisseur la rend telle quelle, et
+     * rien ne prouve alors qu'elle n'a pas de serveur.
+     */
+    @Transactional
+    public int purgeConnectionsWithoutServer() {
+        List<ConnectorConnection> stale = new ArrayList<>();
+        for (ConnectorConnection conn : repository.findAll()) {
+            Map<String, String> config = parseConfig(conn.getConfig());
+            if (config != null && config.getOrDefault(CONFIG_URL, "").isBlank()) stale.add(conn);
+        }
+        repository.deleteAll(stale);
+        return stale.size();
+    }
+
     /** Déconnecte un serveur MCP du workspace (supprime la ligne connecteur) + invalide le cache. */
     @Transactional
     public void disconnectServer(Long workspaceId, String connectorKey) {
@@ -402,11 +419,17 @@ public class WorkspaceMcpService {
     }
 
     private Map<String, String> readConfig(String json) {
+        Map<String, String> config = parseConfig(json);
+        return config != null ? config : Map.of();
+    }
+
+    /** Config lue, ou {@code null} si elle ne se lit pas (à distinguer d'une config vide). */
+    private Map<String, String> parseConfig(String json) {
         if (json == null || json.isBlank()) return Map.of();
         try {
             return objectMapper.readValue(json, new TypeReference<Map<String, String>>() {});
         } catch (Exception ex) {
-            return Map.of();
+            return null;
         }
     }
 }

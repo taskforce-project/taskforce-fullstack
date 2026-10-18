@@ -433,6 +433,20 @@ class WorkspaceMcpServiceTest {
     }
 
     @Test
+    @DisplayName("purge : supprime les identifiants sans serveur MCP, garde les serveurs et les configs illisibles")
+    void purge_removes_only_readable_configs_without_server() {
+        ConnectorConnection legacy = ConnectorConnection.builder()
+            .connectorKey("stripe").config("{\"apiKey\":\"sk_test\"}").build();
+        // Ce que rend le convertisseur quand il ne peut pas déchiffrer : le texte chiffré tel quel.
+        ConnectorConnection unreadable = ConnectorConnection.builder()
+            .connectorKey("notion").config("enc:AAAA").build();
+        when(repository.findAll()).thenReturn(List.of(mcpConnector(), legacy, unreadable));
+
+        assertThat(service.purgeConnectionsWithoutServer()).isEqualTo(1);
+        verify(repository).deleteAll(List.of(legacy));
+    }
+
+    @Test
     @DisplayName("disconnectServer : supprime la ligne connecteur")
     void disconnect_server_deletes() {
         when(repository.existsByWorkspaceIdAndConnectorKey(1L, "linear")).thenReturn(true);

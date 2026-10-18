@@ -15,8 +15,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.taskforce.tf_api.core.repository.McpOAuthStateRepository;
 import com.taskforce.tf_api.core.repository.OAuthStateRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceInvitationRepository;
+import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -40,6 +42,8 @@ class RetentionSchedulerTest {
     @Mock private OtpService                    otpService;
     @Mock private OAuthStateRepository          oauthStateRepository;
     @Mock private WorkspaceInvitationRepository invitationRepository;
+    @Mock private McpOAuthStateRepository       mcpOauthStateRepository;
+    @Mock private WorkspaceMcpService           workspaceMcp;
 
     @InjectMocks private RetentionScheduler scheduler;
 
@@ -50,24 +54,30 @@ class RetentionSchedulerTest {
     }
 
     @Test
-    @DisplayName("applique les trois purges en une passe")
+    @DisplayName("applique toutes les purges en une passe")
     void runsEveryPurge() {
         withGracePeriod();
 
         scheduler.applyRetentionPolicies();
 
+        verifyEveryPurgeRan();
+    }
+
+    private void verifyEveryPurgeRan() {
         verify(otpService).cleanupExpiredOtps();
         verify(oauthStateRepository).deleteByExpiresAtBefore(any());
+        verify(mcpOauthStateRepository).deleteByExpiresAtBefore(any());
         verify(invitationRepository).deleteStaleInvitations(any());
+        verify(workspaceMcp).purgeConnectionsWithoutServer();
     }
 
     /**
-     * Le cas qui justifie le try/catch par purge : quelle que soit celle qui casse, les deux autres
+     * Le cas qui justifie le try/catch par purge : quelle que soit celle qui casse, les autres
      * doivent s'exécuter et le job se terminer sans propager l'exception (sinon Spring ne relancerait
      * ce job que le lendemain, en repartant du même échec).
      */
     @ParameterizedTest(name = "un échec sur « {0} » n''empêche pas les autres purges")
-    @ValueSource(strings = {"otp", "oauth", "invitations"})
+    @ValueSource(strings = {"otp", "oauth", "mcp-oauth", "invitations", "credentials"})
     @DisplayName("isole l'échec d'une purge")
     void isolatesFailures(String failing) {
         withGracePeriod();
@@ -76,15 +86,15 @@ class RetentionSchedulerTest {
         switch (failing) {
             case "otp"         -> when(otpService.cleanupExpiredOtps()).thenThrow(boom);
             case "oauth"       -> when(oauthStateRepository.deleteByExpiresAtBefore(any())).thenThrow(boom);
+            case "mcp-oauth"   -> when(mcpOauthStateRepository.deleteByExpiresAtBefore(any())).thenThrow(boom);
             case "invitations" -> when(invitationRepository.deleteStaleInvitations(any())).thenThrow(boom);
+            case "credentials" -> when(workspaceMcp.purgeConnectionsWithoutServer()).thenThrow(boom);
             default            -> throw new IllegalArgumentException(failing);
         }
 
         scheduler.applyRetentionPolicies();
 
-        verify(otpService).cleanupExpiredOtps();
-        verify(oauthStateRepository).deleteByExpiresAtBefore(any());
-        verify(invitationRepository).deleteStaleInvitations(any());
+        verifyEveryPurgeRan();
     }
 
     @Test
