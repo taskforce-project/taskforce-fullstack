@@ -148,7 +148,7 @@ export default function DashboardPage() {
         {cardsError && cards.length === 0 ? (
           // Jamais de spinner infini : message court + réessai.
           <div className="flex flex-col items-center justify-center gap-2.5 rounded-xl border border-border py-12 text-center">
-            <p className="text-sm text-muted-foreground">Couldn't load your cards.</p>
+            <p className="text-sm text-muted-foreground">Couldn&apos;t load your cards.</p>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void fetchCards(slug)}>
               <RefreshCw className="size-3.5" /> Retry
             </Button>

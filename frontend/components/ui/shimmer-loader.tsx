@@ -32,7 +32,7 @@ export function ShimmerLoader({
   // le texte change en place et la vague CONTINUE. `repeatDelay` court : sinon la vague fait une
   // longue pause (proportionnelle à la longueur) et on voyait « le texte défiler sans animation ».
   return (
-    <TextShimmerWave as="span" className={className} transition={{ repeatDelay: 0.2 }}>
+    <TextShimmerWave className={className} transition={{ repeatDelay: 0.2 }}>
       {text}
     </TextShimmerWave>
   )

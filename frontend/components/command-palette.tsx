@@ -201,7 +201,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
                 <p className="text-sm leading-relaxed flex-1">
                   {aiError
                     ? <span className="text-destructive">{aiError}</span>
-                    : <span className="text-foreground">{aiText || (isRunning ? <TextShimmerWave as="span">Cortex is thinking…</TextShimmerWave> : "")}</span>}
+                    : <span className="text-foreground">{aiText || (isRunning ? <TextShimmerWave>Cortex is thinking…</TextShimmerWave> : "")}</span>}
                 </p>
               </div>
               {!isRunning && (

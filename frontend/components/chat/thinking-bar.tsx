@@ -44,7 +44,7 @@ export function ThinkingBar({
       <Loader variant="spin" size="sm" className="text-primary" />
       {/* Pas de `key` : la vague CONTINUE quand la phase change (sinon reset visible). `repeatDelay`
           court → animation quasi-continue (le défaut fait une longue pause selon la longueur). */}
-      <TextShimmerWave as="span" transition={{ repeatDelay: 0.2 }}>{text}</TextShimmerWave>
+      <TextShimmerWave transition={{ repeatDelay: 0.2 }}>{text}</TextShimmerWave>
     </span>
   )
 }
