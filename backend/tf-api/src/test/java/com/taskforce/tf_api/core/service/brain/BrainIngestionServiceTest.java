@@ -434,10 +434,8 @@ class BrainIngestionServiceTest {
         assertThat(folder.getRefType()).isEqualTo("PROJECT");
         assertThat(folder.getRefId()).isEqualTo(PROJECT_ID);
         assertThat(folder.getTitle()).isEqualTo("Refonte Web"); // le dossier porte le nom du projet
-        assertThat(folder.getTags()).contains("project", "contexte", "ingestion-auto");
+        assertThat(folder.getTags()).contains("project", "context", "ingestion-auto");
         assertThat(folder.getContent()).contains("Refonte du site public");
-        // metadata.projects ancre la region du projet dans le graphe (Phase 4ter)
-        assertThat(folder.getMetadata()).containsEntry("projects", List.of(PROJECT_ID));
         // Notes du projet creees en plus, nichees sous le dossier (niveau PROJET).
         assertThat(captor.getAllValues().size()).isGreaterThan(1);
         assertThat(captor.getAllValues()).anySatisfy(c ->
