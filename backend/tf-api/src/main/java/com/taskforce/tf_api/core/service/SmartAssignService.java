@@ -21,7 +21,6 @@ import com.taskforce.tf_api.core.dto.request.SmartAssignPreviewRequest;
 import com.taskforce.tf_api.core.dto.response.BulkSmartAssignItemResponse;
 import com.taskforce.tf_api.core.dto.response.SmartAssignCandidateResponse;
 import com.taskforce.tf_api.core.dto.response.SmartAssignResponse;
-import com.taskforce.tf_api.core.enums.AiGenerationKind;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.model.Issue;
@@ -97,7 +96,6 @@ public class SmartAssignService {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final AiMeter aiMeter; // gate quota + capture/enregistrement de la conso tokens du scoring LLM
-    private final AiGenerationService aiGenerationService; // data flywheel : capture des recos smart-assign (draft)
     private final DeliveryAgentProviderRegistry agentRegistry; // A3 : agents candidats a la delegation
 
     @Value("${ai.model.smart-assign:gateway-default}")
@@ -129,12 +127,10 @@ public class SmartAssignService {
             hasText(issue.getDescription()), true, true);
 
         SmartAssignCandidateResponse recommended = response.getRecommended();
-        // On ne trace un assignment_event / draft que pour une reco HUMAINE (userId non nul) : une reco
-        // d'agent est une delegation, pas une affectation (elle n'alimente pas le flywheel Smart Assign).
+        // On ne trace un assignment_event que pour une reco HUMAINE (userId non nul) : une reco d'agent
+        // est une délégation, pas une affectation.
         if (recommended != null && recommended.getUserId() != null) {
             logAssignmentEvent(workspace.getId(), issue.getId(), recommended.getUserId(), requestingUserId, recommended);
-            // Data flywheel : capture la reco (top-1) comme draft ; finalisé à l'affectation réelle (updateIssue).
-            recordSmartAssignDraft(workspace.getId(), issue.getId(), recommended, requestingUserId);
         }
         return response;
     }
@@ -882,18 +878,6 @@ public class SmartAssignService {
         } catch (Exception ex) {
             log.warn("Unable to persist ai_runs for smart assign: {}", ex.getMessage());
         }
-    }
-
-    /** Data flywheel : capture la reco smart-assign (top-1) comme draft (ligne ouverte, opt-in workspace). */
-    private void recordSmartAssignDraft(Long workspaceId, Long issueId, SmartAssignCandidateResponse top, Long userId) {
-        Map<String, Object> draft = new HashMap<>();
-        draft.put("userId", top.getUserId());
-        draft.put("score", top.getScore());
-        draft.put("displayName", top.getDisplayName());
-        aiGenerationService.record(AiGenerationService.Capture.builder()
-            .workspaceId(workspaceId).kind(AiGenerationKind.SMART_ASSIGN).requestRef(String.valueOf(issueId))
-            .draft(draft).model(modelName).userId(userId)
-            .build());
     }
 
     private void logAssignmentEvent(Long workspaceId, Long issueId, Long assigneeUserId, Long assignedByUserId,

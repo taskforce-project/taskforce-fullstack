@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -20,7 +19,6 @@ import com.taskforce.tf_api.core.dto.response.IssueSpecDraft;
 import com.taskforce.tf_api.core.dto.response.IssueSpecDraft.SimilarNode;
 import com.taskforce.tf_api.core.dto.response.KnowledgeNodeResponse;
 import com.taskforce.tf_api.core.dto.response.SmartAssignResponse;
-import com.taskforce.tf_api.core.enums.AiGenerationKind;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueType;
@@ -30,7 +28,6 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.IssueTypeRepository;
 import com.taskforce.tf_api.core.repository.ProjectLabelRepository;
-import com.taskforce.tf_api.core.service.AiGenerationService;
 import com.taskforce.tf_api.core.service.AiMeter;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.SmartAssignService;
@@ -70,7 +67,6 @@ public class IssueAiService {
     private final LlmClient          llm;
     private final ObjectMapper       objectMapper;
     private final AiMeter            aiMeter; // gate quota + comptage de la conso tokens de la génération de spec
-    private final AiGenerationService aiGenerationService; // data flywheel : capture best-effort des specs (draft -> final)
 
     @Value("${ai.model.assistant:gateway-default}")
     private String model; // ignoré par l'AI Gateway (Ollama impose son modèle) ; utile si provider=groq
@@ -99,8 +95,6 @@ public class IssueAiService {
         List<String> projectTypes = issueTypeRepository.findByProjectIdOrderByName(projectId)
             .stream().map(IssueType::getName).toList();
 
-        long startNs = System.nanoTime();
-        String usedModel = "fallback";
         IssueSpecDraft draft;
         if (!llm.isConfigured()) {
             draft = fallbackDraft(issue, similar);
@@ -122,15 +116,12 @@ public class IssueAiService {
                 String priority = normalizePriority(json.path("priority").asText(null));
                 String type = matchName(json.path("type").asText(null), projectTypes);
                 draft = new IssueSpecDraft(spec, prompt, breakdown, similar, "generated", labels, storyPoints, priority, type);
-                usedModel = model + " (" + tier + ")";
             } catch (Exception ex) {
                 log.warn("Génération spec IA indisponible (issue={}): {}", issueId, ex.getMessage());
                 draft = fallbackDraft(issue, similar);
             }
         }
 
-        // Data flywheel : capture best-effort du draft (opt-in workspace), finalisé à l'approbation.
-        recordSpecDraft(ws, issue, draft, similar, usedModel, (System.nanoTime() - startNs) / 1_000_000, userId);
         return draft;
     }
 
@@ -165,9 +156,6 @@ public class IssueAiService {
             .build();
 
         KnowledgeNodeResponse saved = knowledgeService.createNode(slug, userId, node);
-
-        // Data flywheel : finalise la capture de spec (le draft de la génération devient le final approuvé).
-        recordSpecFinal(ws, issue, req, userId);
 
         // ── Persistance SUR l'issue (l'IA a écrit le ticket, l'humain valide) ──
         if (req.applyToIssue()) {
@@ -248,34 +236,6 @@ public class IssueAiService {
     // =========================================================================
     // Data flywheel — capture des générations de spec (best-effort, opt-in workspace)
     // =========================================================================
-
-    /** Capture le draft de spec à la génération : ligne ouverte, finalisée ensuite à l'approbation. */
-    private void recordSpecDraft(Workspace ws, Issue issue, IssueSpecDraft draft, List<SimilarNode> similar,
-                                 String usedModel, long latencyMs, Long userId) {
-        Map<String, Object> draftMap = new LinkedHashMap<>();
-        draftMap.put("spec", draft.spec());
-        draftMap.put("executionPrompt", draft.executionPrompt());
-        draftMap.put("breakdown", draft.breakdown());
-        draftMap.put("mode", draft.mode());
-        List<Long> contextRefs = similar.stream().map(SimilarNode::nodeId).filter(Objects::nonNull).toList();
-        aiGenerationService.record(AiGenerationService.Capture.builder()
-            .workspaceId(ws.getId()).kind(AiGenerationKind.SPEC).requestRef(identifier(issue))
-            .draft(draftMap).contextRefs(contextRefs)
-            .model(usedModel).latencyMs((int) Math.min(latencyMs, Integer.MAX_VALUE)).userId(userId)
-            .build());
-    }
-
-    /** Finalise la capture à l'approbation : le final retenu (spec éventuellement éditée) → signal + edit distance. */
-    private void recordSpecFinal(Workspace ws, Issue issue, ApproveSpecRequest req, Long userId) {
-        Map<String, Object> finalMap = new LinkedHashMap<>();
-        finalMap.put("spec", req.spec());
-        finalMap.put("executionPrompt", req.executionPrompt());
-        finalMap.put("breakdown", req.breakdown());
-        aiGenerationService.record(AiGenerationService.Capture.builder()
-            .workspaceId(ws.getId()).kind(AiGenerationKind.SPEC).requestRef(identifier(issue))
-            .finalValue(finalMap).userId(userId)
-            .build());
-    }
 
     // =========================================================================
     // Helpers — LLM
