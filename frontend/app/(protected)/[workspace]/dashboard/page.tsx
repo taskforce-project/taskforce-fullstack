@@ -84,7 +84,7 @@ export default function DashboardPage() {
 
   // Tour produit : au 1ᵉʳ dashboard (jamais vu), on le lance après un court délai - le temps que la
   // grille se peigne pour que les cibles `data-tour` existent. `hasSeen` (persisté) évite tout
-  // re-déclenchement. Rejeu depuis l'aide via `?tour=1` (forcé même si déjà vu), puis on nettoie l'URL.
+  // re-déclenchement. Rejeu depuis Ctrl+K via `?tour=1` (forcé même si déjà vu), puis on nettoie l'URL.
   const tourHasSeen = useTourStore((s) => s.hasSeen)
   const tourActive = useTourStore((s) => s.isActive)
   const tourDismissed = useTourStore((s) => s.dismissed)

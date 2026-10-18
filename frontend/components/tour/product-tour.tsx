@@ -16,7 +16,7 @@ import { useTourStore } from "@/lib/store/tour-store";
  * l'app). Piloté au clavier, rendu en portal.</p>
  *
  * <p>Monté une fois dans {@code AppShell} ; rend {@code null} tant que le store n'est pas actif. Déclenché
- * 1× (cf. {@code hasSeen} persisté) au 1ᵉʳ dashboard, rejouable depuis l'aide.</p>
+ * 1× (cf. {@code hasSeen} persisté) au 1ᵉʳ dashboard, rejouable depuis Ctrl+K.</p>
  */
 
 interface TourPoint {

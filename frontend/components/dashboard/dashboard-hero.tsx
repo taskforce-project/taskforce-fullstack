@@ -13,6 +13,7 @@ import { ProjectIcon } from "@/components/ui/project-icon"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { useProjectStore } from "@/lib/store/project-store"
+import { useModKeyLabel } from "@/lib/hooks/use-mod-key"
 
 /** Connecteurs mis en avant dans la pilule (clés du catalogue - cf. ConnectorCatalog.java). */
 const PILL_TOOLS = [
@@ -67,6 +68,7 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
   const params = useParams<{ workspace: string }>()
   const slug = params?.workspace ?? ""
   const router = useRouter()
+  const modKey = useModKeyLabel()
   const openSettings = useSettingsStore((s) => s.openSettings)
   const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
   const projects = useProjectStore((s) => s.projects)
@@ -189,7 +191,7 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
             className="min-w-0 flex-1 bg-transparent text-left text-foreground outline-none placeholder:text-muted-foreground"
           />
           <kbd className="hidden shrink-0 items-center gap-1 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground sm:flex">
-            Ctrl K
+            {modKey} K
           </kbd>
         </div>
 
@@ -240,15 +242,15 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
               <span className="flex items-center gap-1.5">
                 <kbd className="inline-flex size-4 items-center justify-center rounded border border-border bg-muted text-[10px]">↑</kbd>
                 <kbd className="inline-flex size-4 items-center justify-center rounded border border-border bg-muted text-[10px]">↓</kbd>
-                pour naviguer
+                to navigate
               </span>
               <span className="flex items-center gap-1.5">
                 <kbd className="inline-flex h-4 items-center justify-center rounded border border-border bg-muted px-1 text-[10px]">↵</kbd>
-                pour ouvrir
+                to open
               </span>
               <span className="ml-auto flex items-center gap-1.5">
                 <kbd className="inline-flex h-4 items-center justify-center rounded border border-border bg-muted px-1 text-[10px]">esc</kbd>
-                pour fermer
+                to close
               </span>
             </div>
           </div>

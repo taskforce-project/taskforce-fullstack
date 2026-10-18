@@ -26,6 +26,7 @@ import { usePanelStore } from "@/lib/store/panel-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { AgentChat } from "@/components/agent/agent-chat"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { useModKeyLabel } from "@/lib/hooks/use-mod-key"
 
 /**
  * Map a URL segment (slug) to a display label.
@@ -113,6 +114,7 @@ function useBreadcrumbs() {
 export function AppTopbar() {
   const breadcrumbs = useBreadcrumbs()
   const { t } = usePreferencesStore()
+  const modKey = useModKeyLabel()
   const [cmdOpen, setCmdOpen] = React.useState(false)
   const togglePanel = usePanelStore((s) => s.togglePanel)
   const openAssistant = React.useCallback(() => {
@@ -182,7 +184,7 @@ export function AppTopbar() {
           <Search className="size-3.5" />
           <span className="hidden lg:inline">{t.shell.search}</span>
           <Kbd className="hidden lg:inline-flex gap-0.5">
-            <span>⌘</span><span>K</span>
+            <span>{modKey}</span><span>K</span>
           </Kbd>
         </button>
 
