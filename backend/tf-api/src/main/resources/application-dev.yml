@@ -166,6 +166,13 @@ integrations:
     tools-cache-ttl-ms: ${MCP_TOOLS_CACHE_TTL_MS:60000}   # cache tools/list par workspace
     tool-tier: ${MCP_TOOL_TIER:fast}                      # tier LLM des tours avec outils externes (fast|standard|deep)
     allow-private-network: ${MCP_ALLOW_PRIVATE_NETWORK:false} # true = serveurs MCP du réseau interne admis (on-premise)
+# Webhooks sortants (OSS-6.2) : envois signés HMAC-SHA256, tentés jusqu'à 6 fois sur 9 h environ.
+taskforce:
+  webhooks:
+    dispatch-interval-ms: ${WEBHOOKS_DISPATCH_INTERVAL_MS:5000}       # fréquence de la file d'envoi
+    timeout-ms: ${WEBHOOKS_TIMEOUT_MS:10000}                          # attente de la réponse du destinataire
+    allow-private-network: ${WEBHOOKS_ALLOW_PRIVATE_NETWORK:false}    # true = destinataires du réseau interne admis (n8n auto-hébergé)
+
 # Runner local de délégation (ADR-013) : Claude Code exécuté sur le poste de l'utilisateur.
 # Activé en dev ; le client Keycloak du runner se crée avec scripts/keycloak-runner.ps1.
 delivery:
