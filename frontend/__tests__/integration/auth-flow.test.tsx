@@ -189,31 +189,6 @@ describe('Integration Tests - Authentication Flow', () => {
       expect(newResult.current.theme).toBe('dark');
     });
 
-    it('should update translations when language changes', async () => {
-      const { usePreferencesStore } = await import('@/lib/store/preferences-store');
-      const { renderHook, act } = await import('@testing-library/react');
-      
-      const { result } = renderHook(() => usePreferencesStore());
-      
-      act(() => {
-        result.current.setLanguage('en');
-      });
-      const enTranslations = result.current.t;
-
-      act(() => {
-        result.current.setLanguage('fr');
-      });
-      const frTranslations = result.current.t;
-
-      // Translations should be different
-      expect(frTranslations).not.toBe(enTranslations);
-      expect(result.current.language).toBe('fr');
-
-      // Restore default - the preferences store is a module singleton and leaks across tests.
-      act(() => {
-        result.current.setLanguage('en');
-      });
-    });
   });
 
   describe('API Service Integration', () => {

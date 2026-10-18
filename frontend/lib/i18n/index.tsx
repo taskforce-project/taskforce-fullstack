@@ -1,25 +1,12 @@
 "use client"
 
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-} from "react"
+import React, { createContext, useCallback, useContext, useMemo } from "react"
 import { CONSTANTS_EN } from "@/lib/constants_en"
-import { CONSTANTS_FR } from "@/lib/constants_fr"
-import type { TranslationKeys } from "@/lib/constants_en"
 
-export type Locale = "en" | "fr"
-
-const LOCALE_STORAGE_KEY = "tf-locale"
-
-const translations: Record<Locale, TranslationKeys> = {
-  en: CONSTANTS_EN,
-  fr: CONSTANTS_FR,
-}
-
+/**
+ * Textes de l'interface. Le produit est monolingue (anglais) : un seul jeu de constantes. Le passage par
+ * `t("clé")` reste, pour qu'une traduction puisse s'ajouter sans toucher aux composants.
+ */
 function getNestedValue(obj: Record<string, unknown>, path: string): string {
   const result = path.split(".").reduce<unknown>((acc, key) => {
     if (acc && typeof acc === "object" && key in (acc as Record<string, unknown>)) {
@@ -31,38 +18,18 @@ function getNestedValue(obj: Record<string, unknown>, path: string): string {
 }
 
 interface I18nContextType {
-  readonly locale: Locale
-  readonly setLocale: (locale: Locale) => void
   readonly t: (path: string) => string
 }
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined)
 
 export function I18nProvider({ children }: { readonly children: React.ReactNode }) {
-  // App verrouillée en anglais pour la v1 (produit monolingue). On ne lit délibérément PAS le
-  // `tf-locale` sauvegardé : un navigateur ayant stocké "fr" via l'ancien sélecteur (retiré)
-  // afficherait l'UI applicative en français alors que le reste est en anglais. `setLocale` existe
-  // encore pour une future passe i18n ; les constantes FR restent dans l'arbre.
-  const [locale, setLocale] = useState<Locale>("en")
-
-  const updateLocale = useCallback((newLocale: Locale) => {
-    setLocale(newLocale)
-    localStorage.setItem(LOCALE_STORAGE_KEY, newLocale)
-  }, [])
-
   const t = useCallback(
-    (path: string): string =>
-      getNestedValue(
-        translations[locale] as unknown as Record<string, unknown>,
-        path
-      ),
-    [locale]
+    (path: string): string => getNestedValue(CONSTANTS_EN as unknown as Record<string, unknown>, path),
+    []
   )
 
-  const contextValue = useMemo(
-    () => ({ locale, setLocale: updateLocale, t }),
-    [locale, updateLocale, t]
-  )
+  const contextValue = useMemo(() => ({ t }), [t])
 
   return (
     <I18nContext.Provider value={contextValue}>
