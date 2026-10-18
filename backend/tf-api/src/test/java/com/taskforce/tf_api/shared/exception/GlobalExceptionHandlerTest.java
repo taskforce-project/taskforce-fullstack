@@ -11,6 +11,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 import com.taskforce.tf_api.shared.dto.ErrorResponse;
 
@@ -98,6 +99,16 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<ErrorResponse> r = handler.handleIllegalArgument(
             new IllegalArgumentException("argument invalide"), req());
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("méthode non prise en charge → 405 avec l'en-tête Allow")
+    void method_not_allowed_405() {
+        ResponseEntity<ErrorResponse> r = handler.handleMethodNotSupported(
+            new HttpRequestMethodNotSupportedException("GET", List.of("POST")), req());
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(r.getHeaders().getAllow()).containsExactly(org.springframework.http.HttpMethod.POST);
+        assertThat(r.getBody().getMessage()).contains("not allowed");
     }
 
     @Test
