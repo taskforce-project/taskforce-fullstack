@@ -102,7 +102,6 @@ export async function getAnalyticsWorkload(slug: string, days = 14): Promise<Wor
 
 export interface AiInsight {
   agent: string;
-  agentColor: string;
   category: string;
   urgency: "low" | "medium" | "high";
   confidence: number;

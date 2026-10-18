@@ -296,9 +296,10 @@ export const ASSISTANT_ROUTES = {
 
 /**
  * Consommation IA (tokens) du workspace - mois courant + plafond de l'instance (illimité par défaut).
- * Backend: @RequestMapping("/api/workspaces/{slug}/ai")
+ * Backend: @RequestMapping("/api/workspaces/{slug}/ai"). État de l'IA de l'instance : GET /api/ai/status.
  */
 export const AI_ROUTES = {
+  STATUS: "/api/ai/status",
   USAGE: (slug: string) => `/api/workspaces/${slug}/ai/usage`,
   CONVERSATIONS: (slug: string) => `/api/workspaces/${slug}/ai/conversations`,
   CONVERSATION: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}`,
