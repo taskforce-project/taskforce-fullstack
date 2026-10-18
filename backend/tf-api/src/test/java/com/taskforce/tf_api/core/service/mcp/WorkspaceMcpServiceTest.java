@@ -119,6 +119,21 @@ class WorkspaceMcpServiceTest {
     }
 
     @Test
+    @DisplayName("execute() retrouve un outil par le nom assaini qu'en voit Cortex, et l'appelle par son nom d'origine")
+    void execute_resolves_the_name_exposed_to_cortex() throws Exception {
+        ConnectorConnection conn = ConnectorConnection.builder().connectorKey("linear")
+            .config("{\"mcpUrl\":\"http://x/mcp\",\"mcpAllow\":\"issues.create\"}").build();
+        when(repository.findByWorkspaceIdAndConnectorKey(1L, "linear")).thenReturn(Optional.of(conn));
+        when(client.initialize(any())).thenReturn(session);
+        when(client.listTools(session)).thenReturn(List.of(def("issues.list"), def("issues.create")));
+        when(client.callTool(eq(session), eq("issues.create"), any())).thenReturn("DONE");
+
+        // Le point n'est pas admis dans un nom d'outil côté modèle : Cortex propose « linear__issues_create ».
+        assertThat(service.execute(1L, "linear__issues_create", Map.of(), true)).isEqualTo("DONE");
+        verify(client).callTool(eq(session), eq("issues.create"), any());
+    }
+
+    @Test
     @DisplayName("execute() refuse une écriture à un simple membre, sans appeler l'outil (OSS-1.5)")
     void execute_refuses_write_without_manager_role() throws Exception {
         when(repository.findByWorkspaceIdAndConnectorKey(1L, "linear")).thenReturn(Optional.of(mcpConnector()));
@@ -153,6 +168,22 @@ class WorkspaceMcpServiceTest {
         assertThatThrownBy(() -> service.execute(1L, "linear__delete_issue", Map.of(), true))
             .isInstanceOf(ForbiddenException.class);
         verify(client, never()).initialize(any());
+    }
+
+    @Test
+    @DisplayName("execute() n'exécute jamais un outil désactivé qui porte le même nom assaini qu'un outil autorisé")
+    void execute_never_picks_a_disabled_lookalike() throws Exception {
+        // Seul « issues.create » est activé : Cortex le voit sous « linear__issues_create », nom que porte aussi
+        // l'outil désactivé « issues_create ».
+        ConnectorConnection conn = ConnectorConnection.builder().connectorKey("linear")
+            .config("{\"mcpUrl\":\"http://x/mcp\",\"mcpAllow\":\"issues.create\"}").build();
+        when(repository.findByWorkspaceIdAndConnectorKey(1L, "linear")).thenReturn(Optional.of(conn));
+        when(client.initialize(any())).thenReturn(session);
+        when(client.listTools(session)).thenReturn(List.of(def("issues_create"), def("issues.create")));
+        when(client.callTool(eq(session), eq("issues.create"), any())).thenReturn("DONE");
+
+        assertThat(service.execute(1L, "linear__issues_create", Map.of(), true)).isEqualTo("DONE");
+        verify(client, never()).callTool(any(), eq("issues_create"), any());
     }
 
     @Test

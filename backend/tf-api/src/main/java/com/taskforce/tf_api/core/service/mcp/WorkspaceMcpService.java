@@ -104,6 +104,11 @@ public class WorkspaceMcpService {
      * toolRef} = nom namespacé {@code <connecteur>__<outil>}. L'appartenance au workspace est vérifiée en
      * amont par le contrôleur.
      *
+     * <p>Cortex nomme l'outil par son nom exposé (assaini et borné, cf. {@link ExternalMcpTool}), la console
+     * par son nom d'origine : les deux formes sont reconnues, et le serveur est toujours appelé avec le nom
+     * d'origine. Sans cela, un outil au nom pointé ({@code issues.create}) proposé par Cortex échouait à la
+     * validation.</p>
+     *
      * <p>OSS-1.5 : un outil qui modifie des données (sans indice {@code readOnlyHint}, donc traité comme une
      * écriture) n'est exécuté que si {@code canWrite} (propriétaire ou administrateur du workspace). L'outil
      * doit aussi figurer dans l'allow-list du connecteur quand elle existe, comme pour la liste affichée.</p>
@@ -119,25 +124,36 @@ public class WorkspaceMcpService {
         McpClient.ServerRef ref = toServerRef(conn);
         if (ref == null) throw new BusinessException("The connector " + connectorKey + " is not an MCP server (mcpUrl missing)");
 
+        // Allow-list (noms d'origine) : refus sans ouvrir de session si aucun outil autorisé ne porte ce nom.
         Set<String> allow = allowList(conn);
-        if (!allow.isEmpty() && !allow.contains(toolName)) {
+        if (!allow.isEmpty() && allow.stream().noneMatch(a -> refersTo(a, connectorKey, toolName, toolRef))) {
             throw new ForbiddenException("This tool is not enabled for this workspace: " + toolName);
         }
 
         McpClient.Session session = client.initialize(ref);
         try {
-            McpClient.ToolDef def = client.listTools(session).stream()
-                .filter(t -> t.name().equals(toolName))
-                .findFirst()
+            // Seuls les outils activés comptent (ceux que voit Cortex) ; à nom assaini égal, le nom d'origine
+            // identique à la référence l'emporte.
+            List<McpClient.ToolDef> candidates = client.listTools(session).stream()
+                .filter(t -> allow.isEmpty() || allow.contains(t.name()))
+                .filter(t -> refersTo(t.name(), connectorKey, toolName, toolRef))
+                .toList();
+            McpClient.ToolDef def = candidates.stream().filter(t -> t.name().equals(toolName)).findFirst()
+                .or(() -> candidates.stream().findFirst())
                 .orElseThrow(() -> new ResourceNotFoundException("MCP tool not found: " + toolName));
             if (!def.readOnly() && !canWrite) {
                 throw new ForbiddenException(
                     "Only workspace owners and admins can run an action that changes data in an external tool.");
             }
-            return client.callTool(session, toolName, args);
+            return client.callTool(session, def.name(), args);
         } finally {
             client.close(session);
         }
+    }
+
+    /** Le nom d'origine {@code originalName} est-il celui que désigne la référence, brute ou exposée à Cortex ? */
+    private static boolean refersTo(String originalName, String connectorKey, String toolName, String toolRef) {
+        return originalName.equals(toolName) || ExternalMcpTool.buildName(connectorKey, originalName).equals(toolRef);
     }
 
     /**
