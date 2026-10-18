@@ -22,6 +22,20 @@ export interface RunResult {
   error?: string;
 }
 
+/** Événement de la chronologie d'un run (miroir de `RunnerEventsRequest` côté backend). */
+export interface RunnerEvent {
+  kind: string;
+  tool?: string;
+  text: string;
+}
+
+/** Demande de validation d'une action de l'agent, décidée dans TaskForce par la personne qui a délégué. */
+export interface Approval {
+  approvalId: number;
+  status: "PENDING" | "ALLOWED" | "DENIED" | "EXPIRED";
+  expiresAt: string;
+}
+
 export class ApiError extends Error {
   constructor(readonly status: number, message: string) {
     super(message);
@@ -48,7 +62,7 @@ export class TaskforceApi {
       clientId: this.config.clientId,
       clientSecret: this.config.clientSecret,
     }, false);
-    if (!body?.accessToken) throw new Error("Réponse sans jeton");
+    if (!body?.accessToken) throw new Error("The token response has no token");
     this.cached = { token: body.accessToken, expiresAt: Date.now() + body.expiresIn * 1000 };
     return this.cached;
   }
@@ -63,6 +77,20 @@ export class TaskforceApi {
 
   async result(runId: number, result: RunResult): Promise<void> {
     await this.send("POST", `/delivery/runner/runs/${runId}/result`, result);
+  }
+
+  /** Ajoute des événements à la chronologie du run (suivi en direct dans l'app). */
+  async events(runId: number, events: RunnerEvent[]): Promise<void> {
+    await this.send("POST", `/delivery/runner/runs/${runId}/events`, { events });
+  }
+
+  /** Ouvre une demande de validation : la personne qui a délégué autorise ou refuse dans l'app. */
+  requestApproval(runId: number, tool: string, summary: string): Promise<Approval> {
+    return this.send<Approval>("POST", `/delivery/runner/runs/${runId}/approvals`, { tool, summary });
+  }
+
+  approvalStatus(runId: number, approvalId: number): Promise<Approval> {
+    return this.send<Approval>("GET", `/delivery/runner/runs/${runId}/approvals/${approvalId}`);
   }
 
   private async send<T>(method: "GET" | "POST", path: string, body?: unknown, authenticated = true): Promise<T> {

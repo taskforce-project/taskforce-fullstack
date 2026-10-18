@@ -2,68 +2,90 @@
 /**
  * Agent de SUBSTITUTION pour éprouver le runner de bout en bout sans consommer Claude.
  *
- * Se lance à la place de `claude` (mêmes arguments, prompt sur stdin, résultat JSON sur stdout) et fait
- * ce qu'un agent ferait, en vrai : il démarre le serveur MCP TaskForce décrit par `--mcp-config`, lit
- * l'issue, la commente, SONDE les limites de la session déléguée (ce qui doit être refusé l'est-il ?),
- * puis laisse un commit dans le worktree.
+ * Se lance à la place de `claude` (mêmes arguments, prompt sur stdin, sortie `stream-json` sur stdout) et fait ce
+ * qu'un agent ferait, en vrai : il parle au serveur MCP de l'instance décrit par `--mcp-config` (HTTP, session
+ * déléguée), lit l'issue, la commente, SONDE les limites de la session (ce qui doit être refusé l'est-il ?),
+ * demande une validation par le hook `PermissionRequest` du fichier `--settings` (comme Claude Code le ferait pour
+ * `npm test`), puis laisse un commit dans le worktree.
  *
  * Usage : dans runner.config.json, `"agent": { "command": ".../test/fixtures/stub-agent" }`
  * (`stub-agent.cmd` sous Windows). Jamais en production.
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const here = dirname(fileURLToPath(import.meta.url));
-const mcpPackage = resolve(here, "..", "..", "..", "taskforce-mcp", "package.json");
-const requireFromMcp = createRequire(mcpPackage);
-const { Client } = requireFromMcp("@modelcontextprotocol/sdk/client/index.js");
-const { StdioClientTransport } = requireFromMcp("@modelcontextprotocol/sdk/client/stdio.js");
+import { join } from "node:path";
 
 if (process.argv.includes("--version")) {
-  console.log("stub-agent 0.1.0 (taskforce-runner test fixture, no LLM)");
+  console.log("2.1.293 (stub-agent: taskforce-runner test fixture, no LLM)");
   process.exit(0);
 }
 
-function argValue(flag) {
+const emit = (line) => process.stdout.write(JSON.stringify(line) + "\n");
+const argValue = (flag) => {
   const i = process.argv.indexOf(flag);
   return i >= 0 ? process.argv[i + 1] : undefined;
-}
-
-async function readStdin() {
-  let data = "";
-  for await (const chunk of process.stdin) data += chunk;
-  return data;
-}
+};
 
 function finish(ok, result) {
-  process.stdout.write(JSON.stringify({
-    type: "result", subtype: ok ? "success" : "error_during_execution", is_error: !ok,
-    result, num_turns: 1, total_cost_usd: 0, session_id: "stub",
-  }) + "\n");
+  emit({ type: "result", subtype: ok ? "success" : "error_during_execution", is_error: !ok, result, num_turns: 1,
+    total_cost_usd: 0, session_id: "stub" });
+  emit({ type: "system", subtype: "task_summary" });
   process.exit(ok ? 0 : 1);
 }
 
-const prompt = await readStdin();
+let prompt = "";
+for await (const chunk of process.stdin) prompt += chunk;
 const ids = /projectId (\d+), issueId (\d+)/.exec(prompt);
-if (!ids) finish(false, "stub-agent: projectId/issueId introuvables dans le prompt");
+if (!ids) finish(false, "stub-agent: projectId/issueId not found in the prompt");
 const projectId = Number(ids[1]);
 const issueId = Number(ids[2]);
 
-const mcpConfig = JSON.parse(readFileSync(argValue("--mcp-config"), "utf8"));
-const server = mcpConfig.mcpServers.taskforce;
-const client = new Client({ name: "taskforce-runner-stub-agent", version: "0.1.0" });
-await client.connect(new StdioClientTransport({
-  command: server.command, args: server.args, env: { ...process.env, ...server.env },
-}));
+emit({ type: "system", subtype: "init", model: "stub", claude_code_version: "stub-agent" });
 
-const call = async (name, args) => {
-  const res = await client.callTool({ name, arguments: args });
-  const text = res.content?.[0]?.text ?? "";
-  return { refused: res.isError === true, text };
-};
+// ---------------------------------------------------------------- serveur MCP de l'instance (HTTP)
+const server = JSON.parse(readFileSync(argValue("--mcp-config"), "utf8")).mcpServers.taskforce;
+let rpcId = 0;
+async function rpc(method, params) {
+  const res = await fetch(server.url, {
+    method: "POST",
+    headers: { ...server.headers, "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }),
+  });
+  if (!res.ok) throw new Error(`MCP ${method}: HTTP ${res.status}`);
+  return (await res.json()).result;
+}
+await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "stub-agent", version: "0.2.0" } });
+
+async function call(name, args) {
+  const id = `toolu_stub_${rpcId + 1}`;
+  emit({ type: "assistant", message: { content: [{ type: "tool_use", id, name: `mcp__taskforce__${name}`, input: args }] } });
+  const result = await rpc("tools/call", { name, arguments: args });
+  const text = result?.content?.[0]?.text ?? "";
+  emit({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: id, is_error: result?.isError === true, content: text }] } });
+  return { refused: result?.isError === true, text };
+}
+
+// ---------------------------------------------------------------- validation par le hook PermissionRequest
+async function askApproval(command) {
+  const hook = JSON.parse(readFileSync(argValue("--settings"), "utf8")).hooks.PermissionRequest[0].hooks[0];
+  const headers = Object.fromEntries(Object.entries(hook.headers ?? {}).map(([key, value]) => [
+    key, String(value).replace(/\$([A-Z_][A-Z0-9_]*)/g, (_, name) => (hook.allowedEnvVars ?? []).includes(name) ? process.env[name] ?? "" : ""),
+  ]));
+  emit({ type: "assistant", message: { content: [{ type: "tool_use", id: "toolu_stub_bash", name: "Bash", input: { command } }] } });
+  const res = await fetch(hook.url, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ hook_event_name: "PermissionRequest", tool_name: "Bash", tool_input: { command } }),
+    signal: AbortSignal.timeout(hook.timeout * 1000),
+  });
+  const decision = (await res.json()).hookSpecificOutput?.decision ?? { behavior: "deny", message: "no decision" };
+  if (decision.behavior === "allow") {
+    emit({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_stub_bash", is_error: false, content: "(simulated) tests passed" }] } });
+    return true;
+  }
+  emit({ type: "system", subtype: "permission_denied", tool_name: "Bash", message: decision.message ?? "Denied" });
+  return false;
+}
 
 const lines = [];
 const expect = (label, outcome, shouldBeRefused) => {
@@ -73,25 +95,30 @@ const expect = (label, outcome, shouldBeRefused) => {
 };
 
 let allPass = true;
+allPass &= expect("read the delegated issue", await call("get_issue", { projectId, issueId }), false);
+allPass &= expect("list workspace projects (read)", await call("list_projects", {}), false);
+allPass &= expect("search the Brain OS (read via POST)", await call("brain_search", { query: "architecture" }), false);
+allPass &= expect("comment the delegated issue (write, in scope)",
+  await call("add_comment", { projectId, issueId, content: "Runner self-test: the delegated session reached this issue through the MCP server of the instance." }), false);
+// Hors périmètre : un AUTRE projet du même workspace, puis Cortex (niveau workspace).
+allPass &= expect("create an issue in ANOTHER project (write, out of scope)",
+  await call("create_issue", { projectId: projectId + 1, title: "must be refused" }), true);
+allPass &= expect("ask Cortex (workspace level, out of scope)", await call("ask_cortex", { message: "hello from the stub agent" }), true);
+
+const approved = await askApproval("npm test");
+lines.push(`- INFO approval of "npm test" in TaskForce: ${approved ? "allowed" : "denied"}`);
+
+let committed = false;
 try {
-  const issue = await call("taskforce_get_issue", { projectId, issueId });
-  allPass &= expect("read the delegated issue", issue, false);
-  allPass &= expect("list workspace projects (read)", await call("taskforce_list_projects", {}), false);
-  allPass &= expect("search the Brain OS (read via POST)", await call("taskforce_brain_search", { query: "architecture" }), false);
-  allPass &= expect("comment the delegated issue (write, in scope)",
-    await call("taskforce_add_comment", { projectId, issueId, content: "Runner self-test: delegated session reached this issue through the TaskForce MCP." }), false);
-  // Hors périmètre : un AUTRE projet du même workspace, puis une écriture de niveau workspace.
-  allPass &= expect("create an issue in ANOTHER project (write, out of scope)",
-    await call("taskforce_create_issue", { projectId: projectId + 1, title: "must be refused" }), true);
-  allPass &= expect("ask Cortex (workspace-level write, out of scope)",
-    await call("taskforce_ask_cortex", { message: "hello from the stub agent" }), true);
-} finally {
-  await client.close();
+  execFileSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd: process.cwd(), stdio: "ignore" });
+  writeFileSync(join(process.cwd(), "RUNNER_SELFTEST.md"),
+    `# Runner self-test\n\nProduced by the stub agent for issue ${issueId} (project ${projectId}).\n\n${lines.join("\n")}\n`);
+  execFileSync("git", ["add", "RUNNER_SELFTEST.md"], { cwd: process.cwd() });
+  execFileSync("git", ["commit", "-m", "test: runner self-test"], { cwd: process.cwd() });
+  committed = true;
+} catch {
+  // tâche sans dépôt : rien à commiter, le commentaire tient lieu de livrable
 }
 
-writeFileSync(join(process.cwd(), "RUNNER_SELFTEST.md"),
-  `# Runner self-test\n\nProduced by the stub agent for issue ${issueId} (project ${projectId}).\n\n${lines.join("\n")}\n`);
-execFileSync("git", ["add", "RUNNER_SELFTEST.md"], { cwd: process.cwd() });
-execFileSync("git", ["commit", "-m", "test: runner self-test"], { cwd: process.cwd() });
-
-finish(Boolean(allPass), `Stub agent run (no LLM involved). Delegated-session checks:\n${lines.join("\n")}\n\nOne commit added (RUNNER_SELFTEST.md).`);
+finish(Boolean(allPass), `Stub agent run (no LLM involved). Delegated-session checks:\n${lines.join("\n")}\n\n`
+  + (committed ? "One commit added (RUNNER_SELFTEST.md)." : "No repository: the comment is the deliverable."));

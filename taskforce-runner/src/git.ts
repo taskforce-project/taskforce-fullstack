@@ -95,7 +95,7 @@ export async function runSetup(worktree: Worktree, commands: string[][]): Promis
     if (!file) continue;
     const result = await run(file, args, { cwd: worktree.path, timeoutMs: 15 * 60_000 });
     if (result.code !== 0) {
-      throw new Error(`Commande de préparation en échec (« ${[file, ...args].join(" ")} », code ${result.code})`);
+      throw new Error(`Setup command failed ("${[file, ...args].join(" ")}", code ${result.code})`);
     }
   }
 }
@@ -136,7 +136,7 @@ export async function openPullRequest(
       "--body-file", bodyFile,
     ], { cwd: worktree.path, timeoutMs: 2 * 60_000 });
     const url = out.split(/\r?\n/).map((l) => l.trim()).filter((l) => /^https?:\/\//.test(l)).pop();
-    if (!url) throw new Error(`gh pr create n'a pas rendu d'URL : ${out.slice(-200)}`);
+    if (!url) throw new Error(`gh pr create returned no URL: ${out.slice(-200)}`);
     return url;
   } finally {
     rmSync(bodyFile, { force: true });

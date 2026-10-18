@@ -2,7 +2,7 @@
   "name": "taskforce-runner",
   "version": "0.1.0",
   "license": "AGPL-3.0-only",
-  "description": "Runner local de délégation TaskForce (ADR-013) : réclame les tâches déléguées à Claude Code, lance Claude Code sans interface dans un worktree git, ouvre la pull request et rend le résultat à TaskForce.",
+  "description": "Local delegation runner of TaskForce: picks up the tasks you delegate to Claude Code, runs your own Claude Code headless in a git worktree with approvals in TaskForce, opens the pull request and reports back.",
   "type": "module",
   "private": true,
   "bin": {

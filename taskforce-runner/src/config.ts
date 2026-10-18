@@ -34,8 +34,13 @@ export interface AgentConfig {
   timeoutMinutes: number;
   /** false = pas de mention « Co-Authored-By: Claude » dans les commits de l'agent. */
   attribution: boolean;
-  /** Outils autorisés en plus du socle (ex. `Bash(npm test:*)`). */
+  /** Outils autorisés en plus du socle (ex. `Bash(npm test *)`). */
   extraAllowedTools: string[];
+  /**
+   * Attente d'une décision dans TaskForce quand l'agent demande une action hors du socle (OSS-5.4). Sans réponse
+   * dans ce délai, l'action est refusée.
+   */
+  approvalTimeoutMinutes: number;
 }
 
 export interface RunnerConfig {
@@ -62,8 +67,6 @@ export interface RunnerConfig {
    */
   acceptRepoless: boolean;
   agent: AgentConfig;
-  /** Entrée du serveur MCP TaskForce (dist/index.js de taskforce-mcp). */
-  mcpEntry: string;
 }
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -87,7 +90,7 @@ export function parseEnvFile(content: string): Record<string, string> {
 function asPositiveInt(value: unknown, fallback: number, label: string): number {
   if (value === undefined || value === null) return fallback;
   if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
-    throw new Error(`Configuration : ${label} doit être un entier positif`);
+    throw new Error(`Configuration: ${label} must be a positive integer`);
   }
   return value;
 }
@@ -99,7 +102,7 @@ function asCommandList(value: unknown, label: string): string[][] {
     (cmd) => Array.isArray(cmd) && cmd.length > 0 && cmd.every((part) => typeof part === "string" && part.length > 0),
   );
   if (!valid) {
-    throw new Error(`Configuration : ${label} doit être une liste de commandes en tableaux d'arguments, ex. [["npm", "ci"]]`);
+    throw new Error(`Configuration: ${label} must be a list of commands, each an array of arguments, e.g. [["npm", "ci"]]`);
   }
   return value as string[][];
 }
@@ -107,33 +110,33 @@ function asCommandList(value: unknown, label: string): string[][] {
 function asStringArray(value: unknown, label: string): string[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value) || value.some((v) => typeof v !== "string")) {
-    throw new Error(`Configuration : ${label} doit être une liste de chaînes`);
+    throw new Error(`Configuration: ${label} must be a list of strings`);
   }
   return value as string[];
 }
 
 /** Valide le contenu de `runner.config.json` (objet déjà parsé). Exporté pour les tests. */
-export function parseRunnerConfigFile(json: unknown): Omit<RunnerConfig, "apiUrl" | "clientId" | "clientSecret" | "home" | "mcpEntry"> {
-  if (typeof json !== "object" || json === null) throw new Error("Configuration : objet JSON attendu");
+export function parseRunnerConfigFile(json: unknown): Omit<RunnerConfig, "apiUrl" | "clientId" | "clientSecret" | "home"> {
+  if (typeof json !== "object" || json === null) throw new Error("Configuration: a JSON object is expected");
   const cfg = json as Record<string, unknown>;
 
   const repos: Record<string, RepoConfig> = {};
   const rawRepos = (cfg.repos ?? {}) as Record<string, unknown>;
-  if (typeof rawRepos !== "object" || rawRepos === null) throw new Error("Configuration : repos doit être un objet");
+  if (typeof rawRepos !== "object" || rawRepos === null) throw new Error("Configuration: repos must be an object");
   for (const [fullName, value] of Object.entries(rawRepos)) {
     if (!/^[\w.-]+\/[\w.-]+$/.test(fullName)) {
-      throw new Error(`Configuration : « ${fullName} » n'est pas un dépôt « owner/name »`);
+      throw new Error(`Configuration: "${fullName}" is not an "owner/name" repository`);
     }
     const repo = (typeof value === "string" ? { path: value } : value) as Record<string, unknown> | null;
     if (!repo || typeof repo.path !== "string" || !repo.path.trim()) {
-      throw new Error(`Configuration : repos["${fullName}"].path est obligatoire`);
+      throw new Error(`Configuration: repos["${fullName}"].path is required`);
     }
     if (!isAbsolute(repo.path)) {
-      throw new Error(`Configuration : repos["${fullName}"].path doit être un chemin absolu`);
+      throw new Error(`Configuration: repos["${fullName}"].path must be an absolute path`);
     }
     const baseBranch = repo.baseBranch === undefined ? "main" : repo.baseBranch;
     if (typeof baseBranch !== "string" || !/^[\w./-]+$/.test(baseBranch)) {
-      throw new Error(`Configuration : repos["${fullName}"].baseBranch invalide`);
+      throw new Error(`Configuration: repos["${fullName}"].baseBranch is not a valid branch name`);
     }
     repos[fullName.toLowerCase()] = {
       path: repo.path,
@@ -144,10 +147,10 @@ export function parseRunnerConfigFile(json: unknown): Omit<RunnerConfig, "apiUrl
 
   const rawAgent = (cfg.agent ?? {}) as Record<string, unknown>;
   const model = rawAgent.model === undefined || rawAgent.model === null ? null : rawAgent.model;
-  if (model !== null && typeof model !== "string") throw new Error("Configuration : agent.model doit être une chaîne ou null");
+  if (model !== null && typeof model !== "string") throw new Error("Configuration: agent.model must be a string or null");
   const auth = rawAgent.auth === undefined ? "subscription" : rawAgent.auth;
   if (auth !== "subscription" && auth !== "api-key") {
-    throw new Error('Configuration : agent.auth doit valoir "subscription" ou "api-key"');
+    throw new Error('Configuration: agent.auth must be "subscription" or "api-key"');
   }
 
   return {
@@ -166,6 +169,7 @@ export function parseRunnerConfigFile(json: unknown): Omit<RunnerConfig, "apiUrl
       timeoutMinutes: asPositiveInt(rawAgent.timeoutMinutes, 45, "agent.timeoutMinutes"),
       attribution: rawAgent.attribution === true,
       extraAllowedTools: asStringArray(rawAgent.extraAllowedTools, "agent.extraAllowedTools"),
+      approvalTimeoutMinutes: Math.min(asPositiveInt(rawAgent.approvalTimeoutMinutes, 10, "agent.approvalTimeoutMinutes"), 60),
     },
   };
 }
@@ -181,8 +185,8 @@ export function loadConfig(): RunnerConfig {
   const clientSecret = env("TASKFORCE_RUNNER_CLIENT_SECRET") ?? "";
   if (!clientId || !clientSecret) {
     throw new Error(
-      "Identifiants du runner absents. Lancer : .\\scripts\\keycloak-runner.ps1 -Owner <e-mail> -Name <nom> " +
-        "(écrit taskforce-runner/.env).",
+      "Runner credentials are missing. In TaskForce, open Settings > Agents, set up your local runner, and save the "
+        + "credentials it shows as taskforce-runner/.env.",
     );
   }
 
@@ -191,14 +195,11 @@ export function loadConfig(): RunnerConfig {
     ? parseRunnerConfigFile(JSON.parse(readFileSync(configPath, "utf8")))
     : parseRunnerConfigFile({});
 
-  const mcpEntry = env("TASKFORCE_MCP_ENTRY") ?? resolve(PACKAGE_ROOT, "..", "taskforce-mcp", "dist", "index.js");
-
   return {
     ...fileConfig,
     apiUrl,
     clientId,
     clientSecret,
     home: env("TASKFORCE_RUNNER_HOME") ?? join(homedir(), ".taskforce-runner"),
-    mcpEntry,
   };
 }
