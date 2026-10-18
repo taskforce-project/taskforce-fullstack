@@ -27,6 +27,7 @@ import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { getGitHubRepos, getGitHubRepoIssues, syncGitHub, syncSlack, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { IntegrationsCatalog } from "@/components/integrations/integrations-catalog"
+import { WebhooksPanel } from "@/components/settings/webhooks-panel"
 import { AgentsPanel } from "@/components/settings/agents-panel"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { ProfileOverview } from "@/components/profile/profile-overview"
@@ -1254,11 +1255,10 @@ function IntegrationsPanel() {
   const { activeWorkspace } = useWorkspaceStore()
   const slug = activeWorkspace?.slug ?? ""
   const {
-    githubStatus, slackStatus, slackChannels, webhooks,
+    githubStatus, slackStatus, slackChannels,
     fetchGitHubStatus, disconnectGitHub,
     fetchSlackStatus, disconnectSlack,
     fetchSlackChannels, addSlackChannel, removeSlackChannel,
-    fetchWebhooks, addWebhook, removeWebhook,
   } = useIntegrationStore()
 
   // Slack channel form
@@ -1267,19 +1267,11 @@ function IntegrationsPanel() {
   const [addingChannel, setAddingChannel] = useState(false)
   const [syncingChannel, setSyncingChannel] = useState<string | null>(null)
 
-  // Webhook form
-  const [webhookUrl,    setWebhookUrl]    = useState("")
-  const [webhookEvents, setWebhookEvents] = useState<string[]>(["issue.created"])
-  const [addingWebhook, setAddingWebhook] = useState(false)
-
-  const ALL_EVENTS = ["issue.created", "issue.updated", "issue.deleted", "cycle.completed", "comment.created"]
-
   useEffect(() => {
     if (!slug) return
     fetchGitHubStatus(slug).catch(() => null)
     fetchSlackStatus(slug).catch(() => null)
-    fetchWebhooks(slug).catch(() => null)
-  }, [slug, fetchGitHubStatus, fetchSlackStatus, fetchWebhooks])
+  }, [slug, fetchGitHubStatus, fetchSlackStatus])
 
   useEffect(() => {
     if (slug && slackStatus?.connected) {
@@ -1330,26 +1322,6 @@ function IntegrationsPanel() {
     } finally {
       setSyncingChannel(null)
     }
-  }
-
-  async function handleAddWebhook() {
-    if (!webhookUrl.trim()) return
-    setAddingWebhook(true)
-    try {
-      await addWebhook(slug, { url: webhookUrl.trim(), eventTypes: webhookEvents })
-      setWebhookUrl("")
-      toast.success("Webhook added")
-    } catch {
-      toast.error("Invalid or unreachable URL")
-    } finally {
-      setAddingWebhook(false)
-    }
-  }
-
-  function toggleEvent(event: string) {
-    setWebhookEvents((prev) =>
-      prev.includes(event) ? prev.filter((e) => e !== event) : [...prev, event]
-    )
   }
 
   return (
@@ -1467,68 +1439,9 @@ function IntegrationsPanel() {
         </SectionCard>
       )}
 
-      {/* ---- Webhooks ---- */}
-      <SectionCard title="Webhooks" description="Receive HTTP POST events for workspace activity.">
-        <div className="flex flex-col gap-3">
-          {webhooks.length > 0 && (
-            <div className="flex flex-col gap-2 mb-1">
-              {webhooks.map((wh) => (
-                <div key={wh.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
-                  <div className="min-w-0 mr-2">
-                    <p className="text-sm font-mono text-foreground truncate">{wh.url}</p>
-                    <p className="text-xs text-muted-foreground">{wh.eventTypes.join(", ")}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {wh.lastStatus && (
-                      <Badge variant="outline" className={cn("text-xs", wh.lastStatus < 300 ? "text-ink-green border-shape-green/20" : "text-destructive border-destructive/20")}>
-                        {wh.lastStatus}
-                      </Badge>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                      onClick={async () => {
-                        try { await removeWebhook(slug, wh.id); toast.success("Webhook removed") }
-                        catch { toast.error("Couldn't remove the webhook") }
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex gap-2">
-            <StyledInput
-              type="url"
-              placeholder="https://example.com/webhook"
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-            />
-            <Button size="sm" className="h-control text-xs shrink-0" disabled={!webhookUrl || addingWebhook} onClick={handleAddWebhook}>
-              {addingWebhook ? "Adding…" : "Add webhook"}
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {ALL_EVENTS.map((event) => (
-              <button
-                key={event}
-                type="button"
-                onClick={() => toggleEvent(event)}
-                className={cn(
-                  "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
-                  webhookEvents.includes(event)
-                    ? "border-primary/50 bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground hover:border-primary/30"
-                )}
-              >
-                {event}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* ---- Webhooks sortants (OSS-6.2) ---- */}
+      <SectionCard title="Webhooks" description="Send workspace events to n8n, Zapier, Make or your own endpoint.">
+        {slug && <WebhooksPanel slug={slug} />}
       </SectionCard>
     </div>
   )

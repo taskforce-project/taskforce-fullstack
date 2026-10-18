@@ -400,6 +400,12 @@ export const INTEGRATION_ROUTES = {
   SLACK_SYNC:        (slug: string, channel: string) => `/api/workspaces/${slug}/integrations/slack/sync?channel=${encodeURIComponent(channel)}`,
   WEBHOOKS:          (slug: string) => `/api/workspaces/${slug}/webhooks`,
   WEBHOOK:           (slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}`,
+  /** Nouveau secret de signature (montré une fois) */
+  WEBHOOK_SECRET:    (slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}/secret`,
+  /** Envoi immédiat de l'événement de test « ping » */
+  WEBHOOK_TEST:      (slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}/test`,
+  /** 20 derniers envois d'un webhook */
+  WEBHOOK_DELIVERIES:(slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}/deliveries`,
   /** Catalogue : intégrations natives, préréglages MCP, serveurs MCP du workspace, avec leur statut */
   CATALOG:           (slug: string) => `/api/workspaces/${slug}/integrations/catalog`,
   /** Serveurs MCP externes du workspace (GET statut · POST connect · DELETE par clé) → outils live dans Cortex */

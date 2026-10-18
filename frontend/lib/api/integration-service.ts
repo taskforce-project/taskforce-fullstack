@@ -56,20 +56,45 @@ export interface SlackChannelPayload {
   eventTypes: string[];
 }
 
+/** Événements auxquels un webhook peut s'abonner (miroir de WebhookEventType côté backend). */
+export const WEBHOOK_EVENTS = ["issue.created", "issue.updated", "issue.deleted", "comment.created", "cycle.completed"] as const;
+
 export interface Webhook {
   id: number;
   url: string;
+  /** Vide = tous les événements. */
   eventTypes: string[];
+  /** Faux = en pause : rien n'est envoyé. */
   active: boolean;
   lastFiredAt: string | null;
+  /** Code HTTP du dernier envoi ; null si le serveur n'a pas répondu (ou rien d'envoyé, `lastFiredAt` null). */
   lastStatus: number | null;
   createdAt: string;
 }
 
 export interface WebhookPayload {
   url: string;
-  secret?: string;
   eventTypes: string[];
+  active?: boolean;
+}
+
+/** Webhook créé et son secret de signature, montré cette seule fois. */
+export interface CreatedWebhook {
+  webhook: Webhook;
+  secret: string;
+}
+
+/** Un envoi : en attente (nouvelle tentative le `nextAttemptAt`), livré ou abandonné. */
+export interface WebhookDelivery {
+  deliveryId: string;
+  eventType: string;
+  status: "PENDING" | "DELIVERED" | "FAILED";
+  attempts: number;
+  lastStatus: number | null;
+  lastError: string | null;
+  createdAt: string;
+  deliveredAt: string | null;
+  nextAttemptAt: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -216,8 +241,9 @@ export async function getWebhooks(slug: string): Promise<Webhook[]> {
   return res.data.data;
 }
 
-export async function createWebhook(slug: string, payload: WebhookPayload): Promise<Webhook> {
-  const res = await apiClient.post<{ data: Webhook }>(INTEGRATION_ROUTES.WEBHOOKS(slug), payload);
+/** Crée un webhook ; la réponse porte son secret de signature, montré cette seule fois. */
+export async function createWebhook(slug: string, payload: WebhookPayload): Promise<CreatedWebhook> {
+  const res = await apiClient.post<{ data: CreatedWebhook }>(INTEGRATION_ROUTES.WEBHOOKS(slug), payload);
   return res.data.data;
 }
 
@@ -228,6 +254,24 @@ export async function updateWebhook(slug: string, id: number, payload: WebhookPa
 
 export async function deleteWebhook(slug: string, id: number): Promise<void> {
   await apiClient.delete(INTEGRATION_ROUTES.WEBHOOK(slug, id));
+}
+
+/** Nouveau secret de signature (montré une fois) ; l'ancien ne signe plus rien. */
+export async function regenerateWebhookSecret(slug: string, id: number): Promise<string> {
+  const res = await apiClient.post<{ data: { secret: string } }>(INTEGRATION_ROUTES.WEBHOOK_SECRET(slug, id));
+  return res.data.data.secret;
+}
+
+/** Envoie tout de suite l'événement de test « ping » et renvoie le résultat de l'envoi. */
+export async function testWebhook(slug: string, id: number): Promise<WebhookDelivery> {
+  const res = await apiClient.post<{ data: WebhookDelivery }>(INTEGRATION_ROUTES.WEBHOOK_TEST(slug, id));
+  return res.data.data;
+}
+
+/** Les 20 derniers envois d'un webhook, du plus récent au plus ancien. */
+export async function getWebhookDeliveries(slug: string, id: number): Promise<WebhookDelivery[]> {
+  const res = await apiClient.get<{ data: WebhookDelivery[] }>(INTEGRATION_ROUTES.WEBHOOK_DELIVERIES(slug, id));
+  return res.data.data;
 }
 
 // ---------------------------------------------------------------------------

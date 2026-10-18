@@ -20,6 +20,9 @@ import {
   createWebhook,
   updateWebhook,
   deleteWebhook,
+  regenerateWebhookSecret,
+  testWebhook,
+  getWebhookDeliveries,
   importMcpProject,
   getIntegrationCatalog,
   getMcpServers,
@@ -273,15 +276,39 @@ describe('integration-service', () => {
   });
 
   describe('createWebhook', () => {
-    it('POST le payload de webhook', async () => {
+    it('POST le payload de webhook et renvoie le webhook avec son secret', async () => {
       const payload = { url: 'https://x', eventTypes: ['issue.created'] };
-      const hook = { id: 1, ...payload, active: true } as any;
-      vi.mocked(apiClient.post).mockResolvedValue(envelope(hook));
+      const created = { webhook: { id: 1, ...payload, active: true }, secret: 'whsec_x' } as any;
+      vi.mocked(apiClient.post).mockResolvedValue(envelope(created));
 
       const result = await createWebhook(SLUG, payload);
 
       expect(apiClient.post).toHaveBeenCalledWith(INTEGRATION_ROUTES.WEBHOOKS(SLUG), payload);
-      expect(result).toEqual(hook);
+      expect(result.secret).toBe('whsec_x');
+    });
+  });
+
+  describe('secret, test et historique d\'un webhook', () => {
+    it('POST secret renvoie le nouveau secret', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue(envelope({ secret: 'whsec_new' }));
+
+      expect(await regenerateWebhookSecret(SLUG, 1)).toBe('whsec_new');
+      expect(apiClient.post).toHaveBeenCalledWith(INTEGRATION_ROUTES.WEBHOOK_SECRET(SLUG, 1));
+    });
+
+    it('POST test renvoie le résultat de l\'envoi', async () => {
+      const delivery = { deliveryId: 'd1', status: 'DELIVERED', lastStatus: 204 } as any;
+      vi.mocked(apiClient.post).mockResolvedValue(envelope(delivery));
+
+      expect(await testWebhook(SLUG, 1)).toEqual(delivery);
+      expect(apiClient.post).toHaveBeenCalledWith(INTEGRATION_ROUTES.WEBHOOK_TEST(SLUG, 1));
+    });
+
+    it('GET deliveries renvoie l\'historique', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue(envelope([]));
+
+      expect(await getWebhookDeliveries(SLUG, 1)).toEqual([]);
+      expect(apiClient.get).toHaveBeenCalledWith(INTEGRATION_ROUTES.WEBHOOK_DELIVERIES(SLUG, 1));
     });
   });
 
