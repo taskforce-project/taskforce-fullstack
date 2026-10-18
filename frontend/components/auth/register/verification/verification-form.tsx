@@ -150,7 +150,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       toast.error(t.common.error, {
-        description: errorMessage || "Code de vérification invalide",
+        description: errorMessage || "Invalid verification code",
       });
     } finally {
       setIsLoading(false);

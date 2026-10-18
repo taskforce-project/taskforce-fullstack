@@ -25,7 +25,7 @@ export function Reasoning({ content, isStreaming = false, defaultOpen = false, c
         className="flex w-full items-center gap-2 px-3 py-2 text-left text-muted-foreground hover:text-foreground">
         <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} />
         <Brain className="size-3.5" />
-        {isStreaming ? <TextShimmerWave>Raisonnement…</TextShimmerWave> : <span className="font-medium">Raisonnement</span>}
+        {isStreaming ? <TextShimmerWave>Reasoning…</TextShimmerWave> : <span className="font-medium">Reasoning</span>}
       </button>
       {open && (
         <div className="border-t px-3 py-2 text-muted-foreground">

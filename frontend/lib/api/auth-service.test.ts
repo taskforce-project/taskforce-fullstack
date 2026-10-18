@@ -324,7 +324,7 @@ describe('authService - API Service', () => {
       const mockResponse = {
         data: {
           success: true,
-          message: 'Mot de passe réinitialisé',
+          message: 'Password reset',
           data: {},
         },
       };
@@ -334,7 +334,7 @@ describe('authService - API Service', () => {
       const response = await authService.resetPassword('test@example.com', '123456', 'NewPass@2024!');
 
       expect(response).toBeDefined();
-      expect(response.message).toBe('Mot de passe réinitialisé');
+      expect(response.message).toBe('Password reset');
       
       expect(client.apiClient.post).toHaveBeenCalledWith(AUTH_ROUTES.RESET_PASSWORD, {
         email: 'test@example.com',
@@ -541,12 +541,12 @@ describe('authService - couverture OAuth / challenge / fallbacks / garde-fous', 
 
   it('forgotPassword retombe sur un message par défaut si le serveur ne renvoie rien', async () => {
     vi.mocked(client.apiClient.post).mockResolvedValue({ data: { message: '' } } as any);
-    await expect(authService.forgotPassword('a@b.co')).resolves.toEqual({ message: 'Email envoyé' });
+    await expect(authService.forgotPassword('a@b.co')).resolves.toEqual({ message: 'Email sent' });
   });
 
   it('resetPassword retombe sur un message par défaut si le serveur ne renvoie rien', async () => {
     vi.mocked(client.apiClient.post).mockResolvedValue({ data: { message: '' } } as any);
-    await expect(authService.resetPassword('a@b.co', '123456', 'New@Pass1')).resolves.toEqual({ message: 'Mot de passe réinitialisé' });
+    await expect(authService.resetPassword('a@b.co', '123456', 'New@Pass1')).resolves.toEqual({ message: 'Password reset' });
   });
 
   it("logout purge le localStorage même si l'appel serveur échoue", async () => {

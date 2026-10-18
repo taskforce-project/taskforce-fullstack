@@ -263,7 +263,7 @@ describe('AuthContext', () => {
 
       expect(() => {
         renderHook(() => useAuth());
-      }).toThrow('useAuth doit être utilisé à l\'intérieur d\'un AuthProvider');
+      }).toThrow('useAuth must be used within an AuthProvider');
 
       consoleSpy.mockRestore();
     });

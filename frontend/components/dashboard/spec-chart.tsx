@@ -83,7 +83,7 @@ export function DashboardSpecChart({ slug, spec, refreshToken = 0, preferInlineD
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
         <AlertCircle className="size-4 text-amber-500" />
-        <p className="text-xs text-muted-foreground">{spec.unsupported ?? "Demande non satisfiable."}</p>
+        <p className="text-xs text-muted-foreground">{spec.unsupported ?? "This request can't be charted."}</p>
       </div>
     )
   }
@@ -137,7 +137,7 @@ function BreakdownBody({
   if (data.length === 0) return <CardEmpty message="No data for this breakdown" />
 
   const color = "#6366f1"
-  const yName = spec.yLabel ?? "Valeur"
+  const yName = spec.yLabel ?? "Value"
   const margin = { top: 4, right: 0, left: 0, bottom: 0 }
 
   if (spec.chartType === "line") {

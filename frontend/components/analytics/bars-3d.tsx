@@ -152,12 +152,12 @@ export function Bars3D({
         >
           <p className="font-medium text-popover-foreground">{hover.label}</p>
           <p className="text-muted-foreground">
-            {yLabel ?? "Valeur"} : <span className="font-semibold text-popover-foreground">{hover.value.toLocaleString("fr-FR")}</span>
+            {yLabel ?? "Value"} : <span className="font-semibold text-popover-foreground">{hover.value.toLocaleString("en-US")}</span>
           </p>
         </div>
       )}
       <p className="pointer-events-none absolute bottom-1 left-2 text-[10px] text-muted-foreground/60">
-        Glisse pour tourner · survole une barre
+        Drag to rotate · hover a bar
       </p>
     </div>
   )

@@ -82,7 +82,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       set({ projects, isLoading: false });
       return projects;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors du chargement des projets";
+      const message = err instanceof Error ? err.message : "Couldn't load the projects";
       set({ isLoading: false, error: message });
       return [];
     }
@@ -94,7 +94,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       set((state) => ({ projects: [project, ...state.projects] }));
       return project;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors de la création du projet";
+      const message = err instanceof Error ? err.message : "Couldn't create the project";
       set({ error: message });
       return null;
     }
@@ -113,7 +113,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       }));
       return res;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors du lien du dépôt";
+      const message = err instanceof Error ? err.message : "Couldn't link the repository";
       set({ error: message });
       return null;
     }
@@ -132,7 +132,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       }));
       return true;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors du délien du dépôt";
+      const message = err instanceof Error ? err.message : "Couldn't unlink the repository";
       set({ error: message });
       return false;
     }
@@ -147,7 +147,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       }));
       return updated;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors de la mise à jour du projet";
+      const message = err instanceof Error ? err.message : "Couldn't update the project";
       set({ error: message });
       return null;
     }
@@ -162,7 +162,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       }));
       return updated;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors de l'archivage du projet";
+      const message = err instanceof Error ? err.message : "Couldn't archive the project";
       set({ error: message });
       return null;
     }
@@ -187,7 +187,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
         projects: state.projects.map((p) => (p.id === id ? { ...p, isFavorite: !next } : p)),
         activeProject: state.activeProject?.id === id ? { ...state.activeProject, isFavorite: !next } : state.activeProject,
       }));
-      const message = err instanceof Error ? err.message : "Erreur lors de la mise à jour des favoris";
+      const message = err instanceof Error ? err.message : "Couldn't update the favorites";
       set({ error: message });
       return null;
     }
@@ -202,7 +202,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       }));
       return true;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors de la suppression du projet";
+      const message = err instanceof Error ? err.message : "Couldn't delete the project";
       set({ error: message });
       return false;
     }

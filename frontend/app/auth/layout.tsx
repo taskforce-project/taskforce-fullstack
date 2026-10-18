@@ -52,7 +52,7 @@ export default function AuthLayout({
       <aside className="auth-aside">
         <div className="auth-aside-noise" />
         <div className="auth-aside-content">
-          <a href={siteUrl} className="auth-aside-brand" aria-label="TaskForce, retour au site">
+          <a href={siteUrl} className="auth-aside-brand" aria-label="TaskForce, back to the website">
             <Image
               src="/assets/logo/logo_taskforce_tp.png"
               alt="TaskForce"
@@ -84,7 +84,7 @@ export default function AuthLayout({
       {/* ── Colonne formulaire (droite) : barre · contenu · footer ── */}
       <div className="auth-formcol">
         <header className="auth-topbar">
-          <a href={siteUrl} className="auth-brand-mobile" aria-label="TaskForce, retour au site">
+          <a href={siteUrl} className="auth-brand-mobile" aria-label="TaskForce, back to the website">
             <Image
               src="/assets/logo/logo_taskforce_tp.png"
               alt=""

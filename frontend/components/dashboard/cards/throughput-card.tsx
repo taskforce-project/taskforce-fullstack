@@ -66,7 +66,7 @@ export function ThroughputCard({ slug, card, globalRange, refreshToken }: Dashbo
   return (
     <div className="flex h-full flex-col p-4 pb-0">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-2xl font-semibold tabular-nums tracking-tight">{totalResolved.toLocaleString("fr-FR")}</span>
+        <span className="text-2xl font-semibold tabular-nums tracking-tight">{totalResolved.toLocaleString("en-US")}</span>
         <span className="text-[11px] text-muted-foreground">{caption}</span>
       </div>
       <div className="mt-2 h-28 w-full">

@@ -178,7 +178,7 @@ apiClient.interceptors.response.use(
       if (!error.response) {
         // Réseau / timeout : `id` stable → un seul toast à la fois (pas d'empilement de doublons).
         if (silent) {
-          console.warn(`[api] réseau/timeout (silencieux) ${error.config?.url ?? ""} - ${message}`)
+          console.warn(`[api] network/timeout (silent) ${error.config?.url ?? ""} - ${message}`)
         } else {
           toast.error("Couldn't reach the server", {
             id: "api-network-error",

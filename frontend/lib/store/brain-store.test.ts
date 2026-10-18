@@ -58,7 +58,7 @@ describe('brain-store', () => {
         await useBrainStore.getState().fetchOverview('ws');
       });
 
-      expect(useBrainStore.getState().error).toBe('Impossible de charger le Brain OS');
+      expect(useBrainStore.getState().error).toBe("Couldn't load Brain OS");
       expect(useBrainStore.getState().loading).toBe(false);
     });
   });
@@ -158,7 +158,7 @@ describe('brain-store', () => {
 
       expect(useBrainStore.getState().searchResults).toEqual([]);
       expect(useBrainStore.getState().searching).toBe(false);
-      expect(useBrainStore.getState().error).toBe('Recherche indisponible');
+      expect(useBrainStore.getState().error).toBe('Search is unavailable');
     });
   });
 

@@ -113,7 +113,7 @@ export function DashboardCardItem({
       {Body ? (
         <Body slug={slug} card={card} globalRange={globalRange} refreshToken={refreshToken + localRefresh} />
       ) : (
-        <CardEmpty message={`Type de carte inconnu : ${card.cardType}`} />
+        <CardEmpty message={`Unknown card type: ${card.cardType}`} />
       )}
     </CardShell>
   )

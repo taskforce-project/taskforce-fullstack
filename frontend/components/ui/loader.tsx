@@ -101,7 +101,7 @@ interface LoaderProps
 function Loader({ className, variant = DEFAULT_SPINNER, intent, size, ...props }: LoaderProps) {
   const LoaderPrimitive = LOADERS[variant in LOADERS ? variant : DEFAULT_SPINNER]
   return (
-    <span role="progressbar" aria-label={props["aria-label"] ?? "Chargement…"} data-slot="loader"
+    <span role="progressbar" aria-label={props["aria-label"] ?? "Loading…"} data-slot="loader"
           className="inline-flex">
       <LoaderPrimitive
         role="presentation"

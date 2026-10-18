@@ -41,7 +41,7 @@ export const usePageStore = create<PageStore>((set) => ({
       const pages = await pageService.list(slug, projectId)
       set({ pages, loading: false })
     } catch {
-      set({ loading: false, error: "Impossible de charger les pages" })
+      set({ loading: false, error: "Couldn't load the pages" })
     }
   },
 
@@ -51,7 +51,7 @@ export const usePageStore = create<PageStore>((set) => ({
       const page = await pageService.get(slug, projectId, pageId)
       set({ currentPage: page, loading: false })
     } catch {
-      set({ loading: false, error: "Impossible de charger la page" })
+      set({ loading: false, error: "Couldn't load the page" })
     }
   },
 

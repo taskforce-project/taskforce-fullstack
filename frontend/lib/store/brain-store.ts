@@ -54,7 +54,7 @@ export const useBrainStore = create<BrainState>((set, get) => ({
       const overview = await getBrainOverview(slug)
       set({ overview, loading: false })
     } catch {
-      set({ error: "Impossible de charger le Brain OS", loading: false })
+      set({ error: "Couldn't load Brain OS", loading: false })
     }
   },
 
@@ -100,7 +100,7 @@ export const useBrainStore = create<BrainState>((set, get) => ({
       const results = await searchBrainApi(slug, q)
       set({ searchResults: results, searching: false })
     } catch {
-      set({ searchResults: [], searching: false, error: "Recherche indisponible" })
+      set({ searchResults: [], searching: false, error: "Search is unavailable" })
     }
   },
 

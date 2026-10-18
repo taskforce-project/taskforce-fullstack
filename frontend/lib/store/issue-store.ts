@@ -125,7 +125,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set({ issues, isLoading: false, loadedProjectId: projectId });
       return issues;
     } catch (err) {
-      const message = extractError(err, "Erreur lors du chargement des issues");
+      const message = extractError(err, "Couldn't load the issues");
       set({ isLoading: false, error: message });
       return [];
     }
@@ -137,7 +137,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set({ activeIssue: issue });
       return issue;
     } catch (err) {
-      const message = extractError(err, "Erreur lors du chargement de l'issue");
+      const message = extractError(err, "Couldn't load the issue");
       set({ error: message });
       return null;
     }
@@ -155,7 +155,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       }));
       return issue;
     } catch (err) {
-      const message = extractError(err, "Erreur lors de la création de l'issue");
+      const message = extractError(err, "Couldn't create the issue");
       set({ error: message });
       return null;
     }
@@ -189,7 +189,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
     } catch (err) {
       // On garde le message d'erreur dans le store (bannière/diagnostic) mais on signale l'échec
       // par le retour `false` : l'appelant affiche un toast au bon moment (cf. WS-10 sur updateIssue).
-      const message = extractError(err, "Erreur lors de la suppression de l'issue");
+      const message = extractError(err, "Couldn't delete the issue");
       set({ error: message });
       return false;
     }
@@ -230,7 +230,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
         await deleteIssueApi(slug, projectId, issueId);
       } catch (err) {
         restore();
-        set({ error: extractError(err, "Erreur lors de la suppression de l'issue") });
+        set({ error: extractError(err, "Couldn't delete the issue") });
         toast.error("Couldn't delete issue");
       }
     }, 6000);
@@ -261,7 +261,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       }));
       return updated;
     } catch (err) {
-      const message = extractError(err, "Erreur lors de l'archivage de l'issue");
+      const message = extractError(err, "Couldn't archive the issue");
       set({ error: message });
       return null;
     }
@@ -276,7 +276,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       }));
       return updated;
     } catch (err) {
-      const message = extractError(err, "Erreur lors de l'épinglage de l'issue");
+      const message = extractError(err, "Couldn't pin the issue");
       set({ error: message });
       return null;
     }
@@ -305,7 +305,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set({ statuses });
       return statuses;
     } catch (err) {
-      const message = extractError(err, "Erreur lors du chargement des statuts");
+      const message = extractError(err, "Couldn't load the statuses");
       set({ error: message });
       return [];
     }
@@ -317,7 +317,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set((state) => ({ statuses: [...state.statuses, status] }));
       return status;
     } catch (err) {
-      const message = extractError(err, "Erreur lors de la création du statut");
+      const message = extractError(err, "Couldn't create the status");
       set({ error: message });
       return null;
     }
@@ -329,7 +329,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set((state) => ({ statuses: state.statuses.map((s) => (s.id === updated.id ? updated : s)) }));
       return updated;
     } catch (err) {
-      const message = extractError(err, "Erreur lors de la mise à jour du statut");
+      const message = extractError(err, "Couldn't update the status");
       set({ error: message });
       return null;
     }
@@ -342,7 +342,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       return true;
     } catch (err) {
       // Retour `false` pour que l'appelant toaste l'échec (ex. 409 colonne non vide) au bon moment.
-      const message = extractError(err, "Erreur lors de la suppression du statut");
+      const message = extractError(err, "Couldn't delete the status");
       set({ error: message });
       return false;
     }
@@ -354,7 +354,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set({ types });
       return types;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors du chargement des types";
+      const message = err instanceof Error ? err.message : "Couldn't load the issue types";
       set({ error: message });
       return [];
     }
@@ -366,7 +366,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set({ comments });
       return comments;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors du chargement des commentaires";
+      const message = err instanceof Error ? err.message : "Couldn't load the comments";
       set({ error: message });
       return [];
     }
@@ -378,7 +378,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set((state) => ({ comments: [...state.comments, comment] }));
       return comment;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors de l'ajout du commentaire";
+      const message = err instanceof Error ? err.message : "Couldn't add the comment";
       set({ error: message });
       return null;
     }
@@ -392,7 +392,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       }));
       return updated;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors de la mise à jour du commentaire";
+      const message = err instanceof Error ? err.message : "Couldn't update the comment";
       set({ error: message });
       return null;
     }
@@ -405,7 +405,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       return true;
     } catch (err) {
       // Retour false (pas de throw) : l'appelant (issue-sheet) toaste l'echec au bon moment.
-      const message = err instanceof Error ? err.message : "Erreur lors de la suppression du commentaire";
+      const message = err instanceof Error ? err.message : "Couldn't delete the comment";
       set({ error: message });
       return false;
     }
@@ -417,7 +417,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set({ activity });
       return activity;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors du chargement de l'activité";
+      const message = err instanceof Error ? err.message : "Couldn't load the activity";
       set({ error: message });
       return [];
     }

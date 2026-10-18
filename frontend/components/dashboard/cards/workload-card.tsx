@@ -79,7 +79,7 @@ export function WorkloadCard({ slug, card, globalRange, refreshToken }: Dashboar
               <div
                 key={d.date}
                 className={cn("h-3 min-w-0 flex-1 rounded-[2px]", cellClass(d.count, peak))}
-                title={`${m.displayName} · ${d.date} : ${d.count}`}
+                title={`${m.displayName} · ${d.date}: ${d.count}`}
               />
             ))}
           </div>
@@ -87,8 +87,8 @@ export function WorkloadCard({ slug, card, globalRange, refreshToken }: Dashboar
         </div>
       ))}
       <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground/70">
-        <span>Échéances · {days} j</span>
-        {members.length > MAX_MEMBERS && <span>+{members.length - MAX_MEMBERS} membres</span>}
+        <span>Due dates · {days} d</span>
+        {members.length > MAX_MEMBERS && <span>+{members.length - MAX_MEMBERS} members</span>}
       </div>
     </div>
   )

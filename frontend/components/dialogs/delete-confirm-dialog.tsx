@@ -116,7 +116,7 @@ export function DeleteConfirmDialog({
         {gated && (
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-muted-foreground">
-              {confirmTextLabel ?? <>Pour confirmer, saisissez <span className="font-medium text-foreground">{confirmText}</span></>}
+              {confirmTextLabel ?? <>To confirm, type <span className="font-medium text-foreground">{confirmText}</span></>}
             </label>
             <Input
               value={typed}

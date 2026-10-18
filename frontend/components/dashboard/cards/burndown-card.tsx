@@ -56,7 +56,7 @@ export function BurndownCard({ slug, refreshToken }: DashboardCardBodyProps) {
   return (
     <div className="flex h-full flex-col p-4 pb-0">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-2xl font-semibold tabular-nums tracking-tight">{remaining.toLocaleString("fr-FR")}</span>
+        <span className="text-2xl font-semibold tabular-nums tracking-tight">{remaining.toLocaleString("en-US")}</span>
         <span className="text-[11px] text-muted-foreground">Remaining vs ideal</span>
       </div>
       <div className="mt-2 h-28 w-full">
@@ -76,7 +76,7 @@ export function BurndownCard({ slug, refreshToken }: DashboardCardBodyProps) {
             <Line
               type="monotone"
               dataKey="remaining"
-              name="Restant"
+              name="Remaining"
               stroke="#f43f5e"
               strokeWidth={2}
               dot={false}

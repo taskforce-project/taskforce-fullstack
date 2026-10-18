@@ -7,10 +7,10 @@ import { TextShimmerWave } from "@/components/ui/text-shimmer-wave"
 
 /** Phases de réflexion de Cortex, défilées pendant la génération (donne un déroulé « vivant »). */
 const PHASES = [
-  "Compréhension de la demande…",
-  "Recherche dans le Brain OS…",
-  "Raisonnement…",
-  "Rédaction de la réponse…",
+  "Understanding the request…",
+  "Searching Brain OS…",
+  "Reasoning…",
+  "Writing the answer…",
 ]
 
 /**
