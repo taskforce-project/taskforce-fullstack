@@ -37,6 +37,7 @@ import com.taskforce.tf_api.core.service.delivery.ClaudeCodeProvider;
 import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProvider;
 import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProviderRegistry;
 import com.taskforce.tf_api.core.service.delivery.DeliveryContext;
+import com.taskforce.tf_api.core.service.delivery.GitHubCopilotProvider;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -84,7 +85,7 @@ public class SmartAssignService {
      * Ordre de préférence du provider selon qu'un dépôt est lié. Claude Code (runner local) sait faire les
      * deux : pull request avec un dépôt, réponse écrite sans.
      */
-    private static final List<String> AGENT_PREF_WITH_REPO = List.of(ClaudeCodeProvider.KEY);
+    private static final List<String> AGENT_PREF_WITH_REPO = List.of(ClaudeCodeProvider.KEY, GitHubCopilotProvider.KEY);
     private static final List<String> AGENT_PREF_NO_REPO   = List.of(ClaudeCodeProvider.KEY);
 
     private final WorkspaceRepository workspaceRepository;

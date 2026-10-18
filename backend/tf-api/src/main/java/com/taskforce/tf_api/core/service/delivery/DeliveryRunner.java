@@ -1,8 +1,11 @@
 package com.taskforce.tf_api.core.service.delivery;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -49,6 +52,10 @@ public class DeliveryRunner {
     private final IssueStatusRepository issueStatusRepository;
     private final IssueRepository issueRepository;
     private final NotificationService notificationService;
+
+    /** Intervalle minimal entre deux lectures d'un provider « push » pour un même run (API externe, quotas). */
+    static final Duration POLL_EVERY = Duration.ofSeconds(20);
+    private final Map<Long, Instant> lastPolled = new ConcurrentHashMap<>();
 
     @Async
     @Transactional
@@ -123,6 +130,12 @@ public class DeliveryRunner {
         if (provider == null) {
             return;
         }
+        Instant now = Instant.now();
+        Instant last = lastPolled.get(runId);
+        if (last != null && last.plus(POLL_EVERY).isAfter(now)) {
+            return;
+        }
+        lastPolled.put(runId, now);
         try {
             Issue issue = run.getIssue();
             Project project = issue != null ? issue.getProject() : null;
@@ -130,6 +143,9 @@ public class DeliveryRunner {
                 ? project.getWorkspace().getId() : null;
             applyPoll(run, provider.poll(run.getExternalRef(), workspaceId));
             runRepository.save(run);
+            if (run.getStatus() != DeliveryRunStatus.RUNNING) {
+                lastPolled.remove(runId);
+            }
         } catch (Exception e) {
             failRun(run, e.getMessage());
             log.warn("Delivery run {} (refresh) en échec : {}", runId, e.getMessage());
