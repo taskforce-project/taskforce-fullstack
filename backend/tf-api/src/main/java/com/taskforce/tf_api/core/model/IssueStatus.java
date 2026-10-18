@@ -62,7 +62,7 @@ public class IssueStatus {
 
     @Column(nullable = false, length = 30)
     @Builder.Default
-    private String color = "#6366f1";
+    private String color = "#2f6bf6";
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)

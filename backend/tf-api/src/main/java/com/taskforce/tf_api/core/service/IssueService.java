@@ -159,16 +159,16 @@ public class IssueService {
     @Transactional
     public void seedDefaultStatusesAndTypes(Project project) {
         // --- Statuts ---
-        issueStatusRepository.save(buildStatus(project, "Backlog",     "#94a3b8", IssueStatusCategory.BACKLOG,    (short) 0, false));
-        issueStatusRepository.save(buildStatus(project, "Todo",        "#6366f1", IssueStatusCategory.UNSTARTED,  (short) 1, true));
-        issueStatusRepository.save(buildStatus(project, "In Progress", "#f59e0b", IssueStatusCategory.STARTED,    (short) 2, false));
-        issueStatusRepository.save(buildStatus(project, "Done",        "#10b981", IssueStatusCategory.COMPLETED,  (short) 3, false));
-        issueStatusRepository.save(buildStatus(project, "Cancelled",   "#ef4444", IssueStatusCategory.CANCELLED,  (short) 4, false));
+        issueStatusRepository.save(buildStatus(project, "Backlog",     "#736e67", IssueStatusCategory.BACKLOG,    (short) 0, false));
+        issueStatusRepository.save(buildStatus(project, "Todo",        "#2f6bf6", IssueStatusCategory.UNSTARTED,  (short) 1, true));
+        issueStatusRepository.save(buildStatus(project, "In Progress", "#ffaa0d", IssueStatusCategory.STARTED,    (short) 2, false));
+        issueStatusRepository.save(buildStatus(project, "Done",        "#418b5c", IssueStatusCategory.COMPLETED,  (short) 3, false));
+        issueStatusRepository.save(buildStatus(project, "Cancelled",   "#e14322", IssueStatusCategory.CANCELLED,  (short) 4, false));
 
         // --- Types ---
-        issueTypeRepository.save(buildType(project, "Task",    "#6366f1", "circle-dot", true));
-        issueTypeRepository.save(buildType(project, "Bug",     "#ef4444", "bug",        false));
-        issueTypeRepository.save(buildType(project, "Feature", "#10b981", "zap",        false));
+        issueTypeRepository.save(buildType(project, "Task",    "#2f6bf6", "circle-dot", true));
+        issueTypeRepository.save(buildType(project, "Bug",     "#e14322", "bug",        false));
+        issueTypeRepository.save(buildType(project, "Feature", "#418b5c", "zap",        false));
 
         // --- Compteur séquence (uniquement si absent) ---
         boolean counterExists = sequenceCounterRepository.findByProjectIdForUpdate(project.getId()).isPresent();
