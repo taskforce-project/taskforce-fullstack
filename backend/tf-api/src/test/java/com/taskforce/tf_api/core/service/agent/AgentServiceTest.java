@@ -1,322 +1,308 @@
 package com.taskforce.tf_api.core.service.agent;
 
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
+import com.taskforce.tf_api.core.enums.NodeDomain;
+import com.taskforce.tf_api.core.enums.NodeType;
+import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.LlmClient;
+import com.taskforce.tf_api.core.service.LlmUsage;
+import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
+import com.taskforce.tf_api.core.service.brain.BrainSearchService;
+import com.taskforce.tf_api.core.service.mcp.ExternalMcpTool;
+import com.taskforce.tf_api.core.service.mcp.McpClient;
+import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests unitaires — {@link AgentService}. Chemin de repli (sans clé LLM) : retrieval réel + réponse fallback.
+ * Tests unitaires de {@link AgentService} (Cortex) : repli sans IA, boucle d'outils où le modèle choisit
+ * d'appeler un outil ou de répondre, messages conversationnels, mémoire, écritures MCP proposées.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AgentService")
 class AgentServiceTest {
 
-    @Mock private com.taskforce.tf_api.core.service.brain.BrainAccessGuard access;
-    @Mock private com.taskforce.tf_api.core.service.brain.BrainSearchService search;
+    @Mock private BrainAccessGuard access;
+    @Mock private BrainSearchService search;
     @Mock private AgentToolRegistry tools;
-    @Mock private LlmClient groq;   // on mocke l'INTERFACE, jamais une impl concrete (TF-AI-GROQ-CLEANUP)
-    @Mock private ObjectMapper objectMapper;
-    @Mock private com.taskforce.tf_api.core.service.AiUsageService aiUsageService;
-    @Mock private com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService workspaceMcp;
+    @Mock private LlmClient llm;   // on mocke l'INTERFACE, jamais une implémentation concrète
+    @Spy  private ObjectMapper objectMapper = new ObjectMapper();
+    @Mock private AiUsageService aiUsageService;
+    @Mock private WorkspaceMcpService workspaceMcp;
 
     @InjectMocks private AgentService service;
 
-    @Test
-    @DisplayName("run renvoie une réponse de repli (strategy fallback) quand Groq n'est pas configuré")
-    void run_fallback_without_llm() {
+    private final ObjectMapper json = new ObjectMapper();
+
+    private void stubWorkspace() {
         Workspace ws = Workspace.builder().id(1L).slug("acme").name("Acme").build();
         when(access.resolveAndAuthorize("acme", 7L)).thenReturn(ws);
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
-        when(groq.isConfigured()).thenReturn(false);
-
-        AssistantAnswer answer = service.run("acme", 7L, "Quel est le statut du projet ?");
-
-        assertThat(answer).isNotNull();
-        assertThat(answer.mode()).isEqualTo("fallback");
     }
 
-    private Workspace stubWorkspace() {
-        Workspace ws = Workspace.builder().id(1L).slug("acme").name("Acme").build();
-        when(access.resolveAndAuthorize("acme", 7L)).thenReturn(ws);
-        return ws;
+    private void stubToolLoop() {
+        when(workspaceMcp.toolsFor(any())).thenReturn(List.of());
+        when(tools.toolDefinitions(anyList())).thenReturn(List.of());
     }
 
     @Test
-    @DisplayName("run (fast) : message non-deep + Groq configuré → réponse directe, mode fast")
-    void run_fast_direct() {
+    @DisplayName("sans IA disponible → réponse de repli, avec la recherche réelle")
+    void fallback_without_ai() {
         stubWorkspace();
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
-        when(groq.isConfigured()).thenReturn(true);
-        // Chemin fast = complétion multi-tours (llm.chat) désormais.
-        when(groq.chat(anyString(), org.mockito.ArgumentMatchers.any(), anyString()))
-            .thenReturn("Réponse directe");
-        when(groq.currentUsage()).thenReturn(new com.taskforce.tf_api.core.service.LlmUsage(12, 34, 46));
+        when(llm.isConfigured()).thenReturn(false);
 
-        // Message « métier » (non small-talk) → chemin knowledge fast (avec recherche Brain OS).
-        AssistantAnswer answer = service.run("acme", 7L, "Donne-moi le statut du projet");
+        AssistantAnswer answer = service.run("acme", 7L, "What is the status of the project?");
+
+        assertThat(answer.mode()).isEqualTo("fallback");
+        assertThat(answer.answer()).contains("AI unavailable");
+        verify(search).retrieveRelevant(eq(1L), anyString(), anyInt());
+    }
+
+    @Test
+    @DisplayName("le modèle répond sans outil → mode fast, usage réel remonté")
+    void model_answers_directly() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Direct answer\"}"));
+        when(llm.currentUsage()).thenReturn(new LlmUsage(12, 34, 46));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Give me the status of the project");
 
         assertThat(answer.mode()).isEqualTo("fast");
-        assertThat(answer.answer()).isEqualTo("Réponse directe");
-        // usage réel remonté jusqu'au DTO
+        assertThat(answer.answer()).isEqualTo("Direct answer");
         assertThat(answer.usage().totalTokens()).isEqualTo(46);
         assertThat(answer.usage().promptTokens()).isEqualTo(12);
+        assertThat(answer.toolCalls()).isEmpty();
     }
 
     @Test
-    @DisplayName("run (deep) : boucle d'outils — 1 appel d'outil puis réponse finale, mode deep")
-    void run_deep_tool_loop() throws Exception {
+    @DisplayName("aucun routage par mots-clés : tout message reçoit les outils, le modèle choisit")
+    void every_message_gets_the_tools() throws Exception {
         stubWorkspace();
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
+        stubToolLoop();
+        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"ok\"}"));
 
-        var node = com.taskforce.tf_api.core.model.KnowledgeNode.builder()
-            .type(com.taskforce.tf_api.core.enums.NodeType.DECISION)
-            .domain(com.taskforce.tf_api.core.enums.NodeDomain.PROJET)
-            .title("Note").content("contenu").build();
+        service.run("acme", 7L, "Quel est le statut du projet ?");
+
+        verify(tools).toolDefinitions(anyList());
+        verify(llm).rawChat(anyList(), anyList(), eq("fast"));
+        verify(llm, never()).chat(anyList(), anyString());
+    }
+
+    @Test
+    @DisplayName("boucle d'outils : un appel d'outil puis la réponse finale → mode deep")
+    void tool_loop() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        KnowledgeNode node = KnowledgeNode.builder()
+            .type(NodeType.DECISION).domain(NodeDomain.PROJET).title("Note").content("content").build();
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of(node));
-        when(groq.isConfigured()).thenReturn(true);
-        when(workspaceMcp.toolsFor(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
-        when(tools.toolDefinitions(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"search_brain\",\"arguments\":\"{}\"}}]}"),
+            json.readTree("{\"content\":\"Final answer\"}"));
+        AgentTool tool = Mockito.mock(AgentTool.class);
+        when(tools.get(eq("search_brain"), anyList())).thenReturn(tool);
+        when(tool.execute(any(), any())).thenReturn("tool result");
 
-        var real = new ObjectMapper();
-        var withCall = real.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"search_brain\",\"arguments\":\"{}\"}}]}");
-        var finalMsg = real.readTree("{\"content\":\"Réponse finale\"}");
-        when(groq.rawChat(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), anyString()))
-            .thenReturn(withCall, finalMsg);
-
-        AgentTool tool = org.mockito.Mockito.mock(AgentTool.class);
-        when(tools.get(org.mockito.ArgumentMatchers.eq("search_brain"), org.mockito.ArgumentMatchers.anyList())).thenReturn(tool);
-        when(tool.execute(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn("résultat outil");
-
-        AssistantAnswer answer = service.run("acme", 7L, "analyse le projet et propose un plan");
+        AssistantAnswer answer = service.run("acme", 7L, "Analyze the project and propose a plan");
 
         assertThat(answer.mode()).isEqualTo("deep");
-        assertThat(answer.answer()).isEqualTo("Réponse finale");
+        assertThat(answer.answer()).isEqualTo("Final answer");
         assertThat(answer.toolCalls()).hasSize(1);
         assertThat(answer.sources()).hasSize(1);
     }
 
     @Test
-    @DisplayName("run (deep) : outil inconnu → tool call en erreur mais réponse produite")
-    void run_deep_unknown_tool() throws Exception {
+    @DisplayName("outil inconnu → appel en erreur, réponse produite quand même")
+    void unknown_tool() throws Exception {
         stubWorkspace();
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
+        stubToolLoop();
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
-        when(groq.isConfigured()).thenReturn(true);
-        when(workspaceMcp.toolsFor(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
-        when(tools.toolDefinitions(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"ghost\",\"arguments\":\"{}\"}}]}"),
+            json.readTree("{\"content\":\"Done\"}"));
 
-        var real = new ObjectMapper();
-        var withCall = real.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"ghost\",\"arguments\":\"{}\"}}]}");
-        var finalMsg = real.readTree("{\"content\":\"Fini\"}");
-        when(groq.rawChat(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), anyString()))
-            .thenReturn(withCall, finalMsg);
-        // tools.get("ghost", external) renvoie null par défaut (mock) → chemin « outil inconnu ».
-
-        AssistantAnswer answer = service.run("acme", 7L, "décide et archive la note");
+        AssistantAnswer answer = service.run("acme", 7L, "Archive the note");
 
         assertThat(answer.mode()).isEqualTo("deep");
         assertThat(answer.toolCalls()).anyMatch(tc -> "error".equals(tc.status()));
     }
 
     @Test
-    @DisplayName("run : exception LLM en cours de génération → repli gracieux (mode fallback)")
-    void run_exception_falls_back() {
+    @DisplayName("le modèle échoue en cours de réponse → repli gracieux")
+    void model_failure_falls_back() {
         stubWorkspace();
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
+        stubToolLoop();
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
-        when(groq.isConfigured()).thenReturn(true);
-        when(groq.chat(anyString(), org.mockito.ArgumentMatchers.any(), anyString()))
-            .thenThrow(new RuntimeException("LLM down"));
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenThrow(new RuntimeException("model down"));
 
-        AssistantAnswer answer = service.run("acme", 7L, "Quel est le statut du projet ?");
+        AssistantAnswer answer = service.run("acme", 7L, "What is the status of the project?");
 
         assertThat(answer.mode()).isEqualTo("fallback");
+        assertThat(answer.steps()).anyMatch(s -> "error".equals(s.status()));
+    }
+
+    @ParameterizedTest(name = "« {0} » conversationnel : {1}")
+    @CsvSource({
+        "hello, true",
+        "Hi!, true",
+        "thanks, true",
+        "Bonjour, true",
+        "hey how are you, true",
+        "merci beaucoup, true",
+        "What is the status of the project?, false",
+        "list my issues, false",
+        "hello can you create an issue for the login bug, false",
+    })
+    @DisplayName("détection des messages conversationnels (plusieurs langues)")
+    void conversational_detection(String message, boolean expected) {
+        assertThat(AgentService.isConversational(message)).isEqualTo(expected);
     }
 
     @Test
-    @DisplayName("run (conversationnel) : salutation → réponse directe, SANS recherche Brain OS ni sources")
-    void run_conversational_greeting() {
+    @DisplayName("salutation → réponse directe, SANS recherche ni sources")
+    void greeting_skips_search() {
         stubWorkspace();
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
-        when(groq.isConfigured()).thenReturn(true);
-        when(groq.chat(anyString(), org.mockito.ArgumentMatchers.any(), anyString()))
-            .thenReturn("Bonjour ! Tout va bien, merci 😊");
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.chat(anyList(), anyString())).thenReturn("Hello! All good, thanks.");
 
-        AssistantAnswer answer = service.run("acme", 7L, "Hey comment va tu ?");
+        AssistantAnswer answer = service.run("acme", 7L, "Hey how are you?");
 
         assertThat(answer.mode()).isEqualTo("fast");
-        assertThat(answer.answer()).isEqualTo("Bonjour ! Tout va bien, merci 😊");
+        assertThat(answer.answer()).isEqualTo("Hello! All good, thanks.");
         assertThat(answer.sources()).isEmpty();
-        // Étapes réelles : pas de « Recherche dans le Brain OS » pour un simple bonjour
         assertThat(answer.steps()).noneMatch(s -> s.label().contains("Brain OS"));
-        // Et aucune recherche n'a été déclenchée
-        org.mockito.Mockito.verify(search, org.mockito.Mockito.never())
-            .retrieveRelevant(anyLong(), anyString(), anyInt());
+        verify(search, never()).retrieveRelevant(anyLong(), anyString(), anyInt());
     }
 
     @Test
-    @DisplayName("run (conversationnel) : compte au plafond → 409 (IllegalStateException), AUCUN appel LLM")
-    void run_conversational_blocked_when_quota_reached() {
+    @DisplayName("salutation d'un compte au plafond → refus AVANT tout appel au modèle")
+    void greeting_blocked_by_quota() {
         stubWorkspace();
-        when(groq.isConfigured()).thenReturn(true);
-        // Le small-talk est métré → il doit être gated comme le chemin principal : au plafond, le gate
-        // lève AVANT tout appel LLM (sinon contournement du quota en enchaînant « salut »/« merci »).
-        org.mockito.Mockito.doThrow(new IllegalStateException("Quota IA mensuel atteint"))
+        when(llm.isConfigured()).thenReturn(true);
+        Mockito.doThrow(new IllegalStateException("Monthly AI quota reached"))
             .when(aiUsageService).assertWithinQuota(anyLong());
 
-        assertThatThrownBy(() -> service.run("acme", 7L, "Hey comment va tu ?"))
+        assertThatThrownBy(() -> service.run("acme", 7L, "Hey how are you?"))
             .isInstanceOf(IllegalStateException.class);
-
-        // Gate AVANT beginUsageCapture/chat : aucun token n'est consommé au-dessus du plafond.
-        org.mockito.Mockito.verify(groq, org.mockito.Mockito.never())
-            .chat(anyString(), org.mockito.ArgumentMatchers.any(), anyString());
+        verify(llm, never()).chat(anyList(), anyString());
     }
 
     @Test
-    @DisplayName("run (mémoire) : l'historique de la conversation est injecté dans les messages du LLM")
-    void run_injects_conversation_history() {
+    @DisplayName("mémoire : l'historique est injecté entre le message système et le message courant")
+    void history_is_injected() throws Exception {
         stubWorkspace();
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
+        stubToolLoop();
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
-        when(groq.isConfigured()).thenReturn(true);
-        when(groq.chat(anyString(), org.mockito.ArgumentMatchers.any(), anyString()))
-            .thenReturn("Ton projet s'appelle Zephyr.");
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Your project is Zephyr.\"}"));
 
-        List<java.util.Map<String, Object>> history = List.of(
-            java.util.Map.of("role", "user", "content", "Mon projet s'appelle Zephyr"),
-            java.util.Map.of("role", "assistant", "content", "Bien noté, Zephyr."));
+        List<Map<String, Object>> history = List.of(
+            Map.of("role", "user", "content", "My project is called Zephyr"),
+            Map.of("role", "assistant", "content", "Noted, Zephyr."));
 
-        AssistantAnswer answer = service.run("acme", 7L, "Rappelle-moi son nom", history);
+        AssistantAnswer answer = service.run("acme", 7L, "Remind me of its name", history);
 
-        assertThat(answer.answer()).isEqualTo("Ton projet s'appelle Zephyr.");
-
-        // Les messages envoyés au LLM = system + historique (2) + message courant.
+        assertThat(answer.answer()).isEqualTo("Your project is Zephyr.");
         @SuppressWarnings("unchecked")
-        org.mockito.ArgumentCaptor<List<java.util.Map<String, Object>>> captor =
-            org.mockito.ArgumentCaptor.forClass(List.class);
-        org.mockito.Mockito.verify(groq).chat(anyString(), captor.capture(), anyString());
-        List<java.util.Map<String, Object>> sent = captor.getValue();
+        ArgumentCaptor<List<Map<String, Object>>> captor = ArgumentCaptor.forClass(List.class);
+        verify(llm).rawChat(captor.capture(), anyList(), anyString());
+        List<Map<String, Object>> sent = captor.getValue();
         assertThat(sent).hasSize(4);
         assertThat(sent.get(0)).containsEntry("role", "system");
-        assertThat(sent.get(1)).containsEntry("content", "Mon projet s'appelle Zephyr");
+        assertThat(sent.get(1)).containsEntry("content", "My project is called Zephyr");
         assertThat(sent.get(2)).containsEntry("role", "assistant");
-        assertThat(sent.get(3)).containsEntry("content", "Rappelle-moi son nom");
+        assertThat(sent.get(3)).containsEntry("content", "Remind me of its name");
     }
 
     @Test
-    @DisplayName("run (deep) : écriture externe MCP → PROPOSÉE (pending), pas exécutée (validation humaine)")
-    void run_deep_external_write_is_proposed_not_executed() throws Exception {
+    @DisplayName("écriture dans un outil externe (MCP) → PROPOSÉE à l'utilisateur, pas exécutée")
+    void external_write_is_proposed() throws Exception {
         stubWorkspace();
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "confirmExternalWrites", true);
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "maxExternalTools", 20);
+        ReflectionTestUtils.setField(service, "confirmExternalWrites", true);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        ReflectionTestUtils.setField(service, "maxExternalTools", 20);
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
-        when(groq.isConfigured()).thenReturn(true);
+        when(llm.isConfigured()).thenReturn(true);
 
-        // Un outil externe d'ÉCRITURE (readOnly=false) découvert pour le workspace.
-        var extClient = org.mockito.Mockito.mock(com.taskforce.tf_api.core.service.mcp.McpClient.class);
-        var real = new ObjectMapper();
-        var writeDef = new com.taskforce.tf_api.core.service.mcp.McpClient.ToolDef(
-            "do_write", "écrit qqch", real.readTree("{\"type\":\"object\"}"), false);
-        var extTool = new com.taskforce.tf_api.core.service.mcp.ExternalMcpTool(
-            extClient,
-            new com.taskforce.tf_api.core.service.mcp.McpClient.ServerRef("srv", "http://x/mcp", null),
-            writeDef, real);
-        when(workspaceMcp.toolsFor(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(extTool));
-        when(tools.toolDefinitions(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of());
-        when(tools.get(org.mockito.ArgumentMatchers.eq("srv__do_write"), org.mockito.ArgumentMatchers.anyList()))
-            .thenReturn(extTool);
+        McpClient extClient = Mockito.mock(McpClient.class);
+        var writeDef = new McpClient.ToolDef("do_write", "writes something", json.readTree("{\"type\":\"object\"}"), false);
+        var extTool = new ExternalMcpTool(extClient, new McpClient.ServerRef("srv", "http://x/mcp", null), writeDef, json);
+        when(workspaceMcp.toolsFor(any())).thenReturn(List.of(extTool));
+        when(tools.toolDefinitions(anyList())).thenReturn(List.of());
+        when(tools.get(eq("srv__do_write"), anyList())).thenReturn(extTool);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"srv__do_write\",\"arguments\":\"{}\"}}]}"),
+            json.readTree("{\"content\":\"I propose to create the issue.\"}"));
 
-        var real2 = new ObjectMapper();
-        var withCall = real2.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"srv__do_write\",\"arguments\":\"{}\"}}]}");
-        var finalMsg = real2.readTree("{\"content\":\"Je propose de créer l'issue.\"}");
-        when(groq.rawChat(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), anyString()))
-            .thenReturn(withCall, finalMsg);
+        AssistantAnswer answer = service.run("acme", 7L, "Create an issue in the external tool");
 
-        AssistantAnswer answer = service.run("acme", 7L, "crée une issue dans l'outil externe");
-
-        assertThat(answer.mode()).isEqualTo("deep");
         assertThat(answer.toolCalls()).hasSize(1);
         assertThat(answer.toolCalls().get(0).status()).isEqualTo("pending");
-        // L'écriture externe n'a PAS été exécutée (aucun appel au serveur MCP).
-        org.mockito.Mockito.verify(extClient, org.mockito.Mockito.never())
-            .initialize(org.mockito.ArgumentMatchers.any());
+        verify(extClient, never()).initialize(any()); // rien n'a été envoyé au serveur MCP
     }
 
     @Test
-    @DisplayName("run (deep) : outils externes connectés → le system prompt porte le réflexe (TF-MCP-03)")
-    void run_deep_prompt_carries_tool_reflex() throws Exception {
+    @DisplayName("outils externes connectés → le message système les annonce et donne les règles d'usage")
+    void prompt_carries_tool_rules() throws Exception {
         stubWorkspace();
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "maxExternalTools", 20);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        ReflectionTestUtils.setField(service, "maxExternalTools", 20);
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
-        when(groq.isConfigured()).thenReturn(true);
+        when(llm.isConfigured()).thenReturn(true);
+        var readDef = new McpClient.ToolDef("list_things", "lists things", json.readTree("{\"type\":\"object\"}"), true);
+        var extTool = new ExternalMcpTool(Mockito.mock(McpClient.class),
+            new McpClient.ServerRef("linear", "http://x/mcp", null), readDef, json);
+        when(workspaceMcp.toolsFor(any())).thenReturn(List.of(extTool));
+        when(tools.toolDefinitions(anyList())).thenReturn(List.of());
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"ok\"}"));
 
-        // Un outil externe de LECTURE, namespacé « linear__list_things », connecté sur le workspace.
-        var real = new ObjectMapper();
-        var readDef = new com.taskforce.tf_api.core.service.mcp.McpClient.ToolDef(
-            "list_things", "liste des choses", real.readTree("{\"type\":\"object\"}"), true);
-        var extTool = new com.taskforce.tf_api.core.service.mcp.ExternalMcpTool(
-            org.mockito.Mockito.mock(com.taskforce.tf_api.core.service.mcp.McpClient.class),
-            new com.taskforce.tf_api.core.service.mcp.McpClient.ServerRef("linear", "http://x/mcp", null),
-            readDef, real);
-        when(workspaceMcp.toolsFor(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(extTool));
-        when(tools.toolDefinitions(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of());
-        // Le LLM répond directement (aucun appel d'outil) → un seul tour ; on capture les messages envoyés.
-        when(groq.rawChat(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), anyString()))
-            .thenReturn(real.readTree("{\"content\":\"ok\"}"));
-
-        service.run("acme", 7L, "analyse le projet et propose un plan"); // message deep → boucle d'outils
+        service.run("acme", 7L, "Show me the Linear things");
 
         @SuppressWarnings("unchecked")
-        org.mockito.ArgumentCaptor<List<java.util.Map<String, Object>>> captor =
-            org.mockito.ArgumentCaptor.forClass(List.class);
-        org.mockito.Mockito.verify(groq).rawChat(anyString(), captor.capture(),
-            org.mockito.ArgumentMatchers.any(), anyString());
-        String systemMsg = String.valueOf(captor.getValue().get(0).get("content"));
-        assertThat(systemMsg).contains("linear__list_things"); // l'outil connecté est annoncé
-        assertThat(systemMsg).contains("APPELLE-LE");          // le réflexe (Pilier 1) est présent
-        assertThat(systemMsg).contains("système externe");     // routage : namespace
-        assertThat(systemMsg).contains("TaskForce par défaut"); // routage (Pilier 2) : cible par défaut
-        assertThat(systemMsg).contains("find_integration");    // Pilier 3 : réflexe « connecte X »
-    }
-
-    @Test
-    @DisplayName("routing (TF-MCP-03 3.1) : « liste mes issues » arme le chemin deep (outils)")
-    void run_liste_routes_deep() throws Exception {
-        stubWorkspace();
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
-        when(groq.isConfigured()).thenReturn(true);
-        when(workspaceMcp.toolsFor(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
-        when(tools.toolDefinitions(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of());
-        var real = new ObjectMapper();
-        when(groq.rawChat(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), anyString()))
-            .thenReturn(real.readTree("{\"content\":\"ok\"}"));
-
-        // « liste » n'armait pas les outils avant 3.1 (mode fast) ; il doit désormais router deep.
-        AssistantAnswer answer = service.run("acme", 7L, "liste mes issues Linear");
-
-        assertThat(answer.mode()).isEqualTo("deep");
+        ArgumentCaptor<List<Map<String, Object>>> captor = ArgumentCaptor.forClass(List.class);
+        verify(llm).rawChat(captor.capture(), anyList(), anyString());
+        String system = String.valueOf(captor.getValue().get(0).get("content"));
+        assertThat(system).contains("linear__list_things")
+            .contains("CALL IT")
+            .contains("external system")
+            .contains("target TaskForce by default")
+            .contains("find_integration");
     }
 }

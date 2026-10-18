@@ -122,7 +122,7 @@ public class AnalysisJobService {
     public AnalysisJobResponse answer(String slug, Long jobId, Long userId, String answer) {
         AnalysisJob job = requireJob(slug, jobId, userId);
         if (job.getStatus() != AnalysisJobStatus.WAITING_FOR_INPUT) {
-            throw new BusinessException("Ce workflow n'attend pas de réponse");
+            throw new BusinessException("This workflow is not waiting for an answer");
         }
         job.setAnswer(answer);
         job.setQuestion(null);
@@ -135,7 +135,7 @@ public class AnalysisJobService {
     public void dismiss(String slug, Long jobId, Long userId) {
         AnalysisJob job = requireJob(slug, jobId, userId);
         if (job.getStatus().isActive()) {
-            throw new BusinessException("Impossible de retirer un workflow en cours");
+            throw new BusinessException("A running workflow cannot be removed");
         }
         job.setDismissed(true);
     }
@@ -148,7 +148,7 @@ public class AnalysisJobService {
     @Transactional
     public JobContext startJob(Long jobId) {
         AnalysisJob job = jobRepository.findById(jobId)
-            .orElseThrow(() -> new ResourceNotFoundException("Workflow introuvable: " + jobId));
+            .orElseThrow(() -> new ResourceNotFoundException("Workflow not found: " + jobId));
         job.setStatus(AnalysisJobStatus.RUNNING);
         job.setError(null);
         applyPlan(job, plan -> plan.status(AnalysisPlan.OBSERVE, AnalysisPlan.IN_PROGRESS));
@@ -260,7 +260,7 @@ public class AnalysisJobService {
     public StoredPriorityResponse dismissPriority(String slug, Long priorityId, Long userId) {
         DecisionPriority priority = requirePriority(slug, priorityId, userId);
         if (priority.getStatus() == DecisionPriorityStatus.ACCEPTED) {
-            throw new BusinessException("Cette priorité a déjà été transformée en issue");
+            throw new BusinessException("This priority has already been turned into an issue");
         }
         priority.setStatus(priority.getStatus() == DecisionPriorityStatus.DISMISSED
             ? DecisionPriorityStatus.NEW
@@ -274,7 +274,7 @@ public class AnalysisJobService {
     public StoredPriorityResponse edit(String slug, Long priorityId, Long userId, EditPriorityRequest request) {
         DecisionPriority priority = requirePriority(slug, priorityId, userId);
         if (priority.getStatus() == DecisionPriorityStatus.ACCEPTED) {
-            throw new BusinessException("Cette priorité a déjà été transformée en issue");
+            throw new BusinessException("This priority has already been turned into an issue");
         }
         if (request.getTitle() != null && !request.getTitle().isBlank()) {
             priority.setTitle(request.getTitle().trim());
@@ -321,7 +321,7 @@ public class AnalysisJobService {
     private AnalysisJob requireJob(String slug, Long jobId, Long userId) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         AnalysisJob job = jobRepository.findByIdAndWorkspaceId(jobId, ws.getId())
-            .orElseThrow(() -> new ResourceNotFoundException("Workflow introuvable: " + jobId));
+            .orElseThrow(() -> new ResourceNotFoundException("Workflow not found: " + jobId));
         visibilityGuard.assertCanView(job.getProject(), userId);  // TF-RBAC-INTEL
         return job;
     }
@@ -329,7 +329,7 @@ public class AnalysisJobService {
     private DecisionPriority requirePriority(String slug, Long priorityId, Long userId) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         DecisionPriority priority = priorityRepository.findByIdAndWorkspaceId(priorityId, ws.getId())
-            .orElseThrow(() -> new ResourceNotFoundException("Priorité introuvable: " + priorityId));
+            .orElseThrow(() -> new ResourceNotFoundException("Priority not found: " + priorityId));
         visibilityGuard.assertCanView(priority.getBrief().getProject(), userId);  // TF-RBAC-INTEL
         return priority;
     }

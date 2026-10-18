@@ -26,15 +26,15 @@ public class ListIssuesTool implements AgentTool {
     @Override public String name() { return "list_issues"; }
 
     @Override public String description() {
-        return "Liste des issues TaskForce. Sans projectId : mes issues assignées dans le workspace. "
-            + "Avec projectId (voir list_projects) : les issues de ce projet.";
+        return "Lists TaskForce issues. Without projectId: the issues assigned to me in the workspace. "
+            + "With projectId (see list_projects): the issues of that project.";
     }
 
     @Override public Map<String, Object> parametersSchema() {
         return Map.of(
             "type", "object",
             "properties", Map.of(
-                "projectId", Map.of("type", "integer", "description", "Optionnel : restreindre à ce projet")
+                "projectId", Map.of("type", "integer", "description", "Optional: limit to this project")
             )
         );
     }
@@ -45,9 +45,9 @@ public class ListIssuesTool implements AgentTool {
             ? issueService.listIssues(ctx.slug(), projectId, ctx.userId())
             : issueService.listMyIssues(ctx.slug(), ctx.userId());
         if (issues.isEmpty()) {
-            return projectId != null ? "Aucune issue dans ce projet." : "Aucune issue ne t'est assignée.";
+            return projectId != null ? "No issue in this project." : "No issue is assigned to you.";
         }
-        StringBuilder sb = new StringBuilder("Issues (" + issues.size() + ") :");
+        StringBuilder sb = new StringBuilder("Issues (" + issues.size() + "):");
         for (IssueResponse i : issues) {
             String status = i.getStatus() != null ? i.getStatus().getName() : "?";
             sb.append("\n- ").append(i.getIdentifier()).append(" ").append(i.getTitle())

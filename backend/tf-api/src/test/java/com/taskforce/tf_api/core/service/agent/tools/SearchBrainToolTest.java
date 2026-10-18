@@ -54,7 +54,7 @@ class SearchBrainToolTest {
     void no_result() {
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
         assertThat(tool().execute(Map.of("query", "x"), new AgentContext("acme", 1L, 7L)))
-            .isEqualTo("Aucune note pertinente trouvée.");
+            .isEqualTo("No relevant note found.");
     }
 
     @Test
@@ -66,7 +66,7 @@ class SearchBrainToolTest {
 
         String out = tool().execute(Map.of("query", "techno", "topK", 3), new AgentContext("acme", 1L, 7L));
 
-        assertThat(out).contains("Notes pertinentes").contains("Choix techno").contains("Sans contenu");
+        assertThat(out).contains("Relevant notes").contains("Choix techno").contains("Sans contenu");
         assertThat(out).contains("…"); // contenu long tronqué
         verify(search).retrieveRelevant(eq(1L), eq("techno"), eq(3));
     }

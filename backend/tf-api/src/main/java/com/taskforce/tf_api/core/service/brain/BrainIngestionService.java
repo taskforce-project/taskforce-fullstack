@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,9 +75,6 @@ public class BrainIngestionService {
     private final LlmClient                llm;
     private final AiMeter                  aiMeter;
 
-    @Value("${ai.model.assistant:gateway-default}")
-    private String model; // ignoré par l'AI Gateway (Ollama impose son modèle) ; utile si provider=groq
-
     /** Plafond d'issues listées par section (au-delà de ~20 KB le contenu partirait sur MinIO). */
     static final int LIST_CAP = 50;
 
@@ -91,22 +87,22 @@ public class BrainIngestionService {
     private static final List<String> WORKSPACE_TAGS = List.of("context", "company", "ingestion-auto");
 
     private static final String SYNTHESIS_SYSTEM = """
-        Tu es l'analyste du Brain OS de TaskForce. On te donne les FAITS d'un cycle de développement,
-        extraits de la base de données. Tu produis une courte synthèse en markdown français.
+        You are the analyst of the TaskForce Brain OS. You are given the FACTS of a development cycle,
+        taken from the database. You write a short summary in English markdown.
 
-        RÈGLE ABSOLUE : n'ajoute AUCUN fait. Tu ne disposes que des faits fournis — ne suppose rien
-        sur les causes, les personnes, le code ou le contexte, et n'écris aucun chiffre qui ne figure
-        pas dans les faits. S'il te manque un élément pour conclure, dis-le au lieu de combler.
+        ABSOLUTE RULE: add NO fact. You only have the facts provided: assume nothing about causes,
+        people, code or context, and write no number that is not in the facts. If something is
+        missing to conclude, say so instead of filling the gap.
 
-        Structure ta réponse exactement ainsi, et rien d'autre :
-        ### Lecture des chiffres
-        2 à 4 puces fondées UNIQUEMENT sur les faits fournis.
+        Structure your answer exactly like this, and nothing else:
+        ### Reading the numbers
+        2 to 4 bullet points based ONLY on the facts provided.
 
-        ### Propositions pour le prochain cycle
-        2 à 3 puces d'actions concrètes, formulées à l'infinitif. Ce sont des propositions soumises
-        à l'équipe, pas des décisions actées.
+        ### Proposals for the next cycle
+        2 to 3 bullet points of concrete actions, starting with a verb. They are proposals for the
+        team, not decisions already made.
 
-        Pas de titre de niveau 1 ou 2, pas de préambule, pas de conclusion.
+        No level 1 or 2 heading, no preamble, no conclusion.
         """;
 
     // =========================================================================
@@ -193,7 +189,7 @@ public class BrainIngestionService {
             }
             if (points != null) pointsPlanned += points;
 
-            String type = issue.getType() != null ? issue.getType().getName() : "Sans type";
+            String type = issue.getType() != null ? issue.getType().getName() : "No type";
             byType.merge(type, 1, Integer::sum);
             byAssignee.merge(assignee, 1, Integer::sum);
         }
@@ -240,7 +236,7 @@ public class BrainIngestionService {
         if (!llm.isConfigured()) return null;
         try {
             String out = aiMeter.metered(workspaceId, () ->
-                llm.chatCompletion(model, SYNTHESIS_SYSTEM, synthesisPrompt(facts), false, "fast"));
+                llm.chatCompletion(SYNTHESIS_SYSTEM, synthesisPrompt(facts), false, "fast"));
             return out != null && !out.isBlank() ? out : null;
         } catch (Exception ex) {
             // Couvre le gate de quota (409) comme la panne LLM : la rétro sort quand même, en faits seuls.
@@ -251,28 +247,28 @@ public class BrainIngestionService {
 
     /** Le LLM ne reçoit QUE des faits — c'est ce qui l'empêche d'en inventer. */
     private String synthesisPrompt(CycleFacts f) {
-        StringBuilder sb = new StringBuilder("Faits du cycle « ").append(f.cycleName()).append(" » :\n");
-        sb.append("- Projet : ").append(f.projectName()).append("\n");
+        StringBuilder sb = new StringBuilder("Facts of the cycle \"").append(f.cycleName()).append("\":\n");
+        sb.append("- Project: ").append(f.projectName()).append("\n");
         if (f.startDate() != null && f.endDate() != null) {
-            sb.append("- Période : ").append(f.startDate()).append(" → ").append(f.endDate()).append("\n");
+            sb.append("- Period: ").append(f.startDate()).append(" to ").append(f.endDate()).append("\n");
         }
-        sb.append("- Issues : ").append(f.total()).append(" au total, ")
-          .append(f.delivered().size()).append(" livrées, ")
-          .append(f.slipped().size()).append(" non livrées, ")
-          .append(f.cancelled().size()).append(" annulées (complétion ").append(f.completionRate()).append(" %)\n");
-        sb.append("- Story points : ").append(f.pointsDelivered()).append(" livrés sur ")
-          .append(f.pointsPlanned()).append(" planifiés\n");
-        sb.append("- Répartition par type : ").append(flatten(f.byType())).append("\n");
-        sb.append("- Répartition par assigné : ").append(flatten(f.byAssignee())).append("\n");
+        sb.append("- Issues: ").append(f.total()).append(" in total, ")
+          .append(f.delivered().size()).append(" delivered, ")
+          .append(f.slipped().size()).append(" not delivered, ")
+          .append(f.cancelled().size()).append(" cancelled (completion ").append(f.completionRate()).append("%)\n");
+        sb.append("- Story points: ").append(f.pointsDelivered()).append(" delivered out of ")
+          .append(f.pointsPlanned()).append(" planned\n");
+        sb.append("- By type: ").append(flatten(f.byType())).append("\n");
+        sb.append("- By assignee: ").append(flatten(f.byAssignee())).append("\n");
         if (!f.slipped().isEmpty()) {
-            sb.append("- Non livrées : ").append(f.slipped().stream()
+            sb.append("- Not delivered: ").append(f.slipped().stream()
                 .limit(LIST_CAP).map(i -> i.key() + " (" + i.title() + ")").toList()).append("\n");
         }
         return sb.toString();
     }
 
     private String flatten(Map<String, Integer> counts) {
-        if (counts.isEmpty()) return "(aucune)";
+        if (counts.isEmpty()) return "(none)";
         List<String> parts = new ArrayList<>();
         counts.forEach((key, count) -> parts.add(key + " ×" + count));
         return String.join(", ", parts);

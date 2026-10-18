@@ -5,10 +5,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationDetail;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationSummary;
@@ -39,18 +39,15 @@ public class AiConversationService {
     private static final int KEEP_RECENT = 6;
 
     private static final String SUMMARY_SYSTEM =
-        "Tu condenses l'historique d'une conversation entre un utilisateur et l'assistant Cortex. "
-        + "Produis un résumé FACTUEL et compact (150 mots max) qui préserve le contexte, les faits/chiffres "
-        + "donnés, les décisions prises, les préférences et les tâches en cours. Pas de salutations ni de méta.";
+        "You condense the history of a conversation between a user and the Cortex assistant. "
+        + "Write a FACTUAL, compact summary (150 words max) that keeps the context, the facts and numbers "
+        + "given, the decisions made, the preferences and the tasks in progress. No greetings, no meta comments.";
 
     private final AiConversationRepository conversationRepository;
     private final AiMessageRepository messageRepository;
     private final LlmClient llm;
     private final AiMeter aiMeter; // gate quota + comptage de la conso tokens de la compression d'historique
-
-    // Nom de modèle passé au client LLM (ignoré par l'AI Gateway, qui impose son modèle Ollama).
-    @Value("${ai.model.assistant:gateway-default}")
-    private String model;
+    private final TransactionTemplate transactionTemplate;
 
     // ── Lecture ───────────────────────────────────────────────────────────────
 
@@ -89,7 +86,7 @@ public class AiConversationService {
 
         if (summary != null && !summary.isBlank()) {
             out.add(Map.of("role", "system",
-                "content", "Résumé des échanges précédents de cette conversation : " + summary));
+                "content", "Summary of the earlier exchanges of this conversation: " + summary));
             long upto = conv.getSummaryUptoId() != null ? conv.getSummaryUptoId() : 0L;
             for (AiMessage m : messageRepository.findByConversationIdAndIdGreaterThanOrderByIdAsc(conversationId, upto)) {
                 out.add(Map.of("role", m.getRole(), "content", m.getContent()));
@@ -112,55 +109,73 @@ public class AiConversationService {
      * appel LLM, uniquement au franchissement. Best-effort : un échec de résumé ne casse jamais le chat.
      * À appeler avant {@link #recentHistory} pour un tour donné.
      */
-    @Transactional
     public void compressIfNeeded(Long conversationId) {
         if (!llm.isConfigured()) {
             return;
         }
-        if (messageRepository.countByConversationId(conversationId) <= COMPRESS_THRESHOLD) {
+        // Lecture dans une transaction courte ; l'appel au modèle se fait hors transaction, puis l'écriture
+        // du résumé dans une autre transaction courte. Aucune connexion ne reste ouverte pendant la génération.
+        PendingSummary pending = transactionTemplate.execute(status -> pendingSummary(conversationId));
+        if (pending == null) {
             return;
+        }
+        String summary;
+        try {
+            // Métré : gate quota (au-dessus du plafond → compression sautée, best-effort) + comptage réel.
+            summary = aiMeter.metered(pending.workspaceId(),
+                () -> llm.chatCompletion(SUMMARY_SYSTEM, pending.prompt(), false, "fast"));
+        } catch (Exception e) {
+            return; // compression best-effort : on n'échoue pas le tour pour un résumé raté
+        }
+        if (summary == null || summary.isBlank()) {
+            return;
+        }
+        transactionTemplate.executeWithoutResult(status ->
+            conversationRepository.findById(conversationId).ifPresent(conv -> {
+                conv.setSummary(summary.strip());
+                conv.setSummaryUptoId(pending.uptoId());
+                conversationRepository.save(conv);
+            }));
+    }
+
+    /** Ce qu'il reste à résumer : le prompt et le dernier message couvert ; {@code null} s'il n'y a rien à faire. */
+    private record PendingSummary(Long workspaceId, String prompt, Long uptoId) {}
+
+    private PendingSummary pendingSummary(Long conversationId) {
+        if (messageRepository.countByConversationId(conversationId) <= COMPRESS_THRESHOLD) {
+            return null;
         }
         AiConversation conv = conversationRepository.findById(conversationId).orElse(null);
         if (conv == null) {
-            return;
+            return null;
         }
         long upto = conv.getSummaryUptoId() != null ? conv.getSummaryUptoId() : 0L;
         List<AiMessage> unsummarized =
             messageRepository.findByConversationIdAndIdGreaterThanOrderByIdAsc(conversationId, upto);
         if (unsummarized.size() <= KEEP_RECENT) {
-            return; // rien de nouveau à condenser (on garde les récents verbatim)
+            return null; // rien de nouveau à condenser (on garde les récents verbatim)
         }
         List<AiMessage> toSummarize = unsummarized.subList(0, unsummarized.size() - KEEP_RECENT);
-        try {
-            // Métré : gate quota (au-dessus du plafond → compression sautée, best-effort) + comptage réel.
-            String summary = aiMeter.metered(conv.getWorkspaceId(),
-                () -> llm.chatCompletion(model, SUMMARY_SYSTEM, buildSummaryPrompt(conv.getSummary(), toSummarize), false, "fast"));
-            if (summary != null && !summary.isBlank()) {
-                conv.setSummary(summary.strip());
-                conv.setSummaryUptoId(toSummarize.get(toSummarize.size() - 1).getId());
-                conversationRepository.save(conv);
-            }
-        } catch (Exception e) {
-            // Compression best-effort : on n'échoue pas le tour pour un résumé raté.
-        }
+        return new PendingSummary(conv.getWorkspaceId(), buildSummaryPrompt(conv.getSummary(), toSummarize),
+            toSummarize.get(toSummarize.size() - 1).getId());
     }
 
     /** Construit le prompt de résumé : résumé courant (à étendre) + nouveaux échanges à intégrer. */
     private static String buildSummaryPrompt(String existingSummary, List<AiMessage> messages) {
         StringBuilder sb = new StringBuilder();
         if (existingSummary != null && !existingSummary.isBlank()) {
-            sb.append("Résumé actuel à mettre à jour :\n").append(existingSummary).append("\n\n");
+            sb.append("Current summary to update:\n").append(existingSummary).append("\n\n");
         }
-        sb.append("Nouveaux échanges à intégrer :\n");
+        sb.append("New exchanges to merge:\n");
         for (AiMessage m : messages) {
-            String who = "assistant".equals(m.getRole()) ? "Cortex" : "Utilisateur";
+            String who = "assistant".equals(m.getRole()) ? "Cortex" : "User";
             String c = m.getContent() != null ? m.getContent() : "";
             if (c.length() > 600) {
                 c = c.substring(0, 600) + "…";
             }
-            sb.append("- ").append(who).append(" : ").append(c.replace("\n", " ")).append('\n');
+            sb.append("- ").append(who).append(": ").append(c.replace("\n", " ")).append('\n');
         }
-        sb.append("\nRésumé mis à jour (150 mots max) :");
+        sb.append("\nUpdated summary (150 words max):");
         return sb.toString();
     }
 
@@ -220,7 +235,7 @@ public class AiConversationService {
 
     private AiConversation requireOwned(Long id, Long userId) {
         return conversationRepository.findByIdAndUserId(id, userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Conversation introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
     }
 
     private static String trim(String s) {

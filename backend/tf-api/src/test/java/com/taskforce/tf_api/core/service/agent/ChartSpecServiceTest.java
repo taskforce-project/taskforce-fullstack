@@ -59,8 +59,6 @@ class ChartSpecServiceTest {
         lenient().when(access.resolveAndAuthorize(anyString(), any())).thenReturn(ws);
         // Scope TF-RBAC-INTEL : l'utilisateur voit des projets (les données mockées de queryService priment).
         lenient().when(visibilityGuard.viewableProjectIds(any(), any())).thenReturn(List.of(1L, 2L));
-        ReflectionTestUtils.setField(service, "model", "test-model");
-
         // Whitelist du moteur de requête (données réelles) — stubs génériques.
         lenient().when(queryService.isValidDimension(anyString())).thenReturn(true);
         lenient().when(queryService.dimensionLabel(anyString())).thenReturn("Projet");
@@ -238,6 +236,6 @@ class ChartSpecServiceTest {
 
     private void llmReturns(String json) {
         when(llm.isConfigured()).thenReturn(true);
-        when(llm.chatCompletion(anyString(), anyString(), anyString(), anyBoolean(), anyString())).thenReturn(json);
+        when(llm.chatCompletion(anyString(), anyString(), anyBoolean(), anyString())).thenReturn(json);
     }
 }

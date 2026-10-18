@@ -238,7 +238,7 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
             + "{\"agent\":\"CTO\",\"category\":\"Engineering\",\"urgency\":\"low\",\"confidence\":99,\"action\":\"Revue\",\"insight\":\"Vélocité stable\"}"
             + "]}";
         // 5 arguments : generateInsights route désormais par LlmClient avec un tier (« fast »).
-        org.mockito.Mockito.when(llm.chatCompletion(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), any()))
+        org.mockito.Mockito.when(llm.chatCompletion(any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), any()))
             .thenReturn(json);
         // le mock ObjectMapper délègue à un vrai parseur pour readTree
         org.mockito.Mockito.when(objectMapper.readTree(org.mockito.ArgumentMatchers.anyString()))
@@ -257,7 +257,7 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
     void insights_fallback_on_empty_json() throws Exception {
         org.mockito.Mockito.when(aiMeter.metered(any(), any()))
             .thenAnswer(i -> ((AiMeter.AiCall<?>) i.getArgument(1)).call());
-        org.mockito.Mockito.when(llm.chatCompletion(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), any()))
+        org.mockito.Mockito.when(llm.chatCompletion(any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), any()))
             .thenReturn("{}");
         org.mockito.Mockito.when(objectMapper.readTree(org.mockito.ArgumentMatchers.anyString()))
             .thenAnswer(i -> new ObjectMapper().readTree((String) i.getArgument(0)));

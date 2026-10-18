@@ -54,7 +54,6 @@ class DecisionServiceTest {
 
     @BeforeEach
     void setup() {
-        ReflectionTestUtils.setField(service, "model", "test-model");
     }
 
     private Snapshot snap(long total, long open, long inProgress, long completed, long overdue, long dueSoon) {
@@ -63,7 +62,7 @@ class DecisionServiceTest {
 
     private void llmReturns(String json) {
         when(llm.isConfigured()).thenReturn(true);
-        when(llm.chatCompletion(any(), any(), any(), anyBoolean(), any())).thenReturn(json);
+        when(llm.chatCompletion(any(), any(), anyBoolean(), any())).thenReturn(json);
     }
 
     @Nested
@@ -76,11 +75,11 @@ class DecisionServiceTest {
             DecisionBrief brief = service.fallbackBrief(project, snap(10, 5, 6, 3, 2, 1));
 
             assertThat(brief.mode()).isEqualTo("fallback");
-            assertThat(brief.situation()).contains("Web").contains("30%").contains("en retard");
+            assertThat(brief.situation()).contains("Web").contains("30%").contains("overdue");
             assertThat(brief.risks()).hasSize(3);
             assertThat(brief.priorities()).hasSize(3);
             assertThat(brief.priorities().get(0).level()).isEqualTo("HIGH");
-            assertThat(brief.priorities().get(0).title()).contains("en retard");
+            assertThat(brief.priorities().get(0).title()).contains("overdue");
         }
 
         @Test
@@ -89,7 +88,7 @@ class DecisionServiceTest {
             DecisionBrief brief = service.fallbackBrief(project, snap(5, 2, 1, 3, 0, 0));
 
             assertThat(brief.risks()).hasSize(1);
-            assertThat(brief.risks().get(0)).contains("Pas de signal");
+            assertThat(brief.risks().get(0)).contains("No strong risk signal");
             assertThat(brief.priorities()).hasSize(1);
             assertThat(brief.priorities().get(0).level()).isEqualTo("LOW");
         }
@@ -143,7 +142,7 @@ class DecisionServiceTest {
         @DisplayName("LLM en échec → repli fallback (jamais d'exception propagée)")
         void llm_throws() {
             when(llm.isConfigured()).thenReturn(true);
-            when(llm.chatCompletion(any(), any(), any(), anyBoolean(), any())).thenThrow(new RuntimeException("timeout"));
+            when(llm.chatCompletion(any(), any(), anyBoolean(), any())).thenThrow(new RuntimeException("timeout"));
 
             DecisionService.Analysis a = service.analyze(project, snap(4, 2, 1, 1, 0, 0), List.of(), false, null, false);
 

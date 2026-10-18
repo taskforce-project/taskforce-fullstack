@@ -95,6 +95,7 @@ class SmartAssignServiceTest {
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private AiUsageService aiUsageService; // dép. du vrai AiMeter (pass-through en test)
     @Mock private DeliveryAgentProviderRegistry agentRegistry; // A3 : vide en test → aucune reco d'agent
+    @Mock private AiStatusService aiStatus; // nom du modèle tracé dans ai_runs
 
     private SmartAssignService service;
 
@@ -109,8 +110,9 @@ class SmartAssignServiceTest {
         service = new SmartAssignService(
             workspaceRepository, workspaceMemberRepository, projectRepository,
             projectMemberRepository, issueRepository, llm, jdbcTemplate, new ObjectMapper(), aiMeter,
-            agentRegistry);
-        ReflectionTestUtils.setField(service, "modelName", "test-model");
+            agentRegistry, new com.taskforce.tf_api.util.InlineTransactionTemplate(), aiStatus);
+        lenient().when(aiStatus.current()).thenReturn(
+            new AiStatusService.AiStatus(true, true, "main-model", "fast-model", true, "embed-model"));
 
         workspace = Workspace.builder().id(WS_ID).slug(SLUG).name("Demo").build();
         // public → resolveCandidates lit les membres du workspace (une seule source à stubber).
@@ -134,7 +136,7 @@ class SmartAssignServiceTest {
             .thenReturn(List.of());
 
         // Groq renvoie par défaut un JSON vide et valide → ranking déterministe piloté par les règles Java.
-        lenient().when(llm.chatCompletion(any(), any(), any(), anyBoolean(), any()))
+        lenient().when(llm.chatCompletion(any(), any(), anyBoolean(), any()))
             .thenReturn("{\"scores\":[]}");
     }
 
@@ -293,7 +295,7 @@ class SmartAssignServiceTest {
             User u = user(10L, "Alice");
             stubResolvedContext();
             stubWorkspaceMembers(u);
-            when(llm.chatCompletion(any(), any(), any(), anyBoolean(), any()))
+            when(llm.chatCompletion(any(), any(), anyBoolean(), any()))
                 .thenThrow(new RuntimeException("groq down"));
 
             SmartAssignResponse res = service.preview(SLUG, PROJECT_ID, REQUESTER, previewRequest(IssuePriority.MEDIUM));
@@ -316,7 +318,7 @@ class SmartAssignServiceTest {
             stubResolvedContext();
             stubWorkspaceMembers(alice, bob);
             stubSkills(10L, "java");
-            when(llm.chatCompletion(any(), any(), any(), anyBoolean(), any()))
+            when(llm.chatCompletion(any(), any(), anyBoolean(), any()))
                 .thenReturn("{\"scores\":[{\"candidate_id\":11,\"score\":0.99,\"reason\":\"great semantic fit\"}]}");
 
             SmartAssignResponse res = service.preview(SLUG, PROJECT_ID, REQUESTER, previewRequest(IssuePriority.MEDIUM, "java"));

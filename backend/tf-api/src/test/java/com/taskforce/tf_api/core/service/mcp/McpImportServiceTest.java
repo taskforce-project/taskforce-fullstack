@@ -42,14 +42,15 @@ class McpImportServiceTest {
     @Mock private ProjectService projectService;
     @Mock private IssueService issueService;
     @Mock private LlmClient llm;
+    @Mock private com.taskforce.tf_api.core.service.AiUsageService aiUsageService;
 
     private McpImportService service;
     private final Workspace ws = Workspace.builder().id(10L).slug("acme").build();
 
     @BeforeEach
     void setup() {
-        service = new McpImportService(workspaceMcp, projectService, issueService, llm, new ObjectMapper());
-        ReflectionTestUtils.setField(service, "model", "m");
+        service = new McpImportService(workspaceMcp, projectService, issueService, llm, new ObjectMapper(),
+            new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm));
     }
 
     private void connectorWithTools(String... tools) {
@@ -63,7 +64,7 @@ class McpImportServiceTest {
         connectorWithTools("list_issues", "save_issue");
         when(workspaceMcp.execute(eq(10L), eq("linear__list_issues"), any(), eq(true))).thenReturn("<données brutes Linear>");
         when(llm.isConfigured()).thenReturn(true);
-        when(llm.chatCompletion(eq("m"), anyString(), anyString(), eq(true))).thenReturn(
+        when(llm.chatCompletion(anyString(), anyString(), eq(true), any())).thenReturn(
             "{\"issues\":[{\"title\":\"Bug login\",\"description\":\"casse\",\"priority\":\"HIGH\"},{\"title\":\"Feature X\"}]}");
         when(projectService.createProject(eq("acme"), eq(7L), any()))
             .thenReturn(ProjectResponse.builder().id(99L).identifier("IMPORT").name("Import Linear").build());
@@ -97,7 +98,7 @@ class McpImportServiceTest {
         connectorWithTools("list_issues");
         when(workspaceMcp.execute(eq(10L), eq("linear__list_issues"), any(), eq(true))).thenReturn("bla");
         when(llm.isConfigured()).thenReturn(true);
-        when(llm.chatCompletion(anyString(), anyString(), anyString(), eq(true))).thenReturn("pas du json");
+        when(llm.chatCompletion(anyString(), anyString(), eq(true), any())).thenReturn("pas du json");
         when(projectService.createProject(eq("acme"), eq(7L), any()))
             .thenReturn(ProjectResponse.builder().id(99L).identifier("X").name("X").build());
 

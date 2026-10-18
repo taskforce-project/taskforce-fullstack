@@ -45,7 +45,7 @@ public class SavedChartService {
     public SavedChartResponse save(String slug, Long userId, SaveChartRequest request) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         if (request.getSpec() == null) {
-            throw new BusinessException("La spec du graphe est obligatoire");
+            throw new BusinessException("The chart spec is required");
         }
         SavedChart chart = SavedChart.builder()
             .workspace(ws)
@@ -60,7 +60,7 @@ public class SavedChartService {
     public void delete(String slug, Long userId, Long chartId) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         SavedChart chart = repository.findByIdAndWorkspaceId(chartId, ws.getId())
-            .orElseThrow(() -> new ResourceNotFoundException("Graphe épinglé introuvable: " + chartId));
+            .orElseThrow(() -> new ResourceNotFoundException("Pinned chart not found: " + chartId));
         repository.delete(chart);
     }
 
