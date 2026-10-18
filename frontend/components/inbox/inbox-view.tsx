@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation"
 import {
   Radio, AtSign, ShieldAlert, ClipboardList,
   CheckCheck, Flame, AlertTriangle, Clock, CheckCircle2,
-  MessageSquare, ArrowRight, ArrowUpRight, X, RefreshCw,
+  MessageSquare, ArrowRight, ArrowUpRight, X, RefreshCw, ShieldQuestion, Bot, OctagonX,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -43,6 +43,9 @@ const TYPE_CONFIG: Partial<Record<string, TypeCfg>> = {
   statusChanged: { icon: ArrowRight,    label: "Status updated",    color: "text-muted-foreground" },
   completed:     { icon: CheckCircle2,  label: "Completed",         color: "text-ink-green" },
   overload:      { icon: AlertTriangle, label: "Overload",          color: "text-ink-yellow" },
+  agentApproval: { icon: ShieldQuestion, label: "Approval needed",  color: "text-ink-yellow" },
+  agentDone:     { icon: Bot,            label: "Agent finished",   color: "text-ink-green" },
+  agentFailed:   { icon: OctagonX,       label: "Agent failed",     color: "text-destructive" },
 }
 
 // Fallback pour tout type non mappé → évite le crash si le backend renvoie un type inconnu.

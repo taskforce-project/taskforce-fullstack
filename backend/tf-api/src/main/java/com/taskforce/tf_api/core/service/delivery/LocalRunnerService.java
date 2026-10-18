@@ -9,7 +9,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.taskforce.tf_api.core.dto.request.RunnerApprovalRequest;
+import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
+import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerClaimResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.DeliveryRun;
@@ -46,19 +49,22 @@ public class LocalRunnerService {
     private final ProjectVisibilityGuard visibilityGuard;
     private final DeliveryRunner deliveryRunner;
     private final LocalRunnerSettings settings;
+    private final DeliveryActivityService activityService;
 
     public LocalRunnerService(
         DeliveryRunRepository runRepository,
         UserRepository userRepository,
         ProjectVisibilityGuard visibilityGuard,
         DeliveryRunner deliveryRunner,
-        LocalRunnerSettings settings
+        LocalRunnerSettings settings,
+        DeliveryActivityService activityService
     ) {
         this.runRepository = runRepository;
         this.userRepository = userRepository;
         this.visibilityGuard = visibilityGuard;
         this.deliveryRunner = deliveryRunner;
         this.settings = settings;
+        this.activityService = activityService;
     }
 
     /**
@@ -141,7 +147,35 @@ public class LocalRunnerService {
             ? new DeliveryPoll(DeliveryRunStatus.DONE, result.summary().trim(), result.resultUrl(), null)
             : new DeliveryPoll(DeliveryRunStatus.FAILED, null, null,
                 (result.error() == null || result.error().isBlank()) ? "The runner reported a failure." : result.error().trim());
+        activityService.closeApprovals(runId);
         deliveryRunner.complete(runId, poll);
+    }
+
+    /** Chronologie en direct (OSS-5.3) : le run est verrouillé, les numéros d'ordre restent continus. */
+    @Transactional
+    public void appendEvents(Long runId, RunnerIdentity runner, RunnerEventsRequest request) {
+        DeliveryRun run = runRepository.findByIdForUpdate(runId)
+            .orElseThrow(() -> new ForbiddenException(REFUSED));
+        assertHeldBy(run, runner);
+        activityService.appendEvents(run, request.events());
+    }
+
+    /** Ouvre une demande de validation d'une action de l'agent (OSS-5.4). */
+    @Transactional
+    public RunnerApprovalResponse requestApproval(Long runId, RunnerIdentity runner, RunnerApprovalRequest request) {
+        DeliveryRun run = runRepository.findById(runId)
+            .orElseThrow(() -> new ForbiddenException(REFUSED));
+        assertHeldBy(run, runner);
+        return activityService.openApproval(run, request.tool(), request.summary());
+    }
+
+    /** Décision sur une demande, lue par le runner jusqu'à ce qu'elle ne soit plus en attente. */
+    @Transactional
+    public RunnerApprovalResponse approvalStatus(Long runId, Long approvalId, RunnerIdentity runner) {
+        DeliveryRun run = runRepository.findById(runId)
+            .orElseThrow(() -> new ForbiddenException(REFUSED));
+        assertHeldBy(run, runner);
+        return activityService.approvalStatus(run, approvalId);
     }
 
     /**

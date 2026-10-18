@@ -10,15 +10,18 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.taskforce.tf_api.core.dto.request.ApprovalDecisionRequest;
 import com.taskforce.tf_api.core.dto.request.DelegateRequest;
 import com.taskforce.tf_api.core.dto.response.DeliveryProviderResponse;
+import com.taskforce.tf_api.core.dto.response.DeliveryRunActivityResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
-import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProviderRegistry;
+import com.taskforce.tf_api.core.service.delivery.DeliveryActivityService;
 import com.taskforce.tf_api.core.service.delivery.DeliveryRunner;
 import com.taskforce.tf_api.core.service.delivery.DeliveryService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
@@ -42,21 +45,23 @@ public class DeliveryController {
     private static final String RUNNING = DeliveryRunStatus.RUNNING.name();
     private static final String QUEUED  = DeliveryRunStatus.QUEUED.name();
 
-    private final DeliveryAgentProviderRegistry registry;
     private final DeliveryService deliveryService;
     private final DeliveryRunner deliveryRunner;
+    private final DeliveryActivityService activityService;
     private final UserRepository userRepository;
 
-    /** GET /api/workspaces/{slug}/delivery/providers — providers disponibles pour la délégation. */
+    /**
+     * GET /api/workspaces/{slug}/delivery/providers?projectId= : agents de la délégation, chacun prêt ou non pour la
+     * personne connectée (et pour ce projet si {@code projectId} est donné), avec ce qui manque.
+     */
     @GetMapping("/providers")
     public ResponseEntity<ApiResponse<List<DeliveryProviderResponse>>> listProviders(
-        @PathVariable String slug
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @RequestParam(name = "projectId", required = false) Long projectId
     ) {
-        List<DeliveryProviderResponse> providers = registry.all().stream()
-            .map(p -> new DeliveryProviderResponse(
-                p.key(), p.displayName(), p.logoKey(), p.available(), p.models()))
-            .toList();
-        return ResponseEntity.ok(ApiResponse.success("Providers retrieved", providers));
+        return ResponseEntity.ok(ApiResponse.success("Providers retrieved",
+            deliveryService.listProviders(slug, projectId, resolveUserId(jwt))));
     }
 
     /**
@@ -117,6 +122,38 @@ public class DeliveryController {
             runs = deliveryService.listRuns(slug, userId);
         }
         return ResponseEntity.ok(ApiResponse.success("Runs retrieved", runs));
+    }
+
+    /**
+     * GET /api/workspaces/{slug}/delivery/runs/{runId}/activity?after=N : chronologie en direct du run après
+     * l'événement N, et ses demandes de validation (OSS-5.3, OSS-5.4). Lue par la fiche d'issue pendant le run.
+     */
+    @GetMapping("/runs/{runId}/activity")
+    public ResponseEntity<ApiResponse<DeliveryRunActivityResponse>> activity(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long runId,
+        @RequestParam(name = "after", defaultValue = "0") int after
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("Run activity",
+            activityService.activity(slug, runId, after, resolveUserId(jwt))));
+    }
+
+    /**
+     * POST /api/workspaces/{slug}/delivery/runs/{runId}/approvals/{approvalId} : autorise ou refuse une action de
+     * l'agent. Seule la personne qui a délégué répond : l'action s'exécute sur sa machine.
+     */
+    @PostMapping("/runs/{runId}/approvals/{approvalId}")
+    public ResponseEntity<ApiResponse<Void>> decide(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long runId,
+        @PathVariable Long approvalId,
+        @Valid @RequestBody ApprovalDecisionRequest request
+    ) {
+        boolean allow = "ALLOW".equals(request.decision());
+        activityService.decide(slug, runId, approvalId, allow, resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success(allow ? "Action allowed" : "Action denied", null));
     }
 
     private Long resolveUserId(Jwt jwt) {

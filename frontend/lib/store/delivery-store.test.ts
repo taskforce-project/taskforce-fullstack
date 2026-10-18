@@ -11,6 +11,8 @@ vi.mock('../api/delivery-service', () => ({
   delegateIssue: vi.fn(),
   getRunnerStatus: vi.fn(),
   provisionRunner: vi.fn(),
+  getRunActivity: vi.fn(),
+  decideApproval: vi.fn(),
 }));
 
 function makeRun(overrides: Partial<DeliveryRun> = {}): DeliveryRun {
@@ -23,13 +25,13 @@ function makeRun(overrides: Partial<DeliveryRun> = {}): DeliveryRun {
 }
 
 const PROVIDERS: DeliveryProvider[] = [
-  { key: 'claude-code', displayName: 'Claude Code', logoKey: 'anthropic', available: true, models: ['claude-sonnet-5'] },
+  { key: 'claude-code', displayName: 'Claude Code', logoKey: 'anthropic', available: true, models: ['claude-sonnet-5'], ready: true, reason: null },
 ];
 
 describe('delivery-store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    act(() => useDeliveryStore.setState({ providers: [], providersLoading: false, runs: {}, workspaceRuns: [], runner: null }));
+    act(() => useDeliveryStore.setState({ providers: [], projectProviders: {}, providersLoading: false, runs: {}, workspaceRuns: [], runner: null, activity: {} }));
   });
 
   it('fetchProviders loads the providers', async () => {
@@ -129,5 +131,74 @@ describe('delivery-store', () => {
     let res: unknown = 'unset';
     await act(async () => { res = await useDeliveryStore.getState().provisionRunner(); });
     expect(res).toBeNull();
+  });
+
+  // ---- activité d'un run (lot 5) ----
+
+  const approval = (status: 'PENDING' | 'ALLOWED', canDecide = true) => ({
+    id: 9, tool: 'Bash', summary: 'npm install lodash', status, createdAt: null, expiresAt: null, decidedAt: null,
+    decidedBy: null, canDecide,
+  });
+  const event = (seq: number) => ({ seq, kind: 'tool' as const, tool: 'Bash', text: `step ${seq}`, at: null });
+
+  it('fetchActivity reads after the last known event and appends without duplicates', async () => {
+    vi.mocked(svc.getRunActivity)
+      .mockResolvedValueOnce({ events: [event(1), event(2)], approvals: [approval('PENDING')] })
+      .mockResolvedValueOnce({ events: [event(2), event(3)], approvals: [approval('ALLOWED', false)] });
+
+    await act(async () => { await useDeliveryStore.getState().fetchActivity('acme', 100); });
+    await act(async () => { await useDeliveryStore.getState().fetchActivity('acme', 100); });
+
+    expect(svc.getRunActivity).toHaveBeenNthCalledWith(1, 'acme', 100, 0);
+    expect(svc.getRunActivity).toHaveBeenNthCalledWith(2, 'acme', 100, 2);
+    const activity = useDeliveryStore.getState().activity[100];
+    expect(activity?.events.map((e) => e.seq)).toEqual([1, 2, 3]);
+    expect(activity?.approvals[0]?.status).toBe('ALLOWED');
+  });
+
+  it('fetchActivity returns null on failure and keeps what it had', async () => {
+    act(() => useDeliveryStore.setState({ activity: { 100: { events: [event(1)], approvals: [] } } }));
+    vi.mocked(svc.getRunActivity).mockRejectedValue(new Error('x'));
+    let res: unknown = 'unset';
+    await act(async () => { res = await useDeliveryStore.getState().fetchActivity('acme', 100); });
+    expect(res).toBeNull();
+    expect(useDeliveryStore.getState().activity[100]?.events).toHaveLength(1);
+  });
+
+  it('decideApproval sends the decision then refreshes the activity', async () => {
+    vi.mocked(svc.decideApproval).mockResolvedValue(undefined);
+    vi.mocked(svc.getRunActivity).mockResolvedValue({ events: [], approvals: [approval('ALLOWED', false)] });
+    let ok = false;
+    await act(async () => { ok = await useDeliveryStore.getState().decideApproval('acme', 100, 9, true); });
+    expect(ok).toBe(true);
+    expect(svc.decideApproval).toHaveBeenCalledWith('acme', 100, 9, true);
+    expect(useDeliveryStore.getState().activity[100]?.approvals[0]?.status).toBe('ALLOWED');
+  });
+
+  it('decideApproval returns false when the server refuses', async () => {
+    vi.mocked(svc.decideApproval).mockRejectedValue(new Error('expired'));
+    let ok = true;
+    await act(async () => { ok = await useDeliveryStore.getState().decideApproval('acme', 100, 9, false); });
+    expect(ok).toBe(false);
+  });
+
+  // ---- agents par projet (lot 5) ----
+
+  it('fetchProjectProviders keeps the list of each project apart', async () => {
+    const notReady = [{ ...PROVIDERS[0]!, ready: false, reason: 'Set up your local runner first' }];
+    vi.mocked(svc.getDeliveryProviders).mockResolvedValueOnce(PROVIDERS).mockResolvedValueOnce(notReady);
+    await act(async () => { await useDeliveryStore.getState().fetchProjectProviders('acme', 12); });
+    await act(async () => { await useDeliveryStore.getState().fetchProjectProviders('acme', 13); });
+    expect(svc.getDeliveryProviders).toHaveBeenNthCalledWith(1, 'acme', 12);
+    expect(useDeliveryStore.getState().projectProviders[12]?.[0]?.ready).toBe(true);
+    expect(useDeliveryStore.getState().projectProviders[13]?.[0]?.reason).toBe('Set up your local runner first');
+    expect(useDeliveryStore.getState().providers).toEqual([]);
+  });
+
+  it('fetchProjectProviders returns [] on failure', async () => {
+    vi.mocked(svc.getDeliveryProviders).mockRejectedValue(new Error('x'));
+    let res = PROVIDERS;
+    await act(async () => { res = await useDeliveryStore.getState().fetchProjectProviders('acme', 12); });
+    expect(res).toEqual([]);
   });
 });

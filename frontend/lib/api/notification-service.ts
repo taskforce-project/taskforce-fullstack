@@ -71,14 +71,15 @@ export async function acknowledgeAll(slug: string): Promise<void> {
 // Réglages (portée compte : par événement, par canal)
 // ---------------------------------------------------------------------------
 
-/** Événements réglables (regroupent les 8 `type` de notifications). */
+/** Événements réglables (regroupent les 12 `type` de notifications). */
 export type NotificationEventKey =
   | "assigned"
   | "mention"
   | "commented"
   | "statusChanged"
   | "dueDate"
-  | "overload";
+  | "overload"
+  | "agent";
 
 export interface NotificationPreference {
   eventKey: NotificationEventKey;

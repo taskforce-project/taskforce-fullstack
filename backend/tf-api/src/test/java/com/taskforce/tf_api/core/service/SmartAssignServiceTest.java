@@ -410,6 +410,40 @@ class SmartAssignServiceTest {
         }
 
         @Test
+        @DisplayName("un agent n'est proposé que s'il est prêt pour la personne qui demande (OSS-5.7)")
+        void should_suggest_only_a_ready_agent() {
+            User alice = user(10L, "Alice");
+            stubResolvedContext();
+            stubWorkspaceMembers(alice);
+            stubSkills(10L, "java");
+            Issue bug = Issue.builder().id(ISSUE_ID).title("Fix the footer typo").description("Steps in the spec").project(project)
+                .status(IssueStatus.builder().category(IssueStatusCategory.BACKLOG).build())
+                .priority(IssuePriority.MEDIUM).storyPoints(1).labels(Set.of(label("bug"))).build();
+            when(issueRepository.findById(ISSUE_ID)).thenReturn(Optional.of(bug));
+            java.util.concurrent.atomic.AtomicBoolean runnerSetUp = new java.util.concurrent.atomic.AtomicBoolean(false);
+            com.taskforce.tf_api.core.service.delivery.DeliveryAgentProvider claude =
+                org.mockito.Mockito.mock(com.taskforce.tf_api.core.service.delivery.DeliveryAgentProvider.class);
+            when(claude.key()).thenReturn("claude-code");
+            lenient().when(claude.displayName()).thenReturn("Claude Code");
+            when(claude.available()).thenReturn(true);
+            when(claude.unavailableReason(any())).thenAnswer(inv -> runnerSetUp.get() ? null : "Set up your local runner first");
+            when(agentRegistry.get("claude-code")).thenReturn(claude);
+            lenient().when(agentRegistry.all()).thenReturn(List.of(claude));
+
+            SmartAssignResponse withoutRunner = service.recommend(SLUG, PROJECT_ID, ISSUE_ID, REQUESTER);
+            runnerSetUp.set(true);
+            SmartAssignResponse withRunner = service.recommend(SLUG, PROJECT_ID, ISSUE_ID, REQUESTER);
+
+            java.util.function.Function<SmartAssignResponse, List<String>> kinds = r -> java.util.stream.Stream
+                .concat(java.util.stream.Stream.of(r.getRecommended()), r.getAlternatives() == null ? java.util.stream.Stream.empty() : r.getAlternatives().stream())
+                .filter(java.util.Objects::nonNull).map(c -> c.getKind() == null ? "user" : c.getKind()).toList();
+            assertThat(kinds.apply(withoutRunner)).doesNotContain("agent");
+            assertThat(kinds.apply(withRunner)).contains("agent");
+            verify(claude, org.mockito.Mockito.atLeastOnce()).unavailableReason(org.mockito.ArgumentMatchers.argThat(
+                ctx -> Long.valueOf(REQUESTER).equals(ctx.userId()) && ctx.project() != null && ctx.workspace() != null));
+        }
+
+        @Test
         @DisplayName("lève ResourceNotFoundException si l'issue n'appartient pas au projet (IDOR)")
         void should_throw_when_issue_from_other_project() {
             stubResolvedContext();

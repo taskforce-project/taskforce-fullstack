@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import {
   X, RefreshCw, Clock, CheckCircle2, AlertTriangle, CircleDot,
   Flag, Tag, Calendar, Layers, GitBranch, Activity,
@@ -1155,11 +1155,12 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const [sectionCounts, setSectionCounts] = useState({ checklist: 0, attachments: 0, relations: 0 })
 
   // Agents de délégation : proposés DANS le menu Assignee (déléguer = comme assigner une personne).
-  const deliveryProviders = useDeliveryStore((s) => s.providers)
-  const fetchDeliveryProviders = useDeliveryStore((s) => s.fetchProviders)
+  const deliveryProviders = useDeliveryStore((s) => (projectId ? s.projectProviders[projectId] : undefined))
+  const fetchDeliveryProviders = useDeliveryStore((s) => s.fetchProjectProviders)
   const delegateToAgent = useDeliveryStore((s) => s.delegate)
   const fetchDeliveryRun = useDeliveryStore((s) => s.fetchRun)
-  const availableAgents = deliveryProviders.filter((p) => p.available)
+  // Seuls les agents prêts pour la personne et pour ce projet sont proposés (lot 5) : runner créé, dépôt lié...
+  const availableAgents = useMemo(() => (deliveryProviders ?? []).filter((p) => p.available && p.ready), [deliveryProviders])
 
   useEffect(() => { if (editingTitle) titleRef.current?.focus() }, [editingTitle])
 
@@ -1190,7 +1191,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
       .catch(() => { /* silent */ })
     fetchLabels(workspaceSlug, projectId)
       .catch(() => { /* silent */ })
-    fetchDeliveryProviders(workspaceSlug).catch(() => { /* silent */ })
+    if (projectId) fetchDeliveryProviders(workspaceSlug, projectId).catch(() => { /* silent */ })
   }, [open, workspaceSlug, projectId, fetchStatuses, fetchLabels, fetchDeliveryProviders])
 
   // Cycles du projet (options du sélecteur) + cycle courant de l'issue - CYC-03b.

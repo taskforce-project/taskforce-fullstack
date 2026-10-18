@@ -139,6 +139,9 @@ class DeliverySessionFilterTest {
         assertThat(delegated.getClaimAsString("preferred_username")).isEqualTo(OWNER);
         assertThat(delegated.getSubject()).isEqualTo("kc-7");
         assertThat(delegated.<Long>getClaim("tf_delivery_run")).isEqualTo(100L);
+        // Portée du run, que le serveur MCP de l'instance rejuge outil par outil (OSS-5.2).
+        assertThat(delegated.getClaimAsString(DeliverySessionFilter.WORKSPACE_CLAIM)).isEqualTo("acme");
+        assertThat(delegated.<Long>getClaim(DeliverySessionFilter.PROJECT_CLAIM)).isEqualTo(12L);
         // Aucun claim du jeton machine n'est repris : ni rôle, ni propriétaire.
         assertThat(delegated.hasClaim("realm_access")).isFalse();
         assertThat(delegated.hasClaim("tf_runner_owner")).isFalse();

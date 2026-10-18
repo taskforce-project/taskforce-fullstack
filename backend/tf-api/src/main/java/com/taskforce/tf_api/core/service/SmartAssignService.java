@@ -36,6 +36,8 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.delivery.ClaudeCodeProvider;
 import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProvider;
 import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProviderRegistry;
+import com.taskforce.tf_api.core.service.delivery.DeliveryContext;
+import com.taskforce.tf_api.core.service.delivery.GitHubCopilotProvider;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -83,7 +85,7 @@ public class SmartAssignService {
      * Ordre de préférence du provider selon qu'un dépôt est lié. Claude Code (runner local) sait faire les
      * deux : pull request avec un dépôt, réponse écrite sans.
      */
-    private static final List<String> AGENT_PREF_WITH_REPO = List.of(ClaudeCodeProvider.KEY);
+    private static final List<String> AGENT_PREF_WITH_REPO = List.of(ClaudeCodeProvider.KEY, GitHubCopilotProvider.KEY);
     private static final List<String> AGENT_PREF_NO_REPO   = List.of(ClaudeCodeProvider.KEY);
 
     private final WorkspaceRepository workspaceRepository;
@@ -123,7 +125,7 @@ public class SmartAssignService {
 
         SmartAssignResponse response = computeRecommendation(
             input.workspace(), input.project(), input.text(), input.labels(), input.priority(), input.storyPoints(),
-            input.hasSpec(), true, true);
+            input.hasSpec(), true, requestingUserId);
 
         SmartAssignCandidateResponse recommended = response.getRecommended();
         // On ne trace un assignment_event que pour une reco HUMAINE (userId non nul) : une reco d'agent
@@ -158,7 +160,7 @@ public class SmartAssignService {
         // A la creation, pas d'agent : on ne peut pas encore deleguer une issue inexistante (assignation
         // humaine seulement ; la delegation se fait depuis une issue existante).
         return computeRecommendation(workspace, project, issueText, issueLabels, priority, null,
-            hasText(request.getDescription()), true, false);
+            hasText(request.getDescription()), true, null);
     }
 
     /**
@@ -186,7 +188,7 @@ public class SmartAssignService {
             }
             SmartAssignResponse rec = computeRecommendation(
                 workspace, project, input.text(), input.labels(), input.priority(), input.storyPoints(),
-                input.hasSpec(), true, true); // A4 : le bulk considère aussi les agents
+                input.hasSpec(), true, requestingUserId); // A4 : le bulk considère aussi les agents
             results.add(BulkSmartAssignItemResponse.builder()
                 .issueId(issueId)
                 .recommended(rec.getRecommended())
@@ -212,7 +214,7 @@ public class SmartAssignService {
         // d'agent ici (la redistribution rééquilibre la CHARGE entre humains ; un agent n'a pas de charge).
         return computeRecommendation(
             workspace, project, buildIssueText(issue, labels), labels, issue.getPriority(), issue.getStoryPoints(),
-            hasText(issue.getDescription()), false, false);
+            hasText(issue.getDescription()), false, null);
     }
 
     private Workspace resolveWorkspace(String workspaceSlug, Long requestingUserId) {
@@ -250,12 +252,14 @@ public class SmartAssignService {
     private SmartAssignResponse computeRecommendation(Workspace workspace, Project project,
                                                       String issueText, List<String> issueLabels,
                                                       IssuePriority priority, Integer issueStoryPoints,
-                                                      boolean hasSpec, boolean useAi, boolean considerAgents) {
+                                                      boolean hasSpec, boolean useAi, Long agentsFor) {
         Prepared prepared = transactionTemplate.execute(status -> {
             // A3 : la tâche se prête-t-elle a une délégation a un agent (bien cadree, faible risque) ? Si oui
             // et qu'un agent est disponible, l'agent devient un candidat (recommande ou alternative).
-            SmartAssignCandidateResponse agentCandidate = considerAgents
-                ? buildAgentCandidate(project, issueLabels, issueText, priority, issueStoryPoints, hasSpec) : null;
+            // Seuls les agents prêts pour la personne qui demande sont proposés (OSS-5.7) ; {@code agentsFor} null = aucun.
+            SmartAssignCandidateResponse agentCandidate = agentsFor != null
+                ? buildAgentCandidate(new DeliveryContext(agentsFor, workspace, project), issueLabels, issueText, priority,
+                    issueStoryPoints, hasSpec) : null;
 
             List<User> candidates = resolveCandidates(workspace, project);
             if (candidates.isEmpty()) {
@@ -346,14 +350,15 @@ public class SmartAssignService {
      * Construit le candidat "agent" si la tâche s'y prête et qu'un agent est disponible, sinon null.
      * Score = adéquation de la TÂCHE a une délégation (indépendant des humains).
      */
-    private SmartAssignCandidateResponse buildAgentCandidate(Project project, List<String> labels, String issueText,
+    private SmartAssignCandidateResponse buildAgentCandidate(DeliveryContext context, List<String> labels, String issueText,
                                                              IssuePriority priority, Integer points, boolean hasSpec) {
+        Project project = context.project();
         boolean repoLinked = project != null && project.getRepoFullName() != null && !project.getRepoFullName().isBlank();
         int suitability = agentSuitability(labels, issueText, priority, points, hasSpec, repoLinked);
         if (suitability < AGENT_ALTERNATIVE_THRESHOLD) {
             return null;
         }
-        DeliveryAgentProvider provider = pickAgent(repoLinked);
+        DeliveryAgentProvider provider = pickAgent(repoLinked, context);
         if (provider == null) {
             return null;
         }
@@ -424,12 +429,15 @@ public class SmartAssignService {
     }
 
     /** Choisit le provider d'agent disponible le mieux adapté (ordre de préférence selon le dépôt lié). */
-    private DeliveryAgentProvider pickAgent(boolean repoLinked) {
+    /** Premier agent prêt dans l'ordre de préférence, sinon le premier agent prêt tout court, sinon aucun. */
+    private DeliveryAgentProvider pickAgent(boolean repoLinked, DeliveryContext context) {
         for (String key : (repoLinked ? AGENT_PREF_WITH_REPO : AGENT_PREF_NO_REPO)) {
             DeliveryAgentProvider p = agentRegistry.get(key);
-            if (p != null && p.available()) return p;
+            if (p != null && p.available() && p.unavailableReason(context) == null) return p;
         }
-        return agentRegistry.all().stream().filter(DeliveryAgentProvider::available).findFirst().orElse(null);
+        return agentRegistry.all().stream()
+            .filter(p -> p.available() && p.unavailableReason(context) == null)
+            .findFirst().orElse(null);
     }
 
     private boolean hasText(String s) {

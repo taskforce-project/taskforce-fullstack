@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 
 import { BrandLogo } from "@/components/ui/brand-logo"
+import { ClaudeCodeMcpSetup } from "@/components/settings/claude-code-mcp-setup"
 import { LocalRunnerSetup } from "@/components/settings/local-runner-setup"
 import { Badge } from "@/components/ui/badge"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
@@ -44,11 +45,16 @@ export function AgentsPanel() {
                     {!p.available && <Badge variant="secondary" className="text-[10px] uppercase">Off</Badge>}
                   </p>
                   <p className="text-xs text-muted-foreground">{descriptionFor(p.key, p.available)}</p>
+                  {p.available && !p.ready && p.reason && (
+                    <p className="mt-0.5 text-xs text-ink-yellow">{p.reason}</p>
+                  )}
                 </div>
               </div>
 
               {/* Runner local : identité machine en libre-service (ADR-013) */}
               {p.key === "claude-code" && p.available && <LocalRunnerSetup />}
+              {/* Mode interactif : le Claude Code de la personne sur le serveur MCP de l'instance (lot 5) */}
+              {p.key === "claude-code" && slug && <ClaudeCodeMcpSetup slug={slug} />}
             </div>
           ))}
           {providers.length === 0 && (
@@ -65,6 +71,11 @@ function descriptionFor(key: string, available: boolean): string {
     return available
       ? "Your own Claude Code, on your machine: works on a branch and opens a pull request."
       : "Your own Claude Code, on your machine. Not enabled on this instance: an administrator turns it on with DELIVERY_LOCAL_RUNNER_ENABLED=true."
+  }
+  if (key === "github-copilot") {
+    return available
+      ? "GitHub's cloud agent: works in the project's repository and opens a pull request. Needs a Copilot plan with the cloud agent, on the GitHub account connected to the workspace."
+      : "GitHub's cloud agent. Not available on this instance: GitHub isn't set up (GITHUB_CLIENT_ID)."
   }
   return available ? "Available for delegation." : "Not enabled on this instance."
 }

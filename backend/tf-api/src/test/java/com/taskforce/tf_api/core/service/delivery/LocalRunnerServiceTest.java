@@ -16,6 +16,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.taskforce.tf_api.core.dto.request.RunnerApprovalRequest;
+import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
 import com.taskforce.tf_api.core.dto.response.RunnerClaimResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
@@ -40,6 +42,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -57,6 +60,7 @@ class LocalRunnerServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private ProjectVisibilityGuard visibilityGuard;
     @Mock private DeliveryRunner deliveryRunner;
+    @Mock private DeliveryActivityService activityService;
 
     private LocalRunnerService service;
     private User owner;
@@ -64,7 +68,7 @@ class LocalRunnerServiceTest {
     @BeforeEach
     void setUp() {
         LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15);
-        service = new LocalRunnerService(runRepository, userRepository, visibilityGuard, deliveryRunner, settings);
+        service = new LocalRunnerService(runRepository, userRepository, visibilityGuard, deliveryRunner, settings, activityService);
         owner = User.builder().id(7L).email(OWNER_EMAIL).keycloakId("kc-7").isActive(true).build();
     }
 
@@ -245,6 +249,8 @@ class LocalRunnerServiceTest {
         assertThat(poll.getValue().status()).isEqualTo(DeliveryRunStatus.DONE);
         assertThat(poll.getValue().summary()).isEqualTo("PR opened");
         assertThat(poll.getValue().resultUrl()).isEqualTo("https://github.com/acme/website/pull/9");
+        // Run terminé : les demandes de validation encore ouvertes ne recevront plus de réponse utile.
+        verify(activityService).closeApprovals(100L);
     }
 
     @Test
@@ -275,5 +281,48 @@ class LocalRunnerServiceTest {
             .isInstanceOf(ForbiddenException.class);
 
         verify(deliveryRunner, never()).complete(anyLong(), any());
+    }
+
+    // ── chronologie et validations (lot 5) ───────────────────────────────────
+
+    @Test
+    @DisplayName("events : le runner qui tient le run ajoute à sa chronologie, sous verrou")
+    void events_of_the_held_run() {
+        DeliveryRun held = run(100L, DeliveryRunStatus.RUNNING, "tf-runner-pierre", owner, LocalDateTime.now());
+        when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(held));
+        RunnerEventsRequest request = new RunnerEventsRequest(List.of(new RunnerEventsRequest.Event("tool", "Bash", "npm test")));
+
+        service.appendEvents(100L, RUNNER, request);
+
+        verify(activityService).appendEvents(held, request.events());
+    }
+
+    @Test
+    @DisplayName("validation : ouverte et lue par le runner qui tient le run")
+    void approvals_of_the_held_run() {
+        DeliveryRun held = run(100L, DeliveryRunStatus.RUNNING, "tf-runner-pierre", owner, LocalDateTime.now());
+        when(runRepository.findById(100L)).thenReturn(Optional.of(held));
+
+        service.requestApproval(100L, RUNNER, new RunnerApprovalRequest("Bash", "npm install lodash"));
+        service.approvalStatus(100L, 9L, RUNNER);
+
+        verify(activityService).openApproval(held, "Bash", "npm install lodash");
+        verify(activityService).approvalStatus(held, 9L);
+    }
+
+    @Test
+    @DisplayName("chronologie et validations refusées à un autre runner, ou sur un run terminé")
+    void activity_refused_outside_the_held_run() {
+        DeliveryRun other = run(100L, DeliveryRunStatus.RUNNING, "tf-runner-someone-else", owner, LocalDateTime.now());
+        DeliveryRun finished = run(200L, DeliveryRunStatus.DONE, "tf-runner-pierre", owner, LocalDateTime.now());
+        when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(other));
+        when(runRepository.findById(200L)).thenReturn(Optional.of(finished));
+        RunnerEventsRequest request = new RunnerEventsRequest(List.of(new RunnerEventsRequest.Event("text", null, "hi")));
+
+        assertThatThrownBy(() -> service.appendEvents(100L, RUNNER, request)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> service.requestApproval(200L, RUNNER, new RunnerApprovalRequest("Bash", "x")))
+            .isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> service.approvalStatus(200L, 9L, RUNNER)).isInstanceOf(ForbiddenException.class);
+        verifyNoInteractions(activityService);
     }
 }

@@ -677,7 +677,7 @@ function AppearancePanel() {
   )
 }
 
-/** Événements réglables (regroupent les 8 `type` de notifications back). */
+/** Événements réglables (regroupent les 12 `type` de notifications back). */
 const NOTIF_EVENTS: { key: NotificationEventKey; label: string; description: string }[] = [
   { key: "assigned",      label: "Assigned to you", description: "When an issue is assigned to you" },
   { key: "mention",       label: "Mentions",        description: "When someone @mentions you in a comment" },
@@ -685,6 +685,7 @@ const NOTIF_EVENTS: { key: NotificationEventKey; label: string; description: str
   { key: "statusChanged", label: "Status changes",  description: "When an issue you're involved in changes status or is completed" },
   { key: "dueDate",       label: "Due dates",       description: "Reminders when your issues are due soon or overdue" },
   { key: "overload",      label: "Team overload",   description: "When a teammate's workload gets too high (managers)" },
+  { key: "agent",         label: "Coding agents",   description: "When an agent you delegated to asks for approval, finishes or fails" },
 ]
 
 /**
