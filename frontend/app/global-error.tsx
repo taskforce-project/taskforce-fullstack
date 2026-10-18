@@ -31,9 +31,9 @@ export default function GlobalError({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#0b0b0c",
-          color: "#e5e5e5",
-          fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif",
+          background: "#0b0e19",
+          color: "#f3f2f0",
+          fontFamily: "Geist, system-ui, -apple-system, Segoe UI, sans-serif",
         }}
       >
         <div
@@ -50,7 +50,7 @@ export default function GlobalError({
           <span
             style={{
               fontSize: 13,
-              fontWeight: 600,
+              fontWeight: 550,
               letterSpacing: "0.15em",
               textTransform: "uppercase",
               opacity: 0.85,
@@ -58,7 +58,7 @@ export default function GlobalError({
           >
             TaskForce
           </span>
-          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>Something went wrong</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 550, letterSpacing: "-0.025em", margin: 0 }}>Something went wrong</h1>
           <p style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.7, margin: 0 }}>
             An unexpected error occurred. Try reloading the page.
             {error.digest ? ` (ref: ${error.digest})` : ""}
@@ -69,12 +69,13 @@ export default function GlobalError({
             style={{
               marginTop: 4,
               padding: "9px 20px",
-              borderRadius: 8,
+              borderRadius: 0,
               border: "none",
-              background: "#2563eb",
+              boxShadow: "inset 0 -2px 0 rgba(0, 0, 0, 0.30)",
+              background: "#2f6bf6",
               color: "#ffffff",
               fontSize: 14,
-              fontWeight: 500,
+              fontWeight: 450,
               cursor: "pointer",
             }}
           >
