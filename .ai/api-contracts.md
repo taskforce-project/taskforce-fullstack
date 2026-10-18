@@ -32,9 +32,6 @@
 | RoadmapController            | `/api/workspaces/{slug}/roadmap`                                           |       ✅       |
 | WebhookController            | `/api/workspaces/{slug}/webhooks`                                          |       ✅       |
 | IntegrationController        | `/api/workspaces/{slug}/integrations/...` + `/api/integrations/*/callback` |       ✅       |
-| StripeController             | `/api/stripe`                                                              |       ✅       |
-| StripeWebhookController      | `/api/webhooks`                                                            |       ✅       |
-| SalesController              | `/api/sales`                                                               |       ✅       |
 | FileController (ged)         | `/api/files`                                                               |       ✅       |
 | AttachmentController (ged)   | `/api/workspaces/{slug}/projects/{projectId}/issues/{issueId}/attachments` |       ✅       |
 | **CycleController**          | `/workspaces/{slug}/projects/{projectId}/cycles`                           | ❌ **missing** |
@@ -56,7 +53,6 @@ Legend: M = HTTP method. FE service = `frontend/lib/api/<file>`. BE = `backend/.
 | M    | Path                                                       | FE fn            | BE method        | Status                                         |
 | ---- | ---------------------------------------------------------- | ---------------- | ---------------- | ---------------------------------------------- |
 | POST | `/api/auth/register`                                       | `register`       | `register`       | ✅                                             |
-| POST | `/api/auth/select-plan`                                    | `selectPlan`     | `selectPlan`     | ✅                                             |
 | POST | `/api/auth/verify-otp`                                     | `verifyOtp`      | `verifyOtp`      | ✅                                             |
 | POST | `/api/auth/resend-otp`                                     | `resendOtp`      | `resendOtp`      | ✅                                             |
 | POST | `/api/auth/login`                                          | `login`          | `login`          | ✅                                             |
@@ -118,12 +114,10 @@ projets visibles par l'appelant (`ProjectVisibilityGuard.viewableProjectIds`).
   `@RequestMapping("/api/workspaces/{slug}")` + `@GetMapping("/my-issues")` : **l'URL externe de `/my-issues`
   est inchangée**.
 
-### Stripe — ✅ paths, partial backend (`stripe-service.ts`)
+### Facturation et ventes : retirées le 18/10/2026 (ADR-016)
 
-`createCheckoutSession` POST `/api/stripe/create-checkout`, `getSubscriptionInfo` GET
-`/api/stripe/subscription`, `cancelSubscription` POST `/api/stripe/cancel`.
-⚠️ Backend `StripeController` confirmed only `GET /verify-session`; the create-checkout / subscription /
-cancel handlers + `StripeWebhookController` event handlers are partially stubbed (see [`technical-debt.md`](./technical-debt.md) TD-005).
+`/api/billing/**`, `/api/stripe/**`, `/api/webhooks/stripe`, `/api/auth/select-plan`, `/api/sales/**` et
+`/api/workspaces/{slug}/usage` n'existent plus (lot 2 du plan open source).
 
 ### Profile — ⚠️ broken import (`profile-service.ts` ↔ `ProfileController`)
 
@@ -168,13 +162,11 @@ Backend endpoint exists at `/api/workspaces/{slug}/projects/{projectId}/issues/{
 
 ### Avatars — ✅ (`FileController` `/api/files/avatars/{userId}`, public; Dicebear fallback)
 
-### Sales — ✅ (`SalesController` `POST /api/sales/inquiry`, public; BE notify-email is a TODO stub)
-
 ---
 
 ## 3. Defined route groups in `lib/config/api-routes.ts`
 
-Present: `AUTH_ROUTES`, `STRIPE_ROUTES`, `USER_ROUTES`, `WORKSPACE_ROUTES`, `PROJECT_ROUTES`,
+Present: `AUTH_ROUTES`, `USER_ROUTES`, `WORKSPACE_ROUTES`, `PROJECT_ROUTES`,
 `ISSUE_ROUTES`, `CYCLE_ROUTES`, `ANALYTICS_ROUTES`, `NOTIFICATION_ROUTES`, `PROFILE_ROUTES`,
 `PAGE_ROUTES`, `TEAM_ROUTES`, `DISCUSSION_ROUTES`.
 
@@ -225,7 +217,7 @@ Frontend `AUTH_ROUTES.REFRESH_TOKEN = /api/auth/refresh`; backend method is mapp
 | Auth, User, Workspace, Project, Issue (core), Analytics, Notification, Profile(path), Labels, Sales, Avatars | ✅ aligned                     |
 | Cycle, Team, Page, Discussion, Chat                                                                          | ❌ 404 (missing `/api`)        |
 | Messages, Integrations, Attachments, Roadmap                                                                 | ❌ undefined FE route constant |
-| Profile import, Auth refresh, Stripe write-paths                                                             | ⚠️ runtime/stub issues         |
+| Profile import, Auth refresh                                                                                 | ⚠️ runtime/stub issues         |
 
 > When wiring a new endpoint: (1) add the controller path **with `/api`**, (2) add the constant to
 > `api-routes.ts`, (3) consume it in the service, (4) read `response.data.data` (envelope).
