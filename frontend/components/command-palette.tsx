@@ -34,6 +34,7 @@ import { useTheme } from "next-themes"
 
 import { cn } from "@/lib/utils"
 import { useCreateProjectStore } from "@/lib/store/create-project-store"
+import { useSettingsStore } from "@/lib/store/settings-store"
 import { useBrainStore } from "@/lib/store/brain-store"
 import { sendAssistantMessage } from "@/lib/api/assistant-service"
 
@@ -95,6 +96,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
+  const openSettings = useSettingsStore((s) => s.openSettings)
   const { setTheme } = useTheme()
 
   // ─── État mode IA ──────────────────────────────────────────────────────────
@@ -140,6 +142,10 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
   // ─── Navigation ────────────────────────────────────────────────────────────
   // Les routes sont scopées au workspace (/{slug}/…) - on préfixe le slug courant. (QA Q-24)
   function go(path: string) { router.push(slug ? `/${slug}${path}` : path); onOpenChange(false) }
+  // Réglages et profil s'ouvrent en place, comme depuis la barre latérale. Passer par les routes
+  // `/settings` ou `/profile` (qui ouvrent le modal puis renvoient au dashboard) démontait la page
+  // courante, le <main> de l'AppShell étant indexé sur le chemin, et relançait tous ses chargements.
+  function openSettingsHere(section?: string) { openSettings(section); onOpenChange(false) }
 
   const ACTIONS: CommandAction[] = [
     // Navigation
@@ -151,8 +157,8 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
     { id: "cycles",        label: "Go to Cycles",        group: "Navigation", icon: <Repeat className="h-4 w-4" />, action: () => go("/cycles") },
     { id: "roadmap",       label: "Go to Roadmap",       group: "Navigation", icon: <CalendarRange className="h-4 w-4" />, action: () => go("/roadmap") },
     { id: "members",       label: "Go to Members",       group: "Navigation", icon: <Users className="h-4 w-4" />, action: () => go("/members") },
-    { id: "settings",      label: "Go to Settings",      group: "Navigation", icon: <Settings className="h-4 w-4" />, action: () => go("/settings") },
-    { id: "profile",       label: "View my profile",     group: "Navigation", icon: <User className="h-4 w-4" />, action: () => go("/profile") },
+    { id: "settings",      label: "Go to Settings",      group: "Navigation", icon: <Settings className="h-4 w-4" />, action: () => openSettingsHere() },
+    { id: "profile",       label: "View my profile",     group: "Navigation", icon: <User className="h-4 w-4" />, action: () => openSettingsHere("profile") },
     { id: "intelligence",  label: "Go to Intelligence",  group: "Navigation", icon: <Activity className="h-4 w-4" />, action: () => go("/analytics") },
     { id: "brain",         label: "Go to Brain OS",      group: "Navigation", icon: <Brain className="h-4 w-4" />,            action: () => go("/brain") },
     // Actions
