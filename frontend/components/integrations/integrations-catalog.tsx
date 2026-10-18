@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { Info, Loader2, ExternalLink, Check, Plug, Search, ChevronLeft, Globe, BookOpen, Server, Wrench, AlertTriangle, Terminal } from "lucide-react"
+import { Info, Loader2, ExternalLink, Check, Plug, Search, ChevronLeft, Globe, BookOpen, Server, Wrench, AlertTriangle, Terminal, Plus } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -14,30 +14,34 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { cn } from "@/lib/utils"
+import { getErrorMessage } from "@/lib/api/client"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import {
   getIntegrationCatalog, getPlaneStatus, connectPlane, listPlaneProjects, syncPlane, disconnectPlane,
-  connectConnector, disconnectConnector,
   getMcpServers, connectMcpServer, disconnectMcpServer, startMcpOAuth,
+  CUSTOM_MCP_CATEGORY, NEW_CUSTOM_MCP_KEY,
   type IntegrationCatalog, type ConnectorView, type PlaneProject, type PlaneStatus, type McpServerStatus,
 } from "@/lib/api/integration-service"
 import { McpActionConsole } from "@/components/integrations/mcp-action-console"
 
-const CAP_LABEL: Record<string, string> = { observe: "Observe", act: "Act", metrics: "Metrics", recommend: "Components", mcp: "MCP" }
+const CAP_LABEL: Record<string, string> = { observe: "Observe", act: "Act", mcp: "MCP" }
 const CAP_DESC: Record<string, string> = {
-  observe: "Native deep integration: reads this service's data into TaskForce.",
-  act: "Can act in the service from TaskForce (write).",
-  metrics: "Reports metrics and indicators.",
-  recommend: "Component recommendations by Cortex (coming soon).",
-  mcp: "Plug this tool's MCP server: its tools go live in Cortex (read + actions under your approval).",
+  observe: "Reads this service's data into TaskForce.",
+  act: "Acts in the service from TaskForce.",
+  mcp: "Its tools go live in Cortex: reads run directly, a change waits for the approval of an owner or admin.",
 }
-const AUTH_LABEL: Record<string, string> = { OAUTH2: "OAuth", API_KEY: "API Key", TOKEN: "Token", CONFIG: "Config", NONE: "No auth" }
-const AUTH_HELP: Record<string, string> = {
-  OAUTH2: "Connect via OAuth (redirect to the service).",
+const AUTH_LABEL: Record<ConnectorView["authType"], string> = { OAUTH2: "OAuth", API_KEY: "API key", MCP: "MCP" }
+const AUTH_HELP: Record<ConnectorView["authType"], string> = {
+  OAUTH2: "One click: you are redirected to the service to authorize access.",
   API_KEY: "Connect with an API key.",
-  TOKEN: "Connect with a personal access token.",
-  CONFIG: "Connect with an endpoint + credentials.",
-  NONE: "No authentication required.",
+  MCP: "Through its MCP server: OAuth in one click, an access token, or a custom header.",
+}
+
+/** Fiche vide d'un serveur MCP ajouté à la main : le backend dérive sa clé `custom-<slug>` du nom saisi. */
+const NEW_CUSTOM_SERVER: ConnectorView = {
+  key: NEW_CUSTOM_MCP_KEY, name: "", category: CUSTOM_MCP_CATEGORY, authType: "MCP", connected: false,
+  fields: [], capabilities: ["mcp"], description: null, docsUrl: null, setupHint: null, websiteUrl: null,
+  mcpSuggestedUrl: null,
 }
 
 /** Puce de filtre par catégorie (façon marketplace). */
@@ -58,7 +62,10 @@ function CatPill({ active, onClick, children }: Readonly<{ active: boolean; onCl
   )
 }
 
-/** Le catalogue générique : rend le « pool » d'outils (GET /integrations/catalog) groupé par catégorie. */
+/**
+ * Le catalogue des intégrations (ADR-020) : GitHub, Slack et Plane en natif, les serveurs MCP officiels en
+ * préréglage, et tout autre serveur MCP ajouté à la main (« Connect an MCP server »).
+ */
 export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   const [catalog, setCatalog] = useState<IntegrationCatalog | null>(null)
   const [loading, setLoading] = useState(true)
@@ -79,9 +86,10 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
       .then((c) => {
         setCatalog(c)
         setError(false)
-        // Garde la fiche ouverte à jour (ex. état « connecté » après connexion).
+        // Garde la fiche ouverte à jour (ex. état « connecté » après connexion) ; un serveur déconnecté
+        // disparaît du catalogue, sa fiche se ferme.
         setDetailTool((prev) => prev
-          ? c.categories.flatMap((g) => g.tools).find((t) => t.key === prev.key) ?? prev
+          ? c.categories.flatMap((g) => g.tools).find((t) => t.key === prev.key) ?? null
           : null)
       })
       .catch(() => setError(true))
@@ -90,20 +98,8 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
 
   useEffect(() => { refresh() }, [refresh])
 
-  // Retour du callback OAuth MCP (TF-MCP-02) : ?mcp=connected|error → toast + refresh, puis on nettoie l'URL.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const mcp = params.get("mcp")
-    if (!mcp) return
-    if (mcp === "connected") { toast.success("MCP server connected via OAuth"); refresh() }
-    else if (mcp === "error") toast.error("OAuth connection failed - try again or paste a token")
-    params.delete("mcp")
-    const q = params.toString()
-    window.history.replaceState({}, "", window.location.pathname + (q ? `?${q}` : ""))
-  }, [refresh])
-
   async function handleAction(tool: ConnectorView) {
-    // GitHub / Slack : OAuth 1-clic dédié (redirection). Le reste → dialog générique (formulaire).
+    // GitHub / Slack non connectés : OAuth 1-clic dédié (redirection). Le reste ouvre le dialogue.
     if (!tool.connected && (tool.key === "github" || tool.key === "slack")) {
       try {
         if (tool.key === "github") await connectGitHub(slug)
@@ -131,7 +127,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
       .filter((g) => g.tools.length > 0)
   }, [catalog, query, activeCat, statusFilter])
 
-  if (loading) {
+  if (loading && !catalog) {
     return (
       <div className="flex items-center justify-center py-12 text-muted-foreground">
         <Loader2 className="size-5 animate-spin" />
@@ -162,22 +158,26 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
         ) : (
         <>
         <p className="text-xs text-muted-foreground">
-          GitHub, Slack and Plane are deep integrations that sync natively. Every other tool connects through
-          its own MCP server: one click for the ones marked &quot;MCP-ready&quot;, or paste your endpoint. Its tools
-          then go live in Cortex (reads run, writes need your approval).
+          Pick an official MCP server below or connect your own. Its tools then go live in Cortex: reads run
+          directly, a change waits for the approval of an owner or admin.
         </p>
 
-        {/* Filtre par statut de connexion - « ce que j'ai connecté ou pas » (en tête). */}
-        <div className="flex gap-1.5">
-          <CatPill active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>
-            All <span className="tabular-nums opacity-60">{catalog.total}</span>
-          </CatPill>
-          <CatPill active={statusFilter === "connected"} onClick={() => setStatusFilter("connected")}>
-            Connected <span className="tabular-nums opacity-60">{catalog.connected}</span>
-          </CatPill>
-          <CatPill active={statusFilter === "disconnected"} onClick={() => setStatusFilter("disconnected")}>
-            Not connected <span className="tabular-nums opacity-60">{Math.max(0, catalog.total - catalog.connected)}</span>
-          </CatPill>
+        {/* Filtre par statut de connexion, et l'ajout d'un serveur MCP hors catalogue. */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex gap-1.5">
+            <CatPill active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>
+              All <span className="tabular-nums opacity-60">{catalog.total}</span>
+            </CatPill>
+            <CatPill active={statusFilter === "connected"} onClick={() => setStatusFilter("connected")}>
+              Connected <span className="tabular-nums opacity-60">{catalog.connected}</span>
+            </CatPill>
+            <CatPill active={statusFilter === "disconnected"} onClick={() => setStatusFilter("disconnected")}>
+              Not connected <span className="tabular-nums opacity-60">{Math.max(0, catalog.total - catalog.connected)}</span>
+            </CatPill>
+          </div>
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setDialogTool(NEW_CUSTOM_SERVER)}>
+            <Plus className="size-3.5" /> Connect an MCP server
+          </Button>
         </div>
 
         {/* Recherche */}
@@ -186,7 +186,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search connectors…"
+            placeholder="Search integrations…"
             className="h-control-lg pl-9"
           />
         </div>
@@ -203,21 +203,12 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
           ))}
         </div>
 
-        {/* Résumé */}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-shape-green" /><span className="font-medium text-foreground">{catalog.connected}</span> connected</span>
-          <span className="text-muted-foreground/40">·</span>
-          <span><span className="font-medium text-foreground">{catalog.available}</span> available</span>
-          <span className="text-muted-foreground/40">·</span>
-          <span>{catalog.total} total</span>
-        </div>
-
         {/* Grille */}
         {groups.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">
             {statusFilter === "connected"
               ? "No integrations connected yet."
-              : "No connector matches your search."}
+              : "No integration matches your search. If the tool has an MCP server, connect it with Connect an MCP server."}
           </p>
         ) : (
           groups.map((group) => (
@@ -247,20 +238,21 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   )
 }
 
-/** Tuile d'un connecteur - clic → fiche détaillée (façon Claude). Logo, état, description, capacités. */
-function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; onOpenDetail: () => void }>) {
-  const planned = tool.status === "PLANNED"
+/** Capacités affichées : lecture et actions natives ; un serveur MCP est déjà dit par son mode de connexion. */
+function shownCapabilities(tool: ConnectorView): string[] {
+  return tool.capabilities.filter((c) => c !== "mcp")
+}
 
+/** Tuile d'un connecteur - clic → fiche détaillée. Logo, état, description, capacités. */
+function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; onOpenDetail: () => void }>) {
+  const caps = shownCapabilities(tool)
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={onOpenDetail}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenDetail() } }}
-      className={cn(
-        "flex cursor-pointer flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-foreground/20 hover:shadow-sm",
-        planned && "opacity-80",
-      )}
+      className="flex cursor-pointer flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-foreground/20 hover:shadow-sm"
     >
       {/* Ligne haute : logo + état */}
       <div className="flex items-start justify-between gap-2">
@@ -271,12 +263,8 @@ function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; o
           <Badge variant="outline" className="gap-1 border-shape-green/25 bg-shape-green/10 text-[10px] text-ink-green">
             <Check className="size-3" /> Connected
           </Badge>
-        ) : planned ? (
-          <Badge variant="outline" className="text-[10px] text-muted-foreground">Soon</Badge>
         ) : (
-          // Un connecteur MCP se connecte via une URL MCP : on affiche "MCP", pas l'auth native
-          // ("OAuth"/"API Key") qui laisserait croire à une intégration native dédiée.
-          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">{tool.capabilities.includes("mcp") ? "MCP" : (AUTH_LABEL[tool.authType] ?? tool.authType)}</span>
+          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">{AUTH_LABEL[tool.authType]}</span>
         )}
       </div>
 
@@ -286,38 +274,24 @@ function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; o
         {tool.description && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{tool.description}</p>}
       </div>
 
-      {/* Capacités - le badge « MCP-ready » (endpoint MCP hébergé officiel, connexion 1-clic) prime. */}
-      <div className="flex min-w-0 flex-wrap gap-1">
-        {tool.mcpSuggestedUrl && (
-          <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-            <Plug className="size-3" /> MCP-ready
-          </span>
-        )}
-        {/* Honnêteté : pour un connecteur générique (cap "mcp"), l'"observe" se fait VIA MCP (pas
-            d'ingestion auto) → on masque le chip "Observe" redondant. Il ne reste que sur les
-            intégrations profondes (Plane/GitHub/Slack) qui lisent nativement. */}
-        {tool.capabilities
-          .filter((c) => !(c === "observe" && tool.capabilities.includes("mcp")))
-          .filter((c) => c !== "mcp")
-          .slice(0, 3)
-          .map((c) => (
+      {caps.length > 0 && (
+        <div className="flex min-w-0 flex-wrap gap-1">
+          {caps.map((c) => (
             <span key={c} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{CAP_LABEL[c] ?? c}</span>
           ))}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
 
 /**
- * Fiche détaillée d'un connecteur (façon Claude) - infos honnêtes UNIQUEMENT : description, ce que
- * permet le connecteur (capacités), mode de connexion, catégorie et liens RÉELS (site officiel + docs).
- * Pas de listes d'outils/auteurs inventées pour les services qu'on n'intègre pas réellement.
+ * Fiche détaillée d'un connecteur - infos réelles uniquement : description, ce que permet le connecteur,
+ * mode de connexion, catégorie et liens officiels.
  */
 function ConnectorDetailView({
   tool, categoryLabel, onBack, onConnect,
 }: Readonly<{ tool: ConnectorView; categoryLabel: string; onBack: () => void; onConnect: () => void }>) {
-  const planned = tool.status === "PLANNED"
-
   return (
     <div className="flex flex-col gap-6">
       {/* Retour */}
@@ -339,58 +313,41 @@ function ConnectorDetailView({
                   <Check className="size-3" /> Connected
                 </Badge>
               )}
-              {planned && <Badge variant="outline" className="text-[10px] text-muted-foreground">Soon</Badge>}
             </div>
             {tool.description && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{tool.description}</p>}
           </div>
         </div>
-        {!planned && (
-          <Button size="sm" className="shrink-0 gap-1.5" variant={tool.connected ? "outline" : "default"} onClick={onConnect}>
-            <Plug className="size-3.5" />
-            {tool.connected ? (tool.authType === "OAUTH2" ? "Manage" : "Configure") : "Connect"}
-          </Button>
-        )}
+        <Button size="sm" className="shrink-0 gap-1.5" variant={tool.connected ? "outline" : "default"} onClick={onConnect}>
+          <Plug className="size-3.5" />
+          {tool.connected ? "Manage" : "Connect"}
+        </Button>
       </div>
 
       {/* Ce que ça permet */}
-      {tool.capabilities.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">What this connector can do</h4>
-          <ul className="flex flex-col gap-1.5">
-            {tool.capabilities
-              .filter((c) => !(c === "observe" && tool.capabilities.includes("mcp")))
-              .map((c) => (
-                <li key={c} className="flex items-start gap-2 text-sm text-foreground">
-                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/60" />
-                  <span><span className="font-medium">{CAP_LABEL[c] ?? c}</span>{CAP_DESC[c] ? ` - ${CAP_DESC[c]}` : ""}</span>
-                </li>
-              ))}
-          </ul>
-        </section>
-      )}
+      <section className="flex flex-col gap-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">What this integration can do</h4>
+        <ul className="flex flex-col gap-1.5">
+          {tool.capabilities.map((c) => (
+            <li key={c} className="flex items-start gap-2 text-sm text-foreground">
+              <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/60" />
+              <span><span className="font-medium">{CAP_LABEL[c] ?? c}</span>{CAP_DESC[c] ? `: ${CAP_DESC[c]}` : ""}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
-      {/* Connexion - pour un connecteur MCP, on connecte via l'URL du serveur MCP (pas l'auth
-          native "API Key" du service, qui induirait en erreur). Le setupHint natif est masqué. */}
+      {/* Connexion */}
       <section className="flex flex-col gap-2">
         <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Connection</h4>
-        {tool.capabilities.includes("mcp") ? (
-          <p className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">MCP server</span>
-            {" - Connect by pasting this tool's MCP server URL. An access token is optional."}
-          </p>
-        ) : (
-          <>
-            <p className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">{AUTH_LABEL[tool.authType] ?? tool.authType}</span>
-              {AUTH_HELP[tool.authType] ? ` - ${AUTH_HELP[tool.authType]}` : ""}
-            </p>
-            {tool.setupHint && (
-              <div className="flex gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
-                <Info className="mt-0.5 size-3.5 shrink-0" />
-                <span>{tool.setupHint}</span>
-              </div>
-            )}
-          </>
+        <p className="text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{AUTH_LABEL[tool.authType]}</span>
+          {`: ${AUTH_HELP[tool.authType]}`}
+        </p>
+        {tool.setupHint && (
+          <div className="flex gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
+            <Info className="mt-0.5 size-3.5 shrink-0" />
+            <span>{tool.setupHint}</span>
+          </div>
         )}
       </section>
 
@@ -424,120 +381,101 @@ function ConnectorDetailView({
   )
 }
 
-/**
- * Dialog de connexion générique (formulaire piloté par `tool.fields`) + aide `setupHint`.
- * La connexion/sync est spécifique au connecteur (ici Plane) ; le formulaire, lui, est déclaratif.
- */
+/** Dialogue de connexion : natives (GitHub, Slack, Plane) et serveurs MCP (préréglage ou ajouté à la main). */
 function ConnectorDialog({
   slug, tool, onClose, onChanged,
 }: Readonly<{ slug: string; tool: ConnectorView; onClose: () => void; onChanged: () => void }>) {
+  const isNew = tool.key === NEW_CUSTOM_MCP_KEY
+  // Plus large quand la console d'actions d'un serveur MCP est dépliée.
+  const [wide, setWide] = useState(false)
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className={cn("sm:max-w-md", wide && "sm:max-w-2xl")}>
+        <DialogHeader>
+          <DialogTitle>{isNew ? "Connect an MCP server" : tool.name}</DialogTitle>
+        </DialogHeader>
+        {tool.authType === "MCP" ? (
+          <McpServerForm slug={slug} tool={tool} onClose={onClose} onChanged={onChanged} onWide={setWide} />
+        ) : tool.key === "plane" ? (
+          <PlaneForm slug={slug} tool={tool} onClose={onClose} onChanged={onChanged} />
+        ) : (
+          <NativeOAuthPanel slug={slug} tool={tool} onClose={onClose} onChanged={onChanged} />
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+type PanelProps = Readonly<{ slug: string; tool: ConnectorView; onClose: () => void; onChanged: () => void }>
+
+/** GitHub ou Slack connecté : état et déconnexion par leur propre route (pas une connexion MCP). */
+function NativeOAuthPanel({ slug, tool, onClose, onChanged }: PanelProps) {
+  const { disconnectGitHub, disconnectSlack } = useIntegrationStore()
+  const [busy, setBusy] = useState(false)
+
+  async function handleDisconnect() {
+    setBusy(true)
+    try {
+      if (tool.key === "github") await disconnectGitHub(slug)
+      else await disconnectSlack(slug)
+      toast.success(`${tool.name} disconnected`)
+      onChanged()
+      onClose()
+    } catch (e) {
+      toast.error(getErrorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2 rounded-md border border-shape-green/25 bg-shape-green/10 p-3 text-xs text-ink-green">
+        <Check className="size-4 shrink-0" />
+        <span><span className="font-medium">{tool.name}</span> is connected for this workspace.</span>
+      </div>
+      {tool.key === "github" && (
+        <p className="text-xs text-muted-foreground">Each project links its repository in its own settings (Code repository).</p>
+      )}
+      <DialogFooter>
+        <Button variant="outline" size="sm"
+                className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={handleDisconnect} disabled={busy}>
+          {busy && <Loader2 className="size-3.5 animate-spin" />} Disconnect
+        </Button>
+      </DialogFooter>
+    </div>
+  )
+}
+
+/** Plane : clé API et slug de workspace, puis synchronisation d'un projet dans le Brain OS. */
+function PlaneForm({ slug, tool, onClose, onChanged }: PanelProps) {
   const [form, setForm] = useState<Record<string, string>>({})
   const [connecting, setConnecting] = useState(false)
   const [status, setStatus] = useState<PlaneStatus | null>(null)
   const [projects, setProjects] = useState<PlaneProject[]>([])
   const [projectId, setProjectId] = useState("")
   const [syncing, setSyncing] = useState(false)
-
-  const isPlane = tool.key === "plane"
   const connected = tool.connected || Boolean(status?.connected)
 
-  // Connecteur « MCP-connectable » : on branche un serveur MCP externe (URL) → ses outils deviennent
-  // live dans Cortex (lecture + actions validées). Prime sur le stockage d'identifiants opaque.
-  const isMcp = tool.capabilities.includes("mcp")
-  // « MCP-ready » : si l'outil a un serveur MCP distant hébergé officiel, on pré-remplit son URL
-  // (éditable) → 1-clic. L'effet ci-dessous la remplace par l'URL réelle si déjà branché.
-  const [mcpUrl, setMcpUrl] = useState(tool.mcpSuggestedUrl ?? "")
-  const [mcpToken, setMcpToken] = useState("")
-  const [mcpStatus, setMcpStatus] = useState<McpServerStatus | null>(null)
-  const [mcpBusy, setMcpBusy] = useState(false)
-  // Console d'actions (TF-MCP-06) : dépliée sous le statut d'un serveur MCP joignable.
-  const [showConsole, setShowConsole] = useState(false)
-
   const loadConnected = useCallback(async () => {
-    if (!isPlane) return
     try {
       const [st, pr] = await Promise.all([getPlaneStatus(slug), listPlaneProjects(slug)])
       setStatus(st)
       setProjects(pr)
       setProjectId((prev) => prev || pr[0]?.id || "")
     } catch { /* pas encore connecté */ }
-  }, [isPlane, slug])
+  }, [slug])
 
   useEffect(() => { if (tool.connected) loadConnected() }, [tool.connected, loadConnected])
-
-  // Statut du serveur MCP de ce connecteur (si déjà branché) - à l'ouverture.
-  useEffect(() => {
-    if (!isMcp) return
-    getMcpServers(slug)
-      .then((list) => {
-        const s = list.find((x) => x.connectorKey === tool.key) ?? null
-        setMcpStatus(s)
-        if (s) setMcpUrl(s.url)
-      })
-      .catch(() => { /* pas branché, ou plan sans intégrations */ })
-  }, [isMcp, slug, tool.key])
-
-  async function handleMcpConnect() {
-    if (!mcpUrl.trim()) return
-    setMcpBusy(true)
-    try {
-      const list = await connectMcpServer(slug, {
-        connectorKey: tool.key,
-        mcpUrl: mcpUrl.trim(),
-        mcpToken: mcpToken.trim() || undefined,
-      })
-      const s = list.find((x) => x.connectorKey === tool.key) ?? null
-      setMcpStatus(s)
-      if (s?.reachable) toast.success(`${tool.name}: ${s.tools.length} tool(s) live in Cortex`)
-      else toast.error("Connected, but the MCP server is unreachable")
-      onChanged()
-    } catch {
-      toast.error("MCP connection failed - check the server URL")
-    } finally {
-      setMcpBusy(false)
-    }
-  }
-
-  async function handleMcpOAuth() {
-    if (!mcpUrl.trim()) return
-    setMcpBusy(true)
-    try {
-      const authorizeUrl = await startMcpOAuth(slug, tool.key, mcpUrl.trim())
-      window.location.href = authorizeUrl // redirection vers le consentement du service (la page quitte)
-    } catch {
-      toast.error("OAuth unavailable for this server - paste an access token instead")
-      setMcpBusy(false)
-    }
-  }
-
-  async function handleMcpDisconnect() {
-    setMcpBusy(true)
-    try {
-      await disconnectMcpServer(slug, tool.key)
-      setMcpStatus(null)
-      setMcpUrl(""); setMcpToken("")
-      toast.success(`${tool.name} MCP server disconnected`)
-      onChanged()
-    } catch {
-      toast.error("Could not disconnect")
-    } finally {
-      setMcpBusy(false)
-    }
-  }
 
   async function handleConnect() {
     setConnecting(true)
     try {
-      if (isPlane) {
-        await connectPlane(slug, { apiKey: form.apiKey ?? "", planeWorkspace: form.planeWorkspace ?? "" })
-        await loadConnected()
-      } else {
-        // Connecteur générique : identifiants stockés chiffrés côté back.
-        await connectConnector(slug, tool.key, form)
-      }
+      await connectPlane(slug, { apiKey: form.apiKey ?? "", planeWorkspace: form.planeWorkspace ?? "" })
+      await loadConnected()
       toast.success(`${tool.name} connected`)
       onChanged()
-      if (!isPlane) onClose()
     } catch {
       toast.error("Connection failed - check the details you entered")
     } finally {
@@ -562,8 +500,7 @@ function ConnectorDialog({
 
   async function handleDisconnect() {
     try {
-      if (isPlane) await disconnectPlane(slug)
-      else await disconnectConnector(slug, tool.key)
+      await disconnectPlane(slug)
       toast.success(`${tool.name} disconnected`)
       onChanged()
       onClose()
@@ -572,15 +509,10 @@ function ConnectorDialog({
     }
   }
 
-  return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className={cn("sm:max-w-md", showConsole && "sm:max-w-2xl")}>
-        <DialogHeader>
-          <DialogTitle>{tool.name}</DialogTitle>
-        </DialogHeader>
-
-        {/* Aide : où récupérer la clé - masquée en mode MCP (on connecte via une URL MCP, pas la clé native). */}
-        {!isMcp && tool.setupHint && (
+  if (!connected) {
+    return (
+      <div className="flex flex-col gap-3">
+        {tool.setupHint && (
           <div className="flex gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
             <Info className="mt-0.5 size-3.5 shrink-0" />
             <span>
@@ -597,161 +529,264 @@ function ConnectorDialog({
             </span>
           </div>
         )}
+        {tool.fields.map((f) => (
+          <label key={f.key} className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              {f.label}{f.required && " *"}
+            </span>
+            <Input
+              type={f.secret ? "password" : "text"}
+              value={form[f.key] ?? ""}
+              onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
+              autoComplete={f.secret ? "off" : undefined}
+            />
+          </label>
+        ))}
+        <DialogFooter>
+          <Button onClick={handleConnect} disabled={connecting} className="gap-1.5">
+            {connecting ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
+            {connecting ? "Connecting…" : "Connect"}
+          </Button>
+        </DialogFooter>
+      </div>
+    )
+  }
 
-        {isMcp ? (
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-xs text-muted-foreground">
+        {status?.planeWorkspace && <>Workspace <span className="font-medium text-foreground">{status.planeWorkspace}</span> · </>}
+        {status?.ingestedNodes ?? 0} item(s) ingested into the Brain OS.
+      </p>
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-muted-foreground">Project to sync</span>
+        <Select value={projectId} onValueChange={setProjectId}>
+          <SelectTrigger className="h-control"><SelectValue placeholder="Choose a project…" /></SelectTrigger>
+          <SelectContent position="popper">
+            {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </label>
+      <DialogFooter className="sm:justify-between">
+        <Button variant="outline" size="sm"
+                className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={handleDisconnect}>
+          Disconnect
+        </Button>
+        <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={handleSync} disabled={syncing || !projectId}>
+          {syncing ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
+          {syncing ? "Syncing…" : "Sync to the Brain OS"}
+        </Button>
+      </DialogFooter>
+    </div>
+  )
+}
+
+/**
+ * Serveur MCP : préréglage (URL officielle préremplie) ou serveur ajouté à la main (nom obligatoire). OAuth en
+ * un clic, ou jeton envoyé en `Authorization: Bearer` ou dans un en-tête choisi. Une fois connecté : outils
+ * exposés, console d'actions, déconnexion.
+ */
+function McpServerForm({
+  slug, tool, onClose, onChanged, onWide,
+}: PanelProps & Readonly<{ onWide: (wide: boolean) => void }>) {
+  const isNew = tool.key === NEW_CUSTOM_MCP_KEY
+  const isCustom = tool.category === CUSTOM_MCP_CATEGORY
+  const [name, setName] = useState(isNew ? "" : tool.name)
+  const [mcpUrl, setMcpUrl] = useState(tool.mcpSuggestedUrl ?? "")
+  const [authMode, setAuthMode] = useState<"bearer" | "header">("bearer")
+  const [headerName, setHeaderName] = useState("")
+  const [mcpToken, setMcpToken] = useState("")
+  const [status, setStatus] = useState<McpServerStatus | null>(null)
+  const [busy, setBusy] = useState(false)
+  // Console d'actions (TF-MCP-06) : dépliée sous le statut d'un serveur joignable.
+  const [showConsole, setShowConsole] = useState(false)
+
+  // Statut du serveur s'il est déjà branché (un nouveau serveur n'en a pas encore).
+  useEffect(() => {
+    if (isNew) return
+    getMcpServers(slug)
+      .then((list) => {
+        const s = list.find((x) => x.connectorKey === tool.key) ?? null
+        setStatus(s)
+        if (s) setMcpUrl(s.url)
+      })
+      .catch(() => { /* pas branché */ })
+  }, [isNew, slug, tool.key])
+
+  function toggleConsole() {
+    const next = !showConsole
+    setShowConsole(next)
+    onWide(next)
+  }
+
+  const nameMissing = isCustom && !name.trim()
+  const headerMissing = authMode === "header" && (!headerName.trim() || !mcpToken.trim())
+  const canSubmit = !busy && Boolean(mcpUrl.trim()) && !nameMissing
+
+  async function handleConnect() {
+    setBusy(true)
+    try {
+      const list = await connectMcpServer(slug, {
+        connectorKey: tool.key,
+        name: isCustom ? name.trim() : undefined,
+        mcpUrl: mcpUrl.trim(),
+        mcpToken: mcpToken.trim() || undefined,
+        headerName: authMode === "header" ? headerName.trim() : undefined,
+      })
+      const s = isNew
+        ? list.find((x) => x.name === name.trim() && x.url === mcpUrl.trim()) ?? null
+        : list.find((x) => x.connectorKey === tool.key) ?? null
+      const label = isCustom ? name.trim() : tool.name
+      if (s?.reachable) toast.success(`${label}: ${s.tools.length} tool(s) live in Cortex`)
+      else toast.error(`${label} is saved, but the server can't be reached${s?.error ? `: ${s.error}` : ""}`)
+      onChanged()
+      // Un nouveau serveur prend sa clé définitive côté serveur : sa carte apparaît au catalogue.
+      if (isNew) onClose()
+      else setStatus(s)
+    } catch (e) {
+      toast.error(getErrorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleOAuth() {
+    setBusy(true)
+    try {
+      const authorizeUrl = await startMcpOAuth(slug, tool.key, mcpUrl.trim(), undefined, isCustom ? name.trim() : undefined)
+      window.location.href = authorizeUrl // redirection vers le consentement du service (la page quitte)
+    } catch (e) {
+      toast.error(getErrorMessage(e))
+      setBusy(false)
+    }
+  }
+
+  async function handleDisconnect() {
+    setBusy(true)
+    try {
+      await disconnectMcpServer(slug, tool.key)
+      setStatus(null)
+      setMcpUrl(tool.mcpSuggestedUrl ?? ""); setMcpToken("")
+      toast.success(`${tool.name} disconnected`)
+      onChanged()
+      if (isCustom) onClose()
+    } catch (e) {
+      toast.error(getErrorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (status) {
+    return (
+      <div className="flex flex-col gap-3">
+        {status.reachable ? (
           <div className="flex flex-col gap-3">
-            <div className="flex gap-2 rounded-md border border-primary/25 bg-primary/5 p-3 text-xs leading-relaxed text-muted-foreground">
-              <Server className="mt-0.5 size-3.5 shrink-0 text-primary" />
-              <span>
-                Plug <span className="font-medium text-foreground">{tool.name}</span>&apos;s MCP server. Its tools go
-                live in Cortex: reads run directly, writes are proposed and executed only after your approval.
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-shape-green/25 bg-shape-green/10 p-3 text-xs text-ink-green">
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                <Check className="size-4 shrink-0" /> Connected, {status.tools.length} tool(s) available
               </span>
-            </div>
-
-            {mcpStatus ? (
-              <>
-                {mcpStatus.reachable ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-shape-green/25 bg-shape-green/10 p-3 text-xs text-ink-green">
-                      <span className="inline-flex items-center gap-1.5 font-medium">
-                        <Check className="size-4 shrink-0" /> Connected - {mcpStatus.tools.length} tool(s) available
-                      </span>
-                      {mcpStatus.tools.length > 0 && (
-                        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-[11px]" onClick={() => setShowConsole((v) => !v)}>
-                          <Terminal className="size-3" /> {showConsole ? "Hide actions" : "Run an action"}
-                        </Button>
-                      )}
-                    </div>
-                    {showConsole ? (
-                      <McpActionConsole slug={slug} connectorKey={tool.key} connectorName={tool.name} />
-                    ) : mcpStatus.tools.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {mcpStatus.tools.slice(0, 8).map((t) => (
-                          <span key={t} className="inline-flex items-center gap-1 rounded bg-shape-green/15 px-1.5 py-0.5 text-[11px] text-ink-green">
-                            <Wrench className="size-3" /> {t}
-                          </span>
-                        ))}
-                        {mcpStatus.tools.length > 8 && <span className="self-center text-[11px] text-muted-foreground">+{mcpStatus.tools.length - 8} more</span>}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-start gap-2 rounded-md border border-shape-yellow/25 bg-shape-yellow/10 p-3 text-xs text-ink-yellow">
-                    <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                    <span>Server saved but <span className="font-medium">unreachable</span>{mcpStatus.error ? ` - ${mcpStatus.error}` : ""}.</span>
-                  </div>
-                )}
-                <DialogFooter className="sm:justify-between">
-                  <Button variant="outline" size="sm"
-                          className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
-                          onClick={handleMcpDisconnect} disabled={mcpBusy}>
-                    Disconnect
-                  </Button>
-                  <span className="max-w-[55%] self-center truncate text-[11px] text-muted-foreground" title={mcpStatus.url}>
-                    {mcpStatus.url}
-                  </span>
-                </DialogFooter>
-              </>
-            ) : (
-              <div className="flex flex-col gap-3">
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-muted-foreground">MCP server URL *</span>
-                  <Input type="text" placeholder="https://.../mcp" value={mcpUrl}
-                         onChange={(e) => setMcpUrl(e.target.value)} autoComplete="off" />
-                  <span className="text-[11px] text-muted-foreground/70">
-                    {tool.mcpSuggestedUrl
-                      ? "Official hosted endpoint pre-filled."
-                      : "Paste this tool's MCP server URL (a hosted endpoint or http://localhost:port)."}
-                  </span>
-                </label>
-                {/* 1-clic : OAuth (decouverte + DCR + PKCE) - aucun token a coller. */}
-                <Button onClick={handleMcpOAuth} disabled={mcpBusy || !mcpUrl.trim()} className="gap-1.5">
-                  {mcpBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Server className="size-3.5" />}
-                  {mcpBusy ? "Redirecting…" : "Connect with OAuth (1-click)"}
+              {status.tools.length > 0 && (
+                <Button variant="outline" size="sm" className="h-7 gap-1.5 text-[11px]" onClick={toggleConsole}>
+                  <Terminal className="size-3" /> {showConsole ? "Hide actions" : "Run an action"}
                 </Button>
-                <div className="flex items-center gap-2 text-[11px] text-muted-foreground/50">
-                  <span className="h-px flex-1 bg-border" /> or paste a token <span className="h-px flex-1 bg-border" />
-                </div>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-muted-foreground">Access token (optional)</span>
-                  <Input type="password" value={mcpToken}
-                         onChange={(e) => setMcpToken(e.target.value)} autoComplete="off" />
-                </label>
-                <DialogFooter>
-                  <Button variant="outline" onClick={handleMcpConnect} disabled={mcpBusy || !mcpUrl.trim()} className="gap-1.5">
-                    {mcpBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
-                    Connect with URL + token
-                  </Button>
-                </DialogFooter>
+              )}
+            </div>
+            {showConsole ? (
+              <McpActionConsole slug={slug} connectorKey={tool.key} connectorName={tool.name} />
+            ) : status.tools.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {status.tools.slice(0, 8).map((t) => (
+                  <span key={t} className="inline-flex items-center gap-1 rounded bg-shape-green/15 px-1.5 py-0.5 text-[11px] text-ink-green">
+                    <Wrench className="size-3" /> {t}
+                  </span>
+                ))}
+                {status.tools.length > 8 && <span className="self-center text-[11px] text-muted-foreground">+{status.tools.length - 8} more</span>}
               </div>
             )}
           </div>
-        ) : !connected ? (
-          <div className="flex flex-col gap-3">
-            {tool.fields.map((f) => (
-              <label key={f.key} className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {f.label}{f.required && " *"}
-                </span>
-                <Input
-                  type={f.secret ? "password" : "text"}
-                  value={form[f.key] ?? ""}
-                  onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
-                  autoComplete={f.secret ? "off" : undefined}
-                />
-              </label>
-            ))}
-            <DialogFooter>
-              <Button onClick={handleConnect} disabled={connecting} className="gap-1.5">
-                {connecting ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
-                {connecting ? "Connecting…" : "Connect"}
-              </Button>
-            </DialogFooter>
-          </div>
-        ) : isPlane ? (
-          <div className="flex flex-col gap-3">
-            <p className="text-xs text-muted-foreground">
-              {status?.planeWorkspace && <>Workspace <span className="font-medium text-foreground">{status.planeWorkspace}</span> · </>}
-              {status?.ingestedNodes ?? 0} item(s) ingested into the Brain OS.
-            </p>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-muted-foreground">Project to sync</span>
-              <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger className="h-control"><SelectValue placeholder="Choose a project…" /></SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </label>
-            <DialogFooter className="sm:justify-between">
-              <Button variant="outline" size="sm"
-                      className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
-                      onClick={handleDisconnect}>
-                Disconnect
-              </Button>
-              <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={handleSync} disabled={syncing || !projectId}>
-                {syncing ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
-                {syncing ? "Syncing…" : "Sync → Brain OS"}
-              </Button>
-            </DialogFooter>
-          </div>
         ) : (
-          // Connecteur générique connecté : identifiants stockés (chiffrés). La sync par service viendra ensuite.
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 rounded-md border border-shape-green/25 bg-shape-green/10 p-3 text-xs text-ink-green">
-              <Check className="size-4 shrink-0" />
-              <span><span className="font-medium">{tool.name}</span> is connected - credentials saved (encrypted).</span>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" size="sm"
-                      className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
-                      onClick={handleDisconnect}>
-                Disconnect
-              </Button>
-            </DialogFooter>
+          <div className="flex items-start gap-2 rounded-md border border-shape-yellow/25 bg-shape-yellow/10 p-3 text-xs text-ink-yellow">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            <span>Server saved but <span className="font-medium">unreachable</span>{status.error ? `: ${status.error}` : ""}.</span>
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+        <DialogFooter className="sm:justify-between">
+          <Button variant="outline" size="sm"
+                  className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={handleDisconnect} disabled={busy}>
+            Disconnect
+          </Button>
+          <span className="max-w-[55%] self-center truncate text-[11px] text-muted-foreground" title={status.url}>
+            {status.url}
+          </span>
+        </DialogFooter>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex gap-2 rounded-md border border-primary/25 bg-primary/5 p-3 text-xs leading-relaxed text-muted-foreground">
+        <Server className="mt-0.5 size-3.5 shrink-0 text-primary" />
+        <span>
+          {isNew ? "Any tool with an MCP server" : <><span className="font-medium text-foreground">{tool.name}</span>&apos;s MCP server</>}
+          : its tools go live in Cortex. Reads run directly, a change waits for the approval of an owner or admin.
+        </span>
+      </div>
+
+      {isCustom && (
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-muted-foreground">Name *</span>
+          <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Team docs" autoComplete="off" />
+        </label>
+      )}
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-muted-foreground">MCP server URL *</span>
+        <Input type="text" placeholder="https://.../mcp" value={mcpUrl}
+               onChange={(e) => setMcpUrl(e.target.value)} autoComplete="off" />
+        <span className="text-[11px] text-muted-foreground/70">
+          {tool.mcpSuggestedUrl ? "Official server, prefilled." : "The address of the server (Streamable HTTP)."}
+        </span>
+      </label>
+
+      {/* 1-clic : OAuth (découverte + DCR + PKCE), aucun jeton à coller. */}
+      <Button onClick={handleOAuth} disabled={!canSubmit} className="gap-1.5">
+        {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Server className="size-3.5" />}
+        Connect with OAuth
+      </Button>
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground/50">
+        <span className="h-px flex-1 bg-border" /> or with a token <span className="h-px flex-1 bg-border" />
+      </div>
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-muted-foreground">Send the token as</span>
+        <Select value={authMode} onValueChange={(v) => setAuthMode(v as "bearer" | "header")}>
+          <SelectTrigger className="h-control"><SelectValue /></SelectTrigger>
+          <SelectContent position="popper">
+            <SelectItem value="bearer">Authorization: Bearer</SelectItem>
+            <SelectItem value="header">A custom header</SelectItem>
+          </SelectContent>
+        </Select>
+      </label>
+      {authMode === "header" && (
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-muted-foreground">Header name *</span>
+          <Input value={headerName} onChange={(e) => setHeaderName(e.target.value)} placeholder="X-API-Key" autoComplete="off" />
+        </label>
+      )}
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-muted-foreground">
+          {authMode === "header" ? "Header value *" : "Access token (optional)"}
+        </span>
+        <Input type="password" value={mcpToken} onChange={(e) => setMcpToken(e.target.value)} autoComplete="off" />
+      </label>
+      <DialogFooter>
+        <Button variant="outline" onClick={handleConnect} disabled={!canSubmit || headerMissing} className="gap-1.5">
+          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
+          Connect
+        </Button>
+      </DialogFooter>
+    </div>
   )
 }

@@ -400,10 +400,8 @@ export const INTEGRATION_ROUTES = {
   SLACK_SYNC:        (slug: string, channel: string) => `/api/workspaces/${slug}/integrations/slack/sync?channel=${encodeURIComponent(channel)}`,
   WEBHOOKS:          (slug: string) => `/api/workspaces/${slug}/webhooks`,
   WEBHOOK:           (slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}`,
-  /** Catalogue générique : le pool d'outils + statut de connexion */
+  /** Catalogue : intégrations natives, préréglages MCP, serveurs MCP du workspace, avec leur statut */
   CATALOG:           (slug: string) => `/api/workspaces/${slug}/integrations/catalog`,
-  /** Connexion générique d'un connecteur du catalogue (POST config / DELETE) */
-  CONNECTOR:         (slug: string, key: string) => `/api/workspaces/${slug}/integrations/connectors/${key}`,
   /** Serveurs MCP externes du workspace (GET statut · POST connect · DELETE par clé) → outils live dans Cortex */
   MCP_SERVERS:       (slug: string) => `/api/workspaces/${slug}/mcp/servers`,
   MCP_SERVER:        (slug: string, key: string) => `/api/workspaces/${slug}/mcp/servers/${key}`,

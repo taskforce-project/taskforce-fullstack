@@ -21,6 +21,12 @@ import {
   updateWebhook,
   deleteWebhook,
   importMcpProject,
+  getIntegrationCatalog,
+  getMcpServers,
+  connectMcpServer,
+  disconnectMcpServer,
+  startMcpOAuth,
+  NEW_CUSTOM_MCP_KEY,
 } from './integration-service';
 import { apiClient } from './client';
 import { INTEGRATION_ROUTES } from '../config/api-routes';
@@ -299,6 +305,56 @@ describe('integration-service', () => {
       await deleteWebhook(SLUG, 1);
 
       expect(apiClient.delete).toHaveBeenCalledWith(INTEGRATION_ROUTES.WEBHOOK(SLUG, 1));
+    });
+  });
+
+  // --- Catalogue et serveurs MCP (ADR-020) ---
+  describe('getIntegrationCatalog', () => {
+    it('GET le catalogue du workspace', async () => {
+      const catalog = { total: 28, connected: 0, categories: [] };
+      vi.mocked(apiClient.get).mockResolvedValue(envelope(catalog));
+
+      expect(await getIntegrationCatalog(SLUG)).toEqual(catalog);
+      expect(apiClient.get).toHaveBeenCalledWith(INTEGRATION_ROUTES.CATALOG(SLUG));
+    });
+  });
+
+  describe('serveurs MCP', () => {
+    const status = { connectorKey: 'custom-docs', name: 'Docs', url: 'https://docs.example.com/mcp', reachable: true, tools: ['search'], error: null };
+
+    it('GET les statuts', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue(envelope([status]));
+
+      expect(await getMcpServers(SLUG)).toEqual([status]);
+      expect(apiClient.get).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_SERVERS(SLUG));
+    });
+
+    it('POST un nouveau serveur ajouté à la main : clé « custom », nom et en-tête choisi', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue(envelope([status]));
+      const payload = { connectorKey: NEW_CUSTOM_MCP_KEY, name: 'Docs', mcpUrl: 'https://docs.example.com/mcp', mcpToken: 'k-1', headerName: 'X-Api-Key' };
+
+      expect(await connectMcpServer(SLUG, payload)).toEqual([status]);
+      expect(NEW_CUSTOM_MCP_KEY).toBe('custom');
+      expect(apiClient.post).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_SERVERS(SLUG), payload);
+    });
+
+    it('DELETE un serveur par sa clé', async () => {
+      vi.mocked(apiClient.delete).mockResolvedValue(envelope([]));
+
+      expect(await disconnectMcpServer(SLUG, 'custom-docs')).toEqual([]);
+      expect(apiClient.delete).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_SERVER(SLUG, 'custom-docs'));
+    });
+
+    it("démarre l'OAuth avec le nom d'un serveur ajouté à la main et renvoie l'URL d'autorisation", async () => {
+      vi.mocked(apiClient.post).mockResolvedValue(envelope({ authorizeUrl: 'https://as.example.com/authorize' }));
+
+      const url = await startMcpOAuth(SLUG, 'custom', 'https://docs.example.com/mcp', undefined, 'Docs');
+
+      expect(url).toBe('https://as.example.com/authorize');
+      expect(apiClient.post).toHaveBeenCalledWith(
+        INTEGRATION_ROUTES.MCP_OAUTH_START(SLUG, 'custom'),
+        { mcpUrl: 'https://docs.example.com/mcp', returnTo: undefined, name: 'Docs' },
+      );
     });
   });
 

@@ -470,10 +470,10 @@ export default function ProjectSettingsPage() {
                 <BrandLogo slug={k} name={k} className="size-full" />
               </div>
             ))}
-            <span className="ml-1 text-xs text-muted-foreground">+40 others</span>
+            <span className="ml-1 text-xs text-muted-foreground">and any MCP server</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            GitHub, Slack and all connectors plug in at the <span className="font-medium text-foreground">workspace</span> level, then apply to this project - a single place to manage.
+            GitHub, Slack, Plane and MCP servers connect at the <span className="font-medium text-foreground">workspace</span> level, then apply to this project: a single place to manage them.
           </p>
           <Button className="gap-2" onClick={() => openSettings("integrations")}>
             <Plug className="size-4" /> Manage integrations

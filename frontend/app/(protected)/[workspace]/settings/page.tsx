@@ -1355,7 +1355,7 @@ function IntegrationsPanel() {
   return (
     <div className="flex flex-col gap-4">
       {/* ---- Catalogue (le pool générique) ---- */}
-      <SectionCard title="Integrations catalog" description="Connect your tools to the Brain OS. Deep sync for GitHub, Slack and Plane; MCP for the rest (ⓘ help on hover).">
+      <SectionCard title="Integrations catalog" description="GitHub, Slack and Plane sync natively; any other tool connects through its MCP server.">
 
         {slug && <IntegrationsCatalog slug={slug} />}
       </SectionCard>
