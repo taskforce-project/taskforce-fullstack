@@ -5,7 +5,6 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,13 +12,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.taskforce.tf_api.core.dto.request.ConnectKeyRequest;
 import com.taskforce.tf_api.core.dto.request.DelegateRequest;
-import com.taskforce.tf_api.core.dto.response.DeliveryKeyStatus;
 import com.taskforce.tf_api.core.dto.response.DeliveryProviderResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
-import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProviderRegistry;
@@ -84,7 +80,7 @@ public class DeliveryController {
 
     /**
      * GET /api/workspaces/{slug}/delivery/issues/{issueId}/run — dernier run (data null si aucun).
-     * Si le run est encore en cours (provider <b>asynchrone</b> type Cursor), on le ré-interroge une
+     * Si le run est encore en cours (provider <b>asynchrone</b>), on le ré-interroge une
      * fois : le polling du front fait ainsi progresser l'état jusqu'au terminal (DONE/FAILED). Encore en
      * attente, il est relu aussi : une délégation que personne ne réclame y est close (runner local, ADR-013).
      */
@@ -121,66 +117,6 @@ public class DeliveryController {
             runs = deliveryService.listRuns(slug, userId);
         }
         return ResponseEntity.ok(ApiResponse.success("Runs récupérés", runs));
-    }
-
-    // =========================================================================
-    // Clés API de délégation du workspace (Anthropic B1, Cursor... - chiffrées)
-    // =========================================================================
-
-    /** GET …/delivery/anthropic — état de la clé Anthropic (jamais renvoyée en clair). */
-    @GetMapping("/anthropic")
-    public ResponseEntity<ApiResponse<DeliveryKeyStatus>> anthropicStatus(
-        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug
-    ) {
-        DeliveryKeyStatus status = deliveryService.keyStatus(slug, resolveUserId(jwt), IntegrationProvider.ANTHROPIC);
-        return ResponseEntity.ok(ApiResponse.success("Statut Anthropic récupéré", status));
-    }
-
-    /** POST …/delivery/anthropic — connecte/remplace la clé API Anthropic (OWNER/ADMIN). */
-    @PostMapping("/anthropic")
-    public ResponseEntity<ApiResponse<DeliveryKeyStatus>> connectAnthropic(
-        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @Valid @RequestBody ConnectKeyRequest request
-    ) {
-        DeliveryKeyStatus status = deliveryService.connectKey(
-            slug, resolveUserId(jwt), IntegrationProvider.ANTHROPIC, request.apiKey());
-        return ResponseEntity.ok(ApiResponse.success("Clé Anthropic connectée", status));
-    }
-
-    /** DELETE …/delivery/anthropic — déconnecte la clé API Anthropic (OWNER/ADMIN). */
-    @DeleteMapping("/anthropic")
-    public ResponseEntity<ApiResponse<Void>> disconnectAnthropic(
-        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug
-    ) {
-        deliveryService.disconnectKey(slug, resolveUserId(jwt), IntegrationProvider.ANTHROPIC);
-        return ResponseEntity.ok(ApiResponse.success("Clé Anthropic déconnectée", null));
-    }
-
-    /** GET …/delivery/cursor — état de la clé Cursor (jamais renvoyée en clair). */
-    @GetMapping("/cursor")
-    public ResponseEntity<ApiResponse<DeliveryKeyStatus>> cursorStatus(
-        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug
-    ) {
-        DeliveryKeyStatus status = deliveryService.keyStatus(slug, resolveUserId(jwt), IntegrationProvider.CURSOR);
-        return ResponseEntity.ok(ApiResponse.success("Statut Cursor récupéré", status));
-    }
-
-    /** POST …/delivery/cursor — connecte/remplace la clé API Cursor (OWNER/ADMIN). */
-    @PostMapping("/cursor")
-    public ResponseEntity<ApiResponse<DeliveryKeyStatus>> connectCursor(
-        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @Valid @RequestBody ConnectKeyRequest request
-    ) {
-        DeliveryKeyStatus status = deliveryService.connectKey(
-            slug, resolveUserId(jwt), IntegrationProvider.CURSOR, request.apiKey());
-        return ResponseEntity.ok(ApiResponse.success("Clé Cursor connectée", status));
-    }
-
-    /** DELETE …/delivery/cursor — déconnecte la clé API Cursor (OWNER/ADMIN). */
-    @DeleteMapping("/cursor")
-    public ResponseEntity<ApiResponse<Void>> disconnectCursor(
-        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug
-    ) {
-        deliveryService.disconnectKey(slug, resolveUserId(jwt), IntegrationProvider.CURSOR);
-        return ResponseEntity.ok(ApiResponse.success("Clé Cursor déconnectée", null));
     }
 
     private Long resolveUserId(Jwt jwt) {

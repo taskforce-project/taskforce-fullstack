@@ -15,7 +15,7 @@ export interface DeliveryProvider {
   models: string[];
 }
 
-/** Liste les providers délégables du workspace (Claude Code / Copilot / Cursor...). */
+/** Liste les providers délégables du workspace (aujourd'hui Claude Code). */
 export async function getDeliveryProviders(slug: string): Promise<DeliveryProvider[]> {
   const res = await apiClient.get<{ data: DeliveryProvider[] }>(DELIVERY_ROUTES.PROVIDERS(slug));
   return res.data.data;
@@ -68,38 +68,6 @@ export async function getIssueRun(slug: string, issueId: number): Promise<Delive
 export async function listWorkspaceRuns(slug: string): Promise<DeliveryRun[]> {
   const res = await apiClient.get<{ data: DeliveryRun[] }>(DELIVERY_ROUTES.RUNS(slug), { silentError: true });
   return res.data.data ?? [];
-}
-
-/** Providers de délégation dont l'exécution dépend d'une clé API stockée par workspace. */
-export type DeliveryKeyProvider = "anthropic" | "cursor";
-
-/** État de la connexion d'une clé API de délégation (Anthropic, Cursor... TF-AGENT-DELIVERY). */
-export interface DeliveryKeyStatus {
-  /** Une clé est connectée (délégation vers ce provider possible). */
-  connected: boolean;
-  /** Indice non sensible pour reconnaître la clé (4 derniers caractères, ex. "...AB12"), ou null. */
-  keyHint: string | null;
-}
-
-/** Lit l'état d'une clé de délégation du workspace (la clé n'est jamais renvoyée en clair). */
-export async function getDeliveryKey(slug: string, provider: DeliveryKeyProvider): Promise<DeliveryKeyStatus> {
-  const res = await apiClient.get<{ data: DeliveryKeyStatus }>(DELIVERY_ROUTES.KEY(slug, provider));
-  return res.data.data;
-}
-
-/** Connecte (ou remplace) une clé de délégation du workspace (OWNER/ADMIN). */
-export async function connectDeliveryKey(
-  slug: string,
-  provider: DeliveryKeyProvider,
-  apiKey: string,
-): Promise<DeliveryKeyStatus> {
-  const res = await apiClient.post<{ data: DeliveryKeyStatus }>(DELIVERY_ROUTES.KEY(slug, provider), { apiKey });
-  return res.data.data;
-}
-
-/** Déconnecte une clé de délégation du workspace (OWNER/ADMIN). */
-export async function disconnectDeliveryKey(slug: string, provider: DeliveryKeyProvider): Promise<void> {
-  await apiClient.delete(DELIVERY_ROUTES.KEY(slug, provider));
 }
 
 /** Runner local de l'utilisateur (ADR-013), tel que le serveur le connaît. Ne contient jamais de secret. */

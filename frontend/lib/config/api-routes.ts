@@ -32,7 +32,7 @@ export const AUTH_ROUTES = {
  * Backend: @RequestMapping("/api/workspaces/{slug}/delivery")
  */
 export const DELIVERY_ROUTES = {
-  /** Providers délégables (Claude Code / Copilot / Cursor...) pour le picker. */
+  /** Providers délégables (aujourd'hui Claude Code) pour le picker. */
   PROVIDERS: (slug: string) => `/api/workspaces/${slug}/delivery/providers`,
   /** Délègue une issue à un agent (POST). */
   DELEGATE: (slug: string, issueId: number) => `/api/workspaces/${slug}/delivery/issues/${issueId}/delegate`,
@@ -40,8 +40,6 @@ export const DELIVERY_ROUTES = {
   RUN: (slug: string, issueId: number) => `/api/workspaces/${slug}/delivery/issues/${issueId}/run`,
   /** Runs de délégation du workspace (GET) - vue « workflow » (agents en parallèle). */
   RUNS: (slug: string) => `/api/workspaces/${slug}/delivery/runs`,
-  /** Clé API de délégation d'un provider (GET état / POST connecter / DELETE déconnecter) - `provider` = "anthropic" | "cursor". */
-  KEY: (slug: string, provider: string) => `/api/workspaces/${slug}/delivery/${provider}`,
   /**
    * Runner local de l'utilisateur connecté (ADR-013) : GET = état, jamais de secret ; POST = provisionner ou
    * régénérer le secret. Sans slug : l'identité d'un runner est liée à la personne, pas au workspace.

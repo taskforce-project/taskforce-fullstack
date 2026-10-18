@@ -10,7 +10,7 @@ import lombok.Data;
 @Data
 public class DelegateRequest {
 
-    /** Clé du provider ("claude-code", "stub"...). Doit être disponible. */
+    /** Clé du provider ("claude-code"). Doit être disponible. */
     @NotBlank(message = "Le provider est obligatoire")
     private String providerKey;
 

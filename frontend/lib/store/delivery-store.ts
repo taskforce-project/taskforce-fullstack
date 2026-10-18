@@ -4,13 +4,8 @@ import {
   getIssueRun,
   listWorkspaceRuns,
   delegateIssue,
-  getDeliveryKey,
-  connectDeliveryKey,
-  disconnectDeliveryKey,
   getRunnerStatus,
   provisionRunner as provisionRunnerApi,
-  type DeliveryKeyProvider,
-  type DeliveryKeyStatus,
   type DeliveryProvider,
   type DeliveryRun,
   type RunnerProvision,
@@ -30,8 +25,6 @@ interface DeliveryState {
   runs: Record<number, DeliveryRun | null>;
   /** Runs de délégation du workspace (vue « workflow »), les plus récents d'abord. */
   workspaceRuns: DeliveryRun[];
-  /** État des clés de délégation par provider ("anthropic" | "cursor"). Absent = pas encore chargé. */
-  keys: Record<string, DeliveryKeyStatus>;
   /** Runner local de l'utilisateur (ADR-013). `null` = pas encore chargé. Jamais de secret ici. */
   runner: RunnerStatus | null;
 
@@ -39,9 +32,6 @@ interface DeliveryState {
   fetchRun: (slug: string, issueId: number) => Promise<DeliveryRun | null>;
   fetchWorkspaceRuns: (slug: string) => Promise<DeliveryRun[]>;
   delegate: (slug: string, issueId: number, providerKey: string, model?: string) => Promise<DeliveryRun | null>;
-  fetchKey: (slug: string, provider: DeliveryKeyProvider) => Promise<DeliveryKeyStatus | null>;
-  connectKey: (slug: string, provider: DeliveryKeyProvider, apiKey: string) => Promise<DeliveryKeyStatus | null>;
-  disconnectKey: (slug: string, provider: DeliveryKeyProvider) => Promise<boolean>;
   fetchRunner: () => Promise<RunnerStatus | null>;
   /** Renvoie les identifiants (secret compris) à l'appelant SANS les garder : le secret ne vit pas dans l'état global. */
   provisionRunner: () => Promise<RunnerProvision | null>;
@@ -52,7 +42,6 @@ export const useDeliveryStore = create<DeliveryState>((set) => ({
   providersLoading: false,
   runs: {},
   workspaceRuns: [],
-  keys: {},
   runner: null,
 
   fetchProviders: async (slug) => {
@@ -94,36 +83,6 @@ export const useDeliveryStore = create<DeliveryState>((set) => ({
       return run;
     } catch {
       return null;
-    }
-  },
-
-  fetchKey: async (slug, provider) => {
-    try {
-      const status = await getDeliveryKey(slug, provider);
-      set((state) => ({ keys: { ...state.keys, [provider]: status } }));
-      return status;
-    } catch {
-      return null;
-    }
-  },
-
-  connectKey: async (slug, provider, apiKey) => {
-    try {
-      const status = await connectDeliveryKey(slug, provider, apiKey);
-      set((state) => ({ keys: { ...state.keys, [provider]: status } }));
-      return status;
-    } catch {
-      return null;
-    }
-  },
-
-  disconnectKey: async (slug, provider) => {
-    try {
-      await disconnectDeliveryKey(slug, provider);
-      set((state) => ({ keys: { ...state.keys, [provider]: { connected: false, keyHint: null } } }));
-      return true;
-    } catch {
-      return false;
     }
   },
 

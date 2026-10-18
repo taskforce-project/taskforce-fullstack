@@ -16,7 +16,7 @@ public class SmartAssignCandidateResponse {
     /** "user" (assigner une personne) ou "agent" (déléguer). Défaut "user" pour les candidats humains. */
     @Builder.Default
     private String kind = "user";
-    /** Clé du provider d'agent (ex. "cursor", "claude-api") quand {@code kind="agent"} ; null sinon. */
+    /** Clé du provider d'agent (ex. "claude-code") quand {@code kind="agent"} ; null sinon. */
     private String agentKey;
     /** Slug de logo de l'agent (résolu par {@code BrandLogo}) quand {@code kind="agent"} ; null sinon. */
     private String agentLogoKey;

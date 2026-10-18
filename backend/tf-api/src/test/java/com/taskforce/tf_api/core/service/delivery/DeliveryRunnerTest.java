@@ -38,8 +38,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Prouve le pipeline de délégation (TF-AGENT-DELIVERY) avec le provider stub : {@code dispatch -> poll
- * -> résultat}, puis l'auto-move de l'issue (slice 4) vers « In review by AI » (DONE) / « Blocked »
+ * Prouve le pipeline de délégation (TF-AGENT-DELIVERY) avec un provider « push » simulé : {@code dispatch
+ * -> poll -> résultat}, puis l'auto-move de l'issue (slice 4) vers « In review by AI » (DONE) / « Blocked »
  * (échec).
  */
 @ExtendWith(MockitoExtension.class)
@@ -54,8 +54,8 @@ class DeliveryRunnerTest {
     @InjectMocks private DeliveryRunner runner;
 
     @Test
-    @DisplayName("stub : run -> DONE (résumé + lien) et issue déplacée vers « In review by AI »")
-    void stub_run_completes_and_moves_issue() {
+    @DisplayName("provider « push » : dispatch puis poll -> DONE (résumé + lien), issue déplacée vers « In review by AI »")
+    void push_run_completes_and_moves_issue() {
         Project project = mock(Project.class);
         when(project.getId()).thenReturn(100L);
         when(project.getRepoFullName()).thenReturn(null);
@@ -67,9 +67,13 @@ class DeliveryRunnerTest {
         when(issue.getProject()).thenReturn(project);
 
         DeliveryRun run = DeliveryRun.builder()
-            .id(10L).issue(issue).providerKey("stub").status(DeliveryRunStatus.QUEUED).build();
+            .id(10L).issue(issue).providerKey("push").status(DeliveryRunStatus.QUEUED).build();
         when(runRepository.findById(10L)).thenReturn(Optional.of(run));
-        when(registry.get("stub")).thenReturn(new StubDeliveryProvider());
+        DeliveryAgentProvider push = mock(DeliveryAgentProvider.class);
+        when(push.dispatch(any())).thenReturn(new DeliveryDispatch("ref-10"));
+        when(push.poll(eq("ref-10"), any())).thenReturn(
+            new DeliveryPoll(DeliveryRunStatus.DONE, "Pull request opened", "https://example.com/pull/10", null));
+        when(registry.get("push")).thenReturn(push);
         // Colonne « In review by AI » absente -> créée
         when(issueStatusRepository.findByProjectIdAndName(100L, "In review by AI")).thenReturn(Optional.empty());
         when(issueStatusRepository.findByProjectIdOrderByPosition(100L)).thenReturn(List.of());
@@ -79,7 +83,8 @@ class DeliveryRunnerTest {
 
         assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.DONE);
         assertThat(run.getSummary()).isNotBlank();
-        assertThat(run.getResultUrl()).contains("stub-1-");
+        assertThat(run.getExternalRef()).isEqualTo("ref-10");
+        assertThat(run.getResultUrl()).isEqualTo("https://example.com/pull/10");
         verify(issue).setStatus(any(IssueStatus.class));       // issue déplacée
         verify(issueRepository).save(issue);
         verify(issueStatusRepository).save(any(IssueStatus.class)); // colonne créée

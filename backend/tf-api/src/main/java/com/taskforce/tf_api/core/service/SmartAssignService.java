@@ -35,6 +35,7 @@ import com.taskforce.tf_api.core.repository.ProjectMemberRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.delivery.ClaudeCodeProvider;
 import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProvider;
 import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProviderRegistry;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -80,9 +81,12 @@ public class SmartAssignService {
     private static final int AGENT_RECOMMEND_THRESHOLD = 65;
     /** Entre les deux : l'agent est proposé en alternative (l'humain reste recommandé). */
     private static final int AGENT_ALTERNATIVE_THRESHOLD = 45;
-    /** Ordre de préférence du provider selon qu'un dépôt est lié (agents qui ouvrent une PR d'abord). */
-    private static final List<String> AGENT_PREF_WITH_REPO = List.of("cursor", "github-copilot", "claude-api", "stub");
-    private static final List<String> AGENT_PREF_NO_REPO   = List.of("claude-api", "github-copilot", "stub");
+    /**
+     * Ordre de préférence du provider selon qu'un dépôt est lié. Claude Code (runner local) sait faire les
+     * deux : pull request avec un dépôt, réponse écrite sans.
+     */
+    private static final List<String> AGENT_PREF_WITH_REPO = List.of(ClaudeCodeProvider.KEY);
+    private static final List<String> AGENT_PREF_NO_REPO   = List.of(ClaudeCodeProvider.KEY);
 
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;

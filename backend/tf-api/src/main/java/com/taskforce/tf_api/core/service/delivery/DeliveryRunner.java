@@ -81,7 +81,7 @@ public class DeliveryRunner {
             run.setExternalRef(dispatch.externalRef());
             runRepository.save(run);
 
-            // Provider synchrone (ex. ClaudeApiProvider) : résultat déjà là ; sinon on poll (async).
+            // Provider synchrone : résultat déjà là ; sinon on poll (async).
             DeliveryPoll poll = dispatch.immediateResult() != null
                 ? dispatch.immediateResult()
                 : provider.poll(dispatch.externalRef(), workspaceId);
@@ -95,7 +95,7 @@ public class DeliveryRunner {
     }
 
     /**
-     * Ré-interroge un run <b>asynchrone</b> encore en cours (ex. Cursor Background Agent) et applique
+     * Ré-interroge un run <b>asynchrone</b> encore en cours et applique
      * l'avancement. Appelé par le contrôleur sur lecture du run (le polling front fait ainsi progresser
      * l'état jusqu'au terminal). No-op si le run n'est pas RUNNING, sans handle, ou déjà résolu par un
      * résultat immédiat (providers synchrones). Seule exception : un run encore en attente d'un provider

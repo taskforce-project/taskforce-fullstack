@@ -4,9 +4,6 @@ import {
   delegateIssue,
   getIssueRun,
   listWorkspaceRuns,
-  getDeliveryKey,
-  connectDeliveryKey,
-  disconnectDeliveryKey,
   getRunnerStatus,
   provisionRunner,
 } from './delivery-service';
@@ -43,14 +40,14 @@ describe('delivery-service', () => {
 
   it('delegateIssue POST le provider et retourne le run', async () => {
     const run = {
-      id: 1, issueId: 5, providerKey: 'stub', model: 'stub', status: 'QUEUED',
+      id: 1, issueId: 5, providerKey: 'claude-code', model: 'claude-sonnet-5', status: 'QUEUED',
       summary: null, resultUrl: null, error: null, startedById: 7, createdAt: null, updatedAt: null,
     };
     vi.mocked(apiClient.post).mockResolvedValue(envelope(run));
 
-    const res = await delegateIssue(SLUG, 5, 'stub');
+    const res = await delegateIssue(SLUG, 5, 'claude-code');
 
-    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DELEGATE(SLUG, 5), { providerKey: 'stub', model: undefined });
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DELEGATE(SLUG, 5), { providerKey: 'claude-code', model: undefined });
     expect(res).toEqual(run);
   });
 
@@ -65,7 +62,7 @@ describe('delivery-service', () => {
 
   it('listWorkspaceRuns GET les runs du workspace (silentError, [] si vide)', async () => {
     const runs = [
-      { id: 1, issueId: 5, providerKey: 'stub', model: null, status: 'RUNNING', summary: null, resultUrl: null, error: null, startedById: 7, createdAt: null, updatedAt: null },
+      { id: 1, issueId: 5, providerKey: 'claude-code', model: null, status: 'RUNNING', summary: null, resultUrl: null, error: null, startedById: 7, createdAt: null, updatedAt: null },
     ];
     vi.mocked(apiClient.get).mockResolvedValue(envelope(runs));
     const res = await listWorkspaceRuns(SLUG);
@@ -77,34 +74,6 @@ describe('delivery-service', () => {
     vi.mocked(apiClient.get).mockResolvedValue(envelope(null));
     const res = await listWorkspaceRuns(SLUG);
     expect(res).toEqual([]);
-  });
-
-  it('getDeliveryKey GET l’état de la clé (anthropic)', async () => {
-    const status = { connected: true, keyHint: '...AB12' };
-    vi.mocked(apiClient.get).mockResolvedValue(envelope(status));
-
-    const res = await getDeliveryKey(SLUG, 'anthropic');
-
-    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.KEY(SLUG, 'anthropic'));
-    expect(res).toEqual(status);
-  });
-
-  it('connectDeliveryKey POST la clé et retourne le statut (cursor)', async () => {
-    const status = { connected: true, keyHint: '...WXYZ' };
-    vi.mocked(apiClient.post).mockResolvedValue(envelope(status));
-
-    const res = await connectDeliveryKey(SLUG, 'cursor', 'key_WXYZ');
-
-    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.KEY(SLUG, 'cursor'), { apiKey: 'key_WXYZ' });
-    expect(res).toEqual(status);
-  });
-
-  it('disconnectDeliveryKey DELETE la clé', async () => {
-    vi.mocked(apiClient.delete).mockResolvedValue(envelope(null));
-
-    await disconnectDeliveryKey(SLUG, 'anthropic');
-
-    expect(apiClient.delete).toHaveBeenCalledWith(DELIVERY_ROUTES.KEY(SLUG, 'anthropic'));
   });
 
   it('getRunnerStatus GET l’état du runner, en appel de fond (silentError)', async () => {
