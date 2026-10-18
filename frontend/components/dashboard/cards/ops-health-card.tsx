@@ -40,7 +40,7 @@ export function OpsHealthCard({ slug, refreshToken }: DashboardCardBodyProps) {
         <MiniMetric
           label="At risk"
           value={String(atRisk)}
-          valueClassName={atRisk > 0 ? "text-amber-600 dark:text-amber-400" : undefined}
+          valueClassName={atRisk > 0 ? "text-ink-yellow" : undefined}
         />
       </div>
 
@@ -54,9 +54,9 @@ export function OpsHealthCard({ slug, refreshToken }: DashboardCardBodyProps) {
         {/* Empilement sémantique : les couleurs de statut restent vert/orange/rouge. */}
         <SegmentBar
           segments={[
-            { value: health.healthy, className: "bg-emerald-500" },
-            { value: health.atRisk, className: "bg-amber-500" },
-            { value: health.critical, className: "bg-rose-500" },
+            { value: health.healthy, className: "bg-shape-green" },
+            { value: health.atRisk, className: "bg-shape-yellow" },
+            { value: health.critical, className: "bg-shape-red" },
             { value: health.paused, className: "bg-muted-foreground/40" },
           ]}
         />

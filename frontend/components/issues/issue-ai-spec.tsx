@@ -235,7 +235,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
             onClick={handleCopy}
             disabled={!prompt.trim()}
           >
-            {copied ? <Check className="size-3.5 text-green-500" /> : <Copy className="size-3.5" />}
+            {copied ? <Check className="size-3.5 text-ink-green" /> : <Copy className="size-3.5" />}
             {copied ? "Copied" : "Copy"}
           </Button>
         </div>
@@ -301,7 +301,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
       {/* Approbation → issue remplie + write-back Brain OS */}
       <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
         {saved && (
-          <span className="mr-auto flex items-center gap-1.5 text-xs text-green-600 dark:text-green-500">
+          <span className="mr-auto flex items-center gap-1.5 text-xs text-ink-green">
             <Check className="size-3.5" />
             {applyToIssue ? "Issue updated" : "Saved to the Brain OS"}
           </span>

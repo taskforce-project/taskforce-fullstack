@@ -18,18 +18,18 @@ import type { AnalysisDepth, StoredBrief, StoredPriority } from "@/lib/api/analy
 import type { DecisionSnapshot } from "@/lib/api/analytics-service"
 
 const LEVEL: Record<StoredPriority["level"], { label: string; cls: string }> = {
-  HIGH:   { label: "High",   cls: "text-rose-500 border-rose-500/30 bg-rose-500/10" },
-  MEDIUM: { label: "Medium", cls: "text-amber-500 border-amber-500/30 bg-amber-500/10" },
-  LOW:    { label: "Low",    cls: "text-blue-500 border-blue-500/30 bg-blue-500/10" },
+  HIGH:   { label: "High",   cls: "text-destructive border-destructive/30 bg-destructive/10" },
+  MEDIUM: { label: "Medium", cls: "text-ink-yellow border-shape-yellow/30 bg-shape-yellow/10" },
+  LOW:    { label: "Low",    cls: "text-ink-blue border-primary/30 bg-primary/10" },
 }
 
 function Chip({ label, value, alert = false }: Readonly<{ label: string; value: number; alert?: boolean }>) {
   return (
     <span className={cn(
       "inline-flex items-baseline gap-1 rounded-md border px-2 py-0.5 text-xs tabular-nums",
-      alert && value > 0 ? "border-rose-500/30 bg-rose-500/10 text-rose-500" : "border-border bg-background text-muted-foreground"
+      alert && value > 0 ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border bg-background text-muted-foreground"
     )}>
-      <span className={cn("font-semibold", alert && value > 0 ? "text-rose-500" : "text-foreground")}>{value}</span>
+      <span className={cn("font-semibold", alert && value > 0 ? "text-destructive" : "text-foreground")}>{value}</span>
       {label}
     </span>
   )
@@ -139,7 +139,7 @@ function PriorityCard({
           {accepted && priority.issueId && (
             <Link
               href={`/${slug}/projects/${projectId}?issue=${priority.issueId}`}
-              className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-emerald-500 hover:underline"
+              className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-ink-green hover:underline"
             >
               <Check className="size-3" /> {priority.issueIdentifier ?? "Issue created"}
               <ExternalLink className="size-3" />
@@ -189,7 +189,7 @@ function PriorityCard({
               <button
                 type="button" disabled={busy} title="Dismiss"
                 onClick={() => run(() => dismissPriority(slug, projectId, priority.id), "Action failed")}
-                className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-rose-500"
+                className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive"
               >
                 <X className="size-3.5" />
               </button>
@@ -298,9 +298,9 @@ export function DecisionBoard({
         <button
           type="button"
           onClick={openWorkflowPanel}
-          className="mt-3 flex w-full items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/[0.06] px-3 py-2 text-left text-xs text-foreground transition-colors hover:bg-blue-500/[0.1]"
+          className="mt-3 flex w-full items-center gap-2 rounded-lg border border-primary/30 bg-primary/[0.06] px-3 py-2 text-left text-xs text-foreground transition-colors hover:bg-primary/[0.1]"
         >
-          <Loader2 className="size-3.5 shrink-0 animate-spin text-blue-500" />
+          <Loader2 className="size-3.5 shrink-0 animate-spin text-ink-blue" />
           {runningJob.status === "WAITING_FOR_INPUT"
             ? "The AI needs a clarification from you - open the workflow"
             : "Analysis running - follow the steps in the dock"}
@@ -328,12 +328,12 @@ export function DecisionBoard({
           {brief.risks.length > 0 && (
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <AlertTriangle className="size-3.5 text-amber-500" /> Risks
+                <AlertTriangle className="size-3.5 text-ink-yellow" /> Risks
               </div>
               <ul className="flex flex-col gap-1">
                 {brief.risks.map((risk) => (
                   <li key={risk} className="flex gap-1.5 text-xs text-muted-foreground">
-                    <span className="text-amber-500">•</span>{risk}
+                    <span className="text-ink-yellow">•</span>{risk}
                   </li>
                 ))}
               </ul>

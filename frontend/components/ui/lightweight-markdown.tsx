@@ -102,7 +102,7 @@ function renderInline(text: string, keyPrefix: string, opts: MarkdownProps): Rea
         </button>,
       )
     } else if (token.startsWith("==")) {
-      out.push(<mark key={key} className="rounded bg-amber-200/60 px-0.5 dark:bg-amber-400/25">{token.slice(2, -2)}</mark>)
+      out.push(<mark key={key} className="rounded bg-shape-yellow/30 px-0.5">{token.slice(2, -2)}</mark>)
     } else if (token.startsWith("**")) {
       out.push(<strong key={key}>{token.slice(2, -2)}</strong>)
     } else if (token.startsWith("*") || token.startsWith("_")) {
@@ -132,14 +132,14 @@ function renderInline(text: string, keyPrefix: string, opts: MarkdownProps): Rea
 // ─── Callouts (façon Obsidian) ────────────────────────────────────────────────
 
 const CALLOUTS: Record<string, { icon: typeof Info; cls: string; accent: string; label: string }> = {
-  note:    { icon: Info, cls: "border-blue-500/30 bg-blue-500/5", accent: "text-blue-500", label: "Note" },
-  info:    { icon: Info, cls: "border-blue-500/30 bg-blue-500/5", accent: "text-blue-500", label: "Info" },
-  tip:     { icon: Lightbulb, cls: "border-emerald-500/30 bg-emerald-500/5", accent: "text-emerald-500", label: "Tip" },
-  success: { icon: CheckCircle2, cls: "border-emerald-500/30 bg-emerald-500/5", accent: "text-emerald-500", label: "Success" },
-  warning: { icon: AlertTriangle, cls: "border-amber-500/30 bg-amber-500/5", accent: "text-amber-500", label: "Warning" },
-  danger:  { icon: XCircle, cls: "border-red-500/30 bg-red-500/5", accent: "text-red-500", label: "Danger" },
-  error:   { icon: XCircle, cls: "border-red-500/30 bg-red-500/5", accent: "text-red-500", label: "Error" },
-  question:{ icon: AlertCircle, cls: "border-violet-500/30 bg-violet-500/5", accent: "text-violet-500", label: "Question" },
+  note:    { icon: Info, cls: "border-primary/30 bg-primary/5", accent: "text-ink-blue", label: "Note" },
+  info:    { icon: Info, cls: "border-primary/30 bg-primary/5", accent: "text-ink-blue", label: "Info" },
+  tip:     { icon: Lightbulb, cls: "border-shape-green/30 bg-shape-green/5", accent: "text-ink-green", label: "Tip" },
+  success: { icon: CheckCircle2, cls: "border-shape-green/30 bg-shape-green/5", accent: "text-ink-green", label: "Success" },
+  warning: { icon: AlertTriangle, cls: "border-shape-yellow/30 bg-shape-yellow/5", accent: "text-ink-yellow", label: "Warning" },
+  danger:  { icon: XCircle, cls: "border-destructive/30 bg-destructive/5", accent: "text-destructive", label: "Danger" },
+  error:   { icon: XCircle, cls: "border-destructive/30 bg-destructive/5", accent: "text-destructive", label: "Error" },
+  question:{ icon: AlertCircle, cls: "border-shape-pink/30 bg-shape-pink/5", accent: "text-ink-pink", label: "Question" },
 }
 
 // ─── Coloration légère et générique ───────────────────────────────────────────
@@ -160,10 +160,10 @@ function highlightCode(code: string): ReactNode[] {
   while ((m = TOKEN_RE.exec(code)) !== null) {
     if (m.index > last) out.push(code.slice(last, m.index))
     const key = `t${i++}`
-    if (m[1]) out.push(<span key={key} className="text-emerald-500 dark:text-emerald-400">{m[1]}</span>)
+    if (m[1]) out.push(<span key={key} className="text-ink-green">{m[1]}</span>)
     else if (m[2]) out.push(<span key={key} className="text-muted-foreground italic">{m[2]}</span>)
-    else if (m[3]) out.push(<span key={key} className="text-amber-600 dark:text-amber-400">{m[3]}</span>)
-    else if (m[4]) out.push(KEYWORDS.has(m[4]) ? <span key={key} className="font-medium text-violet-600 dark:text-violet-400">{m[4]}</span> : m[4])
+    else if (m[3]) out.push(<span key={key} className="text-ink-yellow">{m[3]}</span>)
+    else if (m[4]) out.push(KEYWORDS.has(m[4]) ? <span key={key} className="font-medium text-ink-pink">{m[4]}</span> : m[4])
     last = m.index + m[0].length
   }
   if (last < code.length) out.push(code.slice(last))
@@ -178,7 +178,7 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }) {
       <div className="flex items-center justify-between border-b bg-muted/60 px-3 py-1">
         <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{lang || "code"}</span>
         <button type="button" onClick={copy} className="text-muted-foreground hover:text-foreground" aria-label="Copy">
-          {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+          {copied ? <Check className="size-3.5 text-ink-green" /> : <Copy className="size-3.5" />}
         </button>
       </div>
       <pre className="overflow-x-auto px-3 py-2 text-[0.8rem] leading-relaxed"><code className="font-mono">{highlightCode(code)}</code></pre>
@@ -295,7 +295,7 @@ export function Markdown(props: MarkdownProps) {
         if (b.type === "h") return <p key={i} className={H_CLS[Math.min(b.level, 4) - 1]}>{inl(b.text, `h${i}`)}</p>
         if (b.type === "tasks") {
           const boxCls = (checked: boolean) =>
-            `mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border transition-colors ${checked ? "border-emerald-500 bg-emerald-500 text-white" : "border-muted-foreground/40"}`
+            `mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border transition-colors ${checked ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40"}`
           return (
             <ul key={i} className="space-y-1">
               {b.items.map((it) => (

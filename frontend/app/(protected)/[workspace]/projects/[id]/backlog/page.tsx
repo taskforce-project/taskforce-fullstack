@@ -17,30 +17,13 @@ import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
+import { PRIORITY_DOT } from "@/lib/palette"
 import { useIssueStore } from "@/lib/store/issue-store"
 import type { Issue, IssuePriority } from "@/lib/api/issue-service"
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
-
-const PRIORITY_DOT: Record<IssuePriority, string> = {
-  URGENT: "bg-red-400",
-  HIGH:   "bg-orange-400",
-  MEDIUM: "bg-yellow-400",
-  LOW:    "bg-slate-400",
-  NONE:   "bg-muted-foreground/30",
-}
-
-const AVATAR_COLORS = ["bg-violet-500","bg-blue-500","bg-emerald-500","bg-orange-500","bg-pink-500","bg-cyan-500","bg-amber-500","bg-indigo-500"]
-
-function emailInitials(email: string): string {
-  return email.slice(0, 2).toUpperCase()
-}
-
-function assigneeColor(id: number): string {
-  return AVATAR_COLORS[id % AVATAR_COLORS.length]
-}
 
 function formatDate(iso: string | null | undefined): string | undefined {
   if (!iso) return undefined
@@ -63,7 +46,7 @@ function toSheetIssue(issue: Issue): SheetIssue {
     statusName:     issue.status.name,
     statusCategory: issue.status.category,
     assignee:       issue.assignee
-      ? { initials: emailInitials(issue.assignee.email), color: assigneeColor(issue.assignee.id), name: issue.assignee.displayName ?? issue.assignee.email, email: issue.assignee.email, userId: issue.assignee.id }
+      ? { name: issue.assignee.displayName ?? issue.assignee.email, email: issue.assignee.email, userId: issue.assignee.id }
       : null,
     assigneeId:     issue.assignee?.id ?? null,
     labels:         issue.labels,
@@ -181,7 +164,7 @@ export default function ProjectBacklogPage() {
               type="button"
               onClick={(e) => { e.stopPropagation(); handleToggleDone(issue) }}
               title="Mark as done"
-              className="shrink-0 text-muted-foreground transition-colors hover:text-emerald-500"
+              className="shrink-0 text-muted-foreground transition-colors hover:text-ink-green"
             >
               <CircleDot className="h-3.5 w-3.5" />
             </button>

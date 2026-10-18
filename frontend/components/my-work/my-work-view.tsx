@@ -17,6 +17,7 @@ import { DataTable, type DataTableColumn } from "@/components/ui/data-table"
 import { RefreshControl } from "@/components/ui/refresh-control"
 import { IssueSheetLoader, type IssueSheetTarget } from "@/components/sheets/issue-sheet-loader"
 import { cn } from "@/lib/utils"
+import { PRIORITY_DOT as DOT } from "@/lib/palette"
 import { useUserStore } from "@/lib/store/user-store"
 import { pageService, type WorkspacePage } from "@/lib/api/page-service"
 import { listMyIssues } from "@/lib/api/issue-service"
@@ -98,11 +99,11 @@ const CYCLE_STATUS_MAP: Record<ApiCycleStatus, CycleStatus> = {
 // ─── Presentation config (Tailwind utilities only) ───────────────────────────
 
 const PRIORITY_DOT: Record<IssuePriority, string> = {
-  urgent: "bg-rose-500",
-  high:   "bg-orange-500",
-  medium: "bg-amber-500",
-  low:    "bg-muted-foreground/40",
-  none:   "bg-muted-foreground/20",
+  urgent: DOT.URGENT,
+  high:   DOT.HIGH,
+  medium: DOT.MEDIUM,
+  low:    DOT.LOW,
+  none:   DOT.NONE,
 }
 
 /** Ordre logique pour le tri par priorité (urgent en tête). */
@@ -112,9 +113,9 @@ const PRIORITY_ORDER: Record<IssuePriority, number> = {
 
 const STATUS_ICON: Record<IssueStatus, React.ReactNode> = {
   todo:        <CircleDot className="size-3.5 text-muted-foreground" />,
-  in_progress: <RefreshCw className="size-3.5 text-blue-500" />,
-  in_review:   <Clock className="size-3.5 text-amber-500" />,
-  done:        <CheckCircle2 className="size-3.5 text-emerald-500" />,
+  in_progress: <RefreshCw className="size-3.5 text-ink-blue" />,
+  in_review:   <Clock className="size-3.5 text-ink-yellow" />,
+  done:        <CheckCircle2 className="size-3.5 text-ink-green" />,
   cancelled:   <CheckCircle2 className="size-3.5 text-muted-foreground" />,
 }
 
@@ -123,8 +124,8 @@ const STATUS_LABEL: Record<IssueStatus, string> = {
 }
 
 const CYCLE_STATUS: Record<CycleStatus, { label: string; dot: string }> = {
-  active:    { label: "Active",    dot: "bg-emerald-500" },
-  upcoming:  { label: "Upcoming",  dot: "bg-blue-500" },
+  active:    { label: "Active",    dot: "bg-shape-green" },
+  upcoming:  { label: "Upcoming",  dot: "bg-primary" },
   completed: { label: "Completed", dot: "bg-muted-foreground" },
 }
 

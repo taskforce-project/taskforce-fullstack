@@ -61,10 +61,10 @@ export function AiUsageCard({ slug, refreshToken }: DashboardCardBodyProps) {
           className={cn(
             "h-full rounded-full transition-[width] duration-500",
             pct >= 90
-              ? "bg-rose-500"
+              ? "bg-shape-red"
               : pct >= 70
-                ? "bg-amber-500"
-                : "bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300",
+                ? "bg-shape-yellow"
+                : "bg-primary",
           )}
           style={{ width: `${unlimited ? 4 : pct}%` }}
         />

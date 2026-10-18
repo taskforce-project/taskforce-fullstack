@@ -205,7 +205,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
 
         {/* Résumé */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-emerald-500" /><span className="font-medium text-foreground">{catalog.connected}</span> connected</span>
+          <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-shape-green" /><span className="font-medium text-foreground">{catalog.connected}</span> connected</span>
           <span className="text-muted-foreground/40">·</span>
           <span><span className="font-medium text-foreground">{catalog.available}</span> available</span>
           <span className="text-muted-foreground/40">·</span>
@@ -268,7 +268,7 @@ function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; o
           <BrandLogo slug={tool.key} name={tool.name} className="size-full" />
         </div>
         {tool.connected ? (
-          <Badge variant="outline" className="gap-1 border-emerald-500/25 bg-emerald-500/10 text-[10px] text-emerald-500">
+          <Badge variant="outline" className="gap-1 border-shape-green/25 bg-shape-green/10 text-[10px] text-ink-green">
             <Check className="size-3" /> Connected
           </Badge>
         ) : planned ? (
@@ -335,7 +335,7 @@ function ConnectorDetailView({
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-lg font-semibold text-foreground">{tool.name}</h3>
               {tool.connected && (
-                <Badge variant="outline" className="gap-1 border-emerald-500/25 bg-emerald-500/10 text-[10px] text-emerald-500">
+                <Badge variant="outline" className="gap-1 border-shape-green/25 bg-shape-green/10 text-[10px] text-ink-green">
                   <Check className="size-3" /> Connected
                 </Badge>
               )}
@@ -612,7 +612,7 @@ function ConnectorDialog({
               <>
                 {mcpStatus.reachable ? (
                   <div className="flex flex-col gap-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-600 dark:text-emerald-400">
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-shape-green/25 bg-shape-green/10 p-3 text-xs text-ink-green">
                       <span className="inline-flex items-center gap-1.5 font-medium">
                         <Check className="size-4 shrink-0" /> Connected - {mcpStatus.tools.length} tool(s) available
                       </span>
@@ -627,7 +627,7 @@ function ConnectorDialog({
                     ) : mcpStatus.tools.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {mcpStatus.tools.slice(0, 8).map((t) => (
-                          <span key={t} className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[11px] text-emerald-600 dark:text-emerald-400">
+                          <span key={t} className="inline-flex items-center gap-1 rounded bg-shape-green/15 px-1.5 py-0.5 text-[11px] text-ink-green">
                             <Wrench className="size-3" /> {t}
                           </span>
                         ))}
@@ -636,7 +636,7 @@ function ConnectorDialog({
                     )}
                   </div>
                 ) : (
-                  <div className="flex items-start gap-2 rounded-md border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400">
+                  <div className="flex items-start gap-2 rounded-md border border-shape-yellow/25 bg-shape-yellow/10 p-3 text-xs text-ink-yellow">
                     <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                     <span>Server saved but <span className="font-medium">unreachable</span>{mcpStatus.error ? ` - ${mcpStatus.error}` : ""}.</span>
                   </div>
@@ -738,7 +738,7 @@ function ConnectorDialog({
         ) : (
           // Connecteur générique connecté : identifiants stockés (chiffrés). La sync par service viendra ensuite.
           <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 rounded-md border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-600 dark:text-emerald-400">
+            <div className="flex items-center gap-2 rounded-md border border-shape-green/25 bg-shape-green/10 p-3 text-xs text-ink-green">
               <Check className="size-4 shrink-0" />
               <span><span className="font-medium">{tool.name}</span> is connected - credentials saved (encrypted).</span>
             </div>

@@ -206,7 +206,7 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
 
           {/* Notice : la personne doit ACCEPTER l'invitation avant de rejoindre. */}
           {selected && (
-            <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/10 px-2.5 py-2 text-xs text-blue-500">
+            <div className="flex items-start gap-2 rounded-md border border-primary/20 bg-primary/10 px-2.5 py-2 text-xs text-ink-blue">
               <Info className="mt-0.5 size-3.5 shrink-0" />
               <span>They&apos;ll receive an invitation to this project{alreadyInWorkspace ? "" : " and the workspace"} and must accept it before joining.</span>
             </div>

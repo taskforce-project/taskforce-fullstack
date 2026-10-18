@@ -81,13 +81,13 @@ type RoleFilter = "all" | WorkspaceRole
 const ROLE_CONFIG: Record<WorkspaceRole, { label: string; badgeClass: string; icon: React.ReactNode }> = {
   OWNER: {
     label: "Owner",
-    badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/20",
-    icon: <Crown className="size-3 text-amber-400" />,
+    badgeClass: "bg-shape-yellow/15 text-ink-yellow border-shape-yellow/20",
+    icon: <Crown className="size-3 text-ink-yellow" />,
   },
   ADMIN: {
     label: "Admin",
-    badgeClass: "bg-violet-500/15 text-violet-400 border-violet-500/20",
-    icon: <Shield className="size-3 text-violet-400" />,
+    badgeClass: "bg-primary/15 text-ink-blue border-primary/20",
+    icon: <Shield className="size-3 text-ink-blue" />,
   },
   MEMBER: {
     label: "Member",
@@ -744,7 +744,7 @@ export default function MembersPage() {
         // se confondre avec « No members found », qui laissait croire à un workspace vide.
         <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16 text-center shadow-sm">
           <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-muted">
-            <AlertTriangle className="size-5 text-amber-500" />
+            <AlertTriangle className="size-5 text-ink-yellow" />
           </div>
           <p className="text-base font-medium text-foreground">Could not load members</p>
           <p className="mt-1 text-sm text-muted-foreground">Something went wrong while loading this workspace.</p>

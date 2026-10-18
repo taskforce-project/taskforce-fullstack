@@ -77,7 +77,7 @@ export function BurndownCard({ slug, refreshToken }: DashboardCardBodyProps) {
               type="monotone"
               dataKey="remaining"
               name="Remaining"
-              stroke="#f43f5e"
+              stroke="var(--chart-2)"
               strokeWidth={2}
               dot={false}
               activeDot={{ r: 3 }}
@@ -87,7 +87,7 @@ export function BurndownCard({ slug, refreshToken }: DashboardCardBodyProps) {
               type="monotone"
               dataKey="ideal"
               name="Ideal"
-              stroke="#94a3b8"
+              stroke="var(--subtle)"
               strokeWidth={2}
               strokeDasharray="4 4"
               dot={false}

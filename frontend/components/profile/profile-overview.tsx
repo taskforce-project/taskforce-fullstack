@@ -19,11 +19,11 @@ import { useWorkspaceStore } from "@/lib/store/workspace-store"
 
 const HEAT_COLORS = [
   "bg-muted",
-  "bg-emerald-900/60",
-  "bg-emerald-700/70",
-  "bg-emerald-500/80",
-  "bg-emerald-400",
-  "bg-emerald-300",
+  "bg-primary/20",
+  "bg-primary/40",
+  "bg-primary/60",
+  "bg-primary/80",
+  "bg-primary",
 ]
 
 function ContributionGraph({ heatmap }: Readonly<{ heatmap: HeatWeek[] }>) {

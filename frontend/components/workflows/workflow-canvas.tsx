@@ -17,7 +17,11 @@ import type { DeliveryProvider, DeliveryRun } from "@/lib/api/delivery-service"
 // ─── Statut unifie (plan d'analyse + job + run de delegation) -> couleur/libelle. ───
 type Tone = "done" | "running" | "waiting" | "failed" | "idle"
 const TONE_COLOR: Record<Tone, string> = {
-  done: "#10b981", running: "#3b82f6", waiting: "#f59e0b", failed: "#f43f5e", idle: "#8a8f98",
+  done: "var(--shape-green)", running: "var(--primary)", waiting: "var(--shape-yellow)", failed: "var(--shape-red)", idle: "var(--subtle)",
+}
+/** Encre lisible du même statut (libellé, icône), dans les deux thèmes. */
+const TONE_INK: Record<Tone, string> = {
+  done: "var(--ink-green)", running: "var(--ink-blue)", waiting: "var(--ink-yellow)", failed: "var(--ink-red)", idle: "var(--muted-foreground)",
 }
 function toneOf(status: string | undefined): Tone {
   switch (status) {
@@ -47,6 +51,7 @@ const KIND_ICON = { job: Layers, task: GitBranch, agent: Bot, run: FileText } as
 function FlowNode({ data, selected }: NodeProps<Node<FlowData>>) {
   const Icon = KIND_ICON[data.kind]
   const color = TONE_COLOR[data.tone]
+  const ink = TONE_INK[data.tone]
   const isContainer = data.kind === "job" || data.kind === "agent"
   return (
     <div
@@ -57,7 +62,7 @@ function FlowNode({ data, selected }: NodeProps<Node<FlowData>>) {
       style={{ borderLeft: `3px solid ${color}`, width: isContainer ? 210 : 190 }}
     >
       <Handle type="target" position={Position.Left} style={{ opacity: 0, width: 1, height: 1 }} />
-      <span className="flex size-6 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: `${color}1f`, color }}>
+      <span className="flex size-6 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color: ink }}>
         <Icon className="size-3.5" />
       </span>
       <div className="min-w-0 flex-1">
@@ -65,7 +70,7 @@ function FlowNode({ data, selected }: NodeProps<Node<FlowData>>) {
         <p className="flex items-center gap-1 truncate text-[10px] text-[var(--muted-foreground)]">
           {data.sub && <span className="truncate">{data.sub}</span>}
           {data.sub && <span aria-hidden>·</span>}
-          <span style={{ color }}>{statusLabel(data.status)}</span>
+          <span style={{ color: ink }}>{statusLabel(data.status)}</span>
         </p>
       </div>
       <Handle type="source" position={Position.Right} style={{ opacity: 0, width: 1, height: 1 }} />

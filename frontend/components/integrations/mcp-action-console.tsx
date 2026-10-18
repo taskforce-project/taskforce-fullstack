@@ -132,7 +132,7 @@ export function McpActionConsole({
   // ---- Chargement / erreur ------------------------------------------------
   if (loadError) {
     return (
-      <div className="flex items-start gap-2 rounded-md border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400">
+      <div className="flex items-start gap-2 rounded-md border border-shape-yellow/25 bg-shape-yellow/10 p-3 text-xs text-ink-yellow">
         <AlertTriangle className="mt-0.5 size-4 shrink-0" />
         <span>{loadError}</span>
       </div>
@@ -162,8 +162,8 @@ export function McpActionConsole({
           <Wrench className="size-4 text-primary" />
           <span className="font-mono text-sm font-semibold text-foreground">{selected.name}</span>
           {selected.readOnly
-            ? <Badge variant="outline" className="gap-1 border-emerald-500/25 bg-emerald-500/10 text-[10px] text-emerald-500"><ShieldCheck className="size-3" /> Read</Badge>
-            : <Badge variant="outline" className="gap-1 border-amber-500/25 bg-amber-500/10 text-[10px] text-amber-500"><Pencil className="size-3" /> Write</Badge>}
+            ? <Badge variant="outline" className="gap-1 border-shape-green/25 bg-shape-green/10 text-[10px] text-ink-green"><ShieldCheck className="size-3" /> Read</Badge>
+            : <Badge variant="outline" className="gap-1 border-shape-yellow/25 bg-shape-yellow/10 text-[10px] text-ink-yellow"><Pencil className="size-3" /> Write</Badge>}
         </div>
         {selected.description && <p className="text-xs leading-relaxed text-muted-foreground">{selected.description}</p>}
 
@@ -240,8 +240,8 @@ export function McpActionConsole({
 
         {/* Confirmation d'écriture (bannière inline plutôt qu'un dialog imbriqué) */}
         {confirming ? (
-          <div className="flex flex-col gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+          <div className="flex flex-col gap-2 rounded-md border border-shape-yellow/30 bg-shape-yellow/10 p-3">
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-yellow">
               <AlertTriangle className="size-4 shrink-0" /> This runs a write action on {connectorName}. Continue?
             </span>
             <div className="flex justify-end gap-2">
@@ -299,7 +299,7 @@ export function McpActionConsole({
               <Wrench className="size-3.5 shrink-0 text-muted-foreground" />
               <span className="font-mono text-xs font-semibold text-foreground">{t.name}</span>
               {!t.readOnly && (
-                <Badge variant="outline" className="gap-1 border-amber-500/25 bg-amber-500/10 text-[9px] text-amber-500"><Pencil className="size-2.5" /> Write</Badge>
+                <Badge variant="outline" className="gap-1 border-shape-yellow/25 bg-shape-yellow/10 text-[9px] text-ink-yellow"><Pencil className="size-2.5" /> Write</Badge>
               )}
             </span>
             {t.description && <span className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">{t.description}</span>}

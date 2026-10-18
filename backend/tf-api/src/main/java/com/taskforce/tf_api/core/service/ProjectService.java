@@ -282,11 +282,11 @@ public class ProjectService {
 
     private void seedDefaultLabels(Project project) {
         String[][] defaults = {
-            { "Bug",         "#ef4444" },
-            { "Feature",     "#6366f1" },
-            { "Improvement", "#f59e0b" },
-            { "Documentation", "#10b981" },
-            { "Question",    "#64748b" },
+            { "Bug",         "#e14322" },
+            { "Feature",     "#2f6bf6" },
+            { "Improvement", "#ffaa0d" },
+            { "Documentation", "#418b5c" },
+            { "Question",    "#736e67" },
         };
         for (String[] entry : defaults) {
             ProjectLabel label = ProjectLabel.builder()
@@ -568,7 +568,7 @@ public class ProjectService {
         ProjectLabel label = ProjectLabel.builder()
             .project(project)
             .name(request.getName())
-            .color(request.getColor() != null ? request.getColor() : "#6366f1")
+            .color(request.getColor() != null ? request.getColor() : "#2f6bf6")
             .description(request.getDescription())
             .build();
 

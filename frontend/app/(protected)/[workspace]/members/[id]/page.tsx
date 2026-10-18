@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
+import { seriesColor } from "@/lib/palette"
 import { MemberSkillsCard } from "@/components/members/member-skills-card"
 import { MemberAvailabilityCard } from "@/components/members/member-availability-card"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
@@ -36,20 +37,15 @@ import type { Issue } from "@/lib/api/issue-service"
 // ---------------------------------------------------------------------------
 
 const ROLE_CONFIG: Record<WorkspaceRole, { label: string; badgeClass: string; icon: React.ReactNode }> = {
-  OWNER:  { label: "Owner",  badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/20",   icon: <Crown  className="h-3 w-3 text-amber-400" /> },
-  ADMIN:  { label: "Admin",  badgeClass: "bg-violet-500/15 text-violet-400 border-violet-500/20", icon: <Shield className="h-3 w-3 text-violet-400" /> },
+  OWNER:  { label: "Owner",  badgeClass: "bg-shape-yellow/15 text-ink-yellow border-shape-yellow/20",   icon: <Crown  className="h-3 w-3 text-ink-yellow" /> },
+  ADMIN:  { label: "Admin",  badgeClass: "bg-primary/15 text-ink-blue border-primary/20", icon: <Shield className="h-3 w-3 text-ink-blue" /> },
   MEMBER: { label: "Member", badgeClass: "bg-muted text-muted-foreground border-border",           icon: <User   className="h-3 w-3 text-muted-foreground" /> },
 }
 
-const MEMBER_COLORS = [
-  "bg-primary", "bg-violet-500", "bg-emerald-500",
-  "bg-orange-500", "bg-blue-500", "bg-pink-500", "bg-cyan-500",
-]
-
 function issueDotColor(category: string): string {
-  if (category === "COMPLETED") return "text-emerald-400"
-  if (category === "CANCELLED") return "text-red-400"
-  if (category === "STARTED")   return "text-blue-400"
+  if (category === "COMPLETED") return "text-ink-green"
+  if (category === "CANCELLED") return "text-destructive"
+  if (category === "STARTED")   return "text-ink-blue"
   return "text-muted-foreground"
 }
 
@@ -132,7 +128,7 @@ export default function MemberProfilePage() {
   const myRole   = members.find((m) => m.email === user?.email)?.role
   const canEdit  = isYou || myRole === "OWNER" || myRole === "ADMIN"
   const role     = ROLE_CONFIG[member.role]
-  const color      = MEMBER_COLORS[member.userId % MEMBER_COLORS.length]
+  const color      = seriesColor(member.userId)
   const doneCount  = assignedIssues.filter((i) => i.status.category === "COMPLETED").length
   const inProgress = assignedIssues.filter((i) => i.status.category === "STARTED").length
 

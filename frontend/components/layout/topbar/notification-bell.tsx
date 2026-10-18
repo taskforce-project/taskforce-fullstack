@@ -19,9 +19,9 @@ import { useNotificationsRealtime } from "@/lib/hooks/use-notifications-realtime
 import { cn } from "@/lib/utils"
 
 const URGENCY_DOT: Record<Urgency, string> = {
-  critical: "bg-rose-500",
-  warning: "bg-amber-500",
-  info: "bg-blue-500",
+  critical: "bg-shape-red",
+  warning: "bg-shape-yellow",
+  info: "bg-primary",
   low: "bg-muted-foreground/40",
 }
 

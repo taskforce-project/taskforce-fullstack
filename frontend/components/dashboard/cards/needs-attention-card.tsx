@@ -40,7 +40,7 @@ export function NeedsAttentionCard({ slug, refreshToken }: DashboardCardBodyProp
   if (flagged.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-1.5 p-4 text-center">
-        <CheckCircle2 className="size-5 text-emerald-500" />
+        <CheckCircle2 className="size-5 text-ink-green" />
         <p className="text-sm font-medium text-muted-foreground">Nothing to report</p>
         <p className="text-xs text-muted-foreground/70">All operations are healthy.</p>
       </div>
@@ -55,7 +55,7 @@ export function NeedsAttentionCard({ slug, refreshToken }: DashboardCardBodyProp
           href={`./projects/${p.id}`}
           className="flex items-center gap-3 border-b border-border px-4 py-2.5 transition-colors last:border-0 hover:bg-muted/50"
         >
-          <span className={cn("size-2 shrink-0 rounded-full", healthOf(p) === "critical" ? "bg-rose-500" : "bg-amber-500")} />
+          <span className={cn("size-2 shrink-0 rounded-full", healthOf(p) === "critical" ? "bg-shape-red" : "bg-shape-yellow")} />
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{p.name}</span>
           <Badge variant="secondary" className="shrink-0 font-normal text-muted-foreground">
             {p.openIssues} open

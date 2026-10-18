@@ -132,12 +132,12 @@ class ProjectServiceIntegrationTest extends AbstractIntegrationTest {
 
             UpdateProjectRequest upd = new UpdateProjectRequest();
             upd.setName("New Name");
-            upd.setColor("bg-emerald-500");
+            upd.setColor("bg-shape-green");
             projectService.updateProject(SLUG, created.getId(), owner.getId(), upd);
 
             Project reloaded = projectRepository.findById(created.getId()).orElseThrow();
             assertThat(reloaded.getName()).isEqualTo("New Name");
-            assertThat(reloaded.getColor()).isEqualTo("bg-emerald-500");
+            assertThat(reloaded.getColor()).isEqualTo("bg-shape-green");
         }
 
         @Test
@@ -307,7 +307,7 @@ class ProjectServiceIntegrationTest extends AbstractIntegrationTest {
             upd.setStatus(com.taskforce.tf_api.core.enums.ProjectStatus.PAUSED);
             upd.setIsPublic(true);
             upd.setIconUrl("icon.png");
-            upd.setColor("bg-rose-500");
+            upd.setColor("bg-shape-red");
             upd.setGrowthMode(true);
 
             projectService.updateProject(SLUG, created.getId(), owner.getId(), upd);

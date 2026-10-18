@@ -98,7 +98,7 @@ export function LocalRunnerSetup() {
       )}
 
       {confirming && (
-        <div className="flex flex-col gap-1.5 rounded border border-amber-500/30 bg-amber-500/5 p-2">
+        <div className="flex flex-col gap-1.5 rounded border border-shape-yellow/30 bg-shape-yellow/5 p-2">
           <span className="text-[11px] text-foreground">
             A new secret replaces the current one: a runner already started stops working until you paste the new
             secret.
@@ -116,7 +116,7 @@ export function LocalRunnerSetup() {
 
       {credentials && (
         <div className="flex flex-col gap-2">
-          <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+          <p className="text-[11px] font-medium text-ink-yellow">
             Copy it now: the secret is shown only once.
           </p>
           <CodeBlock label="1. Get the runner (Node 20+, git)" text={INSTALL_COMMANDS} />

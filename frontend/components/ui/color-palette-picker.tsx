@@ -2,16 +2,19 @@
 
 import { cn } from "@/lib/utils"
 
-/** Palette d'accent partagée (classes Tailwind). Alignée sur celle des Teams. */
+/**
+ * Palette d'accent des projets (classes Tailwind, stockées en base) : `bg-primary` = sans teinte, puis
+ * les formes pleines de la direction artistique. V93 a converti les anciennes valeurs.
+ */
 export const PROJECT_COLORS = [
   "bg-primary",
-  "bg-violet-500",
-  "bg-emerald-500",
-  "bg-orange-500",
-  "bg-blue-500",
-  "bg-pink-500",
-  "bg-cyan-500",
-  "bg-amber-500",
+  "bg-shape-blue",
+  "bg-shape-sky",
+  "bg-shape-green",
+  "bg-shape-lime",
+  "bg-shape-yellow",
+  "bg-shape-red",
+  "bg-shape-pink",
 ] as const
 
 interface ColorPalettePickerProps {
@@ -35,7 +38,7 @@ export function ColorPalettePicker({ value, onChange, className }: ColorPaletteP
           onClick={() => onChange(c)}
           className={cn(
             "size-6 rounded-full border-2 transition-transform",
-            c,
+            c === "bg-primary" ? "bg-subtle" : c,
             value === c ? "border-foreground scale-110" : "border-transparent hover:scale-105"
           )}
         />

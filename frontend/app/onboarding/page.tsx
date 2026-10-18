@@ -357,7 +357,7 @@ export default function OnboardingPage() {
                     className="rounded-full border px-3 py-1.5 text-sm transition-colors"
                     style={
                       seniority === s.value
-                        ? { borderColor: "var(--primary)", background: "var(--primary)", color: "#fff" }
+                        ? { borderColor: "var(--primary)", background: "var(--primary)", color: "var(--primary-foreground)" }
                         : { borderColor: "var(--border)", color: "var(--label-secondary)" }
                     }
                   >

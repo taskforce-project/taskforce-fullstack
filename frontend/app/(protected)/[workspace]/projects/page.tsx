@@ -117,9 +117,9 @@ function progressPct(project: Project): number {
 }
 
 const HEALTH_META: Record<HealthLevel, { label: string; dot: string }> = {
-  healthy:   { label: "Healthy",  dot: "bg-emerald-500" },
-  "at-risk": { label: "At risk",  dot: "bg-amber-500" },
-  critical:  { label: "Critical", dot: "bg-rose-500" },
+  healthy:   { label: "Healthy",  dot: "bg-shape-green" },
+  "at-risk": { label: "At risk",  dot: "bg-shape-yellow" },
+  critical:  { label: "Critical", dot: "bg-shape-red" },
   paused:    { label: "Paused",   dot: "bg-muted-foreground" },
 }
 
@@ -145,7 +145,7 @@ function VelocityCell({ delta }: { readonly delta: number | null }) {
   }
   const positive = delta > 0
   return (
-    <span className={cn("inline-flex items-center gap-1 text-xs font-medium tabular-nums", positive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+    <span className={cn("inline-flex items-center gap-1 text-xs font-medium tabular-nums", positive ? "text-ink-green" : "text-destructive")}>
       {positive ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
       {positive ? "+" : ""}{delta}%
     </span>
@@ -225,17 +225,17 @@ function StatsStrip({
     <SectionCard title="Overview" bodyClassName="p-0">
       <MetricSplit>
         <Metric label="Total operations" value={total} />
-        <Metric label="Active" value={active} valueClassName="text-emerald-600 dark:text-emerald-400" />
+        <Metric label="Active" value={active} valueClassName="text-ink-green" />
         <Metric
           label="At risk"
           value={atRisk}
-          valueClassName={atRisk > 0 ? "text-amber-600 dark:text-amber-400" : undefined}
+          valueClassName={atRisk > 0 ? "text-ink-yellow" : undefined}
           chart={history.length > 0 ? riskTrend("red", "atRisk") : undefined}
         />
         <Metric
           label="Critical"
           value={critical}
-          valueClassName={critical > 0 ? "text-rose-600 dark:text-rose-400" : undefined}
+          valueClassName={critical > 0 ? "text-destructive" : undefined}
           chart={history.length > 0 ? riskTrend("red", "critical") : undefined}
         />
         <Metric label="Avg progress" value={`${avgProgress}%`} />
@@ -288,7 +288,7 @@ function OperationRow({
       <TableCell className="hidden md:table-cell">
         {riskSignal ? (
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-            <AlertTriangle className="size-3 shrink-0 text-amber-500" />
+            <AlertTriangle className="size-3 shrink-0 text-ink-yellow" />
             {riskSignal}
           </span>
         ) : (
@@ -315,11 +315,11 @@ function OperationRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            className={cn(project.isFavorite ? "text-amber-500" : "text-muted-foreground")}
+            className={cn(project.isFavorite ? "text-shape-yellow" : "text-muted-foreground")}
             title={project.isFavorite ? "Unpin" : "Pin"}
             onClick={(e) => { e.stopPropagation(); toggleFavorite(slug, project.id, !project.isFavorite) }}
           >
-            <Star className={cn("size-4", project.isFavorite && "fill-amber-400 text-amber-400")} />
+            <Star className={cn("size-4", project.isFavorite && "fill-shape-yellow text-shape-yellow")} />
           </Button>
           {/* Archive / Réactiver - action directe (QA2-22 : plus cachée dans le « … ») */}
           {project.status === "ARCHIVED" ? (
@@ -414,10 +414,10 @@ function ProjectCard({
           onClick={(e) => { e.stopPropagation(); toggleFavorite(slug, project.id, !project.isFavorite) }}
           className={cn(
             "shrink-0 rounded p-1 transition-colors hover:bg-muted",
-            project.isFavorite ? "text-amber-500" : "text-muted-foreground/50 hover:text-foreground"
+            project.isFavorite ? "text-shape-yellow" : "text-muted-foreground/50 hover:text-foreground"
           )}
         >
-          <Star className={cn("size-4", project.isFavorite && "fill-amber-400 text-amber-400")} />
+          <Star className={cn("size-4", project.isFavorite && "fill-shape-yellow text-shape-yellow")} />
         </button>
       </div>
 

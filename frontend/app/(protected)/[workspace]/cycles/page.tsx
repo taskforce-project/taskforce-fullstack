@@ -53,7 +53,7 @@ interface Cycle {
   id: string
   name: string
   description: string | null
-  project: { id: string; name: string; emoji: string; color: string }
+  project: { id: string; name: string; emoji: string }
   status: CycleStatus
   startDate: string
   endDate: string
@@ -63,15 +63,6 @@ interface Cycle {
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-const PROJECT_COLORS = [
-  "bg-blue-500", "bg-violet-500", "bg-emerald-500", "bg-amber-500",
-  "bg-slate-500", "bg-orange-500", "bg-pink-500", "bg-cyan-500",
-]
-
-function projectColor(id: number): string {
-  return PROJECT_COLORS[id % PROJECT_COLORS.length]
-}
 
 const API_STATUS_MAP: Record<ApiCycleStatus, CycleStatus> = {
   ACTIVE:    "active",
@@ -154,8 +145,8 @@ function CycleCard({ cycle, slug, reload }: Readonly<{ cycle: Cycle; slug: strin
   }
 
   function daysLeftColor(): string {
-    if (left <= 2) return "text-red-400"
-    if (left <= 5) return "text-amber-400"
+    if (left <= 2) return "text-destructive"
+    if (left <= 5) return "text-ink-yellow"
     return "text-muted-foreground"
   }
 
@@ -167,12 +158,12 @@ function CycleCard({ cycle, slug, reload }: Readonly<{ cycle: Cycle; slug: strin
           {/* Status icon */}
           <div className={cn(
             "mt-0.5 h-8 w-8 rounded-lg flex items-center justify-center shrink-0",
-            cycle.status === "active"    && "bg-emerald-500/10",
-            cycle.status === "upcoming"  && "bg-blue-500/10",
+            cycle.status === "active"    && "bg-shape-green/10",
+            cycle.status === "upcoming"  && "bg-primary/10",
             cycle.status === "completed" && "bg-muted",
           )}>
-            {cycle.status === "active"    && <Play        className="h-4 w-4 text-emerald-400" />}
-            {cycle.status === "upcoming"  && <Clock       className="h-4 w-4 text-blue-400"    />}
+            {cycle.status === "active"    && <Play        className="h-4 w-4 text-ink-green" />}
+            {cycle.status === "upcoming"  && <Clock       className="h-4 w-4 text-ink-blue"    />}
             {cycle.status === "completed" && <CheckCircle2 className="h-4 w-4 text-muted-foreground" />}
           </div>
 
@@ -183,8 +174,8 @@ function CycleCard({ cycle, slug, reload }: Readonly<{ cycle: Cycle; slug: strin
                 variant="outline"
                 className={cn(
                   "text-[10px] px-1.5 py-0 h-4 border font-medium",
-                  cycle.status === "active"    && "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
-                  cycle.status === "upcoming"  && "border-blue-500/30 bg-blue-500/10 text-blue-400",
+                  cycle.status === "active"    && "border-shape-green/30 bg-shape-green/10 text-ink-green",
+                  cycle.status === "upcoming"  && "border-primary/30 bg-primary/10 text-ink-blue",
                   cycle.status === "completed" && "border-border bg-muted/50 text-muted-foreground",
                 )}
               >
@@ -208,17 +199,17 @@ function CycleCard({ cycle, slug, reload }: Readonly<{ cycle: Cycle; slug: strin
             {/* Transitions contextuelles - remplacent le « Edit cycle » qui n'avait aucun onClick. */}
             {cycle.status === "upcoming" && (
               <DropdownMenuItem className="gap-2" disabled={busy} onClick={() => handleTransition("ACTIVE")}>
-                <Play className="h-4 w-4 text-emerald-400" />Start cycle
+                <Play className="h-4 w-4 text-ink-green" />Start cycle
               </DropdownMenuItem>
             )}
             {cycle.status === "active" && (
               <DropdownMenuItem className="gap-2" disabled={busy} onClick={() => handleTransition("COMPLETED")}>
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />Complete cycle
+                <CheckCircle2 className="h-4 w-4 text-ink-green" />Complete cycle
               </DropdownMenuItem>
             )}
             {cycle.status === "completed" && (
               <DropdownMenuItem className="gap-2" disabled={busy} onClick={() => handleTransition("ACTIVE")}>
-                <Play className="h-4 w-4 text-blue-400" />Reopen cycle
+                <Play className="h-4 w-4 text-ink-blue" />Reopen cycle
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
@@ -247,7 +238,7 @@ function CycleCard({ cycle, slug, reload }: Readonly<{ cycle: Cycle; slug: strin
           {/* Mini breakdown */}
           <div className="flex items-center gap-3 mt-0.5">
             {cycle.issues.inProgress > 0 && (
-              <span className="flex items-center gap-1 text-[10px] text-blue-400">
+              <span className="flex items-center gap-1 text-[10px] text-ink-blue">
                 <RefreshCw className="h-3 w-3" />{cycle.issues.inProgress}
               </span>
             )}
@@ -340,7 +331,6 @@ function mapApiCyclesToLocal(
         id:    String(proj.id),
         name:  proj.name,
         emoji: proj.identifier.slice(0, 2),
-        color: projectColor(proj.id),
       },
       status:    API_STATUS_MAP[c.status],
       startDate: c.startDate ?? "",

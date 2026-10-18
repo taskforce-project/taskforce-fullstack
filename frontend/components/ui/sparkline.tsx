@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils"
 
 /** Teintes disponibles - alignées sur le sens produit : bleu = activité, rouge = risque. */
 const TONE = {
-  blue: "#3b82f6",
-  red:  "#ef4444",
+  blue: "var(--chart-1)",
+  red:  "var(--chart-2)",
 } as const
 
 export type SparklineTone = keyof typeof TONE

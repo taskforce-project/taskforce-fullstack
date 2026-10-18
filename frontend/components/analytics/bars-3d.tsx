@@ -12,8 +12,15 @@ import * as THREE from "three"
  * <p>Composant défensif : nettoyage complet (géométries/matériaux/renderer, RAF, listeners,
  * ResizeObserver) au démontage, redimensionnement suivi.
  */
+/** Couleur pour Three.js : une variable CSS (`var(--chart-1)`) est lue sur la racine du document. */
+function resolveColor(color: string): string {
+  const m = /^var\((--[\w-]+)\)$/.exec(color)
+  if (!m) return color
+  return getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim() || "#2f6bf6"
+}
+
 export function Bars3D({
-  data, color = "#6366f1", yLabel,
+  data, color = "var(--chart-1)", yLabel,
 }: Readonly<{ data: { label: string; value: number }[]; color?: string; yLabel?: string }>) {
   const mountRef = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<{ x: number; y: number; label: string; value: number } | null>(null)
@@ -47,7 +54,7 @@ export function Bars3D({
     const spacing = 1.7
     const maxH = 5.5
     const totalW = (n - 1) * spacing
-    const base = new THREE.Color(color)
+    const base = new THREE.Color(resolveColor(color))
     const bars: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>[] = []
 
     data.forEach((d, i) => {

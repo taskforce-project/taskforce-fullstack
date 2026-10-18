@@ -39,18 +39,18 @@ export interface PlanTask {
 }
 
 function StatusIcon({ status, size }: Readonly<{ status: PlanStatus; size: string }>) {
-  if (status === "completed") return <CheckCircle2 className={`${size} text-emerald-500`} />
-  if (status === "in-progress") return <CircleDotDashed className={`${size} text-blue-500`} />
-  if (status === "need-help") return <CircleAlert className={`${size} text-amber-500`} />
-  if (status === "failed") return <CircleX className={`${size} text-rose-500`} />
+  if (status === "completed") return <CheckCircle2 className={`${size} text-ink-green`} />
+  if (status === "in-progress") return <CircleDotDashed className={`${size} text-ink-blue`} />
+  if (status === "need-help") return <CircleAlert className={`${size} text-ink-yellow`} />
+  if (status === "failed") return <CircleX className={`${size} text-destructive`} />
   return <Circle className={`${size} text-muted-foreground`} />
 }
 
 const STATUS_BADGE: Record<PlanStatus, string> = {
-  completed:     "bg-emerald-500/15 text-emerald-500",
-  "in-progress": "bg-blue-500/15 text-blue-500",
-  "need-help":   "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-  failed:        "bg-rose-500/15 text-rose-500",
+  completed:     "bg-shape-green/15 text-ink-green",
+  "in-progress": "bg-primary/15 text-ink-blue",
+  "need-help":   "bg-shape-yellow/15 text-ink-yellow",
+  failed:        "bg-destructive/15 text-destructive",
   pending:       "bg-muted text-muted-foreground",
 }
 

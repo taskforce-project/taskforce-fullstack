@@ -22,9 +22,9 @@ export function FeedbackBar({
   return (
     <div className={cn("flex items-center gap-0.5", className)}>
       <button type="button" onClick={copy} className={btn} aria-label="Copy">
-        {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+        {copied ? <Check className="size-3.5 text-ink-green" /> : <Copy className="size-3.5" />}
       </button>
-      <button type="button" onClick={() => send("up")} className={cn(btn, vote === "up" && "text-emerald-500")} aria-label="Helpful">
+      <button type="button" onClick={() => send("up")} className={cn(btn, vote === "up" && "text-ink-green")} aria-label="Helpful">
         <ThumbsUp className="size-3.5" />
       </button>
       <button type="button" onClick={() => send("down")} className={cn(btn, vote === "down" && "text-destructive")} aria-label="Not helpful">

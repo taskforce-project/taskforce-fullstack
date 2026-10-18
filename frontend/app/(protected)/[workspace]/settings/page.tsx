@@ -445,7 +445,7 @@ function AccountPanel() {
               variant="outline"
               onClick={handleRestore}
               disabled={restoring}
-              className="h-8 shrink-0 gap-2 border-amber-500/50 text-xs"
+              className="h-8 shrink-0 gap-2 border-shape-yellow/50 text-xs"
             >
               {restoring ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <RotateCcw className="size-3.5" aria-hidden />}
               Restore account
@@ -590,8 +590,8 @@ function AppearancePanel() {
                 className={cn(
                   "h-8 w-12 rounded",
                   opt === "light" && "bg-white border border-border",
-                  opt === "dark" && "bg-zinc-900",
-                  opt === "system" && "bg-gradient-to-r from-white to-zinc-900 border border-border"
+                  opt === "dark" && "bg-night",
+                  opt === "system" && "bg-gradient-to-r from-white to-night border border-border"
                 )}
               />
               <span className="text-xs font-medium text-foreground">{opt}</span>
@@ -1090,7 +1090,7 @@ function StatusPanel() {
       : health ? kind(health.status)
       : "DEGRADED"
   const dotClass = (s: Row["state"]) =>
-    s === "UP" ? "bg-emerald-500" : s === "DOWN" ? "bg-red-500" : s === "DEGRADED" ? "bg-amber-500" : "bg-muted-foreground/40"
+    s === "UP" ? "bg-shape-green" : s === "DOWN" ? "bg-shape-red" : s === "DEGRADED" ? "bg-shape-yellow" : "bg-muted-foreground/40"
 
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
@@ -1101,9 +1101,9 @@ function StatusPanel() {
 
       <div className={cn(
         "flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium",
-        overall === "UP" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
-          : overall === "DOWN" ? "border-red-500/30 bg-red-500/10 text-red-500"
-          : "border-amber-500/30 bg-amber-500/10 text-amber-500"
+        overall === "UP" ? "border-shape-green/30 bg-shape-green/10 text-ink-green"
+          : overall === "DOWN" ? "border-destructive/30 bg-destructive/10 text-destructive"
+          : "border-shape-yellow/30 bg-shape-yellow/10 text-ink-yellow"
       )}>
         {overall === "UP" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
         {overall === "CHECKING" ? "Checking service health…"
@@ -1236,11 +1236,11 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
               rel="noopener noreferrer"
               className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted/40"
             >
-              <Badge variant="outline" className={cn("h-4 px-1.5 text-[10px]", i.pullRequest ? "text-violet-400 border-violet-500/30" : "text-muted-foreground")}>
+              <Badge variant="outline" className={cn("h-4 px-1.5 text-[10px]", i.pullRequest ? "text-ink-pink border-shape-pink/30" : "text-muted-foreground")}>
                 {i.pullRequest ? "PR" : "Issue"} #{i.number}
               </Badge>
               <span className="flex-1 truncate text-foreground">{i.title}</span>
-              <span className={cn("text-[10px]", i.state === "open" ? "text-emerald-400" : "text-muted-foreground")}>{i.state}</span>
+              <span className={cn("text-[10px]", i.state === "open" ? "text-ink-green" : "text-muted-foreground")}>{i.state}</span>
             </a>
           ))}
         </div>
@@ -1374,7 +1374,7 @@ function IntegrationsPanel() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/20 bg-emerald-500/10">Connected</Badge>
+              <Badge variant="outline" className="text-xs text-ink-green border-shape-green/20 bg-shape-green/10">Connected</Badge>
               <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDisconnectGitHub}>
                 Disconnect
               </Button>
@@ -1399,7 +1399,7 @@ function IntegrationsPanel() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/20 bg-emerald-500/10">Connected</Badge>
+                <Badge variant="outline" className="text-xs text-ink-green border-shape-green/20 bg-shape-green/10">Connected</Badge>
                 <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDisconnectSlack}>
                   Disconnect
                 </Button>
@@ -1479,7 +1479,7 @@ function IntegrationsPanel() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {wh.lastStatus && (
-                      <Badge variant="outline" className={cn("text-xs", wh.lastStatus < 300 ? "text-emerald-400 border-emerald-500/20" : "text-destructive border-destructive/20")}>
+                      <Badge variant="outline" className={cn("text-xs", wh.lastStatus < 300 ? "text-ink-green border-shape-green/20" : "text-destructive border-destructive/20")}>
                         {wh.lastStatus}
                       </Badge>
                     )}
@@ -1669,7 +1669,7 @@ function UsagePanel() {
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className={cn("h-full rounded-full transition-[width] duration-500", pct >= 90 ? "bg-rose-500" : pct >= 70 ? "bg-amber-500" : "bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300")}
+                  className={cn("h-full rounded-full transition-[width] duration-500", pct >= 90 ? "bg-shape-red" : pct >= 70 ? "bg-shape-yellow" : "bg-primary")}
                   style={{ width: `${unlimited ? 4 : pct}%` }}
                 />
               </div>

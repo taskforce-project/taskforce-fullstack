@@ -33,8 +33,7 @@ export function TextShimmerWave({
     <motion.span
       className={cn(
         'relative inline-block [perspective:500px]',
-        '[--base-color:#a1a1aa] [--base-gradient-color:#000]',
-        'dark:[--base-color:#71717a] dark:[--base-gradient-color:#ffffff]',
+        '[--base-color:var(--subtle)] [--base-gradient-color:var(--foreground)]',
         className
       )}
       style={{ color: 'var(--base-color)' }}
