@@ -14,9 +14,6 @@ public class AiInsightResponse {
     /** Acronyme de l'agent fictif (ex: COO, CFO, CTO) */
     private String agent;
 
-    /** Couleur hex de l'agent pour l'UI */
-    private String agentColor;
-
     /** Catégorie : Operations, Finance, Product, Engineering */
     private String category;
 
@@ -33,8 +30,7 @@ public class AiInsightResponse {
     private String insight;
 
     /**
-     * Provenance : {@code generated} (le LLM a répondu) | {@code fallback} (repli déterministe) |
-     * {@code upgrade} (mur payant).
+     * Provenance : {@code generated} (le LLM a répondu) | {@code fallback} (repli déterministe).
      *
      * <p>Champ ajouté par {@code TF-INTEL-INSIGHTS}. Sans lui, le front était <b>incapable</b> de
      * distinguer un insight réel d'un repli — et comme l'appel LLM échouait systématiquement (clé Groq

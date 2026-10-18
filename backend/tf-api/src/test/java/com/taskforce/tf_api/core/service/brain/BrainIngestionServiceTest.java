@@ -92,7 +92,6 @@ class BrainIngestionServiceTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(service, "model", "test-model");
         // writeProjectNode cherche le dossier d'espace (refType=WORKSPACE) comme parent de containment.
         // Par defaut absent -> parentNodeId null (non regressif) ; lenient car tous les tests ne
         // passent pas par writeProjectNode, et les tests writeWorkspaceNode le re-stubent explicitement.
@@ -154,7 +153,7 @@ class BrainIngestionServiceTest {
         CycleFacts facts = service.collectCycleFacts(CYCLE_ID);
 
         assertThat(facts.delivered().get(0).assignee()).isEqualTo("Unassigned");
-        assertThat(facts.byType()).containsEntry("Sans type", 1);
+        assertThat(facts.byType()).containsEntry("No type", 1);
         assertThat(facts.pointsPlanned()).isZero();
     }
 
@@ -196,7 +195,7 @@ class BrainIngestionServiceTest {
     void should_return_synthesis_when_llm_available() throws Exception {
         when(llm.isConfigured()).thenReturn(true);
         passThroughMeter();
-        when(llm.chatCompletion(anyString(), anyString(), anyString(), anyBoolean(), eq("fast")))
+        when(llm.chatCompletion(anyString(), anyString(), anyBoolean(), eq("fast")))
             .thenReturn("### Lecture des chiffres\n- 75 % livrées");
 
         assertThat(service.synthesize(WS, facts(3, 1, 0))).contains("75 % livrées");
@@ -235,7 +234,7 @@ class BrainIngestionServiceTest {
     void should_treat_blank_llm_answer_as_missing() throws Exception {
         when(llm.isConfigured()).thenReturn(true);
         passThroughMeter();
-        when(llm.chatCompletion(anyString(), anyString(), anyString(), anyBoolean(), anyString()))
+        when(llm.chatCompletion(anyString(), anyString(), anyBoolean(), anyString()))
             .thenReturn("   ");
 
         assertThat(service.synthesize(WS, facts(3, 1, 0))).isNull();

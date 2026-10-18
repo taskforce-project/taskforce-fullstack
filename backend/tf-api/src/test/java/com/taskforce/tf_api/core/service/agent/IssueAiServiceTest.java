@@ -63,6 +63,8 @@ class IssueAiServiceTest {
     @Mock private LlmClient llm;
     @Spy  private ObjectMapper objectMapper = new ObjectMapper();
     @Mock private AiMeter aiMeter;
+    @Spy  private org.springframework.transaction.support.TransactionTemplate transactionTemplate =
+        new com.taskforce.tf_api.util.InlineTransactionTemplate();
     @InjectMocks private IssueAiService service;
 
     private final Workspace ws = Workspace.builder().id(5L).slug("acme").build();
@@ -72,7 +74,6 @@ class IssueAiServiceTest {
 
     @BeforeEach
     void setup() throws Exception {
-        ReflectionTestUtils.setField(service, "model", "test-model");
         when(access.resolveAndAuthorize("acme", 9L)).thenReturn(ws);
         when(issueRepository.findById(10L)).thenReturn(Optional.of(issue));
         when(search.retrieveRelevantScored(anyLong(), any(), anyInt())).thenReturn(List.of());
@@ -84,7 +85,7 @@ class IssueAiServiceTest {
 
     private void llmReturns(String json) {
         when(llm.isConfigured()).thenReturn(true);
-        when(llm.chatCompletion(any(), any(), any(), anyBoolean(), any())).thenReturn(json);
+        when(llm.chatCompletion(any(), any(), anyBoolean(), any())).thenReturn(json);
     }
 
     @Test
@@ -133,7 +134,7 @@ class IssueAiServiceTest {
     @DisplayName("LLM en échec → repli déterministe (jamais d'exception propagée)")
     void llm_throws_fallback() {
         when(llm.isConfigured()).thenReturn(true);
-        when(llm.chatCompletion(any(), any(), any(), anyBoolean(), any())).thenThrow(new RuntimeException("down"));
+        when(llm.chatCompletion(any(), any(), anyBoolean(), any())).thenThrow(new RuntimeException("down"));
 
         IssueSpecDraft draft = service.generateSpec("acme", 1L, 10L, 9L, false);
 

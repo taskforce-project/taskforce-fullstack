@@ -1,3 +1,3 @@
-"""TaskForce AI Service — AI Gateway (LLM local Ollama) + embeddings + smart-assign scoring."""
+"""TaskForce AI Service : passerelle vers un fournisseur d'IA compatible OpenAI (chat et embeddings)."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

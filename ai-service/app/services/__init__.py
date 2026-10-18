@@ -1,1 +1,1 @@
-"""Logique métier : embeddings, passerelle LLM (Ollama), scoring smart-assign."""
+"""Client du fournisseur d'IA et état de disponibilité."""

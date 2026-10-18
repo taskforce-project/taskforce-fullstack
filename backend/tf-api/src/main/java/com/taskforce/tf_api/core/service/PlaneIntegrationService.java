@@ -123,7 +123,7 @@ public class PlaneIntegrationService {
                     node.setMetadata(metadata);
                     node.setUpdatedBy(String.valueOf(userId));
                     nodeRepository.save(node);
-                    search.embedNode(node); // ré-indexe (contenu susceptible d'avoir changé)
+                    search.markForReindex(node.getId()); // contenu susceptible d'avoir changé : vecteur recalculé en tâche de fond
                     updated++;
                 }
             } else {

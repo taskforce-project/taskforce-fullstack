@@ -56,7 +56,7 @@ class FindIntegrationToolTest {
     void finds_available_not_connected() {
         when(catalogService.getCatalog(eq("acme"), eq(7L))).thenReturn(catalog());
         String out = tool().execute(Map.<String, Object>of("query", "stripe"), new AgentContext("acme", 1L, 7L));
-        assertThat(out).contains("Stripe").contains("NON connecté").contains("Réglages");
+        assertThat(out).contains("Stripe").contains("NOT connected").contains("Settings");
     }
 
     @Test
@@ -72,6 +72,6 @@ class FindIntegrationToolTest {
     void no_match_is_honest() {
         when(catalogService.getCatalog(eq("acme"), eq(7L))).thenReturn(catalog());
         String out = tool().execute(Map.<String, Object>of("query", "salesforce"), new AgentContext("acme", 1L, 7L));
-        assertThat(out).contains("Aucune intégration");
+        assertThat(out).contains("No integration matches");
     }
 }

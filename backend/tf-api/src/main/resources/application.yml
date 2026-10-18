@@ -72,6 +72,14 @@ server:
 ai:
   quota:
     monthly-tokens-per-account: ${AI_MONTHLY_TOKENS_PER_ACCOUNT:0}
+  # ai-service : passerelle vers le fournisseur d'IA (Ollama par défaut, ou toute API compatible OpenAI), jointe
+  # sur le réseau interne. Le fournisseur et les modèles se règlent côté ai-service (AI_BASE_URL, AI_MODEL...).
+  service:
+    url: ${AI_SERVICE_URL:http://ai-service:8000}
+    # Secret partagé avec l'ai-service : sans lui, l'IA est coupée (l'ai-service refuse tout appel).
+    token: ${AI_SERVICE_TOKEN:}
+    # Délai de lecture d'une réponse du modèle : au-dessus de AI_TIMEOUT de l'ai-service (120 s par défaut).
+    read-timeout-ms: ${AI_SERVICE_READ_TIMEOUT_MS:150000}
 
 # Actuator Configuration
 management:

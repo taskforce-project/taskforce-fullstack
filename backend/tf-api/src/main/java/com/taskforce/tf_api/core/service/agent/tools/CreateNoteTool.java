@@ -27,21 +27,21 @@ public class CreateNoteTool implements AgentTool {
     @Override public String name() { return "create_note"; }
 
     @Override public String description() {
-        return "Crée une note dans le Brain OS du workspace. Choisir un domaine (PROJET, PRODUIT, "
+        return "Creates a note in the Brain OS of the workspace. Pick a domain (PROJET, PRODUIT, "
             + "ARCHITECTURE, ENGINEERING, API, INFRA, SECURITE, OPERATIONS, AUDITS, RUNBOOKS, PCA_PRA, "
-            + "DECISIONS, ROADMAP, DESIGN, UTILISATEUR, HISTORIQUE) et un type (ADR, DECISION, RUNBOOK, "
-            + "SOP, FINDING, DOC, SPEC, NOTE). Utiliser [[Titre]] pour lier et #tags pour classer.";
+            + "DECISIONS, ROADMAP, DESIGN, UTILISATEUR, HISTORIQUE) and a type (ADR, DECISION, RUNBOOK, "
+            + "SOP, FINDING, DOC, SPEC, NOTE). Use [[Title]] to link notes and #tags to classify them.";
     }
 
     @Override public Map<String, Object> parametersSchema() {
         return Map.of(
             "type", "object",
             "properties", Map.of(
-                "domain",  Map.of("type", "string", "description", "Domaine (ex. DECISIONS)"),
-                "type",    Map.of("type", "string", "description", "Type de note (ex. DECISION)"),
-                "title",   Map.of("type", "string", "description", "Titre court et clair"),
-                "content", Map.of("type", "string", "description", "Contenu markdown"),
-                "tags",    Map.of("type", "array", "items", Map.of("type", "string"), "description", "Tags optionnels")
+                "domain",  Map.of("type", "string", "description", "Domain (e.g. DECISIONS)"),
+                "type",    Map.of("type", "string", "description", "Note type (e.g. DECISION)"),
+                "title",   Map.of("type", "string", "description", "Short, clear title"),
+                "content", Map.of("type", "string", "description", "Markdown content"),
+                "tags",    Map.of("type", "array", "items", Map.of("type", "string"), "description", "Optional tags")
             ),
             "required", List.of("domain", "type", "title")
         );
@@ -59,6 +59,6 @@ public class CreateNoteTool implements AgentTool {
             req.setTags(tags);
         }
         KnowledgeNodeResponse node = knowledgeService.createNode(ctx.slug(), ctx.userId(), req);
-        return "Note créée : « " + node.getTitle() + " » dans " + node.getDomain() + " (id " + node.getId() + ").";
+        return "Note created: \"" + node.getTitle() + "\" in " + node.getDomain() + " (id " + node.getId() + ").";
     }
 }

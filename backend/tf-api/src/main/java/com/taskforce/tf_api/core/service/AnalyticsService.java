@@ -9,7 +9,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,9 +63,6 @@ public class AnalyticsService {
     private final UserRepository             userRepository;
     private final JdbcTemplate               jdbcTemplate;
     private final ProjectVisibilityGuard     visibilityGuard;
-
-    @Value("${ai.model.assistant:gateway-default}")
-    private String assistantModel;
 
     /** Résout le workspace par slug ET vérifie que l'appelant en est membre (RBAC, PROD-3.2). */
     private Workspace requireWorkspaceMember(String slug, Long userId) {
@@ -332,10 +328,10 @@ public class AnalyticsService {
     }
 
     // -------------------------------------------------------------------------
-    // AI Insights (Groq)
+    // AI Insights
     // -------------------------------------------------------------------------
 
-    // Pas de @Transactional englobante : lectures indépendantes + appel Groq.
+    // Pas de @Transactional englobante : lectures indépendantes + appel au modèle.
     // Une tx readOnly se faisait marquer rollback-only par une écriture interne → 500 au commit (FIX-006).
     //
     // Cache (PERF-CACHE-01) : générer les insights = appel LLM COÛTEUX sur des métriques peu volatiles.
@@ -385,7 +381,7 @@ public class AnalyticsService {
             "and include a concrete recommendation. " +
             "Respond ONLY with valid JSON in this exact schema:\n" +
             "{\"insights\":[{" +
-            "\"agent\":\"COO\",\"agentColor\":\"#0a84ff\"," +
+            "\"agent\":\"COO\"," +
             "\"category\":\"Operations\",\"urgency\":\"high\"," +
             "\"confidence\":85,\"action\":\"Adjust sprint scope\"," +
             "\"insight\":\"...\"" +
@@ -395,7 +391,7 @@ public class AnalyticsService {
         try {
             // Métré : gate quota AVANT l'appel (au-dessus du plafond → repli, aucun token brûlé) + comptage réel.
             String raw = aiMeter.metered(ws.getId(),
-                () -> llm.chatCompletion(assistantModel, systemPrompt, context, true, "fast"));
+                () -> llm.chatCompletion(systemPrompt, context, true, "fast"));
             JsonNode root = objectMapper.readTree(raw);
             JsonNode arr  = root.path("insights");
             if (!arr.isArray() || arr.isEmpty()) {
@@ -407,7 +403,6 @@ public class AnalyticsService {
             for (JsonNode n : arr) {
                 result.add(AiInsightResponse.builder()
                     .agent(n.path("agent").asText("AI"))
-                    .agentColor(n.path("agentColor").asText("#a78bfa"))
                     .category(n.path("category").asText("General"))
                     .urgency(n.path("urgency").asText("medium"))
                     .confidence(Math.max(50, Math.min(95, n.path("confidence").asInt(70))))
@@ -445,7 +440,7 @@ public class AnalyticsService {
     private List<AiInsightResponse> fallbackInsights() {
         return List.of(
             AiInsightResponse.builder()
-                .agent("COO").agentColor("#0a84ff").category("Operations")
+                .agent("COO").category("Operations")
                 .urgency("medium").confidence(70)
                 .action("Review open issues").insight("Check open issues and team workload to optimize sprint delivery.")
                 .mode("fallback")

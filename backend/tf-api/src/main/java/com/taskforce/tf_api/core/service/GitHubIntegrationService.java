@@ -430,7 +430,7 @@ public class GitHubIntegrationService {
                     node.setMetadata(metadata);
                     node.setUpdatedBy(String.valueOf(userId));
                     nodeRepository.save(node);
-                    brainSearch.embedNode(node); // re-indexe (l'issue a pu changer)
+                    brainSearch.markForReindex(node.getId()); // l'issue a pu changer : vecteur recalculé en tâche de fond
                     updated++;
                 }
             } else {

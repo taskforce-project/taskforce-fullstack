@@ -27,18 +27,18 @@ public class CreateProjectTool implements AgentTool {
     @Override public String name() { return "create_project"; }
 
     @Override public String description() {
-        return "Crée un projet TaskForce. Requiert name. identifier (préfixe d'issue, 2-10 car., ex. WEB) "
-            + "est dérivé du nom si absent. Optionnel : description. Utile notamment pour accueillir un "
-            + "projet importé d'un outil externe.";
+        return "Creates a TaskForce project. Requires name. identifier (issue prefix, 2 to 10 characters, e.g. WEB) "
+            + "is derived from the name when missing. Optional: description. Useful, for example, to host a "
+            + "project imported from an external tool.";
     }
 
     @Override public Map<String, Object> parametersSchema() {
         return Map.of(
             "type", "object",
             "properties", Map.of(
-                "name",        Map.of("type", "string", "description", "Nom du projet"),
-                "identifier",  Map.of("type", "string", "description", "Préfixe d'issue 2-10 car. (optionnel, dérivé du nom sinon)"),
-                "description", Map.of("type", "string", "description", "Description (optionnel)")
+                "name",        Map.of("type", "string", "description", "Project name"),
+                "identifier",  Map.of("type", "string", "description", "Issue prefix, 2 to 10 characters (optional, derived from the name otherwise)"),
+                "description", Map.of("type", "string", "description", "Description (optional)")
             ),
             "required", List.of("name")
         );
@@ -46,7 +46,7 @@ public class CreateProjectTool implements AgentTool {
 
     @Override public String execute(Map<String, Object> args, AgentContext ctx) {
         String name = args.get("name") != null ? String.valueOf(args.get("name")).trim() : "";
-        if (name.isEmpty()) return "name manquant : impossible de créer un projet sans nom.";
+        if (name.isEmpty()) return "name is missing: a project needs a name.";
 
         CreateProjectRequest req = new CreateProjectRequest();
         req.setName(name);
@@ -55,8 +55,8 @@ public class CreateProjectTool implements AgentTool {
         if (args.get("description") != null) req.setDescription(String.valueOf(args.get("description")));
 
         ProjectResponse project = projectService.createProject(ctx.slug(), ctx.userId(), req);
-        return "Projet créé dans TaskForce : " + project.getIdentifier() + " « " + project.getName()
-            + " » (id " + project.getId() + ").";
+        return "Project created in TaskForce: " + project.getIdentifier() + " \"" + project.getName()
+            + "\" (id " + project.getId() + ").";
     }
 
     /** Préfixe d'issue depuis le nom : alphanumérique en majuscules, 2-10 car. ; « PRJ » en dernier recours. */
