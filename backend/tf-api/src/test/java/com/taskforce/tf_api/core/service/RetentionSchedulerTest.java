@@ -17,6 +17,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.taskforce.tf_api.core.repository.McpOAuthStateRepository;
 import com.taskforce.tf_api.core.repository.OAuthStateRepository;
+import com.taskforce.tf_api.core.repository.WebhookDeliveryRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceInvitationRepository;
 import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
 
@@ -44,6 +45,7 @@ class RetentionSchedulerTest {
     @Mock private WorkspaceInvitationRepository invitationRepository;
     @Mock private McpOAuthStateRepository       mcpOauthStateRepository;
     @Mock private WorkspaceMcpService           workspaceMcp;
+    @Mock private WebhookDeliveryRepository     webhookDeliveryRepository;
 
     @InjectMocks private RetentionScheduler scheduler;
 
@@ -69,6 +71,7 @@ class RetentionSchedulerTest {
         verify(mcpOauthStateRepository).deleteByExpiresAtBefore(any());
         verify(invitationRepository).deleteStaleInvitations(any());
         verify(workspaceMcp).purgeConnectionsWithoutServer();
+        verify(webhookDeliveryRepository).deleteFinishedBefore(any());
     }
 
     /**
@@ -77,7 +80,7 @@ class RetentionSchedulerTest {
      * ce job que le lendemain, en repartant du même échec).
      */
     @ParameterizedTest(name = "un échec sur « {0} » n''empêche pas les autres purges")
-    @ValueSource(strings = {"otp", "oauth", "mcp-oauth", "invitations", "credentials"})
+    @ValueSource(strings = {"otp", "oauth", "mcp-oauth", "invitations", "credentials", "webhooks"})
     @DisplayName("isole l'échec d'une purge")
     void isolatesFailures(String failing) {
         withGracePeriod();
@@ -89,6 +92,7 @@ class RetentionSchedulerTest {
             case "mcp-oauth"   -> when(mcpOauthStateRepository.deleteByExpiresAtBefore(any())).thenThrow(boom);
             case "invitations" -> when(invitationRepository.deleteStaleInvitations(any())).thenThrow(boom);
             case "credentials" -> when(workspaceMcp.purgeConnectionsWithoutServer()).thenThrow(boom);
+            case "webhooks"    -> when(webhookDeliveryRepository.deleteFinishedBefore(any())).thenThrow(boom);
             default            -> throw new IllegalArgumentException(failing);
         }
 

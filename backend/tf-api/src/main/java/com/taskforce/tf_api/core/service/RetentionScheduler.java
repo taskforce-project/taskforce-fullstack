@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import com.taskforce.tf_api.core.repository.McpOAuthStateRepository;
 import com.taskforce.tf_api.core.repository.OAuthStateRepository;
+import com.taskforce.tf_api.core.repository.WebhookDeliveryRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceInvitationRepository;
 import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
 
@@ -38,6 +39,8 @@ import lombok.extern.slf4j.Slf4j;
  *   <li><b>Invitations sans suite</b> — l'e-mail d'une personne qui n'est jamais devenue
  *       utilisatrice ; c'est la donnée la plus exposée des trois.</li>
  * </ul>
+ * Les <b>envois de webhook</b> terminés (livrés ou abandonnés) sont gardés 30 jours pour l'historique de l'écran
+ * des webhooks : leur corps reprend le contenu des issues et des commentaires.
  * S'y ajoutent les <b>identifiants sans serveur MCP</b> (minimisation, art. 5.1.c) : clés saisies dans le
  * formulaire générique d'intégrations retiré au lot 6, qu'aucun code ne lisait (cf.
  * {@link WorkspaceMcpService#purgeConnectionsWithoutServer()}).
@@ -60,6 +63,7 @@ public class RetentionScheduler {
     private final WorkspaceInvitationRepository invitationRepository;
     private final McpOAuthStateRepository       mcpOauthStateRepository;
     private final WorkspaceMcpService           workspaceMcp;
+    private final WebhookDeliveryRepository     webhookDeliveryRepository;
 
     /**
      * Délai de grâce après expiration d'une invitation, avant purge. Non nul pour qu'un
@@ -67,6 +71,10 @@ public class RetentionScheduler {
      */
     @Value("${taskforce.retention.invitation-grace-days:30}")
     private int invitationGraceDays;
+
+    /** Durée de conservation d'un envoi de webhook terminé (historique de l'écran des webhooks). */
+    @Value("${taskforce.retention.webhook-delivery-days:30}")
+    private int webhookDeliveryDays;
 
     /**
      * Tous les jours à 03:30 (fuseau serveur, UTC en dev) — décalé des jobs d'alerte de 08:00 et
@@ -84,9 +92,11 @@ public class RetentionScheduler {
         int mcpStates   = purge("expired MCP OAuth states",   this::purgeMcpOauthStates);
         int invitations = purge("unanswered invitations",     this::purgeStaleInvitations);
         int credentials = purge("credentials without an MCP server", workspaceMcp::purgeConnectionsWithoutServer);
+        int deliveries  = purge("finished webhook deliveries", this::purgeWebhookDeliveries);
 
         log.info("Rétention appliquée : {} OTP, {} states OAuth, {} states OAuth MCP, {} invitations, "
-            + "{} identifiants sans serveur MCP supprimés", otps, states, mcpStates, invitations, credentials);
+            + "{} identifiants sans serveur MCP, {} envois de webhook supprimés",
+            otps, states, mcpStates, invitations, credentials, deliveries);
     }
 
     private int purgeOauthStates() {
@@ -95,6 +105,10 @@ public class RetentionScheduler {
 
     private int purgeMcpOauthStates() {
         return (int) mcpOauthStateRepository.deleteByExpiresAtBefore(LocalDateTime.now());
+    }
+
+    private int purgeWebhookDeliveries() {
+        return webhookDeliveryRepository.deleteFinishedBefore(LocalDateTime.now().minusDays(webhookDeliveryDays));
     }
 
     private int purgeStaleInvitations() {
