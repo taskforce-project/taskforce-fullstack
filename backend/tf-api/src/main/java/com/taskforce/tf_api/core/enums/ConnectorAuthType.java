@@ -1,20 +1,17 @@
 package com.taskforce.tf_api.core.enums;
 
 /**
- * Mode d'authentification d'un connecteur — pilote le formulaire de connexion côté UI.
+ * Mode de connexion d'un outil du catalogue d'intégrations.
  *
  * <ul>
- *   <li>{@code OAUTH2} : flux d'autorisation (redirection) — ex. GitHub, Slack, Google.</li>
- *   <li>{@code API_KEY} : une clé unique — ex. Plane, Stripe, Resend.</li>
- *   <li>{@code TOKEN} : un token personnel — ex. Vercel, Figma, Notion (internal).</li>
- *   <li>{@code CONFIG} : plusieurs champs — ex. AWS (key/secret/region), SMTP, Keycloak.</li>
- *   <li>{@code NONE} : sans secret (webhook entrant, etc.).</li>
+ *   <li>{@code OAUTH2} : redirection vers le fournisseur, rien à saisir (GitHub, Slack).</li>
+ *   <li>{@code API_KEY} : une clé à coller (Plane).</li>
+ *   <li>{@code MCP} : le serveur MCP de l'outil, par OAuth en un clic, jeton ou en-tête (préréglages et serveurs
+ *       personnalisés, ADR-020).</li>
  * </ul>
  */
 public enum ConnectorAuthType {
     OAUTH2,
     API_KEY,
-    TOKEN,
-    CONFIG,
-    NONE
+    MCP
 }

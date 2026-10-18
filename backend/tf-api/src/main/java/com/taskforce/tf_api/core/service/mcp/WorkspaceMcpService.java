@@ -57,6 +57,9 @@ public class WorkspaceMcpService {
     /** Statut d'un serveur MCP connecté (pour l'UI de gestion des connexions). */
     public record McpServerStatus(String connectorKey, String url, boolean reachable, List<String> tools, String error) {}
 
+    /** Serveur MCP enregistré sur le workspace, lu sans appel réseau (pour le catalogue). */
+    public record ConnectedServer(String connectorKey, String url) {}
+
     /**
      * Outil MCP <b>riche</b> (schéma d'arguments inclus) — alimente la console d'actions (TF-MCP-06).
      * {@code inputSchema} = JSON Schema brut du serveur (rendu en formulaire côté front) ; {@code
@@ -92,6 +95,17 @@ public class WorkspaceMcpService {
         List<AgentTool> tools = discover(wsId);
         cache.put(wsId, new Cached(now + cacheTtlMs, tools));
         return tools;
+    }
+
+    /** Serveurs MCP enregistrés sur le workspace (connecteurs portant un {@code mcpUrl}), sans les sonder. */
+    @Transactional(readOnly = true)
+    public List<ConnectedServer> connectedServers(Long workspaceId) {
+        List<ConnectedServer> out = new ArrayList<>();
+        for (ConnectorConnection conn : repository.findByWorkspaceId(workspaceId)) {
+            String url = readConfig(conn.getConfig()).getOrDefault(CONFIG_URL, "").trim();
+            if (!url.isEmpty()) out.add(new ConnectedServer(conn.getConnectorKey(), url));
+        }
+        return out;
     }
 
     /** Invalide le cache d'un workspace (après (dé)connexion d'un serveur MCP). */

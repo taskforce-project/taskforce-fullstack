@@ -330,7 +330,8 @@ public class AgentService {
           .append("Never create anything the user did not ask for. ")
           .append("If you need data from an external system you have no tool for, call find_integration: when ")
           .append("the integration exists but is not connected, invite the user to connect it (Settings > ")
-          .append("Integrations); when it is not in the catalog, say so plainly. Never make data up. ");
+          .append("Integrations); when it is not in the catalog, say so plainly and add that a tool with an MCP ")
+          .append("server can still be connected there. Never make data up. ");
         if (!external.isEmpty()) {
             String names = external.stream().map(AgentTool::name).collect(Collectors.joining(", "));
             sb.append("External tools are connected (MCP servers): ").append(names).append(". ")

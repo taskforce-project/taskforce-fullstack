@@ -3,12 +3,11 @@ package com.taskforce.tf_api.core.dto.response;
 import java.util.List;
 
 /**
- * Le catalogue d'intégrations d'un workspace : le « pool » d'outils groupé par catégorie, avec pour
- * chaque outil son statut de connexion. Pilote l'UI générique des intégrations (pas d'écran par outil).
+ * Le catalogue d'intégrations d'un workspace, groupé par catégorie, avec pour chaque outil son état de
+ * connexion.
  */
 public record IntegrationCatalogResponse(
     int total,
-    int available,
     int connected,
     List<CategoryGroup> categories
 ) {
@@ -20,7 +19,6 @@ public record IntegrationCatalogResponse(
         String name,
         String category,
         String authType,
-        String status,       // AVAILABLE | PLANNED
         boolean connected,
         List<ConnectorField> fields,
         List<String> capabilities,
@@ -28,7 +26,7 @@ public record IntegrationCatalogResponse(
         String docsUrl,
         String setupHint,
         String websiteUrl,
-        /** URL d'un serveur MCP distant hébergé, pré-remplie (éditable) dans le dialog Connect. Null sinon. */
+        /** URL du serveur MCP hébergé officiel, préremplie (modifiable) dans le dialogue de connexion. */
         String mcpSuggestedUrl
     ) {}
 }

@@ -92,6 +92,18 @@ class WorkspaceMcpServiceTest {
     }
 
     @Test
+    @DisplayName("connectedServers : les connecteurs portant un mcpUrl, sans aucun appel réseau")
+    void connected_servers_lists_mcp_rows_only() {
+        ConnectorConnection plain = ConnectorConnection.builder()
+            .connectorKey("stripe").config("{\"apiKey\":\"sk_test\"}").build();
+        when(repository.findByWorkspaceId(1L)).thenReturn(List.of(mcpConnector(), plain));
+
+        assertThat(service.connectedServers(1L))
+            .containsExactly(new WorkspaceMcpService.ConnectedServer("linear", "http://x/mcp"));
+        verify(client, never()).initialize(any());
+    }
+
+    @Test
     @DisplayName("cache TTL : deux appels → un seul handshake serveur")
     void caches_within_ttl() throws Exception {
         when(repository.findByWorkspaceId(1L)).thenReturn(List.of(mcpConnector()));

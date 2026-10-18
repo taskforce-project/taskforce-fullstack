@@ -27,7 +27,6 @@ import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.GitHubIntegrationService;
 import com.taskforce.tf_api.core.service.PlaneIntegrationService;
 import com.taskforce.tf_api.core.service.SlackIntegrationService;
-import com.taskforce.tf_api.core.service.integration.ConnectorConnectionService;
 import com.taskforce.tf_api.core.service.integration.IntegrationCatalogService;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
@@ -64,7 +63,6 @@ class IntegrationControllerWebMvcTest {
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository;
     @MockitoBean private PlaneIntegrationService planeService;
     @MockitoBean private IntegrationCatalogService catalogService;
-    @MockitoBean private ConnectorConnectionService connectorConnectionService;
     @MockitoBean private AuthorizationService authorizationService;
 
     @BeforeEach
