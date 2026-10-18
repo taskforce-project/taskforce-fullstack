@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -15,6 +17,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthenticationToken;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
@@ -47,6 +51,13 @@ public class SecurityConfig {
      */
     @Autowired
     private ObjectProvider<PostAuthenticationFilter> postAuthenticationFilters;
+
+    /**
+     * Bearers qui ne sont pas des JWT de Keycloak (jeton personnel, OSS-5.1), essayés avant le décodeur JWT
+     * (cf. {@link BearerTokenAuthenticator}). Vide : seul le décodeur JWT authentifie.
+     */
+    @Autowired
+    private ObjectProvider<BearerTokenAuthenticator> bearerTokenAuthenticators;
 
     /**
      * JwtDecoder RS256 adossé au JWK Set de Keycloak : valide les access tokens <b>émis par
@@ -179,10 +190,11 @@ public class SecurityConfig {
     @Order(2)
     public SecurityFilterChain protectedEndpointsFilterChain(HttpSecurity http) throws Exception {
         applySecurityHeaders(http);
+        AuthenticationManager bearerManager = bearerAuthenticationManager();
         http
             .cors(Customizer.withDefaults())
             .authorizeHttpRequests(authz -> authz.anyRequest().authenticated())
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder())))
+            .oauth2ResourceServer(oauth2 -> oauth2.authenticationManagerResolver(request -> bearerManager))
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
@@ -193,5 +205,24 @@ public class SecurityConfig {
 
         return http.build();
     }
-}
 
+    /**
+     * Authentifie le bearer de la chaîne protégée : un authentificateur qui reconnaît la forme du jeton le prend
+     * (jeton personnel), sinon le décodeur JWT de Keycloak, comme avant. Le jeton personnel ne sort jamais de
+     * cette chaîne : la chaîne des invitations et les routes publiques ne connaissent que le JWT.
+     */
+    private AuthenticationManager bearerAuthenticationManager() {
+        AuthenticationManager jwtManager = new ProviderManager(new JwtAuthenticationProvider(jwtDecoder()));
+        return authentication -> {
+            if (authentication instanceof BearerTokenAuthenticationToken bearer) {
+                String token = bearer.getToken();
+                for (BearerTokenAuthenticator authenticator : bearerTokenAuthenticators.orderedStream().toList()) {
+                    if (authenticator.supports(token)) {
+                        return authenticator.authenticate(token);
+                    }
+                }
+            }
+            return jwtManager.authenticate(authentication);
+        };
+    }
+}
