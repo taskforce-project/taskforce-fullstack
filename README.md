@@ -90,8 +90,8 @@ taskforce-fullstack/
 ├─ frontend/         App Next.js 16 (React 19, TypeScript)
 ├─ landing-page/     Site marketing Astro
 ├─ ai-service/       Passerelle IA (FastAPI) -> runtime Ollama local
-├─ taskforce-mcp/    Serveur Model Context Protocol
-├─ taskforce-runner/ Runner local de délégation (Claude Code sur ton poste, prototype)
+├─ taskforce-runner/ Runner local de délégation (Claude Code sur ton poste)
+├─ taskforce-plugin/ Plugin Claude Code (mode interactif, serveur MCP de l'instance)
 ├─ keycloak/         Identité & accès
 ├─ nginx/            Reverse proxy / TLS
 ├─ observability/    OpenTelemetry + SigNoz

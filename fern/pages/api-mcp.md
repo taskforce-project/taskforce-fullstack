@@ -9,8 +9,8 @@ pour **piloter TaskForce depuis un agent** — que vous branchiez le serveur MCP
 construisiez le vôtre.
 
 Toutes les routes ci-dessous suivent les [conventions](/api/api-conventions) (préfixe `/api`, enveloppe
-`ApiResponse`) et exigent un jeton [Bearer](/api/api-authentification) — typiquement un **compte de
-service** dédié à l'agent.
+`ApiResponse`) et exigent un jeton [Bearer](/api/api-authentification) de session. Un jeton personnel ne sert qu'au serveur MCP
+ci-dessous.
 
 ## Le principe : contextualiser → décider → agir
 
@@ -30,26 +30,39 @@ Un bon agent ne fonce pas : il **se renseigne** avant d'écrire. Le fil recomman
   </Step>
 </Steps>
 
-## Le serveur MCP de TaskForce (10 outils)
+## Le serveur MCP de l'instance (12 outils)
 
-Le serveur `taskforce-mcp` expose **10 outils** (7 lecture, 3 écriture), chacun câblé sur une route :
+Chaque workspace a son serveur MCP, servi par l'instance elle-même en HTTP (transport « Streamable HTTP », réponses
+JSON, sans état) : `POST /api/workspaces/{slug}/mcp`. Claude Code s'y branche avec un **jeton personnel**, créé dans
+**Settings > Agents > Claude Code in your terminal**. Le jeton agit au nom de la personne qui l'a créé et ne sert
+qu'à ce serveur : les autres routes de l'API le refusent.
 
-| Outil MCP | Route appelée | Rôle |
+```bash
+claude mcp add --transport http taskforce https://<instance>/api/workspaces/<slug>/mcp --header "Authorization: Bearer tfp_..."
+```
+
+| Outil MCP | Équivalent REST | Rôle |
 | --- | --- | --- |
-| `taskforce_ask_cortex` | `POST /workspaces/{slug}/assistant` | Interroger Cortex (RAG sur le Brain OS) + sources |
-| `taskforce_workspace_kpis` | `GET /workspaces/{slug}/analytics/kpis` | Santé du workspace (vélocité, en cours, à risque) |
-| `taskforce_list_projects` | `GET /workspaces/{slug}/projects` | Lister les opérations |
-| `taskforce_list_my_issues` | `GET /workspaces/{slug}/my-issues` | Les tâches assignées au porteur du jeton |
-| `taskforce_brain_search` | `POST /workspaces/{slug}/brain/search` | Recherche sémantique dans le Brain OS |
-| `taskforce_list_issues` | `GET /workspaces/{slug}/projects/{projectId}/issues` | Lister les tâches d'une opération |
-| `taskforce_list_issue_statuses` | `GET .../projects/{projectId}/issues/statuses` | Résoudre un `statusId` |
-| `taskforce_create_issue` | `POST .../projects/{projectId}/issues` | **Créer** une tâche |
-| `taskforce_update_issue` | `PATCH .../projects/{projectId}/issues/{issueId}` | **Mettre à jour** (statut, assigné, priorité…) |
-| `taskforce_smart_assign` | `POST .../issues/{issueId}/smart-assign` | Recommander un assigné (à appliquer via update) |
+| `list_projects` | `GET /workspaces/{slug}/projects` | Lister les projets |
+| `list_issues` | `GET .../projects/{projectId}/issues` | Lister les issues d'un projet (50 par défaut) |
+| `get_issue` | `GET .../projects/{projectId}/issues/{issueId}` | Une issue et son fil de commentaires |
+| `list_issue_statuses` | `GET .../projects/{projectId}/issues/statuses` | Résoudre un `statusId` |
+| `list_my_issues` | `GET /workspaces/{slug}/my-issues` | Les issues assignées à la personne |
+| `workspace_kpis` | `GET /workspaces/{slug}/analytics/kpis` | Santé du workspace |
+| `brain_search` | `POST /workspaces/{slug}/brain/search` | Recherche dans le Brain OS |
+| `create_issue` | `POST .../projects/{projectId}/issues` | **Créer** une issue |
+| `update_issue` | `PATCH .../projects/{projectId}/issues/{issueId}` | **Mettre à jour** (statut, assigné, priorité...) |
+| `add_comment` | `POST .../issues/{issueId}/comments` | **Commenter** une issue |
+| `smart_assign` | `POST .../issues/{issueId}/smart-assign` | Recommander un assigné (à appliquer avec `update_issue`) |
+| `ask_cortex` | `POST /workspaces/{slug}/assistant` | Interroger Cortex |
+
+Chaque outil appelle le même service que sa route REST, avec les droits de la personne. Pour un agent lancé par le
+runner local, chaque appel est en plus jugé par la portée de la session déléguée sur son équivalent REST : lecture
+du workspace, écriture sur les issues du projet du run, jamais de suppression.
 
 ## Les routes utiles à un agent
 
-Au-delà des 10 outils fournis, voici l'ensemble des routes qu'un agent voudra mobiliser, par intention.
+Au-delà des 12 outils du serveur MCP, voici l'ensemble des routes qu'un agent voudra mobiliser, par intention.
 
 ### 1 · Se renseigner (lecture)
 
