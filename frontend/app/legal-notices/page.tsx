@@ -46,7 +46,7 @@ export default function LegalNoticesPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">3. Description of service</h2>
             <p>
-              TaskForce is a project management SaaS platform providing issue tracking, sprint cycles, team collaboration, document pages, and AI-assisted features. Service is provided &ldquo;as is&rdquo; with no uptime guarantee under the free plan. Pro and Enterprise plans are subject to a separate SLA.
+              TaskForce is open-source project management software (AGPL-3.0) providing issue tracking, cycles, team collaboration, document pages, and AI-assisted features. This instance is provided &ldquo;as is&rdquo;, free of charge, with no uptime guarantee.
             </p>
           </section>
 

@@ -58,7 +58,6 @@ export const CONSTANTS_EN = {
     // Authentication - Register
     register: {
       title: "Create your account",
-      subtitle: "Start your free trial today",
       alreadyHaveAccount: "Already have an account?",
       signInLink: "Sign in",
       
@@ -120,19 +119,6 @@ export const CONSTANTS_EN = {
           manufacturing: "Manufacturing",
           other: "Other",
         },
-      },
-
-      // Step 3: Confirmation
-      step3: {
-        title: "You're all set!",
-        subtitle: "Review your information and start your free trial",
-        reviewTitle: "Review your details",
-        personalInfo: "Personal information",
-        organizationInfo: "Organization",
-        freeTrialTitle: "Free trial included",
-        freeTrialDescription: "Start with a 14-day free trial. No credit card required.",
-        createAccountButton: "Create account",
-        startTrialButton: "Start free trial",
       },
 
       // Progress Indicator
@@ -525,33 +511,6 @@ export const CONSTANTS_EN = {
     deleteAccountDesc: "Permanently delete your account and all data. This cannot be undone.",
     saveChanges: "Save changes",
     saved: "Saved!",
-  },
-
-  help: {
-    title: "Help & Docs",
-    subtitle: "Find answers, guides, and resources.",
-    searchPlaceholder: "Search docs, guides, FAQs…",
-    categories: "Categories",
-    gettingStarted: "Getting Started",
-    gettingStartedDesc: "Set up your workspace, invite your team, create your first project.",
-    projects: "Projects & Issues",
-    projectsDesc: "Learn how to organize work with projects, issues, cycles, and backlogs.",
-    integrations: "Integrations",
-    integrationsDesc: "Connect Taskforce with GitHub, Slack, Jira, and more.",
-    security: "Security & Permissions",
-    securityDesc: "Manage roles, SSO, audit logs, and data retention policies.",
-    contactSupport: "Contact support",
-    contactSupportDesc: "Can't find what you're looking for? Our team is here to help.",
-    openChat: "Open chat",
-    sendEmail: "Send email",
-    popularArticles: "Popular articles",
-    articles: {
-      a1: "How to create your first issue",
-      a2: "Setting up cycles and sprints",
-      a3: "Using the kanban board",
-      a4: "Inviting team members",
-      a5: "Configuring notifications",
-    },
   },
 
   // App shell - footer, top bar, workspace switcher (rendered on every authenticated screen).

@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useId, useState } from "react"
-import Link from "next/link"
 import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts"
 
 import { AreaGradient, chartBaseline } from "@/components/ui/sparkline"
@@ -19,7 +18,6 @@ export function ThroughputCard({ slug, card, globalRange, refreshToken }: Dashbo
   const [points, setPoints] = useState<ThroughputPoint[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const [gated, setGated] = useState(false)
   const [retry, setRetry] = useState(0)
 
   const weekly = card.timeRange === "8w"
@@ -31,18 +29,14 @@ export function ThroughputCard({ slug, card, globalRange, refreshToken }: Dashbo
     let alive = true
     setLoading(true)
     setError(false)
-    setGated(false)
     getAnalyticsThroughput(slug, null, bucket)
       .then((d) => {
         if (alive) setPoints(d)
       })
-      .catch((e: unknown) => {
+      .catch(() => {
         if (!alive) return
         setPoints([])
-        // 409 = mur de plan (FREE) - à distinguer d'un vrai manque de données.
-        const status = (e as { response?: { status?: number } }).response?.status
-        if (status === 409) setGated(true)
-        else setError(true)
+        setError(true)
       })
       .finally(() => {
         if (alive) setLoading(false)
@@ -53,15 +47,6 @@ export function ThroughputCard({ slug, card, globalRange, refreshToken }: Dashbo
   }, [slug, bucket, refreshToken, retry])
 
   if (loading) return <CardSkeleton />
-  if (gated) {
-    return (
-      <div className="flex h-full items-center justify-center p-4">
-        <Link href="./analytics" className="text-xs text-primary hover:underline">
-          Detailed throughput available on a higher plan
-        </Link>
-      </div>
-    )
-  }
   if (error) return <CardError onRetry={() => setRetry((n) => n + 1)} />
 
   const data = weekly ? points : points.slice(-windowDays)

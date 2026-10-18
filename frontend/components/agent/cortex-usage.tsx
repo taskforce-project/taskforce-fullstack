@@ -49,8 +49,8 @@ function Ring({ pct }: { pct: number }) {
 }
 
 /**
- * Modal « façon Claude » sous l'input du chat : **fenêtre de contexte** + **utilisation du forfait**
- * (conso du mois vs plafond du plan, avec réinitialisation), modèle + refresh en pied, CTA détails/upgrade.
+ * Modal « façon Claude » sous l'input du chat : **fenêtre de contexte** + **consommation du mois**
+ * (vs le plafond de l'instance s'il y en a un, avec réinitialisation), modèle + refresh en pied.
  * Auto-porté (pas de portail) pour rester bien positionné dans le panneau flottant.
  */
 export function CortexUsage({ sessionTokens, className }: { sessionTokens: number; className?: string }) {

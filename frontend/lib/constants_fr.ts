@@ -60,7 +60,6 @@ export const CONSTANTS_FR: TranslationKeys = {
     // Authentification - Inscription
     register: {
       title: "Créez votre compte",
-      subtitle: "Commencez votre essai gratuit dès aujourd'hui",
       alreadyHaveAccount: "Vous avez déjà un compte ?",
       signInLink: "Se connecter",
       
@@ -122,19 +121,6 @@ export const CONSTANTS_FR: TranslationKeys = {
           manufacturing: "Industrie",
           other: "Autre",
         },
-      },
-
-      // Étape 3 : Confirmation
-      step3: {
-        title: "Tout est prêt !",
-        subtitle: "Vérifiez vos informations et commencez votre essai gratuit",
-        reviewTitle: "Vérifiez vos informations",
-        personalInfo: "Informations personnelles",
-        organizationInfo: "Organisation",
-        freeTrialTitle: "Essai gratuit inclus",
-        freeTrialDescription: "Commencez avec un essai gratuit de 14 jours. Aucune carte bancaire requise.",
-        createAccountButton: "Créer le compte",
-        startTrialButton: "Commencer l'essai gratuit",
       },
 
       // Indicateur de progression
@@ -526,33 +512,6 @@ export const CONSTANTS_FR: TranslationKeys = {
     deleteAccountDesc: "Supprimer définitivement votre compte et toutes les données. Cette action est irréversible.",
     saveChanges: "Enregistrer",
     saved: "Enregistré !",
-  },
-
-  help: {
-    title: "Aide & Docs",
-    subtitle: "Trouvez des réponses, guides et ressources.",
-    searchPlaceholder: "Rechercher dans la doc, guides, FAQ…",
-    categories: "Catégories",
-    gettingStarted: "Débuter",
-    gettingStartedDesc: "Configurez votre espace, invitez votre équipe, créez votre premier projet.",
-    projects: "Projets & Issues",
-    projectsDesc: "Organisez le travail avec des projets, issues, cycles et backlogs.",
-    integrations: "Intégrations",
-    integrationsDesc: "Connectez Taskforce avec GitHub, Slack, Jira et plus.",
-    security: "Sécurité & Permissions",
-    securityDesc: "Gérez les rôles, SSO, journaux d'audit et politiques de rétention.",
-    contactSupport: "Contacter le support",
-    contactSupportDesc: "Vous ne trouvez pas ce que vous cherchez ? Notre équipe est là pour vous aider.",
-    openChat: "Ouvrir le chat",
-    sendEmail: "Envoyer un email",
-    popularArticles: "Articles populaires",
-    articles: {
-      a1: "Comment créer ma première issue",
-      a2: "Configurer des cycles et sprints",
-      a3: "Utiliser le tableau kanban",
-      a4: "Inviter des membres d'équipe",
-      a5: "Configurer les notifications",
-    },
   },
 
   // Coquille de l'app - footer, barre supérieure, sélecteur d'espace (sur chaque écran authentifié).
