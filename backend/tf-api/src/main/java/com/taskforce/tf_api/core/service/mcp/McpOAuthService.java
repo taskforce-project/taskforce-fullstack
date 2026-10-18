@@ -64,11 +64,15 @@ public class McpOAuthService {
 
     /**
      * Demarre le flux et renvoie l'URL d'autorisation (le front y redirige le navigateur).
-     * Autorisation (membre + BUSINESS+ + manager) faite en amont par le controleur.
+     * Autorisation (membre + manager) faite en amont par le controleur. La cle est celle d'un prereglage du
+     * catalogue ou d'un serveur personnalise, dont le nom est garde jusqu'au callback (cf.
+     * {@link WorkspaceMcpService#resolveServer}).
      */
     @Transactional
-    public String start(Workspace ws, Long userId, String connectorKey, String mcpUrl, String returnTo) {
+    public String start(Workspace ws, Long userId, String connectorKey, String name, String mcpUrl,
+                        String returnTo) {
         SsrfGuard.assertPublicHttpUrl(mcpUrl);
+        WorkspaceMcpService.ServerIdentity server = workspaceMcp.resolveServer(ws.getId(), connectorKey, name);
         DiscoveredAuth auth = discovery.discover(mcpUrl);
         // Le navigateur sera redirige vers authorization_endpoint (issu de la metadata d'un serveur
         // semi-fiable) : on le valide comme http(s) PUBLIC (jamais une cible interne, jamais un schema
@@ -78,7 +82,7 @@ public class McpOAuthService {
 
         if (auth.registrationEndpoint() == null) {
             throw new BusinessException("This server doesn't support dynamic client registration (DCR): "
-                + "connexion 1-clic indisponible, utilise l'URL + token.");
+                + "one-click connection is unavailable, connect it with a token instead.");
         }
         JsonNode reg = client.postJson(auth.registrationEndpoint(), dcrBody(redirectUri));
         String clientId = reg.path("client_id").asText(null);
@@ -90,7 +94,7 @@ public class McpOAuthService {
 
         stateRepository.save(McpOAuthState.builder()
             .state(state).workspaceId(ws.getId()).userId(userId)
-            .connectorKey(connectorKey).mcpUrl(mcpUrl).codeVerifier(verifier)
+            .connectorKey(server.connectorKey()).mcpName(server.name()).mcpUrl(mcpUrl).codeVerifier(verifier)
             .tokenEndpoint(auth.tokenEndpoint()).clientId(clientId).clientSecret(clientSecret)
             .redirectUri(redirectUri).scope(auth.scopesSupported()).issuer(auth.issuer())
             .returnTo(sanitizeReturnTo(returnTo))
@@ -123,7 +127,7 @@ public class McpOAuthService {
                     .workspace(workspaceRepository.getReferenceById(row.getWorkspaceId()))
                     .connectorKey(row.getConnectorKey()).build());
 
-            tokenService.storeInitialTokens(conn, tok, row.getMcpUrl(), row.getIssuer(),
+            tokenService.storeInitialTokens(conn, tok, row.getMcpUrl(), row.getMcpName(), row.getIssuer(),
                 row.getClientId(), row.getClientSecret(), row.getTokenEndpoint());
             workspaceMcp.invalidate(row.getWorkspaceId());
             return appRedirect(row, "connected");

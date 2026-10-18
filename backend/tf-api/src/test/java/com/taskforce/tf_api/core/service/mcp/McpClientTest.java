@@ -32,6 +32,8 @@ class McpClientTest {
     private String url;
     private volatile boolean emitSession = true;   // le serveur émet-il un mcp-session-id ? (stateful)
     private volatile boolean unauthorized = false; // le serveur répond-il 401 à l'initialize ?
+    private volatile String lastAuthorization;     // en-têtes d'authentification de la dernière requête
+    private volatile String lastApiKey;
     // Le serveur embarqué écoute sur 127.0.0.1 : ce client admet le réseau privé. La garde anti-SSRF est
     // testée à part, sur un client qui le refuse (comportement par défaut).
     private final McpClient client = new McpClient(new ObjectMapper(), 2000L, 5000L, true);
@@ -42,6 +44,8 @@ class McpClientTest {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/mcp", exchange -> {
             String method = exchange.getRequestMethod();
+            lastAuthorization = exchange.getRequestHeaders().getFirst("Authorization");
+            lastApiKey = exchange.getRequestHeaders().getFirst("X-Api-Key");
             String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             if ("DELETE".equals(method)) { exchange.sendResponseHeaders(200, -1); exchange.close(); return; }
             if (body.contains("notifications/initialized")) { exchange.sendResponseHeaders(202, -1); exchange.close(); return; }
@@ -110,6 +114,18 @@ class McpClientTest {
         String result = client.callTool(session, "echo", Map.of("x", "hello"));
         assertThat(result).isEqualTo("CALLED echo");
         client.close(session);
+    }
+
+    @Test
+    @DisplayName("jeton relayé en Bearer par défaut, ou tel quel dans l'en-tête choisi pour le serveur")
+    void token_goes_in_the_chosen_header() {
+        client.listTools(client.initialize(new McpClient.ServerRef("srv", url, "t-1")));
+        assertThat(lastAuthorization).isEqualTo("Bearer t-1");
+        assertThat(lastApiKey).isNull();
+
+        client.listTools(client.initialize(new McpClient.ServerRef("srv", url, "k-2", "X-Api-Key")));
+        assertThat(lastApiKey).isEqualTo("k-2");
+        assertThat(lastAuthorization).isNull();
     }
 
     @Test

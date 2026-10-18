@@ -37,6 +37,10 @@ public class McpTokenService {
     static final String K_CLIENT_SECRET = "mcpClientSecret";
     static final String K_TOKEN_EP     = "mcpTokenEndpoint";
     static final String K_MCP_URL      = "mcpUrl";           // = resource (RFC 8707)
+    // Clés de WorkspaceMcpService : nom d'un serveur personnalisé, jeton collé et son en-tête.
+    static final String K_MCP_NAME      = WorkspaceMcpService.CONFIG_NAME;
+    static final String K_PASTED_TOKEN  = WorkspaceMcpService.CONFIG_TOKEN;
+    static final String K_PASTED_HEADER = WorkspaceMcpService.CONFIG_HEADER;
 
     /** On rafraichit 60 s avant l'expiration reelle (marge d'horloge + latence). */
     private static final long REFRESH_SKEW_MS = 60_000;
@@ -80,12 +84,19 @@ public class McpTokenService {
         }
     }
 
-    /** Stocke, au callback, les tokens + les infos necessaires au refresh ulterieur (+ mcpUrl si neuf). */
+    /**
+     * Stocke, au callback, les tokens + les infos necessaires au refresh ulterieur (+ mcpUrl si neuf, + nom d'un
+     * serveur personnalise). Un jeton colle et son en-tete, laisses par une connexion precedente, sont retires :
+     * l'OAuth les remplace.
+     */
     @Transactional
-    public void storeInitialTokens(ConnectorConnection conn, JsonNode tokenResponse, String mcpUrl, String issuer,
-                                   String clientId, String clientSecret, String tokenEndpoint) {
+    public void storeInitialTokens(ConnectorConnection conn, JsonNode tokenResponse, String mcpUrl, String name,
+                                   String issuer, String clientId, String clientSecret, String tokenEndpoint) {
         Map<String, String> config = read(conn.getConfig());
         if (mcpUrl != null && !mcpUrl.isBlank()) config.put(K_MCP_URL, mcpUrl);
+        if (name != null && !name.isBlank()) config.put(K_MCP_NAME, name);
+        config.remove(K_PASTED_TOKEN);
+        config.remove(K_PASTED_HEADER);
         config.put(K_OAUTH_ISSUER, issuer);
         config.put(K_CLIENT_ID, clientId);
         if (clientSecret != null && !clientSecret.isBlank()) config.put(K_CLIENT_SECRET, clientSecret);

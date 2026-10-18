@@ -8,6 +8,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -20,6 +24,7 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
+import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -54,7 +59,9 @@ class WorkspaceMcpServiceTest {
 
     @BeforeEach
     void setup() {
-        service = new WorkspaceMcpService(repository, client, objectMapper, tokenService);
+        ConnectorCatalog catalog = new ConnectorCatalog();
+        catalog.build();
+        service = new WorkspaceMcpService(repository, client, objectMapper, tokenService, catalog);
         ReflectionTestUtils.setField(service, "cacheTtlMs", 60_000L);
     }
 
@@ -99,7 +106,7 @@ class WorkspaceMcpServiceTest {
         when(repository.findByWorkspaceId(1L)).thenReturn(List.of(mcpConnector(), plain));
 
         assertThat(service.connectedServers(1L))
-            .containsExactly(new WorkspaceMcpService.ConnectedServer("linear", "http://x/mcp"));
+            .containsExactly(new WorkspaceMcpService.ConnectedServer("linear", null, "http://x/mcp"));
         verify(client, never()).initialize(any());
     }
 
@@ -296,7 +303,7 @@ class WorkspaceMcpServiceTest {
         Workspace ws = Workspace.builder().id(1L).slug("acme").build();
         when(repository.findByWorkspaceIdAndConnectorKey(1L, "linear")).thenReturn(Optional.empty());
 
-        service.connectServer(ws, "linear", "http://x/mcp", null, "create_issue");
+        service.connectServer(ws, "linear", null, "http://x/mcp", null, null, "create_issue");
 
         ArgumentCaptor<ConnectorConnection> captor = ArgumentCaptor.forClass(ConnectorConnection.class);
         verify(repository).save(captor.capture());
@@ -313,9 +320,116 @@ class WorkspaceMcpServiceTest {
         doThrow(new BusinessException("MCP server refused: internal address"))
             .when(client).assertAllowed("http://169.254.169.254/latest");
 
-        assertThatThrownBy(() -> service.connectServer(ws, "linear", " http://169.254.169.254/latest ", null, null))
+        assertThatThrownBy(() -> service.connectServer(ws, "linear", null, " http://169.254.169.254/latest ", null, null, null))
             .isInstanceOf(BusinessException.class);
         verify(repository, never()).save(any());
+    }
+
+    // ── Serveurs personnalisés (ADR-020) ────────────────────────────────────
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"github", "slack", "plane", "trello", "custom-", "custom-Docs", "custom--x", "docs"})
+    @NullSource
+    @DisplayName("resolveServer refuse une native, une clé inconnue ou mal formée")
+    void resolve_refuses_other_keys(String key) {
+        assertThatThrownBy(() -> service.resolveServer(1L, key, "Docs")).isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    @DisplayName("resolveServer : un préréglage garde sa clé, sans nom à stocker")
+    void resolve_keeps_a_preset() {
+        assertThat(service.resolveServer(1L, "linear", "ignored"))
+            .isEqualTo(new WorkspaceMcpService.ServerIdentity("linear", null));
+    }
+
+    @ParameterizedTest(name = "{0} -> {1}")
+    @CsvSource(delimiter = '|', value = {
+        "Team docs        | custom-team-docs",
+        "Équipe Données ! | custom-equipe-donnees",
+        "???              | custom-server",
+    })
+    @DisplayName("nouveau serveur personnalisé : la clé dérive du nom")
+    void new_custom_key_derives_from_the_name(String name, String key) {
+        assertThat(service.resolveServer(1L, "custom", name).connectorKey()).isEqualTo(key);
+    }
+
+    @Test
+    @DisplayName("nouveau serveur personnalisé : clé déjà prise → suffixe, jamais d'écrasement")
+    void new_custom_key_never_overwrites() {
+        when(repository.existsByWorkspaceIdAndConnectorKey(1L, "custom-docs")).thenReturn(true);
+        when(repository.existsByWorkspaceIdAndConnectorKey(1L, "custom-docs-2")).thenReturn(true);
+
+        assertThat(service.resolveServer(1L, "custom", "Docs"))
+            .isEqualTo(new WorkspaceMcpService.ServerIdentity("custom-docs-3", "Docs"));
+    }
+
+    @ParameterizedTest(name = "[{0}]")
+    @ValueSource(strings = {"", "   "})
+    @NullSource
+    @DisplayName("un serveur personnalisé exige un nom")
+    void custom_server_needs_a_name(String name) {
+        assertThatThrownBy(() -> service.resolveServer(1L, "custom", name)).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.resolveServer(1L, "custom-docs", name)).isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    @DisplayName("un nom de serveur au-delà de 60 caractères est refusé")
+    void custom_server_name_is_bounded() {
+        assertThatThrownBy(() -> service.resolveServer(1L, "custom", "x".repeat(61)))
+            .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    @DisplayName("connectServer : serveur personnalisé avec en-tête nommé → nom, jeton et en-tête chiffrés en config")
+    void connect_custom_server_with_a_header() {
+        Workspace ws = Workspace.builder().id(1L).slug("acme").build();
+        when(repository.findByWorkspaceIdAndConnectorKey(1L, "custom-docs")).thenReturn(Optional.empty());
+
+        var id = service.connectServer(ws, "custom", "Docs", "https://docs.example.com/mcp", "k-123", "X-Api-Key", null);
+
+        assertThat(id).isEqualTo(new WorkspaceMcpService.ServerIdentity("custom-docs", "Docs"));
+        ArgumentCaptor<ConnectorConnection> captor = ArgumentCaptor.forClass(ConnectorConnection.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getConnectorKey()).isEqualTo("custom-docs");
+        assertThat(captor.getValue().getConfig()).contains("\"mcpName\":\"Docs\"")
+            .contains("\"mcpToken\":\"k-123\"").contains("\"mcpHeader\":\"X-Api-Key\"");
+    }
+
+    @ParameterizedTest(name = "[{0}]")
+    @ValueSource(strings = {"Host", "mcp-session-id", "Content-Type", "X Api Key", "X-Api-Key\r\nEvil"})
+    @DisplayName("connectServer refuse un en-tête de transport ou mal formé, sans rien enregistrer")
+    void connect_refuses_a_bad_header(String header) {
+        Workspace ws = Workspace.builder().id(1L).slug("acme").build();
+
+        assertThatThrownBy(() -> service.connectServer(ws, "linear", null, "https://x.example.com/mcp", "v", header, null))
+            .isInstanceOf(BusinessException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("connectServer : un en-tête nommé sans valeur est refusé")
+    void connect_refuses_a_header_without_value() {
+        Workspace ws = Workspace.builder().id(1L).slug("acme").build();
+
+        assertThatThrownBy(() -> service.connectServer(ws, "linear", null, "https://x.example.com/mcp", " ", "X-Api-Key", null))
+            .isInstanceOf(BusinessException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("statuts : le jeton part dans l'en-tête choisi, et le nom du serveur est rendu")
+    void statuses_use_the_chosen_header() throws Exception {
+        ConnectorConnection conn = ConnectorConnection.builder().connectorKey("custom-docs")
+            .config("{\"mcpUrl\":\"http://x/mcp\",\"mcpName\":\"Docs\",\"mcpToken\":\"k-123\",\"mcpHeader\":\"X-Api-Key\"}")
+            .build();
+        when(repository.findByWorkspaceId(1L)).thenReturn(List.of(conn));
+        when(client.initialize(any())).thenReturn(session);
+        when(client.listTools(session)).thenReturn(List.of(def("search")));
+
+        List<WorkspaceMcpService.McpServerStatus> statuses = service.serverStatuses(1L);
+
+        verify(client).initialize(new McpClient.ServerRef("custom-docs", "http://x/mcp", "k-123", "X-Api-Key"));
+        assertThat(statuses).singleElement().satisfies(s -> assertThat(s.name()).isEqualTo("Docs"));
     }
 
     @Test

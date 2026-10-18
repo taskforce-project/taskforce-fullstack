@@ -35,7 +35,7 @@ public class ConnectorCatalog {
     private final Map<String, ConnectorDescriptor> byKey = new LinkedHashMap<>();
 
     @PostConstruct
-    void build() {
+    public void build() {
         // URL des préréglages : serveurs officiels en HTTP « Streamable » ; sonde initialize du 03/09/2026
         // (401 avec WWW-Authenticate OAuth pour la plupart, donc OAuth en un clic possible).
 

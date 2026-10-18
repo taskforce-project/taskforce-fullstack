@@ -63,13 +63,14 @@ class ConnectorCatalogTest {
     }
 
     @Test
-    @DisplayName("les clés sont des slugs stables, sans doublon")
+    @DisplayName("les clés sont des slugs stables, sans doublon, hors du préfixe des serveurs personnalisés")
     void lesClesSontDesSlugsUniques() {
         // La clé sert d'identifiant d'URL et de colonne en base : ni majuscule, ni espace, ni doublon (la Map
         // écraserait la première déclaration sans bruit).
         List<String> cles = catalogue.all().stream().map(ConnectorDescriptor::key).toList();
 
-        assertThat(cles).allMatch(k -> k.matches("[a-z0-9-]+"), "slug minuscule").doesNotHaveDuplicates();
+        assertThat(cles).allMatch(k -> k.matches("[a-z0-9-]+"), "slug minuscule").doesNotHaveDuplicates()
+            .noneMatch(k -> k.startsWith("custom"));
     }
 
     @Test

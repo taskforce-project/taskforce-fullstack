@@ -24,6 +24,7 @@ import com.taskforce.tf_api.shared.exception.ForbiddenException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.when;
 
 /** Tests unitaires de {@link IntegrationCatalogService} : état de connexion réel des natives et des préréglages. */
@@ -63,8 +64,8 @@ class IntegrationCatalogServiceTest {
             .thenReturn(List.of(Integration.builder().provider(IntegrationProvider.GITHUB).build()));
         // « github » enregistré comme serveur MCP ne doit pas se faire passer pour la native.
         when(workspaceMcp.connectedServers(1L)).thenReturn(List.of(
-            new ConnectedServer("linear", "https://mcp.linear.app/mcp"),
-            new ConnectedServer("slack", "https://example.com/mcp")));
+            new ConnectedServer("linear", null, "https://mcp.linear.app/mcp"),
+            new ConnectedServer("slack", null, "https://example.com/mcp")));
 
         IntegrationCatalogResponse catalog = service.getCatalog("acme", 7L);
 
@@ -73,6 +74,34 @@ class IntegrationCatalogServiceTest {
             .containsExactlyInAnyOrder("github", "linear");
         assertThat(catalog.connected()).isEqualTo(2);
         assertThat(catalog.total()).isEqualTo(28).isEqualTo(tools.size());
+    }
+
+    @Test
+    @DisplayName("serveurs hors catalogue listés en dernier, connectés, avec leur nom et l'hôte de leur URL")
+    void lists_custom_servers_last() {
+        when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(1L, 7L)).thenReturn(true);
+        when(integrationRepository.findByWorkspaceId(1L)).thenReturn(List.of());
+        // « trello » : connexion MCP héritée d'une tuile retirée au lot 6, sans nom enregistré.
+        when(workspaceMcp.connectedServers(1L)).thenReturn(List.of(
+            new ConnectedServer("custom-team-docs", "Team docs", "https://docs.example.com/mcp"),
+            new ConnectedServer("trello", null, "https://mcp.trello.example/sse")));
+
+        IntegrationCatalogResponse catalog = service.getCatalog("acme", 7L);
+
+        var last = catalog.categories().get(catalog.categories().size() - 1);
+        assertThat(last.category()).isEqualTo("CUSTOM_MCP");
+        assertThat(last.label()).isEqualTo("Your MCP servers");
+        assertThat(last.tools()).extracting(ConnectorView::key, ConnectorView::name, ConnectorView::description)
+            .containsExactly(
+                tuple("custom-team-docs", "Team docs", "docs.example.com"),
+                tuple("trello", "trello", "mcp.trello.example"));
+        assertThat(last.tools()).allSatisfy(t -> {
+            assertThat(t.connected()).isTrue();
+            assertThat(t.authType()).isEqualTo("MCP");
+            assertThat(t.mcpSuggestedUrl()).isNull();
+        });
+        assertThat(catalog.total()).isEqualTo(30);
+        assertThat(catalog.connected()).isEqualTo(2);
     }
 
     @Test
