@@ -46,16 +46,8 @@ spring:
       use-key-prefix: true
       cache-null-values: false
 
-  # Security Configuration
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM:taskforce}
-          jwk-set-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM:taskforce}/protocol/openid-connect/certs
-      # Pas de bloc `client` : le client OAuth2 de Spring n'est consommé nulle part (la connexion
-      # externe passe par OAuthLoginService, en appels maison lisant `keycloak.*`). Sa présence
-      # déclenchait une découverte OIDC au démarrage, incompatible avec un realm à issuer fixe.
+  # Pas de bloc `security.oauth2` : le décodeur JWT est fourni par SecurityConfig.jwtDecoder() (issuer
+  # public, JWKS interne, lus dans `keycloak.*`), et la connexion externe passe par OAuthLoginService.
   web:
     error:
       include-stacktrace: never
@@ -98,13 +90,6 @@ keycloak:
     username: ${KEYCLOAK_ADMIN_USERNAME}
     password: ${KEYCLOAK_ADMIN_PASSWORD}
     client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
-  # Endpoints OIDC (dérivés de keycloak.url/realm) — consommés par KeycloakAuthService / OAuthLoginService.
-  endpoints:
-    token: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/token
-    logout: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/logout
-    userinfo: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/userinfo
-    introspect: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/token/introspect
-    certs: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/certs
 
 # Application URLs (OAuth callbacks, liens e-mail)
 app:

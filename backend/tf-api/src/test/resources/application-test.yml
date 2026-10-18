@@ -29,21 +29,9 @@ spring:
           starttls:
             enable: false
 
-# JWT Configuration
-jwt:
-  secret: testSecretKeyForJWTTokenGenerationThatIsVeryLongForTestingPurposes
-  access-token:
-    expiration: 3600
-  refresh-token:
-    expiration: 86400
-
 # Keycloak Configuration (mock)
 keycloak:
   realm: taskforce-test
-  auth-server-url: http://localhost:8080/auth
-  resource: taskforce-api-test
-  credentials:
-    secret: test-secret
   admin:
     client-id: admin-cli
     client-secret: test-admin-secret

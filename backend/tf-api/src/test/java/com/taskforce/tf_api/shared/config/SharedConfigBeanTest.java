@@ -79,20 +79,12 @@ class SharedConfigBeanTest {
     }
 
     @Test
-    @DisplayName("OAuth2Config — tous les beans (RestTemplates, endpoints, ObjectMapper) se construisent")
+    @DisplayName("OAuth2Config — les beans (RestTemplates, ObjectMapper) se construisent")
     void oauth2Config_beans() {
         OAuth2Config cfg = new OAuth2Config();
-        ReflectionTestUtils.setField(cfg, "keycloakUrl", "http://localhost:8081");
-        ReflectionTestUtils.setField(cfg, "realm", "taskforce");
-        ReflectionTestUtils.setField(cfg, "clientId", "tf-api");
-        ReflectionTestUtils.setField(cfg, "clientSecret", "secret");
 
         assertThat(cfg.keycloakRestTemplate()).isNotNull();
         assertThat(cfg.restTemplate()).isNotNull();
-        assertThat(cfg.keycloakTokenEndpoint()).isNotNull();
-        assertThat(cfg.keycloakLogoutEndpoint()).isNotNull();
-        assertThat(cfg.keycloakUserinfoEndpoint()).isNotNull();
-        assertThat(cfg.keycloakIntrospectEndpoint()).isNotNull();
         assertThat(cfg.objectMapper()).isNotNull();
     }
 
