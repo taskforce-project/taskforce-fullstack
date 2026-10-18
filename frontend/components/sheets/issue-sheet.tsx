@@ -60,6 +60,7 @@ import type { IssueComment, IssueActivity, IssueLabel, IssueStatus as ApiIssueSt
 import { listChildIssues, listRelations, addRelation, deleteRelation,
          listChecklist, addChecklistItem, updateChecklistItem, deleteChecklistItem,
          listWorklogs, addWorklog, deleteWorklog } from "@/lib/api/issue-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -113,10 +114,8 @@ function getStatusCfg(category: IssueStatusCategory) {
 
 function formatCommentTime(iso: string): string {
   try {
-    // Le backend renvoie un LocalDateTime UTC sans offset ("...T12:00:00") : sans "Z",
-    // new Date() le parse en heure locale et un commentaire récent reste bloqué sur
-    // "just now" (diff ≤ 0). On force UTC si aucun fuseau n'est présent. Cf. ISS-09.
-    const d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + "Z")
+    // Date-heure du backend sans fuseau, lue en UTC (sinon un commentaire récent reste sur "just now", ISS-09).
+    const d = parseServerDate(iso)
     const now = new Date()
     const diff = Math.floor((now.getTime() - d.getTime()) / 1000)
     if (diff < 60) return "just now"
@@ -423,7 +422,7 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
   const entries: FeedEntry[] = [
     ...comments.map((c) => ({ kind: "comment" as const, at: c.createdAt, data: c })),
     ...activity.map((a) => ({ kind: "event"   as const, at: a.createdAt, data: a })),
-  ].sort((x, y) => new Date(y.at).getTime() - new Date(x.at).getTime()) // plus récent d'abord
+  ].sort((x, y) => parseServerDate(y.at).getTime() - parseServerDate(x.at).getTime()) // plus récent d'abord
   const shown = entries.slice(0, visible)
   const remaining = entries.length - shown.length
 
