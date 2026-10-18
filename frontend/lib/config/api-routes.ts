@@ -74,14 +74,6 @@ export const STATUS_ROUTES = {
 } as const;
 
 /**
- * Retours utilisateur (« Give feedback »).
- * Backend: @RequestMapping("/api/feedback")
- */
-export const FEEDBACK_ROUTES = {
-  SUBMIT: "/api/feedback",
-} as const;
-
-/**
  * Acceptation / refus d'une assignation de tâche (assigné courant).
  * Backend: @RequestMapping("/api/me/assignments")
  */

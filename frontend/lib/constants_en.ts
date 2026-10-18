@@ -33,7 +33,6 @@ export const CONSTANTS_EN = {
     export: "Export",
     required: "Required",
     optional: "Optional",
-    comingSoon: "Coming soon",
     learnMore: "Learn more",
   },
 
@@ -335,7 +334,6 @@ export const CONSTANTS_EN = {
     settings: "Settings",
     help: "Help",
     createProject: "New Project",
-    comingSoon: "Soon",
     sub: {
       myAll: "All my queues",
       myIssues: "Issues",
@@ -568,8 +566,6 @@ export const CONSTANTS_EN = {
     openCommandPalette: "Open command palette",
     askAi: "Ask AI",
     openAiAssistant: "Open the AI assistant",
-    experimental: "Experimental",
-    giveFeedback: "Give feedback",
     // Workspace switcher
     workspaces: "Workspaces",
     yourWorkspaces: "Your workspaces",

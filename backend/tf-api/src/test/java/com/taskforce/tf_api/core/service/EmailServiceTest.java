@@ -316,38 +316,4 @@ class EmailServiceTest {
             verify(mailSender).send(any(MimeMessage.class));
         }
     }
-
-    @Nested
-    @DisplayName("Send Internal Notification")
-    class SendInternalNotificationTests {
-
-        @Test
-        @DisplayName("devrait envoyer une notification interne avec succès")
-        void sendInternalNotification_withValidData_shouldSendEmail() {
-            // Given
-            doNothing().when(mailSender).send(any(MimeMessage.class));
-
-            // When
-            emailService.sendInternalNotification(
-                    "team@taskforce.dev", "Nouveau retour", "<html><body>Retour</body></html>");
-
-            // Then
-            verify(mailSender).send(any(MimeMessage.class));
-            verifyNoInteractions(templateEngine);
-        }
-
-        @Test
-        @DisplayName("devrait avaler l'exception d'envoi sans la propager (best-effort)")
-        void sendInternalNotification_withMailError_shouldNotThrow() {
-            // Given
-            doThrow(new RuntimeException("SMTP down"))
-                    .when(mailSender).send(any(MimeMessage.class));
-
-            // When/Then : best-effort → aucune exception propagée
-            emailService.sendInternalNotification(
-                    "team@taskforce.dev", "Nouveau retour", "<html><body>Retour</body></html>");
-
-            verify(mailSender).send(any(MimeMessage.class));
-        }
-    }
 }

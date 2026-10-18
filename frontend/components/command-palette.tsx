@@ -27,6 +27,7 @@ import {
   ArrowRight,
   Brain,
   FileText,
+  Bug,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -44,6 +45,9 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command"
+
+/** Les bugs et idées se signalent sur le dépôt du projet (open source), pas dans l'instance. */
+const REPORT_ISSUE_URL = "https://github.com/taskforce-project/taskforce-fullstack/issues/new/choose"
 
 // ─── Hook IA - appelle le VRAI assistant (Cortex), plus de mock ──────────────
 //
@@ -142,10 +146,8 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
     { id: "members",       label: "Go to Members",       group: "Navigation", icon: <Users className="h-4 w-4" />,           shortcut: "G T", action: () => go("/members") },
     { id: "settings",      label: "Go to Settings",      group: "Navigation", icon: <Settings className="h-4 w-4" />,       shortcut: "G S", action: () => go("/settings") },
     { id: "profile",       label: "View my profile",     group: "Navigation", icon: <User className="h-4 w-4" />,           shortcut: "G F", action: () => go("/profile") },
-    // Labs - accès rapide aux fonctionnalités en finition. Mêmes icônes que la sidebar (Activity / Brain),
-    // en couleur normale (pas de dégradé) : la carte « Labs » suffit à les signaler.
-    { id: "intelligence",  label: "Intelligence",        group: "Labs",       icon: <Activity className="h-4 w-4" />, shortcut: "G A", action: () => go("/analytics") },
-    { id: "brain",         label: "Brain OS",            group: "Labs",       icon: <Brain className="h-4 w-4" />,                     action: () => go("/brain") },
+    { id: "intelligence",  label: "Go to Intelligence",  group: "Navigation", icon: <Activity className="h-4 w-4" />,         shortcut: "G A", action: () => go("/analytics") },
+    { id: "brain",         label: "Go to Brain OS",      group: "Navigation", icon: <Brain className="h-4 w-4" />,            action: () => go("/brain") },
     // Actions
     { id: "ask-ai",        label: "Ask AI",              group: "Actions",    icon: <Sparkles className="h-4 w-4" />,        shortcut: "A",   action: enterAiMode },
     // La création d'issue est propre à un projet : on mène à la liste des projets, où chacun porte
@@ -153,6 +155,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
     { id: "new-issue",     label: "Create issue",     group: "Actions",    icon: <Plus className="h-4 w-4" />,            shortcut: "C",   action: () => go("/projects") },
     { id: "new-project",   label: "Create project",     group: "Actions",    icon: <Plus className="h-4 w-4" />,                             action: () => { openCreateProject(); onOpenChange(false) } },
     { id: "notifications", label: "Open notifications", group: "Actions", icon: <Bell className="h-4 w-4" />,                          action: () => go("/inbox") },
+    { id: "report-issue",  label: "Report an issue on GitHub", group: "Actions", icon: <Bug className="h-4 w-4" />, action: () => { window.open(REPORT_ISSUE_URL, "_blank", "noopener,noreferrer"); onOpenChange(false) } },
     // Appearance
     { id: "theme-light",   label: "Switch to light mode", group: "Appearance", icon: <Sun className="h-4 w-4" />,    action: () => { setTheme("light"); onOpenChange(false) } },
     { id: "theme-dark",    label: "Switch to dark mode",  group: "Appearance", icon: <Moon className="h-4 w-4" />,   action: () => { setTheme("dark"); onOpenChange(false) } },
@@ -249,7 +252,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
                     <CommandItem
                       key={action.id}
                       onSelect={action.action}
-                      className={cn("group gap-3", action.group === "Labs" && "lab-cmd-row")}
+                      className="group gap-3"
                     >
                       <span className={action.id === "ask-ai" ? "text-primary" : "text-muted-foreground"}>
                         {action.icon}

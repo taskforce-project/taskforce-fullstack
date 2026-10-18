@@ -35,7 +35,6 @@ export const CONSTANTS_FR: TranslationKeys = {
     export: "Exporter",
     required: "Requis",
     optional: "Optionnel",
-    comingSoon: "Bientôt disponible",
     learnMore: "En savoir plus",
   },
 
@@ -336,7 +335,6 @@ export const CONSTANTS_FR: TranslationKeys = {
     settings: "Paramètres",
     help: "Aide",
     createProject: "Nouveau projet",
-    comingSoon: "Bientôt",
     sub: {
       myAll: "Toutes mes files",
       myIssues: "Tâches",
@@ -569,8 +567,6 @@ export const CONSTANTS_FR: TranslationKeys = {
     openCommandPalette: "Ouvrir la palette de commandes",
     askAi: "Demander à l'IA",
     openAiAssistant: "Ouvrir l'assistant IA",
-    experimental: "Expérimentation",
-    giveFeedback: "Donner mon feedback",
     // Sélecteur d'espace de travail
     workspaces: "Espaces de travail",
     yourWorkspaces: "Vos espaces",

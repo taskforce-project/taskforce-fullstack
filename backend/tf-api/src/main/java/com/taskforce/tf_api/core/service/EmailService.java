@@ -203,19 +203,6 @@ public class EmailService {
         }
     }
 
-    /**
-     * Envoi générique d'une notification interne (ex : retours produit). Best-effort :
-     * en cas d'échec on logue sans propager (ne casse jamais l'action métier appelante).
-     */
-    public void sendInternalNotification(String toEmail, String subject, String htmlContent) {
-        try {
-            sendHtmlEmail(toEmail, subject, htmlContent);
-            log.info("Notification interne envoyée à : {}", toEmail);
-        } catch (Exception e) {
-            log.error("Échec de l'envoi de la notification interne à {} : {}", toEmail, e.getMessage());
-        }
-    }
-
     private void sendHtmlEmail(String toEmail, String subject, String htmlContent) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");

@@ -13,7 +13,6 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BrandLogo } from "@/components/ui/brand-logo"
-import { LabBanner } from "@/components/layout/lab-banner"
 import { cn } from "@/lib/utils"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import {
@@ -162,10 +161,11 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
           />
         ) : (
         <>
-        <LabBanner
-          feature="integrations"
-          message="GitHub, Slack and Plane are deep integrations that sync natively. Every other tool connects through its own MCP server - one click for the ones marked 'MCP-ready', or paste your endpoint - and its tools then go live in Cortex (reads run, writes need your approval). A few (UI components) are on the roadmap, shown as 'Soon'."
-        />
+        <p className="text-xs text-muted-foreground">
+          GitHub, Slack and Plane are deep integrations that sync natively. Every other tool connects through
+          its own MCP server: one click for the ones marked &quot;MCP-ready&quot;, or paste your endpoint. Its tools
+          then go live in Cortex (reads run, writes need your approval).
+        </p>
 
         {/* Filtre par statut de connexion - « ce que j'ai connecté ou pas » (en tête). */}
         <div className="flex gap-1.5">

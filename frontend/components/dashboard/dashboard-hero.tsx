@@ -22,7 +22,7 @@ const PILL_TOOLS = [
   { slug: "linear", name: "Linear" },
 ] as const
 
-/** Même contenu que la palette Ctrl+K - navigation + Labs (les actions spéciales sont ajoutées à part). */
+/** Même contenu que la palette Ctrl+K - navigation (les actions spéciales sont ajoutées à part). */
 const NAV_ITEMS = [
   { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { label: "Inbox", path: "/inbox", icon: Inbox },
@@ -31,8 +31,6 @@ const NAV_ITEMS = [
   { label: "Issues", path: "/my-work/issues", icon: CircleDot },
   { label: "Cycles", path: "/cycles", icon: Repeat },
   { label: "Members", path: "/members", icon: Users },
-] as const
-const LAB_ITEMS = [
   { label: "Intelligence", path: "/analytics", icon: Activity },
   { label: "Brain OS", path: "/brain", icon: Brain },
 ] as const
@@ -118,10 +116,6 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
   ;(query ? NAV_ITEMS.filter((n) => match(n.label)) : NAV_ITEMS).forEach((n) => rows.push({
     key: `n-${n.path}`, section: "Navigation",
     icon: <n.icon className="size-4 shrink-0 text-muted-foreground" />, label: n.label, run: () => go(n.path),
-  }))
-  ;(query ? LAB_ITEMS.filter((l) => match(l.label)) : LAB_ITEMS).forEach((l) => rows.push({
-    key: `l-${l.path}`, section: "Labs",
-    icon: <l.icon className="size-4 shrink-0 text-muted-foreground" />, label: l.label, run: () => go(l.path),
   }))
   ;(query ? ACTIONS.filter((a) => match(a.label)) : ACTIONS).forEach((a) => rows.push({
     key: `a-${a.label}`, section: "Actions",
@@ -223,8 +217,6 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
                     onMouseEnter={() => setActiveIndex(i)}
                     className={cn(
                       "flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left text-sm transition-colors",
-                      // Lignes Labs (Intelligence, Brain OS) : même vague en fond que dans le Ctrl+K.
-                      row.section === "Labs" && "lab-cmd-row",
                       i === activeIdx && "bg-muted",
                     )}
                   >
