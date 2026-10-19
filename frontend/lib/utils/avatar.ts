@@ -1,6 +1,8 @@
 import { createAvatar } from "@dicebear/core"
 import { identicon } from "@dicebear/collection"
 
+import { API_URL } from "@/lib/config/urls"
+
 /**
  * Retourne l'URL de l'avatar pour un utilisateur.
  * - Si `avatarUrl` est défini en DB (photo OAuth GitHub/Google, ou fichier importé) → l'utilise.
@@ -13,9 +15,8 @@ function resolveApiAvatarUrl(avatarUrl: string): string {
     return avatarUrl
   }
 
-  const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080").replace(/\/$/, "")
   const normalizedPath = avatarUrl.startsWith("/") ? avatarUrl : `/${avatarUrl}`
-  return `${apiBaseUrl}${normalizedPath}`
+  return `${API_URL}${normalizedPath}`
 }
 
 /**

@@ -14,6 +14,7 @@ import { SettingsModal } from "@/components/settings/settings-modal"
 import { CreateProjectModal } from "@/components/dialogs/create-project-modal"
 import { ProductTour } from "@/components/tour/product-tour"
 import { PendingInvitationsBanner } from "@/components/invitations/pending-invitations-banner"
+import { IS_DESKTOP } from "@/lib/desktop"
 
 interface AppShellProps {
   readonly children: React.ReactNode
@@ -29,10 +30,11 @@ export function AppShell({ children }: AppShellProps) {
         <AppTopbar />
         {/* Invitations reçues en attente d'approbation - bannière montée hors du <main> keyé par
             la route : un seul fetch par session, persistante à la navigation. Nulle si rien. */}
-        <PendingInvitationsBanner />
+        {/* Ni l'une ni l'autre dans l'app desktop : pas d'invitations, et le compte se supprime en ligne. */}
+        {!IS_DESKTOP && <PendingInvitationsBanner />}
         {/* Bandeau de restauration en HAUT, dans le flux (sous la topbar) : il POUSSE le contenu au
             lieu de le masquer (l'ancienne barre fixe basse recouvrait les cartes). Nul hors suppression. */}
-        <AccountDeletionBanner />
+        {!IS_DESKTOP && <AccountDeletionBanner />}
         {/* `relative` : les panneaux (workflows / chat IA) se positionnent en OVERLAY par-dessus le
             contenu (absolute). `overflow-hidden` : pendant le slide d'ouverture le panneau part hors
             écran à droite - sans clip ici, ça crée une barre de scroll horizontale transitoire qui

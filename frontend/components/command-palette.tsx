@@ -37,6 +37,7 @@ import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { useBrainStore } from "@/lib/store/brain-store"
 import { sendAssistantMessage } from "@/lib/api/assistant-service"
+import { IS_DESKTOP } from "@/lib/desktop"
 
 import {
   CommandDialog,
@@ -156,7 +157,8 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
     { id: "issues",        label: "Go to Issues",        group: "Navigation", icon: <CircleDot className="h-4 w-4" />, action: () => go("/my-work/issues") },
     { id: "cycles",        label: "Go to Cycles",        group: "Navigation", icon: <Repeat className="h-4 w-4" />, action: () => go("/cycles") },
     { id: "roadmap",       label: "Go to Roadmap",       group: "Navigation", icon: <CalendarRange className="h-4 w-4" />, action: () => go("/roadmap") },
-    { id: "members",       label: "Go to Members",       group: "Navigation", icon: <Users className="h-4 w-4" />, action: () => go("/members") },
+    // App desktop : pas de membres, on y travaille seul avec ses agents.
+    ...(IS_DESKTOP ? [] : [{ id: "members", label: "Go to Members", group: "Navigation", icon: <Users className="h-4 w-4" />, action: () => go("/members") }]),
     { id: "settings",      label: "Go to Settings",      group: "Navigation", icon: <Settings className="h-4 w-4" />, action: () => openSettingsHere() },
     { id: "profile",       label: "View my profile",     group: "Navigation", icon: <User className="h-4 w-4" />, action: () => openSettingsHere("profile") },
     { id: "intelligence",  label: "Go to Intelligence",  group: "Navigation", icon: <Activity className="h-4 w-4" />, action: () => go("/analytics") },

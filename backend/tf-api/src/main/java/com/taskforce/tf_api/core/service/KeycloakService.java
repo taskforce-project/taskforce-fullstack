@@ -1,212 +1,48 @@
 package com.taskforce.tf_api.core.service;
 
-import java.util.Collections;
-import java.util.List;
-
-import org.keycloak.admin.client.Keycloak;
-import org.keycloak.admin.client.KeycloakBuilder;
-import org.keycloak.admin.client.resource.RealmResource;
-import org.keycloak.admin.client.resource.UserResource;
-import org.keycloak.admin.client.resource.UsersResource;
-import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
-import jakarta.annotation.PostConstruct;
-import jakarta.ws.rs.core.Response;
-import lombok.extern.slf4j.Slf4j;
 
 /**
- * Service pour communiquer avec Keycloak
- * L'API Java gère toutes les interactions avec Keycloak, pas le frontend
+ * Annuaire des comptes TaskForce : identité, nom, mot de passe et état des comptes, tenus par Keycloak.
+ *
+ * <p>Deux implémentations : {@link KeycloakAdminService} (webapp et auto-hébergement, API d'administration de
+ * Keycloak) et, dans l'app desktop, l'annuaire du seul compte connecté, qui ne joint jamais Keycloak
+ * ({@code com.taskforce.tf_api.core.desktop.DesktopAccountDirectory}). Le nom de l'interface reste celui de
+ * l'ancienne classe pour ne pas toucher à ses appelants.</p>
  */
-@Service
-@Slf4j
-public class KeycloakService {
+public interface KeycloakService {
 
-    @Value("${keycloak.url}")
-    private String serverUrl;
+    /** Crée un compte ; rend son identifiant Keycloak. */
+    String createUser(String email, String password, String firstName, String lastName);
 
-    @Value("${keycloak.realm}")
-    private String realm;
+    /** Marque l'adresse du compte comme vérifiée. */
+    void verifyEmail(String keycloakId);
 
-    @Value("${keycloak.admin.username}")
-    private String adminUsername;
-
-    @Value("${keycloak.admin.password}")
-    private String adminPassword;
-
-    @Value("${keycloak.admin.client-id:admin-cli}")
-    private String adminClientId;
-
-    private Keycloak keycloak;
-    private RealmResource realmResource;
-
-    @PostConstruct
-    public void init() {
-        keycloak = KeycloakBuilder.builder()
-            .serverUrl(serverUrl)
-            .realm("master") // Connexion admin sur le realm master
-            .username(adminUsername)
-            .password(adminPassword)
-            .clientId(adminClientId)
-            .build();
-
-        realmResource = keycloak.realm(realm);
-        log.info("Keycloak admin client initialisé avec succès pour le realm : {}", realm);
-    }
+    /** Compte par identifiant Keycloak. */
+    UserRepresentation getUserById(String keycloakId);
 
     /**
-     * Crée un utilisateur dans Keycloak
-     * Retourne l'ID Keycloak de l'utilisateur créé
+     * Compte par adresse e-mail.
+     *
+     * @throws RuntimeException aucun compte n'a cette adresse
      */
-    public String createUser(String email, String password, String firstName, String lastName) {
-        log.info("Création d'un utilisateur Keycloak : {}", email);
+    UserRepresentation getUserByEmail(String email);
 
-        UserRepresentation user = new UserRepresentation();
-        user.setEmail(email);
-        user.setUsername(email);
-        user.setFirstName(firstName);
-        user.setLastName(lastName);
-        user.setEnabled(true);
-        user.setEmailVerified(false);
+    /** Vrai si un compte a cette adresse. */
+    boolean emailExists(String email);
 
-        // Créer les credentials (mot de passe)
-        CredentialRepresentation credential = new CredentialRepresentation();
-        credential.setType(CredentialRepresentation.PASSWORD);
-        credential.setValue(password);
-        credential.setTemporary(false);
-        user.setCredentials(Collections.singletonList(credential));
+    /** Remplace le mot de passe du compte. */
+    void updatePassword(String keycloakId, String newPassword);
 
-        // Créer l'utilisateur
-        UsersResource usersResource = realmResource.users();
-        Response response = usersResource.create(user);
+    /** Active ou désactive le compte. */
+    void setUserEnabled(String keycloakId, boolean enabled);
 
-        if (response.getStatus() == 201) {
-            // Récupérer l'ID de l'utilisateur créé
-            String locationHeader = response.getHeaderString("Location");
-            String userId = locationHeader.substring(locationHeader.lastIndexOf('/') + 1);
-            log.info("Utilisateur Keycloak créé avec succès. ID : {}", userId);
-            response.close();
-            return userId;
-        } else {
-            String error = response.readEntity(String.class);
-            response.close();
-            log.error("Erreur lors de la création de l'utilisateur Keycloak : {}", error);
-            throw new RuntimeException("Error creating the user: " + error);
-        }
-    }
+    /** Change le prénom et/ou le nom ; un champ {@code null} reste inchangé. */
+    void updateUserNames(String keycloakId, String firstName, String lastName);
 
-    /**
-     * Vérifie l'email d'un utilisateur dans Keycloak
-     */
-    public void verifyEmail(String keycloakId) {
-        log.info("Vérification de l'email pour l'utilisateur Keycloak : {}", keycloakId);
+    /** Supprime le compte. */
+    void deleteUser(String keycloakId);
 
-        UserResource userResource = realmResource.users().get(keycloakId);
-        UserRepresentation user = userResource.toRepresentation();
-        user.setEmailVerified(true);
-        userResource.update(user);
-
-        log.info("Email vérifié avec succès pour l'utilisateur : {}", keycloakId);
-    }
-
-    /**
-     * Récupère un utilisateur Keycloak par son ID
-     */
-    public UserRepresentation getUserById(String keycloakId) {
-        log.info("Récupération de l'utilisateur Keycloak : {}", keycloakId);
-        return realmResource.users().get(keycloakId).toRepresentation();
-    }
-
-    /**
-     * Récupère un utilisateur Keycloak par son email
-     */
-    public UserRepresentation getUserByEmail(String email) {
-        log.info("Recherche de l'utilisateur Keycloak par email : {}", email);
-        List<UserRepresentation> users = realmResource.users().search(email, true);
-
-        if (users.isEmpty()) {
-            throw new RuntimeException("User not found: " + email);
-        }
-
-        return users.get(0);
-    }
-
-    /**
-     * Vérifie si un email existe déjà dans Keycloak
-     */
-    public boolean emailExists(String email) {
-        log.info("Vérification de l'existence de l'email dans Keycloak : {}", email);
-        List<UserRepresentation> users = realmResource.users().search(email, true);
-        return !users.isEmpty();
-    }
-
-    /**
-     * Met à jour le mot de passe d'un utilisateur
-     */
-    public void updatePassword(String keycloakId, String newPassword) {
-        log.info("Mise à jour du mot de passe pour l'utilisateur : {}", keycloakId);
-
-        CredentialRepresentation credential = new CredentialRepresentation();
-        credential.setType(CredentialRepresentation.PASSWORD);
-        credential.setValue(newPassword);
-        credential.setTemporary(false);
-
-        UserResource userResource = realmResource.users().get(keycloakId);
-        userResource.resetPassword(credential);
-
-        log.info("Mot de passe mis à jour avec succès");
-    }
-
-    /**
-     * Active ou désactive un utilisateur
-     */
-    public void setUserEnabled(String keycloakId, boolean enabled) {
-        log.info("Modification du statut de l'utilisateur {} : {}", keycloakId, enabled);
-
-        UserResource userResource = realmResource.users().get(keycloakId);
-        UserRepresentation user = userResource.toRepresentation();
-        user.setEnabled(enabled);
-        userResource.update(user);
-
-        log.info("Statut utilisateur modifié avec succès");
-    }
-
-    /**
-     * Met à jour le prénom et/ou le nom d'un utilisateur dans Keycloak.
-     * Seuls les champs non-null sont appliqués.
-     */
-    public void updateUserNames(String keycloakId, String firstName, String lastName) {
-        log.info("Mise à jour des noms pour l'utilisateur Keycloak : {}", keycloakId);
-
-        UserResource userResource = realmResource.users().get(keycloakId);
-        UserRepresentation user = userResource.toRepresentation();
-
-        if (firstName != null) user.setFirstName(firstName);
-        if (lastName != null)  user.setLastName(lastName);
-
-        userResource.update(user);
-        log.info("Noms mis à jour avec succès pour keycloakId={}", keycloakId);
-    }
-
-    /**
-     * Supprime un utilisateur de Keycloak
-     */
-    public void deleteUser(String keycloakId) {
-        log.info("Suppression de l'utilisateur Keycloak : {}", keycloakId);
-        realmResource.users().get(keycloakId).remove();
-        log.info("Utilisateur supprimé avec succès");
-    }
-
-    /**
-     * Déconnecte l'utilisateur de <b>toutes</b> ses sessions Keycloak (invalide access + refresh
-     * tokens côté IdP). Équivalent OIDC natif de l'ancienne « révocation de tous les tokens ».
-     */
-    public void logoutUser(String keycloakId) {
-        log.info("Déconnexion de toutes les sessions Keycloak pour : {}", keycloakId);
-        realmResource.users().get(keycloakId).logout();
-        log.info("Sessions Keycloak invalidées pour : {}", keycloakId);
-    }
+    /** Ferme toutes les sessions du compte. */
+    void logoutUser(String keycloakId);
 }

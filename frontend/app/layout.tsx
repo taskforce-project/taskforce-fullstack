@@ -10,6 +10,7 @@ import { CookieConsent } from "@/components/common/cookie-consent";
 import { PostHogProvider } from "@/components/analytics/posthog-provider";
 import { A11yFilters } from "@/components/a11y/a11y-filters";
 import { Toaster } from "@/components/ui/sonner";
+import { IS_DESKTOP } from "@/lib/desktop";
 
 // Geist et Geist Mono (Vercel, licence SIL Open Font) : polices de la direction artistique 2026.
 const geist = Geist({
@@ -52,8 +53,13 @@ export default function RootLayout({
                       (modals/voile/menus) + le Toaster + la banniere cookie vivent HORS de ce div ->
                       leur `position: fixed` reste ancree au viewport meme en mode daltonien. */}
                   <div id="app-root">{children}</div>
-                  <CookieConsent />
-                  <PostHogProvider />
+                  {/* Statistiques d'usage : jamais dans l'app desktop, qui n'envoie aucune télémétrie. */}
+                  {!IS_DESKTOP && (
+                    <>
+                      <CookieConsent />
+                      <PostHogProvider />
+                    </>
+                  )}
                 </AuthProvider>
               </ErrorBoundary>
               {/* Défs SVG des filtres daltonisme - appliquées à <body> via globals.css (en plus du contraste élevé) */}

@@ -1,6 +1,6 @@
 # Site de l'app desktop (landing-page/)
 
-**Date :** 19/10/2026 · **Statut :** fait, sur dev ; pas de release vers main tant que l'app desktop n'existe pas (consigne du CEO du 19/10).
+**Date :** 19/10/2026 · **Statut :** en prod le 19/10 (PR #357), avant l'app desktop, sur décision du CEO du 19/10 ; la page de téléchargement dit qu'aucune release desktop n'est publiée.
 **Fiche Brain OS :** `taskforce-docs/v1/02-produit/Landing.md` (LP-DESKTOP-001).
 
 ## Pourquoi

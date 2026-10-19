@@ -62,6 +62,7 @@ import { listChildIssues, listRelations, addRelation, deleteRelation,
          listChecklist, addChecklistItem, updateChecklistItem, deleteChecklistItem,
          listWorklogs, addWorklog, deleteWorklog } from "@/lib/api/issue-service"
 import { parseServerDate } from "@/lib/utils/server-date"
+import { IS_DESKTOP } from "@/lib/desktop"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1206,7 +1207,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
   // Connexion GitHub du workspace : conditionne la section GitHub (liens de PR et de commits).
   useEffect(() => {
-    if (open && workspaceSlug) fetchGitHubStatus(workspaceSlug).catch(() => { /* silent */ })
+    if (open && workspaceSlug && !IS_DESKTOP) fetchGitHubStatus(workspaceSlug).catch(() => { /* silent */ })
   }, [open, workspaceSlug, fetchGitHubStatus])
 
   // Cycles du projet (options du sélecteur) + cycle courant de l'issue - CYC-03b.
@@ -1571,8 +1572,9 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </CollapsibleSection>
             )}
 
-            {/* GitHub - repliable (le contenu ne se charge qu'à l'ouverture) */}
-            {workspaceSlug && (
+            {/* GitHub - repliable (le contenu ne se charge qu'à l'ouverture). Liens tenus par l'intégration GitHub de
+                l'espace, absente de l'app desktop : la pull request d'un agent y reste sur son run (« View result »). */}
+            {workspaceSlug && !IS_DESKTOP && (
               <CollapsibleSection icon={<BrandLogo slug="github" name="GitHub" className="size-4" />} title="GitHub" count={githubLinks[issueId]?.length ?? 0}>
                 <GitHubTab issueId={issueId} workspaceSlug={workspaceSlug} />
               </CollapsibleSection>

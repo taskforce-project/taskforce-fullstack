@@ -69,7 +69,7 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class GitHubIntegrationService {
+public class GitHubIntegrationService implements ProjectRepoHost {
 
     private static final String GITHUB_OAUTH_AUTHORIZE = "https://github.com/login/oauth/authorize";
     private static final String GITHUB_TOKEN_URL       = "https://github.com/login/oauth/access_token";
@@ -446,6 +446,7 @@ public class GitHubIntegrationService {
      * connexion). {@code auto_init=true} pour que le dépôt ait un commit initial → clonable tout de suite
      * par un coding agent (TF-AGENT-DELIVERY). Renvoie le {@code "owner/name"} du dépôt créé.
      */
+    @Override
     public String createRepo(String workspaceSlug, String repoName, boolean isPrivate) {
         String name = GitHubRepoNames.requireName(repoName);
         String token = requireAccessToken(workspaceSlug);
@@ -476,6 +477,7 @@ public class GitHubIntegrationService {
     }
 
     /** Vérifie qu'un dépôt {@code "owner/name"} existe et est accessible via le token du workspace. */
+    @Override
     public void assertRepoAccessible(String workspaceSlug, String repoFullName) {
         String repo = GitHubRepoNames.requireFullName(repoFullName);
         String token = requireAccessToken(workspaceSlug);

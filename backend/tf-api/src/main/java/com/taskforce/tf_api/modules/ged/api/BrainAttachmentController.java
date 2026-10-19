@@ -19,7 +19,7 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.modules.ged.dto.response.BrainFileResponse;
-import com.taskforce.tf_api.modules.ged.service.MinioService;
+import com.taskforce.tf_api.modules.ged.service.ObjectStorage;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -35,7 +35,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class BrainAttachmentController {
 
-    private final MinioService    minioService;
+    private final ObjectStorage    objectStorage;
     private final UserRepository  userRepository;
     private final BrainAccessGuard access;
 
@@ -59,7 +59,7 @@ public class BrainAttachmentController {
         String key  = "brain/" + ws.getId() + "/" + name;
 
         String contentType = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
-        minioService.upload(key, file.getInputStream(), file.getSize(), contentType);
+        objectStorage.upload(key, file.getInputStream(), file.getSize(), contentType);
 
         String url = "/api/files/brain/" + ws.getId() + "/" + name;
         boolean isImage = contentType.startsWith("image/");

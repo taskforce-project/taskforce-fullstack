@@ -5,7 +5,7 @@ import com.taskforce.tf_api.core.dto.response.UserResponse;
 import com.taskforce.tf_api.core.dto.response.UserSearchResult;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
-import com.taskforce.tf_api.modules.ged.service.MinioService;
+import com.taskforce.tf_api.modules.ged.service.ObjectStorage;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import com.taskforce.tf_api.shared.util.ImageUtils;
 
@@ -33,7 +33,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final KeycloakService keycloakService;
-    private final MinioService minioService;
+    private final ObjectStorage objectStorage;
     private final EmailService emailService;
 
     // Miroir du délai de grâce porté par GdprService : sert à exposer la date de PURGE dans /me.
@@ -153,9 +153,9 @@ public class UserService {
             byte[] original = file.getBytes();
             byte[] resized = ImageUtils.resizeAvatar(original);
             if (resized != null) {
-                minioService.upload(objectKey, new ByteArrayInputStream(resized), resized.length, "image/jpeg");
+                objectStorage.upload(objectKey, new ByteArrayInputStream(resized), resized.length, "image/jpeg");
             } else {
-                minioService.upload(objectKey, new ByteArrayInputStream(original), original.length, file.getContentType());
+                objectStorage.upload(objectKey, new ByteArrayInputStream(original), original.length, file.getContentType());
             }
         } catch (Exception e) {
             throw new RuntimeException("Avatar upload failed: " + e.getMessage(), e);

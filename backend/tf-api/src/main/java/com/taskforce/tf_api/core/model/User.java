@@ -73,6 +73,13 @@ public class User {
     private Boolean isActive = true;
 
     /**
+     * Identifiant WebAuthn de la personne (« user handle », base64url), tiré au hasard à sa première passkey : ses
+     * passkeys le portent, il ne dit rien d'elle et ne change pas avec son adresse (V101).
+     */
+    @Column(name = "passkey_handle", unique = true, length = 128)
+    private String passkeyHandle;
+
+    /**
      * Suppression de compte planifiée (délai de grâce) : horodatage de la DEMANDE de suppression.
      * {@code null} = aucune suppression en cours. Le compte reste récupérable jusqu'à la purge (job).
      */

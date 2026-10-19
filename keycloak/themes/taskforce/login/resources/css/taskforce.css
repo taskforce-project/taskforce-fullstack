@@ -1,0 +1,369 @@
+/*
+ * Page de connexion du compte TaskForce : mêmes couleurs, mêmes boutons que l'écran de connexion de l'app desktop
+ * (desktop/static/signin.html). Posée sur le thème « keycloak » de base, dont elle remplace le fond, la carte, les
+ * champs et les boutons. Clair ou sombre selon le système.
+ */
+:root {
+  --tf-bg: #fbfbfc;
+  --tf-panel: #ffffff;
+  --tf-ink: #1c1b19;
+  --tf-muted: #6b6862;
+  --tf-line: #e6e6e9;
+  --tf-field: #ffffff;
+  --tf-accent: #2f6bf6;
+  --tf-accent-hover: #2457d0;
+  --tf-accent-ink: #ffffff;
+  --tf-error: #b42318;
+  --tf-error-bg: #fef3f2;
+  --tf-ok: #067647;
+  --tf-ok-bg: #ecfdf3;
+  --tf-font: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tf-bg: #0e1116;
+    --tf-panel: #151a21;
+    --tf-ink: #ecebe8;
+    --tf-muted: #9a978f;
+    --tf-line: #262b33;
+    --tf-field: #0e1116;
+    --tf-accent-hover: #4b80f7;
+    --tf-error: #f97066;
+    --tf-error-bg: #2a1614;
+    --tf-ok: #47cd89;
+    --tf-ok-bg: #0f2a1d;
+  }
+}
+
+html, body.login-pf, .login-pf body {
+  background: var(--tf-bg) none !important;
+  color: var(--tf-ink);
+  font-family: var(--tf-font);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.login-pf-page {
+  padding: 56px 16px 40px;
+}
+
+/* En-tête : la marque, puis le nom. */
+.login-pf-page .login-pf-page-header {
+  margin-bottom: 20px;
+}
+
+#kc-header-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  color: var(--tf-ink);
+  font-family: var(--tf-font);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  text-transform: none;
+  white-space: normal;
+}
+
+#kc-header-wrapper::before {
+  content: "";
+  width: 44px;
+  height: 44px;
+  background: url("../img/taskforce.svg") no-repeat center / contain;
+}
+
+/* Carte */
+.login-pf-page .card-pf {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 28px 32px 24px;
+  background: var(--tf-panel);
+  border: 1px solid var(--tf-line);
+  border-top: 1px solid var(--tf-line);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  color: var(--tf-ink);
+}
+
+.login-pf-page .login-pf-header {
+  margin-bottom: 20px;
+}
+
+#kc-page-title {
+  font-family: var(--tf-font);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-align: left;
+  color: var(--tf-ink);
+  margin: 0;
+}
+
+.login-pf-page .login-pf-header .login-pf-locale,
+#kc-locale {
+  display: none;
+}
+
+/* Inscription : le titre d'abord, la mention des champs obligatoires dessous, sans les colonnes de Bootstrap. */
+.login-pf-page .login-pf-header > div {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 4px;
+}
+
+.login-pf-page .login-pf-header [class*="col-"] {
+  float: none;
+  width: auto;
+  padding: 0;
+}
+
+.login-pf-page .login-pf-header .subtitle {
+  color: var(--tf-muted);
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.login-pf-page .required {
+  color: var(--tf-error);
+}
+
+/* Champs */
+.login-pf-page label,
+.pf-c-form__label,
+.pf-c-form__label-text,
+.control-label {
+  color: var(--tf-ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.pf-c-form-control,
+.form-control,
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+  height: 40px !important;
+  padding: 8px 12px !important;
+  background: var(--tf-field) !important;
+  color: var(--tf-ink) !important;
+  border: 1px solid var(--tf-line) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  font-family: var(--tf-font);
+  font-size: 14px;
+}
+
+.pf-c-form-control:focus,
+.form-control:focus,
+input:focus {
+  border-color: var(--tf-accent) !important;
+  outline: 2px solid color-mix(in srgb, var(--tf-accent) 25%, transparent);
+  outline-offset: 0;
+}
+
+.pf-c-form-control[aria-invalid="true"] {
+  border-color: var(--tf-error) !important;
+}
+
+/* PatternFly trace les bordures des boutons dans un pseudo-élément : on les trace sur le bouton lui-même. */
+.pf-c-button::after {
+  border: 0 !important;
+}
+
+/* Champ mot de passe avec bouton d'affichage */
+.pf-c-input-group .pf-c-button.pf-m-control {
+  height: 40px;
+  border: 1px solid var(--tf-line) !important;
+  border-left: 0 !important;
+  border-radius: 0 8px 8px 0 !important;
+  background: var(--tf-field) !important;
+  color: var(--tf-muted) !important;
+}
+
+.pf-c-input-group .pf-c-form-control {
+  border-radius: 8px 0 0 8px !important;
+}
+
+.pf-c-input-group {
+  background: transparent !important;
+}
+
+/* Boutons : pleine largeur, en pilule, comme dans l'app desktop */
+#kc-login,
+.pf-c-button.pf-m-primary,
+.btn-primary,
+input[type="submit"] {
+  height: 40px;
+  border-radius: 999px !important;
+  background: var(--tf-accent) !important;
+  border: 1px solid var(--tf-accent) !important;
+  color: var(--tf-accent-ink) !important;
+  font-family: var(--tf-font);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: none !important;
+}
+
+#kc-login:hover,
+.pf-c-button.pf-m-primary:hover,
+.btn-primary:hover,
+input[type="submit"]:hover {
+  background: var(--tf-accent-hover) !important;
+  border-color: var(--tf-accent-hover) !important;
+}
+
+.pf-c-button.pf-m-secondary,
+.btn-default {
+  height: 40px;
+  border-radius: 999px !important;
+  background: var(--tf-panel) !important;
+  border: 1px solid var(--tf-line) !important;
+  color: var(--tf-ink) !important;
+  font-weight: 500;
+}
+
+.pf-c-button:focus-visible,
+.btn:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--tf-accent);
+  outline-offset: 2px;
+}
+
+#kc-form-buttons {
+  margin-top: 20px;
+}
+
+/* Liens */
+.login-pf-page a,
+#kc-registration a,
+#kc-form-options a {
+  color: var(--tf-accent);
+  font-weight: 500;
+}
+
+.login-pf-page a:hover {
+  color: var(--tf-accent-hover);
+}
+
+#kc-form-options .checkbox label,
+.login-pf-page .help-block,
+.login-pf-page .instruction {
+  color: var(--tf-muted);
+  font-weight: 400;
+}
+
+/* Fournisseurs (GitHub, Google) */
+#kc-social-providers hr {
+  border-color: var(--tf-line);
+  margin: 24px 0 16px;
+}
+
+#kc-social-providers h4 {
+  color: var(--tf-muted);
+  font-size: 13px;
+  font-weight: 400;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.kc-social-item,
+#kc-social-providers .pf-c-button {
+  height: 40px;
+  border: 1px solid var(--tf-line) !important;
+  border-radius: 999px !important;
+  background: var(--tf-panel) !important;
+  color: var(--tf-ink) !important;
+  box-shadow: none !important;
+  font-weight: 500;
+}
+
+.kc-social-item:hover,
+#kc-social-providers .pf-c-button:hover {
+  background: var(--tf-bg) !important;
+}
+
+.kc-social-provider-logo,
+.kc-social-gray {
+  color: var(--tf-ink) !important;
+}
+
+/* Bas de carte : « New user? Register » */
+.login-pf-page .login-pf-signup,
+#kc-info {
+  margin: 20px 0 0 !important;
+  padding: 16px 0 0;
+  background: transparent;
+  border-top: 1px solid var(--tf-line);
+  color: var(--tf-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+#kc-info-wrapper {
+  padding: 0;
+  background: transparent;
+}
+
+/* Messages */
+.alert,
+.pf-c-alert {
+  border-radius: 8px;
+  border: 1px solid var(--tf-line);
+  background: var(--tf-panel);
+  color: var(--tf-ink);
+  box-shadow: none;
+}
+
+.alert-error,
+.pf-c-alert.pf-m-danger,
+.kc-feedback-text {
+  color: var(--tf-error);
+}
+
+.alert-error,
+.pf-c-alert.pf-m-danger {
+  background: var(--tf-error-bg);
+  border-color: color-mix(in srgb, var(--tf-error) 35%, transparent);
+}
+
+.alert-success,
+.pf-c-alert.pf-m-success {
+  background: var(--tf-ok-bg);
+  color: var(--tf-ok);
+  border-color: color-mix(in srgb, var(--tf-ok) 35%, transparent);
+}
+
+span.pf-c-form__helper-text.pf-m-error,
+#input-error,
+.kc-feedback-text {
+  color: var(--tf-error);
+  font-size: 13px;
+}
+
+/* Double authentification : QR code et étapes */
+#kc-totp-secret-qr-code {
+  border: 1px solid var(--tf-line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 8px;
+}
+
+#kc-totp-settings,
+#kc-totp-settings li {
+  color: var(--tf-ink);
+}
+
+@media (max-width: 480px) {
+  .login-pf-page {
+    padding-top: 32px;
+  }
+
+  .login-pf-page .card-pf {
+    padding: 24px 20px 20px;
+    border-radius: 10px;
+  }
+}

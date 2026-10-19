@@ -19,8 +19,13 @@ vi.mock('../api/auth-service', () => ({
     logout: vi.fn(),
     getCurrentUser: vi.fn(),
     isAuthenticated: vi.fn(),
+    passkeySignInOptions: vi.fn(),
+    passkeySignIn: vi.fn(),
   },
 }));
+
+const { mockGetPasskey } = vi.hoisted(() => ({ mockGetPasskey: vi.fn() }));
+vi.mock('../auth/passkeys', () => ({ getPasskey: mockGetPasskey }));
 
 describe('AuthContext', () => {
   const mockRouter = {
@@ -172,6 +177,67 @@ describe('AuthContext', () => {
 
       expect(result.current.user).toBeNull();
       expect(result.current.isAuthenticated).toBe(false);
+    });
+  });
+
+  describe('loginWithPasskey', () => {
+    const challenge = { requestId: 'req-1', options: { challenge: 'c' } };
+
+    async function signedOut() {
+      vi.mocked(authService.authService.getCurrentUser).mockReturnValue(null);
+      const hook = renderHook(() => useAuth(), { wrapper: AuthProvider });
+      await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
+      return hook.result;
+    }
+
+    it('signs in with the passkey picked in the browser', async () => {
+      vi.mocked(authService.authService.passkeySignInOptions).mockResolvedValue(challenge);
+      mockGetPasskey.mockResolvedValue({ id: 'abc' });
+      vi.mocked(authService.authService.passkeySignIn).mockResolvedValue({ user: mockUser, accessToken: 'at', expiresIn: 3600 });
+      const result = await signedOut();
+
+      await act(async () => {
+        await expect(result.current.loginWithPasskey()).resolves.toMatchObject({ accessToken: 'at' });
+      });
+
+      expect(mockGetPasskey).toHaveBeenCalledWith(challenge.options, {});
+      expect(authService.authService.passkeySignIn).toHaveBeenCalledWith({ requestId: 'req-1', credential: { id: 'abc' } });
+      expect(result.current.user).toEqual(mockUser);
+    });
+
+    it('opens nothing when the person closes the passkey window', async () => {
+      vi.mocked(authService.authService.passkeySignInOptions).mockResolvedValue(challenge);
+      mockGetPasskey.mockResolvedValue(null);
+      const result = await signedOut();
+
+      await act(async () => {
+        await expect(result.current.loginWithPasskey()).resolves.toBeNull();
+      });
+
+      expect(authService.authService.passkeySignIn).not.toHaveBeenCalled();
+      expect(result.current.user).toBeNull();
+    });
+
+    it('stays quiet when the email field cannot get a challenge', async () => {
+      vi.mocked(authService.authService.passkeySignInOptions).mockRejectedValue(new Error('offline'));
+      const result = await signedOut();
+      const signal = new AbortController().signal;
+
+      await act(async () => {
+        await expect(result.current.loginWithPasskey({ conditional: true, signal })).resolves.toBeNull();
+      });
+
+      expect(authService.authService.passkeySignInOptions).toHaveBeenCalledWith(true);
+      expect(mockGetPasskey).not.toHaveBeenCalled();
+    });
+
+    it('reports a missing challenge when the person asked for a passkey', async () => {
+      vi.mocked(authService.authService.passkeySignInOptions).mockRejectedValue(new Error('offline'));
+      const result = await signedOut();
+
+      await act(async () => {
+        await expect(result.current.loginWithPasskey()).rejects.toThrow('offline');
+      });
     });
   });
 

@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Tests unitaires de {@link ProjectRepoService} (lien Projet ↔ dépôt, TF-AGENT-DELIVERY slice 1).
- * GitHub et la garde d'écriture sont mockés : on vérifie la logique de modes, le scope cross-tenant
+ * L'hôte du dépôt (GitHub) et la garde d'écriture sont mockés : on vérifie la logique de modes, le scope cross-tenant
  * et le délien.
  */
 @ExtendWith(MockitoExtension.class)
@@ -35,7 +35,7 @@ import static org.mockito.Mockito.when;
 class ProjectRepoServiceTest {
 
     @Mock private ProjectRepository projectRepository;
-    @Mock private GitHubIntegrationService gitHubService;
+    @Mock private ProjectRepoHost repoHost;
     @Mock private ProjectVisibilityGuard visibilityGuard;
 
     @InjectMocks private ProjectRepoService service;
@@ -62,7 +62,7 @@ class ProjectRepoServiceTest {
     void link_create_ok() {
         Project project = projectInWorkspace(SLUG);
         when(projectRepository.findById(PROJECT_ID)).thenReturn(Optional.of(project));
-        when(gitHubService.createRepo(SLUG, "new-repo", true)).thenReturn("me/new-repo");
+        when(repoHost.createRepo(SLUG, "new-repo", true)).thenReturn("me/new-repo");
 
         ProjectRepoResponse res = service.linkRepo(SLUG, PROJECT_ID, USER_ID, request("CREATE", "new-repo", null));
 
@@ -83,7 +83,7 @@ class ProjectRepoServiceTest {
 
         assertThat(res.repoFullName()).isEqualTo("someone/existing");
         assertThat(project.getRepoFullName()).isEqualTo("someone/existing");
-        verify(gitHubService).assertRepoAccessible(SLUG, "someone/existing");
+        verify(repoHost).assertRepoAccessible(SLUG, "someone/existing");
     }
 
     @Test
@@ -94,7 +94,7 @@ class ProjectRepoServiceTest {
 
         assertThatThrownBy(() -> service.linkRepo(SLUG, PROJECT_ID, USER_ID, request("LINK", null, "someone/x?per_page=1")))
             .isInstanceOf(BusinessException.class);
-        org.mockito.Mockito.verifyNoInteractions(gitHubService);
+        org.mockito.Mockito.verifyNoInteractions(repoHost);
         assertThat(project.getRepoFullName()).isNull();
     }
 

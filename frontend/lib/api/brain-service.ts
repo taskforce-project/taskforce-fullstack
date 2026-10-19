@@ -4,6 +4,7 @@
  */
 import { apiClient } from "./client"
 import { BRAIN_ROUTES } from "../config/api-routes"
+import { API_URL } from "../config/urls"
 
 export interface KnowledgeNode {
   id: number
@@ -133,9 +134,8 @@ export async function uploadBrainFile(slug: string, file: File): Promise<BrainFi
     { headers: { "Content-Type": "multipart/form-data" } },
   )
   const data = res.data.data
-  const base = process.env.NEXT_PUBLIC_API_URL ?? ""
   // Le backend renvoie un chemin relatif (/api/files/brain/…) → on préfixe l'host public.
-  return { ...data, url: data.url.startsWith("http") ? data.url : `${base}${data.url}` }
+  return { ...data, url: data.url.startsWith("http") ? data.url : `${API_URL}${data.url}` }
 }
 
 /** Recherche sémantique (pgvector). Renvoie les nodes classés par similarité. */

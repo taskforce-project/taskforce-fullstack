@@ -1,7 +1,9 @@
 package com.taskforce.tf_api.shared.config;
 
 import java.util.Optional;
+import java.util.stream.Stream;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -9,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageDeliveryException;
@@ -19,14 +22,19 @@ import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.shared.security.BearerTokenAuthenticator;
 import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,8 +66,23 @@ class StompAuthInterceptorTest {
     @Mock private JwtIdentityResolver identityResolver;
     @Mock private com.taskforce.tf_api.core.service.RealtimeAuthorizationService realtimeAuth;
     @Mock private MessageChannel channel;
+    @Mock private ObjectProvider<BearerTokenAuthenticator> bearerTokenAuthenticators;
 
     @InjectMocks private StompAuthInterceptor interceptor;
+
+    /** Par défaut aucun authentificateur de bearer : seul le décodeur JWT de Keycloak authentifie. */
+    @BeforeEach
+    void noBearerAuthenticators() {
+        lenient().when(bearerTokenAuthenticators.orderedStream()).thenAnswer(invocation -> Stream.empty());
+    }
+
+    private BearerTokenAuthenticator authenticator(boolean realtime) {
+        BearerTokenAuthenticator authenticator = mock(BearerTokenAuthenticator.class);
+        lenient().when(authenticator.supports(any())).thenReturn(true);
+        lenient().when(authenticator.allowsRealtime()).thenReturn(realtime);
+        when(bearerTokenAuthenticators.orderedStream()).thenAnswer(invocation -> Stream.of(authenticator));
+        return authenticator;
+    }
 
     /**
      * {@code setLeaveMutable(true)} reproduit le pipeline réel : sur le {@code clientInboundChannel},
@@ -96,6 +119,33 @@ class StompAuthInterceptorTest {
     @Nested
     @DisplayName("CONNECT — tout échec d'authentification REFUSE la connexion")
     class Connect {
+
+        @Test
+        @DisplayName("jeton de l'app desktop → authentifie sans le décodeur JWT")
+        void desktop_launch_token_opens_realtime() {
+            Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").claim("email", "ada@example.com").build();
+            BearerTokenAuthenticator desktop = authenticator(true);
+            when(desktop.authenticate("tfd_launch")).thenReturn(new JwtAuthenticationToken(jwt));
+            when(identityResolver.resolveEmail(jwt)).thenReturn("ada@example.com");
+            when(userRepository.findByEmail("ada@example.com"))
+                .thenReturn(Optional.of(User.builder().id(1L).email("ada@example.com").build()));
+
+            Message<?> out = interceptor.preSend(connect("Bearer tfd_launch"), channel);
+
+            assertThat(SimpMessageHeaderAccessor.getUser(out.getHeaders()).getName()).isEqualTo("1");
+            verify(jwtDecoder, never()).decode(any());
+        }
+
+        @Test
+        @DisplayName("jeton personnel → n'ouvre pas le temps réel : le décodeur JWT le refuse")
+        void personal_access_token_does_not_open_realtime() {
+            BearerTokenAuthenticator personal = authenticator(false);
+            when(jwtDecoder.decode("tfp_token")).thenThrow(new org.springframework.security.oauth2.jwt.BadJwtException("not a JWT"));
+
+            assertThatThrownBy(() -> interceptor.preSend(connect("Bearer tfp_token"), channel))
+                .isInstanceOf(MessageDeliveryException.class);
+            verify(personal, never()).authenticate(any());
+        }
 
         @Test
         @DisplayName("Bearer valide → authentifie et pose le Principal (= userId)")

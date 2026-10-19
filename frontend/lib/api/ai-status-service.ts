@@ -17,7 +17,11 @@ export interface AiStatus {
   embeddingModel: string | null
 }
 
-export async function getAiStatus(): Promise<AiStatus> {
-  const res = await apiClient.get<{ data: AiStatus }>(AI_ROUTES.STATUS, { silentError: true })
+/** `refresh` relit l'état sans attendre la fin du cache du backend (30 s), juste après un changement de fournisseur. */
+export async function getAiStatus(options: { refresh?: boolean } = {}): Promise<AiStatus> {
+  const res = await apiClient.get<{ data: AiStatus }>(AI_ROUTES.STATUS, {
+    silentError: true,
+    ...(options.refresh ? { params: { refresh: true } } : {}),
+  })
   return res.data.data
 }

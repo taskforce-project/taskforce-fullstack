@@ -28,8 +28,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("KeycloakService Tests")
-class KeycloakServiceTest {
+@DisplayName("KeycloakAdminService Tests")
+class KeycloakAdminServiceTest {
 
     @Mock
     private Keycloak keycloak;
@@ -47,7 +47,7 @@ class KeycloakServiceTest {
     private Response response;
 
     @InjectMocks
-    private KeycloakService keycloakService;
+    private KeycloakAdminService keycloakService;
 
     @BeforeEach
     void setup() {

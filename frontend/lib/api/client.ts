@@ -6,6 +6,8 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { toast } from "sonner";
 import { API_URL, API_URL_SSR } from "@/lib/config/urls";
+import { IS_DESKTOP } from "@/lib/desktop";
+import { getSessionToken } from "./session-token";
 
 /**
  * Extension de la config Axios : `silentError` supprime le toast global (réseau/5xx).
@@ -69,7 +71,7 @@ apiClient.interceptors.request.use(
       }
     } else {
       // Ajouter le token pour les endpoints protégés
-      const token = globalThis.window ? localStorage.getItem("accessToken") : null;
+      const token = getSessionToken();
       
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -135,7 +137,9 @@ apiClient.interceptors.response.use(
 
     // Erreur 401 sur un endpoint protégé, pas déjà retryé.
     // (les 401 des endpoints auth - ex. mauvais mot de passe - sont laissés au formulaire)
-    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
+    // App desktop : le jeton de lancement vaut tant que l'app reste ouverte, il n'y a ni renouvellement ni page de
+    // connexion ; le 401 revient à l'appelant comme une autre erreur 4xx.
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint && !IS_DESKTOP) {
       originalRequest._retry = true;
       try {
         // Single-flight : tous les 401 concurrents partagent le MÊME appel de refresh

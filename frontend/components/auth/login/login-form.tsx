@@ -4,14 +4,17 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import Link from "next/link"
 import { useAuth } from "@/lib/contexts/auth-context"
+import type { AuthResponse } from "@/lib/api/auth-service"
+import { afterSignInPath } from "@/lib/auth/desktop-handoff"
+import { passkeyAutofillAvailable, passkeysSupported } from "@/lib/auth/passkeys"
 import { sanitizeInput, globalRateLimiter } from "@/lib/utils/validation"
 import { loginSchema, firstZodError } from "@/lib/validation/auth-schemas"
-import { Loader2 } from "lucide-react"
+import { KeyRound, Loader2 } from "lucide-react"
 import { AuthSocialButtons } from "@/components/auth/auth-social-buttons"
 import { acceptInvitation } from "@/lib/api/invitation-service"
 import { stashInvitationToken, takeInvitationToken } from "@/lib/utils/pending-invitation"
@@ -25,9 +28,14 @@ import { stashInvitationToken, takeInvitationToken } from "@/lib/utils/pending-i
  *
  * Validation Zod + limitation de tentatives (mot de passe ET codes 2FA). Après connexion, on pose le
  * drapeau `tf.intro` → l'intro de marque joue aussi sur un login par mot de passe (comme en OAuth).
+ *
+ * <b>Passkeys</b> : quand le navigateur en gère, un bouton les propose, et le champ e-mail les suggère dès qu'on le
+ * touche (demande « conditionnelle », annulée dès que la personne choisit le bouton ou quitte la page).
  */
+const noSubscription = () => () => {}
+
 export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
-  const { login } = useAuth()
+  const { login, loginWithPasskey } = useAuth()
   const router = useRouter()
   const { t } = usePreferencesStore()
   const [isLoading, setIsLoading] = useState(false)
@@ -35,12 +43,83 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   // Étape 2FA : le serveur a répondu `twoFactorRequired` → on garde email+password et on demande le code.
   const [totpStep, setTotpStep] = useState(false)
   const [code, setCode] = useState("")
+  // Lu après l'hydratation : le serveur ne connaît pas le navigateur.
+  const passkeys = useSyncExternalStore(noSubscription, passkeysSupported, () => false)
+  const [passkeyBusy, setPasskeyBusy] = useState(false)
+  const autofill = useRef<AbortController | null>(null)
 
   // Un lien d'invitation mène ici avec `?invitation=<token>` : on le met de côté pour l'appliquer
   // après connexion (couvre aussi le détour OAuth, qui perd les paramètres d'URL au retour).
   useEffect(() => {
     stashInvitationToken(new URLSearchParams(window.location.search).get("invitation"))
   }, [])
+
+  // Passkeys suggérées dans le champ e-mail, tant que la page reste ouverte sur l'étape 1.
+  useEffect(() => {
+    if (totpStep) return
+    const controller = new AbortController()
+    autofill.current = controller
+    void (async () => {
+      if (!(await passkeyAutofillAvailable()) || controller.signal.aborted) return
+      try {
+        const result = await loginWithPasskey({ conditional: true, signal: controller.signal })
+        if (result) await finishSignIn(result)
+      } catch (error) {
+        if (!controller.signal.aborted) showPasskeyError(error)
+      }
+    })()
+    return () => controller.abort()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totpStep])
+
+  const showPasskeyError = (error: unknown) => {
+    const message = error instanceof Error && error.name !== "PasskeyError" ? error.message : ""
+    toast.error(t.common.error, { description: message || t.auth.ui.passkeyFailed })
+  }
+
+  const handlePasskey = async () => {
+    autofill.current?.abort()
+    setPasskeyBusy(true)
+    try {
+      const result = await loginWithPasskey()
+      if (result) await finishSignIn(result)
+    } catch (error) {
+      showPasskeyError(error)
+    } finally {
+      setPasskeyBusy(false)
+    }
+  }
+
+  /** Session ouverte : invitation en attente, intro de marque, puis la page suivante. */
+  const finishSignIn = async (result: AuthResponse) => {
+    globalRateLimiter.reset("login")
+    globalRateLimiter.reset("login-2fa")
+
+    // L'intro de marque joue aussi après un login par mot de passe (pas seulement OAuth) :
+    // l'AppShell/ProtectedLayout consomme ce drapeau au montage.
+    try {
+      sessionStorage.setItem("tf.intro", "1")
+    } catch {
+      /* mode privé / stockage indisponible - pas d'intro, on entre quand même */
+    }
+
+    // Approbation explicite : si l'utilisateur arrive d'un lien d'invitation, on l'applique
+    // maintenant (best-effort - un échec n'empêche jamais la connexion réussie).
+    const invitationToken = takeInvitationToken()
+    if (invitationToken) {
+      try {
+        await acceptInvitation(invitationToken)
+        toast.success("Invitation accepted")
+      } catch {
+        toast.success(t.auth.success.loginSuccess)
+      }
+    } else {
+      toast.success(t.auth.success.loginSuccess)
+    }
+    // Direct vers l'onboarding si non fait - évite que l'app « flashe » avant le wizard.
+    // Connexion demandée par l'app desktop : retour sur son accord plutôt que dans la webapp.
+    router.replace(afterSignInPath(result.user?.onboardingCompleted === false ? "/onboarding" : "/"))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -86,32 +165,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         return
       }
 
-      globalRateLimiter.reset("login")
-      globalRateLimiter.reset("login-2fa")
-
-      // L'intro de marque joue aussi après un login par mot de passe (pas seulement OAuth) :
-      // l'AppShell/ProtectedLayout consomme ce drapeau au montage.
-      try {
-        sessionStorage.setItem("tf.intro", "1")
-      } catch {
-        /* mode privé / stockage indisponible - pas d'intro, on entre quand même */
-      }
-
-      // Approbation explicite : si l'utilisateur arrive d'un lien d'invitation, on l'applique
-      // maintenant (best-effort - un échec n'empêche jamais la connexion réussie).
-      const invitationToken = takeInvitationToken()
-      if (invitationToken) {
-        try {
-          await acceptInvitation(invitationToken)
-          toast.success("Invitation accepted")
-        } catch {
-          toast.success(t.auth.success.loginSuccess)
-        }
-      } else {
-        toast.success(t.auth.success.loginSuccess)
-      }
-      // Direct vers l'onboarding si non fait - évite que l'app « flashe » avant le wizard.
-      router.replace(result.user?.onboardingCompleted === false ? "/onboarding" : "/")
+      await finishSignIn(result)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       toast.error(t.common.error, { description: errorMessage || t.auth.errors.loginFailed })
@@ -164,7 +218,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
               <Input
                 id="email"
                 type="email"
-                autoComplete="email"
+                autoComplete="username webauthn"
                 placeholder={t.auth.ui.emailPlaceholder}
                 required
                 value={formData.email}
@@ -195,9 +249,22 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
               />
             </div>
 
-            <Button type="submit" disabled={isLoading} className="auth-submit">
+            <Button type="submit" disabled={isLoading || passkeyBusy} className="auth-submit">
               {isLoading ? (<><Loader2 className="size-4 animate-spin" />{t.auth.ui.signingIn}</>) : t.auth.ui.signIn}
             </Button>
+            {passkeys && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handlePasskey()}
+                disabled={isLoading || passkeyBusy}
+                className="w-full"
+              >
+                {passkeyBusy
+                  ? (<><Loader2 className="size-4 animate-spin" />{t.auth.ui.passkeyWaiting}</>)
+                  : (<><KeyRound className="size-4" />{t.auth.ui.passkeySignIn}</>)}
+              </Button>
+            )}
           </form>
 
           <p className="mt-5 text-center text-xs" style={{ color: "var(--label-tertiary)" }}>

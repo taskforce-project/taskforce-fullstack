@@ -9,6 +9,7 @@ import {
 } from './brain-service';
 import { apiClient } from './client';
 import { BRAIN_ROUTES } from '../config/api-routes';
+import { API_URL } from '../config/urls';
 
 vi.mock('./client', () => ({
   apiClient: {
@@ -97,8 +98,7 @@ describe('brain-service', () => {
       expect((call[1] as FormData).get('file')).toBe(file);
       expect(call[2]).toEqual({ headers: { 'Content-Type': 'multipart/form-data' } });
 
-      const base = process.env.NEXT_PUBLIC_API_URL ?? '';
-      expect(result.url).toBe(`${base}/api/files/brain/x.png`);
+      expect(result.url).toBe(`${API_URL}/api/files/brain/x.png`);
       expect(result.filename).toBe('x.png');
     });
 

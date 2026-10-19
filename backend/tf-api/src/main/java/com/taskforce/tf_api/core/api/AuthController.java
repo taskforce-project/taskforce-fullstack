@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.api;
 
 import java.util.Map;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.beans.factory.annotation.Value;
 
 import org.springframework.http.HttpHeaders;
@@ -41,6 +42,8 @@ import lombok.extern.slf4j.Slf4j;
  * Tous les appels à Keycloak passent par l'API Java
  */
 @RestController
+// Connexion, inscription et mots de passe passent par Keycloak : absents de l'app desktop, où le compte se connecte dans la coque.
+@Profile("!desktop")
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @Slf4j

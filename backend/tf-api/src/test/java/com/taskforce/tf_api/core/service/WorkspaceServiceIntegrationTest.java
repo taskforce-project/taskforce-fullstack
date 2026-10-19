@@ -123,6 +123,14 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
             assertThat(second.getSlug()).isNotEqualTo(first.getSlug());
             assertThat(second.getSlug()).startsWith("dupe-");
         }
+
+        @Test
+        @DisplayName("un nom réservé par une page de la webapp (/account) reçoit un suffixe")
+        void should_not_take_a_reserved_slug() {
+            Workspace ws = workspaceService.createWorkspace(owner, "Account");
+
+            assertThat(ws.getSlug()).startsWith("account-").isNotEqualTo("account");
+        }
     }
 
     // =========================================================================

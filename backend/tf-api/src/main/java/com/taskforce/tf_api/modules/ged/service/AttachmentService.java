@@ -51,7 +51,7 @@ public class AttachmentService {
     private final AttachmentRepository attachmentRepository;
     private final IssueRepository issueRepository;
     private final UserRepository userRepository;
-    private final MinioService minioService;
+    private final ObjectStorage objectStorage;
     private final ProjectVisibilityGuard visibilityGuard;
 
     @Transactional
@@ -71,14 +71,12 @@ public class AttachmentService {
 
         String rawOriginalName = file.getOriginalFilename();
         String originalName = rawOriginalName != null && !rawOriginalName.isBlank() ? rawOriginalName : "unknown";
-        String ext = rawOriginalName != null && rawOriginalName.contains(".")
-            ? rawOriginalName.substring(rawOriginalName.lastIndexOf('.'))
-            : "";
+        String ext = extensionOf(rawOriginalName);
         String storedKey = "issues/" + issueId + "/" + UUID.randomUUID() + ext;
         String contentType = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
 
         try {
-            minioService.upload(storedKey, file.getInputStream(), file.getSize(), contentType);
+            objectStorage.upload(storedKey, file.getInputStream(), file.getSize(), contentType);
         } catch (Exception e) {
             throw new RuntimeException("Upload to storage failed", e);
         }
@@ -121,7 +119,7 @@ public class AttachmentService {
             throw new ForbiddenException("You are not the owner of this attachment");
         }
 
-        minioService.delete(attachment.getStoredKey());
+        objectStorage.delete(attachment.getStoredKey());
         attachmentRepository.delete(attachment);
     }
 
@@ -175,9 +173,9 @@ public class AttachmentService {
     private AttachmentResponse toResponse(Attachment a) {
         String downloadUrl;
         try {
-            downloadUrl = minioService.presignedGetUrl(a.getStoredKey());
+            downloadUrl = objectStorage.presignedGetUrl(a.getStoredKey());
         } catch (Exception e) {
-            log.warn("Présignature MinIO échouée pour {} : {}", a.getStoredKey(), e.getMessage());
+            log.warn("Lien de téléchargement impossible pour {} : {}", a.getStoredKey(), e.getMessage());
             downloadUrl = null;
         }
 
@@ -191,5 +189,21 @@ public class AttachmentService {
                 .uploadedByName(a.getUploadedBy() != null ? a.getUploadedBy().getDisplayName() : "Unknown")
                 .downloadUrl(downloadUrl)
                 .build();
+    }
+
+    /**
+     * Extension du nom d'origine, réduite à des lettres et des chiffres (10 au plus) : elle entre dans la clé de
+     * stockage, qui devient un chemin de fichier dans l'app desktop. Un nom fabriqué ({@code a.x/../../y}) ne peut
+     * donc pas faire sortir la clé de son dossier.
+     */
+    static String extensionOf(String originalName) {
+        if (originalName == null || originalName.lastIndexOf('.') < 0) {
+            return "";
+        }
+        String ext = originalName.substring(originalName.lastIndexOf('.') + 1).replaceAll("[^A-Za-z0-9]", "");
+        if (ext.isEmpty()) {
+            return "";
+        }
+        return "." + (ext.length() > 10 ? ext.substring(0, 10) : ext).toLowerCase(java.util.Locale.ROOT);
     }
 }
