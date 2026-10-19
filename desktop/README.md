@@ -47,7 +47,8 @@ development build:
 
 | Variable | Use |
 | --- | --- |
-| `TF_DESKTOP_ISSUER` | account service to sign in to, for example `http://localhost:8180/realms/taskforce-dev` |
+| `TF_DESKTOP_WEB_URL` | web app whose sign-in page the app opens, for example `http://localhost:3000` |
+| `TF_DESKTOP_API_URL` | API of that web app, for example `http://localhost:8080` |
 | `TF_DESKTOP_USER_DATA` | settings and data folder, to keep test accounts apart from the installed app |
 | `TF_DESKTOP_SIGNIN_IN_LOG=1` | writes the sign-in page to the log instead of opening the default browser |
 | `TF_DESKTOP_RESOURCES` | resources folder, when not `desktop/resources` |

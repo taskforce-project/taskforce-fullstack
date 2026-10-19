@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import { join } from "node:path";
 
-import { accountPageUrl, ISSUER, refresh, revoke, signIn, signInError } from "./account";
+import { ACCOUNT_SERVER, accountPageUrl, refresh, revoke, SessionEndedError, signIn, signInError } from "./account";
 import { parseAiInput } from "./ai";
 import { connectMcp, disconnectMcp, isPersonalToken, isWorkspaceSlug, mcpConnection } from "./claude";
 import { createRepo, DEVICE_PAGE, findRepo, GitHubSignIn, isNewRepoName, isRepoFullName, listRepos } from "./github";
@@ -47,29 +47,50 @@ async function main(): Promise<void> {
 
   // Un compte connecté par un autre service de comptes (développement, changement d'adresse) demande une reconnexion.
   let account = settings.account();
-  if (account?.issuer !== ISSUER) account = undefined;
+  if (account?.issuer !== ACCOUNT_SERVER) account = undefined;
   let signInWin: BrowserWindow | null = null;
+  let refreshed: Promise<"valid" | "ended" | "offline"> = Promise.resolve("valid");
   if (!account) {
     ({ account, window: signInWin } = await signInWindow());
   } else {
-    void refreshAccount(account);
+    refreshed = refreshAccount(account);
   }
   await openApp(account, signInWin);
+  // Session fermée en ligne : traitée une fois la pile démarrée, pour qu'elle s'arrête proprement.
+  if ((await refreshed) === "ended") await sessionEnded();
   startUpdater();
 }
 
-/** Renouvelle la session en ligne et relit le compte ; hors ligne, l'app continue avec le compte connu. */
-async function refreshAccount(account: Account): Promise<void> {
-  const refreshToken = settings.secret(account.subject, "refreshToken");
-  if (!refreshToken) return;
+/**
+ * Relit le compte en ligne et prolonge sa session ; hors ligne, l'app continue avec le compte connu. `ended` : la
+ * session a été fermée en ligne (réglages de la webapp), l'app doit demander de se reconnecter.
+ */
+async function refreshAccount(account: Account): Promise<"valid" | "ended" | "offline"> {
+  const sessionToken = settings.secret(account.subject, "sessionToken");
+  if (!sessionToken) return "ended";
   try {
-    const result = await refresh(refreshToken);
-    if (result.account.subject !== account.subject) return;
-    settings.setAccount(result.account);
-    settings.setSecret(account.subject, "refreshToken", result.refreshToken);
+    const fresh = await refresh(sessionToken);
+    if (fresh.subject === account.subject) settings.setAccount(fresh);
+    return "valid";
   } catch (error) {
-    log.warn(`Session not refreshed (offline or expired): ${(error as Error).message}`);
+    if (error instanceof SessionEndedError) return "ended";
+    log.warn(`Session not refreshed (offline): ${(error as Error).message}`);
+    return "offline";
   }
+}
+
+/** Session fermée en ligne : l'app le dit, oublie le compte sur ce poste et revient à l'écran de connexion. */
+async function sessionEnded(): Promise<void> {
+  log.info("Session ended online: signing out of this computer");
+  settings.clearAccount();
+  await dialog.showMessageBox({
+    type: "info",
+    buttons: ["Sign in"],
+    message: "You're signed out of this computer",
+    detail: "Your session ended, or this computer was signed out from your account settings. Sign in again to keep using TaskForce here. Your projects stay on this computer.",
+  });
+  app.relaunch();
+  app.quit();
 }
 
 /** Écran de connexion : se résout une fois le compte connecté, la fenêtre encore ouverte (cf. `openApp`). */
@@ -91,7 +112,7 @@ function signInWindow(): Promise<{ account: Account; window: BrowserWindow }> {
       try {
         const result = await signIn(openBrowser, signUp);
         settings.setAccount(result.account);
-        settings.setSecret(result.account.subject, "refreshToken", result.refreshToken);
+        settings.setSecret(result.account.subject, "sessionToken", result.sessionToken);
         log.info("Signed in");
         resolve({ account: result.account, window });
         return { ok: true };
@@ -270,8 +291,8 @@ function registerIpc(): void {
   ipcMain.handle("desktop:sign-out", async () => {
     const account = stack?.account ?? settings.account();
     if (account) {
-      const refreshToken = settings.secret(account.subject, "refreshToken");
-      if (refreshToken) await revoke(refreshToken).catch((error: Error) => log.warn(`Revoke failed: ${error.message}`));
+      const sessionToken = settings.secret(account.subject, "sessionToken");
+      if (sessionToken) await revoke(sessionToken).catch((error: Error) => log.warn(`Revoke failed: ${error.message}`));
     }
     settings.clearAccount();
     log.info("Signed out");

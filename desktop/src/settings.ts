@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 
 import { DEFAULT_AI_SETTINGS, type AiSettings } from "./ai";
 
-/** Compte TaskForce connecté, lu dans le jeton d'identité du compte hébergé. */
+/** Compte TaskForce connecté, tel que l'API du compte le rend à la connexion. */
 export interface Account {
   /** Service de comptes qui l'a connecté : un compte d'un autre service (développement, nouvelle adresse) ne s'ouvre pas. */
   issuer: string;
@@ -16,7 +16,9 @@ export interface Account {
 
 /** Secrets d'un compte sur ce poste, chiffrés par le système (DPAPI, Trousseau, libsecret). */
 interface AccountSecrets {
-  /** Jeton de rafraîchissement du compte hébergé (session longue, renouvelée en ligne). */
+  /** Jeton de session de l'app (`tfa_`), ouvert par la connexion dans la webapp et prolongé à chaque lancement. */
+  sessionToken?: string;
+  /** Ancienne session Keycloak (avant la connexion par la webapp) : plus lue, effacée à la déconnexion. */
   refreshToken?: string;
   /** Mot de passe de la base embarquée du compte. */
   databasePassword?: string;
@@ -86,7 +88,7 @@ export const settings = {
     if (current.account) {
       const secrets = { ...(current.secrets ?? {}) };
       const entry = secrets[current.account.subject];
-      if (entry) secrets[current.account.subject] = { ...entry, refreshToken: undefined };
+      if (entry) secrets[current.account.subject] = { ...entry, sessionToken: undefined, refreshToken: undefined };
       write({ ...current, account: undefined, secrets });
     }
   },
