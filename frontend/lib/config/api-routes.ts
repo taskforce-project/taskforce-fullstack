@@ -374,9 +374,6 @@ export const TEAM_ROUTES = {
   REMOVE_MEMBER:  (slug: string, teamId: number, userId: number) => `/api/workspaces/${slug}/teams/${teamId}/members/${userId}`,
 } as const;
 
-// Base backend pour les redirections navigateur (OAuth) - PAS pour les appels Axios.
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-
 /**
  * Routes intégrations (GitHub / Slack / Webhooks)
  * Backend: IntegrationController + WebhookController
@@ -387,12 +384,13 @@ export const INTEGRATION_ROUTES = {
   GITHUB_ISSUES:     (slug: string, repo: string) => `/api/workspaces/${slug}/integrations/github/issues?repo=${encodeURIComponent(repo)}`,
   /** Ingestion Brain OS : issues + PR d'un depot -> nodes de connaissance */
   GITHUB_SYNC:       (slug: string, repo: string) => `/api/workspaces/${slug}/integrations/github/sync?repo=${encodeURIComponent(repo)}`,
-  GITHUB_CONNECT:    (slug: string) => `${API_BASE}/api/workspaces/${slug}/integrations/github/connect`,
+  /** Appel Axios qui renvoie l'URL d'autorisation : relative, comme les autres (base du client HTTP). */
+  GITHUB_CONNECT:    (slug: string) => `/api/workspaces/${slug}/integrations/github/connect`,
   GITHUB_DISCONNECT: (slug: string) => `/api/workspaces/${slug}/integrations/github`,
   GITHUB_LINKS:      (slug: string, issueId: number) => `/api/workspaces/${slug}/integrations/github/issues/${issueId}/links`,
   GITHUB_LINK:       (slug: string, linkId: number) => `/api/workspaces/${slug}/integrations/github/links/${linkId}`,
   SLACK_STATUS:      (slug: string) => `/api/workspaces/${slug}/integrations/slack/status`,
-  SLACK_CONNECT:     (slug: string) => `${API_BASE}/api/workspaces/${slug}/integrations/slack/connect`,
+  SLACK_CONNECT:     (slug: string) => `/api/workspaces/${slug}/integrations/slack/connect`,
   SLACK_DISCONNECT:  (slug: string) => `/api/workspaces/${slug}/integrations/slack`,
   SLACK_CHANNELS:    (slug: string) => `/api/workspaces/${slug}/integrations/slack/channels`,
   SLACK_CHANNEL:     (slug: string, channelId: number) => `/api/workspaces/${slug}/integrations/slack/channels/${channelId}`,
