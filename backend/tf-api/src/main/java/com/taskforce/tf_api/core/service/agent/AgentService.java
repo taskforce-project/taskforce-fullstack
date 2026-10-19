@@ -21,6 +21,7 @@ import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.AiUsageService;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
@@ -38,7 +39,8 @@ import lombok.extern.slf4j.Slf4j;
  *
  * <p><b>Sans IA disponible</b>, la recherche reste réelle : on renvoie les notes trouvées et un message
  * de repli. Les écritures dans un outil externe (MCP) ne sont jamais exécutées par le modèle : elles sont
- * proposées à l'utilisateur, qui les valide dans la conversation.</p>
+ * proposées à un propriétaire ou un administrateur, qui les valide dans la conversation ; aucun réglage ne
+ * lève cette validation.</p>
  *
  * <p><b>PC-022 — aucune transaction n'englobe la boucle LLM.</b> L'orchestrateur ne tient aucune
  * transaction ; chaque accès à la base passe par un collaborateur transactionnel (BrainAccessGuard,
@@ -57,10 +59,7 @@ public class AgentService {
     private final ObjectMapper        objectMapper;
     private final AiUsageService      aiUsageService;
     private final WorkspaceMcpService workspaceMcp;
-
-    // Sûreté MCP : les écritures externes sont PROPOSÉES (validation humaine), pas exécutées par l'agent.
-    @Value("${integrations.mcp.confirm-writes:true}")
-    private boolean confirmExternalWrites;
+    private final AuthorizationService authorization;
 
     // Tier des tours avec outils externes MCP. Défaut "fast" ; "standard" pour plus de fiabilité
     // multi-outils si le matériel suit.
@@ -257,11 +256,18 @@ public class AgentService {
                     if (tool == null) {
                         result = "Unknown tool: " + name;
                         status = "error";
-                    } else if (confirmExternalWrites && tool instanceof ExternalMcpTool ext && !ext.isReadOnly()) {
-                        // Écriture externe : NE PAS exécuter, proposer l'action à l'utilisateur (validation humaine).
-                        result = "Action proposed to the user, waiting for their approval in the conversation. "
-                            + "Do not call this tool again; just summarize the action you propose.";
-                        status = "pending";
+                    } else if (tool instanceof ExternalMcpTool ext && !ext.isReadOnly()) {
+                        // Écriture externe : jamais exécutée par le modèle. Proposée seulement à qui peut la
+                        // valider (propriétaire ou administrateur, OSS-1.5), refusée d'emblée aux autres.
+                        if (authorization.isManager(ctx.workspaceId(), ctx.userId())) {
+                            result = "Action proposed to the user, waiting for their approval in the conversation. "
+                                + "Do not call this tool again; just summarize the action you propose.";
+                            status = "pending";
+                        } else {
+                            result = "Not run: only workspace owners and admins can approve a change in an external "
+                                + "tool. Tell the user that an owner or admin has to make this change.";
+                            status = "error";
+                        }
                     } else {
                         Map<String, Object> args = objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {});
                         result = tool.execute(args, ctx);
@@ -324,7 +330,8 @@ public class AgentService {
           .append("Never create anything the user did not ask for. ")
           .append("If you need data from an external system you have no tool for, call find_integration: when ")
           .append("the integration exists but is not connected, invite the user to connect it (Settings > ")
-          .append("Integrations); when it is not in the catalog, say so plainly. Never make data up. ");
+          .append("Integrations); when it is not in the catalog, say so plainly and add that a tool with an MCP ")
+          .append("server can still be connected there. Never make data up. ");
         if (!external.isEmpty()) {
             String names = external.stream().map(AgentTool::name).collect(Collectors.joining(", "));
             sb.append("External tools are connected (MCP servers): ").append(names).append(". ")
@@ -334,7 +341,7 @@ public class AgentService {
               .append("For an action possible on both sides (e.g. creating an issue), target TaskForce by default; ")
               .append("target an external system only when the user names it. ")
               .append("Call an external write tool only with explicit, checked parameters and only when the user ")
-              .append("asked for it; it will be submitted to the user for approval anyway. ");
+              .append("asked for it; it never runs directly: an owner or admin approves it in the conversation. ");
         }
         if (!hits.isEmpty()) {
             sb.append("\n\nContext (Brain OS):\n");

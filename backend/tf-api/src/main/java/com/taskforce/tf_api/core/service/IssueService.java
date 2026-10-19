@@ -4,7 +4,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -46,7 +48,9 @@ import com.taskforce.tf_api.core.enums.IssueActivityType;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueRelationType;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
+import com.taskforce.tf_api.core.enums.WebhookEventType;
 import com.taskforce.tf_api.core.event.IssueCompletedEvent;
+import com.taskforce.tf_api.core.service.webhook.WorkspaceWebhookEvent;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueActivity;
 import com.taskforce.tf_api.core.model.IssueComment;
@@ -370,12 +374,13 @@ public class IssueService {
 
         IssueResponse created = toResponse(issue);
         publishIssueEvent("created", issue.getProject().getId(), issue.getId(), created);
+        publishWebhook(project, WebhookEventType.ISSUE_CREATED, reporterId, Map.of("issue", created), issue.getId());
 
         // Push Slack (best-effort, async) vers les canaux abonnés à "issue.created"
         slackService.notifyEvent(
             project.getWorkspace().getId(),
             "issue.created",
-            "🆕 New issue *" + project.getIdentifier() + "-" + issue.getSequenceNumber() + "* : " + issue.getTitle()
+            "🆕 New issue *" + project.getIdentifier() + "-" + issue.getSequenceNumber() + "*: " + issue.getTitle()
         );
 
         return created;
@@ -390,6 +395,7 @@ public class IssueService {
         issue.setAssignmentStatus(AssignmentStatus.ACCEPTED);
         IssueResponse resp = toResponse(issue);
         publishIssueEvent("updated", issue.getProject().getId(), issue.getId(), resp);
+        publishWebhook(issue.getProject(), WebhookEventType.ISSUE_UPDATED, userId, Map.of("issue", resp), issue.getId());
         return resp;
     }
 
@@ -414,6 +420,7 @@ public class IssueService {
 
         IssueResponse resp = toResponse(issue);
         publishIssueEvent("updated", issue.getProject().getId(), issue.getId(), resp);
+        publishWebhook(issue.getProject(), WebhookEventType.ISSUE_UPDATED, userId, Map.of("issue", resp), issue.getId());
         return resp;
     }
 
@@ -437,6 +444,8 @@ public class IssueService {
 
         Issue issue = resolveIssue(issueId, project.getId());
         User actor = resolveUser(userId);
+        // Un glisser-déposer dans une colonne ne change que la position : rien à annoncer hors de l'écran.
+        boolean positionOnly = isPositionOnly(request);
 
         if (request.getTitle() != null && !request.getTitle().isBlank()) {
             String old = issue.getTitle();
@@ -557,6 +566,8 @@ public class IssueService {
         } catch (Exception e) {
             log.warn("Publication temps réel 'issue.updated' échouée (non bloquant) : {}", e.getMessage());
         }
+        if (positionOnly) return updated;
+        publishWebhook(project, WebhookEventType.ISSUE_UPDATED, userId, Map.of("issue", updated), issue.getId());
         try {
             slackService.notifyEvent(issue.getProject().getWorkspace().getId(), "issue.updated",
                 "✏️ Issue *" + issue.getProject().getIdentifier() + "-" + issue.getSequenceNumber() + "* updated: " + issue.getTitle());
@@ -690,8 +701,10 @@ public class IssueService {
         String issueRef   = project.getIdentifier() + "-" + issue.getSequenceNumber();
         String issueTitle = issue.getTitle();
         Long   workspaceId = project.getWorkspace().getId();
+        Map<String, Object> deleted = issueRef(project, issue);
         issueRepository.delete(issue);
         publishIssueEvent("deleted", project.getId(), issueId, null);
+        publishWebhook(project, WebhookEventType.ISSUE_DELETED, userId, Map.of("issue", deleted), null);
         slackService.notifyEvent(workspaceId, "issue.deleted", "🗑️ Issue *" + issueRef + "* deleted: " + issueTitle);
         log.info("Issue {} supprimée du projet {}", issueId, projectId);
     }
@@ -707,6 +720,7 @@ public class IssueService {
         issue = issueRepository.save(issue);
         IssueResponse updated = toResponse(issue);
         publishIssueEvent("updated", project.getId(), issueId, updated);
+        publishWebhook(project, WebhookEventType.ISSUE_UPDATED, userId, Map.of("issue", updated), issueId);
         return updated;
     }
 
@@ -720,6 +734,34 @@ public class IssueService {
         IssueResponse updated = toResponse(issue);
         publishIssueEvent("updated", project.getId(), issueId, updated);
         return updated;
+    }
+
+    /**
+     * Événement pour les webhooks sortants du workspace (OSS-6.2). Leurs envois sont écrits avant le commit de
+     * cette transaction, puis envoyés hors transaction ; {@code issueId} donne le lien vers l'issue.
+     */
+    private void publishWebhook(Project project, WebhookEventType type, Long actorId, Object data, Long issueId) {
+        String path = issueId == null ? null
+            : "/" + project.getWorkspace().getSlug() + "/projects/" + project.getId() + "/issues/" + issueId;
+        events.publishEvent(new WorkspaceWebhookEvent(project.getWorkspace().getId(), type, actorId, data, path));
+    }
+
+    /** Référence courte d'une issue (événement sur une issue supprimée, ou dont le détail est ailleurs). */
+    private static Map<String, Object> issueRef(Project project, Issue issue) {
+        Map<String, Object> ref = new LinkedHashMap<>();
+        ref.put("id", issue.getId());
+        ref.put("identifier", project.getIdentifier() + "-" + issue.getSequenceNumber());
+        ref.put("title", issue.getTitle());
+        ref.put("projectId", project.getId());
+        return ref;
+    }
+
+    /** La requête ne fait que déplacer l'issue dans sa colonne (glisser-déposer). */
+    static boolean isPositionOnly(UpdateIssueRequest r) {
+        return r.getPosition() != null && r.getTitle() == null && r.getDescription() == null
+            && r.getPriority() == null && r.getStatusId() == null && r.getTypeId() == null
+            && r.getAssigneeId() == null && r.getParentId() == null && r.getStartDate() == null
+            && r.getDueDate() == null && r.getStoryPoints() == null && r.getLabelIds() == null;
     }
 
     /** Diffuse un événement issue en temps réel sur le topic projet (best-effort). */
@@ -871,6 +913,9 @@ public class IssueService {
             .build();
         comment = commentRepository.save(comment);
         logActivity(issue, author, IssueActivityType.COMMENT_ADDED, null, null);
+        IssueCommentResponse created = toCommentResponse(comment);
+        publishWebhook(project, WebhookEventType.COMMENT_CREATED, userId,
+            Map.of("comment", created, "issue", issueRef(project, issue)), issue.getId());
         notificationService.notifyCommented(issue, author, comment);
         slackService.notifyEvent(project.getWorkspace().getId(), "comment.created",
             "💬 New comment from " + author.getDisplayName() + " on *" + project.getIdentifier() + "-" + issue.getSequenceNumber() + "*");
@@ -880,7 +925,7 @@ public class IssueService {
         if (!mentioned.isEmpty()) {
             notificationService.notifyMentions(issue, author, mentioned, request.getContent());
         }
-        return toCommentResponse(comment);
+        return created;
     }
 
     /** Motif de mention : @ suivi d'un token email ou de sa partie locale (ex. @pierre.michel ou @a@b.com) */

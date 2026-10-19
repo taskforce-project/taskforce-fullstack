@@ -255,6 +255,20 @@ describe('project-store', () => {
     expect(useProjectStore.getState().error).toBe('repofail');
   });
 
+  it('linkRepo keeps the backend message (repository not found)', async () => {
+    act(() => useProjectStore.setState({ projects: [makeProject({ id: 5 })] }));
+    vi.mocked(svc.setProjectRepo).mockRejectedValue(Object.assign(new Error('Request failed with status code 400'), {
+      isAxiosError: true,
+      response: { status: 400, data: { message: 'GitHub repository not found or not accessible: a/b' } },
+    }));
+
+    await act(async () => {
+      await useProjectStore.getState().linkRepo('acme', 5, { mode: 'LINK', repoFullName: 'a/b' });
+    });
+
+    expect(useProjectStore.getState().error).toBe('GitHub repository not found or not accessible: a/b');
+  });
+
   it('unlinkRepo clears the project repo fields and returns true', async () => {
     const original = makeProject({ id: 5, repoProvider: 'github', repoFullName: 'me/old' });
     act(() => useProjectStore.setState({ projects: [original], activeProject: original }));

@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { ProjectMembersManager } from "@/components/projects/project-members-manager"
+import { ProjectRepositoryCard } from "@/components/projects/project-repository-card"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import {
   Select,
@@ -459,10 +460,12 @@ export default function ProjectSettingsPage() {
       </section>
       )}
 
-      {/* ── Integrations → gérées au niveau workspace ── */}
+      {/* ── Integrations : le dépôt de code du projet, puis les intégrations (gérées au niveau workspace) ── */}
       {section === "integrations" && (
       <section>
-        <SectionTitle icon={GitBranch} title="Integrations" description="Managed once for the whole workspace" />
+        <SectionTitle icon={GitBranch} title="Integrations" description="This project's code repository, and the tools connected to the workspace" />
+        <div className="flex flex-col gap-4">
+        <ProjectRepositoryCard workspace={workspace} projectId={projectId} />
         <div className="flex flex-col items-start gap-4 rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             {["github", "slack", "linear", "notion", "figma"].map((k) => (
@@ -470,14 +473,15 @@ export default function ProjectSettingsPage() {
                 <BrandLogo slug={k} name={k} className="size-full" />
               </div>
             ))}
-            <span className="ml-1 text-xs text-muted-foreground">+40 others</span>
+            <span className="ml-1 text-xs text-muted-foreground">and any MCP server</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            GitHub, Slack and all connectors plug in at the <span className="font-medium text-foreground">workspace</span> level, then apply to this project - a single place to manage.
+            GitHub, Slack, Plane and MCP servers connect at the <span className="font-medium text-foreground">workspace</span> level, then apply to this project: a single place to manage them.
           </p>
           <Button className="gap-2" onClick={() => openSettings("integrations")}>
             <Plug className="size-4" /> Manage integrations
           </Button>
+        </div>
         </div>
       </section>
       )}

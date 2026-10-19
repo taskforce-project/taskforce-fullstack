@@ -27,6 +27,9 @@ import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { getGitHubRepos, getGitHubRepoIssues, syncGitHub, syncSlack, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { IntegrationsCatalog } from "@/components/integrations/integrations-catalog"
+import { DisconnectConfirmDialog, DISCONNECT_CONSEQUENCES } from "@/components/integrations/disconnect-confirm-dialog"
+import { WebhooksPanel } from "@/components/settings/webhooks-panel"
+import { EventPicker } from "@/components/settings/event-picker"
 import { AgentsPanel } from "@/components/settings/agents-panel"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { ProfileOverview } from "@/components/profile/profile-overview"
@@ -44,7 +47,7 @@ import {
   type NotificationEventKey,
 } from "@/lib/api/notification-service"
 import { getSystemStatus, type SystemStatus } from "@/lib/api/status-service"
-import { apiClient } from "@/lib/api/client"
+import { apiClient, getErrorMessage } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
 import { cn } from "@/lib/utils"
 
@@ -1254,32 +1257,26 @@ function IntegrationsPanel() {
   const { activeWorkspace } = useWorkspaceStore()
   const slug = activeWorkspace?.slug ?? ""
   const {
-    githubStatus, slackStatus, slackChannels, webhooks,
+    githubStatus, slackStatus, slackChannels,
     fetchGitHubStatus, disconnectGitHub,
     fetchSlackStatus, disconnectSlack,
     fetchSlackChannels, addSlackChannel, removeSlackChannel,
-    fetchWebhooks, addWebhook, removeWebhook,
   } = useIntegrationStore()
 
   // Slack channel form
   const [channelId,   setChannelId]   = useState("")
   const [channelName, setChannelName] = useState("")
+  const [channelEvents, setChannelEvents] = useState<string[]>(["issue.created"])
   const [addingChannel, setAddingChannel] = useState(false)
   const [syncingChannel, setSyncingChannel] = useState<string | null>(null)
-
-  // Webhook form
-  const [webhookUrl,    setWebhookUrl]    = useState("")
-  const [webhookEvents, setWebhookEvents] = useState<string[]>(["issue.created"])
-  const [addingWebhook, setAddingWebhook] = useState(false)
-
-  const ALL_EVENTS = ["issue.created", "issue.updated", "issue.deleted", "cycle.completed", "comment.created"]
+  // Déconnexion en attente de confirmation (elle révoque l'accès chez le service).
+  const [confirmDisconnect, setConfirmDisconnect] = useState<"github" | "slack" | null>(null)
 
   useEffect(() => {
     if (!slug) return
     fetchGitHubStatus(slug).catch(() => null)
     fetchSlackStatus(slug).catch(() => null)
-    fetchWebhooks(slug).catch(() => null)
-  }, [slug, fetchGitHubStatus, fetchSlackStatus, fetchWebhooks])
+  }, [slug, fetchGitHubStatus, fetchSlackStatus])
 
   useEffect(() => {
     if (slug && slackStatus?.connected) {
@@ -1287,21 +1284,14 @@ function IntegrationsPanel() {
     }
   }, [slug, slackStatus?.connected, fetchSlackChannels])
 
-  async function handleDisconnectGitHub() {
+  async function handleDisconnect(provider: "github" | "slack") {
+    const name = provider === "github" ? "GitHub" : "Slack"
     try {
-      await disconnectGitHub(slug)
-      toast.success("GitHub disconnected")
-    } catch {
-      toast.error("Couldn't disconnect GitHub")
-    }
-  }
-
-  async function handleDisconnectSlack() {
-    try {
-      await disconnectSlack(slug)
-      toast.success("Slack disconnected")
-    } catch {
-      toast.error("Couldn't disconnect Slack")
+      if (provider === "github") await disconnectGitHub(slug)
+      else await disconnectSlack(slug)
+      toast.success(`${name} disconnected`)
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     }
   }
 
@@ -1309,12 +1299,12 @@ function IntegrationsPanel() {
     if (!channelId.trim() || !channelName.trim()) return
     setAddingChannel(true)
     try {
-      await addSlackChannel(slug, { channelId: channelId.trim(), channelName: channelName.trim(), eventTypes: ["issue.created"] })
+      await addSlackChannel(slug, { channelId: channelId.trim(), channelName: channelName.trim(), eventTypes: channelEvents })
       setChannelId("")
       setChannelName("")
       toast.success("Slack channel added")
-    } catch {
-      toast.error("Couldn't add the channel")
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     } finally {
       setAddingChannel(false)
     }
@@ -1325,37 +1315,17 @@ function IntegrationsPanel() {
     try {
       const r = await syncSlack(slug, chId)
       toast.success(`Ingested into the Brain OS: ${r.created} created, ${r.updated} updated`)
-    } catch {
-      toast.error("Couldn't sync this channel")
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     } finally {
       setSyncingChannel(null)
     }
   }
 
-  async function handleAddWebhook() {
-    if (!webhookUrl.trim()) return
-    setAddingWebhook(true)
-    try {
-      await addWebhook(slug, { url: webhookUrl.trim(), eventTypes: webhookEvents })
-      setWebhookUrl("")
-      toast.success("Webhook added")
-    } catch {
-      toast.error("Invalid or unreachable URL")
-    } finally {
-      setAddingWebhook(false)
-    }
-  }
-
-  function toggleEvent(event: string) {
-    setWebhookEvents((prev) =>
-      prev.includes(event) ? prev.filter((e) => e !== event) : [...prev, event]
-    )
-  }
-
   return (
     <div className="flex flex-col gap-4">
       {/* ---- Catalogue (le pool générique) ---- */}
-      <SectionCard title="Integrations catalog" description="Connect your tools to the Brain OS. Deep sync for GitHub, Slack and Plane; MCP for the rest (ⓘ help on hover).">
+      <SectionCard title="Integrations catalog" description="GitHub, Slack and Plane sync natively; any other tool connects through its MCP server.">
 
         {slug && <IntegrationsCatalog slug={slug} />}
       </SectionCard>
@@ -1376,7 +1346,7 @@ function IntegrationsPanel() {
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-xs text-ink-green border-shape-green/20 bg-shape-green/10">Connected</Badge>
-              <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDisconnectGitHub}>
+              <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setConfirmDisconnect("github")}>
                 Disconnect
               </Button>
             </div>
@@ -1401,7 +1371,7 @@ function IntegrationsPanel() {
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs text-ink-green border-shape-green/20 bg-shape-green/10">Connected</Badge>
-                <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDisconnectSlack}>
+                <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setConfirmDisconnect("slack")}>
                   Disconnect
                 </Button>
               </div>
@@ -1418,7 +1388,7 @@ function IntegrationsPanel() {
                 <div key={ch.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
                   <div>
                     <p className="text-sm font-medium text-foreground">#{ch.channelName}</p>
-                    <p className="text-xs text-muted-foreground">{ch.eventTypes.join(", ")}</p>
+                    <p className="text-xs text-muted-foreground">{ch.eventTypes.length === 0 ? "All events" : ch.eventTypes.join(", ")}</p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <Button
@@ -1462,74 +1432,28 @@ function IntegrationsPanel() {
                   {addingChannel ? "Adding…" : "Add"}
                 </Button>
               </div>
+              <EventPicker value={channelEvents} onChange={setChannelEvents} />
             </div>
           </div>
         </SectionCard>
       )}
 
-      {/* ---- Webhooks ---- */}
-      <SectionCard title="Webhooks" description="Receive HTTP POST events for workspace activity.">
-        <div className="flex flex-col gap-3">
-          {webhooks.length > 0 && (
-            <div className="flex flex-col gap-2 mb-1">
-              {webhooks.map((wh) => (
-                <div key={wh.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
-                  <div className="min-w-0 mr-2">
-                    <p className="text-sm font-mono text-foreground truncate">{wh.url}</p>
-                    <p className="text-xs text-muted-foreground">{wh.eventTypes.join(", ")}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {wh.lastStatus && (
-                      <Badge variant="outline" className={cn("text-xs", wh.lastStatus < 300 ? "text-ink-green border-shape-green/20" : "text-destructive border-destructive/20")}>
-                        {wh.lastStatus}
-                      </Badge>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                      onClick={async () => {
-                        try { await removeWebhook(slug, wh.id); toast.success("Webhook removed") }
-                        catch { toast.error("Couldn't remove the webhook") }
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex gap-2">
-            <StyledInput
-              type="url"
-              placeholder="https://example.com/webhook"
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-            />
-            <Button size="sm" className="h-control text-xs shrink-0" disabled={!webhookUrl || addingWebhook} onClick={handleAddWebhook}>
-              {addingWebhook ? "Adding…" : "Add webhook"}
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {ALL_EVENTS.map((event) => (
-              <button
-                key={event}
-                type="button"
-                onClick={() => toggleEvent(event)}
-                className={cn(
-                  "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
-                  webhookEvents.includes(event)
-                    ? "border-primary/50 bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground hover:border-primary/30"
-                )}
-              >
-                {event}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* ---- Webhooks sortants (OSS-6.2) ---- */}
+      <SectionCard title="Webhooks" description="Send workspace events to n8n, Zapier, Make or your own endpoint.">
+        {slug && <WebhooksPanel slug={slug} />}
       </SectionCard>
+
+      <DisconnectConfirmDialog
+        open={confirmDisconnect !== null}
+        onOpenChange={(open) => { if (!open) setConfirmDisconnect(null) }}
+        name={confirmDisconnect === "slack" ? "Slack" : "GitHub"}
+        consequence={DISCONNECT_CONSEQUENCES[confirmDisconnect ?? "github"]}
+        onConfirm={() => {
+          const provider = confirmDisconnect
+          setConfirmDisconnect(null)
+          if (provider) handleDisconnect(provider)
+        }}
+      />
     </div>
   )
 }
@@ -1795,7 +1719,8 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
  * Route `/settings` - la page standalone a été RETIRÉE (redondante avec le modal Settings, monté
  * globalement dans `app-shell` et ouvrable depuis n'importe quel CTA via `useSettingsStore`). Cette
  * route se contente désormais d'OUVRIR le modal par-dessus le dashboard, en préservant le deep-link
- * `?section=` et le retour OAuth GitHub/Slack (toast + ouverture directe sur « Integrations »).
+ * `?section=` et le retour OAuth GitHub, Slack et serveurs MCP (toast + ouverture directe sur
+ * « Integrations »). Le toast se fait ici : l'URL est remplacée avant que le catalogue ne la lise.
  * Les briques (`SECTIONS`, `SettingsNav`, `SettingsPanels`, panneaux) restent exportées ci-dessus
  * et sont réutilisées par le modal.
  */
@@ -1810,9 +1735,15 @@ export default function SettingsPage() {
     const section = searchParams.get("section")
     const github = searchParams.get("github")
     const slack = searchParams.get("slack")
-    if (github === "connected") toast.success("GitHub connected successfully!")
-    if (slack === "connected") toast.success("Slack connected successfully!")
-    const target = github || slack
+    const mcp = searchParams.get("mcp")
+    // Un id par service : l'effet peut repasser avant que router.replace n'ait retiré les paramètres, un seul toast.
+    if (github === "connected") toast.success("GitHub connected successfully!", { id: "oauth-github" })
+    if (github === "error") toast.error("GitHub wasn't connected. Try again, and accept the access on GitHub.", { id: "oauth-github" })
+    if (slack === "connected") toast.success("Slack connected successfully!", { id: "oauth-slack" })
+    if (slack === "error") toast.error("Slack wasn't connected. Try again, and allow the access on Slack.", { id: "oauth-slack" })
+    if (mcp === "connected") toast.success("MCP server connected", { id: "oauth-mcp" })
+    if (mcp === "error") toast.error("The MCP server connection failed. Try again, or connect it with a token.", { id: "oauth-mcp" })
+    const target = github || slack || mcp
       ? "integrations"
       : section && SECTIONS.some((s) => s.key === section)
         ? section

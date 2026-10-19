@@ -30,6 +30,18 @@ class SharedConfigBeanTest {
     }
 
     @Test
+    @DisplayName("CorsConfig - le CORS passe avant le rate limiting (sinon un 429 part sans en-têtes CORS)")
+    @SuppressWarnings("unchecked")
+    void corsConfig_runsBeforeRateLimiting() {
+        CorsConfig cors = new CorsConfig();
+        var corsRegistration = cors.corsFilterRegistration(cors.corsFilter());
+        ObjectProvider<ProxyManager<String>> provider = mock(ObjectProvider.class);
+        var rateLimitRegistration = new RateLimitConfig().rateLimitFilter(provider);
+
+        assertThat(corsRegistration.getOrder()).isLessThan(rateLimitRegistration.getOrder());
+    }
+
+    @Test
     @DisplayName("OpenApiConfig — customOpenAPI() se construit")
     void openApiConfig_customOpenAPI() {
         OpenApiConfig cfg = new OpenApiConfig();

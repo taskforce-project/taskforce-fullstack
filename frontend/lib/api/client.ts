@@ -196,14 +196,10 @@ apiClient.interceptors.response.use(
         // il frappe TOUS les appels de l'onglet pendant la fenêtre. Sans message dédié, l'appli
         // paraissait simplement figée (les stores avalent l'erreur en silence). `id` stable →
         // un seul toast même quand une rafale d'appels est rejetée d'un coup.
-        const retryAfter = Number(error.response?.headers?.["retry-after"])
-        const wait = Number.isFinite(retryAfter) && retryAfter > 0 ? `${retryAfter}s` : "a few seconds"
-        console.warn(`[api] 429 ${error.config?.url ?? ""} - retry after ${wait}`)
+        const message = rateLimitMessage(error.response?.headers?.["retry-after"])
+        console.warn(`[api] 429 ${error.config?.url ?? ""} - ${message}`)
         if (!silent) {
-          toast.warning("Too many requests", {
-            id: "api-rate-limit",
-            description: `You've hit the rate limit. Try again in ${wait}.`,
-          })
+          toast.warning(message, { id: "api-rate-limit" })
         }
       } else if (status && status >= 400) {
         // 4xx contextuel : pas de toast global - l'appelant décide. Trace console pour le dev.
@@ -226,10 +222,24 @@ export interface ApiError {
 }
 
 /**
+ * Message d'un 429 du limiteur de débit. Le backend annonce l'attente dans `Retry-After` (exposé par
+ * son CORS) ; une attente courte ou inconnue se dit « a few seconds », plus parlant que « 2s ».
+ */
+export function rateLimitMessage(retryAfter: unknown): string {
+  const seconds = Number(retryAfter);
+  const wait = Number.isFinite(seconds) && seconds > 5 ? `${Math.ceil(seconds)} seconds` : "a few seconds";
+  return `Too many requests, try again in ${wait}.`;
+}
+
+/**
  * Fonction helper pour extraire le message d'erreur
  */
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
+    // Un 429 se dit de la même façon partout : toast global, formulaires, états d'erreur des stores.
+    if (error.response?.status === 429) {
+      return rateLimitMessage(error.response.headers?.["retry-after"]);
+    }
     const apiError = error.response?.data as ApiError;
     return apiError?.message || error.message || "Something went wrong";
   }

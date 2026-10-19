@@ -155,18 +155,20 @@ integrations:
   slack:
     client-id: ${SLACK_CLIENT_ID:}
     client-secret: ${SLACK_CLIENT_SECRET:}
-    # Miroir Slack → chat : poller de sync auto des canaux miroir
-    mirror:
-      poll-enabled: ${SLACK_MIRROR_POLL_ENABLED:true}
-      poll-interval-ms: ${SLACK_MIRROR_POLL_INTERVAL_MS:60000}
   # MCP — TaskForce = hôte MCP : Cortex pilote des serveurs MCP externes (cf. McpClient / WorkspaceMcpService)
   mcp:
     connect-timeout-ms: ${MCP_CONNECT_TIMEOUT_MS:10000}
     read-timeout-ms: ${MCP_READ_TIMEOUT_MS:60000}
     tools-cache-ttl-ms: ${MCP_TOOLS_CACHE_TTL_MS:60000}   # cache tools/list par workspace
-    confirm-writes: ${MCP_CONFIRM_WRITES:true}            # écritures externes proposées (validation humaine)
     tool-tier: ${MCP_TOOL_TIER:fast}                      # tier LLM des tours avec outils externes (fast|standard|deep)
     allow-private-network: ${MCP_ALLOW_PRIVATE_NETWORK:false} # true = serveurs MCP du réseau interne admis (on-premise)
+# Webhooks sortants (OSS-6.2) : envois signés HMAC-SHA256, tentés jusqu'à 6 fois sur 9 h environ.
+taskforce:
+  webhooks:
+    dispatch-interval-ms: ${WEBHOOKS_DISPATCH_INTERVAL_MS:5000}       # fréquence de la file d'envoi
+    timeout-ms: ${WEBHOOKS_TIMEOUT_MS:10000}                          # attente de la réponse du destinataire
+    allow-private-network: ${WEBHOOKS_ALLOW_PRIVATE_NETWORK:false}    # true = destinataires du réseau interne admis (n8n auto-hébergé)
+
 # Runner local de délégation (ADR-013) : Claude Code exécuté sur le poste de l'utilisateur.
 # Activé en dev ; le client Keycloak du runner se crée avec scripts/keycloak-runner.ps1.
 delivery:

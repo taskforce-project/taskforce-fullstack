@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { getErrorMessage } from "../api/client";
 import type {
   Project,
   CreateProjectPayload,
@@ -113,8 +114,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       }));
       return res;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Couldn't link the repository";
-      set({ error: message });
+      set({ error: getErrorMessage(err) });
       return null;
     }
   },
@@ -132,8 +132,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       }));
       return true;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Couldn't unlink the repository";
-      set({ error: message });
+      set({ error: getErrorMessage(err) });
       return false;
     }
   },

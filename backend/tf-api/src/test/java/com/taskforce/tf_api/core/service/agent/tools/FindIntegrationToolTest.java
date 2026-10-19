@@ -29,12 +29,12 @@ class FindIntegrationToolTest {
     private FindIntegrationTool tool() { return new FindIntegrationTool(catalogService); }
 
     private ConnectorView connector(String key, String name, String category, boolean connected, List<String> caps) {
-        return new ConnectorView(key, name, category, "OAUTH2", "AVAILABLE", connected,
+        return new ConnectorView(key, name, category, "OAUTH2", connected,
             List.of(), caps, null, null, null, null, null);
     }
 
     private IntegrationCatalogResponse catalog() {
-        return new IntegrationCatalogResponse(2, 2, 1, List.of(
+        return new IntegrationCatalogResponse(2, 1, List.of(
             new CategoryGroup("PAYMENT", "Paiement", List.of(
                 connector("stripe", "Stripe", "PAYMENT", false, List.of("payments", "billing")))),
             new CategoryGroup("PROJECT_MANAGEMENT", "Gestion de projet", List.of(
@@ -68,10 +68,10 @@ class FindIntegrationToolTest {
     }
 
     @Test
-    @DisplayName("aucune correspondance → réponse franche (pas d'intégration)")
+    @DisplayName("aucune correspondance → réponse franche, et la piste du serveur MCP")
     void no_match_is_honest() {
         when(catalogService.getCatalog(eq("acme"), eq(7L))).thenReturn(catalog());
         String out = tool().execute(Map.<String, Object>of("query", "salesforce"), new AgentContext("acme", 1L, 7L));
-        assertThat(out).contains("No integration matches");
+        assertThat(out).contains("No integration matches").contains("Connect an MCP server");
     }
 }

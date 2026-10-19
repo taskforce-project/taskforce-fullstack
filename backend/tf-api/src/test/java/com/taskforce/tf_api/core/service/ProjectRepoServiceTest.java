@@ -87,6 +87,18 @@ class ProjectRepoServiceTest {
     }
 
     @Test
+    @DisplayName("LINK : un nom de dépôt mal formé est refusé avant tout appel à GitHub (il finirait dans l'URL de l'API)")
+    void link_refuses_a_malformed_repository() {
+        Project project = projectInWorkspace(SLUG);
+        when(projectRepository.findById(PROJECT_ID)).thenReturn(Optional.of(project));
+
+        assertThatThrownBy(() -> service.linkRepo(SLUG, PROJECT_ID, USER_ID, request("LINK", null, "someone/x?per_page=1")))
+            .isInstanceOf(BusinessException.class);
+        org.mockito.Mockito.verifyNoInteractions(gitHubService);
+        assertThat(project.getRepoFullName()).isNull();
+    }
+
+    @Test
     @DisplayName("Mode invalide → 400 métier")
     void link_invalidMode() {
         Project project = projectInWorkspace(SLUG);

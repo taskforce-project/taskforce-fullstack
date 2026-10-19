@@ -20,6 +20,7 @@ import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.Integration;
 import com.taskforce.tf_api.core.repository.IntegrationRepository;
+import com.taskforce.tf_api.core.service.GitHubRepoNames;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -40,7 +41,6 @@ public class GitHubCopilotProvider implements DeliveryAgentProvider {
     public static final String KEY = "github-copilot";
 
     static final String API = "https://api.github.com";
-    private static final Pattern REPO = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100}$");
     private static final Pattern TASK_ID = Pattern.compile("^[A-Za-z0-9_-]{1,100}$");
     private static final int MAX_PROMPT = 20_000;
 
@@ -232,7 +232,7 @@ public class GitHubCopilotProvider implements DeliveryAgentProvider {
     }
 
     private static boolean isRepo(String fullName) {
-        return fullName != null && REPO.matcher(fullName).matches() && !fullName.contains("..");
+        return GitHubRepoNames.isFullName(fullName);
     }
 
     private static String str(Object value) {

@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.taskforce.tf_api.core.dto.request.ConnectConnectorRequest;
 import com.taskforce.tf_api.core.dto.request.ConnectPlaneRequest;
 import com.taskforce.tf_api.core.dto.request.GitHubLinkRequest;
 import com.taskforce.tf_api.core.dto.request.SlackChannelRequest;
@@ -40,7 +39,6 @@ import com.taskforce.tf_api.core.service.GitHubIntegrationService;
 import com.taskforce.tf_api.core.service.PlaneClient.PlaneProject;
 import com.taskforce.tf_api.core.service.PlaneIntegrationService;
 import com.taskforce.tf_api.core.service.SlackIntegrationService;
-import com.taskforce.tf_api.core.service.integration.ConnectorConnectionService;
 import com.taskforce.tf_api.core.service.integration.IntegrationCatalogService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -56,7 +54,6 @@ public class IntegrationController {
     private final SlackIntegrationService  slackService;
     private final PlaneIntegrationService  planeService;
     private final IntegrationCatalogService catalogService;
-    private final ConnectorConnectionService connectorConnectionService;
     private final UserRepository           userRepository;
     private final WorkspaceRepository      workspaceRepository;
     private final AuthorizationService     authorizationService;
@@ -78,36 +75,6 @@ public class IntegrationController {
         @PathVariable String slug, @AuthenticationPrincipal Jwt jwt
     ) {
         return ResponseEntity.ok(ApiResponse.success(catalogService.getCatalog(slug, resolveUser(jwt).getId())));
-    }
-
-    // ====================================================================
-    // Connecteurs génériques (tout le catalogue hors GitHub/Slack/Plane)
-    // Stockage chiffré des identifiants + état de connexion persisté.
-    // ====================================================================
-
-    @PostMapping("/api/workspaces/{slug}/integrations/connectors/{key}")
-    public ResponseEntity<ApiResponse<Void>> connectConnector(
-        @PathVariable String slug,
-        @PathVariable String key,
-        @RequestBody(required = false) ConnectConnectorRequest request,
-        @AuthenticationPrincipal Jwt jwt
-    ) {
-        requireManager(slug, jwt);
-        connectorConnectionService.connect(
-            slug, resolveUser(jwt).getId(), key,
-            request != null ? request.getConfig() : null);
-        return ResponseEntity.ok(ApiResponse.success("Connector connected", null));
-    }
-
-    @DeleteMapping("/api/workspaces/{slug}/integrations/connectors/{key}")
-    public ResponseEntity<ApiResponse<Void>> disconnectConnector(
-        @PathVariable String slug,
-        @PathVariable String key,
-        @AuthenticationPrincipal Jwt jwt
-    ) {
-        requireManager(slug, jwt);
-        connectorConnectionService.disconnect(slug, resolveUser(jwt).getId(), key);
-        return ResponseEntity.ok(ApiResponse.success("Connector disconnected", null));
     }
 
     // ====================================================================
@@ -166,12 +133,14 @@ public class IntegrationController {
     }
 
     /** Callback appelé par GitHub — endpoint PUBLIC (pas de JWT requis). {@code state} = token aléatoire. */
+    /** Retour de GitHub : toujours une redirection vers l'app ({@code github=connected} ou {@code github=error}). */
     @GetMapping("/api/integrations/github/callback")
     public ResponseEntity<Void> githubCallback(
-        @RequestParam String code,
-        @RequestParam String state
+        @RequestParam(required = false) String code,
+        @RequestParam(required = false) String state,
+        @RequestParam(required = false) String error
     ) {
-        String redirectUrl = gitHubService.handleCallback(code, state);
+        String redirectUrl = gitHubService.handleCallback(code, state, error);
         return ResponseEntity.status(HttpStatus.FOUND)
             .location(URI.create(redirectUrl))
             .build();
@@ -245,12 +214,14 @@ public class IntegrationController {
     }
 
     /** Callback appelé par Slack — endpoint PUBLIC. {@code state} = token aléatoire. */
+    /** Retour de Slack : toujours une redirection vers l'app ({@code slack=connected} ou {@code slack=error}). */
     @GetMapping("/api/integrations/slack/callback")
     public ResponseEntity<Void> slackCallback(
-        @RequestParam String code,
-        @RequestParam String state
+        @RequestParam(required = false) String code,
+        @RequestParam(required = false) String state,
+        @RequestParam(required = false) String error
     ) {
-        String redirectUrl = slackService.handleCallback(code, state);
+        String redirectUrl = slackService.handleCallback(code, state, error);
         return ResponseEntity.status(HttpStatus.FOUND)
             .location(URI.create(redirectUrl))
             .build();

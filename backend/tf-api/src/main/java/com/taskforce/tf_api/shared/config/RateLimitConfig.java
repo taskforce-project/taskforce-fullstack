@@ -6,7 +6,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
 
 @Configuration
 public class RateLimitConfig {
@@ -24,7 +23,9 @@ public class RateLimitConfig {
         FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>();
         registration.setFilter(new RateLimitFilter(proxyManager));
         registration.addUrlPatterns("/api/*");
-        registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10); // avant Spring Security
+        // Après le CORS, pour qu'un 429 porte Access-Control-Allow-Origin (sinon le navigateur le masque en
+        // erreur réseau) ; avant Spring Security, pour ne pas décoder de jeton pendant une rafale.
+        registration.setOrder(CorsConfig.FILTER_ORDER + 5);
         registration.setName("rateLimitFilter");
         return registration;
     }

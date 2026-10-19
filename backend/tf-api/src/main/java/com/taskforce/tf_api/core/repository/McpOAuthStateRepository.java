@@ -3,6 +3,7 @@ package com.taskforce.tf_api.core.repository;
 import java.time.LocalDateTime;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.model.McpOAuthState;
 
@@ -12,6 +13,10 @@ import com.taskforce.tf_api.core.model.McpOAuthState;
  */
 public interface McpOAuthStateRepository extends JpaRepository<McpOAuthState, String> {
 
-    /** Purge des states expires (balayage opportuniste). */
+    /**
+     * Purge des states expires, appelee par le {@link com.taskforce.tf_api.core.service.RetentionScheduler}.
+     * {@code @Transactional} ici pour que le scheduler l'appelle hors transaction (comme OAuthStateRepository).
+     */
+    @Transactional
     long deleteByExpiresAtBefore(LocalDateTime cutoff);
 }

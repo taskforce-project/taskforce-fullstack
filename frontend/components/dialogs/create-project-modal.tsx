@@ -23,12 +23,18 @@ export function CreateProjectModal() {
 
   // Même retour fluide pour GitHub connecté depuis la section « dépôt de code » : le callback renvoie sur
   // `…?newProject=repo&github=connected`, on rouvre la création là où elle en était (brouillon restauré).
+  // En échec (`github=error` : accès refusé chez GitHub, lien expiré), on la rouvre aussi : le brouillon
+  // n'est pas perdu et le bouton « Connect GitHub » est de nouveau là.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get("newProject") !== "repo") return
-    if (params.get("github") === "connected") {
+    const github = params.get("github")
+    if (github === "connected") {
       openCreateProject({ repoSetup: true })
       toast.success("GitHub connected - create or link the repository")
+    } else if (github === "error") {
+      openCreateProject({ repoSetup: true })
+      toast.error("GitHub wasn't connected. Try again, and accept the access on GitHub.")
     }
     params.delete("newProject")
     params.delete("github")
