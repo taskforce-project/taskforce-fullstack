@@ -15,8 +15,9 @@ This folder holds the Electron shell. The app itself is the rest of the reposito
 
 ## How it works
 
-- **Sign-in.** The shell signs in to the hosted account in the browser (authorization code with PKCE, back on
-  127.0.0.1, client `taskforce-desktop`) and keeps an offline session encrypted by the system keychain.
+- **Sign-in.** The shell opens the web app's `/auth/desktop` page in the browser, where the person signs in or creates
+  their account as on the web, then lets the app in. The app gets a one-time code back on 127.0.0.1 (PKCE), exchanges
+  it for its own session and keeps it encrypted by the system keychain; no Keycloak page is shown.
 - **Local stack.** At each start the shell starts the account's database, the backend and the interface, then a local
   proxy that gives the interface and the API one origin on 127.0.0.1. A launch token drawn at each start is the only
   way into the API; the window gets it through the preload bridge.
