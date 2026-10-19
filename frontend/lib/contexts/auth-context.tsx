@@ -90,7 +90,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (isLoading || !user || globalThis.window === undefined) return;
     const path = pathname ?? globalThis.location.pathname;
 
-    if (user.onboardingCompleted === false && !path.startsWith("/onboarding") && !path.startsWith("/auth")) {
+    // `/account` : la page du compte, que l'app desktop ouvre pour un compte qui n'a pas d'espace de travail en ligne.
+    if (user.onboardingCompleted === false && !path.startsWith("/onboarding") && !path.startsWith("/auth")
+      && !path.startsWith("/account")) {
       router.replace("/onboarding");
       return;
     }

@@ -32,6 +32,7 @@ import { WebhooksPanel } from "@/components/settings/webhooks-panel"
 import { EventPicker } from "@/components/settings/event-picker"
 import { AgentsPanel } from "@/components/settings/agents-panel"
 import { DesktopAiPanel } from "@/components/settings/desktop-ai-panel"
+import { DesktopSessionsCard } from "@/components/settings/desktop-sessions-card"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { ProfileOverview } from "@/components/profile/profile-overview"
 import { MemberSkillsCard } from "@/components/members/member-skills-card"
@@ -936,6 +937,7 @@ function SecurityPanel() {
           </div>
         </div>
       </SectionCard>
+      <DesktopSessionsCard />
     </div>
   )
 }
