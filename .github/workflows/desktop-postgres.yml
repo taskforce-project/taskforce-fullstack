@@ -53,14 +53,18 @@ jobs:
       - name: Check the bundle on a fresh cluster
         shell: pwsh
         run: |
+          # PostgreSQL drops administrator rights on Windows: its data and log must be writable by a plain user,
+          # which the root of C:\ is not.
           $bin = "dist\postgres\bin"
-          & "$bin\initdb.exe" -D C:\pgdata -U taskforce -A trust -E UTF8 --locale-provider=builtin --builtin-locale=C.UTF-8
+          $data = Join-Path $env:RUNNER_TEMP "pgdata"
+          $log = Join-Path $env:RUNNER_TEMP "pg.log"
+          & "$bin\initdb.exe" -D $data -U taskforce -A trust -E UTF8 --locale-provider=builtin --builtin-locale=C.UTF-8
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          & "$bin\pg_ctl.exe" -D C:\pgdata -o "-p 55432 -h 127.0.0.1" -l C:\pg.log -w start
-          if ($LASTEXITCODE -ne 0) { Get-Content C:\pg.log; exit 1 }
+          & "$bin\pg_ctl.exe" -D $data -o "-p 55432 -h 127.0.0.1" -l $log -w start
+          if ($LASTEXITCODE -ne 0) { Get-Content $log; exit 1 }
           & "$bin\psql.exe" -h 127.0.0.1 -p 55432 -U taskforce -d postgres -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION vector; CREATE EXTENSION "uuid-ossp"; SELECT extversion FROM pg_extension WHERE extname = ''vector''; SELECT ''[1,2,3]''::vector <=> ''[1,2,4]''::vector AS cosine_distance;'
           $code = $LASTEXITCODE
-          & "$bin\pg_ctl.exe" -D C:\pgdata -w stop
+          & "$bin\pg_ctl.exe" -D $data -w stop
           exit $code
 
       - name: Pack
@@ -87,8 +91,9 @@ jobs:
           curl -fsSLO "https://ftp.postgresql.org/pub/source/v${PG_VERSION}/postgresql-${PG_VERSION}.tar.bz2"
           tar xjf "postgresql-${PG_VERSION}.tar.bz2"
           cd "postgresql-${PG_VERSION}"
-          # Relocatable: the tools find their libraries next to them ($ORIGIN), wherever the app is installed.
-          ./configure --prefix=/opt/tfpg --without-icu --without-readline --with-uuid=e2fs --disable-rpath \
+          # Relocatable: the tools find their libraries next to them ($ORIGIN), wherever the app is installed. A
+          # prefix containing "pgsql" keeps share/ and lib/ flat: otherwise PostgreSQL nests them in postgresql/.
+          ./configure --prefix=/opt/pgsql --without-icu --without-readline --with-uuid=e2fs --disable-rpath \
             LDFLAGS='-Wl,-rpath,$$ORIGIN/../lib'
           make -j"$(nproc)" -s
           make -s install
@@ -99,11 +104,11 @@ jobs:
           git clone --depth 1 --branch "${PGVECTOR_VERSION}" https://github.com/pgvector/pgvector.git
           cd pgvector
           # No -march=native: the library must run on every x86-64 CPU, not only on the build machine's.
-          make OPTFLAGS="" PG_CONFIG=/opt/tfpg/bin/pg_config
-          make install PG_CONFIG=/opt/tfpg/bin/pg_config
+          make OPTFLAGS="" PG_CONFIG=/opt/pgsql/bin/pg_config
+          make install PG_CONFIG=/opt/pgsql/bin/pg_config
 
       - name: Trim the bundle
-        run: node desktop/postgres/trim.mjs /opt/tfpg dist/postgres
+        run: node desktop/postgres/trim.mjs /opt/pgsql dist/postgres
 
       - name: Check the bundle on a fresh cluster
         run: |
