@@ -1,12 +1,16 @@
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 
+import { SelfHostedLegal, isSelfHosted } from "@/components/legal/self-hosted-legal"
+
 export const metadata = {
   title: "Privacy Policy - TaskForce",
   description: "How TaskForce collects, uses, and protects your personal data.",
 }
 
 export default function PrivacyPolicyPage() {
+  // Instance auto-hébergée : ses données sont chez son administrateur, sans mesure d'audience du projet.
+  if (isSelfHosted()) return <SelfHostedLegal kind="privacy" />
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-6 py-12">

@@ -1,12 +1,16 @@
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 
+import { SelfHostedLegal, isSelfHosted } from "@/components/legal/self-hosted-legal"
+
 export const metadata = {
   title: "Legal Notices - TaskForce",
   description: "Terms of service, acceptable use, and legal information for TaskForce.",
 }
 
 export default function LegalNoticesPage() {
+  // Instance auto-hébergée : son administrateur en répond, pas l'éditeur du service hébergé.
+  if (isSelfHosted()) return <SelfHostedLegal kind="legal" />
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-6 py-12">
