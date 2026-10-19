@@ -7,6 +7,7 @@ import {
   readConsent,
   writeConsent,
   analyticsAllowed,
+  analyticsConfigured,
   openConsentPreferences,
 } from "./consent"
 
@@ -31,6 +32,14 @@ describe("analytics/consent", () => {
   })
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
+  })
+
+  it("analyticsConfigured: vrai seulement avec une clé PostHog fournie au build", () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test")
+    expect(analyticsConfigured()).toBe(true)
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "")
+    expect(analyticsConfigured()).toBe(false)
   })
 
   it("readConsent: null quand aucun choix", () => {
