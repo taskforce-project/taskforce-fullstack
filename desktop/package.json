@@ -13,8 +13,9 @@
     "start": "npm run build && electron .",
     "test": "tsx --test test/*.test.ts",
     "resources": "node scripts/prepare-resources.mjs",
-    "dist:win": "npm run build && electron-builder --win nsis --publish never",
-    "dist:linux": "npm run build && electron-builder --linux deb AppImage --publish never"
+    "icon": "node scripts/make-icon.mjs",
+    "dist:win": "npm run build && npm run icon && electron-builder --win nsis --publish never",
+    "dist:linux": "npm run build && npm run icon && electron-builder --linux deb AppImage --publish never"
   },
   "dependencies": {
     "electron-updater": "6.8.9"
