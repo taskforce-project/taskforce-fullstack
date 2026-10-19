@@ -15,6 +15,7 @@ import com.taskforce.tf_api.core.dto.response.CycleResponse;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.dto.response.MyWorkCycleResponse;
 import com.taskforce.tf_api.core.enums.CycleStatus;
+import com.taskforce.tf_api.core.enums.WebhookEventType;
 import com.taskforce.tf_api.core.event.CycleCompletedEvent;
 import com.taskforce.tf_api.core.model.Cycle;
 import com.taskforce.tf_api.core.model.CycleIssue;
@@ -29,6 +30,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.webhook.WorkspaceWebhookEvent;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -166,7 +168,8 @@ public class CycleService {
         cycle = cycleRepository.save(cycle);
 
         // Push Slack à la transition vers COMPLETED (une seule fois)
-        if (cycle.getStatus() == CycleStatus.COMPLETED && previousStatus != CycleStatus.COMPLETED) {
+        boolean completedNow = cycle.getStatus() == CycleStatus.COMPLETED && previousStatus != CycleStatus.COMPLETED;
+        if (completedNow) {
             slackService.notifyEvent(project.getWorkspace().getId(), "cycle.completed",
                 "🏁 Cycle *" + cycle.getName() + "* completed");
             // … et le Brain OS écrit la rétro du cycle. Publié ici (même garde « une seule fois »),
@@ -175,9 +178,16 @@ public class CycleService {
                 workspaceSlug, project.getWorkspace().getId(), project.getId(), cycle.getId(), userId));
         }
 
-        return toResponse(cycle,
+        CycleResponse response = toResponse(cycle,
             cycleIssueRepository.countByCycleId(cycle.getId()),
             cycleIssueRepository.countCompletedByCycleId(cycle.getId()));
+        if (completedNow) {
+            // Webhooks sortants (OSS-6.2) : envois écrits avant le commit, envoyés ensuite.
+            events.publishEvent(new WorkspaceWebhookEvent(project.getWorkspace().getId(),
+                WebhookEventType.CYCLE_COMPLETED, userId, Map.of("cycle", response),
+                "/" + workspaceSlug + "/projects/" + project.getId() + "/cycles/" + cycle.getId()));
+        }
+        return response;
     }
 
     @Transactional

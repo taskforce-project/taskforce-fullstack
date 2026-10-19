@@ -7,12 +7,16 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mockito;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestTemplate;
 
 import com.taskforce.tf_api.core.dto.request.CreateKnowledgeNodeRequest;
@@ -28,6 +32,7 @@ import com.taskforce.tf_api.core.repository.OAuthStateRepository;
 import com.taskforce.tf_api.core.repository.SlackChannelRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
+import com.taskforce.tf_api.shared.exception.BusinessException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -79,7 +84,7 @@ class SlackIntegrationContractTest {
 
         // Ordre du constructeur @RequiredArgsConstructor = ordre de déclaration des champs final :
         // integrationRepository, slackChannelRepository, workspaceRepository, oauthStateRepository, restTemplate,
-        // knowledgeService, nodeRepository, brainSearch, jdbcTemplate
+        // knowledgeService, nodeRepository, brainSearch, jdbcTemplate, tx
         service = new SlackIntegrationService(
             integrationRepository,
             slackChannelRepository,
@@ -89,7 +94,8 @@ class SlackIntegrationContractTest {
             knowledgeService,
             nodeRepository,
             brainSearch,
-            jdbcTemplate
+            jdbcTemplate,
+            new TransactionTemplate(Mockito.mock(PlatformTransactionManager.class))
         );
 
         ReflectionTestUtils.setField(service, "clientId", "cid");
@@ -116,22 +122,21 @@ class SlackIntegrationContractTest {
                 "{\"ok\":true,\"access_token\":\"xoxb\",\"team\":{\"id\":\"T1\",\"name\":\"Acme\"}}",
                 MediaType.APPLICATION_JSON));
 
-        String redirect = service.handleCallback("the-code", "the-state");
+        String redirect = service.handleCallback("the-code", "the-state", null);
 
         assertThat(redirect).contains("slack=connected");
         server.verify();
     }
 
     @Test
-    @DisplayName("handleCallback : ok=false → RuntimeException")
-    void handleCallback_ok_false_leve_exception() {
+    @DisplayName("handleCallback : ok=false → retour dans l'app avec slack=error (plus d'erreur JSON de l'API)")
+    void handleCallback_ok_false_redirects_with_error() {
         stubState("the-state");
         server.expect(requestTo("https://slack.com/api/oauth.v2.access"))
             .andExpect(method(HttpMethod.POST))
             .andRespond(withSuccess("{\"ok\":false,\"error\":\"bad\"}", MediaType.APPLICATION_JSON));
 
-        assertThatThrownBy(() -> service.handleCallback("the-code", "the-state"))
-            .isInstanceOf(RuntimeException.class);
+        assertThat(service.handleCallback("the-code", "the-state", null)).contains("slack=error");
         server.verify();
     }
 
@@ -144,8 +149,8 @@ class SlackIntegrationContractTest {
     }
 
     @Test
-    @DisplayName("sendNotification : POST chat.postMessage (Bearer) avec corps JSON {channel, text}")
-    void sendNotification_poste_le_bon_wire() {
+    @DisplayName("dispatchEvent : POST chat.postMessage (Bearer) avec corps JSON {channel, text}")
+    void dispatchEvent_poste_le_bon_wire() {
         Integration integration = Integration.builder()
             .workspace(workspace)
             .provider(IntegrationProvider.SLACK)
@@ -157,7 +162,7 @@ class SlackIntegrationContractTest {
 
         SlackChannel channel = SlackChannel.builder()
             .workspace(workspace)
-            .channelId("C123")
+            .channelId("C0123456789")
             .channelName("general")
             .active(true)
             .build();
@@ -168,11 +173,11 @@ class SlackIntegrationContractTest {
             .andExpect(method(HttpMethod.POST))
             .andExpect(header("Authorization", "Bearer xoxb-token"))
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-            .andExpect(jsonPath("$.channel").value("C123"))
-            .andExpect(jsonPath("$.text").value("Nouvelle notification"))
+            .andExpect(jsonPath("$.channel").value("C0123456789"))
+            .andExpect(jsonPath("$.text").value("New issue"))
             .andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
 
-        service.sendNotification(WORKSPACE_ID, "Nouvelle notification");
+        service.dispatchEvent(WORKSPACE_ID, "issue.created", "New issue");
 
         server.verify();
     }
@@ -185,7 +190,7 @@ class SlackIntegrationContractTest {
         Mockito.when(integrationRepository.findByWorkspaceIdAndProvider(WORKSPACE_ID, IntegrationProvider.SLACK))
             .thenReturn(Optional.of(integration));
 
-        server.expect(requestTo(org.hamcrest.Matchers.containsString("conversations.history?channel=C1")))
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("conversations.history?channel=C0123456789")))
             .andExpect(method(HttpMethod.GET))
             .andExpect(header("Authorization", "Bearer xoxb-token"))
             .andRespond(withSuccess("{\"ok\":true,\"messages\":["
@@ -193,7 +198,7 @@ class SlackIntegrationContractTest {
                 + "{\"subtype\":\"channel_join\",\"ts\":\"150\",\"text\":\"joined\"},"
                 + "{\"ts\":\"100\",\"user\":\"U1\",\"text\":\"first\"}]}", MediaType.APPLICATION_JSON));
 
-        var msgs = service.fetchHistory(WORKSPACE_ID, "C1", null);
+        var msgs = service.fetchHistory(WORKSPACE_ID, "C0123456789", null);
 
         assertThat(msgs).hasSize(2);                       // le channel_join (subtype) est ignoré
         assertThat(msgs.get(0).text()).isEqualTo("first");  // remis en ordre chronologique (ts 100 avant 200)
@@ -228,12 +233,12 @@ class SlackIntegrationContractTest {
         Mockito.when(integrationRepository.findByWorkspaceIdAndProvider(WORKSPACE_ID, IntegrationProvider.SLACK))
             .thenReturn(Optional.of(integration));
         SlackChannel channel = SlackChannel.builder()
-            .workspace(workspace).channelId("C1").channelName("general").active(true).build();
+            .workspace(workspace).channelId("C0123456789").channelName("general").active(true).build();
         Mockito.when(slackChannelRepository.findByWorkspaceIdOrderByCreatedAtDesc(WORKSPACE_ID))
             .thenReturn(List.of(channel));
 
         // 1) conversations.history (2 messages du même auteur), 2) users.info (une seule fois : cache)
-        server.expect(requestTo(org.hamcrest.Matchers.containsString("conversations.history?channel=C1")))
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("conversations.history?channel=C0123456789")))
             .andExpect(method(HttpMethod.GET))
             .andRespond(withSuccess("{\"ok\":true,\"messages\":["
                 + "{\"ts\":\"200\",\"user\":\"U1\",\"text\":\"second message\"},"
@@ -244,7 +249,7 @@ class SlackIntegrationContractTest {
                 "{\"ok\":true,\"user\":{\"real_name\":\"Alice R\",\"profile\":{\"display_name\":\"alice\"}}}",
                 MediaType.APPLICATION_JSON));
 
-        SlackSyncResponse result = service.sync(SLUG, 9L, "C1");
+        SlackSyncResponse result = service.sync(SLUG, 9L, "C0123456789");
 
         assertThat(result.created()).isEqualTo(2);
         assertThat(result.updated()).isZero();
@@ -253,5 +258,35 @@ class SlackIntegrationContractTest {
         Mockito.verify(knowledgeService, Mockito.times(2))
             .createNode(Mockito.eq(SLUG), Mockito.eq(9L), Mockito.any(CreateKnowledgeNodeRequest.class));
         server.verify();
+    }
+
+    @Test
+    @DisplayName("sync : Slack refuse de lire le canal (missing_scope) → message qui dit de reconnecter, rien d'ingéré")
+    void sync_explains_a_slack_refusal() {
+        Mockito.when(workspaceRepository.findBySlug(SLUG)).thenReturn(Optional.of(workspace));
+        Integration integration = Integration.builder()
+            .workspace(workspace).provider(IntegrationProvider.SLACK).accessToken("xoxb-token").meta(Map.of()).build();
+        Mockito.when(integrationRepository.findByWorkspaceIdAndProvider(WORKSPACE_ID, IntegrationProvider.SLACK))
+            .thenReturn(Optional.of(integration));
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("conversations.history?channel=C0123456789")))
+            .andRespond(withSuccess("{\"ok\":false,\"error\":\"missing_scope\"}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> service.sync(SLUG, 9L, "C0123456789"))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining("reconnect Slack");
+        Mockito.verifyNoInteractions(knowledgeService);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+        "missing_scope     | reconnect Slack",
+        "not_in_channel    | Add the TaskForce app to this channel",
+        "channel_not_found | not found",
+        "token_revoked     | reconnect Slack",
+        "ratelimited       | ratelimited",
+    })
+    @DisplayName("chaque refus de Slack devient une action à faire")
+    void slack_refusals_say_what_to_do(String error, String expected) {
+        assertThat(SlackIntegrationService.slackRefusal(error).getMessage()).contains(expected);
     }
 }

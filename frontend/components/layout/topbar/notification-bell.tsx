@@ -35,15 +35,17 @@ export function NotificationBell() {
   const signals = useNotificationStore((s) => s.signals)
   const unreadCount = useNotificationStore((s) => s.unreadCount)
   const fetchNotifications = useNotificationStore((s) => s.fetchNotifications)
+  const ensureNotifications = useNotificationStore((s) => s.ensureNotifications)
   const markAllAsRead = useNotificationStore((s) => s.markAllAsRead)
   const [open, setOpen] = React.useState(false)
 
   // Push temps réel (US-023) : abonnement STOMP /topic/notifications.{userId}
   useNotificationsRealtime(slug)
 
+  // Chargement partagé avec la colonne « Recent » du dashboard : une seule requête pour les deux.
   React.useEffect(() => {
-    if (slug) fetchNotifications(slug)
-  }, [slug, fetchNotifications])
+    if (slug) void ensureNotifications(slug)
+  }, [slug, ensureNotifications])
 
   // Filet de sécurité : rafraîchit toutes les 60 s si le push STOMP est indisponible.
   React.useEffect(() => {

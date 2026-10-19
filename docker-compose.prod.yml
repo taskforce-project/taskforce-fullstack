@@ -191,11 +191,18 @@ services:
       AI_RATE_ACCOUNT_TPM: ${AI_RATE_ACCOUNT_TPM:-0}
       AI_RATE_ACCOUNT_RPM: ${AI_RATE_ACCOUNT_RPM:-0}
 
-      # Integration OAuth GitHub (Connect GitHub a un workspace : ingestion Brain + delegation Copilot).
-      # Meme regle : plumbe explicitement, sinon integrations.github.client-id lit "" -> 404.
-      # Defaut vide (`:`) pour ne pas crasher le boot si non renseigne.
+      # Intégrations OAuth GitHub (ingestion Brain OS, délégation Copilot) et Slack (canaux, miroir des issues).
+      # Même règle : transmises explicitement, sinon integrations.*.client-id lit "" et la connexion est refusée.
+      # Défaut vide pour ne pas empêcher le démarrage si elles ne sont pas renseignées.
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      SLACK_CLIENT_ID: ${SLACK_CLIENT_ID:-}
+      SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET:-}
+
+      # Garde anti-SSRF des serveurs MCP et des webhooks sortants (ADR-020). true = adresses du réseau interne
+      # admises (n8n ou serveur MCP auto-hébergés), réservé à une instance dont les admins sont de confiance.
+      MCP_ALLOW_PRIVATE_NETWORK: ${MCP_ALLOW_PRIVATE_NETWORK:-false}
+      WEBHOOKS_ALLOW_PRIVATE_NETWORK: ${WEBHOOKS_ALLOW_PRIVATE_NETWORK:-false}
 
       # Chiffrement au repos des données personnelles (RGPD).
       # Le nom DOIT être TF_ENCRYPTION_KEY : c'est celui que lit `security.encryption-key`.

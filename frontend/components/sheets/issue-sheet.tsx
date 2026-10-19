@@ -54,6 +54,7 @@ import { useIssueStore } from "@/lib/store/issue-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { useLabelStore } from "@/lib/store/label-store"
 import { useIntegrationStore } from "@/lib/store/integration-store"
+import { githubUrl, isCommitSha, isGitHubRepoFullName, isPullRequestNumber } from "@/lib/utils/github"
 import { listProjectMembers, type ProjectMember } from "@/lib/api/project-service"
 import { listCycles, addIssueToCycle, removeIssueFromCycle, listIssueCycles, type Cycle } from "@/lib/api/cycle-service"
 import type { IssueComment, IssueActivity, IssueLabel, IssueStatus as ApiIssueStatus, Issue, IssueRelation, IssueRelationType, ChecklistItem, Worklog } from "@/lib/api/issue-service"
@@ -194,6 +195,8 @@ function CollapsibleSection({
 
 function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; workspaceSlug: string }>) {
   const { githubStatus, githubLinks, fetchGitHubLinks, addGitHubLink, removeGitHubLink } = useIntegrationStore()
+  const openSettings = useSettingsStore((s) => s.openSettings)
+  const connected = Boolean(githubStatus?.connected)
   const links = githubLinks[issueId] ?? []
   const [loading, setLoading] = useState(false)
 
@@ -208,39 +211,46 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
   const [linkTitle,     setLinkTitle]     = useState("")
   const [submitting,    setSubmitting]    = useState(false)
 
+  // Les liens (et le statut de leurs PR, relu chez GitHub) ne se lisent qu'avec une connexion GitHub.
   useEffect(() => {
+    if (!connected) return
     setLoading(true)
     fetchGitHubLinks(workspaceSlug, issueId).catch(() => null).finally(() => setLoading(false))
-  }, [workspaceSlug, issueId, fetchGitHubLinks])
+  }, [workspaceSlug, issueId, connected, fetchGitHubLinks])
+
+  const repo = repoFullName.trim()
+  const ref = linkType === "PR" ? prNumber.trim() : commitSha.trim()
+  const canAdd = isGitHubRepoFullName(repo) && (linkType === "PR" ? isPullRequestNumber(ref) : isCommitSha(ref))
 
   async function handleAdd() {
+    if (!canAdd) return
     setSubmitting(true)
     try {
-      await addGitHubLink(workspaceSlug, issueId, {
-        linkType,
-        repoFullName: repoFullName.trim(),
-        prNumber:    linkType === "PR"     ? Number(prNumber)  : undefined,
-        prUrl:       linkType === "PR"     ? prUrl.trim()      : undefined,
-        commitSha:   linkType === "COMMIT" ? commitSha.trim()  : undefined,
-        commitUrl:   linkType === "COMMIT" ? commitUrl.trim()  : undefined,
-        title: linkTitle.trim() || undefined,
-      })
+      // Un lien laissé vide est déduit du dépôt : le backend n'accepte que des pages github.com.
+      await addGitHubLink(workspaceSlug, issueId, linkType === "PR"
+        ? { linkType, repoFullName: repo, prNumber: Number(ref), prUrl: prUrl.trim() || githubUrl(repo, "pull", ref),
+            title: linkTitle.trim() || undefined }
+        : { linkType, repoFullName: repo, commitSha: ref, commitUrl: commitUrl.trim() || githubUrl(repo, "commit", ref),
+            title: linkTitle.trim() || undefined })
       toast.success("GitHub link added")
       setShowForm(false)
       setRepoFullName(""); setPrNumber(""); setPrUrl(""); setCommitSha(""); setCommitUrl(""); setLinkTitle("")
-    } catch {
-      toast.error("Could not add link")
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     } finally {
       setSubmitting(false)
     }
   }
 
-  if (!githubStatus?.connected) {
+  if (!connected) {
     return (
       <div className="flex flex-col items-center gap-3 py-8 text-center">
         <GitBranch className="size-8 text-muted-foreground/40" />
         <p className="text-sm text-muted-foreground">GitHub not connected</p>
-        <p className="text-xs text-muted-foreground/60">Connect GitHub in Workspace Settings → Integrations.</p>
+        <p className="text-xs text-muted-foreground/60">Connect GitHub to link pull requests and commits to this issue.</p>
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => openSettings("integrations")}>
+          Open integrations
+        </Button>
       </div>
     )
   }
@@ -290,7 +300,7 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
               className="text-muted-foreground hover:text-destructive transition-colors"
               onClick={async () => {
                 try { await removeGitHubLink(workspaceSlug, issueId, link.id); toast.success("Link deleted") }
-                catch { toast.error("Could not delete link") }
+                catch (e) { toast.error(getErrorMessage(e)) }
               }}
             >
               <Trash2 className="size-3.5" />
@@ -348,7 +358,7 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
               />
               <Input
                 className="h-8 w-full text-xs"
-                placeholder="PR URL (optional)"
+                placeholder="PR link (optional, found from the number)"
                 value={prUrl}
                 onChange={(e) => setPrUrl(e.target.value)}
               />
@@ -364,7 +374,7 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
               />
               <Input
                 className="h-8 w-full text-xs"
-                placeholder="Commit URL (optional)"
+                placeholder="Commit link (optional, found from the hash)"
                 value={commitUrl}
                 onChange={(e) => setCommitUrl(e.target.value)}
               />
@@ -378,7 +388,7 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
           />
           <div className="flex justify-end gap-2 mt-1">
             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button size="sm" className="h-7 text-xs" disabled={!repoFullName || submitting} onClick={handleAdd}>
+            <Button size="sm" className="h-7 text-xs" disabled={!canAdd || submitting} onClick={handleAdd}>
               {submitting ? "Adding…" : "Add"}
             </Button>
           </div>
@@ -1113,7 +1123,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
           archiveIssue, pinIssue, fetchStatuses, fetchIssue,
           comments: storeComments, activity: storeActivity, statuses: storeStatuses } = useIssueStore()
   const { labelsByProject, fetchLabels } = useLabelStore()
-  const { githubLinks, githubStatus, fetchGitHubLinks } = useIntegrationStore()
+  const { githubLinks, githubStatus, fetchGitHubStatus, fetchGitHubLinks } = useIntegrationStore()
   const openSettings = useSettingsStore((s) => s.openSettings)
 
   const initDescription = issue?.description ?? ""
@@ -1192,6 +1202,11 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
       .catch(() => { /* silent */ })
     if (projectId) fetchDeliveryProviders(workspaceSlug, projectId).catch(() => { /* silent */ })
   }, [open, workspaceSlug, projectId, fetchStatuses, fetchLabels, fetchDeliveryProviders])
+
+  // Connexion GitHub du workspace : conditionne la section GitHub (liens de PR et de commits).
+  useEffect(() => {
+    if (open && workspaceSlug) fetchGitHubStatus(workspaceSlug).catch(() => { /* silent */ })
+  }, [open, workspaceSlug, fetchGitHubStatus])
 
   // Cycles du projet (options du sélecteur) + cycle courant de l'issue - CYC-03b.
   useEffect(() => {

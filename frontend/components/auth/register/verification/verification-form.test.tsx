@@ -105,6 +105,21 @@ describe('OTPForm - Step 2: Verification', () => {
     vi.restoreAllMocks();
   });
 
+  describe('Instance sans vérification d\'e-mail', () => {
+    it('compte déjà prêt (otpSent=false) : pas de code attendu, retour à la connexion', async () => {
+      vi.mocked(authService.register).mockResolvedValue({
+        message: 'Account created. You can now sign in.', email: 'test@example.com', otpSent: false,
+      });
+
+      render(<OTPForm />);
+
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/auth/login'));
+      expect(mockClearRegisterData).toHaveBeenCalled();
+      expect(toast.success).toHaveBeenCalledWith('Account created', { description: 'Sign in to access your workspace.' });
+      expect(toast.success).not.toHaveBeenCalledWith('Verification code sent', expect.anything());
+    });
+  });
+
   describe('Rendering', () => {
     it('should render OTP input fields', async () => {
       render(<OTPForm />);

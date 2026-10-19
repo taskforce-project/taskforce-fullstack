@@ -16,7 +16,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.WebhookRequest;
+import com.taskforce.tf_api.core.dto.response.CreatedWebhookResponse;
+import com.taskforce.tf_api.core.dto.response.WebhookDeliveryResponse;
 import com.taskforce.tf_api.core.dto.response.WebhookResponse;
+import com.taskforce.tf_api.core.dto.response.WebhookSecretResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.WebhookService;
@@ -26,6 +29,7 @@ import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+/** Webhooks sortants d'un workspace (OSS-6.2) : réservés aux propriétaires et administrateurs, lecture comprise. */
 @RestController
 @RequestMapping("/api/workspaces/{slug}/webhooks")
 @RequiredArgsConstructor
@@ -35,20 +39,23 @@ public class WebhookController {
     private final UserRepository userRepository;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<WebhookResponse>>> list(@PathVariable String slug) {
-        return ResponseEntity.ok(ApiResponse.success(webhookService.list(slug)));
+    public ResponseEntity<ApiResponse<List<WebhookResponse>>> list(
+        @PathVariable String slug,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(webhookService.list(slug, resolveUser(jwt).getId())));
     }
 
+    /** Crée un webhook ; la réponse porte son secret de signature, montré cette seule fois. */
     @PostMapping
-    public ResponseEntity<ApiResponse<WebhookResponse>> create(
+    public ResponseEntity<ApiResponse<CreatedWebhookResponse>> create(
         @PathVariable String slug,
         @Valid @RequestBody WebhookRequest req,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        User user = resolveUser(jwt);
-        WebhookResponse webhook = webhookService.create(slug, req, user);
+        CreatedWebhookResponse created = webhookService.create(slug, req, resolveUser(jwt));
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Webhook created", webhook));
+            .body(ApiResponse.success("Webhook created", created));
     }
 
     @PutMapping("/{webhookId}")
@@ -60,6 +67,39 @@ public class WebhookController {
     ) {
         Long userId = resolveUser(jwt).getId();
         return ResponseEntity.ok(ApiResponse.success("Webhook updated", webhookService.update(slug, webhookId, req, userId)));
+    }
+
+    /** Nouveau secret de signature, montré cette seule fois. */
+    @PostMapping("/{webhookId}/secret")
+    public ResponseEntity<ApiResponse<WebhookSecretResponse>> regenerateSecret(
+        @PathVariable String slug,
+        @PathVariable Long webhookId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUser(jwt).getId();
+        return ResponseEntity.ok(ApiResponse.success(webhookService.regenerateSecret(slug, webhookId, userId)));
+    }
+
+    /** Envoie l'événement de test {@code ping} et renvoie le résultat de l'envoi. */
+    @PostMapping("/{webhookId}/test")
+    public ResponseEntity<ApiResponse<WebhookDeliveryResponse>> sendTest(
+        @PathVariable String slug,
+        @PathVariable Long webhookId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUser(jwt).getId();
+        return ResponseEntity.ok(ApiResponse.success(webhookService.sendTest(slug, webhookId, userId)));
+    }
+
+    /** Derniers envois du webhook. */
+    @GetMapping("/{webhookId}/deliveries")
+    public ResponseEntity<ApiResponse<List<WebhookDeliveryResponse>>> deliveries(
+        @PathVariable String slug,
+        @PathVariable Long webhookId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUser(jwt).getId();
+        return ResponseEntity.ok(ApiResponse.success(webhookService.deliveries(slug, webhookId, userId)));
     }
 
     @DeleteMapping("/{webhookId}")

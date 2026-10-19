@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueRequest;
@@ -18,6 +21,7 @@ import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.enums.ProjectRole;
+import com.taskforce.tf_api.core.enums.WebhookEventType;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.AssignmentStatus;
 import com.taskforce.tf_api.core.model.Issue;
@@ -37,6 +41,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.webhook.WorkspaceWebhookEvent;
 import com.taskforce.tf_api.util.AbstractIntegrationTest;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -1342,6 +1347,59 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             issueService.updateIssue(SLUG, project.getId(), id, u2, owner.getId());
 
             assertThat(issueService.listActivity(SLUG, project.getId(), id, owner.getId())).hasSizeGreaterThan(1);
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @RecordApplicationEvents
+    @DisplayName("webhooks sortants (OSS-6.2)")
+    class Webhooks {
+
+        @Autowired private ApplicationEvents applicationEvents;
+
+        private List<WorkspaceWebhookEvent> webhookEvents() {
+            return applicationEvents.stream(WorkspaceWebhookEvent.class).toList();
+        }
+
+        @Test
+        @DisplayName("création, modification, commentaire et suppression publient leur événement, avec le lien de l'issue")
+        void lifecycle_publishes_webhook_events() {
+            Long id = newIssueId("Login bug");
+            UpdateIssueRequest rename = new UpdateIssueRequest();
+            rename.setTitle("Login bug on Safari");
+            issueService.updateIssue(SLUG, project.getId(), id, rename, owner.getId());
+            var comment = new com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest();
+            comment.setContent("Reproduced on Safari 17");
+            issueService.addComment(SLUG, project.getId(), id, comment, owner.getId());
+            issueService.deleteIssue(SLUG, project.getId(), id, owner.getId());
+
+            List<WorkspaceWebhookEvent> events = webhookEvents();
+            assertThat(events).extracting(WorkspaceWebhookEvent::type).containsExactly(
+                WebhookEventType.ISSUE_CREATED, WebhookEventType.ISSUE_UPDATED,
+                WebhookEventType.COMMENT_CREATED, WebhookEventType.ISSUE_DELETED);
+            assertThat(events).allSatisfy(e -> {
+                assertThat(e.workspaceId()).isEqualTo(workspace.getId());
+                assertThat(e.actorId()).isEqualTo(owner.getId());
+            });
+            assertThat(events.get(0).path()).isEqualTo("/" + SLUG + "/projects/" + project.getId() + "/issues/" + id);
+            assertThat(((Map<?, ?>) events.get(0).data()).get("issue")).isInstanceOf(IssueResponse.class);
+            Map<?, ?> deleted = (Map<?, ?>) ((Map<?, ?>) events.get(3).data()).get("issue");
+            assertThat(deleted.get("identifier")).isEqualTo("APP-1");
+            assertThat(events.get(3).path()).isNull();
+        }
+
+        @Test
+        @DisplayName("un simple déplacement dans la colonne ne publie rien, ni webhook ni Slack")
+        void position_only_update_is_silent() {
+            Long id = newIssueId("Login bug");
+            UpdateIssueRequest move = new UpdateIssueRequest();
+            move.setPosition(3);
+
+            issueService.updateIssue(SLUG, project.getId(), id, move, owner.getId());
+
+            assertThat(webhookEvents()).extracting(WorkspaceWebhookEvent::type).containsExactly(WebhookEventType.ISSUE_CREATED);
+            verify(slackService, never()).notifyEvent(any(), org.mockito.ArgumentMatchers.eq("issue.updated"), any());
         }
     }
 }

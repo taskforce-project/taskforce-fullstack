@@ -55,7 +55,7 @@ class McpImportServiceTest {
 
     private void connectorWithTools(String... tools) {
         when(workspaceMcp.serverStatuses(10L)).thenReturn(List.of(
-            new WorkspaceMcpService.McpServerStatus("linear", "https://mcp.linear.app/mcp", true, List.of(tools), null)));
+            new WorkspaceMcpService.McpServerStatus("linear", null, "https://mcp.linear.app/mcp", true, List.of(tools), null)));
     }
 
     @Test

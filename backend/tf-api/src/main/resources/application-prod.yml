@@ -172,6 +172,17 @@ integrations:
       redirect-base: ${APP_API_URL:${APP_URL}}   # base publique du BACKEND (recoit le callback OAuth)
       app-base: ${FRONTEND_URL}                   # base du FRONT (retour utilisateur apres callback)
 
+# Webhooks sortants (OSS-6.2) : envois signés HMAC-SHA256, tentés jusqu'à 6 fois sur 9 h environ.
+taskforce:
+  # Inscription : adresse vérifiée par un code envoyé par e-mail. false = compte prêt tout de suite, pour une instance
+  # sans SMTP (auto-hébergement, SELF_HOSTING.md) ; personne ne prouve alors que l'adresse est la sienne.
+  signup:
+    email-verification: ${SIGNUP_EMAIL_VERIFICATION:true}
+  webhooks:
+    dispatch-interval-ms: ${WEBHOOKS_DISPATCH_INTERVAL_MS:5000}       # fréquence de la file d'envoi
+    timeout-ms: ${WEBHOOKS_TIMEOUT_MS:10000}                          # attente de la réponse du destinataire
+    allow-private-network: ${WEBHOOKS_ALLOW_PRIVATE_NETWORK:false}    # true = destinataires du réseau interne admis (n8n auto-hébergé)
+
 # Runner local de délégation (ADR-013). DÉSACTIVÉ par défaut en prod : tant qu'il l'est, le provider
 # « Claude Code » reste affiché « à venir », et ni les endpoints machine ni le filtre de session déléguée
 # n'existent. L'activer suppose un client Keycloak par runner (scripts/keycloak-runner.ps1 en dev) ; avant

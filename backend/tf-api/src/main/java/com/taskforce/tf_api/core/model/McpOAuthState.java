@@ -80,6 +80,10 @@ public class McpOAuthState {
     @Column(columnDefinition = "TEXT")
     private String issuer;
 
+    /** Nom d'un serveur MCP personnalise (V97) ; null pour un prereglage du catalogue. */
+    @Column(name = "mcp_name", length = 60)
+    private String mcpName;
+
     /** Chemin applicatif RELATIF de retour apres le callback (null = page Settings par defaut). */
     @Column(name = "return_to", length = 500)
     private String returnTo;

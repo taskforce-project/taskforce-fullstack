@@ -21,6 +21,10 @@
   correctif et « less than a minute ago » avec.
 - **Règle** : une date-heure venue de l'API (`createdAt`, `updatedAt`, `*At`) passe par `parseServerDate()`, jamais
   par `new Date()`. Les champs `LocalDate` (échéances, dates de cycle) restent des dates seules.
+- **Remise à niveau sur `dev` (19/10)** : `dev` a reçu les lots 6 et 7 pendant que la PR #346 attendait. Conflit
+  dans `quick-columns.tsx` : la colonne « Recent » lit désormais le store des notifications (`9ce2f58b`) ; gardé, avec
+  son tri et son heure relative par `parseServerDate()`. Le code front arrivé sur `dev` depuis la base de la branche
+  ne lit aucune autre date-heure du serveur en heure locale.
 - **Reste** : l'API publique envoie toujours ces valeurs sans fuseau alors que sa spec OpenAPI les déclare
   `format: date-time` (RFC 3339, fuseau obligatoire). Pour les clients externes, à corriger côté backend (`Instant`
   ou sérialisation avec `Z`) ; `parseServerDate()` restera compatible.

@@ -110,6 +110,51 @@ class AuthServiceTest {
         }
 
         @Test
+        @DisplayName("sans vérification d'e-mail (instance sans SMTP) : compte prêt tout de suite, aucun code envoyé")
+        void register_withoutEmailVerification_completesTheAccountAtOnce() {
+            org.springframework.test.util.ReflectionTestUtils.setField(authService, "signupEmailVerification", false);
+            UserRepresentation created = TestDataBuilder.buildKeycloakUser(TEST_EMAIL, "Test", "User", false);
+            created.setId(TEST_KEYCLOAK_ID);
+            when(userRepository.existsByEmail(TEST_EMAIL)).thenReturn(false);
+            when(keycloakService.emailExists(TEST_EMAIL)).thenReturn(false);
+            when(keycloakService.createUser(anyString(), anyString(), anyString(), anyString())).thenReturn(TEST_KEYCLOAK_ID);
+            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(created);
+            when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+            RegisterResponse response = authService.register(registerRequest);
+
+            assertThat(response.isOtpSent()).isFalse();
+            assertThat(response.getMessage()).contains("You can now sign in");
+            verify(keycloakService).verifyEmail(TEST_KEYCLOAK_ID);
+            verify(userRepository).save(userCaptor.capture());
+            assertThat(userCaptor.getValue().getEmail()).isEqualTo(TEST_EMAIL);
+            verify(workspaceService).createWorkspace(userCaptor.getValue(), "Test");
+            verifyNoInteractions(otpService);
+            // Pas de SMTP : pas d'e-mail de bienvenue tenté.
+            verify(emailService, never()).sendWelcomeEmail(anyString(), anyString());
+        }
+
+        @Test
+        @DisplayName("sans vérification d'e-mail : un compte Keycloak resté non vérifié prend le mot de passe saisi")
+        void register_withoutEmailVerification_takesOverAnUnverifiedAccount() {
+            org.springframework.test.util.ReflectionTestUtils.setField(authService, "signupEmailVerification", false);
+            UserRepresentation pending = TestDataBuilder.buildKeycloakUser(TEST_EMAIL, "Old", "Name", false);
+            pending.setId(TEST_KEYCLOAK_ID);
+            when(userRepository.existsByEmail(TEST_EMAIL)).thenReturn(false);
+            when(keycloakService.emailExists(TEST_EMAIL)).thenReturn(true);
+            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(pending);
+            when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+            RegisterResponse response = authService.register(registerRequest);
+
+            assertThat(response.isOtpSent()).isFalse();
+            verify(keycloakService).updatePassword(TEST_KEYCLOAK_ID, registerRequest.getPassword());
+            verify(keycloakService).updateUserNames(TEST_KEYCLOAK_ID, registerRequest.getFirstName(), registerRequest.getLastName());
+            verify(keycloakService).verifyEmail(TEST_KEYCLOAK_ID);
+            verify(keycloakService, never()).createUser(anyString(), anyString(), anyString(), anyString());
+        }
+
+        @Test
         @DisplayName("devrait créer un nouvel utilisateur et envoyer OTP")
         void register_shouldCreateUserAndSendOtp_whenNewUser() {
             // Given
@@ -314,6 +359,7 @@ class AuthServiceTest {
                 user.setId(1L);
                 return user;
             });
+            when(emailService.isEnabled()).thenReturn(true);
             doNothing().when(emailService).sendWelcomeEmail(anyString(), anyString());
 
             // When
@@ -586,6 +632,7 @@ class AuthServiceTest {
         @DisplayName("devrait envoyer OTP de reset password si utilisateur existe")
         void forgotPassword_shouldSendOtp_whenUserExists() {
             // Given
+            when(emailService.isEnabled()).thenReturn(true);
             when(keycloakService.emailExists(TEST_EMAIL)).thenReturn(true);
             when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
             when(otpService.generateAndSendOtp(anyString(), anyString(), any(), any(), anyString()))
@@ -608,6 +655,7 @@ class AuthServiceTest {
         @DisplayName("devrait lancer exception si utilisateur non trouvé")
         void forgotPassword_shouldThrowException_whenUserNotFound() {
             // Given
+            when(emailService.isEnabled()).thenReturn(true);
             when(keycloakService.emailExists(TEST_EMAIL)).thenReturn(false);
 
             // When/Then
@@ -616,6 +664,18 @@ class AuthServiceTest {
                 .hasMessageContaining("No account");
 
             verify(otpService, never()).generateAndSendOtp(anyString(), anyString(), any(), any(), anyString());
+        }
+
+        @Test
+        @DisplayName("sans SMTP : message clair, aucun code généré ni compte cherché")
+        void forgotPassword_withoutSmtp_saysItIsNotAvailable() {
+            when(emailService.isEnabled()).thenReturn(false);
+
+            assertThatThrownBy(() -> authService.forgotPassword(TEST_EMAIL))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ask an administrator");
+
+            verifyNoInteractions(keycloakService, otpService);
         }
     }
 

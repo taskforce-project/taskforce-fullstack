@@ -19,7 +19,8 @@ import lombok.RequiredArgsConstructor;
  * Outil interne (TF-MCP-03, Pilier 3) : cherche une intégration dans le catalogue TaskForce par nom
  * ou mot-clé, et dit si elle est <b>déjà connectée</b>, <b>disponible mais à connecter</b>, ou
  * <b>absente</b>. Permet à l'agent de <b>guider vers la connexion</b> (« connecte X ») au lieu de
- * prétendre l'absence d'accès ou d'inventer. Générique : piloté par le catalogue, aucun service en dur.
+ * prétendre l'absence d'accès ou d'inventer. Un outil absent du catalogue se branche encore par son
+ * propre serveur MCP (ADR-020) : la réponse le dit.
  */
 @Component
 @RequiredArgsConstructor
@@ -67,7 +68,8 @@ public class FindIntegrationTool implements AgentTool {
 
         if (hits.isEmpty()) {
             return "No integration matches \"" + query + "\" in the TaskForce catalog. "
-                + "Tell the user plainly: there is no integration for it yet.";
+                + "Tell the user plainly, and add that any tool with an MCP server can still be connected: "
+                + "Settings > Integrations > Connect an MCP server.";
         }
         StringBuilder sb = new StringBuilder("Integrations matching \"" + query + "\":");
         for (String h : hits) sb.append("\n").append(h);

@@ -48,7 +48,7 @@ public class ProjectRepoService {
             if (isBlank(request.getRepoFullName())) {
                 throw new BusinessException("The repository to link (owner/name) is required");
             }
-            fullName = request.getRepoFullName().trim();
+            fullName = GitHubRepoNames.requireFullName(request.getRepoFullName());
             gitHubService.assertRepoAccessible(workspaceSlug, fullName);
         } else {
             throw new BusinessException("Invalid mode: expected CREATE or LINK");

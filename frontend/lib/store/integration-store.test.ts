@@ -13,6 +13,7 @@ vi.mock('../api/integration-service', () => ({
   getGitHubStatus: vi.fn(),
   connectGitHub: vi.fn(),
   disconnectGitHub: vi.fn(),
+  getGitHubRepos: vi.fn(),
   getGitHubLinks: vi.fn(),
   addGitHubLink: vi.fn(),
   deleteGitHubLink: vi.fn(),
@@ -26,6 +27,9 @@ vi.mock('../api/integration-service', () => ({
   createWebhook: vi.fn(),
   updateWebhook: vi.fn(),
   deleteWebhook: vi.fn(),
+  regenerateWebhookSecret: vi.fn(),
+  testWebhook: vi.fn(),
+  getWebhookDeliveries: vi.fn(),
 }));
 
 function makeStatus(overrides: Partial<IntegrationStatus> = {}): IntegrationStatus {
@@ -64,8 +68,11 @@ describe('integration-store', () => {
         githubStatus: null,
         slackStatus: null,
         webhooks: [],
+        webhookDeliveries: {},
         slackChannels: [],
         githubLinks: {},
+        githubRepos: [],
+        changes: 0,
       });
     });
   });
@@ -84,9 +91,49 @@ describe('integration-store', () => {
     expect(useIntegrationStore.getState().githubStatus).toEqual(status);
   });
 
-  it('connectGitHub delegates to the service', async () => {
+  it('connectGitHub delegates to the service, with the path to come back to', async () => {
     await act(async () => { await useIntegrationStore.getState().connectGitHub('acme'); });
-    expect(svc.connectGitHub).toHaveBeenCalledWith('acme');
+    expect(svc.connectGitHub).toHaveBeenCalledWith('acme', undefined);
+
+    await act(async () => { await useIntegrationStore.getState().connectGitHub('acme', '/acme?newProject=repo'); });
+    expect(svc.connectGitHub).toHaveBeenLastCalledWith('acme', '/acme?newProject=repo');
+  });
+
+  it('fetchGitHubRepos stores the repositories the connection can see', async () => {
+    const repos = [{ fullName: 'octo/hello', name: 'hello', isPrivate: false, htmlUrl: 'https://github.com/octo/hello', openIssues: 2 }];
+    vi.mocked(svc.getGitHubRepos).mockResolvedValue(repos);
+
+    await act(async () => { await useIntegrationStore.getState().fetchGitHubRepos('acme'); });
+
+    expect(svc.getGitHubRepos).toHaveBeenCalledWith('acme');
+    expect(useIntegrationStore.getState().githubRepos).toEqual(repos);
+  });
+
+  it('disconnectGitHub drops the links and repositories, and tells the catalog to reload', async () => {
+    act(() => useIntegrationStore.setState({
+      githubStatus: makeStatus(),
+      githubLinks: { 55: [makeLink()] },
+      githubRepos: [{ fullName: 'octo/hello', name: 'hello', isPrivate: false, htmlUrl: 'https://github.com/octo/hello', openIssues: 0 }],
+    }));
+    vi.mocked(svc.disconnectGitHub).mockResolvedValue(undefined);
+
+    await act(async () => { await useIntegrationStore.getState().disconnectGitHub('acme'); });
+
+    const state = useIntegrationStore.getState();
+    expect(state.githubLinks).toEqual({});
+    expect(state.githubRepos).toEqual([]);
+    expect(state.changes).toBe(1);
+  });
+
+  it('disconnectGitHub keeps everything when the call fails', async () => {
+    act(() => useIntegrationStore.setState({ githubStatus: makeStatus(), githubLinks: { 55: [makeLink()] } }));
+    vi.mocked(svc.disconnectGitHub).mockRejectedValue(new Error('boom'));
+
+    await expect(useIntegrationStore.getState().disconnectGitHub('acme')).rejects.toThrow('boom');
+
+    expect(useIntegrationStore.getState().githubStatus?.connected).toBe(true);
+    expect(useIntegrationStore.getState().githubLinks[55]).toHaveLength(1);
+    expect(useIntegrationStore.getState().changes).toBe(0);
   });
 
   it('disconnectGitHub resets the status to disconnected', async () => {
@@ -182,6 +229,16 @@ describe('integration-store', () => {
     expect(svc.connectSlack).toHaveBeenCalledWith('acme');
   });
 
+  it('disconnectSlack drops the channels (they belong to the Slack team) and tells the catalog to reload', async () => {
+    act(() => useIntegrationStore.setState({ slackStatus: makeStatus({ provider: 'SLACK' }), slackChannels: [makeChannel()] }));
+    vi.mocked(svc.disconnectSlack).mockResolvedValue(undefined);
+
+    await act(async () => { await useIntegrationStore.getState().disconnectSlack('acme'); });
+
+    expect(useIntegrationStore.getState().slackChannels).toEqual([]);
+    expect(useIntegrationStore.getState().changes).toBe(1);
+  });
+
   it('disconnectSlack resets the status to disconnected', async () => {
     act(() => useIntegrationStore.setState({ slackStatus: makeStatus({ provider: 'SLACK' }) }));
     vi.mocked(svc.disconnectSlack).mockResolvedValue(undefined);
@@ -255,17 +312,18 @@ describe('integration-store', () => {
     expect(useIntegrationStore.getState().webhooks).toEqual(webhooks);
   });
 
-  it('addWebhook appends the webhook', async () => {
+  it('addWebhook puts the new webhook first and returns its secret', async () => {
     act(() => useIntegrationStore.setState({ webhooks: [makeWebhook({ id: 1 })] }));
-    const created = makeWebhook({ id: 2 });
-    vi.mocked(svc.createWebhook).mockResolvedValue(created);
+    vi.mocked(svc.createWebhook).mockResolvedValue({ webhook: makeWebhook({ id: 2 }), secret: 'whsec_x' });
 
+    let secret = '';
     await act(async () => {
-      await useIntegrationStore.getState().addWebhook('acme', { url: 'https://hook', eventTypes: [] });
+      secret = (await useIntegrationStore.getState().addWebhook('acme', { url: 'https://hook', eventTypes: [] })).secret;
     });
 
     expect(svc.createWebhook).toHaveBeenCalledWith('acme', { url: 'https://hook', eventTypes: [] });
-    expect(useIntegrationStore.getState().webhooks.map((w) => w.id)).toEqual([1, 2]);
+    expect(useIntegrationStore.getState().webhooks.map((w) => w.id)).toEqual([2, 1]);
+    expect(secret).toBe('whsec_x');
   });
 
   it('editWebhook replaces the webhook by id', async () => {
@@ -291,5 +349,45 @@ describe('integration-store', () => {
 
     expect(svc.deleteWebhook).toHaveBeenCalledWith('acme', 1);
     expect(useIntegrationStore.getState().webhooks.map((w) => w.id)).toEqual([2]);
+  });
+
+  it('rotateWebhookSecret returns the new secret', async () => {
+    vi.mocked(svc.regenerateWebhookSecret).mockResolvedValue('whsec_new');
+
+    expect(await useIntegrationStore.getState().rotateWebhookSecret('acme', 1)).toBe('whsec_new');
+    expect(svc.regenerateWebhookSecret).toHaveBeenCalledWith('acme', 1);
+  });
+
+  it('sendWebhookTest returns the delivery, then reloads the webhooks and the history', async () => {
+    const delivery = { deliveryId: 'd1', eventType: 'ping', status: 'DELIVERED' as const, attempts: 1, lastStatus: 204,
+      lastError: null, createdAt: '2026-10-18T10:00:00', deliveredAt: '2026-10-18T10:00:01', nextAttemptAt: null };
+    vi.mocked(svc.testWebhook).mockResolvedValue(delivery);
+    vi.mocked(svc.getWebhooks).mockResolvedValue([makeWebhook({ id: 1, lastStatus: 204 })]);
+    vi.mocked(svc.getWebhookDeliveries).mockResolvedValue([delivery]);
+
+    let result = null as unknown;
+    await act(async () => {
+      result = await useIntegrationStore.getState().sendWebhookTest('acme', 1);
+    });
+
+    expect(result).toEqual(delivery);
+    expect(useIntegrationStore.getState().webhooks[0].lastStatus).toBe(204);
+    expect(useIntegrationStore.getState().webhookDeliveries[1]).toEqual([delivery]);
+  });
+
+  it('fetchWebhookDeliveries stores the history by webhook, and removing the webhook drops it', async () => {
+    act(() => useIntegrationStore.setState({ webhooks: [makeWebhook({ id: 1 })] }));
+    vi.mocked(svc.getWebhookDeliveries).mockResolvedValue([]);
+    vi.mocked(svc.deleteWebhook).mockResolvedValue(undefined);
+
+    await act(async () => {
+      await useIntegrationStore.getState().fetchWebhookDeliveries('acme', 1);
+    });
+    expect(useIntegrationStore.getState().webhookDeliveries).toEqual({ 1: [] });
+
+    await act(async () => {
+      await useIntegrationStore.getState().removeWebhook('acme', 1);
+    });
+    expect(useIntegrationStore.getState().webhookDeliveries).toEqual({});
   });
 });

@@ -1,75 +1,239 @@
-# Docker Compose par défaut (pointe vers dev)
-# Pour utiliser: docker-compose up
-# Pour production: docker-compose -f docker-compose-prod.yml up
+# TaskForce, self-hosted on one machine.
+#
+#   ./scripts/selfhost-init.sh        (Windows: .\scripts\selfhost-init.ps1) writes .env with fresh secrets
+#   docker compose up -d --build      first start: images are built from this repository (10 to 20 minutes)
+#
+# Then open the app (TF_APP_URL, http://localhost:3000 by default) and create your account. SELF_HOSTING.md covers
+# AI (Ollama), email, another machine on the network, updates and backups.
+#
+# Development uses docker-compose.dev.yml; the hosted production uses docker-compose.prod.yml.
 
-version: '3.8'
+name: taskforce
 
 services:
   postgres:
-    # pgvector OBLIGATOIRE : les migrations V32/V33/V52/V59 déclarent des colonnes `vector(384)` ; un
-    # `postgres:*-alpine` standard n'embarque pas l'extension → Flyway échoue au 1er démarrage (PC-025).
-    # Aligné sur dev/prod. Le user applicatif (superuser du conteneur) exécute `CREATE EXTENSION vector`.
-    image: ${POSTGRES_IMAGE:-pgvector/pgvector:pg18}
-    container_name: taskforce-db
-    restart: unless-stopped
+    # pgvector is required: several migrations declare vector columns.
+    image: pgvector/pgvector:pg18
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-taskforce_dev}
-      POSTGRES_USER: ${POSTGRES_USER:-taskforce_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taskforce_pass}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      TZ: UTC
+      PGTZ: UTC
+      POSTGRES_DB: ${DB_NAME:-taskforce}
+      POSTGRES_USER: ${DB_USER:-taskforce}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?missing value, run scripts/selfhost-init first}
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - taskforce-network
+      # First start only: creates the Keycloak database and the vector extension.
+      - ./backend/tf-api/src/main/resources/db/init-prod:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-taskforce_user}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-taskforce}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.5.2
+    # The realm (keycloak/realms/selfhost) is imported on the first start only.
+    command: start --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak_prod
+      KC_DB_USERNAME: ${DB_USER:-taskforce}
+      KC_DB_PASSWORD: ${DB_PASSWORD:?missing value, run scripts/selfhost-init first}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?missing value, run scripts/selfhost-init first}
+      # Public address (admin console) and the issuer of every token, including the ones the API asks for through
+      # the internal network.
+      KC_HOSTNAME: ${TF_KEYCLOAK_URL:-http://localhost:8180}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_CACHE: local
+      # Values substituted in the imported realm.
+      TF_APP_URL: ${TF_APP_URL:-http://localhost:3000}
+      TF_API_URL: ${TF_API_URL:-http://localhost:8080}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?missing value, run scripts/selfhost-init first}
+    volumes:
+      - ./keycloak/realms/selfhost:/opt/keycloak/data/import:ro
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${KEYCLOAK_PORT:-8180}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  redis:
+    # Rate limiting and the dashboard cache; nothing to keep.
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  minio:
+    # Attachments and avatars. The browser downloads them from TF_STORAGE_URL, hence the published port.
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-taskforce}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?missing value, run scripts/selfhost-init first}
+      MINIO_REGION: us-east-1
+    volumes:
+      - minio_data:/data
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${STORAGE_PORT:-9000}:9000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  ai-service:
+    build:
+      context: ./ai-service
+    environment:
+      TZ: UTC
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?missing value, run scripts/selfhost-init first}
+      # Ollama on this machine by default (qwen3:8b and bge-m3, see SELF_HOSTING.md), or any OpenAI-compatible API.
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_MODEL_FAST: ${AI_MODEL_FAST:-}
+      AI_EMBED_BASE_URL: ${AI_EMBED_BASE_URL:-}
+      AI_EMBED_API_KEY: ${AI_EMBED_API_KEY:-}
+      AI_EMBED_MODEL: ${AI_EMBED_MODEL:-}
+      AI_TIMEOUT: ${AI_TIMEOUT:-120}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      LOG_LEVEL: INFO
+    # Linux: lets the container reach Ollama on the host (Docker Desktop already knows this name).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)\" || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
 
   backend:
     build:
       context: ./backend/tf-api
-      dockerfile: Dockerfile
-    container_name: taskforce-backend
-    restart: unless-stopped
     environment:
-      # Ce compose « par défaut » pointe vers dev (cf. en-tête). Depuis que le Dockerfile a un défaut
-      # `prod` fail-safe (PC-024), il faut déclarer le profil ici, sinon le backend démarrerait en prod
-      # sans les secrets prod et échouerait.
-      SPRING_PROFILES_ACTIVE: dev
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-taskforce_dev}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-taskforce_user}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-taskforce_pass}
+      TZ: UTC
+      SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: 8080
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      JAVA_OPTS: "-Xmx1024m -Xms256m -XX:+UseG1GC -Duser.timezone=UTC"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-taskforce}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-taskforce}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?missing value, run scripts/selfhost-init first}
+      # Keycloak: reached on the internal network, tokens checked against its public address.
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_PUBLIC_URL: ${TF_KEYCLOAK_URL:-http://localhost:8180}
+      KEYCLOAK_REALM: taskforce
+      KEYCLOAK_CLIENT_ID: taskforce-api
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?missing value, run scripts/selfhost-init first}
+      KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?missing value, run scripts/selfhost-init first}
+      APP_URL: ${TF_APP_URL:-http://localhost:3000}
+      FRONTEND_URL: ${TF_APP_URL:-http://localhost:3000}
+      APP_API_URL: ${TF_API_URL:-http://localhost:8080}
+      CORS_ALLOWED_ORIGINS: ${TF_APP_URL:-http://localhost:3000}
+      AI_SERVICE_URL: http://ai-service:8000
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?missing value, run scripts/selfhost-init first}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${TF_STORAGE_URL:-http://localhost:9000}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-taskforce}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?missing value, run scripts/selfhost-init first}
+      MINIO_BUCKET: taskforce-attachments
+      RATELIMIT_DISTRIBUTED_ENABLED: "true"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TF_ENCRYPTION_KEY: ${TF_ENCRYPTION_KEY:?missing value, run scripts/selfhost-init first}
+      TF_HUMAN_CHALLENGE_SECRET: ${TF_HUMAN_CHALLENGE_SECRET:-}
+      # Email (sign-up codes, invitations, password reset). Empty = no email: then set SIGNUP_EMAIL_VERIFICATION=false.
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-noreply@localhost}
+      MAIL_FROM_NAME: TaskForce
+      SIGNUP_EMAIL_VERIFICATION: ${SIGNUP_EMAIL_VERIFICATION:-false}
+      # Coding agents run by each person on their own machine (Settings > Agents).
+      DELIVERY_LOCAL_RUNNER_ENABLED: ${DELIVERY_LOCAL_RUNNER_ENABLED:-true}
+      AI_MONTHLY_TOKENS_PER_ACCOUNT: ${AI_MONTHLY_TOKENS_PER_ACCOUNT:-0}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      SLACK_CLIENT_ID: ${SLACK_CLIENT_ID:-}
+      SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET:-}
+      MCP_ALLOW_PRIVATE_NETWORK: ${MCP_ALLOW_PRIVATE_NETWORK:-false}
+      WEBHOOKS_ALLOW_PRIVATE_NETWORK: ${WEBHOOKS_ALLOW_PRIVATE_NETWORK:-false}
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "${BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
-    networks:
-      - taskforce-network
+      keycloak:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/readyz >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
-    container_name: taskforce-frontend
-    restart: unless-stopped
+      # Public addresses are written into the app when it is built: change one in .env, then rebuild the frontend
+      # (docker compose up -d --build frontend).
+      args:
+        NEXT_PUBLIC_API_URL: ${TF_API_URL:-http://localhost:8080}
+        NEXT_PUBLIC_API_URL_SSR: http://backend:8080
+        NEXT_PUBLIC_STORAGE_URL: ${TF_STORAGE_URL:-http://localhost:9000}
+        NEXT_PUBLIC_SITE_URL: ${TF_APP_URL:-http://localhost:3000}
+        NEXT_PUBLIC_AUTH_SOCIAL_PROVIDERS: ""
+        NEXT_PUBLIC_POSTHOG_KEY: ""
+        NEXT_PUBLIC_SELF_HOSTED: "true"
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+      NODE_ENV: production
+      PORT: 3000
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "${BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-3000}:3000"
     depends_on:
-      - backend
-    networks:
-      - taskforce-network
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
 
-networks:
-  taskforce-network:
-    driver: bridge
+  # Optional: Ollama in a container (docker compose --profile ollama up -d), then OLLAMA_BASE_URL=http://ollama:11434
+  # in .env. Ollama installed on the machine itself is usually faster (direct GPU access).
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  minio_data:
+  ollama_data:

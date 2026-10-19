@@ -7,7 +7,7 @@ import { Cookie } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
-import { readConsent, writeConsent, CONSENT_OPEN_EVENT } from "@/lib/analytics/consent"
+import { analyticsConfigured, readConsent, writeConsent, CONSENT_OPEN_EVENT } from "@/lib/analytics/consent"
 
 /**
  * Bandeau de consentement cookies (RGPD/CNIL). Cookies **nécessaires** toujours actifs (exemptés) ;
@@ -36,7 +36,8 @@ export function CookieConsent() {
     return () => window.removeEventListener(CONSENT_OPEN_EVENT, onOpen)
   }, [])
 
-  if (!mounted) return null
+  // Sans mesure d'audience (instance sans clé PostHog), il n'y a rien à accepter : pas de bandeau.
+  if (!mounted || !analyticsConfigured()) return null
   // Ouverture DÉRIVÉE (pas de setState dans un effet) : 1er passage sans choix, ou réouverture manuelle.
   const open = forceOpen || (readConsent() === null && !dismissed)
   if (!open) return null

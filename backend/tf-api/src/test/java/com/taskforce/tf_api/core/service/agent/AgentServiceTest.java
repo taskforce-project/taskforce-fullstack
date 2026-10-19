@@ -23,6 +23,7 @@ import com.taskforce.tf_api.core.enums.NodeType;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.AiUsageService;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
@@ -58,6 +59,7 @@ class AgentServiceTest {
     @Spy  private ObjectMapper objectMapper = new ObjectMapper();
     @Mock private AiUsageService aiUsageService;
     @Mock private WorkspaceMcpService workspaceMcp;
+    @Mock private AuthorizationService authorization;
 
     @InjectMocks private AgentService service;
 
@@ -252,16 +254,45 @@ class AgentServiceTest {
     }
 
     @Test
-    @DisplayName("écriture dans un outil externe (MCP) → PROPOSÉE à l'utilisateur, pas exécutée")
+    @DisplayName("écriture dans un outil externe (MCP) → PROPOSÉE à un gestionnaire, pas exécutée")
     void external_write_is_proposed() throws Exception {
         stubWorkspace();
-        ReflectionTestUtils.setField(service, "confirmExternalWrites", true);
+        stubExternalWrite();
+        when(authorization.isManager(1L, 7L)).thenReturn(true);
+
+        AssistantAnswer answer = service.run("acme", 7L, "Create an issue in the external tool");
+
+        assertThat(answer.toolCalls()).hasSize(1);
+        assertThat(answer.toolCalls().get(0).status()).isEqualTo("pending");
+        verify(extClient, never()).initialize(any()); // rien n'a été envoyé au serveur MCP
+    }
+
+    @Test
+    @DisplayName("écriture dans un outil externe demandée par un simple membre → refusée, sans bouton de validation")
+    void external_write_refused_to_a_member() throws Exception {
+        stubWorkspace();
+        stubExternalWrite();
+        when(authorization.isManager(1L, 7L)).thenReturn(false);
+
+        AssistantAnswer answer = service.run("acme", 7L, "Create an issue in the external tool");
+
+        // « pending » afficherait « Approve and run » ; un membre ne peut pas valider (OSS-1.5).
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
+            assertThat(call.status()).isEqualTo("error");
+            assertThat(call.output()).contains("owners and admins");
+        });
+        verify(extClient, never()).initialize(any());
+    }
+
+    private final McpClient extClient = Mockito.mock(McpClient.class);
+
+    /** Un outil MCP d'écriture connecté, que le modèle appelle puis résume. */
+    private void stubExternalWrite() throws Exception {
         ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
         ReflectionTestUtils.setField(service, "maxExternalTools", 20);
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
 
-        McpClient extClient = Mockito.mock(McpClient.class);
         var writeDef = new McpClient.ToolDef("do_write", "writes something", json.readTree("{\"type\":\"object\"}"), false);
         var extTool = new ExternalMcpTool(extClient, new McpClient.ServerRef("srv", "http://x/mcp", null), writeDef, json);
         when(workspaceMcp.toolsFor(any())).thenReturn(List.of(extTool));
@@ -270,12 +301,6 @@ class AgentServiceTest {
         when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
             json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"srv__do_write\",\"arguments\":\"{}\"}}]}"),
             json.readTree("{\"content\":\"I propose to create the issue.\"}"));
-
-        AssistantAnswer answer = service.run("acme", 7L, "Create an issue in the external tool");
-
-        assertThat(answer.toolCalls()).hasSize(1);
-        assertThat(answer.toolCalls().get(0).status()).isEqualTo("pending");
-        verify(extClient, never()).initialize(any()); // rien n'a été envoyé au serveur MCP
     }
 
     @Test
