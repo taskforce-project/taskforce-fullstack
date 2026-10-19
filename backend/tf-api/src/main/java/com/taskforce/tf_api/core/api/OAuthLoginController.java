@@ -3,6 +3,7 @@ package com.taskforce.tf_api.core.api;
 import java.util.Map;
 import java.util.Set;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -45,6 +46,8 @@ import lombok.extern.slf4j.Slf4j;
  * redirection — donc dans une barre d'adresse et un historique.</p>
  */
 @RestController
+// Connexion par GitHub ou Google via Keycloak : absente de l'app desktop, où le compte se connecte dans la coque.
+@Profile("!desktop")
 @RequestMapping("/api/auth/oauth")
 @RequiredArgsConstructor
 @Slf4j

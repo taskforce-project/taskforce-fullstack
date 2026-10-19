@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.api;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +24,8 @@ import lombok.RequiredArgsConstructor;
  * un secret contre un jeton), limité en débit comme un login.
  */
 @RestController
+// Jeton machine du runner émis par Keycloak : dans l'app desktop, la coque lance le runner elle-même.
+@Profile("!desktop")
 @RequestMapping("/api/auth/runner")
 @ConditionalOnProperty(name = LocalRunnerSettings.ENABLED_PROPERTY, havingValue = "true")
 @RequiredArgsConstructor

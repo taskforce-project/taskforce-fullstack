@@ -1,0 +1,148 @@
+# ===============================
+# PROFIL DESKTOP
+# L'app desktop (desktop/, Electron) lance ce backend pour une seule personne, sur 127.0.0.1, avec sa base
+# PostgreSQL embarquée. La coque fournit les ports, le dossier de données, le jeton de lancement et l'identité du
+# compte TaskForce connecté (hébergé) : le backend ne joint jamais Keycloak, il marche hors ligne
+# (spec Specification_App_Desktop §5.2 et §5.7).
+# ===============================
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME:taskforce}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 6
+      minimum-idle: 1
+      connection-timeout: 30000
+  flyway:
+    # Jamais les jeux de données de dev : la base de l'app ne contient que ce que la personne y crée.
+    locations: classpath:db/migration
+  jpa:
+    show-sql: false
+  web:
+    error:
+      include-stacktrace: never
+  # Pas de serveur de courrier dans l'app (le défaut commun vise une boîte de test).
+  mail:
+    host: ""
+  thymeleaf:
+    enabled: true
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    encoding: UTF-8
+
+server:
+  # Jamais joignable depuis le réseau : seule la coque, sur la même machine, parle à l'API.
+  address: 127.0.0.1
+  port: ${TF_DESKTOP_API_PORT}
+
+desktop:
+  # Jeton tiré par la coque à chaque lancement, exigé sur chaque requête (DesktopLaunchTokenAuthenticator).
+  launch-token: ${TF_DESKTOP_LAUNCH_TOKEN}
+  # Dossier de données de l'app (fichiers, pièces jointes, Brain OS), propre au compte connecté.
+  data-dir: ${TF_DESKTOP_DATA_DIR}
+  # Compte TaskForce connecté, lu par la coque dans le jeton du compte hébergé.
+  account:
+    subject: ${TF_DESKTOP_ACCOUNT_SUBJECT}
+    email: ${TF_DESKTOP_ACCOUNT_EMAIL}
+    given-name: ${TF_DESKTOP_ACCOUNT_GIVEN_NAME:}
+    family-name: ${TF_DESKTOP_ACCOUNT_FAMILY_NAME:}
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://127.0.0.1}
+  allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
+  allowed-headers: "*"
+  allow-credentials: true
+  max-age: 3600
+
+# Keycloak n'est jamais joint en desktop : ces valeurs ne servent qu'à construire des beans inutilisés.
+keycloak:
+  url: http://127.0.0.1:9
+  public-url: http://127.0.0.1:9
+  realm: taskforce
+  client-id: taskforce-desktop
+  client-secret: unused
+  admin:
+    username: unused
+    password: unused
+    client-id: admin-cli
+
+app:
+  name: TaskForce
+  url: ${TF_DESKTOP_UI_URL:http://127.0.0.1}
+  frontend-url: ${TF_DESKTOP_UI_URL:http://127.0.0.1}
+  api-url: ${TF_DESKTOP_UI_URL:http://127.0.0.1}
+
+# Pas de serveur de courrier dans l'app : les e-mails de compte partent du côté hébergé.
+mail:
+  host: ""
+  port: 587
+  username: ""
+  password: ""
+  from: noreply@taskforce-project.fr
+  from-name: TaskForce
+  properties:
+    mail:
+      smtp:
+        auth: false
+        starttls:
+          enable: false
+          required: false
+      debug: false
+
+# Codes à usage unique de l'inscription : sans objet dans l'app (l'inscription se fait sur le compte hébergé).
+otp:
+  expiration-minutes: 15
+  length: 6
+  max-attempts: 5
+  max-requests-per-hour: 5
+  dev-fallback-log: false
+
+minio:
+  endpoint: http://127.0.0.1:9
+  public-endpoint: http://127.0.0.1:9
+  access-key: unused
+  secret-key: unused
+  bucket: unused
+
+security:
+  # Clé de chiffrement des jetons et clés en base, générée au premier lancement et gardée dans le trousseau.
+  encryption-key: ${TF_ENCRYPTION_KEY}
+  human-challenge-secret: ${TF_DESKTOP_LAUNCH_TOKEN}
+  turnstile:
+    site-key: ""
+    secret-key: ""
+
+integrations:
+  github:
+    client-id: ${GITHUB_CLIENT_ID:}
+    client-secret: ""
+  slack:
+    client-id: ""
+    client-secret: ""
+  mcp:
+    # Les serveurs MCP locaux sont le cas normal sur un poste.
+    allow-private-network: true
+
+taskforce:
+  signup:
+    email-verification: false
+  webhooks:
+    allow-private-network: true
+
+delivery:
+  local-runner:
+    enabled: true
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    root: INFO
+    com.taskforce: INFO
