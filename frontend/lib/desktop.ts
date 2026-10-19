@@ -35,6 +35,27 @@ export interface DesktopAiView {
 
 export type DesktopAiSaveResult = { ok: true; view: DesktopAiView } | { ok: false; error: string };
 
+/** Réponse d'une action de la coque : la valeur, ou le message à montrer. */
+export type DesktopResult<T> = { ok: true; value: T } | { ok: false; error: string };
+
+/**
+ * Outils de la personne pour les tâches de Claude Code (cf. `desktop/src/tools.ts`). `claude.signedIn` vaut `null`
+ * quand la version installée ne sait pas le dire.
+ */
+export interface DesktopToolsStatus {
+  claude: { installed: boolean; version: string | null; signedIn: boolean | null };
+  git: { installed: boolean; version: string | null };
+  github: { installed: boolean; signedIn: boolean; login: string | null };
+}
+
+/** Dépôt GitHub tel que le `gh` de la personne le voit. */
+export interface DesktopGitHubRepo {
+  fullName: string;
+  private: boolean;
+  /** La personne peut y pousser une branche : condition pour que Claude Code y ouvre une pull request. */
+  canPush: boolean;
+}
+
 /** Ce que la coque expose à la fenêtre de l'app. */
 export interface DesktopBridge {
   /** Jeton de la session de l'app, valable tant qu'elle reste ouverte. */
@@ -51,6 +72,22 @@ export interface DesktopBridge {
   ai: {
     get(): Promise<DesktopAiView>;
     save(input: { settings: DesktopAiSettings; apiKey?: string | null }): Promise<DesktopAiSaveResult>;
+  };
+  tools: {
+    status(): Promise<DesktopToolsStatus>;
+  };
+  /** GitHub par le GitHub CLI de la personne : son jeton reste dans le trousseau du système, jamais dans la page. */
+  github: {
+    repos(): Promise<DesktopResult<DesktopGitHubRepo[]>>;
+    /** Le dépôt, ou `null` s'il n'existe pas ou que la personne n'y a pas accès. */
+    repo(fullName: string): Promise<DesktopResult<DesktopGitHubRepo | null>>;
+    /** Crée le dépôt (avec un README) et rend son `owner/name`. */
+    createRepo(input: { name: string; private: boolean }): Promise<DesktopResult<string>>;
+    /** Lance la connexion et rend le code à usage unique à saisir sur github.com. */
+    signIn(): Promise<DesktopResult<string>>;
+    openSignInPage(): Promise<void>;
+    waitForSignIn(): Promise<{ ok: true } | { ok: false; error: string }>;
+    cancelSignIn(): Promise<void>;
   };
 }
 

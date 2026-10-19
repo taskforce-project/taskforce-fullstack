@@ -4,8 +4,8 @@ import { useEffect } from "react"
 
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { ClaudeCodeMcpSetup } from "@/components/settings/claude-code-mcp-setup"
+import { DesktopClaudeCodeSetup } from "@/components/settings/desktop-claude-code-setup"
 import { LocalRunnerSetup } from "@/components/settings/local-runner-setup"
-import { CopyableCode } from "@/components/settings/copyable-code"
 import { Badge } from "@/components/ui/badge"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
@@ -18,7 +18,9 @@ import { useWorkspaceStore } from "@/lib/store/workspace-store"
  */
 export function AgentsPanel() {
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug) ?? ""
-  const providers = useDeliveryStore((s) => s.providers)
+  const allProviders = useDeliveryStore((s) => s.providers)
+  // App desktop : les agents dans le cloud (GitHub Copilot) passent par l'intégration GitHub de l'espace, absente ici.
+  const providers = IS_DESKTOP ? allProviders.filter((p) => p.key === "claude-code") : allProviders
   const fetchProviders = useDeliveryStore((s) => s.fetchProviders)
 
   useEffect(() => { if (slug) fetchProviders(slug) }, [slug, fetchProviders])
@@ -55,7 +57,7 @@ export function AgentsPanel() {
 
               {/* Runner local : identité machine en libre-service (ADR-013). L'app desktop le lance elle-même. */}
               {p.key === "claude-code" && p.available && !IS_DESKTOP && <LocalRunnerSetup />}
-              {p.key === "claude-code" && IS_DESKTOP && <DesktopClaudeCodeNote />}
+              {p.key === "claude-code" && IS_DESKTOP && <DesktopClaudeCodeSetup />}
               {/* Mode interactif : le Claude Code de la personne sur le serveur MCP de l'instance (lot 5). Pas dans
                   l'app desktop, dont l'API change de port à chaque lancement. */}
               {p.key === "claude-code" && slug && !IS_DESKTOP && <ClaudeCodeMcpSetup slug={slug} />}
@@ -66,20 +68,6 @@ export function AgentsPanel() {
           )}
         </div>
       </section>
-    </div>
-  )
-}
-
-/** App desktop : le runner part avec l'app ; il reste à installer Claude Code et à s'y connecter une fois. */
-function DesktopClaudeCodeNote() {
-  return (
-    <div className="flex flex-col gap-2 text-xs text-muted-foreground">
-      <p>
-        TaskForce runs Claude Code for you while the app is open. Install it on this computer and sign in once
-        with your Claude account; projects without a linked repository get the answer as a comment.
-      </p>
-      <CopyableCode label="Install Claude Code" text="npm install -g @anthropic-ai/claude-code" />
-      <CopyableCode label="Sign in once" text="claude" />
     </div>
   )
 }

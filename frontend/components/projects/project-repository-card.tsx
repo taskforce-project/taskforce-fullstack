@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from "react"
 import { ExternalLink, Loader2, Plug } from "lucide-react"
 import { toast } from "sonner"
 
+import { DesktopGitHubConnect } from "@/components/desktop/desktop-github-connect"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { BrandLogo } from "@/components/ui/brand-logo"
@@ -11,8 +12,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import type { ProjectRepoLinkPayload } from "@/lib/api/project-service"
+import { IS_DESKTOP } from "@/lib/desktop"
 import { cn } from "@/lib/utils"
 import { isGitHubRepoFullName, isGitHubRepoName } from "@/lib/utils/github"
+import { useDesktopToolsStore } from "@/lib/store/desktop-tools-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
@@ -22,6 +26,9 @@ type Mode = "link" | "create"
 /**
  * Dépôt de code d'un projet : le voir, en lier un, en créer un, le changer ou le délier. Il ne se choisissait
  * jusqu'ici qu'à la création du projet. Les agents de code clonent ce dépôt et y ouvrent leurs pull requests.
+ *
+ * Dans la webapp, GitHub passe par l'intégration de l'espace ; dans l'app desktop, par le GitHub CLI de la personne
+ * (`useDesktopToolsStore`) : le dépôt s'y crée ou s'y vérifie, puis se lie par son nom.
  */
 export function ProjectRepositoryCard({ workspace, projectId }: Readonly<{ workspace: string; projectId: number }>) {
   const repoFullName = useProjectStore((s) => (s.activeProject?.id === projectId ? s.activeProject.repoFullName : null))
@@ -32,6 +39,11 @@ export function ProjectRepositoryCard({ workspace, projectId }: Readonly<{ works
   const fetchGitHubStatus = useIntegrationStore((s) => s.fetchGitHubStatus)
   const fetchGitHubRepos = useIntegrationStore((s) => s.fetchGitHubRepos)
   const openSettings = useSettingsStore((s) => s.openSettings)
+  const desktopGitHub = useDesktopToolsStore((s) => s.status?.github ?? null)
+  const desktopRepos = useDesktopToolsStore((s) => s.repos)
+  const refreshTools = useDesktopToolsStore((s) => s.refresh)
+  const fetchDesktopRepos = useDesktopToolsStore((s) => s.fetchRepos)
+  const resolveDesktopRepo = useDesktopToolsStore((s) => s.resolveRepo)
 
   const listId = useId()
   const [editing, setEditing] = useState(false)
@@ -41,17 +53,31 @@ export function ProjectRepositoryCard({ workspace, projectId }: Readonly<{ works
   const [saving, setSaving] = useState(false)
   const [confirmUnlink, setConfirmUnlink] = useState(false)
 
-  const connected = Boolean(githubStatus?.connected)
+  const checking = IS_DESKTOP ? desktopGitHub === null : githubStatus === null
+  const connected = IS_DESKTOP ? Boolean(desktopGitHub?.signedIn) : Boolean(githubStatus?.connected)
   const showForm = connected && (editing || !repoFullName)
+  // Desktop : seuls les dépôts où la personne peut pousser sont proposés (Claude Code y ouvre ses pull requests).
+  const suggestions = IS_DESKTOP
+    ? (desktopRepos ?? []).filter((r) => r.canPush).map((r) => r.fullName)
+    : githubRepos.map((r) => r.fullName)
 
   useEffect(() => {
-    if (workspace) fetchGitHubStatus(workspace).catch(() => { /* la carte dit « connecter GitHub » */ })
-  }, [workspace, fetchGitHubStatus])
+    if (IS_DESKTOP) {
+      if (useDesktopToolsStore.getState().status === null) void refreshTools()
+    } else if (workspace) {
+      fetchGitHubStatus(workspace).catch(() => { /* la carte dit « connecter GitHub » */ })
+    }
+  }, [workspace, fetchGitHubStatus, refreshTools])
 
   // Dépôts proposés à la saisie : lus une fois le formulaire affiché (la liste vient de GitHub).
   useEffect(() => {
-    if (showForm && githubRepos.length === 0) fetchGitHubRepos(workspace).catch(() => { /* saisie libre */ })
-  }, [showForm, githubRepos.length, workspace, fetchGitHubRepos])
+    if (!showForm) return
+    if (IS_DESKTOP) {
+      if (desktopRepos === null) void fetchDesktopRepos()
+    } else if (githubRepos.length === 0) {
+      fetchGitHubRepos(workspace).catch(() => { /* saisie libre */ })
+    }
+  }, [showForm, githubRepos.length, desktopRepos, workspace, fetchGitHubRepos, fetchDesktopRepos])
 
   const name = value.trim()
   const valid = mode === "link" ? isGitHubRepoFullName(name) : isGitHubRepoName(name)
@@ -62,15 +88,24 @@ export function ProjectRepositoryCard({ workspace, projectId }: Readonly<{ works
     setEditing(true)
   }
 
+  /** Ce que le serveur doit lier. Desktop : le dépôt est d'abord créé ou vérifié avec le GitHub CLI de la personne. */
+  async function linkPayload(): Promise<ProjectRepoLinkPayload | null> {
+    if (!IS_DESKTOP) {
+      return mode === "link" ? { mode: "LINK", repoFullName: name } : { mode: "CREATE", repoName: name, privateRepo }
+    }
+    const fullName = await resolveDesktopRepo(mode, name, privateRepo)
+    return fullName ? { mode: "LINK", repoFullName: fullName } : null
+  }
+
   async function handleSave() {
     if (!valid) return
     setSaving(true)
-    const result = await linkRepo(workspace, projectId, mode === "link"
-      ? { mode: "LINK", repoFullName: name }
-      : { mode: "CREATE", repoName: name, privateRepo })
+    const payload = await linkPayload()
+    const result = payload ? await linkRepo(workspace, projectId, payload) : null
     setSaving(false)
     if (!result) {
-      toast.error(useProjectStore.getState().error ?? "Couldn't link the repository")
+      const error = payload ? useProjectStore.getState().error : useDesktopToolsStore.getState().error
+      toast.error(error ?? "Couldn't link the repository")
       return
     }
     toast.success(mode === "link" ? `Linked to ${result.repoFullName}` : `Created ${result.repoFullName} and linked it`)
@@ -95,6 +130,7 @@ export function ProjectRepositoryCard({ workspace, projectId }: Readonly<{ works
           <p className="text-sm font-medium text-foreground">Code repository</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Coding agents clone this repository and open their pull requests there.
+            {IS_DESKTOP && desktopGitHub?.signedIn && ` With GitHub CLI on this computer${desktopGitHub.login ? `, as ${desktopGitHub.login}` : ""}.`}
           </p>
         </div>
       </div>
@@ -121,13 +157,21 @@ export function ProjectRepositoryCard({ workspace, projectId }: Readonly<{ works
         </div>
       )}
 
-      {githubStatus === null && (
+      {IS_DESKTOP && !connected && (
+        <DesktopGitHubConnect
+          purpose={repoFullName
+            ? "Claude Code clones this repository and opens its pull requests with your GitHub account."
+            : "Link a repository so that Claude Code can work on it and open pull requests."}
+        />
+      )}
+
+      {!IS_DESKTOP && checking && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="size-3.5 animate-spin" /> Checking the GitHub connection…
         </div>
       )}
 
-      {githubStatus !== null && !connected && (
+      {!IS_DESKTOP && !checking && !connected && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
           <p className="text-xs text-muted-foreground">
             {repoFullName
@@ -171,7 +215,7 @@ export function ProjectRepositoryCard({ workspace, projectId }: Readonly<{ works
             />
             {mode === "link" && (
               <datalist id={listId}>
-                {githubRepos.map((r) => <option key={r.fullName} value={r.fullName} />)}
+                {suggestions.map((fullName) => <option key={fullName} value={fullName} />)}
               </datalist>
             )}
             {mode === "create" && (
