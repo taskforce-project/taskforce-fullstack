@@ -11,16 +11,14 @@ files:
   - static/**
   - package.json
 extraResources:
-  - from: resources/jre
-    to: jre
-  - from: resources/backend
-    to: backend
-  - from: resources/postgres
-    to: postgres
-  - from: resources/frontend
-    to: frontend
-  - from: resources/runner
-    to: runner
+  # jre, backend, postgres, frontend et runner, copiés en une fois depuis leur dossier parent : electron-builder écarte
+  # toujours le node_modules qui est à la racine de « from », et le serveur Next autonome ne trouverait plus le module
+  # « next ». Son dossier .next commence par un point : il faut le nommer.
+  - from: resources
+    to: .
+    filter:
+      - "**/*"
+      - "frontend/.next/**/*"
 asar: true
 
 win:
