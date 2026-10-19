@@ -114,6 +114,8 @@ jobs:
 
       - name: Check the bundle on a fresh cluster
         run: |
+          # The build folder goes away first: the bundle must run on its own, as on a user's machine.
+          sudo mv /opt/pgsql /opt/pgsql.build
           bin=dist/postgres/bin
           "$bin/initdb" -D /tmp/pgdata -U taskforce -A trust -E UTF8 --locale-provider=builtin --builtin-locale=C.UTF-8
           "$bin/pg_ctl" -D /tmp/pgdata -o "-p 55432 -h 127.0.0.1" -l /tmp/pg.log -w start || { cat /tmp/pg.log; exit 1; }

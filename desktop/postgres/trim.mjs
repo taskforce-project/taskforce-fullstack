@@ -3,7 +3,7 @@
 // the extensions the migrations create (plpgsql, uuid-ossp, vector).
 //
 // Usage: node desktop/postgres/trim.mjs <postgres install dir> <bundle dir>
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 const [src, dest] = process.argv.slice(2);
@@ -27,9 +27,11 @@ for (const name of readdirSync(join(src, "bin"))) {
 }
 
 // lib: shared libraries and server modules; build-time files (import libraries, pgxs, pkgconfig) stay out.
+// On Linux, a library is a chain of links (libpq.so -> libpq.so.5 -> libpq.so.5.18): they are copied as they are,
+// relative. By default cpSync rewrites them as absolute links to the build folder, which no other machine has.
 const SKIP_LIB = (name) => name.endsWith(".lib") || name.endsWith(".a") || name.endsWith(".pdb") || ["pgxs", "pkgconfig"].includes(name);
 for (const name of readdirSync(join(src, "lib"))) {
-  if (!SKIP_LIB(name)) cpSync(join(src, "lib", name), join(dest, "lib", name), { recursive: true });
+  if (!SKIP_LIB(name)) cpSync(join(src, "lib", name), join(dest, "lib", name), { recursive: true, verbatimSymlinks: true });
 }
 
 // share: everything initdb and the server read, without translations or docs, and only our extensions.
@@ -44,7 +46,7 @@ for (const name of readdirSync(join(src, "share"))) {
     }
     continue;
   }
-  cpSync(join(src, "share", name), join(dest, "share", name), { recursive: true });
+  cpSync(join(src, "share", name), join(dest, "share", name), { recursive: true, verbatimSymlinks: true });
 }
 
 for (const ext of EXTENSIONS) {
@@ -56,7 +58,7 @@ for (const ext of EXTENSIONS) {
 
 const size = (dir) => readdirSync(dir).reduce((total, name) => {
   const path = join(dir, name);
-  const stat = statSync(path);
+  const stat = lstatSync(path);
   return total + (stat.isDirectory() ? size(path) : stat.size);
 }, 0);
 console.log(`PostgreSQL bundle in ${dest}: ${(size(dest) / 1024 / 1024).toFixed(1)} MB`);

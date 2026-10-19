@@ -7,7 +7,7 @@
 //
 // Usage : node scripts/prepare-resources.mjs [jre] [backend] [postgres] [frontend] [runner]   (sans argument : tout)
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -33,7 +33,8 @@ function fail(message) {
 function size(dir) {
   return readdirSync(dir).reduce((total, name) => {
     const path = join(dir, name);
-    const stat = statSync(path);
+    // Les liens (bibliothèques de PostgreSQL sous Linux) comptent pour eux-mêmes, sans être suivis.
+    const stat = lstatSync(path);
     return total + (stat.isDirectory() ? size(path) : stat.size);
   }, 0);
 }
@@ -74,7 +75,7 @@ if (step("postgres")) {
   const dest = join(out, "postgres");
   rmSync(dest, { recursive: true, force: true });
   mkdirSync(dest, { recursive: true });
-  if (statSync(bundle).isDirectory()) cpSync(bundle, dest, { recursive: true });
+  if (statSync(bundle).isDirectory()) cpSync(bundle, dest, { recursive: true, verbatimSymlinks: true });
   else if (bundle.endsWith(".zip")) {
     if (process.platform === "win32") {
       execFileSync("powershell.exe", ["-NoProfile", "-Command", `Expand-Archive -LiteralPath '${bundle}' -DestinationPath '${dest}' -Force`], { stdio: "inherit" });
