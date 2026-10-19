@@ -48,6 +48,6 @@ public class StatusController {
         components.add(new ComponentStatus("db", db));
 
         boolean allUp = components.stream().allMatch(c -> "UP".equals(c.status()));
-        return ResponseEntity.ok(ApiResponse.success("Statut", new StatusResponse(allUp ? "UP" : "DOWN", components)));
+        return ResponseEntity.ok(ApiResponse.success("Status", new StatusResponse(allUp ? "UP" : "DOWN", components)));
     }
 }

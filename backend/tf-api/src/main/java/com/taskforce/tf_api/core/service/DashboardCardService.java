@@ -131,12 +131,12 @@ public class DashboardCardService {
 
     private DashboardCard requireCard(Long cardId, Long workspaceId, Long userId) {
         return repository.findByIdAndWorkspaceIdAndUserId(cardId, workspaceId, userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Carte de dashboard introuvable: " + cardId));
+            .orElseThrow(() -> new ResourceNotFoundException("Dashboard card not found: " + cardId));
     }
 
     private User requireUser(Long userId) {
         return userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
     private DashboardCardResponse toResponse(DashboardCard card) {

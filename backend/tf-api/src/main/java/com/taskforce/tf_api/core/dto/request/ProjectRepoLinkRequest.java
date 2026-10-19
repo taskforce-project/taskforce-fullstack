@@ -14,7 +14,7 @@ import lombok.Data;
 @Data
 public class ProjectRepoLinkRequest {
 
-    @NotBlank(message = "Le mode est obligatoire (CREATE ou LINK)")
+    @NotBlank(message = "The mode is required (CREATE or LINK)")
     private String mode;
 
     /** Mode CREATE : nom du dépôt à créer (le propriétaire = le compte GitHub connecté). */

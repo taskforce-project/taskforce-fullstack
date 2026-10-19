@@ -12,9 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CardSkeleton, CardError } from "@/components/dashboard/card-states"
 import { SectionCard, MetricSplit } from "@/components/ui/section-card"
-import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
 import {
   getAnalyticsKpis,
@@ -29,9 +27,9 @@ import { ChartExplorer } from "@/components/analytics/chart-explorer"
 const ALL_PROJECTS = "all"
 
 const SEVERITY_META: Record<"critical" | "warning" | "info", { wrap: string; icon: React.ElementType; iconColor: string }> = {
-  critical: { wrap: "border-rose-500/30 bg-rose-500/[0.07]",  icon: Flame,         iconColor: "text-rose-500" },
-  warning:  { wrap: "border-amber-500/30 bg-amber-500/[0.07]", icon: AlertTriangle, iconColor: "text-amber-500" },
-  info:     { wrap: "border-blue-500/30 bg-blue-500/[0.07]",   icon: Brain,         iconColor: "text-blue-500" },
+  critical: { wrap: "border-destructive/30 bg-destructive/[0.07]",  icon: Flame,         iconColor: "text-destructive" },
+  warning:  { wrap: "border-shape-yellow/30 bg-shape-yellow/[0.07]", icon: AlertTriangle, iconColor: "text-ink-yellow" },
+  info:     { wrap: "border-primary/30 bg-primary/[0.07]",   icon: Brain,         iconColor: "text-ink-blue" },
 }
 
 const URGENCY_SEVERITY: Record<AiInsight["urgency"], "critical" | "warning" | "info"> = {
@@ -53,7 +51,7 @@ interface KpiMetric {
 function KpiCell({ metric }: { readonly metric: KpiMetric }) {
   const positive = metric.delta > 0
   const isGood = metric.deltaInverse ? !positive : positive
-  const deltaClass = metric.delta === 0 ? "text-muted-foreground" : isGood ? "text-emerald-500" : "text-rose-500"
+  const deltaClass = metric.delta === 0 ? "text-muted-foreground" : isGood ? "text-ink-green" : "text-destructive"
   const DeltaIcon = metric.delta === 0 ? Minus : positive ? TrendingUp : TrendingDown
 
   return (
@@ -85,7 +83,7 @@ function InsightRow({ insight }: { readonly insight: AiInsight }) {
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-foreground">{insight.action}</span>
-          <Badge variant="secondary" className="h-5 px-1.5 text-[11px] font-normal" style={{ color: insight.agentColor }}>
+          <Badge variant="secondary" className="h-5 px-1.5 text-[11px] font-normal">
             {insight.agent}
           </Badge>
         </div>
@@ -99,10 +97,8 @@ function InsightRow({ insight }: { readonly insight: AiInsight }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
-  const { user } = useAuth()
   const params = useParams()
   const slug = params.workspace as string
-  const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
   const [kpis, setKpis] = useState<AnalyticsKpis | null>(null)
   const [kpisLoading, setKpisLoading] = useState(true)
   const [kpisError, setKpisError] = useState(false)
@@ -112,7 +108,6 @@ export default function AnalyticsPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [projectFilter, setProjectFilter] = useState<string>(ALL_PROJECTS)
 
-  const isPro = user?.planType === "BUSINESS" || user?.planType === "ENTERPRISE"
   const projectId = projectFilter === ALL_PROJECTS ? null : Number(projectFilter)
 
   // Signaux IA (workspace-wide) : chargement + échec explicites, pour ne plus laisser « No signals yet »
@@ -239,7 +234,7 @@ export default function AnalyticsPage() {
       </SectionCard>
 
       {/* 4 - L'exploration : 3 aperçus → modal (catalogue + génération IA). */}
-      <ChartExplorer slug={slug} projectId={projectId} gated={!isPro} onUpgrade={openUpgrade} />
+      <ChartExplorer slug={slug} projectId={projectId} />
     </PageContainer>
   )
 }

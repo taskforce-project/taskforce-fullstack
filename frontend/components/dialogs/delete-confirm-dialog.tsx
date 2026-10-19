@@ -103,8 +103,8 @@ export function DeleteConfirmDialog({
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <div className="flex items-center gap-3 mb-1">
-            <div className={`size-10 rounded-full flex items-center justify-center shrink-0 ${variant === "warning" ? "bg-amber-500/10" : "bg-destructive/10"}`}>
-              <AlertTriangle className={`size-5 ${variant === "warning" ? "text-amber-500" : "text-destructive"}`} />
+            <div className={`size-10 rounded-full flex items-center justify-center shrink-0 ${variant === "warning" ? "bg-shape-yellow/10" : "bg-destructive/10"}`}>
+              <AlertTriangle className={`size-5 ${variant === "warning" ? "text-ink-yellow" : "text-destructive"}`} />
             </div>
             <DialogTitle>{title}</DialogTitle>
           </div>
@@ -116,7 +116,7 @@ export function DeleteConfirmDialog({
         {gated && (
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-muted-foreground">
-              {confirmTextLabel ?? <>Pour confirmer, saisissez <span className="font-medium text-foreground">{confirmText}</span></>}
+              {confirmTextLabel ?? <>To confirm, type <span className="font-medium text-foreground">{confirmText}</span></>}
             </label>
             <Input
               value={typed}

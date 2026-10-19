@@ -107,16 +107,8 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
         setLinkedIds((prev) => new Set(prev).add(team.id))
         toast.success("Linked")
       }
-    } catch (err) {
-      // 409 = plafond Free du projet privé (collaborateurs via équipe compris) → message clair + upsell.
-      const e = err as { response?: { status?: number; data?: { message?: string } } }
-      if (e?.response?.status === 409) {
-        toast.error(e.response?.data?.message ?? "Collaborator limit reached on this private project (Free plan).", {
-          description: "Make the project public, or upgrade to a paid plan to link without limits.",
-        })
-      } else {
-        toast.error("Action failed")
-      }
+    } catch {
+      toast.error("Action failed")
     }
   }
 
@@ -284,7 +276,7 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
                         <div key={m.userId} className="flex items-center gap-2.5 rounded-md px-1 py-1">
                           <UserAvatar email={m.displayName} name={m.displayName} avatarUrl={m.avatarUrl} className="size-6" fallbackClassName="text-[9px]" />
                           <span className="flex-1 truncate text-sm text-foreground">{m.displayName}</span>
-                          {m.role === "LEAD" && <Badge variant="secondary" className="gap-1 text-[10px]"><Crown className="size-3 text-amber-500" /> Lead</Badge>}
+                          {m.role === "LEAD" && <Badge variant="secondary" className="gap-1 text-[10px]"><Crown className="size-3 text-ink-yellow" /> Lead</Badge>}
                           <button
                             type="button"
                             onClick={() => removeMember(team, m.userId)}

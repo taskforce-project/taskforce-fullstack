@@ -142,7 +142,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
               onClick={() => project && toggleFavorite(workspace, project.id, !project.isFavorite)}
               title={project?.isFavorite ? "Remove from favorites" : "Add to favorites"}
             >
-              <Star className={cn("h-4 w-4", project?.isFavorite && "fill-yellow-400 text-yellow-400")} />
+              <Star className={cn("h-4 w-4", project?.isFavorite && "fill-shape-yellow text-shape-yellow")} />
             </Button>
 
             <CreateIssueDialog projectId={Number(projectId)} workspaceSlug={workspace}>

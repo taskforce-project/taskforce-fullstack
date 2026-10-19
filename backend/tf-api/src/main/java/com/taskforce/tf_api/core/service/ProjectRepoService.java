@@ -41,17 +41,17 @@ public class ProjectRepoService {
         String fullName;
         if ("CREATE".equals(mode)) {
             if (isBlank(request.getRepoName())) {
-                throw new BusinessException("Le nom du dépôt à créer est obligatoire");
+                throw new BusinessException("The name of the repository to create is required");
             }
             fullName = gitHubService.createRepo(workspaceSlug, request.getRepoName().trim(), request.isPrivateRepo());
         } else if ("LINK".equals(mode)) {
             if (isBlank(request.getRepoFullName())) {
-                throw new BusinessException("Le dépôt à lier (owner/name) est obligatoire");
+                throw new BusinessException("The repository to link (owner/name) is required");
             }
-            fullName = request.getRepoFullName().trim();
+            fullName = GitHubRepoNames.requireFullName(request.getRepoFullName());
             gitHubService.assertRepoAccessible(workspaceSlug, fullName);
         } else {
-            throw new BusinessException("Mode invalide : attendu CREATE ou LINK");
+            throw new BusinessException("Invalid mode: expected CREATE or LINK");
         }
 
         project.setRepoProvider(PROVIDER_GITHUB);
@@ -77,9 +77,9 @@ public class ProjectRepoService {
      */
     private Project resolveWritableProject(String workspaceSlug, Long projectId, Long userId) {
         Project project = projectRepository.findById(projectId)
-            .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
         if (project.getWorkspace() == null || !workspaceSlug.equals(project.getWorkspace().getSlug())) {
-            throw new ResourceNotFoundException("Projet introuvable");
+            throw new ResourceNotFoundException("Project not found");
         }
         visibilityGuard.assertCanWrite(project, userId);
         return project;

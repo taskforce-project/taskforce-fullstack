@@ -5,10 +5,11 @@ import java.util.Optional;
 /**
  * Catalogue des événements de notification, côté <b>préférences utilisateur</b>.
  *
- * <p>Les notifications persistées portent un {@code type} libre (String) — 8 valeurs au total,
+ * <p>Les notifications persistées portent un {@code type} libre (String), 12 valeurs au total,
  * écrites par {@link com.taskforce.tf_api.core.service.NotificationService}. Pour les <b>réglages</b>
- * (canaux in-app / email), on regroupe ces types en 6 événements actionnables : {@code completed}
- * suit {@code statusChanged} et {@code overdue} suit {@code dueSoon} (même intention pour l'utilisateur).</p>
+ * (canaux in-app / email), on regroupe ces types en 7 événements actionnables : {@code completed}
+ * suit {@code statusChanged}, {@code overdue} suit {@code dueSoon}, et les trois types de l'agent de code
+ * ({@code agentApproval}, {@code agentDone}, {@code agentFailed}) forment {@code agent}.</p>
  *
  * <p>{@link #key()} est ce qui est persisté dans {@code notification_preferences.event_key} et
  * échangé avec le front.</p>
@@ -20,7 +21,9 @@ public enum NotificationEvent {
     COMMENTED("commented"),
     STATUS_CHANGED("statusChanged"),
     DUE_DATE("dueDate"),
-    OVERLOAD("overload");
+    OVERLOAD("overload"),
+    /** Agent de code : validation demandée, run terminé ou en échec (lot 5). */
+    AGENT("agent");
 
     private final String key;
 
@@ -47,6 +50,7 @@ public enum NotificationEvent {
             case "statusChanged", "completed" -> Optional.of(STATUS_CHANGED);
             case "dueSoon", "overdue" -> Optional.of(DUE_DATE);
             case "overload" -> Optional.of(OVERLOAD);
+            case "agentApproval", "agentDone", "agentFailed" -> Optional.of(AGENT);
             default -> Optional.empty();
         };
     }

@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { ShieldCheck } from "lucide-react";
 
 import { useAuth } from "@/lib/contexts/auth-context";
 import { getTwoFactorStatus } from "@/lib/api/user-service";
 import { notifyRich } from "@/lib/notify";
+import { useSettingsStore } from "@/lib/store/settings-store";
 
 /**
  * Nudge sécurité : à l'arrivée dans l'app, si le 2FA (TOTP) n'est pas actif, propose de l'activer
@@ -30,21 +30,6 @@ let scheduled = false;
 
 export function TwoFactorNudge() {
   const { isAuthenticated } = useAuth();
-  const router = useRouter();
-  // Le nudge est monté dans le layout (protected), AU-DESSUS du segment [workspace] : `useParams()`
-  // n'y voit pas `workspace`. On dérive donc le slug du 1er segment du chemin (les routes de l'app
-  // sont `/{slug}/...`).
-  const pathname = usePathname();
-  const slug = pathname?.split("/").filter(Boolean)[0] ?? "";
-
-  // Lues au moment du tir, sans faire re-jouer l'effet planificateur. Synchronisées dans un effet
-  // (et non pendant le rendu : react-hooks/refs interdit d'écrire une ref au rendu).
-  const slugRef = useRef(slug);
-  const routerRef = useRef(router);
-  useEffect(() => {
-    slugRef.current = slug;
-    routerRef.current = router;
-  });
 
   useEffect(() => {
     if (!isAuthenticated || scheduled) return;
@@ -88,8 +73,9 @@ export function TwoFactorNudge() {
                 onClick: (dismiss) => {
                   remember();
                   dismiss();
-                  const s = slugRef.current;
-                  if (s) routerRef.current.push(`/${s}/settings?section=security`);
+                  // Le modal Réglages est monté dans l'AppShell, à côté de ce nudge : on l'ouvre en
+                  // place. La route `/settings` démontait la page courante et relançait ses chargements.
+                  useSettingsStore.getState().openSettings("security");
                 },
               },
             ],

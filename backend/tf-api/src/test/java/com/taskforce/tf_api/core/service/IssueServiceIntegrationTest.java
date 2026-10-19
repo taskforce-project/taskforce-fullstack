@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -11,7 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueRequest;
@@ -19,6 +21,7 @@ import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.enums.ProjectRole;
+import com.taskforce.tf_api.core.enums.WebhookEventType;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.AssignmentStatus;
 import com.taskforce.tf_api.core.model.Issue;
@@ -38,6 +41,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.webhook.WorkspaceWebhookEvent;
 import com.taskforce.tf_api.util.AbstractIntegrationTest;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -61,7 +65,7 @@ import static org.mockito.Mockito.verify;
  * (IDOR statut hors projet, non-membre → 403).</p>
  */
 @DisplayName("IssueService (intégration Postgres)")
-@Import({IssueService.class, ProjectVisibilityGuard.class, PlanFeatureService.class})
+@Import({IssueService.class, ProjectVisibilityGuard.class})
 class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private IssueService issueService;
@@ -77,7 +81,6 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
     @MockitoBean private SimpMessagingTemplate messagingTemplate;
     @MockitoBean private NotificationService notificationService;
     @MockitoBean private SlackIntegrationService slackService;  // push Slack sur issue.created (no-op en test)
-    @MockitoBean private AiGenerationService aiGenerationService;  // data flywheel : capture des recos (no-op en test)
 
     @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager em;
 
@@ -111,9 +114,6 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
                 && s.getCategory() == IssueStatusCategory.COMPLETED)
             .findFirst().orElseThrow();
 
-        // Bean issueService partagé entre tests : rétention d'historique désactivée par défaut
-        // (le test dédié HistoryRetention la règle explicitement), sinon la valeur fuiterait d'un test à l'autre.
-        ReflectionTestUtils.setField(issueService, "historyRetentionLimit", Integer.MAX_VALUE);
     }
 
     private CreateIssueRequest createRequest(String title, Long assigneeId) {
@@ -203,7 +203,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThatThrownBy(() -> issueService.createIssue(SLUG, project.getId(), createRequest("x", null), stranger.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Accès refusé");
+                .hasMessageContaining("Access denied");
         }
     }
 
@@ -467,7 +467,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             // doublon → BusinessException (chemin existsBy…RelationType contre l'enum Postgres natif)
             assertThatThrownBy(() -> issueService.addRelation(SLUG, project.getId(), source, req, owner.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("existe déjà");
+                .hasMessageContaining("already exists");
         }
     }
 
@@ -644,7 +644,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThatThrownBy(() -> issueService.addRelation(SLUG, project.getId(), source, req, owner.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Type de relation invalide");
+                .hasMessageContaining("Invalid relation type");
         }
 
         @Test
@@ -695,7 +695,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             assertThatThrownBy(() -> issueService.updateComment(
                     SLUG, project.getId(), id, c.getId(), upd, other.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("vos propres commentaires");
+                .hasMessageContaining("your own comments");
         }
 
         @Test
@@ -717,7 +717,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             assertThatThrownBy(() -> issueService.deleteWorklog(
                     SLUG, project.getId(), id, w.getId(), other.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("vos propres entrées");
+                .hasMessageContaining("your own time entries");
         }
 
         @Test
@@ -730,7 +730,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThatThrownBy(() -> issueService.createStatus(SLUG, project.getId(), create, owner.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("existe déjà");
+                .hasMessageContaining("already exists");
         }
 
         @Test
@@ -743,7 +743,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             assertThatThrownBy(() -> issueService.deleteStatus(
                     SLUG, project.getId(), defaultStatus.getId(), owner.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("statut par défaut");
+                .hasMessageContaining("default status");
         }
 
         @Test
@@ -754,7 +754,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThatThrownBy(() -> issueService.getScheduledIssues(SLUG, stranger.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Accès refusé");
+                .hasMessageContaining("Access denied");
         }
 
         @Test
@@ -1285,7 +1285,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             assertThatThrownBy(() -> issueService.createIssue(
                     SLUG, project.getId(), createRequest("nope", null), viewer.getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("lecture seule");
+                .hasMessageContaining("read-only");
         }
 
         @Test
@@ -1334,29 +1334,72 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
     // =========================================================================
     @Nested
-    @DisplayName("rétention d'historique par plan (UNLIMITED_HISTORY)")
-    class HistoryRetention {
+    @DisplayName("historique d'activité complet (aucun plafond de plan)")
+    class FullHistory {
 
         @Test
-        @DisplayName("sans UNLIMITED_HISTORY (FREE) : activité bornée aux N dernières ; BUSINESS voit tout")
-        void activity_retention_gated_by_plan() {
-            ReflectionTestUtils.setField(issueService, "historyRetentionLimit", 1);
-            owner.setPlanType(com.taskforce.tf_api.core.enums.PlanType.FREE);
-            userRepository.save(owner);
-
+        @DisplayName("un compte sans abonnement voit tout l'historique d'une issue (ADR-016)")
+        void activity_is_never_truncated() {
             Long id = newIssueId("Historique"); // 1 activité : CREATED
             UpdateIssueRequest u1 = new UpdateIssueRequest(); u1.setTitle("v2");
             issueService.updateIssue(SLUG, project.getId(), id, u1, owner.getId());
             UpdateIssueRequest u2 = new UpdateIssueRequest(); u2.setPriority(IssuePriority.URGENT);
             issueService.updateIssue(SLUG, project.getId(), id, u2, owner.getId());
 
-            // FREE (pas d'UNLIMITED_HISTORY) → borné à la dernière entrée.
-            assertThat(issueService.listActivity(SLUG, project.getId(), id, owner.getId())).hasSize(1);
-
-            // BUSINESS → historique complet (> 1).
-            owner.setPlanType(com.taskforce.tf_api.core.enums.PlanType.BUSINESS);
-            userRepository.save(owner);
             assertThat(issueService.listActivity(SLUG, project.getId(), id, owner.getId())).hasSizeGreaterThan(1);
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @RecordApplicationEvents
+    @DisplayName("webhooks sortants (OSS-6.2)")
+    class Webhooks {
+
+        @Autowired private ApplicationEvents applicationEvents;
+
+        private List<WorkspaceWebhookEvent> webhookEvents() {
+            return applicationEvents.stream(WorkspaceWebhookEvent.class).toList();
+        }
+
+        @Test
+        @DisplayName("création, modification, commentaire et suppression publient leur événement, avec le lien de l'issue")
+        void lifecycle_publishes_webhook_events() {
+            Long id = newIssueId("Login bug");
+            UpdateIssueRequest rename = new UpdateIssueRequest();
+            rename.setTitle("Login bug on Safari");
+            issueService.updateIssue(SLUG, project.getId(), id, rename, owner.getId());
+            var comment = new com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest();
+            comment.setContent("Reproduced on Safari 17");
+            issueService.addComment(SLUG, project.getId(), id, comment, owner.getId());
+            issueService.deleteIssue(SLUG, project.getId(), id, owner.getId());
+
+            List<WorkspaceWebhookEvent> events = webhookEvents();
+            assertThat(events).extracting(WorkspaceWebhookEvent::type).containsExactly(
+                WebhookEventType.ISSUE_CREATED, WebhookEventType.ISSUE_UPDATED,
+                WebhookEventType.COMMENT_CREATED, WebhookEventType.ISSUE_DELETED);
+            assertThat(events).allSatisfy(e -> {
+                assertThat(e.workspaceId()).isEqualTo(workspace.getId());
+                assertThat(e.actorId()).isEqualTo(owner.getId());
+            });
+            assertThat(events.get(0).path()).isEqualTo("/" + SLUG + "/projects/" + project.getId() + "/issues/" + id);
+            assertThat(((Map<?, ?>) events.get(0).data()).get("issue")).isInstanceOf(IssueResponse.class);
+            Map<?, ?> deleted = (Map<?, ?>) ((Map<?, ?>) events.get(3).data()).get("issue");
+            assertThat(deleted.get("identifier")).isEqualTo("APP-1");
+            assertThat(events.get(3).path()).isNull();
+        }
+
+        @Test
+        @DisplayName("un simple déplacement dans la colonne ne publie rien, ni webhook ni Slack")
+        void position_only_update_is_silent() {
+            Long id = newIssueId("Login bug");
+            UpdateIssueRequest move = new UpdateIssueRequest();
+            move.setPosition(3);
+
+            issueService.updateIssue(SLUG, project.getId(), id, move, owner.getId());
+
+            assertThat(webhookEvents()).extracting(WorkspaceWebhookEvent::type).containsExactly(WebhookEventType.ISSUE_CREATED);
+            verify(slackService, never()).notifyEvent(any(), org.mockito.ArgumentMatchers.eq("issue.updated"), any());
         }
     }
 }

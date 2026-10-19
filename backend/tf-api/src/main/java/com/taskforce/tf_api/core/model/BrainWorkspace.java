@@ -1,6 +1,5 @@
 package com.taskforce.tf_api.core.model;
 
-import com.taskforce.tf_api.core.enums.BrainTemplateType;
 import com.taskforce.tf_api.shared.audit.AuditableEntity;
 
 import jakarta.persistence.Column;
@@ -41,10 +40,6 @@ public class BrainWorkspace extends AuditableEntity {
     @JoinColumn(name = "workspace_id", nullable = false, unique = true)
     private Workspace workspace;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "template_type", nullable = false, length = 40)
-    @Builder.Default
-    private BrainTemplateType templateType = BrainTemplateType.BLANK;
 
     @Column(name = "version_label", nullable = false, length = 20)
     @Builder.Default

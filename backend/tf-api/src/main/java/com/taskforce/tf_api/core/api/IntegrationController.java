@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.taskforce.tf_api.core.dto.request.ConnectConnectorRequest;
 import com.taskforce.tf_api.core.dto.request.ConnectPlaneRequest;
 import com.taskforce.tf_api.core.dto.request.GitHubLinkRequest;
 import com.taskforce.tf_api.core.dto.request.SlackChannelRequest;
@@ -33,17 +32,13 @@ import com.taskforce.tf_api.core.dto.response.SlackChannelResponse;
 import com.taskforce.tf_api.core.dto.response.SlackSyncResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
-import com.taskforce.tf_api.core.enums.PlanFeature;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthorizationService;
-import com.taskforce.tf_api.core.service.PlanFeatureService;
 import com.taskforce.tf_api.core.service.GitHubIntegrationService;
 import com.taskforce.tf_api.core.service.PlaneClient.PlaneProject;
 import com.taskforce.tf_api.core.service.PlaneIntegrationService;
 import com.taskforce.tf_api.core.service.SlackIntegrationService;
-import com.taskforce.tf_api.core.service.integration.ConnectorConnectionService;
 import com.taskforce.tf_api.core.service.integration.IntegrationCatalogService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -59,23 +54,15 @@ public class IntegrationController {
     private final SlackIntegrationService  slackService;
     private final PlaneIntegrationService  planeService;
     private final IntegrationCatalogService catalogService;
-    private final ConnectorConnectionService connectorConnectionService;
     private final UserRepository           userRepository;
     private final WorkspaceRepository      workspaceRepository;
-    private final PlanFeatureService       planFeatureService;
     private final AuthorizationService     authorizationService;
-
-    /** Les intégrations sont une feature Business+ : exige que le COMPTE (propriétaire) la couvre (→ 409). */
-    private void requireIntegrations(String slug) {
-        PlanType plan = workspaceRepository.findOwnerPlanBySlug(slug).orElse(PlanType.FREE);
-        planFeatureService.requireFeature(plan, PlanFeature.INTEGRATIONS);
-    }
 
     /** Config d'intégration = action de gestion : exige OWNER/ADMIN du workspace (sinon 403). */
     private void requireManager(String slug, Jwt jwt) {
         Long wsId = workspaceRepository.findBySlug(slug)
             .map(Workspace::getId)
-            .orElseThrow(() -> new ResourceNotFoundException("Espace de travail introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         authorizationService.requireManager(wsId, resolveUser(jwt).getId());
     }
 
@@ -88,37 +75,6 @@ public class IntegrationController {
         @PathVariable String slug, @AuthenticationPrincipal Jwt jwt
     ) {
         return ResponseEntity.ok(ApiResponse.success(catalogService.getCatalog(slug, resolveUser(jwt).getId())));
-    }
-
-    // ====================================================================
-    // Connecteurs génériques (tout le catalogue hors GitHub/Slack/Plane)
-    // Stockage chiffré des identifiants + état de connexion persisté.
-    // ====================================================================
-
-    @PostMapping("/api/workspaces/{slug}/integrations/connectors/{key}")
-    public ResponseEntity<ApiResponse<Void>> connectConnector(
-        @PathVariable String slug,
-        @PathVariable String key,
-        @RequestBody(required = false) ConnectConnectorRequest request,
-        @AuthenticationPrincipal Jwt jwt
-    ) {
-        requireIntegrations(slug);
-        requireManager(slug, jwt);
-        connectorConnectionService.connect(
-            slug, resolveUser(jwt).getId(), key,
-            request != null ? request.getConfig() : null);
-        return ResponseEntity.ok(ApiResponse.success("Connecteur connecté", null));
-    }
-
-    @DeleteMapping("/api/workspaces/{slug}/integrations/connectors/{key}")
-    public ResponseEntity<ApiResponse<Void>> disconnectConnector(
-        @PathVariable String slug,
-        @PathVariable String key,
-        @AuthenticationPrincipal Jwt jwt
-    ) {
-        requireManager(slug, jwt);
-        connectorConnectionService.disconnect(slug, resolveUser(jwt).getId(), key);
-        return ResponseEntity.ok(ApiResponse.success("Connecteur déconnecté", null));
     }
 
     // ====================================================================
@@ -154,7 +110,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         GitHubSyncResponse result = gitHubService.sync(slug, resolveUser(jwt).getId(), repo);
-        return ResponseEntity.ok(ApiResponse.success("Synchronisation GitHub terminée", result));
+        return ResponseEntity.ok(ApiResponse.success("GitHub sync completed", result));
     }
 
     /**
@@ -170,7 +126,6 @@ public class IntegrationController {
         @RequestParam(required = false) String returnTo,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        requireIntegrations(slug);
         requireManager(slug, jwt);
         User user = resolveUser(jwt);
         URI authorizeUrl = gitHubService.buildAuthorizeUrl(slug, user, returnTo);
@@ -178,12 +133,14 @@ public class IntegrationController {
     }
 
     /** Callback appelé par GitHub — endpoint PUBLIC (pas de JWT requis). {@code state} = token aléatoire. */
+    /** Retour de GitHub : toujours une redirection vers l'app ({@code github=connected} ou {@code github=error}). */
     @GetMapping("/api/integrations/github/callback")
     public ResponseEntity<Void> githubCallback(
-        @RequestParam String code,
-        @RequestParam String state
+        @RequestParam(required = false) String code,
+        @RequestParam(required = false) String state,
+        @RequestParam(required = false) String error
     ) {
-        String redirectUrl = gitHubService.handleCallback(code, state);
+        String redirectUrl = gitHubService.handleCallback(code, state, error);
         return ResponseEntity.status(HttpStatus.FOUND)
             .location(URI.create(redirectUrl))
             .build();
@@ -195,7 +152,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         gitHubService.disconnect(slug);
-        return ResponseEntity.ok(ApiResponse.success("GitHub déconnecté", null));
+        return ResponseEntity.ok(ApiResponse.success("GitHub disconnected", null));
     }
 
     // ====================================================================
@@ -212,7 +169,7 @@ public class IntegrationController {
         User user = resolveUser(jwt);
         GitHubLinkResponse link = gitHubService.addLink(slug, issueId, req, user);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Lien GitHub ajouté", link));
+            .body(ApiResponse.success("GitHub link added", link));
     }
 
     @GetMapping("/api/workspaces/{slug}/integrations/github/issues/{issueId}/links")
@@ -231,7 +188,7 @@ public class IntegrationController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         gitHubService.deleteLink(slug, linkId, resolveUser(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Lien GitHub supprimé", null));
+        return ResponseEntity.ok(ApiResponse.success("GitHub link removed", null));
     }
 
     // ====================================================================
@@ -250,7 +207,6 @@ public class IntegrationController {
         @PathVariable String slug,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        requireIntegrations(slug);
         requireManager(slug, jwt);
         User user = resolveUser(jwt);
         URI authorizeUrl = slackService.buildAuthorizeUrl(slug, user);
@@ -258,12 +214,14 @@ public class IntegrationController {
     }
 
     /** Callback appelé par Slack — endpoint PUBLIC. {@code state} = token aléatoire. */
+    /** Retour de Slack : toujours une redirection vers l'app ({@code slack=connected} ou {@code slack=error}). */
     @GetMapping("/api/integrations/slack/callback")
     public ResponseEntity<Void> slackCallback(
-        @RequestParam String code,
-        @RequestParam String state
+        @RequestParam(required = false) String code,
+        @RequestParam(required = false) String state,
+        @RequestParam(required = false) String error
     ) {
-        String redirectUrl = slackService.handleCallback(code, state);
+        String redirectUrl = slackService.handleCallback(code, state, error);
         return ResponseEntity.status(HttpStatus.FOUND)
             .location(URI.create(redirectUrl))
             .build();
@@ -275,7 +233,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         slackService.disconnect(slug);
-        return ResponseEntity.ok(ApiResponse.success("Slack déconnecté", null));
+        return ResponseEntity.ok(ApiResponse.success("Slack disconnected", null));
     }
 
     // ====================================================================
@@ -291,7 +249,7 @@ public class IntegrationController {
         requireManager(slug, jwt);
         SlackChannelResponse channel = slackService.addChannel(slug, req);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Canal Slack ajouté", channel));
+            .body(ApiResponse.success("Slack channel added", channel));
     }
 
     @GetMapping("/api/workspaces/{slug}/integrations/slack/channels")
@@ -309,7 +267,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         slackService.deleteChannel(slug, channelId);
-        return ResponseEntity.ok(ApiResponse.success("Canal Slack supprimé", null));
+        return ResponseEntity.ok(ApiResponse.success("Slack channel removed", null));
     }
 
     /** Ingere l'historique d'un canal Slack dans le Brain OS (dedupe, embedde). Reserve OWNER/ADMIN. */
@@ -321,7 +279,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         SlackSyncResponse result = slackService.sync(slug, resolveUser(jwt).getId(), channel);
-        return ResponseEntity.ok(ApiResponse.success("Synchronisation Slack terminée", result));
+        return ResponseEntity.ok(ApiResponse.success("Slack sync completed", result));
     }
 
     // ====================================================================
@@ -343,7 +301,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         PlaneStatusResponse status = planeService.connect(slug, resolveUser(jwt).getId(), request);
-        return ResponseEntity.ok(ApiResponse.success("Plane connecté", status));
+        return ResponseEntity.ok(ApiResponse.success("Plane connected", status));
     }
 
     @GetMapping("/api/workspaces/{slug}/integrations/plane/projects")
@@ -361,7 +319,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         PlaneSyncResponse result = planeService.sync(slug, resolveUser(jwt).getId(), projectId);
-        return ResponseEntity.ok(ApiResponse.success("Synchronisation Plane terminée", result));
+        return ResponseEntity.ok(ApiResponse.success("Plane sync completed", result));
     }
 
     @DeleteMapping("/api/workspaces/{slug}/integrations/plane")
@@ -370,7 +328,7 @@ public class IntegrationController {
     ) {
         requireManager(slug, jwt);
         planeService.disconnect(slug, resolveUser(jwt).getId());
-        return ResponseEntity.ok(ApiResponse.success("Plane déconnecté", null));
+        return ResponseEntity.ok(ApiResponse.success("Plane disconnected", null));
     }
 
     // ====================================================================
@@ -380,6 +338,6 @@ public class IntegrationController {
     private User resolveUser(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         return userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 }

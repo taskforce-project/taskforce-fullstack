@@ -137,7 +137,7 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
     <section className="rounded-xl border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <Sparkles className="h-4 w-4 text-violet-400" />
+          <Sparkles className="h-4 w-4 text-primary" />
           Skills
           <span className="text-xs font-normal text-muted-foreground">· used by Smart Assign</span>
         </h2>

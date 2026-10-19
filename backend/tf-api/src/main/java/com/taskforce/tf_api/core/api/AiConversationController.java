@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationDetail;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationSummary;
-import com.taskforce.tf_api.core.model.AiConversation;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -42,7 +41,7 @@ public class AiConversationController {
 
     private Ctx ctx(String slug, Jwt jwt) {
         User user = userRepository.findByEmail(jwt.getClaimAsString("email"))
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         Workspace ws = access.resolveAndAuthorize(slug, user.getId());
         return new Ctx(ws.getId(), user.getId());
     }
@@ -52,16 +51,6 @@ public class AiConversationController {
         @PathVariable String slug, @AuthenticationPrincipal Jwt jwt) {
         Ctx c = ctx(slug, jwt);
         return ResponseEntity.ok(ApiResponse.success(service.list(c.workspaceId(), c.userId())));
-    }
-
-    @PostMapping
-    public ResponseEntity<ApiResponse<ConversationSummary>> create(
-        @PathVariable String slug, @AuthenticationPrincipal Jwt jwt) {
-        Ctx c = ctx(slug, jwt);
-        AiConversation conv = service.create(c.workspaceId(), c.userId(), null);
-        return ResponseEntity.ok(ApiResponse.success(new ConversationSummary(
-            conv.getId(), conv.getTitle(),
-            conv.getUpdatedAt() != null ? conv.getUpdatedAt().toString() : null, 0, 0)));
     }
 
     @GetMapping("/{id}")

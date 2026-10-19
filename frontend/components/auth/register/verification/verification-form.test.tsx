@@ -28,9 +28,9 @@ vi.mock('sonner', () => ({
 // Real French constants (importActual avoids the vi.mock hoisting trap) - keeps the many French
 // text queries valid and drift-proof.
 vi.mock('@/lib/store/preferences-store', async () => {
-  const { CONSTANTS_FR } = await vi.importActual<typeof import('@/lib/constants_fr')>('@/lib/constants_fr');
+  const { CONSTANTS_EN } = await vi.importActual<typeof import('@/lib/constants_en')>('@/lib/constants_en');
   return {
-    usePreferencesStore: () => ({ t: CONSTANTS_FR }),
+    usePreferencesStore: () => ({ t: CONSTANTS_EN }),
   };
 });
 
@@ -71,13 +71,12 @@ vi.mock('@/lib/contexts/auth-context', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-describe('OTPForm - Step 3: Verification', () => {
+describe('OTPForm - Step 2: Verification', () => {
   const mockRegisterData = {
     firstName: 'John',
     lastName: 'Doe',
     email: 'test@example.com',
     password: 'StrongP@ssw0rd!',
-    planType: 'FREE',
   };
 
   beforeEach(() => {
@@ -106,22 +105,37 @@ describe('OTPForm - Step 3: Verification', () => {
     vi.restoreAllMocks();
   });
 
+  describe('Instance sans vérification d\'e-mail', () => {
+    it('compte déjà prêt (otpSent=false) : pas de code attendu, retour à la connexion', async () => {
+      vi.mocked(authService.register).mockResolvedValue({
+        message: 'Account created. You can now sign in.', email: 'test@example.com', otpSent: false,
+      });
+
+      render(<OTPForm />);
+
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/auth/login'));
+      expect(mockClearRegisterData).toHaveBeenCalled();
+      expect(toast.success).toHaveBeenCalledWith('Account created', { description: 'Sign in to access your workspace.' });
+      expect(toast.success).not.toHaveBeenCalledWith('Verification code sent', expect.anything());
+    });
+  });
+
   describe('Rendering', () => {
     it('should render OTP input fields', async () => {
       render(<OTPForm />);
 
       // Wait for component to finish initialization
       await waitFor(() => {
-        expect(screen.getByLabelText(/code de vérification/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
       });
     });
 
-    // Voir plan-form.test.tsx : le fil d'étapes a été remonté au niveau de la page pour cesser
-    // d'être dupliqué dans les trois étapes. Il est testé dans auth-stepper.test.tsx.
+    // Le fil d'étapes a été remonté au niveau de la page pour cesser d'être dupliqué dans chaque
+    // étape. Il est testé dans auth-stepper.test.tsx.
     it('ne porte plus le fil d\'étapes, désormais rendu par la page', () => {
       render(<OTPForm />);
 
-      expect(screen.queryByText(/étape 3 sur 3/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/step 3 of 3/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/100%/i)).not.toBeInTheDocument();
     });
 
@@ -136,13 +150,13 @@ describe('OTPForm - Step 3: Verification', () => {
     it('should render verify button', () => {
       render(<OTPForm />);
 
-      expect(screen.getByRole('button', { name: /vérifier/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^verify$/i })).toBeInTheDocument();
     });
 
     it('should render resend code button', () => {
       render(<OTPForm />);
 
-      expect(screen.getByRole('button', { name: /renvoyer le code/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /resend code/i })).toBeInTheDocument();
     });
   });
 
@@ -154,9 +168,9 @@ describe('OTPForm - Step 3: Verification', () => {
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Session expirée ou données incomplètes',
+          'Session expired or incomplete data',
           expect.objectContaining({
-            description: expect.stringContaining('Veuillez recommencer'),
+            description: expect.stringContaining('Please restart'),
           })
         );
       });
@@ -169,7 +183,6 @@ describe('OTPForm - Step 3: Verification', () => {
         firstName: 'John',
         lastName: 'Doe',
         password: 'StrongP@ssw0rd!',
-        planType: 'FREE',
         // email missing
       });
 
@@ -185,24 +198,7 @@ describe('OTPForm - Step 3: Verification', () => {
         firstName: 'John',
         lastName: 'Doe',
         email: 'test@example.com',
-        planType: 'FREE',
         // password missing
-      });
-
-      render(<OTPForm />);
-
-      await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/auth/register');
-      });
-    });
-
-    it('should redirect if planType is missing', async () => {
-      mockGetRegisterData.mockReturnValue({
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'test@example.com',
-        password: 'StrongP@ssw0rd!',
-        // planType missing
       });
 
       render(<OTPForm />);
@@ -223,14 +219,13 @@ describe('OTPForm - Step 3: Verification', () => {
           password: 'StrongP@ssw0rd!',
           firstName: 'John',
           lastName: 'Doe',
-          planType: 'FREE',
         });
       });
 
       expect(toast.success).toHaveBeenCalledWith(
-        'Code de vérification envoyé',
+        'Verification code sent',
         expect.objectContaining({
-          description: 'Consultez votre boîte mail',
+          description: 'Check your inbox',
         })
       );
     });
@@ -252,7 +247,7 @@ describe('OTPForm - Step 3: Verification', () => {
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Erreur',
+          'Error',
           expect.objectContaining({
             description: expect.stringContaining('User already exists'),
           })
@@ -270,10 +265,10 @@ describe('OTPForm - Step 3: Verification', () => {
       render(<OTPForm />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/code de vérification/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
       });
 
-      const otpInput = screen.getByLabelText(/code de vérification/i);
+      const otpInput = screen.getByLabelText(/verification code/i);
       
       // Enter OTP
       await user.type(otpInput, '123456');
@@ -293,13 +288,13 @@ describe('OTPForm - Step 3: Verification', () => {
       render(<OTPForm />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/code de vérification/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
       });
 
-      const otpInput = screen.getByLabelText(/code de vérification/i);
+      const otpInput = screen.getByLabelText(/verification code/i);
       await user.type(otpInput, '123456');
 
-      const verifyButton = screen.getByRole('button', { name: /vérifier/i });
+      const verifyButton = screen.getByRole('button', { name: /^verify$/i });
       
       const clickPromise = user.click(verifyButton);
 
@@ -316,10 +311,10 @@ describe('OTPForm - Step 3: Verification', () => {
       render(<OTPForm />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/code de vérification/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
       });
 
-      const verifyButton = screen.getByRole('button', { name: /vérifier/i });
+      const verifyButton = screen.getByRole('button', { name: /^verify$/i });
       
       // Button should be disabled when OTP is empty (length !== 6)
       expect(verifyButton).toBeDisabled();
@@ -330,13 +325,13 @@ describe('OTPForm - Step 3: Verification', () => {
       render(<OTPForm />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/code de vérification/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
       });
 
-      const otpInput = screen.getByLabelText(/code de vérification/i);
+      const otpInput = screen.getByLabelText(/verification code/i);
       await user.type(otpInput, '123'); // Only 3 digits
 
-      const verifyButton = screen.getByRole('button', { name: /vérifier/i });
+      const verifyButton = screen.getByRole('button', { name: /^verify$/i });
       
       // Button should be disabled when OTP length is not 6
       expect(verifyButton).toBeDisabled();
@@ -347,13 +342,13 @@ describe('OTPForm - Step 3: Verification', () => {
       render(<OTPForm />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/code de vérification/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
       });
 
-      const otpInput = screen.getByLabelText(/code de vérification/i);
+      const otpInput = screen.getByLabelText(/verification code/i);
       await user.type(otpInput, '123456'); // 6 digits
 
-      const verifyButton = screen.getByRole('button', { name: /vérifier/i });
+      const verifyButton = screen.getByRole('button', { name: /^verify$/i });
       
       // Button should be enabled when OTP length is 6
       expect(verifyButton).not.toBeDisabled();
@@ -367,13 +362,13 @@ describe('OTPForm - Step 3: Verification', () => {
       render(<OTPForm />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/code de vérification/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
       });
 
-      const otpInput = screen.getByLabelText(/code de vérification/i);
+      const otpInput = screen.getByLabelText(/verification code/i);
       await user.type(otpInput, '123456');
 
-      const verifyButton = screen.getByRole('button', { name: /vérifier/i });
+      const verifyButton = screen.getByRole('button', { name: /^verify$/i });
       await user.click(verifyButton);
 
       await waitFor(() => {
@@ -398,18 +393,18 @@ describe('OTPForm - Step 3: Verification', () => {
       render(<OTPForm />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/code de vérification/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
       });
 
-      const otpInput = screen.getByLabelText(/code de vérification/i);
+      const otpInput = screen.getByLabelText(/verification code/i);
       await user.type(otpInput, '999999');
 
-      const verifyButton = screen.getByRole('button', { name: /vérifier/i });
+      const verifyButton = screen.getByRole('button', { name: /^verify$/i });
       await user.click(verifyButton);
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Erreur',
+          'Error',
           expect.objectContaining({
             description: expect.stringContaining('Invalid OTP code'),
           })
@@ -431,17 +426,17 @@ describe('OTPForm - Step 3: Verification', () => {
       render(<OTPForm />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /renvoyer le code/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /resend code/i })).toBeInTheDocument();
       });
 
-      const resendButton = screen.getByRole('button', { name: /renvoyer le code/i });
+      const resendButton = screen.getByRole('button', { name: /resend code/i });
       await user.click(resendButton);
 
       await waitFor(() => {
         expect(authService.resendOtp).toHaveBeenCalledWith('test@example.com');
       });
 
-      expect(toast.success).toHaveBeenCalledWith('Code de vérification renvoyé');
+      expect(toast.success).toHaveBeenCalledWith('Verification code resent');
     });
 
     it('should start countdown after resending OTP', async () => {
@@ -453,15 +448,15 @@ describe('OTPForm - Step 3: Verification', () => {
       render(<OTPForm />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /renvoyer le code/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /resend code/i })).toBeInTheDocument();
       });
 
-      const resendButton = screen.getByRole('button', { name: /renvoyer le code/i });
+      const resendButton = screen.getByRole('button', { name: /resend code/i });
       await user.click(resendButton);
 
       // After resending, should show countdown
       await waitFor(() => {
-        expect(screen.getByText(/renvoyer le code dans \d+s/i)).toBeInTheDocument();
+        expect(screen.getByText(/resend code in \d+s/i)).toBeInTheDocument();
       });
     });
 
@@ -476,17 +471,17 @@ describe('OTPForm - Step 3: Verification', () => {
       render(<OTPForm />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /renvoyer le code/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /resend code/i })).toBeInTheDocument();
       });
 
-      const resendButton = screen.getByRole('button', { name: /renvoyer le code/i });
+      const resendButton = screen.getByRole('button', { name: /resend code/i });
       await user.click(resendButton);
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Erreur',
+          'Error',
           expect.objectContaining({
-            description: 'Veuillez attendre 30 secondes avant de renvoyer le code',
+            description: 'Please wait 30 seconds before resending the code',
           })
         );
       });
@@ -509,15 +504,15 @@ describe('OTPForm - Step 3: Verification', () => {
       render(<OTPForm />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /renvoyer le code/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /resend code/i })).toBeInTheDocument();
       });
 
-      const resendButton = screen.getByRole('button', { name: /renvoyer le code/i });
+      const resendButton = screen.getByRole('button', { name: /resend code/i });
       await user.click(resendButton);
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Erreur',
+          'Error',
           expect.objectContaining({
             description: expect.stringContaining('Email not found'),
           })
@@ -532,10 +527,10 @@ describe('OTPForm - Step 3: Verification', () => {
       render(<OTPForm />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /renvoyer le code/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /resend code/i })).toBeInTheDocument();
       });
 
-      const resendButton = screen.getByRole('button', { name: /renvoyer le code/i });
+      const resendButton = screen.getByRole('button', { name: /resend code/i });
       await user.click(resendButton);
 
       // Verify toast was called instead of checking disabled state
@@ -555,13 +550,13 @@ describe('OTPForm - Step 3: Verification', () => {
       render(<OTPForm />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/code de vérification/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
       });
 
-      const otpInput = screen.getByLabelText(/code de vérification/i);
+      const otpInput = screen.getByLabelText(/verification code/i);
       await user.type(otpInput, '123456');
 
-      const verifyButton = screen.getByRole('button', { name: /vérifier/i });
+      const verifyButton = screen.getByRole('button', { name: /^verify$/i });
       
       const clickPromise = user.click(verifyButton);
 
@@ -578,13 +573,13 @@ describe('OTPForm - Step 3: Verification', () => {
       render(<OTPForm />);
 
       // Should have accessible label (sr-only)
-      expect(screen.getByLabelText(/code de vérification/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
     });
 
     it('should have proper heading structure', () => {
       render(<OTPForm />);
 
-      expect(screen.getByRole('heading', { name: /code de vérification/i })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /verification code/i })).toBeInTheDocument();
     });
   });
 
@@ -592,18 +587,18 @@ describe('OTPForm - Step 3: Verification', () => {
     it('should show instructions about OTP', () => {
       render(<OTPForm />);
 
-      expect(screen.getByText(/code envoyé à/i)).toBeInTheDocument();
+      expect(screen.getByText(/code sent to/i)).toBeInTheDocument();
     });
 
     it('should show instructions about OTP format', async () => {
       render(<OTPForm />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/code de vérification/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
       });
 
       // Should have instruction text about 6-digit code
-      expect(screen.getByText(/entrez le code à 6 chiffres/i)).toBeInTheDocument();
+      expect(screen.getByText(/enter the 6-digit code/i)).toBeInTheDocument();
     });
   });
 });

@@ -84,9 +84,9 @@ public class SkillSuggestionService {
      */
     public List<String> suggest(String slug, String role, List<String> existing, Long requesterId) {
         Workspace workspace = workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspace.getId(), requesterId)) {
-            throw new ForbiddenException("Accès refusé au workspace");
+            throw new ForbiddenException("Access denied to this workspace");
         }
         List<String> already = existing == null ? List.of() : existing;
         Long workspaceId = workspace.getId();
@@ -118,16 +118,16 @@ public class SkillSuggestionService {
 
     private List<String> viaLlm(String role, List<String> already) {
         String system = """
-            Tu aides à décrire les compétences d'un membre d'équipe dans un outil de gestion de projet.
-            On te donne un rôle. Réponds STRICTEMENT en JSON de la forme {"skills":["tag1","tag2",...]}.
-            8 à 12 compétences courtes (1 à 3 mots) : langages, frameworks, outils, savoir-faire concrets
-            et pertinents pour ce rôle. Pas de phrase, pas de numérotation, pas de doublon.
+            You help describe the skills of a team member in a project management tool.
+            You are given a role. Answer STRICTLY in JSON of the form {"skills":["tag1","tag2",...]}.
+            8 to 12 short skills (1 to 3 words): languages, frameworks, tools, concrete know-how
+            relevant to this role. No sentences, no numbering, no duplicates. Write the skills in English.
             """;
-        StringBuilder user = new StringBuilder("Rôle : ").append(role);
+        StringBuilder user = new StringBuilder("Role: ").append(role);
         if (!already.isEmpty()) {
-            user.append(". Déjà sélectionnées (ne pas les répéter) : ").append(String.join(", ", already));
+            user.append(". Already selected (do not repeat them): ").append(String.join(", ", already));
         }
-        String content = llm.chatCompletion(null, system, user.toString(), true);
+        String content = llm.chatCompletion(system, user.toString(), true, "fast");
         return dedupeCap(parse(content), already);
     }
 
@@ -182,23 +182,23 @@ public class SkillSuggestionService {
         String r = role == null ? "" : role.toLowerCase();
         List<String> base;
         if (r.matches(".*(front|react|ui|web).*")) {
-            base = List.of("React", "TypeScript", "CSS", "Next.js", "Accessibilité", "Tests E2E", "Design system");
+            base = List.of("React", "TypeScript", "CSS", "Next.js", "Accessibility", "E2E tests", "Design system");
         } else if (r.matches(".*(back|api|java|spring).*")) {
-            base = List.of("Java", "Spring Boot", "REST", "SQL", "Tests unitaires", "Sécurité", "Docker");
+            base = List.of("Java", "Spring Boot", "REST", "SQL", "Unit tests", "Security", "Docker");
         } else if (r.matches(".*(full ?stack|dev|ingénieur|engineer|développe).*")) {
             base = List.of("TypeScript", "Java", "React", "SQL", "Git", "Tests", "CI/CD", "Docker");
         } else if (r.matches(".*(devops|sre|infra|cloud).*")) {
-            base = List.of("Docker", "Kubernetes", "CI/CD", "Terraform", "Observabilité", "Linux", "Cloud");
+            base = List.of("Docker", "Kubernetes", "CI/CD", "Terraform", "Observability", "Linux", "Cloud");
         } else if (r.matches(".*(design|ux|produit|product).*")) {
-            base = List.of("Figma", "UX Research", "Prototypage", "Design system", "Accessibilité", "Wireframing");
+            base = List.of("Figma", "UX research", "Prototyping", "Design system", "Accessibility", "Wireframing");
         } else if (r.matches(".*(qa|test|quality).*")) {
-            base = List.of("Playwright", "Cypress", "Tests unitaires", "Tests E2E", "Automatisation", "CI/CD");
+            base = List.of("Playwright", "Cypress", "Unit tests", "E2E tests", "Automation", "CI/CD");
         } else if (r.matches(".*(data|ml|ia|ai|analyst).*")) {
-            base = List.of("SQL", "Python", "Data viz", "ETL", "Analyse", "Machine Learning");
+            base = List.of("SQL", "Python", "Data viz", "ETL", "Analysis", "Machine learning");
         } else if (r.matches(".*(pm|chef|manager|lead|scrum|owner|projet).*")) {
-            base = List.of("Agile", "Roadmap", "Priorisation", "Communication", "Gestion des risques", "Stakeholders");
+            base = List.of("Agile", "Roadmap", "Prioritization", "Communication", "Risk management", "Stakeholders");
         } else {
-            base = List.of("Communication", "Organisation", "Collaboration", "Documentation", "Résolution de problèmes");
+            base = List.of("Communication", "Organization", "Collaboration", "Documentation", "Problem solving");
         }
         return dedupeCap(base, already);
     }

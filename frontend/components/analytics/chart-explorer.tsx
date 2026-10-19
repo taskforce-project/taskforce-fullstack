@@ -7,7 +7,7 @@ import {
 } from "recharts"
 import {
   Activity, TrendingDown, Users, CalendarRange, Sparkles, Loader2,
-  Maximize2, AlertCircle, Send, Lock, X, FolderKanban, Pin, Trash2, BarChart3, Box,
+  Maximize2, AlertCircle, Send, X, FolderKanban, Pin, Trash2, BarChart3, Box,
 } from "lucide-react"
 
 import { toast } from "sonner"
@@ -27,21 +27,20 @@ import { listProjects } from "@/lib/api/project-service"
 // ─── Métadonnées de séries ──────────────────────────────────────────────────
 // Le libellé et la couleur d'une série vivent ici (le backend n'envoie que la clé).
 
-// Palette sémantique explicite (le thème garde ses --chart-* en niveaux de gris ; ici on veut
-// des séries distinctes et colorées, lisibles en clair comme en sombre).
+// Palette sémantique : les couleurs de série du thème (--chart-*), lisibles en clair comme en sombre.
 const SERIES_META: Record<string, { label: string; color: string }> = {
-  resolved:   { label: "Resolved",        color: "#10b981" },  // emerald - terminé
-  opened:     { label: "Opened",        color: "#3b82f6" },  // blue - entrant
-  remaining:  { label: "Remaining",         color: "#f43f5e" },  // rose - reste à faire
-  ideal:      { label: "Ideal",           color: "#94a3b8" },  // slate - repère (pointillé)
-  openIssues: { label: "Open issues", color: "#6366f1" },  // indigo - charge
-  completion: { label: "Completion (%)",  color: "#6366f1" },  // indigo - % de complétion projet
-  done:       { label: "Done",       color: "#10b981" },  // emerald
-  open:       { label: "Open",        color: "#f59e0b" },  // amber
+  resolved:   { label: "Resolved",        color: "var(--chart-3)" },  // vert - terminé
+  opened:     { label: "Opened",        color: "var(--chart-1)" },  // bleu - entrant
+  remaining:  { label: "Remaining",         color: "var(--chart-2)" },  // rouge - reste à faire
+  ideal:      { label: "Ideal",           color: "var(--subtle)" },  // gris - repère (pointillé)
+  openIssues: { label: "Open issues", color: "var(--chart-1)" },  // bleu - charge
+  completion: { label: "Completion (%)",  color: "var(--chart-1)" },  // bleu - % de complétion projet
+  done:       { label: "Done",       color: "var(--chart-3)" },  // vert
+  open:       { label: "Open",        color: "var(--chart-4)" },  // jaune
 }
 
 /** Palette de repli pour une série hors catalogue (rotation stable). */
-const FALLBACK_COLORS = ["#3b82f6", "#10b981", "#f43f5e", "#6366f1", "#f59e0b", "#14b8a6"]
+const FALLBACK_COLORS = ["var(--chart-1)", "var(--chart-3)", "var(--chart-2)", "var(--chart-4)", "var(--chart-5)", "var(--subtle)"]
 
 const DATASET_XKEY: Record<string, string> = {
   throughput: "week",   // ThroughputPoint.week sert de libellé, quel que soit le bucket
@@ -208,7 +207,7 @@ function SpecChart({
   if (spec.unsupported) {
     return (
       <Centered>
-        <AlertCircle className="size-5 text-amber-500" />
+        <AlertCircle className="size-5 text-ink-yellow" />
         <p className="max-w-md text-sm text-muted-foreground">{spec.unsupported}</p>
         {onSuggestion && spec.suggestions.length > 0 && (
           <div className="mt-2 flex flex-col items-center gap-2">
@@ -360,7 +359,7 @@ function BreakdownChart({
   if (data.length === 0) {
     return <Centered><p className="text-xs text-muted-foreground">No data for this breakdown</p></Centered>
   }
-  const color = "#6366f1"
+  const color = "var(--chart-1)"
   const yName = spec.yLabel ?? "Value"
 
   // Vue 3D (barres) - Three.js, interactive (rotation + survol).
@@ -408,7 +407,7 @@ function MiniHeatmap({ workload }: { readonly workload: Workload | null }) {
   return (
     <div className="flex h-full items-end gap-1">
       {totals.slice(0, 12).map((v, i) => (
-        <div key={i} className="flex-1 rounded-t" style={{ backgroundColor: "#6366f1", height: `${Math.max((v / max) * 100, 6)}%`, opacity: 0.35 + (v / max) * 0.65 }} />
+        <div key={i} className="flex-1 rounded-t" style={{ backgroundColor: "var(--chart-1)", height: `${Math.max((v / max) * 100, 6)}%`, opacity: 0.35 + (v / max) * 0.65 }} />
       ))}
     </div>
   )
@@ -428,13 +427,12 @@ const TRIPTYCH: ReadonlyArray<{ preset: Preset; caption: string }> = [
  * modal d'exploration, pré-positionné sur le graphe cliqué.
  */
 export function ChartExplorer({
-  slug, projectId, gated = false, onUpgrade,
-}: Readonly<{ slug: string; projectId: number | null; gated?: boolean; onUpgrade?: () => void }>) {
+  slug, projectId,
+}: Readonly<{ slug: string; projectId: number | null }>) {
   const [open, setOpen] = useState(false)
   const [initialPresetId, setInitialPresetId] = useState<string>(PRESETS[0].id)
 
   function openAt(presetId: string) {
-    if (gated) { onUpgrade?.(); return }
     setInitialPresetId(presetId)
     setOpen(true)
   }
@@ -447,9 +445,7 @@ export function ChartExplorer({
             <Activity className="size-4" /> Analytics previews
           </span>
           <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => openAt(PRESETS[0].id)}>
-            {gated
-              ? <><Lock className="size-3.5 text-amber-600 dark:text-amber-400" /> Pro</>
-              : <><Sparkles className="size-3.5 text-primary" /> Explore</>}
+            <Sparkles className="size-3.5 text-primary" /> Explore
           </Button>
         </div>
 
@@ -469,9 +465,7 @@ export function ChartExplorer({
               </div>
               <p className="text-[11px] text-muted-foreground/70">{caption}</p>
               <div className="h-20 w-full">
-                {gated
-                  ? <div className="flex h-full items-center justify-center rounded-md bg-muted/50"><Lock className="size-4 text-muted-foreground/50" /></div>
-                  : <SpecChart slug={slug} projectId={projectId} spec={p.spec} variant="preview" />}
+                <SpecChart slug={slug} projectId={projectId} spec={p.spec} variant="preview" />
               </div>
             </button>
           ))}
@@ -660,7 +654,7 @@ function ChartExplorerModal({
                       <button
                         type="button"
                         onClick={() => removeSaved(chart.id)}
-                        className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-rose-500 group-hover/item:opacity-100"
+                        className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/item:opacity-100"
                         title="Remove"
                       >
                         <Trash2 className="size-3.5" />
@@ -688,7 +682,7 @@ function ChartExplorerModal({
                   {generating ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
                 </Button>
               </div>
-              {genError && <p className="mt-1.5 px-1 text-[11px] text-rose-500">Generation failed, try again.</p>}
+              {genError && <p className="mt-1.5 px-1 text-[11px] text-destructive">Generation failed, try again.</p>}
               <p className="mt-1.5 px-1 text-[11px] text-muted-foreground/70">Rendered from your real data.</p>
             </div>
           </aside>

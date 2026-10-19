@@ -94,7 +94,7 @@ public class KeycloakService {
             String error = response.readEntity(String.class);
             response.close();
             log.error("Erreur lors de la création de l'utilisateur Keycloak : {}", error);
-            throw new RuntimeException("Erreur lors de la création de l'utilisateur : " + error);
+            throw new RuntimeException("Error creating the user: " + error);
         }
     }
 
@@ -128,7 +128,7 @@ public class KeycloakService {
         List<UserRepresentation> users = realmResource.users().search(email, true);
 
         if (users.isEmpty()) {
-            throw new RuntimeException("Utilisateur non trouvé : " + email);
+            throw new RuntimeException("User not found: " + email);
         }
 
         return users.get(0);
@@ -158,39 +158,6 @@ public class KeycloakService {
         userResource.resetPassword(credential);
 
         log.info("Mot de passe mis à jour avec succès");
-    }
-
-    /**
-     * Envoie à l'utilisateur l'email « réinitialiser le mot de passe » (action Keycloak UPDATE_PASSWORD).
-     * On ne fabrique pas d'UI de mot de passe côté app : on déclenche le flux natif Keycloak.
-     */
-    public void sendPasswordResetEmail(String keycloakId) {
-        log.info("Envoi de l'email de réinitialisation du mot de passe pour {}", keycloakId);
-        realmResource.users().get(keycloakId).executeActionsEmail(List.of("UPDATE_PASSWORD"));
-    }
-
-    /** Indique si un credential TOTP (2FA) est configuré pour l'utilisateur. */
-    public boolean isTotpEnabled(String keycloakId) {
-        return realmResource.users().get(keycloakId).credentials().stream()
-            .anyMatch(c -> "otp".equalsIgnoreCase(c.getType()));
-    }
-
-    /**
-     * Envoie l'email « configurer le 2FA » (action Keycloak CONFIGURE_TOTP) : l'utilisateur scanne le
-     * QR sur la page Keycloak. On garde ainsi le secret TOTP côté Keycloak (jamais manipulé par l'app).
-     */
-    public void sendConfigureTotpEmail(String keycloakId) {
-        log.info("Envoi de l'email de configuration 2FA (TOTP) pour {}", keycloakId);
-        realmResource.users().get(keycloakId).executeActionsEmail(List.of("CONFIGURE_TOTP"));
-    }
-
-    /** Désactive le 2FA en supprimant le(s) credential(s) TOTP de l'utilisateur. */
-    public void disableTotp(String keycloakId) {
-        log.info("Désactivation du 2FA (TOTP) pour {}", keycloakId);
-        UserResource userResource = realmResource.users().get(keycloakId);
-        userResource.credentials().stream()
-            .filter(c -> "otp".equalsIgnoreCase(c.getType()))
-            .forEach(c -> userResource.removeCredential(c.getId()));
     }
 
     /**

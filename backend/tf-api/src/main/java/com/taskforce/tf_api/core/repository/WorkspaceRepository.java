@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.Workspace;
 
 @Repository
@@ -20,13 +19,6 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     @Query("SELECT w.owner.id FROM Workspace w WHERE w.id = :workspaceId")
     Optional<Long> findOwnerIdByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
-    /** Forfait du propriétaire (compte) d'un workspace par slug — pour le gating de features par plan. */
-    @Query("SELECT w.owner.planType FROM Workspace w WHERE w.slug = :slug")
-    Optional<PlanType> findOwnerPlanBySlug(@Param("slug") String slug);
-
-    /** Flag opt-in de capture du corpus IA ({@code ai_generations}) d'un workspace, sans charger l'entité. */
-    @Query("SELECT w.aiLearningEnabled FROM Workspace w WHERE w.id = :workspaceId")
-    Optional<Boolean> findAiLearningEnabledById(@Param("workspaceId") Long workspaceId);
 
     Optional<Workspace> findBySlug(String slug);
 

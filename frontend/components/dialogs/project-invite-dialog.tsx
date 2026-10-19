@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import { UserPlus, Search, X, Loader2, Info } from "lucide-react"
 import { toast } from "sonner"
 
@@ -52,7 +51,6 @@ const PROJECT_ROLES: { value: ProjectRole; label: string }[] = [
  * Option : ajouter l'invité à une équipe existante ou en créer une.
  */
 export function ProjectInviteDialog({ workspace, projectId, onInvited }: ProjectInviteDialogProps) {
-  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<UserSearchResult[]>([])
@@ -118,17 +116,8 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
       onInvited()
       reset()
       setOpen(false)
-    } catch (err) {
-      // 409 = plafond du forfait Free sur un projet privé (façon GitHub) → upsell.
-      const e = err as { response?: { status?: number; data?: { message?: string } } }
-      if (e?.response?.status === 409) {
-        toast.error(e.response?.data?.message ?? "Free plan limit reached on this private project.", {
-          description: "Make the project public, or upgrade to a paid plan to invite without limits.",
-          action: { label: "View plans", onClick: () => router.push(`/${workspace}/billing`) },
-        })
-      } else {
-        toast.error("Error while inviting")
-      }
+    } catch {
+      toast.error("Error while inviting")
     } finally {
       setSubmitting(false)
     }
@@ -217,7 +206,7 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
 
           {/* Notice : la personne doit ACCEPTER l'invitation avant de rejoindre. */}
           {selected && (
-            <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/10 px-2.5 py-2 text-xs text-blue-500">
+            <div className="flex items-start gap-2 rounded-md border border-primary/20 bg-primary/10 px-2.5 py-2 text-xs text-ink-blue">
               <Info className="mt-0.5 size-3.5 shrink-0" />
               <span>They&apos;ll receive an invitation to this project{alreadyInWorkspace ? "" : " and the workspace"} and must accept it before joining.</span>
             </div>

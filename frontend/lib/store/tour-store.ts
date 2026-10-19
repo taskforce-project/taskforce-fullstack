@@ -10,7 +10,7 @@
  *       intra-session (fermer → le déclencheur du dashboard rescheduld → réouverture). Repart à
  *       {@code false} au prochain chargement de l'app → la visite est re-montrée si non « déjà vue ».</li>
  * </ul>
- * <p>{@code isActive}/{@code stepIndex} sont éphémères. Rejouable depuis l'aide ({@code ?tour=1}).</p>
+ * <p>{@code isActive}/{@code stepIndex} sont éphémères. Rejouable depuis Ctrl+K ({@code ?tour=1}).</p>
  */
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
@@ -43,7 +43,7 @@ export const useTourStore = create<TourState>()(
       stepIndex: 0,
       hasSeen: false,
       dismissed: false,
-      // Un (re)démarrage lève le drapeau de session : le rejeu depuis l'aide doit réellement s'afficher.
+      // Un (re)démarrage lève le drapeau de session : le rejeu depuis Ctrl+K doit réellement s'afficher.
       start: () => set({ isActive: true, stepIndex: 0, dismissed: false }),
       setStep: (i) => set({ stepIndex: i }),
       close: (markSeen) =>

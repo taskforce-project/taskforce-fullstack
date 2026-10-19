@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useParams } from "next/navigation"
-import { Sparkles, ExternalLink, Zap, ChevronDown, ChevronRight, RefreshCw } from "lucide-react"
+import { Sparkles, ExternalLink, ChevronDown, ChevronRight, RefreshCw } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
 
@@ -22,10 +21,10 @@ const pctOf = (used: number, total: number) =>
 function Bar({ pct, tone = "blue" }: { pct: number; tone?: "blue" | "amber" | "rose" }) {
   const color =
     tone === "rose"
-      ? "bg-rose-500"
+      ? "bg-shape-red"
       : tone === "amber"
-        ? "bg-amber-500"
-        : "bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300"
+        ? "bg-shape-yellow"
+        : "bg-primary"
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
       <div className={cn("h-full rounded-full transition-[width] duration-500", color)} style={{ width: `${pct}%` }} />
@@ -42,7 +41,7 @@ function Ring({ pct }: { pct: number }) {
       <circle cx="8" cy="8" r={r} fill="none" strokeWidth="2" className="stroke-muted" />
       <circle
         cx="8" cy="8" r={r} fill="none" strokeWidth="2" strokeLinecap="round"
-        className={cn(pct >= 90 ? "stroke-rose-500" : pct >= 70 ? "stroke-amber-500" : "stroke-blue-500 dark:stroke-blue-400")}
+        className={cn(pct >= 90 ? "stroke-shape-red" : pct >= 70 ? "stroke-shape-yellow" : "stroke-primary")}
         strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100}
       />
     </svg>
@@ -50,14 +49,13 @@ function Ring({ pct }: { pct: number }) {
 }
 
 /**
- * Modal « façon Claude » sous l'input du chat : **fenêtre de contexte** + **utilisation du forfait**
- * (conso du mois vs plafond du plan, avec réinitialisation), modèle + refresh en pied, CTA détails/upgrade.
+ * Modal « façon Claude » sous l'input du chat : **fenêtre de contexte** + **consommation du mois**
+ * (vs le plafond de l'instance s'il y en a un, avec réinitialisation), modèle + refresh en pied.
  * Auto-porté (pas de portail) pour rester bien positionné dans le panneau flottant.
  */
 export function CortexUsage({ sessionTokens, className }: { sessionTokens: number; className?: string }) {
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
-  const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
   const openSettings = useSettingsStore((s) => s.openSettings)
 
   const [open, setOpen] = useState(false)
@@ -159,14 +157,14 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
 
           <div className="h-px bg-border" />
 
-          {/* Utilisation du forfait */}
+          {/* Utilisation du mois */}
           <div className="p-3">
             <button
               type="button"
               onClick={openDetails}
               className="flex w-full items-center justify-between text-left text-xs font-semibold transition-colors hover:text-foreground"
             >
-              <span>Plan usage · <span className="uppercase text-muted-foreground">{usage?.plan ?? "…"}</span></span>
+              <span>Monthly usage</span>
               <ChevronRight className="size-3 text-muted-foreground" />
             </button>
 
@@ -215,13 +213,6 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
                 className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium transition-colors hover:bg-muted"
               >
                 <ExternalLink className="size-3" /> Details
-              </button>
-              <button
-                type="button"
-                onClick={() => { setOpen(false); openUpgrade() }}
-                className="flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
-              >
-                <Zap className="size-3" /> Upgrade
               </button>
             </div>
           </div>

@@ -47,26 +47,17 @@ export interface AuthResponse {
 export interface OtpResponse {
   message: string;
   expiresIn?: number;
-  checkoutSessionUrl?: string;
 }
 
 /**
- * Réponse d'inscription (étape 1)
+ * Réponse d'inscription (étape 1). `otpSent` faux : l'instance ne vérifie pas les adresses (pas de SMTP), le
+ * compte est déjà prêt.
  */
 export interface RegisterResponse {
-  userId: string;
-  email: string;
-}
-
-/**
- * Réponse de sélection de plan (étape 2)
- */
-export interface SelectPlanResponse {
-  email: string;
-  planType: string;
-  /** Présent uniquement pour un plan payant : redirection vers Stripe Checkout. */
-  stripeCheckoutUrl?: string;
   message: string;
+  email: string;
+  otpSent: boolean;
+  otpExpiresInMinutes?: number | null;
 }
 
 /**
@@ -76,7 +67,6 @@ export interface VerifyOtpResponse {
   verified: boolean;
   message: string;
   authData?: AuthResponse;
-  checkoutSessionUrl?: string;
 }
 
 /**
@@ -216,7 +206,7 @@ export const authService = {
 
   /**
    * Inscription utilisateur (Étape 1)
-   * @param data - Données d'inscription avec plan
+   * @param data - Données d'inscription
    * @returns ID utilisateur et email
    */
   async register(data: RegisterCredentials): Promise<RegisterResponse> {
@@ -229,22 +219,7 @@ export const authService = {
   },
 
   /**
-   * Sélection du plan (Étape 2)
-   * @param email - Email utilisateur
-   * @param planType - Type de plan (FREE, PRO, ENTERPRISE)
-   * @returns URL Stripe si plan payant
-   */
-  async selectPlan(email: string, planType: string): Promise<SelectPlanResponse> {
-    try {
-      const response = await apiClient.post<{ success: boolean; message: string; data: SelectPlanResponse }>(AUTH_ROUTES.SELECT_PLAN, { email, planType });
-      return response.data.data;
-    } catch (error) {
-      throw new Error(getErrorMessage(error));
-    }
-  },
-
-  /**
-   * Vérification du code OTP (Étape 3)
+   * Vérification du code OTP (Étape 2)
    * @param email - Email utilisateur
    * @param otp - Code OTP à 6 chiffres
    * @returns Données d'authentification si succès
@@ -297,7 +272,7 @@ export const authService = {
       // Seul `message` est consommé ici : la charge utile `data` reste volontairement non typée
       // (`unknown`) pour signaler qu'elle n'est pas exploitée côté client.
       const response = await apiClient.post<{ success: boolean; message: string; data: unknown }>(AUTH_ROUTES.FORGOT_PASSWORD, { email });
-      return { message: response.data.message || "Email envoyé" };
+      return { message: response.data.message || "Email sent" };
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
@@ -318,7 +293,7 @@ export const authService = {
         otpCode, 
         newPassword 
       });
-      return { message: response.data.message || "Mot de passe réinitialisé" };
+      return { message: response.data.message || "Password reset" };
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }

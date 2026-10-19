@@ -1,19 +1,12 @@
 package com.taskforce.tf_api.core.service;
 
-import com.stripe.exception.StripeException;
-import com.stripe.model.Customer;
 import com.taskforce.tf_api.core.dto.request.LoginRequest;
 import com.taskforce.tf_api.core.dto.request.RegisterRequest;
-import com.taskforce.tf_api.core.dto.request.SelectPlanRequest;
 import com.taskforce.tf_api.core.dto.request.VerifyOtpRequest;
 import com.taskforce.tf_api.core.dto.response.AuthResponse;
 import com.taskforce.tf_api.core.dto.response.RegisterResponse;
-import com.taskforce.tf_api.core.dto.response.SelectPlanResponse;
 import com.taskforce.tf_api.core.dto.response.VerifyOtpResponse;
-import com.taskforce.tf_api.core.dto.response.VerifySessionResponse;
 import com.taskforce.tf_api.core.enums.OtpType;
-import com.taskforce.tf_api.core.enums.PlanStatus;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.OtpVerification;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -61,9 +54,6 @@ class AuthServiceTest {
 
     @Mock
     private OtpService otpService;
-
-    @Mock
-    private StripeService stripeService;
 
     @Mock
     private EmailService emailService;
@@ -116,7 +106,52 @@ class AuthServiceTest {
 
         @BeforeEach
         void setUp() {
-            registerRequest = TestDataBuilder.buildRegisterRequest(TEST_EMAIL, PlanType.FREE);
+            registerRequest = TestDataBuilder.buildRegisterRequest(TEST_EMAIL);
+        }
+
+        @Test
+        @DisplayName("sans vérification d'e-mail (instance sans SMTP) : compte prêt tout de suite, aucun code envoyé")
+        void register_withoutEmailVerification_completesTheAccountAtOnce() {
+            org.springframework.test.util.ReflectionTestUtils.setField(authService, "signupEmailVerification", false);
+            UserRepresentation created = TestDataBuilder.buildKeycloakUser(TEST_EMAIL, "Test", "User", false);
+            created.setId(TEST_KEYCLOAK_ID);
+            when(userRepository.existsByEmail(TEST_EMAIL)).thenReturn(false);
+            when(keycloakService.emailExists(TEST_EMAIL)).thenReturn(false);
+            when(keycloakService.createUser(anyString(), anyString(), anyString(), anyString())).thenReturn(TEST_KEYCLOAK_ID);
+            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(created);
+            when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+            RegisterResponse response = authService.register(registerRequest);
+
+            assertThat(response.isOtpSent()).isFalse();
+            assertThat(response.getMessage()).contains("You can now sign in");
+            verify(keycloakService).verifyEmail(TEST_KEYCLOAK_ID);
+            verify(userRepository).save(userCaptor.capture());
+            assertThat(userCaptor.getValue().getEmail()).isEqualTo(TEST_EMAIL);
+            verify(workspaceService).createWorkspace(userCaptor.getValue(), "Test");
+            verifyNoInteractions(otpService);
+            // Pas de SMTP : pas d'e-mail de bienvenue tenté.
+            verify(emailService, never()).sendWelcomeEmail(anyString(), anyString());
+        }
+
+        @Test
+        @DisplayName("sans vérification d'e-mail : un compte Keycloak resté non vérifié prend le mot de passe saisi")
+        void register_withoutEmailVerification_takesOverAnUnverifiedAccount() {
+            org.springframework.test.util.ReflectionTestUtils.setField(authService, "signupEmailVerification", false);
+            UserRepresentation pending = TestDataBuilder.buildKeycloakUser(TEST_EMAIL, "Old", "Name", false);
+            pending.setId(TEST_KEYCLOAK_ID);
+            when(userRepository.existsByEmail(TEST_EMAIL)).thenReturn(false);
+            when(keycloakService.emailExists(TEST_EMAIL)).thenReturn(true);
+            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(pending);
+            when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+            RegisterResponse response = authService.register(registerRequest);
+
+            assertThat(response.isOtpSent()).isFalse();
+            verify(keycloakService).updatePassword(TEST_KEYCLOAK_ID, registerRequest.getPassword());
+            verify(keycloakService).updateUserNames(TEST_KEYCLOAK_ID, registerRequest.getFirstName(), registerRequest.getLastName());
+            verify(keycloakService).verifyEmail(TEST_KEYCLOAK_ID);
+            verify(keycloakService, never()).createUser(anyString(), anyString(), anyString(), anyString());
         }
 
         @Test
@@ -127,7 +162,7 @@ class AuthServiceTest {
             when(keycloakService.emailExists(TEST_EMAIL)).thenReturn(false);
             when(keycloakService.createUser(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(TEST_KEYCLOAK_ID);
-            when(otpService.generateAndSendOtp(anyString(), anyString(), any(), any(), anyString(), any()))
+            when(otpService.generateAndSendOtp(anyString(), anyString(), any(), any(), anyString()))
                 .thenReturn(TestDataBuilder.buildOtp());
 
             // When
@@ -137,7 +172,7 @@ class AuthServiceTest {
             assertThat(response).isNotNull();
             assertThat(response.isOtpSent()).isTrue();
             assertThat(response.getEmail()).isEqualTo(TEST_EMAIL);
-            assertThat(response.getMessage()).contains("code de vérification");
+            assertThat(response.getMessage()).contains("verification code");
 
             verify(keycloakService).createUser(
                 TEST_EMAIL,
@@ -150,8 +185,7 @@ class AuthServiceTest {
                 eq(registerRequest.getFirstName()),
                 eq(OtpType.EMAIL_VERIFICATION),
                 isNull(),
-                eq(TEST_KEYCLOAK_ID),
-                eq(PlanType.FREE)
+                eq(TEST_KEYCLOAK_ID)
             );
         }
 
@@ -165,7 +199,7 @@ class AuthServiceTest {
             when(userRepository.existsByEmail(TEST_EMAIL)).thenReturn(false);
             when(keycloakService.emailExists(TEST_EMAIL)).thenReturn(true);
             when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-            when(otpService.generateAndSendOtp(anyString(), anyString(), any(), any(), anyString(), any()))
+            when(otpService.generateAndSendOtp(anyString(), anyString(), any(), any(), anyString()))
                 .thenReturn(TestDataBuilder.buildOtp());
 
             // When
@@ -181,8 +215,7 @@ class AuthServiceTest {
                 eq("Test"), // Prénom de Keycloak
                 eq(OtpType.EMAIL_VERIFICATION),
                 isNull(),
-                eq(TEST_KEYCLOAK_ID),
-                eq(PlanType.FREE)
+                eq(TEST_KEYCLOAK_ID)
             );
         }
 
@@ -199,9 +232,9 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.register(registerRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("déjà vérifié");
+                .hasMessageContaining("already verified");
 
-            verify(otpService, never()).generateAndSendOtp(anyString(), anyString(), any(), any(), anyString(), any());
+            verify(otpService, never()).generateAndSendOtp(anyString(), anyString(), any(), any(), anyString());
         }
 
         @Test
@@ -213,7 +246,7 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.register(registerRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("déjà utilisé");
+                .hasMessageContaining("already in use");
 
             verify(keycloakService, never()).createUser(anyString(), anyString(), anyString(), anyString());
         }
@@ -225,16 +258,16 @@ class AuthServiceTest {
             // Keycloak et l'envoi de courriels. La contrôler après aurait laissé passer le coût
             // qu'elle est censée éviter.
             when(humanChallengeService.verify(any()))
-                .thenReturn("Formulaire soumis trop rapidement. Réessayez.");
+                .thenReturn("The form was submitted too quickly. Please try again.");
 
             assertThatThrownBy(() -> authService.register(registerRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("trop rapidement");
+                .hasMessageContaining("too quickly");
 
             verify(userRepository, never()).existsByEmail(anyString());
             verify(keycloakService, never()).createUser(anyString(), anyString(), anyString(), anyString());
             verify(otpService, never())
-                .generateAndSendOtp(anyString(), anyString(), any(), any(), anyString(), any());
+                .generateAndSendOtp(anyString(), anyString(), any(), any(), anyString());
         }
 
         @Test
@@ -249,7 +282,7 @@ class AuthServiceTest {
             when(keycloakService.createUser(anyString(), anyString(), anyString(), anyString()))
                 .thenThrow(new RuntimeException("User exists with same username"));
             when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-            when(otpService.generateAndSendOtp(anyString(), anyString(), any(), any(), anyString(), any()))
+            when(otpService.generateAndSendOtp(anyString(), anyString(), any(), any(), anyString()))
                 .thenReturn(TestDataBuilder.buildOtp());
 
             // When
@@ -260,7 +293,7 @@ class AuthServiceTest {
             assertThat(response.isOtpSent()).isTrue();
 
             verify(keycloakService).getUserByEmail(TEST_EMAIL);
-            verify(otpService).generateAndSendOtp(anyString(), anyString(), any(), any(), anyString(), any());
+            verify(otpService).generateAndSendOtp(anyString(), anyString(), any(), any(), anyString());
         }
 
         @Test
@@ -278,7 +311,7 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.register(registerRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("déjà vérifié");
+                .hasMessageContaining("already verified");
         }
 
         @Test
@@ -298,87 +331,6 @@ class AuthServiceTest {
     }
 
     @Nested
-    @DisplayName("SelectPlan Tests")
-    class SelectPlanTests {
-
-        private SelectPlanRequest selectPlanRequest;
-
-        @BeforeEach
-        void setUp() {
-            selectPlanRequest = TestDataBuilder.buildSelectPlanRequest(TEST_EMAIL, "BUSINESS");
-        }
-
-        @Test
-        @DisplayName("devrait enregistrer le plan sélectionné avec succès")
-        void selectPlan_shouldStorePlan_whenValidRequest() {
-            // Given
-            UserRepresentation keycloakUser = TestDataBuilder.buildKeycloakUser(TEST_EMAIL, "Test", "User", false);
-            keycloakUser.setId(TEST_KEYCLOAK_ID);
-
-            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-            when(otpService.updatePlanType(TEST_EMAIL, TEST_KEYCLOAK_ID, "BUSINESS")).thenReturn(true);
-
-            // When
-            SelectPlanResponse response = authService.selectPlan(selectPlanRequest);
-
-            // Then
-            assertThat(response).isNotNull();
-            assertThat(response.getEmail()).isEqualTo(TEST_EMAIL);
-            assertThat(response.getPlanType()).isEqualTo("BUSINESS");
-            assertThat(response.isOtpSent()).isTrue();
-            assertThat(response.getMessage()).contains("Plan sélectionné");
-
-            verify(otpService).updatePlanType(TEST_EMAIL, TEST_KEYCLOAK_ID, "BUSINESS");
-        }
-
-        @Test
-        @DisplayName("devrait lancer exception si utilisateur non trouvé")
-        void selectPlan_shouldThrowException_whenUserNotFound() {
-            // Given
-            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(null);
-
-            // When/Then
-            assertThatThrownBy(() -> authService.selectPlan(selectPlanRequest))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("non trouvé");
-
-            verify(otpService, never()).updatePlanType(anyString(), anyString(), anyString());
-        }
-
-        @Test
-        @DisplayName("devrait lancer exception si email déjà vérifié")
-        void selectPlan_shouldThrowException_whenEmailAlreadyVerified() {
-            // Given
-            UserRepresentation keycloakUser = TestDataBuilder.buildKeycloakUser(TEST_EMAIL, "Test", "User", true);
-
-            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-
-            // When/Then
-            assertThatThrownBy(() -> authService.selectPlan(selectPlanRequest))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("déjà vérifié");
-
-            verify(otpService, never()).updatePlanType(anyString(), anyString(), anyString());
-        }
-
-        @Test
-        @DisplayName("devrait lancer exception si OTP non trouvé")
-        void selectPlan_shouldThrowException_whenOtpNotFound() {
-            // Given
-            UserRepresentation keycloakUser = TestDataBuilder.buildKeycloakUser(TEST_EMAIL, "Test", "User", false);
-            keycloakUser.setId(TEST_KEYCLOAK_ID);
-
-            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-            when(otpService.updatePlanType(TEST_EMAIL, TEST_KEYCLOAK_ID, "BUSINESS")).thenReturn(false);
-
-            // When/Then
-            assertThatThrownBy(() -> authService.selectPlan(selectPlanRequest))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Code OTP introuvable");
-        }
-    }
-
-    @Nested
     @DisplayName("VerifyOtp Tests")
     class VerifyOtpTests {
 
@@ -393,12 +345,11 @@ class AuthServiceTest {
             keycloakUser.setId(TEST_KEYCLOAK_ID);
             otpVerification = TestDataBuilder.buildOtp(TEST_EMAIL, TEST_OTP_CODE, OtpType.EMAIL_VERIFICATION);
             otpVerification.setKeycloakId(TEST_KEYCLOAK_ID);
-            otpVerification.setPlanType(PlanType.FREE.toString());
         }
 
         @Test
-        @DisplayName("devrait créer utilisateur avec plan FREE et générer tokens")
-        void verifyOtp_shouldCreateUserWithFreePlan_whenOtpValid() {
+        @DisplayName("devrait créer l'utilisateur et son workspace, puis renvoyer vers la connexion")
+        void verifyOtp_shouldCreateUser_whenOtpValid() {
             // Given
             when(otpService.verifyOtpAndGetDetails(TEST_EMAIL, TEST_OTP_CODE)).thenReturn(otpVerification);
             when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
@@ -408,6 +359,7 @@ class AuthServiceTest {
                 user.setId(1L);
                 return user;
             });
+            when(emailService.isEnabled()).thenReturn(true);
             doNothing().when(emailService).sendWelcomeEmail(anyString(), anyString());
 
             // When
@@ -416,7 +368,6 @@ class AuthServiceTest {
             // Then
             assertThat(response).isNotNull();
             assertThat(response.getVerified()).isTrue();
-            assertThat(response.getCheckoutSessionUrl()).isNull(); // FREE = pas de checkout
             // Migration OIDC : plus d'auto-login post-inscription → redirection vers /login.
             assertThat(response.getAuthData()).isNull();
 
@@ -425,91 +376,9 @@ class AuthServiceTest {
             verify(emailService).sendWelcomeEmail(TEST_EMAIL, "Test");
 
             User savedUser = userCaptor.getValue();
-            assertThat(savedUser.getPlanType()).isEqualTo(PlanType.FREE);
-            assertThat(savedUser.getPlanStatus()).isNull(); // FREE n'a pas de status
             assertThat(savedUser.getEmail()).isEqualTo(TEST_EMAIL);
-        }
-
-        @Test
-        @DisplayName("devrait retourner URL checkout pour plan PRO")
-        void verifyOtp_shouldReturnCheckoutUrl_whenProPlan() throws StripeException {
-            // Given
-            otpVerification.setPlanType(PlanType.BUSINESS.toString());
-
-            Customer stripeCustomer = new Customer();
-            stripeCustomer.setId("cus_123");
-
-            com.stripe.model.checkout.Session checkoutSession = new com.stripe.model.checkout.Session();
-            checkoutSession.setUrl("https://checkout.stripe.com/session123");
-
-            when(otpService.verifyOtpAndGetDetails(TEST_EMAIL, TEST_OTP_CODE)).thenReturn(otpVerification);
-            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-            doNothing().when(keycloakService).verifyEmail(TEST_KEYCLOAK_ID);
-            when(stripeService.createCustomer(anyString(), anyString())).thenReturn(stripeCustomer);
-            when(stripeService.getPriceIdForPlan("BUSINESS")).thenReturn("price_pro");
-            when(stripeService.createCheckoutSession(any(), any(), any(), any(), any()))
-                .thenReturn(checkoutSession);
-            when(userRepository.save(any(User.class))).thenAnswer(i -> {
-                User user = i.getArgument(0);
-                user.setId(1L);
-                return user;
-            });
-            doNothing().when(emailService).sendWelcomeEmail(anyString(), anyString());
-
-            // When
-            VerifyOtpResponse response = authService.verifyOtpAndCompleteRegistration(verifyRequest);
-
-            // Then
-            assertThat(response).isNotNull();
-            assertThat(response.getVerified()).isTrue();
-            assertThat(response.getCheckoutSessionUrl()).isEqualTo("https://checkout.stripe.com/session123");
-
-            verify(stripeService).createCustomer(TEST_EMAIL, "Test User");
-            verify(userRepository).save(userCaptor.capture());
-
-            User savedUser = userCaptor.getValue();
-            // L'utilisateur est créé en FREE ; le forfait payant n'est accordé qu'après paiement (webhook).
-            assertThat(savedUser.getPlanType()).isEqualTo(PlanType.FREE);
-            assertThat(savedUser.getPlanStatus()).isNull();
-            assertThat(savedUser.getStripeCustomerId()).isEqualTo("cus_123");
-        }
-
-        @Test
-        @DisplayName("devrait retourner URL checkout pour plan ENTERPRISE")
-        void verifyOtp_shouldReturnCheckoutUrl_whenEnterprisePlan() throws StripeException {
-            // Given
-            otpVerification.setPlanType(PlanType.ENTERPRISE.toString());
-
-            Customer stripeCustomer = new Customer();
-            stripeCustomer.setId("cus_456");
-
-            com.stripe.model.checkout.Session checkoutSession = new com.stripe.model.checkout.Session();
-            checkoutSession.setUrl("https://checkout.stripe.com/business");
-
-            when(otpService.verifyOtpAndGetDetails(TEST_EMAIL, TEST_OTP_CODE)).thenReturn(otpVerification);
-            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-            doNothing().when(keycloakService).verifyEmail(TEST_KEYCLOAK_ID);
-            when(stripeService.createCustomer(anyString(), anyString())).thenReturn(stripeCustomer);
-            when(stripeService.getPriceIdForPlan("ENTERPRISE")).thenReturn("price_enterprise");
-            when(stripeService.createCheckoutSession(any(), any(), any(), any(), any()))
-                .thenReturn(checkoutSession);
-            when(userRepository.save(any(User.class))).thenAnswer(i -> {
-                User user = i.getArgument(0);
-                user.setId(1L);
-                return user;
-            });
-            doNothing().when(emailService).sendWelcomeEmail(anyString(), anyString());
-
-            // When
-            VerifyOtpResponse response = authService.verifyOtpAndCompleteRegistration(verifyRequest);
-
-            // Then
-            assertThat(response).isNotNull();
-            assertThat(response.getCheckoutSessionUrl()).isNotNull();
-
-            verify(userRepository).save(userCaptor.capture());
-            // Créé en FREE jusqu'au paiement (le checkout est tout de même retourné).
-            assertThat(userCaptor.getValue().getPlanType()).isEqualTo(PlanType.FREE);
+            assertThat(savedUser.getIsActive()).isTrue();
+            verify(workspaceService).createWorkspace(savedUser, "Test");
         }
 
         @Test
@@ -521,41 +390,9 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.verifyOtpAndCompleteRegistration(verifyRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("invalide ou expiré");
+                .hasMessageContaining("Invalid or expired");
 
             verify(userRepository, never()).save(any(User.class));
-        }
-
-        @Test
-        @DisplayName("devrait lancer exception si plan non sélectionné")
-        void verifyOtp_shouldThrowException_whenPlanNotSelected() {
-            // Given
-            otpVerification.setPlanType(null);
-            when(otpService.verifyOtpAndGetDetails(TEST_EMAIL, TEST_OTP_CODE)).thenReturn(otpVerification);
-
-            // When/Then
-            assertThatThrownBy(() -> authService.verifyOtpAndCompleteRegistration(verifyRequest))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Plan non sélectionné");
-
-            verify(userRepository, never()).save(any(User.class));
-        }
-
-        @Test
-        @DisplayName("devrait lancer exception si erreur Stripe")
-        void verifyOtp_shouldThrowException_whenStripeError() throws StripeException {
-            // Given
-            otpVerification.setPlanType(PlanType.BUSINESS.toString());
-
-            when(otpService.verifyOtpAndGetDetails(TEST_EMAIL, TEST_OTP_CODE)).thenReturn(otpVerification);
-            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-            when(stripeService.createCustomer(anyString(), anyString()))
-                .thenThrow(new StripeException("Payment error", null, null, 500) {});
-
-            // When/Then
-            assertThatThrownBy(() -> authService.verifyOtpAndCompleteRegistration(verifyRequest))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("paiement");
         }
     }
 
@@ -573,7 +410,7 @@ class AuthServiceTest {
             loginRequest = TestDataBuilder.buildLoginRequest(TEST_EMAIL, "Password123!");
             keycloakUser = TestDataBuilder.buildKeycloakUser(TEST_EMAIL, "Test", "User", true);
             keycloakUser.setId(TEST_KEYCLOAK_ID);
-            user = TestDataBuilder.buildUser(TEST_EMAIL, PlanType.FREE);
+            user = TestDataBuilder.buildUser(TEST_EMAIL);
             user.setKeycloakId(TEST_KEYCLOAK_ID);
             
             keycloakToken = KeycloakTokenResponse.builder()
@@ -616,7 +453,7 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("vérifier votre email");
+                .hasMessageContaining("verify your email");
 
             verify(userRepository, never()).findByKeycloakId(anyString());
         }
@@ -634,7 +471,7 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("désactivé");
+                .hasMessageContaining("disabled");
         }
 
         @Test
@@ -659,7 +496,6 @@ class AuthServiceTest {
             verify(userRepository).save(userCaptor.capture());
             User createdUser = userCaptor.getValue();
             assertThat(createdUser.getEmail()).isEqualTo(TEST_EMAIL);
-            assertThat(createdUser.getPlanType()).isEqualTo(PlanType.FREE);
             assertThat(createdUser.getIsActive()).isTrue();
         }
 
@@ -667,7 +503,7 @@ class AuthServiceTest {
         @DisplayName("devrait lancer exception si credentials invalides")
         void login_shouldThrowException_whenInvalidCredentials() {
             // Given
-            doThrow(new RuntimeException("Email ou mot de passe incorrect"))
+            doThrow(new RuntimeException("Invalid email or password"))
                 .when(keycloakAuthService).authenticate(TEST_EMAIL, "WrongPassword");
 
             loginRequest = TestDataBuilder.buildLoginRequest(TEST_EMAIL, "WrongPassword");
@@ -675,7 +511,7 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Email ou mot de passe incorrect");
+                .hasMessageContaining("Invalid email or password");
 
             verify(userRepository, never()).findByKeycloakId(anyString());
         }
@@ -718,12 +554,12 @@ class AuthServiceTest {
             when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
             when(userRepository.findByKeycloakId(TEST_KEYCLOAK_ID)).thenReturn(Optional.of(user));
             when(twoFactorService.isEnabled(user.getId())).thenReturn(true);
-            doThrow(new BusinessException("Code d'authentification invalide"))
+            doThrow(new BusinessException("Invalid authentication code"))
                 .when(twoFactorService).verifyOrThrow(user.getId(), "000000");
 
             assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("invalide");
+                .hasMessageContaining("Invalid authentication code");
         }
     }
 
@@ -732,23 +568,19 @@ class AuthServiceTest {
     class ResendOtpTests {
 
         private UserRepresentation keycloakUser;
-        private OtpVerification existingOtp;
 
         @BeforeEach
         void setUp() {
             keycloakUser = TestDataBuilder.buildKeycloakUser(TEST_EMAIL, "Test", "User", false);
             keycloakUser.setId(TEST_KEYCLOAK_ID);
-            existingOtp = TestDataBuilder.buildOtp(TEST_EMAIL, "999999", OtpType.EMAIL_VERIFICATION);
-            existingOtp.setPlanType(PlanType.BUSINESS.toString());
         }
 
         @Test
-        @DisplayName("devrait renvoyer OTP avec le plan précédemment sélectionné")
-        void resendOtp_shouldSendNewOtp_withPreviousPlan() {
+        @DisplayName("devrait renvoyer un nouveau code de vérification")
+        void resendOtp_shouldSendNewOtp() {
             // Given
             when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-            when(otpService.getLatestOtp(TEST_EMAIL)).thenReturn(existingOtp);
-            when(otpService.generateAndSendOtp(anyString(), anyString(), any(), any(), anyString(), any()))
+            when(otpService.generateAndSendOtp(anyString(), anyString(), any(), any(), anyString()))
                 .thenReturn(TestDataBuilder.buildOtp());
 
             // When
@@ -757,40 +589,14 @@ class AuthServiceTest {
             // Then
             assertThat(response).isNotNull();
             assertThat(response.isOtpSent()).isTrue();
-            assertThat(response.getMessage()).contains("nouveau code");
+            assertThat(response.getMessage()).contains("new verification code");
 
             verify(otpService).generateAndSendOtp(
                 eq(TEST_EMAIL),
                 eq("Test"),
                 eq(OtpType.EMAIL_VERIFICATION),
                 isNull(),
-                eq(TEST_KEYCLOAK_ID),
-                eq(PlanType.BUSINESS)
-            );
-        }
-
-        @Test
-        @DisplayName("devrait renvoyer OTP sans plan si aucun OTP précédent")
-        void resendOtp_shouldSendOtpWithoutPlan_whenNoPreviousOtp() {
-            // Given
-            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-            when(otpService.getLatestOtp(TEST_EMAIL)).thenReturn(null);
-            when(otpService.generateAndSendOtp(anyString(), anyString(), any(), any(), anyString(), any()))
-                .thenReturn(TestDataBuilder.buildOtp());
-
-            // When
-            RegisterResponse response = authService.resendOtp(TEST_EMAIL);
-
-            // Then
-            assertThat(response).isNotNull();
-
-            verify(otpService).generateAndSendOtp(
-                eq(TEST_EMAIL),
-                eq("Test"),
-                eq(OtpType.EMAIL_VERIFICATION),
-                isNull(),
-                eq(TEST_KEYCLOAK_ID),
-                isNull()
+                eq(TEST_KEYCLOAK_ID)
             );
         }
 
@@ -804,9 +610,9 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.resendOtp(TEST_EMAIL))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("déjà vérifié");
+                .hasMessageContaining("already verified");
 
-            verify(otpService, never()).generateAndSendOtp(anyString(), anyString(), any(), any(), anyString(), any());
+            verify(otpService, never()).generateAndSendOtp(anyString(), anyString(), any(), any(), anyString());
         }
     }
 
@@ -826,9 +632,10 @@ class AuthServiceTest {
         @DisplayName("devrait envoyer OTP de reset password si utilisateur existe")
         void forgotPassword_shouldSendOtp_whenUserExists() {
             // Given
+            when(emailService.isEnabled()).thenReturn(true);
             when(keycloakService.emailExists(TEST_EMAIL)).thenReturn(true);
             when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-            when(otpService.generateAndSendOtp(anyString(), anyString(), any(), any(), anyString(), any()))
+            when(otpService.generateAndSendOtp(anyString(), anyString(), any(), any(), anyString()))
                 .thenReturn(TestDataBuilder.buildOtp());
 
             // When
@@ -840,8 +647,7 @@ class AuthServiceTest {
                 eq("Test"),
                 eq(OtpType.PASSWORD_RESET),
                 isNull(),
-                eq(TEST_KEYCLOAK_ID),
-                isNull()
+                eq(TEST_KEYCLOAK_ID)
             );
         }
 
@@ -849,14 +655,27 @@ class AuthServiceTest {
         @DisplayName("devrait lancer exception si utilisateur non trouvé")
         void forgotPassword_shouldThrowException_whenUserNotFound() {
             // Given
+            when(emailService.isEnabled()).thenReturn(true);
             when(keycloakService.emailExists(TEST_EMAIL)).thenReturn(false);
 
             // When/Then
             assertThatThrownBy(() -> authService.forgotPassword(TEST_EMAIL))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Aucun compte");
+                .hasMessageContaining("No account");
 
-            verify(otpService, never()).generateAndSendOtp(anyString(), anyString(), any(), any(), anyString(), any());
+            verify(otpService, never()).generateAndSendOtp(anyString(), anyString(), any(), any(), anyString());
+        }
+
+        @Test
+        @DisplayName("sans SMTP : message clair, aucun code généré ni compte cherché")
+        void forgotPassword_withoutSmtp_saysItIsNotAvailable() {
+            when(emailService.isEnabled()).thenReturn(false);
+
+            assertThatThrownBy(() -> authService.forgotPassword(TEST_EMAIL))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ask an administrator");
+
+            verifyNoInteractions(keycloakService, otpService);
         }
     }
 
@@ -900,154 +719,9 @@ class AuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> authService.resetPassword(TEST_EMAIL, "WRONGCODE", "NewPassword123!"))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("invalide ou expiré");
+                .hasMessageContaining("Invalid or expired");
 
             verify(keycloakService, never()).updatePassword(anyString(), anyString());
-        }
-    }
-
-    @Nested
-    @DisplayName("CompleteAfterPayment Tests")
-    class CompleteAfterPaymentTests {
-
-        private com.stripe.model.checkout.Session stripeSession;
-        private com.stripe.model.Customer stripeCustomer;
-        private OtpVerification otpVerification;
-        private UserRepresentation keycloakUser;
-
-        @BeforeEach
-        void setUp() {
-            stripeSession = new com.stripe.model.checkout.Session();
-            stripeSession.setPaymentStatus("paid");
-            stripeSession.setCustomer("cus_123");
-            stripeSession.setSubscription("sub_123");
-
-            stripeCustomer = new com.stripe.model.Customer();
-            stripeCustomer.setEmail(TEST_EMAIL);
-
-            otpVerification = TestDataBuilder.buildOtp(TEST_EMAIL, TEST_OTP_CODE, OtpType.EMAIL_VERIFICATION);
-            otpVerification.setKeycloakId(TEST_KEYCLOAK_ID);
-            otpVerification.setPlanType(PlanType.BUSINESS.toString());
-
-            keycloakUser = TestDataBuilder.buildKeycloakUser(TEST_EMAIL, "Test", "User", false);
-            keycloakUser.setId(TEST_KEYCLOAK_ID);
-        }
-
-        @Test
-        @DisplayName("devrait créer utilisateur avec plan ACTIVE après paiement")
-        void completeAfterPayment_shouldCreateUser_whenSessionValid() throws StripeException {
-            // Given
-            when(stripeService.getCheckoutSession("session_123")).thenReturn(stripeSession);
-            when(stripeService.retrieveCustomer("cus_123")).thenReturn(stripeCustomer);
-            when(otpService.getLatestOtp(TEST_EMAIL)).thenReturn(otpVerification);
-            when(userRepository.existsByEmail(TEST_EMAIL)).thenReturn(false);
-            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-            doNothing().when(keycloakService).verifyEmail(TEST_KEYCLOAK_ID);
-            when(userRepository.save(any(User.class))).thenAnswer(i -> {
-                User user = i.getArgument(0);
-                user.setId(1L);
-                return user;
-            });
-            doNothing().when(emailService).sendWelcomeEmail(anyString(), anyString());
-
-            // When
-            VerifySessionResponse response = authService.completeRegistrationAfterPayment("session_123");
-
-            // Then
-            assertThat(response).isNotNull();
-            assertThat(response.getEmail()).isEqualTo(TEST_EMAIL);
-            assertThat(response.getPlanType()).isEqualTo("BUSINESS");
-            assertThat(response.isUserCreated()).isTrue();
-            assertThat(response.getSubscriptionId()).isEqualTo("sub_123");
-
-            verify(keycloakService).verifyEmail(TEST_KEYCLOAK_ID);
-            verify(userRepository).save(userCaptor.capture());
-            verify(emailService).sendWelcomeEmail(TEST_EMAIL, "Test");
-
-            User savedUser = userCaptor.getValue();
-            assertThat(savedUser.getPlanType()).isEqualTo(PlanType.BUSINESS);
-            assertThat(savedUser.getPlanStatus()).isEqualTo(PlanStatus.ACTIVE);
-            assertThat(savedUser.getStripeCustomerId()).isEqualTo("cus_123");
-            assertThat(savedUser.getStripeSubscriptionId()).isEqualTo("sub_123");
-        }
-
-        @Test
-        @DisplayName("devrait mettre à jour utilisateur existant avec infos paiement")
-        void completeAfterPayment_shouldUpdateUser_whenAlreadyExists() throws StripeException {
-            // Given
-            User existingUser = TestDataBuilder.buildUser(TEST_EMAIL, PlanType.BUSINESS);
-            existingUser.setPlanStatus(PlanStatus.TRIALING);
-
-            when(stripeService.getCheckoutSession("session_123")).thenReturn(stripeSession);
-            when(stripeService.retrieveCustomer("cus_123")).thenReturn(stripeCustomer);
-            // Plus de stub OTP : pour un utilisateur DÉJÀ en base, le forfait vient des métadonnées de
-            // session (upgrade in-app), plus de l'OTP → getLatestOtp n'est jamais appelé sur ce chemin.
-            when(userRepository.existsByEmail(TEST_EMAIL)).thenReturn(true);
-            when(userRepository.findByEmail(TEST_EMAIL)).thenReturn(Optional.of(existingUser));
-            when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
-
-            // When
-            VerifySessionResponse response = authService.completeRegistrationAfterPayment("session_123");
-
-            // Then
-            assertThat(response).isNotNull();
-            assertThat(response.isUserCreated()).isFalse();
-            assertThat(response.getMessage()).contains("abonnement est maintenant actif");
-
-            verify(userRepository).save(userCaptor.capture());
-            User updatedUser = userCaptor.getValue();
-            assertThat(updatedUser.getPlanStatus()).isEqualTo(PlanStatus.ACTIVE);
-            assertThat(updatedUser.getStripeCustomerId()).isEqualTo("cus_123");
-            assertThat(updatedUser.getStripeSubscriptionId()).isEqualTo("sub_123");
-        }
-
-        @Test
-        @DisplayName("devrait lancer exception si paiement non validé")
-        void completeAfterPayment_shouldThrowException_whenPaymentNotPaid() throws StripeException {
-            // Given
-            stripeSession.setPaymentStatus("unpaid");
-            when(stripeService.getCheckoutSession("session_123")).thenReturn(stripeSession);
-
-            // When/Then
-            assertThatThrownBy(() -> authService.completeRegistrationAfterPayment("session_123"))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("paiement n'est pas encore validé");
-
-            verify(userRepository, never()).save(any(User.class));
-        }
-
-        @Test
-        @DisplayName("devrait lancer exception si données d'inscription incomplètes")
-        void completeAfterPayment_shouldThrowException_whenIncompleteData() throws StripeException {
-            // Given
-            otpVerification.setKeycloakId(null); // Données incomplètes
-
-            when(stripeService.getCheckoutSession("session_123")).thenReturn(stripeSession);
-            when(stripeService.retrieveCustomer("cus_123")).thenReturn(stripeCustomer);
-            when(otpService.getLatestOtp(TEST_EMAIL)).thenReturn(otpVerification);
-
-            // When/Then
-            assertThatThrownBy(() -> authService.completeRegistrationAfterPayment("session_123"))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Données d'inscription incomplètes");
-
-            verify(userRepository, never()).save(any(User.class));
-        }
-
-        @Test
-        @DisplayName("devrait lancer exception si aucune inscription en attente")
-        void completeAfterPayment_shouldThrowException_whenNoOtpFound() throws StripeException {
-            // Given
-            when(stripeService.getCheckoutSession("session_123")).thenReturn(stripeSession);
-            when(stripeService.retrieveCustomer("cus_123")).thenReturn(stripeCustomer);
-            when(otpService.getLatestOtp(TEST_EMAIL)).thenReturn(null);
-
-            // When/Then
-            assertThatThrownBy(() -> authService.completeRegistrationAfterPayment("session_123"))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Aucune inscription en attente");
-
-            verify(userRepository, never()).save(any(User.class));
         }
     }
 
@@ -1063,7 +737,7 @@ class AuthServiceTest {
             "expires_in", 300, "refresh_expires_in", 1800);
 
         private User existingUser(boolean twoFactor) {
-            User user = TestDataBuilder.buildUser(TEST_EMAIL, PlanType.FREE);
+            User user = TestDataBuilder.buildUser(TEST_EMAIL);
             when(userRepository.findByEmail(TEST_EMAIL)).thenReturn(Optional.of(user));
             when(twoFactorService.isEnabled(user.getId())).thenReturn(twoFactor);
             return user;

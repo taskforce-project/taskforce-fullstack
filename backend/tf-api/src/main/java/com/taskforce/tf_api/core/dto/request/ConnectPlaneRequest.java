@@ -4,6 +4,6 @@ import jakarta.validation.constraints.NotBlank;
 
 /** Connexion d'un workspace Plane (auth par clé API personnelle). */
 public record ConnectPlaneRequest(
-    @NotBlank(message = "La clé API Plane est obligatoire") String apiKey,
-    @NotBlank(message = "Le slug du workspace Plane est obligatoire") String planeWorkspace
+    @NotBlank(message = "The Plane API key is required") String apiKey,
+    @NotBlank(message = "The Plane workspace slug is required") String planeWorkspace
 ) {}

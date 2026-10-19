@@ -86,7 +86,8 @@ BEGIN
     -- 1. Reset du workspace démo (cascade : projets, issues, équipes, profils…)
     -- ----------------------------------------------------------------
     DELETE FROM workspaces WHERE slug = 'taskforce-demo';
-    -- Données non rattachées au workspace (purge re-run dédiée)
+    -- Données non rattachées au workspace, posées par les versions du seed d'avant le retrait de la
+    -- facturation et du module commercial (ADR-016) : purgées pour qu'un re-seed reparte propre.
     DELETE FROM subscription_history WHERE stripe_event_id LIKE 'seed_%';
     DELETE FROM enterprise_inquiries WHERE email LIKE '%@seedlead.example';
 
@@ -170,60 +171,60 @@ BEGIN
 
     -- ===== Projet WEB =====
     INSERT INTO projects (workspace_id, name, identifier, description, created_by, color, icon_url, growth_mode)
-    VALUES (v_ws, 'Web Application', 'WEB', 'Application web TaskForce (frontend).', v_admin, 'bg-violet-500', 'lucide:Globe', true)
+    VALUES (v_ws, 'Web Application', 'WEB', 'Application web TaskForce (frontend).', v_admin, 'bg-shape-pink', 'lucide:Globe', true)
     RETURNING id INTO v_web;
 
     INSERT INTO issue_statuses (project_id, name, color, category, position, is_default) VALUES
-        (v_web, 'Backlog',     '#94a3b8', 'BACKLOG'::issue_status_category,    0, false),
-        (v_web, 'Todo',        '#6366f1', 'UNSTARTED'::issue_status_category,  1, true),
-        (v_web, 'In Progress', '#f59e0b', 'STARTED'::issue_status_category,    2, false),
-        (v_web, 'Done',        '#10b981', 'COMPLETED'::issue_status_category,  3, false),
-        (v_web, 'Cancelled',   '#ef4444', 'CANCELLED'::issue_status_category,  4, false);
+        (v_web, 'Backlog',     '#736e67', 'BACKLOG'::issue_status_category,    0, false),
+        (v_web, 'Todo',        '#2f6bf6', 'UNSTARTED'::issue_status_category,  1, true),
+        (v_web, 'In Progress', '#ffaa0d', 'STARTED'::issue_status_category,    2, false),
+        (v_web, 'Done',        '#418b5c', 'COMPLETED'::issue_status_category,  3, false),
+        (v_web, 'Cancelled',   '#e14322', 'CANCELLED'::issue_status_category,  4, false);
     INSERT INTO issue_types (project_id, name, color, icon, is_default) VALUES
-        (v_web, 'Task',    '#6366f1', 'circle-dot', true),
-        (v_web, 'Bug',     '#ef4444', 'bug',        false),
-        (v_web, 'Feature', '#10b981', 'zap',        false);
+        (v_web, 'Task',    '#2f6bf6', 'circle-dot', true),
+        (v_web, 'Bug',     '#e14322', 'bug',        false),
+        (v_web, 'Feature', '#418b5c', 'zap',        false);
     INSERT INTO project_labels (project_id, name, color) VALUES
-        (v_web, 'react', '#06b6d4'), (v_web, 'typescript', '#3b82f6'), (v_web, 'css', '#8b5cf6'),
-        (v_web, 'ui', '#ec4899'), (v_web, 'design', '#f97316'), (v_web, 'testing', '#10b981');
+        (v_web, 'react', '#1e4fc4'), (v_web, 'typescript', '#2f6bf6'), (v_web, 'css', '#a3336c'),
+        (v_web, 'ui', '#a3336c'), (v_web, 'design', '#8a5300'), (v_web, 'testing', '#418b5c');
 
     -- ===== Projet API =====
     INSERT INTO projects (workspace_id, name, identifier, description, created_by, color, icon_url)
-    VALUES (v_ws, 'API Platform', 'API', 'Backend Spring & API.', v_admin, 'bg-blue-500', 'lucide:Database')
+    VALUES (v_ws, 'API Platform', 'API', 'Backend Spring & API.', v_admin, 'bg-shape-blue', 'lucide:Database')
     RETURNING id INTO v_api;
 
     INSERT INTO issue_statuses (project_id, name, color, category, position, is_default) VALUES
-        (v_api, 'Backlog',     '#94a3b8', 'BACKLOG'::issue_status_category,    0, false),
-        (v_api, 'Todo',        '#6366f1', 'UNSTARTED'::issue_status_category,  1, true),
-        (v_api, 'In Progress', '#f59e0b', 'STARTED'::issue_status_category,    2, false),
-        (v_api, 'Done',        '#10b981', 'COMPLETED'::issue_status_category,  3, false),
-        (v_api, 'Cancelled',   '#ef4444', 'CANCELLED'::issue_status_category,  4, false);
+        (v_api, 'Backlog',     '#736e67', 'BACKLOG'::issue_status_category,    0, false),
+        (v_api, 'Todo',        '#2f6bf6', 'UNSTARTED'::issue_status_category,  1, true),
+        (v_api, 'In Progress', '#ffaa0d', 'STARTED'::issue_status_category,    2, false),
+        (v_api, 'Done',        '#418b5c', 'COMPLETED'::issue_status_category,  3, false),
+        (v_api, 'Cancelled',   '#e14322', 'CANCELLED'::issue_status_category,  4, false);
     INSERT INTO issue_types (project_id, name, color, icon, is_default) VALUES
-        (v_api, 'Task',    '#6366f1', 'circle-dot', true),
-        (v_api, 'Bug',     '#ef4444', 'bug',        false),
-        (v_api, 'Feature', '#10b981', 'zap',        false);
+        (v_api, 'Task',    '#2f6bf6', 'circle-dot', true),
+        (v_api, 'Bug',     '#e14322', 'bug',        false),
+        (v_api, 'Feature', '#418b5c', 'zap',        false);
     INSERT INTO project_labels (project_id, name, color) VALUES
-        (v_api, 'java', '#ef4444'), (v_api, 'spring', '#10b981'), (v_api, 'api', '#6366f1'),
-        (v_api, 'sql', '#f59e0b'), (v_api, 'testing', '#06b6d4');
+        (v_api, 'java', '#e14322'), (v_api, 'spring', '#418b5c'), (v_api, 'api', '#2f6bf6'),
+        (v_api, 'sql', '#ffaa0d'), (v_api, 'testing', '#1e4fc4');
 
     -- ===== Projet OPS =====
     INSERT INTO projects (workspace_id, name, identifier, description, created_by, color, icon_url)
-    VALUES (v_ws, 'Infrastructure', 'OPS', 'Déploiement, CI/CD, monitoring.', v_admin, 'bg-emerald-500', 'lucide:Cloud')
+    VALUES (v_ws, 'Infrastructure', 'OPS', 'Déploiement, CI/CD, monitoring.', v_admin, 'bg-shape-green', 'lucide:Cloud')
     RETURNING id INTO v_ops;
 
     INSERT INTO issue_statuses (project_id, name, color, category, position, is_default) VALUES
-        (v_ops, 'Backlog',     '#94a3b8', 'BACKLOG'::issue_status_category,    0, false),
-        (v_ops, 'Todo',        '#6366f1', 'UNSTARTED'::issue_status_category,  1, true),
-        (v_ops, 'In Progress', '#f59e0b', 'STARTED'::issue_status_category,    2, false),
-        (v_ops, 'Done',        '#10b981', 'COMPLETED'::issue_status_category,  3, false),
-        (v_ops, 'Cancelled',   '#ef4444', 'CANCELLED'::issue_status_category,  4, false);
+        (v_ops, 'Backlog',     '#736e67', 'BACKLOG'::issue_status_category,    0, false),
+        (v_ops, 'Todo',        '#2f6bf6', 'UNSTARTED'::issue_status_category,  1, true),
+        (v_ops, 'In Progress', '#ffaa0d', 'STARTED'::issue_status_category,    2, false),
+        (v_ops, 'Done',        '#418b5c', 'COMPLETED'::issue_status_category,  3, false),
+        (v_ops, 'Cancelled',   '#e14322', 'CANCELLED'::issue_status_category,  4, false);
     INSERT INTO issue_types (project_id, name, color, icon, is_default) VALUES
-        (v_ops, 'Task',    '#6366f1', 'circle-dot', true),
-        (v_ops, 'Bug',     '#ef4444', 'bug',        false),
-        (v_ops, 'Feature', '#10b981', 'zap',        false);
+        (v_ops, 'Task',    '#2f6bf6', 'circle-dot', true),
+        (v_ops, 'Bug',     '#e14322', 'bug',        false),
+        (v_ops, 'Feature', '#418b5c', 'zap',        false);
     INSERT INTO project_labels (project_id, name, color) VALUES
-        (v_ops, 'docker', '#06b6d4'), (v_ops, 'ci-cd', '#8b5cf6'),
-        (v_ops, 'kubernetes', '#3b82f6'), (v_ops, 'infra', '#10b981');
+        (v_ops, 'docker', '#1e4fc4'), (v_ops, 'ci-cd', '#a3336c'),
+        (v_ops, 'kubernetes', '#2f6bf6'), (v_ops, 'infra', '#418b5c');
 
     -- ----------------------------------------------------------------
     -- 6. Membres de projet
@@ -313,11 +314,11 @@ BEGIN
     -- 9. Équipes + association aux projets (PROD-3.6)
     -- ----------------------------------------------------------------
     INSERT INTO teams (workspace_id, created_by, name, description, emoji, color)
-    VALUES (v_ws, v_admin, 'Frontend Guild', 'UI, design system, web app', '🎨', 'bg-violet-500') RETURNING id INTO v_tf_front;
+    VALUES (v_ws, v_admin, 'Frontend Guild', 'UI, design system, web app', '🎨', 'bg-shape-pink') RETURNING id INTO v_tf_front;
     INSERT INTO teams (workspace_id, created_by, name, description, emoji, color)
-    VALUES (v_ws, v_admin, 'Backend Guild', 'API, data, perf', '⚙️', 'bg-blue-500') RETURNING id INTO v_tf_back;
+    VALUES (v_ws, v_admin, 'Backend Guild', 'API, data, perf', '⚙️', 'bg-shape-blue') RETURNING id INTO v_tf_back;
     INSERT INTO teams (workspace_id, created_by, name, description, emoji, color)
-    VALUES (v_ws, v_admin, 'Platform & QA', 'Infra, CI/CD, qualité', '🚀', 'bg-emerald-500') RETURNING id INTO v_tf_plat;
+    VALUES (v_ws, v_admin, 'Platform & QA', 'Infra, CI/CD, qualité', '🚀', 'bg-shape-green') RETURNING id INTO v_tf_plat;
 
     INSERT INTO team_members (team_id, user_id, role) VALUES
         (v_tf_front, v_sarah, 'LEAD'), (v_tf_front, v_aicha, 'MEMBER'), (v_tf_front, v_diego, 'MEMBER'), (v_tf_front, v_lina, 'MEMBER'),
@@ -473,25 +474,6 @@ BEGIN
         (v_ws, v_admin, 'nouvelle.recrue@example.com', 'MEMBER', 'seed-invite-token-001', 'PENDING', NOW() + INTERVAL '7 days'),
         (v_ws, v_admin, 'consultant.ext@example.com',  'ADMIN',  'seed-invite-token-002', 'PENDING', NOW() + INTERVAL '14 days');
 
-    -- 17. Abonnement Stripe (admin PRO) + historique — pour la page Billing (sans Stripe réel)
-    UPDATE users SET stripe_customer_id = 'cus_seed_admin' WHERE id = v_admin;
-    INSERT INTO subscriptions (user_id, plan_type, status, stripe_customer_id, stripe_subscription_id, stripe_price_id,
-                               amount, currency, billing_interval, current_period_start, current_period_end, started_at)
-    VALUES (v_admin, 'BUSINESS', 'ACTIVE'::plan_status, 'cus_seed_admin', 'sub_seed_admin', 'price_seed_pro',
-            12.00, 'EUR', 'month', NOW() - INTERVAL '10 days', NOW() + INTERVAL '20 days', NOW() - INTERVAL '40 days')
-    ON CONFLICT (user_id) DO UPDATE SET plan_type = EXCLUDED.plan_type, status = EXCLUDED.status,
-        stripe_customer_id = EXCLUDED.stripe_customer_id, stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-        current_period_start = EXCLUDED.current_period_start, current_period_end = EXCLUDED.current_period_end;
-
-    INSERT INTO subscription_history (user_id, plan_type, plan_status, stripe_subscription_id, stripe_event_id, stripe_invoice_id, amount_paid, currency, event_type, event_data, period_start, period_end) VALUES
-        (v_admin, 'BUSINESS', 'ACTIVE'::plan_status, 'sub_seed_admin', 'seed_evt_checkout', NULL,        NULL,  'EUR', 'checkout.session.completed', '{"seed":true}'::jsonb, NOW() - INTERVAL '40 days', NOW() - INTERVAL '10 days'),
-        (v_admin, 'BUSINESS', 'ACTIVE'::plan_status, 'sub_seed_admin', 'seed_evt_invoice1', 'in_seed_1', 12.00, 'EUR', 'invoice.payment_succeeded', '{"seed":true}'::jsonb, NOW() - INTERVAL '10 days', NOW() + INTERVAL '20 days');
-
-    -- 18. Demandes Enterprise (sales/admin)
-    INSERT INTO enterprise_inquiries (full_name, email, team_size, message, status) VALUES
-        ('Claire Dubois', 'claire.dubois@seedlead.example', '51-200', 'Nous cherchons une solution pour 80 personnes avec SSO.', 'NEW'),
-        ('Yann Leroy',    'yann.leroy@seedlead.example',    '11-50',  'Intéressé par le plan Enterprise, un rappel serait apprécié.', 'CONTACTED');
-
     -- ================================================================
     -- 19. VOLUME — ~90 issues étalées sur ~9 semaines (par projet).
     --     Alimente : throughput (created_at/completed_at par semaine),
@@ -565,22 +547,22 @@ BEGIN
     --     throughput JOURNALIER (courbe 1 mois) et tous les KPIs.
     -- ================================================================
     INSERT INTO projects (workspace_id, name, identifier, description, created_by, color, icon_url)
-    VALUES (v_ws, 'Solo Initiatives', 'SOLO', 'Initiatives portées en autonomie par des contributeurs solo.', v_admin, 'bg-amber-500', 'lucide:User')
+    VALUES (v_ws, 'Solo Initiatives', 'SOLO', 'Initiatives portées en autonomie par des contributeurs solo.', v_admin, 'bg-shape-yellow', 'lucide:User')
     RETURNING id INTO v_solo_proj;
 
     INSERT INTO issue_statuses (project_id, name, color, category, position, is_default) VALUES
-        (v_solo_proj, 'Backlog',     '#94a3b8', 'BACKLOG'::issue_status_category,    0, false),
-        (v_solo_proj, 'Todo',        '#6366f1', 'UNSTARTED'::issue_status_category,  1, true),
-        (v_solo_proj, 'In Progress', '#f59e0b', 'STARTED'::issue_status_category,    2, false),
-        (v_solo_proj, 'Done',        '#10b981', 'COMPLETED'::issue_status_category,  3, false),
-        (v_solo_proj, 'Cancelled',   '#ef4444', 'CANCELLED'::issue_status_category,  4, false);
+        (v_solo_proj, 'Backlog',     '#736e67', 'BACKLOG'::issue_status_category,    0, false),
+        (v_solo_proj, 'Todo',        '#2f6bf6', 'UNSTARTED'::issue_status_category,  1, true),
+        (v_solo_proj, 'In Progress', '#ffaa0d', 'STARTED'::issue_status_category,    2, false),
+        (v_solo_proj, 'Done',        '#418b5c', 'COMPLETED'::issue_status_category,  3, false),
+        (v_solo_proj, 'Cancelled',   '#e14322', 'CANCELLED'::issue_status_category,  4, false);
     INSERT INTO issue_types (project_id, name, color, icon, is_default) VALUES
-        (v_solo_proj, 'Task',    '#6366f1', 'circle-dot', true),
-        (v_solo_proj, 'Bug',     '#ef4444', 'bug',        false),
-        (v_solo_proj, 'Feature', '#10b981', 'zap',        false);
+        (v_solo_proj, 'Task',    '#2f6bf6', 'circle-dot', true),
+        (v_solo_proj, 'Bug',     '#e14322', 'bug',        false),
+        (v_solo_proj, 'Feature', '#418b5c', 'zap',        false);
     INSERT INTO project_labels (project_id, name, color) VALUES
-        (v_solo_proj, 'react', '#06b6d4'), (v_solo_proj, 'java', '#ef4444'),
-        (v_solo_proj, 'data', '#8b5cf6'), (v_solo_proj, 'infra', '#10b981');
+        (v_solo_proj, 'react', '#1e4fc4'), (v_solo_proj, 'java', '#e14322'),
+        (v_solo_proj, 'data', '#a3336c'), (v_solo_proj, 'infra', '#418b5c');
 
     SELECT id INTO v_solo_done    FROM issue_statuses WHERE project_id=v_solo_proj AND name='Done';
     SELECT id INTO v_solo_todo    FROM issue_statuses WHERE project_id=v_solo_proj AND name='Todo';

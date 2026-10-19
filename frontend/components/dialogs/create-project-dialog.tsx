@@ -271,7 +271,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
       const url = await startMcpOAuth(slug, tool.key, tool.mcpSuggestedUrl, `/${slug}?import=${tool.key}`)
       window.location.href = url // redirection vers le consentement du service (la page quitte)
     } catch {
-      toast.error("Couldn't start the connection - it may require a Business plan")
+      toast.error("Couldn't start the connection. Please try again.")
       setConnectingKey(null)
     }
   }
@@ -497,7 +497,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                         <BrandLogo slug={t.key} name={t.name} className="size-7" />
                         <span className="text-[12.5px] font-medium text-foreground">{t.name}</span>
                         {t.connected ? (
-                          <span className="text-[10px] font-medium text-emerald-600">Connected</span>
+                          <span className="text-[10px] font-medium text-ink-green">Connected</span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary">
                             {connectingKey === t.key ? (

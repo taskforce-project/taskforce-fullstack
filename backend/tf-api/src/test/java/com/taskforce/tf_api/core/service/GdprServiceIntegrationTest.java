@@ -7,9 +7,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-import com.taskforce.tf_api.core.enums.PlanStatus;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
@@ -37,6 +37,7 @@ class GdprServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private GdprService gdprService;
     @Autowired private UserRepository userRepository;
+    @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private WorkspaceRepository workspaceRepository;
     @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
 
@@ -105,13 +106,19 @@ class GdprServiceIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("purgeAccount anonymise, coupe l'accès et supprime le workspace SOLO (aucun héritier)")
     void purge_anonymizes_and_deletes_solo_workspace() {
+        // Identifiants Stripe hérités de l'ancienne facturation hébergée : colonnes gardées, la purge les efface.
+        jdbcTemplate.update("UPDATE users SET stripe_customer_id = 'cus_legacy', stripe_subscription_id = 'sub_legacy' WHERE id = ?",
+            user.getId());
         gdprService.deleteMyAccount(user.getId()); // planifie (sinon purge = no-op)
         gdprService.purgeAccount(user.getId());
 
         User reloaded = userRepository.findById(user.getId()).orElseThrow();
         assertThat(reloaded.getEmail()).startsWith("deleted-").endsWith("@anonymized.invalid");
         assertThat(reloaded.getIsActive()).isFalse();
-        assertThat(reloaded.getPlanStatus()).isEqualTo(PlanStatus.CANCELED);
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT stripe_customer_id, stripe_subscription_id FROM users WHERE id = ?", user.getId()))
+            .containsEntry("stripe_customer_id", null)
+            .containsEntry("stripe_subscription_id", null);
         assertThat(reloaded.getDeletionScheduledAt()).isNull(); // purge effectuée
         // Workspace solo (aucun autre membre) → supprimé ; appartenances nettoyées.
         assertThat(workspaceRepository.findBySlug("ws-gdpr")).isEmpty();

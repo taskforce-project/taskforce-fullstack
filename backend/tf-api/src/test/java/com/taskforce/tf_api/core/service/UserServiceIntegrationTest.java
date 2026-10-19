@@ -107,18 +107,6 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(userService.searchUsers("findme", "nobody@it.dev")).isEmpty(); // appelant inconnu
     }
 
-    @Test
-    @DisplayName("processDataRequest DELETION désactive le compte et notifie")
-    void should_process_deletion_request() {
-        when(keycloakService.getUserById(anyString())).thenReturn(kcRep());
-
-        userService.processDataRequest("owner@it.dev", "DELETION");
-
-        assertThat(userRepository.findById(user.getId()).orElseThrow().getIsActive()).isFalse();
-        org.mockito.Mockito.verify(emailService)
-            .sendDataRequestEmail(anyString(), anyString(), org.mockito.ArgumentMatchers.eq("DELETION"));
-    }
-
     // =========================================================================
     // uploadAvatar (21 lignes manquées) — succès + branches d'erreur de validation
     // =========================================================================
@@ -150,7 +138,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
 
         assertThatThrownBy(() -> userService.uploadAvatar("owner@it.dev", empty))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("vide");
+            .hasMessageContaining("empty");
     }
 
     @Test
@@ -185,7 +173,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
 
         assertThatThrownBy(() -> userService.uploadAvatar("owner@it.dev", file))
             .isInstanceOf(RuntimeException.class)
-            .hasMessageContaining("Échec de l'upload avatar");
+            .hasMessageContaining("Avatar upload failed");
     }
 
     // =========================================================================

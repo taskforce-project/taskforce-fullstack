@@ -15,13 +15,13 @@ import lombok.Data;
 @Data
 public class CreateLeaveRequest {
 
-    @NotNull(message = "Le type d'indisponibilité est obligatoire")
+    @NotNull(message = "The time off type is required")
     private LeaveType type;
 
-    @NotNull(message = "La date de début est obligatoire")
+    @NotNull(message = "The start date is required")
     private LocalDate startDate;
 
-    @NotNull(message = "La date de fin est obligatoire")
+    @NotNull(message = "The end date is required")
     private LocalDate endDate;
 
     @Size(max = 1000)

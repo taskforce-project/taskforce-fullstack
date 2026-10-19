@@ -21,6 +21,7 @@ import { useWorkflowStore } from "@/lib/store/workflow-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import type { AnalysisJob, JobStatus } from "@/lib/api/analysis-service"
 import type { DeliveryProvider, DeliveryRun, DeliveryRunStatus } from "@/lib/api/delivery-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 export const WORKFLOW_PANEL_ID = "workflows"
 
@@ -37,10 +38,10 @@ export const isActiveRun = (s: DeliveryRunStatus) => s === "QUEUED" || s === "RU
 
 const STATUS: Record<JobStatus, { label: string; pill: string; Icon: typeof Loader2; spin?: boolean }> = {
   QUEUED:            { label: "Queued",          pill: "text-muted-foreground bg-muted",                     Icon: CircleDashed },
-  RUNNING:           { label: "Running",         pill: "text-blue-500 bg-blue-500/12",                        Icon: Loader2, spin: true },
-  WAITING_FOR_INPUT: { label: "Waiting for input", pill: "text-amber-600 dark:text-amber-400 bg-amber-500/14",  Icon: PauseCircle },
-  DONE:              { label: "Done",            pill: "text-emerald-500 bg-emerald-500/12",                  Icon: CheckCircle2 },
-  FAILED:            { label: "Failed",          pill: "text-rose-500 bg-rose-500/12",                        Icon: XCircle },
+  RUNNING:           { label: "Running",         pill: "text-ink-blue bg-primary/12",                        Icon: Loader2, spin: true },
+  WAITING_FOR_INPUT: { label: "Waiting for input", pill: "text-ink-yellow bg-shape-yellow/14",  Icon: PauseCircle },
+  DONE:              { label: "Done",            pill: "text-ink-green bg-shape-green/12",                  Icon: CheckCircle2 },
+  FAILED:            { label: "Failed",          pill: "text-destructive bg-destructive/12",                        Icon: XCircle },
 }
 
 function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
@@ -82,7 +83,7 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
           )}
 
           {job.status === "WAITING_FOR_INPUT" && job.question && (
-            <div className="mt-2 rounded-lg border border-amber-500/35 bg-amber-500/[0.08] p-2.5">
+            <div className="mt-2 rounded-lg border border-shape-yellow/35 bg-shape-yellow/[0.08] p-2.5">
               <p className="text-xs leading-relaxed text-foreground">🤖 {job.question}</p>
               <div className="mt-2 flex gap-1.5">
                 <input
@@ -90,7 +91,7 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
                   onChange={(e) => setReply(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendAnswer() } }}
                   placeholder="Your reply…"
-                  className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 text-xs outline-none focus:border-amber-500/50"
+                  className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 text-xs outline-none focus:border-shape-yellow/50"
                 />
                 <Button size="sm" className="h-8 gap-1 px-2.5 text-xs" onClick={sendAnswer} disabled={!reply.trim() || sending}>
                   {sending ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />}
@@ -100,7 +101,7 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
           )}
 
           {job.status === "FAILED" && job.error && (
-            <p className="mt-2 rounded-lg bg-rose-500/[0.08] px-2.5 py-2 text-xs text-rose-500">{job.error}</p>
+            <p className="mt-2 rounded-lg bg-destructive/[0.08] px-2.5 py-2 text-xs text-destructive">{job.error}</p>
           )}
 
           <div className="mt-3 flex items-center gap-1.5">
@@ -160,7 +161,7 @@ function RunCard({ slug, run, provider }: Readonly<{ slug: string; run: Delivery
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-foreground">{title}</p>
           <p className="truncate text-[11px] text-muted-foreground">
-            {[agentName, run.projectName, when ? formatDistanceToNow(new Date(when), { addSuffix: true }) : null]
+            {[agentName, run.projectName, when ? formatDistanceToNow(parseServerDate(when), { addSuffix: true }) : null]
               .filter(Boolean).join(" · ")}
           </p>
         </div>
@@ -181,7 +182,7 @@ function RunCard({ slug, run, provider }: Readonly<{ slug: string; run: Delivery
             <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground">{run.summary ?? "Done."}</p>
           )}
           {run.status === "FAILED" && (
-            <p className="rounded-lg bg-rose-500/[0.08] px-2.5 py-2 text-xs text-rose-500">{run.error ?? "The agent failed."}</p>
+            <p className="rounded-lg bg-destructive/[0.08] px-2.5 py-2 text-xs text-destructive">{run.error ?? "The agent failed."}</p>
           )}
 
           <div className="mt-3 flex items-center gap-1.5">
@@ -218,7 +219,7 @@ function SectionLabel({ children, count }: Readonly<{ children: ReactNode; count
 /**
  * Contenu du panneau « Workflows IA » (le header/resize/close sont fournis par PanelDock).
  * Deux familles de travail IA, dans l'ordre où on les cherche : les <b>délégations</b> à un agent (une
- * issue confiée à Claude Code, Cursor...), historique compris, puis les <b>analyses</b> de projet, qui
+ * issue confiée à Claude Code), historique compris, puis les <b>analyses</b> de projet, qui
  * tournent en arrière-plan (statut en direct, détail via {@link AgentPlan}, et le HITL).
  * Les données sont chargées et rafraîchies par {@link WorkflowsButton}, monté en permanence.
  */

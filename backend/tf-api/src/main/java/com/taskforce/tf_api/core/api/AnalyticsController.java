@@ -55,7 +55,7 @@ public class AnalyticsController {
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
-            "KPIs récupérés",
+            "KPIs retrieved",
             analyticsService.getKpis(slug, userId, projectId)
         ));
     }
@@ -69,7 +69,7 @@ public class AnalyticsController {
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
-            "Throughput récupéré",
+            "Throughput retrieved",
             analyticsService.getThroughput(slug, userId, projectId, bucket)
         ));
     }
@@ -82,7 +82,7 @@ public class AnalyticsController {
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
-            "Burndown récupéré",
+            "Burndown retrieved",
             analyticsService.getBurndown(slug, userId, projectId)
         ));
     }
@@ -95,7 +95,7 @@ public class AnalyticsController {
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
-            "Capacité récupérée",
+            "Capacity retrieved",
             analyticsService.getCapacity(slug, userId, projectId)
         ));
     }
@@ -108,7 +108,7 @@ public class AnalyticsController {
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
-            "Charge de l'équipe récupérée",
+            "Team workload retrieved",
             analyticsService.getWorkload(slug, userId, days)
         ));
     }
@@ -120,7 +120,7 @@ public class AnalyticsController {
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
-            "Insights générés",
+            "Insights generated",
             analyticsService.generateInsights(slug, userId)
         ));
     }
@@ -134,7 +134,7 @@ public class AnalyticsController {
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
-            "Graphe généré",
+            "Chart generated",
             chartSpecService.generate(slug, userId, request.getPrompt(), request.getProjectId())
         ));
     }
@@ -146,7 +146,7 @@ public class AnalyticsController {
         @RequestBody BreakdownQueryRequest request,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Répartition calculée",
+        return ResponseEntity.ok(ApiResponse.success("Distribution computed",
             chartSpecService.runBreakdown(slug, resolveUserId(jwt),
                 request.getDimension(), request.getMeasure(), request.getScope())));
     }
@@ -157,7 +157,7 @@ public class AnalyticsController {
     public ResponseEntity<ApiResponse<List<SavedChartResponse>>> listSavedCharts(
         @PathVariable String slug, @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Graphes épinglés récupérés",
+        return ResponseEntity.ok(ApiResponse.success("Pinned charts retrieved",
             savedChartService.list(slug, resolveUserId(jwt))));
     }
 
@@ -167,7 +167,7 @@ public class AnalyticsController {
         @Valid @RequestBody SaveChartRequest request,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Graphe épinglé",
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Chart pinned",
             savedChartService.save(slug, resolveUserId(jwt), request)));
     }
 
@@ -176,13 +176,13 @@ public class AnalyticsController {
         @PathVariable String slug, @PathVariable Long chartId, @AuthenticationPrincipal Jwt jwt
     ) {
         savedChartService.delete(slug, resolveUserId(jwt), chartId);
-        return ResponseEntity.ok(ApiResponse.success("Graphe retiré", null));
+        return ResponseEntity.ok(ApiResponse.success("Chart removed", null));
     }
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

@@ -26,8 +26,8 @@ public class ListProjectsTool implements AgentTool {
     @Override public String name() { return "list_projects"; }
 
     @Override public String description() {
-        return "Liste les projets du workspace TaskForce (id, identifiant, nom, nombre d'issues). "
-            + "Utile pour trouver le projectId avant de créer ou lister des issues.";
+        return "Lists the projects of the TaskForce workspace (id, identifier, name, number of issues). "
+            + "Useful to find the projectId before creating or listing issues.";
     }
 
     @Override public Map<String, Object> parametersSchema() {
@@ -36,12 +36,12 @@ public class ListProjectsTool implements AgentTool {
 
     @Override public String execute(Map<String, Object> args, AgentContext ctx) {
         List<ProjectResponse> projects = projectService.listProjects(ctx.slug(), ctx.userId());
-        if (projects.isEmpty()) return "Aucun projet dans ce workspace.";
-        StringBuilder sb = new StringBuilder("Projets (" + projects.size() + ") :");
+        if (projects.isEmpty()) return "No project in this workspace.";
+        StringBuilder sb = new StringBuilder("Projects (" + projects.size() + "):");
         for (ProjectResponse p : projects) {
             sb.append("\n- ").append(p.getIdentifier()).append(" ").append(p.getName())
               .append(" (id ").append(p.getId()).append(", ")
-              .append(p.getOpenIssues()).append("/").append(p.getTotalIssues()).append(" ouvertes)");
+              .append(p.getOpenIssues()).append("/").append(p.getTotalIssues()).append(" open)");
         }
         return sb.toString();
     }

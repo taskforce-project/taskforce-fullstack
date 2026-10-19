@@ -2,20 +2,25 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { Claim } from "./api.js";
+import { ApprovalServer, type ApprovalApi } from "./approvals.js";
 import type { RunnerConfig } from "./config.js";
+import { EventRelay, type EventSink } from "./events.js";
+import { log } from "./log.js";
 import { run } from "./proc.js";
 import { buildPrompt, buildReplyPrompt } from "./prompt.js";
+import { parseAgentOutput, toEvents, type AgentOutcome } from "./stream.js";
 
-export interface AgentOutcome {
-  ok: boolean;
-  /** Résumé final de l'agent (quand ok) ou message d'échec. */
-  text: string;
-  costUsd: number | null;
-  turns: number | null;
-}
+export type { AgentOutcome } from "./stream.js";
+export { parseAgentOutput } from "./stream.js";
 
 /** Nom du serveur MCP vu par Claude Code : ses outils s'appellent `mcp__taskforce__<outil>`. */
 const MCP_SERVER = "taskforce";
+
+/** En-tête qui désigne le run dont l'agent emprunte la session déléguée (cf. `DeliverySessionFilter`, ADR-013). */
+const DELIVERY_RUN_HEADER = "X-TaskForce-Delivery-Run";
+
+/** Variable d'environnement qui porte le jeton du serveur local de validations, lue par le hook. */
+const HOOK_TOKEN_ENV = "TF_HOOK_TOKEN";
 
 /**
  * Mode d'exécution de l'agent :
@@ -25,17 +30,22 @@ const MCP_SERVER = "taskforce";
  */
 export type AgentMode = "repo" | "repoless";
 
-/** Outils MCP TaskForce ouverts à l'agent : ceux qui restent dans le périmètre d'une session déléguée. */
+/** Outils MCP TaskForce ouverts d'office : ceux qui restent dans le périmètre d'une session déléguée. */
 const MCP_TOOLS = [
   "get_issue", "add_comment", "brain_search", "list_projects", "list_issues", "list_issue_statuses",
   "list_my_issues", "workspace_kpis", "create_issue", "update_issue",
 ];
 
 /**
- * Outils pré-autorisés. En mode `dontAsk`, tout le reste est refusé d'office, sans question : pas de
- * shell libre, pas de réseau, pas de push. En mode `repoless` il n'y a pas de dépôt : aucun outil Bash
- * n'est ouvert (l'agent brouillonne dans son dossier temporaire et livre par commentaire). Les outils MCP
- * listés sont ceux qui restent dans le périmètre d'une session déléguée (le backend refuserait les autres).
+ * Jamais permis, même validé dans l'app : le runner pousse et ouvre la pull request lui-même, après l'agent. Une
+ * règle de refus passe avant le hook de validation.
+ */
+export const DENIED_TOOLS = ["Bash(git push)", "Bash(git push *)", "Bash(gh)", "Bash(gh *)"];
+
+/**
+ * Outils pré-autorisés : lire et modifier le dossier de travail, les commandes git locales, les outils MCP du run.
+ * Toute autre action (installer un paquet, lancer les tests, réseau...) n'est pas refusée d'office : elle devient une
+ * demande de validation dans TaskForce (OSS-5.4). En mode `repoless` il n'y a pas de dépôt, donc pas de git.
  */
 export function allowedTools(extra: string[], mode: AgentMode = "repo"): string[] {
   const local = mode === "repoless"
@@ -47,7 +57,7 @@ export function allowedTools(extra: string[], mode: AgentMode = "repo"): string[
       ];
   return [
     ...local,
-    ...MCP_TOOLS.map((tool) => `mcp__${MCP_SERVER}__taskforce_${tool}`),
+    ...MCP_TOOLS.map((tool) => `mcp__${MCP_SERVER}__${tool}`),
     ...extra,
   ];
 }
@@ -64,9 +74,15 @@ export function safeModel(model: string | null | undefined): string | null {
 export function agentArgs(config: RunnerConfig, claim: Claim, mcpConfigPath: string, settingsPath: string, mode: AgentMode = "repo"): string[] {
   const args = [
     "-p",
-    "--output-format", "json",
-    "--permission-mode", "dontAsk",
+    // Suivi en direct : une ligne JSON par message, relayée à la chronologie du run dans TaskForce.
+    "--output-format", "stream-json",
+    "--verbose",
+    // Validations dans l'app : hors du socle pré-autorisé, une action attend une décision humaine (hook
+    // PermissionRequest du fichier --settings). Personne d'autre ne répond : sans décision, refus.
+    "--permission-mode", "manual",
+    "--permission-prompts", "none",
     "--allowedTools", allowedTools(config.agent.extraAllowedTools, mode).join(","),
+    "--disallowedTools", DENIED_TOOLS.join(","),
     "--mcp-config", mcpConfigPath,
     "--strict-mcp-config",
     // Seuls les réglages de la personne (et ceux du runner, via --settings) sont lus, jamais ceux du dépôt
@@ -86,18 +102,59 @@ export function agentArgs(config: RunnerConfig, claim: Claim, mcpConfigPath: str
  * Environnement de l'agent. Par défaut (`auth: "subscription"`) la clé API ambiante est RETIRÉE : sinon
  * Claude Code la préfère au login de l'abonnement, et la facture part sur le compte API sans prévenir.
  */
-export function agentEnv(config: RunnerConfig, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+export function agentEnv(config: RunnerConfig, base: NodeJS.ProcessEnv = process.env, hookToken?: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...base };
   if (config.agent.auth === "subscription") {
     delete env.ANTHROPIC_API_KEY;
     delete env.ANTHROPIC_AUTH_TOKEN;
   } else if (!env.ANTHROPIC_API_KEY) {
-    throw new Error('agent.auth = "api-key" mais ANTHROPIC_API_KEY est absent de l\'environnement');
+    throw new Error('agent.auth is "api-key" but ANTHROPIC_API_KEY is not set in the environment');
   }
   // Les identifiants machine du runner ne descendent jamais dans le processus de l'agent.
   delete env.TASKFORCE_RUNNER_CLIENT_ID;
   delete env.TASKFORCE_RUNNER_CLIENT_SECRET;
+  if (hookToken) env[HOOK_TOKEN_ENV] = hookToken;
+  else delete env[HOOK_TOKEN_ENV];
   return env;
+}
+
+/** Serveur MCP de l'instance pour ce run : HTTP, jeton de session déléguée, en-tête du run. */
+export function mcpConfig(config: RunnerConfig, claim: Claim, sessionToken: string): Record<string, unknown> {
+  return {
+    mcpServers: {
+      [MCP_SERVER]: {
+        type: "http",
+        url: `${config.apiUrl}/workspaces/${encodeURIComponent(claim.workspaceSlug)}/mcp`,
+        headers: {
+          Authorization: `Bearer ${sessionToken}`,
+          [DELIVERY_RUN_HEADER]: String(claim.runId),
+        },
+      },
+    },
+  };
+}
+
+/**
+ * Réglages imposés à la session : pas d'attribution (sauf choix contraire), et le hook de validation vers le
+ * serveur local du runner. Le délai du hook dépasse l'attente du serveur : c'est le serveur qui répond « refusé ».
+ */
+export function agentSettings(config: RunnerConfig, hookUrl: string): Record<string, unknown> {
+  return {
+    // Les deux clés, l'ancienne et la nouvelle, pour couvrir les versions de Claude Code.
+    ...(config.agent.attribution ? {} : { includeCoAuthoredBy: false, attribution: { commit: "", pr: "" } }),
+    hooks: {
+      PermissionRequest: [{
+        matcher: ".*",
+        hooks: [{
+          type: "http",
+          url: hookUrl,
+          headers: { Authorization: `Bearer $${HOOK_TOKEN_ENV}` },
+          allowedEnvVars: [HOOK_TOKEN_ENV],
+          timeout: config.agent.approvalTimeoutMinutes * 60 + 60,
+        }],
+      }],
+    },
+  };
 }
 
 export interface AgentRunOptions {
@@ -108,86 +165,49 @@ export interface AgentRunOptions {
 
 /**
  * Lance Claude Code sans interface dans le dossier de travail (worktree git en mode `repo`, dossier
- * temporaire jetable en mode `repoless`), MCP TaskForce branché sur la session déléguée du run.
+ * temporaire jetable en mode `repoless`), branché sur le serveur MCP de l'instance avec la session déléguée du run.
  *
- * Le MCP reçoit un jeton machine de COURTE durée (jamais le secret du runner), utilisable seulement
- * dans le périmètre de ce run. Le fichier qui le porte vit hors du dossier de travail (l'agent ne lit pas
- * hors de son dossier en mode `dontAsk`) et est supprimé à la fin.
+ * Le jeton de session est de COURTE durée (jamais le secret du runner) et ne vaut que dans le périmètre de ce
+ * run. Les fichiers qui le portent vivent hors du dossier de travail et sont supprimés à la fin.
  */
 export async function runAgent(
   config: RunnerConfig, claim: Claim, workDir: string, sessionToken: string, opts: AgentRunOptions,
+  api: ApprovalApi & EventSink,
 ): Promise<AgentOutcome> {
   const tmp = join(config.home, "tmp");
   mkdirSync(tmp, { recursive: true });
   const mcpConfigPath = join(tmp, `run-${claim.runId}-mcp.json`);
   const settingsPath = join(tmp, `run-${claim.runId}-settings.json`);
 
-  writeFileSync(mcpConfigPath, JSON.stringify({
-    mcpServers: {
-      [MCP_SERVER]: {
-        command: process.execPath,
-        args: [config.mcpEntry],
-        env: {
-          TASKFORCE_API_URL: config.apiUrl,
-          TASKFORCE_WORKSPACE: claim.workspaceSlug,
-          TASKFORCE_TOKEN: sessionToken,
-          TASKFORCE_DELIVERY_RUN: String(claim.runId),
-        },
-      },
-    },
-  }), { encoding: "utf8", mode: 0o600 });
+  const approvals = new ApprovalServer(api, claim.runId, workDir, { waitMs: config.agent.approvalTimeoutMinutes * 60_000 });
+  const relay = new EventRelay(api, claim.runId);
+  const hookUrl = await approvals.start();
 
-  // Sans attribution : ni « Co-Authored-By » dans les commits, ni mention dans une PR (les deux clés,
-  // l'ancienne et la nouvelle, pour couvrir les versions de Claude Code).
-  writeFileSync(settingsPath, JSON.stringify(
-    config.agent.attribution ? {} : { includeCoAuthoredBy: false, attribution: { commit: "", pr: "" } },
-  ), "utf8");
+  writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig(config, claim, sessionToken)), { encoding: "utf8", mode: 0o600 });
+  writeFileSync(settingsPath, JSON.stringify(agentSettings(config, hookUrl)), { encoding: "utf8", mode: 0o600 });
 
   try {
     const result = await run(config.agent.command, agentArgs(config, claim, mcpConfigPath, settingsPath, opts.mode), {
       cwd: workDir,
-      env: agentEnv(config),
+      env: agentEnv(config, process.env, approvals.token),
       input: opts.mode === "repoless" ? buildReplyPrompt(claim) : buildPrompt(claim, opts.branch ?? ""),
       timeoutMs: config.agent.timeoutMinutes * 60_000,
+      onStdoutLine: (line) => {
+        try {
+          relay.push(toEvents(JSON.parse(line), workDir));
+        } catch {
+          // ligne non JSON (avertissement de la CLI) : rien pour la chronologie
+        }
+      },
     });
     if (result.timedOut) {
       return { ok: false, text: `The agent was stopped after ${config.agent.timeoutMinutes} min (timeout).`, costUsd: null, turns: null };
     }
     return parseAgentOutput(result.code, result.stdout, result.stderr);
   } finally {
+    await relay.close().catch((e: unknown) => log.warn(`Live timeline: ${(e as Error).message}`));
+    await approvals.stop();
     rmSync(mcpConfigPath, { force: true });
     rmSync(settingsPath, { force: true });
   }
-}
-
-/** Interprète la sortie `--output-format json` de Claude Code. Exporté pour les tests. */
-export function parseAgentOutput(code: number | null, stdout: string, stderr: string): AgentOutcome {
-  let json: Record<string, unknown> | null = null;
-  const trimmed = stdout.trim();
-  if (trimmed) {
-    try {
-      // La sortie utile est le dernier objet JSON (des avertissements peuvent le précéder).
-      const start = trimmed.lastIndexOf("\n{") >= 0 ? trimmed.lastIndexOf("\n{") + 1 : trimmed.indexOf("{");
-      json = JSON.parse(trimmed.slice(start)) as Record<string, unknown>;
-    } catch {
-      json = null;
-    }
-  }
-  const costUsd = typeof json?.total_cost_usd === "number" ? json.total_cost_usd : null;
-  const turns = typeof json?.num_turns === "number" ? json.num_turns : null;
-  const resultText = typeof json?.result === "string" ? json.result.trim() : "";
-  const failed = code !== 0 || json?.is_error === true
-    || (typeof json?.subtype === "string" && json.subtype !== "success");
-
-  if (failed) {
-    const reason = resultText
-      || (typeof json?.subtype === "string" ? `Claude Code stopped: ${json.subtype}` : "")
-      || stderr.trim().split(/\r?\n/).slice(-3).join(" | ")
-      || `Claude Code exited with code ${code}`;
-    return { ok: false, text: reason.slice(0, 3900), costUsd, turns };
-  }
-  if (!resultText) {
-    return { ok: false, text: "Claude Code finished without a summary.", costUsd, turns };
-  }
-  return { ok: true, text: resultText, costUsd, turns };
 }

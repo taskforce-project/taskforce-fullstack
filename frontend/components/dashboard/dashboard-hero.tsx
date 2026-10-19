@@ -13,6 +13,7 @@ import { ProjectIcon } from "@/components/ui/project-icon"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { useProjectStore } from "@/lib/store/project-store"
+import { useModKeyLabel } from "@/lib/hooks/use-mod-key"
 
 /** Connecteurs mis en avant dans la pilule (clés du catalogue - cf. ConnectorCatalog.java). */
 const PILL_TOOLS = [
@@ -22,7 +23,7 @@ const PILL_TOOLS = [
   { slug: "linear", name: "Linear" },
 ] as const
 
-/** Même contenu que la palette Ctrl+K - navigation + Labs (les actions spéciales sont ajoutées à part). */
+/** Même contenu que la palette Ctrl+K - navigation (les actions spéciales sont ajoutées à part). */
 const NAV_ITEMS = [
   { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { label: "Inbox", path: "/inbox", icon: Inbox },
@@ -31,8 +32,6 @@ const NAV_ITEMS = [
   { label: "Issues", path: "/my-work/issues", icon: CircleDot },
   { label: "Cycles", path: "/cycles", icon: Repeat },
   { label: "Members", path: "/members", icon: Users },
-] as const
-const LAB_ITEMS = [
   { label: "Intelligence", path: "/analytics", icon: Activity },
   { label: "Brain OS", path: "/brain", icon: Brain },
 ] as const
@@ -69,6 +68,7 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
   const params = useParams<{ workspace: string }>()
   const slug = params?.workspace ?? ""
   const router = useRouter()
+  const modKey = useModKeyLabel()
   const openSettings = useSettingsStore((s) => s.openSettings)
   const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
   const projects = useProjectStore((s) => s.projects)
@@ -118,10 +118,6 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
   ;(query ? NAV_ITEMS.filter((n) => match(n.label)) : NAV_ITEMS).forEach((n) => rows.push({
     key: `n-${n.path}`, section: "Navigation",
     icon: <n.icon className="size-4 shrink-0 text-muted-foreground" />, label: n.label, run: () => go(n.path),
-  }))
-  ;(query ? LAB_ITEMS.filter((l) => match(l.label)) : LAB_ITEMS).forEach((l) => rows.push({
-    key: `l-${l.path}`, section: "Labs",
-    icon: <l.icon className="size-4 shrink-0 text-muted-foreground" />, label: l.label, run: () => go(l.path),
   }))
   ;(query ? ACTIONS.filter((a) => match(a.label)) : ACTIONS).forEach((a) => rows.push({
     key: `a-${a.label}`, section: "Actions",
@@ -195,7 +191,7 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
             className="min-w-0 flex-1 bg-transparent text-left text-foreground outline-none placeholder:text-muted-foreground"
           />
           <kbd className="hidden shrink-0 items-center gap-1 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground sm:flex">
-            Ctrl K
+            {modKey} K
           </kbd>
         </div>
 
@@ -223,8 +219,6 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
                     onMouseEnter={() => setActiveIndex(i)}
                     className={cn(
                       "flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left text-sm transition-colors",
-                      // Lignes Labs (Intelligence, Brain OS) : même vague en fond que dans le Ctrl+K.
-                      row.section === "Labs" && "lab-cmd-row",
                       i === activeIdx && "bg-muted",
                     )}
                   >
@@ -248,15 +242,15 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
               <span className="flex items-center gap-1.5">
                 <kbd className="inline-flex size-4 items-center justify-center rounded border border-border bg-muted text-[10px]">↑</kbd>
                 <kbd className="inline-flex size-4 items-center justify-center rounded border border-border bg-muted text-[10px]">↓</kbd>
-                pour naviguer
+                to navigate
               </span>
               <span className="flex items-center gap-1.5">
                 <kbd className="inline-flex h-4 items-center justify-center rounded border border-border bg-muted px-1 text-[10px]">↵</kbd>
-                pour ouvrir
+                to open
               </span>
               <span className="ml-auto flex items-center gap-1.5">
                 <kbd className="inline-flex h-4 items-center justify-center rounded border border-border bg-muted px-1 text-[10px]">esc</kbd>
-                pour fermer
+                to close
               </span>
             </div>
           </div>

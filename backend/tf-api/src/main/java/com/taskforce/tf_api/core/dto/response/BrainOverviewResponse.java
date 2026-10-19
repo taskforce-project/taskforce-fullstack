@@ -20,7 +20,6 @@ public class BrainOverviewResponse {
 
     private Long brainId;
     private Long workspaceId;
-    private String templateType;
     private String versionLabel;
     private long totalNodes;
 

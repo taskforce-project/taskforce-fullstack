@@ -25,10 +25,8 @@ import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.GitHubIntegrationService;
-import com.taskforce.tf_api.core.service.PlanFeatureService;
 import com.taskforce.tf_api.core.service.PlaneIntegrationService;
 import com.taskforce.tf_api.core.service.SlackIntegrationService;
-import com.taskforce.tf_api.core.service.integration.ConnectorConnectionService;
 import com.taskforce.tf_api.core.service.integration.IntegrationCatalogService;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
@@ -65,8 +63,6 @@ class IntegrationControllerWebMvcTest {
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository;
     @MockitoBean private PlaneIntegrationService planeService;
     @MockitoBean private IntegrationCatalogService catalogService;
-    @MockitoBean private ConnectorConnectionService connectorConnectionService;
-    @MockitoBean private PlanFeatureService planFeatureService;
     @MockitoBean private AuthorizationService authorizationService;
 
     @BeforeEach
@@ -106,7 +102,7 @@ class IntegrationControllerWebMvcTest {
     @Test
     @DisplayName("DELETE github (disconnect) par un non-gestionnaire (MEMBER) → 403")
     void disconnect_forbidden_for_non_manager() throws Exception {
-        doThrow(new ForbiddenException("Permission insuffisante pour cette action"))
+        doThrow(new ForbiddenException("You don't have the permission for this action"))
             .when(authorizationService).requireManager(anyLong(), anyLong());
 
         mockMvc.perform(delete("/api/workspaces/acme/integrations/github").with(auth()))
@@ -170,11 +166,12 @@ class IntegrationControllerWebMvcTest {
         when(userRepository.findByEmail(anyString()))
             .thenReturn(Optional.of(User.builder().id(3L).email("dev@it.dev").build()));
         when(gitHubService.addLink(anyString(), anyLong(), any(), any())).thenReturn(
-            new GitHubLinkResponse(1L, "PR", "octo/hello", 42, "https://pr", null, null, "T", "OPEN", null));
+            new GitHubLinkResponse(1L, "PR", "octo/hello", 42, "https://github.com/octo/hello/pull/42", null, null, "T", "OPEN", null));
 
         mockMvc.perform(post("/api/workspaces/acme/integrations/github/issues/5/links").with(auth())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"linkType\":\"PR\",\"repoFullName\":\"octo/hello\",\"prNumber\":42,\"prUrl\":\"https://pr\"}"))
+                .content("{\"linkType\":\"PR\",\"repoFullName\":\"octo/hello\",\"prNumber\":42,"
+                    + "\"prUrl\":\"https://github.com/octo/hello/pull/42\"}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.linkType").value("PR"));
     }
@@ -185,6 +182,22 @@ class IntegrationControllerWebMvcTest {
         mockMvc.perform(post("/api/workspaces/acme/integrations/github/issues/5/links").with(auth())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"linkType\":\"TAG\",\"repoFullName\":\"octo/hello\"}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest(name = "{0}")
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+        "{\"linkType\":\"PR\",\"repoFullName\":\"octo/hello?per_page=1\",\"prNumber\":1}",
+        "{\"linkType\":\"PR\",\"repoFullName\":\"octo/hello\",\"prNumber\":1,\"prUrl\":\"https://evil.example/x\"}",
+        "{\"linkType\":\"PR\",\"repoFullName\":\"octo/hello\",\"prNumber\":-1}",
+        "{\"linkType\":\"COMMIT\",\"repoFullName\":\"octo/hello\",\"commitSha\":\"not-a-hash\"}",
+        "{\"linkType\":\"COMMIT\",\"repoFullName\":\"octo/hello\",\"commitSha\":\"abc1234\",\"commitUrl\":\"javascript:alert(1)\"}",
+    })
+    @DisplayName("POST github issue links : dépôt, numéro, hash ou lien hors github.com refusés à l'entrée → 400")
+    void github_add_link_rejects_bad_input(String body) throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/integrations/github/issues/5/links").with(auth())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
             .andExpect(status().isBadRequest());
     }
 
@@ -278,7 +291,7 @@ class IntegrationControllerWebMvcTest {
     @Test
     @DisplayName("GET github/callback public → 302")
     void github_callback_302() throws Exception {
-        when(gitHubService.handleCallback(anyString(), anyString()))
+        when(gitHubService.handleCallback(anyString(), anyString(), org.mockito.ArgumentMatchers.isNull()))
             .thenReturn("http://localhost:3000/acme/settings?github=connected");
 
         mockMvc.perform(get("/api/integrations/github/callback").param("code", "c").param("state", "acme"))
@@ -286,9 +299,22 @@ class IntegrationControllerWebMvcTest {
     }
 
     @Test
+    @DisplayName("GET github/callback sans code (accès refusé chez GitHub) → 302 vers l'app, plus de 500")
+    void github_callback_access_denied_302() throws Exception {
+        when(gitHubService.handleCallback(org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq("s"),
+                org.mockito.ArgumentMatchers.eq("access_denied")))
+            .thenReturn("http://localhost:3000/acme/settings?section=integrations&github=error");
+
+        mockMvc.perform(get("/api/integrations/github/callback").param("error", "access_denied").param("state", "s"))
+            .andExpect(status().isFound())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string("Location", "http://localhost:3000/acme/settings?section=integrations&github=error"));
+    }
+
+    @Test
     @DisplayName("GET slack/callback public → 302")
     void slack_callback_302() throws Exception {
-        when(slackService.handleCallback(anyString(), anyString()))
+        when(slackService.handleCallback(anyString(), anyString(), org.mockito.ArgumentMatchers.isNull()))
             .thenReturn("http://localhost:3000/acme/settings?slack=connected");
 
         mockMvc.perform(get("/api/integrations/slack/callback").param("code", "c").param("state", "acme"))

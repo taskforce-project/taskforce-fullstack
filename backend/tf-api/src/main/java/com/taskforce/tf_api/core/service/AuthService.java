@@ -7,22 +7,16 @@ import java.util.Map;
 
 import org.springframework.transaction.annotation.Transactional;
 
-import com.stripe.exception.StripeException;
-import com.stripe.model.Customer;
 import com.taskforce.tf_api.core.dto.request.LoginRequest;
 import com.taskforce.tf_api.core.dto.request.RegisterRequest;
-import com.taskforce.tf_api.core.dto.request.SelectPlanRequest;
 import com.taskforce.tf_api.core.dto.request.VerifyOtpRequest;
 import com.taskforce.tf_api.core.dto.request.ForgotPasswordRequest;
 import com.taskforce.tf_api.core.dto.request.ResetPasswordRequest;
 import com.taskforce.tf_api.core.dto.response.AuthResponse;
 import com.taskforce.tf_api.core.dto.response.RegisterResponse;
-import com.taskforce.tf_api.core.dto.response.SelectPlanResponse;
 import com.taskforce.tf_api.core.dto.response.UserResponse;
 import com.taskforce.tf_api.core.dto.response.VerifyOtpResponse;
 import com.taskforce.tf_api.core.enums.OtpType;
-import com.taskforce.tf_api.core.enums.PlanStatus;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.OtpVerification;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -52,7 +46,6 @@ public class AuthService {
     private final KeycloakService keycloakService;
     private final KeycloakAuthService keycloakAuthService;
     private final OtpService otpService;
-    private final StripeService stripeService;
     private final EmailService emailService;
     private final UserRepository userRepository;
     private final WorkspaceService workspaceService;
@@ -61,15 +54,24 @@ public class AuthService {
     private final TwoFactorService twoFactorService;
     private final OAuthTwoFactorChallenge oauthTwoFactorChallenge;
 
-    @Value("${stripe.success-url}")
-    private String stripeSuccessUrl;
-
-    @Value("${stripe.cancel-url}")
-    private String stripeCancelUrl;
-
     // Miroir du délai de grâce (GdprService) : expose la date de PURGE dans la réponse d'auth.
     @Value("${taskforce.account.deletion-grace-days:30}")
     private int graceDays;
+
+    // Vérification de l'adresse à l'inscription, par un code envoyé par e-mail. Une instance sans SMTP
+    // (auto-hébergement) la coupe : le compte est prêt tout de suite, sans preuve que l'adresse appartient à la
+    // personne. Vrai par défaut, la prod et le dev gardent la vérification.
+    @Value("${taskforce.signup.email-verification:true}")
+    private boolean signupEmailVerification = true;
+
+    @jakarta.annotation.PostConstruct
+    void warnWhenSignupIsNotVerified() {
+        if (!signupEmailVerification) {
+            log.warn("Inscription sans vérification d'e-mail (SIGNUP_EMAIL_VERIFICATION=false) : quiconque joint "
+                + "l'instance peut créer un compte avec n'importe quelle adresse, y compris une adresse invitée. "
+                + "À réserver à un réseau privé, ou configurer un SMTP.");
+        }
+    }
 
     /**
      * Inscription d'un nouvel utilisateur
@@ -77,13 +79,12 @@ public class AuthService {
      * 2. Génère et envoie le code OTP
      * 3. Retourne une réponse indiquant que l'OTP a été envoyé
      * 
-     * Nouveau workflow : reçoit toutes les informations en une seule fois (incluant planType)
+     * Reçoit toutes les informations en une seule fois. Aucun choix de forfait : TaskForce est libre (ADR-016).
      * Méthode idempotente : si l'utilisateur existe déjà dans Keycloak mais n'est pas vérifié,
      * renvoie simplement un OTP au lieu de lever une erreur.
      */
     public RegisterResponse register(RegisterRequest request) {
-        log.info("Tentative d'inscription pour : {} avec plan : {}",
-            request.getEmail(), request.getPlanType());
+        log.info("Tentative d'inscription pour : {}", request.getEmail());
 
         // Vérification humaine AVANT tout travail : le but est d'éviter qu'un automate ne déclenche
         // en volume la création Keycloak et l'envoi de courriels. La contrôler après aurait laissé
@@ -95,7 +96,7 @@ public class AuthService {
 
         // Vérifier si l'email existe déjà dans notre DB (utilisateur complètement enregistré)
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Cet email est déjà utilisé. Veuillez vous connecter.");
+            throw new RuntimeException("This email is already in use. Please sign in.");
         }
 
         String keycloakId;
@@ -109,7 +110,7 @@ public class AuthService {
             
             // Si l'email est déjà vérifié, l'utilisateur doit se connecter
             if (Boolean.TRUE.equals(keycloakUser.isEmailVerified())) {
-                throw new RuntimeException("Cet email est déjà vérifié. Veuillez vous connecter.");
+                throw new RuntimeException("This email is already verified. Please sign in.");
             }
             
             // L'utilisateur existe mais n'est pas encore vérifié → renvoyer OTP (idempotent)
@@ -135,7 +136,7 @@ public class AuthService {
                     
                     // Vérifier si l'email est vérifié
                     if (Boolean.TRUE.equals(keycloakUser.isEmailVerified())) {
-                        throw new RuntimeException("Cet email est déjà vérifié. Veuillez vous connecter.");
+                        throw new RuntimeException("This email is already verified. Please sign in.");
                     }
                     
                     keycloakId = keycloakUser.getId();
@@ -148,64 +149,38 @@ public class AuthService {
             }
         }
 
-        // Générer et envoyer le code OTP avec le plan sélectionné
+        // Instance sans vérification d'e-mail (pas de SMTP) : aucun code à envoyer, le compte est prêt.
+        if (!signupEmailVerification) {
+            if (userAlreadyExists) {
+                // Compte resté non vérifié d'une tentative précédente : il prend ce qui vient d'être saisi.
+                keycloakService.updatePassword(keycloakId, request.getPassword());
+                keycloakService.updateUserNames(keycloakId, request.getFirstName(), request.getLastName());
+            }
+            completeRegistration(request.getEmail());
+            log.info("Inscription sans vérification d'e-mail pour : {}", request.getEmail());
+            return RegisterResponse.builder()
+                .message("Account created. You can now sign in.")
+                .email(request.getEmail())
+                .otpSent(false)
+                .build();
+        }
+
+        // Générer et envoyer le code OTP
         otpService.generateAndSendOtp(
             request.getEmail(),
             firstName, // Utiliser le prénom récupéré (peut venir de Keycloak ou de la requête)
             OtpType.EMAIL_VERIFICATION,
             null, // userId pas encore créé dans notre DB
-            keycloakId,
-            request.getPlanType() // Stocker le plan directement dans l'OTP
+            keycloakId
         );
 
-        log.info("Inscription {} pour : {} avec plan {}. OTP envoyé.", 
+        log.info("Inscription {} pour : {}. OTP envoyé.",
             userAlreadyExists ? "réessayée" : "réussie",
-            request.getEmail(), 
-            request.getPlanType());
+            request.getEmail());
 
         return RegisterResponse.builder()
-            .message("Un code de vérification a été envoyé à votre adresse email")
+            .message("A verification code has been sent to your email address")
             .email(request.getEmail())
-            .otpSent(true)
-            .otpExpiresInMinutes(15)
-            .build();
-    }
-
-    /**
-     * Sélection du plan (Étape 2 de l'inscription)
-     * 1. Vérifie que l'utilisateur existe dans Keycloak
-     * 2. Stocke le plan sélectionné dans la table OTP
-     * 3. Renvoie un nouveau code OTP si nécessaire
-     */
-    public SelectPlanResponse selectPlan(SelectPlanRequest request) {
-        log.info("Sélection du plan {} pour : {}", request.getPlanType(), request.getEmail());
-
-        // Vérifier que l'utilisateur existe dans Keycloak
-        UserRepresentation keycloakUser = keycloakService.getUserByEmail(request.getEmail());
-        if (keycloakUser == null) {
-            throw new RuntimeException("Utilisateur non trouvé. Veuillez d'abord vous inscrire.");
-        }
-
-        String keycloakId = keycloakUser.getId();
-
-        // Vérifier si l'email est déjà vérifié
-        if (Boolean.TRUE.equals(keycloakUser.isEmailVerified())) {
-            throw new RuntimeException("Cet email est déjà vérifié. Veuillez vous connecter.");
-        }
-
-        // Stocker le plan dans la table OTP (mise à jour de l'OTP existant)
-        boolean planStored = otpService.updatePlanType(request.getEmail(), keycloakId, request.getPlanType());
-
-        if (!planStored) {
-            throw new RuntimeException("Erreur lors de l'enregistrement du plan. Code OTP introuvable.");
-        }
-
-        log.info("Plan {} enregistré pour {} dans OTP", request.getPlanType(), request.getEmail());
-
-        return SelectPlanResponse.builder()
-            .message("Plan sélectionné avec succès. Vérifiez votre email pour le code de confirmation.")
-            .email(request.getEmail())
-            .planType(request.getPlanType())
             .otpSent(true)
             .otpExpiresInMinutes(15)
             .build();
@@ -213,95 +188,28 @@ public class AuthService {
 
     /**
      * Vérification du code OTP et finalisation de l'inscription
-     * 1. Vérifie le code OTP et récupère le plan sélectionné
+     * 1. Vérifie le code OTP
      * 2. Marque l'email comme vérifié dans Keycloak
-     * 3. Crée l'utilisateur dans notre DB avec le plan
-     * 4. Si plan payant : crée client Stripe et retourne URL checkout
-     * 5. Génère les tokens JWT
+     * 3. Crée l'utilisateur dans notre DB et son workspace initial ; la personne se connecte ensuite
      */
     public VerifyOtpResponse verifyOtpAndCompleteRegistration(VerifyOtpRequest request) {
         log.info("Vérification OTP pour : {}", request.getEmail());
 
-        // Vérifier le code OTP et récupérer le plan sélectionné
-        // (les tentatives sont incrémentées automatiquement en cas d'échec)
+        // Vérifier le code OTP (les tentatives sont incrémentées automatiquement en cas d'échec)
         OtpVerification otpVerification = otpService.verifyOtpAndGetDetails(request.getEmail(), request.getOtpCode());
 
         if (otpVerification == null) {
-            throw new RuntimeException("Code de vérification invalide ou expiré");
+            throw new RuntimeException("Invalid or expired verification code");
         }
 
-        // Récupérer le plan depuis l'OTP
-        String planType = otpVerification.getPlanType();
-        if (planType == null || planType.isEmpty()) {
-            throw new RuntimeException("Plan non sélectionné. Veuillez d'abord choisir un plan.");
-        }
-
-        // Récupérer l'utilisateur depuis Keycloak
-        UserRepresentation keycloakUser = keycloakService.getUserByEmail(request.getEmail());
-        String keycloakId = keycloakUser.getId();
-
-        // Marquer l'email comme vérifié dans Keycloak
-        keycloakService.verifyEmail(keycloakId);
-
-        // Créer l'utilisateur dans notre DB — TOUJOURS en FREE : un forfait payant n'est accordé qu'après
-        // paiement confirmé (webhook checkout.session.completed / subscription.updated). Empêche qu'un
-        // utilisateur s'attribue un plan payant sans payer.
-        PlanType.valueOf(planType.toUpperCase()); // valide le plan choisi (lève si invalide)
-        String firstName = keycloakUser.getFirstName();
-        String lastName = keycloakUser.getLastName();
-        String displayName = buildDisplayName(firstName, lastName);
-        User user = User.builder()
-            .keycloakId(keycloakId)
-            .email(request.getEmail())
-            .planType(PlanType.FREE)
-            .isActive(true)
-            .displayName(displayName)
-            .planStatus(null)
-            .build();
-
-        // Si plan payant, créer le client Stripe
-        String checkoutUrl = null;
-        if (!planType.equalsIgnoreCase("FREE")) {
-            try {
-                Customer stripeCustomer = stripeService.createCustomer(
-                    request.getEmail(),
-                    keycloakUser.getFirstName() + " " + keycloakUser.getLastName()
-                );
-                user.setStripeCustomerId(stripeCustomer.getId());
-
-                // Créer la session de paiement Stripe
-                String priceId = stripeService.getPriceIdForPlan(planType);
-                var session = stripeService.createCheckoutSession(
-                    stripeCustomer.getId(),
-                    priceId,
-                    stripeSuccessUrl,
-                    stripeCancelUrl,
-                    java.util.Map.of("planType", planType.toUpperCase()) // le webhook applique le forfait au paiement
-                );
-                checkoutUrl = session.getUrl();
-
-            } catch (StripeException e) {
-                log.error("Erreur lors de la création du client Stripe", e);
-                throw new RuntimeException("Erreur lors de la configuration du paiement");
-            }
-        }
-
-        user = userRepository.save(user);
-        log.info("Utilisateur créé dans la DB avec ID : {}", user.getId());
-
-        // Créer automatiquement un workspace pour le nouvel utilisateur
-        workspaceService.createWorkspace(user, keycloakUser.getFirstName());
-
-        // Envoyer l'email de bienvenue
-        emailService.sendWelcomeEmail(request.getEmail(), keycloakUser.getFirstName());
+        completeRegistration(request.getEmail());
 
         // Depuis la migration OIDC : plus d'auto-login (Keycloak ne peut émettre un token sans
         // mot de passe, absent à ce stade). Le compte est prêt ; le front redirige vers /login.
         return VerifyOtpResponse.builder()
             .verified(true)
-            .message("Email vérifié avec succès. Vous pouvez maintenant vous connecter.")
+            .message("Email verified. You can now sign in.")
             .authData(null)
-            .checkoutSessionUrl(checkoutUrl)
             .build();
     }
 
@@ -326,14 +234,14 @@ public class AuthService {
             log.info("Authentification Keycloak réussie pour : {}", request.getEmail());
         } catch (RuntimeException e) {
             log.error("Échec d'authentification Keycloak pour {} : {}", request.getEmail(), e.getMessage());
-            throw new RuntimeException("Email ou mot de passe incorrect");
+            throw new RuntimeException("Invalid email or password");
         }
 
         // Récupérer l'utilisateur depuis Keycloak
         UserRepresentation keycloakUser = keycloakService.getUserByEmail(request.getEmail());
 
         if (!keycloakUser.isEmailVerified()) {
-            throw new RuntimeException("Veuillez vérifier votre email avant de vous connecter");
+            throw new RuntimeException("Please verify your email before signing in");
         }
 
         // Récupérer ou créer l'utilisateur dans notre DB
@@ -347,8 +255,6 @@ public class AuthService {
                 User newUser = User.builder()
                     .keycloakId(keycloakUser.getId())
                     .email(keycloakUser.getEmail())
-                    .planType(PlanType.FREE)  // Plan gratuit par défaut
-                    .planStatus(PlanStatus.ACTIVE)
                     .isActive(true)
                     .displayName(buildDisplayName(keycloakUser.getFirstName(), keycloakUser.getLastName()))
                     .build();
@@ -357,7 +263,7 @@ public class AuthService {
             });
 
         if (!user.getIsActive()) {
-            throw new RuntimeException("Ce compte est désactivé");
+            throw new RuntimeException("This account is disabled");
         }
 
         // 2FA géré par l'app : le mot de passe est bon. Si le 2FA est actif, on exige un code TOTP
@@ -392,16 +298,8 @@ public class AuthService {
         UserRepresentation keycloakUser = keycloakService.getUserByEmail(email);
 
         if (keycloakUser.isEmailVerified()) {
-            throw new RuntimeException("Cet email est déjà vérifié");
+            throw new RuntimeException("This email is already verified");
         }
-
-        // Récupérer le plan depuis le dernier OTP (même expiré)
-        OtpVerification existingOtp = otpService.getLatestOtp(email);
-        PlanType planType = existingOtp != null && existingOtp.getPlanType() != null 
-            ? PlanType.valueOf(existingOtp.getPlanType()) 
-            : null;
-        
-        log.info("Plan récupéré depuis le dernier OTP : {} pour {}", planType, email);
 
         // Générer et envoyer un nouveau code OTP
         otpService.generateAndSendOtp(
@@ -409,16 +307,39 @@ public class AuthService {
             keycloakUser.getFirstName(),
             OtpType.EMAIL_VERIFICATION,
             null,
-            keycloakUser.getId(),
-            planType
+            keycloakUser.getId()
         );
 
         return RegisterResponse.builder()
-            .message("Un nouveau code de vérification a été envoyé")
+            .message("A new verification code has been sent")
             .email(email)
             .otpSent(true)
             .otpExpiresInMinutes(15)
             .build();
+    }
+
+    /**
+     * Compte prêt : adresse marquée vérifiée dans Keycloak, utilisateur et premier workspace créés, e-mail de
+     * bienvenue si un SMTP est configuré. La personne se connecte ensuite.
+     */
+    private void completeRegistration(String email) {
+        UserRepresentation keycloakUser = keycloakService.getUserByEmail(email);
+        String keycloakId = keycloakUser.getId();
+        keycloakService.verifyEmail(keycloakId);
+
+        User user = User.builder()
+            .keycloakId(keycloakId)
+            .email(email)
+            .isActive(true)
+            .displayName(buildDisplayName(keycloakUser.getFirstName(), keycloakUser.getLastName()))
+            .build();
+        user = userRepository.save(user);
+        log.info("Utilisateur créé dans la DB avec ID : {}", user.getId());
+
+        workspaceService.createWorkspace(user, keycloakUser.getFirstName());
+        if (emailService.isEnabled()) {
+            emailService.sendWelcomeEmail(email, keycloakUser.getFirstName());
+        }
     }
 
     /**
@@ -430,9 +351,15 @@ public class AuthService {
     public void forgotPassword(String email) {
         log.info("Demande de réinitialisation de mot de passe pour : {}", email);
 
+        // Sans SMTP, le code ne peut pas partir : le dire, plutôt qu'une erreur d'envoi.
+        if (!emailService.isEnabled()) {
+            throw new BusinessException(
+                "Password reset by email is not available on this instance: ask an administrator to reset your password");
+        }
+
         // Vérifier que l'utilisateur existe dans Keycloak
         if (!keycloakService.emailExists(email)) {
-            throw new RuntimeException("Aucun compte associé à cet email");
+            throw new RuntimeException("No account uses this email");
         }
 
         UserRepresentation keycloakUser = keycloakService.getUserByEmail(email);
@@ -444,8 +371,7 @@ public class AuthService {
             keycloakUser.getFirstName(),
             OtpType.PASSWORD_RESET,
             null,
-            keycloakUser.getId(),
-            null
+            keycloakUser.getId()
         );
 
         log.info("Email de réinitialisation envoyé à : {}", email);
@@ -464,7 +390,7 @@ public class AuthService {
         boolean isValid = otpService.verifyOtpWithType(email, otpCode, OtpType.PASSWORD_RESET);
 
         if (!isValid) {
-            throw new RuntimeException("Code de vérification invalide ou expiré");
+            throw new RuntimeException("Invalid or expired verification code");
         }
 
         // Récupérer l'utilisateur Keycloak
@@ -480,145 +406,6 @@ public class AuthService {
     }
 
     /**
-     * Vérifie une session Stripe Checkout payée et applique le forfait. Deux cas :
-     * <ol>
-     *   <li><b>Upgrade in-app</b> (cas courant) : l'utilisateur existe déjà → on applique le forfait
-     *       lu dans les métadonnées de la session, sans exiger d'inscription en attente (OTP). Écriture
-     *       idempotente, en doublon sûr du webhook {@code checkout.session.completed}.</li>
-     *   <li><b>Legacy « inscription PUIS paiement »</b> : l'utilisateur n'existe pas encore → on utilise
-     *       les données mises de côté (OTP) pour le créer en base et vérifier l'email côté Keycloak.</li>
-     * </ol>
-     *
-     * @param sessionId ID de la session Stripe Checkout
-     * @return Détails de la vérification (email, forfait, statut de paiement, IDs Stripe)
-     */
-    public com.taskforce.tf_api.core.dto.response.VerifySessionResponse completeRegistrationAfterPayment(String sessionId) throws StripeException {
-        log.info("Finalisation de l'inscription après paiement - Session: {}", sessionId);
-
-        // 1. Récupérer la session Stripe
-        com.stripe.model.checkout.Session session = stripeService.getCheckoutSession(sessionId);
-        
-        // 2. Vérifier que le paiement est complété
-        if (!"paid".equals(session.getPaymentStatus())) {
-            throw new RuntimeException("Le paiement n'est pas encore validé. Statut: " + session.getPaymentStatus());
-        }
-
-        String customerId = session.getCustomer();
-        String subscriptionId = session.getSubscription();
-        
-        // 3. Récupérer l'email depuis le Customer Stripe (pas depuis la session)
-        com.stripe.model.Customer customer = stripeService.retrieveCustomer(customerId);
-        String customerEmail = customer.getEmail();
-
-        log.info("Paiement validé pour {} - Customer: {}, Subscription: {}", 
-            customerEmail, customerId, subscriptionId);
-
-        // Forfait acheté : source primaire = métadonnées de la session de checkout (posées par
-        // BillingController lors d'un upgrade in-app). L'OTP (ancien flux « inscription PUIS paiement »)
-        // ne sert plus qu'à créer un utilisateur qui n'existe pas encore.
-        String planFromMeta = session.getMetadata() != null ? session.getMetadata().get("planType") : null;
-
-        // Cas normal (upgrade in-app) : l'utilisateur existe déjà → on applique le forfait payé SANS
-        // exiger d'OTP (sinon un compte inscrit normalement, sans inscription en attente, échouait avec
-        // « Aucune inscription en attente trouvée »). Le webhook checkout.session.completed applique la
-        // même chose côté serveur ; les deux écritures sont idempotentes (même plan ACTIVE ré-écrit).
-        if (userRepository.existsByEmail(customerEmail)) {
-            User existingUser = userRepository.findByEmail(customerEmail)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-            PlanType purchased = parsePlanType(planFromMeta);
-            if (purchased == null) purchased = existingUser.getPlanType(); // repli : ne jamais rétrograder
-            if (purchased == null || purchased == PlanType.FREE) {
-                throw new RuntimeException("Forfait acheté indéterminé pour la session " + sessionId);
-            }
-
-            log.info("Utilisateur {} déjà en base : application du forfait {} après paiement.", customerEmail, purchased);
-
-            existingUser.setStripeCustomerId(customerId);
-            existingUser.setStripeSubscriptionId(subscriptionId);
-            existingUser.setPlanType(purchased); // applique le forfait payé
-            existingUser.setPlanStatus(PlanStatus.ACTIVE);
-            userRepository.save(existingUser);
-
-            log.info("Utilisateur {} mis à jour : plan {} ACTIVE, subscription {}",
-                customerEmail, existingUser.getPlanType(), subscriptionId);
-
-            return com.taskforce.tf_api.core.dto.response.VerifySessionResponse.builder()
-                .email(customerEmail)
-                .planType(existingUser.getPlanType().toString())
-                .paymentStatus(session.getPaymentStatus())
-                .subscriptionId(subscriptionId)
-                .customerId(customerId)
-                .userCreated(false)
-                .message("Paiement validé avec succès. Votre abonnement est maintenant actif.")
-                .build();
-        }
-
-        // Legacy (inscription PUIS paiement) : l'utilisateur n'existe pas encore → il faut les données
-        // d'inscription mises de côté (OTP) pour finaliser la création en base + Keycloak.
-        OtpVerification otpVerification = otpService.getLatestOtp(customerEmail);
-        if (otpVerification == null) {
-            throw new RuntimeException("Aucune inscription en attente trouvée pour cet email");
-        }
-
-        String keycloakId = otpVerification.getKeycloakId();
-        String planType = planFromMeta != null ? planFromMeta : otpVerification.getPlanType();
-
-        if (keycloakId == null || planType == null) {
-            throw new RuntimeException("Données d'inscription incomplètes");
-        }
-
-        // 5. Récupérer l'utilisateur Keycloak
-        UserRepresentation keycloakUser = keycloakService.getUserByEmail(customerEmail);
-        
-        // 6. Marquer l'email comme vérifié dans Keycloak
-        if (!Boolean.TRUE.equals(keycloakUser.isEmailVerified())) {
-            keycloakService.verifyEmail(keycloakId);
-            log.info("Email marqué comme vérifié dans Keycloak pour {}", customerEmail);
-        }
-
-        // 7. Créer l'utilisateur en base avec plan payant ACTIVE
-        PlanType planTypeEnum = PlanType.valueOf(planType.toUpperCase());
-        User user = User.builder()
-            .keycloakId(keycloakId)
-            .email(customerEmail)
-            .planType(planTypeEnum)
-            .planStatus(PlanStatus.ACTIVE)  // Plan activé immédiatement après paiement
-            .stripeCustomerId(customerId)
-            .stripeSubscriptionId(subscriptionId)
-            .isActive(true)
-            .displayName(buildDisplayName(keycloakUser.getFirstName(), keycloakUser.getLastName()))
-            .build();
-
-        user = userRepository.save(user);
-        log.info("Utilisateur {} créé en base avec plan {} ACTIVE (ID: {})",
-            customerEmail, planType, user.getId());
-
-        // 8. Envoyer l'email de bienvenue
-        emailService.sendWelcomeEmail(customerEmail, keycloakUser.getFirstName());
-
-        return com.taskforce.tf_api.core.dto.response.VerifySessionResponse.builder()
-            .email(customerEmail)
-            .planType(planType)
-            .paymentStatus(session.getPaymentStatus())
-            .subscriptionId(subscriptionId)
-            .customerId(customerId)
-            .userCreated(true)
-            .message("Inscription finalisée avec succès. Votre abonnement est actif.")
-            .build();
-    }
-
-    /** Parse un nom de forfait en {@link PlanType} ; renvoie {@code null} si absent/invalide. */
-    private static PlanType parsePlanType(String raw) {
-        if (raw == null || raw.isBlank()) return null;
-        try {
-            return PlanType.valueOf(raw.trim().toUpperCase());
-        } catch (IllegalArgumentException ex) {
-            return null;
-        }
-    }
-
-    /**
      * Rafraîchit l'access token via le <b>refresh token Keycloak</b> (rotation gérée par l'IdP).
      * L'utilisateur est identifié à partir du claim {@code email} du nouvel access token.
      */
@@ -629,10 +416,10 @@ public class AuthService {
 
         String email = extractClaim(kcToken.getAccessToken(), "email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+            .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (!user.getIsActive()) {
-            throw new RuntimeException("Ce compte est désactivé");
+            throw new RuntimeException("This account is disabled");
         }
 
         log.info("Token rafraîchi pour : {}", user.getEmail());
@@ -694,8 +481,8 @@ public class AuthService {
             // Un compte GitHub peut n'exposer aucune adresse publique. Sans adresse nous ne pouvons
             // ni rattacher un compte existant, ni en créer un cohérent : mieux vaut le dire.
             throw new RuntimeException(
-                "Votre compte externe ne fournit pas d'adresse e-mail. "
-                + "Rendez-la visible chez le fournisseur, ou utilisez l'inscription classique.");
+                "Your external account doesn't share an email address. "
+                + "Make it visible at the provider, or sign up with email and password.");
         }
 
         // Fix M7 (TF-SEC-OAUTH-VERIFY) : refuser une connexion externe dont le fournisseur déclare l'e-mail
@@ -709,8 +496,8 @@ public class AuthService {
             Boolean.FALSE.equals(verifiedClaim) || "false".equalsIgnoreCase(str(verifiedClaim));
         if (explicitlyUnverified) {
             throw new RuntimeException(
-                "L'adresse e-mail de votre compte externe n'est pas vérifiée. "
-                + "Vérifiez-la chez le fournisseur, puis réessayez.");
+                "The email address of your external account isn't verified. "
+                + "Verify it at the provider, then try again.");
         }
 
         boolean creation = userRepository.findByEmail(email).isEmpty();
@@ -720,8 +507,6 @@ public class AuthService {
             return userRepository.save(User.builder()
                 .keycloakId(keycloakId)
                 .email(email)
-                .planType(PlanType.FREE)
-                .planStatus(PlanStatus.ACTIVE)
                 .isActive(true)
                 .displayName(buildDisplayName(firstName, lastName))
                 .avatarUrl(picture)
@@ -729,7 +514,7 @@ public class AuthService {
         });
 
         if (!user.getIsActive()) {
-            throw new RuntimeException("Ce compte est désactivé");
+            throw new RuntimeException("This account is disabled");
         }
 
         // Rattrapage : un compte créé par mot de passe (donc sans photo) qui se connecte ensuite par
@@ -827,11 +612,6 @@ public class AuthService {
             .avatarUrl(user.getAvatarUrl())
             .jobTitle(user.getJobTitle())
             .onboardingCompleted(user.getOnboardingCompleted())
-            .planType(user.getPlanType())
-            .planStatus(user.getPlanStatus())
-            .subscriptionStartDate(user.getSubscriptionStartDate())
-            .subscriptionEndDate(user.getSubscriptionEndDate())
-            .trialEndDate(user.getTrialEndDate())
             .isActive(user.getIsActive())
             .createdAt(user.getCreatedAt())
             .scheduledPurgeAt(purgeAt)
@@ -851,7 +631,7 @@ public class AuthService {
         try {
             return JWTParser.parse(jwt).getJWTClaimsSet().getStringClaim(claim);
         } catch (ParseException e) {
-            throw new RuntimeException("Token invalide");
+            throw new RuntimeException("Invalid token");
         }
     }
 

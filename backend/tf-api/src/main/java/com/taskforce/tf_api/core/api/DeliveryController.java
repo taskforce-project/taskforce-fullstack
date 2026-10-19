@@ -5,24 +5,23 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.taskforce.tf_api.core.dto.request.ConnectKeyRequest;
+import com.taskforce.tf_api.core.dto.request.ApprovalDecisionRequest;
 import com.taskforce.tf_api.core.dto.request.DelegateRequest;
-import com.taskforce.tf_api.core.dto.response.DeliveryKeyStatus;
 import com.taskforce.tf_api.core.dto.response.DeliveryProviderResponse;
+import com.taskforce.tf_api.core.dto.response.DeliveryRunActivityResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
-import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
-import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProviderRegistry;
+import com.taskforce.tf_api.core.service.delivery.DeliveryActivityService;
 import com.taskforce.tf_api.core.service.delivery.DeliveryRunner;
 import com.taskforce.tf_api.core.service.delivery.DeliveryService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
@@ -46,21 +45,23 @@ public class DeliveryController {
     private static final String RUNNING = DeliveryRunStatus.RUNNING.name();
     private static final String QUEUED  = DeliveryRunStatus.QUEUED.name();
 
-    private final DeliveryAgentProviderRegistry registry;
     private final DeliveryService deliveryService;
     private final DeliveryRunner deliveryRunner;
+    private final DeliveryActivityService activityService;
     private final UserRepository userRepository;
 
-    /** GET /api/workspaces/{slug}/delivery/providers — providers disponibles pour la délégation. */
+    /**
+     * GET /api/workspaces/{slug}/delivery/providers?projectId= : agents de la délégation, chacun prêt ou non pour la
+     * personne connectée (et pour ce projet si {@code projectId} est donné), avec ce qui manque.
+     */
     @GetMapping("/providers")
     public ResponseEntity<ApiResponse<List<DeliveryProviderResponse>>> listProviders(
-        @PathVariable String slug
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @RequestParam(name = "projectId", required = false) Long projectId
     ) {
-        List<DeliveryProviderResponse> providers = registry.all().stream()
-            .map(p -> new DeliveryProviderResponse(
-                p.key(), p.displayName(), p.logoKey(), p.available(), p.models()))
-            .toList();
-        return ResponseEntity.ok(ApiResponse.success("Providers récupérés", providers));
+        return ResponseEntity.ok(ApiResponse.success("Providers retrieved",
+            deliveryService.listProviders(slug, projectId, resolveUserId(jwt))));
     }
 
     /**
@@ -79,12 +80,12 @@ public class DeliveryController {
         DeliveryRunResponse run = deliveryService.delegate(
             slug, issueId, request.getProviderKey(), request.getModel(), userId);
         deliveryRunner.execute(run.id()); // async, une fois le run committé
-        return ResponseEntity.ok(ApiResponse.success("Tâche déléguée", run));
+        return ResponseEntity.ok(ApiResponse.success("Task delegated", run));
     }
 
     /**
      * GET /api/workspaces/{slug}/delivery/issues/{issueId}/run — dernier run (data null si aucun).
-     * Si le run est encore en cours (provider <b>asynchrone</b> type Cursor), on le ré-interroge une
+     * Si le run est encore en cours (provider <b>asynchrone</b>), on le ré-interroge une
      * fois : le polling du front fait ainsi progresser l'état jusqu'au terminal (DONE/FAILED). Encore en
      * attente, il est relu aussi : une délégation que personne ne réclame y est close (runner local, ADR-013).
      */
@@ -100,7 +101,7 @@ public class DeliveryController {
             deliveryRunner.refresh(run.id()); // transaction propre
             run = deliveryService.latestRun(slug, issueId, userId).orElse(run);
         }
-        return ResponseEntity.ok(ApiResponse.success("Run récupéré", run));
+        return ResponseEntity.ok(ApiResponse.success("Run retrieved", run));
     }
 
     /**
@@ -120,73 +121,45 @@ public class DeliveryController {
             queued.forEach(deliveryRunner::refresh);
             runs = deliveryService.listRuns(slug, userId);
         }
-        return ResponseEntity.ok(ApiResponse.success("Runs récupérés", runs));
+        return ResponseEntity.ok(ApiResponse.success("Runs retrieved", runs));
     }
 
-    // =========================================================================
-    // Clés API de délégation du workspace (Anthropic B1, Cursor... - chiffrées)
-    // =========================================================================
-
-    /** GET …/delivery/anthropic — état de la clé Anthropic (jamais renvoyée en clair). */
-    @GetMapping("/anthropic")
-    public ResponseEntity<ApiResponse<DeliveryKeyStatus>> anthropicStatus(
-        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug
+    /**
+     * GET /api/workspaces/{slug}/delivery/runs/{runId}/activity?after=N : chronologie en direct du run après
+     * l'événement N, et ses demandes de validation (OSS-5.3, OSS-5.4). Lue par la fiche d'issue pendant le run.
+     */
+    @GetMapping("/runs/{runId}/activity")
+    public ResponseEntity<ApiResponse<DeliveryRunActivityResponse>> activity(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long runId,
+        @RequestParam(name = "after", defaultValue = "0") int after
     ) {
-        DeliveryKeyStatus status = deliveryService.keyStatus(slug, resolveUserId(jwt), IntegrationProvider.ANTHROPIC);
-        return ResponseEntity.ok(ApiResponse.success("Statut Anthropic récupéré", status));
+        return ResponseEntity.ok(ApiResponse.success("Run activity",
+            activityService.activity(slug, runId, after, resolveUserId(jwt))));
     }
 
-    /** POST …/delivery/anthropic — connecte/remplace la clé API Anthropic (OWNER/ADMIN). */
-    @PostMapping("/anthropic")
-    public ResponseEntity<ApiResponse<DeliveryKeyStatus>> connectAnthropic(
-        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @Valid @RequestBody ConnectKeyRequest request
+    /**
+     * POST /api/workspaces/{slug}/delivery/runs/{runId}/approvals/{approvalId} : autorise ou refuse une action de
+     * l'agent. Seule la personne qui a délégué répond : l'action s'exécute sur sa machine.
+     */
+    @PostMapping("/runs/{runId}/approvals/{approvalId}")
+    public ResponseEntity<ApiResponse<Void>> decide(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long runId,
+        @PathVariable Long approvalId,
+        @Valid @RequestBody ApprovalDecisionRequest request
     ) {
-        DeliveryKeyStatus status = deliveryService.connectKey(
-            slug, resolveUserId(jwt), IntegrationProvider.ANTHROPIC, request.apiKey());
-        return ResponseEntity.ok(ApiResponse.success("Clé Anthropic connectée", status));
-    }
-
-    /** DELETE …/delivery/anthropic — déconnecte la clé API Anthropic (OWNER/ADMIN). */
-    @DeleteMapping("/anthropic")
-    public ResponseEntity<ApiResponse<Void>> disconnectAnthropic(
-        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug
-    ) {
-        deliveryService.disconnectKey(slug, resolveUserId(jwt), IntegrationProvider.ANTHROPIC);
-        return ResponseEntity.ok(ApiResponse.success("Clé Anthropic déconnectée", null));
-    }
-
-    /** GET …/delivery/cursor — état de la clé Cursor (jamais renvoyée en clair). */
-    @GetMapping("/cursor")
-    public ResponseEntity<ApiResponse<DeliveryKeyStatus>> cursorStatus(
-        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug
-    ) {
-        DeliveryKeyStatus status = deliveryService.keyStatus(slug, resolveUserId(jwt), IntegrationProvider.CURSOR);
-        return ResponseEntity.ok(ApiResponse.success("Statut Cursor récupéré", status));
-    }
-
-    /** POST …/delivery/cursor — connecte/remplace la clé API Cursor (OWNER/ADMIN). */
-    @PostMapping("/cursor")
-    public ResponseEntity<ApiResponse<DeliveryKeyStatus>> connectCursor(
-        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @Valid @RequestBody ConnectKeyRequest request
-    ) {
-        DeliveryKeyStatus status = deliveryService.connectKey(
-            slug, resolveUserId(jwt), IntegrationProvider.CURSOR, request.apiKey());
-        return ResponseEntity.ok(ApiResponse.success("Clé Cursor connectée", status));
-    }
-
-    /** DELETE …/delivery/cursor — déconnecte la clé API Cursor (OWNER/ADMIN). */
-    @DeleteMapping("/cursor")
-    public ResponseEntity<ApiResponse<Void>> disconnectCursor(
-        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug
-    ) {
-        deliveryService.disconnectKey(slug, resolveUserId(jwt), IntegrationProvider.CURSOR);
-        return ResponseEntity.ok(ApiResponse.success("Clé Cursor déconnectée", null));
+        boolean allow = "ALLOW".equals(request.decision());
+        activityService.decide(slug, runId, approvalId, allow, resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success(allow ? "Action allowed" : "Action denied", null));
     }
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         return userRepository.findByEmail(email)
             .map(User::getId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 }

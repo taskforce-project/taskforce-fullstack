@@ -31,7 +31,7 @@ public class AiConversation extends AuditableEntity {
     private Long userId;
 
     @Column(nullable = false, length = 200)
-    private String title = "Nouvelle conversation";
+    private String title = "New conversation";
 
     /** Résumé glissant des échanges anciens (compression de contexte). Null tant qu'aucune compression. */
     @Column(columnDefinition = "TEXT")

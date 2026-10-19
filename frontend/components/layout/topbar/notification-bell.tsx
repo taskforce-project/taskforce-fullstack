@@ -19,9 +19,9 @@ import { useNotificationsRealtime } from "@/lib/hooks/use-notifications-realtime
 import { cn } from "@/lib/utils"
 
 const URGENCY_DOT: Record<Urgency, string> = {
-  critical: "bg-rose-500",
-  warning: "bg-amber-500",
-  info: "bg-blue-500",
+  critical: "bg-shape-red",
+  warning: "bg-shape-yellow",
+  info: "bg-primary",
   low: "bg-muted-foreground/40",
 }
 
@@ -35,15 +35,17 @@ export function NotificationBell() {
   const signals = useNotificationStore((s) => s.signals)
   const unreadCount = useNotificationStore((s) => s.unreadCount)
   const fetchNotifications = useNotificationStore((s) => s.fetchNotifications)
+  const ensureNotifications = useNotificationStore((s) => s.ensureNotifications)
   const markAllAsRead = useNotificationStore((s) => s.markAllAsRead)
   const [open, setOpen] = React.useState(false)
 
   // Push temps réel (US-023) : abonnement STOMP /topic/notifications.{userId}
   useNotificationsRealtime(slug)
 
+  // Chargement partagé avec la colonne « Recent » du dashboard : une seule requête pour les deux.
   React.useEffect(() => {
-    if (slug) fetchNotifications(slug)
-  }, [slug, fetchNotifications])
+    if (slug) void ensureNotifications(slug)
+  }, [slug, ensureNotifications])
 
   // Filet de sécurité : rafraîchit toutes les 60 s si le push STOMP est indisponible.
   React.useEffect(() => {
@@ -80,7 +82,7 @@ export function NotificationBell() {
               }}
               className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
             >
-              <CheckCheck className="size-3" /> Tout marquer lu
+              <CheckCheck className="size-3" /> Mark all as read
             </button>
           )}
         </div>
@@ -119,7 +121,7 @@ export function NotificationBell() {
 
         <div className="border-t border-border p-1.5">
           <Button asChild variant="ghost" size="sm" className="w-full justify-center text-xs" onClick={() => setOpen(false)}>
-            <Link href={slug ? `/${slug}/inbox` : "/inbox"}>Voir toutes les notifications</Link>
+            <Link href={slug ? `/${slug}/inbox` : "/inbox"}>View all notifications</Link>
           </Button>
         </div>
       </PopoverContent>

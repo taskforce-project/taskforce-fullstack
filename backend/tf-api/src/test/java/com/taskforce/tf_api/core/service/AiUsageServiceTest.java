@@ -5,18 +5,19 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.taskforce.tf_api.core.dto.response.AiUsageResponse;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.AiTokenUsage;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.AiTokenUsageRepository;
-import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 
@@ -41,7 +42,6 @@ class AiUsageServiceTest {
 
     @Mock private AiTokenUsageRepository repository;
     @Mock private WorkspaceRepository workspaceRepository;
-    @Mock private UserRepository userRepository;
     @Mock private BrainAccessGuard access;
     @Mock private AiRateGuard rateGuard;
 
@@ -89,9 +89,9 @@ class AiUsageServiceTest {
     }
 
     @Test
-    @DisplayName("getUsage : renvoie la conso agrégée du compte + le plafond du plan du propriétaire")
-    void getUsage_returns_account_aggregate_and_owner_plan() {
-        User owner = User.builder().id(99L).planType(PlanType.BUSINESS).build();
+    @DisplayName("getUsage : renvoie la conso agrégée du compte, illimitée par défaut (-1)")
+    void getUsage_returns_account_aggregate_unlimited_by_default() {
+        User owner = User.builder().id(99L).build();
         Workspace ws = Workspace.builder().id(10L).slug("acme").owner(owner).build();
         when(access.resolveAndAuthorize("acme", 7L)).thenReturn(ws);
 
@@ -105,38 +105,45 @@ class AiUsageServiceTest {
 
         AiUsageResponse res = service.getUsage("acme", 7L);
 
-        assertThat(res.plan()).isEqualTo("BUSINESS");
         assertThat(res.usedTokens()).isEqualTo(500);
-        assertThat(res.limitTokens()).isEqualTo(800_000L); // plafond BUSINESS (recalibré sur budget Groq)
+        assertThat(res.limitTokens()).isEqualTo(-1L); // aucun plafond tant que l'instance n'en pose pas
         assertThat(res.requestCount()).isEqualTo(3);
     }
 
     @Test
-    @DisplayName("assertWithinQuota : compte FREE au plafond (50k) → 409 (IllegalStateException)")
-    void assertWithinQuota_throws_when_free_over_limit() {
-        when(workspaceRepository.findOwnerIdByWorkspaceId(10L)).thenReturn(Optional.of(99L));
-        when(userRepository.findById(99L))
-            .thenReturn(Optional.of(User.builder().id(99L).planType(PlanType.FREE).build()));
-        AiTokenUsage row = new AiTokenUsage();
-        row.setTotalTokens(50_000L); // pile au plafond FREE (recalibré Groq)
-        when(repository.findByAccountIdAndPeriod(eq(99L), anyString())).thenReturn(Optional.of(row));
+    @DisplayName("getUsage : expose le plafond posé par l'instance")
+    void getUsage_exposes_instance_limit() {
+        ReflectionTestUtils.setField(service, "monthlyTokenLimit", 1_000L);
+        Workspace ws = Workspace.builder().id(10L).slug("acme").owner(User.builder().id(99L).build()).build();
+        when(access.resolveAndAuthorize("acme", 7L)).thenReturn(ws);
+        when(repository.findByAccountIdAndPeriod(eq(99L), anyString())).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.assertWithinQuota(10L))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("Quota IA");
+        assertThat(service.getUsage("acme", 7L).limitTokens()).isEqualTo(1_000L);
     }
 
-    @Test
-    @DisplayName("assertWithinQuota : compte BUSINESS sous le plafond → OK + garde-débit consulté")
-    void assertWithinQuota_ok_when_under_limit() {
+    @ParameterizedTest(name = "plafond {0}, consommé {1} -> bloqué : {2}")
+    @CsvSource({
+        "0, 10000000, false",      // 0 = illimité (défaut) : jamais bloqué
+        "50000, 50000, true",      // pile au plafond : bloqué (409)
+        "800000, 500000, false"    // sous le plafond : OK
+    })
+    @DisplayName("assertWithinQuota : plafond d'instance, garde-débit toujours consulté")
+    void assertWithinQuota_applies_instance_limit(long limit, long used, boolean blocked) {
+        ReflectionTestUtils.setField(service, "monthlyTokenLimit", limit);
         when(workspaceRepository.findOwnerIdByWorkspaceId(10L)).thenReturn(Optional.of(99L));
-        when(userRepository.findById(99L))
-            .thenReturn(Optional.of(User.builder().id(99L).planType(PlanType.BUSINESS).build()));
-        AiTokenUsage row = new AiTokenUsage();
-        row.setTotalTokens(500_000L); // sous le plafond BUSINESS (800k)
-        when(repository.findByAccountIdAndPeriod(eq(99L), anyString())).thenReturn(Optional.of(row));
+        if (limit > 0) {
+            AiTokenUsage row = new AiTokenUsage();
+            row.setTotalTokens(used);
+            when(repository.findByAccountIdAndPeriod(eq(99L), anyString())).thenReturn(Optional.of(row));
+        }
 
-        assertThatCode(() -> service.assertWithinQuota(10L)).doesNotThrowAnyException();
+        if (blocked) {
+            assertThatThrownBy(() -> service.assertWithinQuota(10L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("monthly AI limit");
+        } else {
+            assertThatCode(() -> service.assertWithinQuota(10L)).doesNotThrowAnyException();
+        }
         // Le garde-débit par minute est consulté sur le COMPTE (résolu depuis le workspace).
         verify(rateGuard).assertWithinRate(99L);
     }

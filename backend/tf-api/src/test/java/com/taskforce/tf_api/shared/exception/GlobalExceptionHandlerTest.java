@@ -11,6 +11,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 import com.taskforce.tf_api.shared.dto.ErrorResponse;
 
@@ -37,10 +38,10 @@ class GlobalExceptionHandlerTest {
     @DisplayName("ResourceNotFoundException → 404 Not Found")
     void not_found_404() {
         ResponseEntity<ErrorResponse> r = handler.handleResourceNotFoundException(
-            new ResourceNotFoundException("Workspace introuvable"), req());
+            new ResourceNotFoundException("Workspace not found"), req());
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(r.getBody()).isNotNull();
-        assertThat(r.getBody().getMessage()).contains("introuvable");
+        assertThat(r.getBody().getMessage()).contains("not found");
         assertThat(r.getBody().getPath()).isEqualTo("/api/test");
     }
 
@@ -72,7 +73,7 @@ class GlobalExceptionHandlerTest {
     @DisplayName("ForbiddenException → 403 Forbidden")
     void forbidden_403() {
         ResponseEntity<ErrorResponse> r = handler.handleForbiddenException(
-            new ForbiddenException("Accès refusé"), req());
+            new ForbiddenException("Access denied"), req());
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
@@ -98,6 +99,16 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<ErrorResponse> r = handler.handleIllegalArgument(
             new IllegalArgumentException("argument invalide"), req());
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("méthode non prise en charge → 405 avec l'en-tête Allow")
+    void method_not_allowed_405() {
+        ResponseEntity<ErrorResponse> r = handler.handleMethodNotSupported(
+            new HttpRequestMethodNotSupportedException("GET", List.of("POST")), req());
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(r.getHeaders().getAllow()).containsExactly(org.springframework.http.HttpMethod.POST);
+        assertThat(r.getBody().getMessage()).contains("not allowed");
     }
 
     @Test

@@ -62,13 +62,11 @@ class ProjectControllerWebMvcTest {
     void gets() throws Exception {
         var a = auth();
         when(projectService.getProject(anyString(), anyLong(), anyLong())).thenReturn(null);
-        when(projectService.getProjectActivity(anyString(), anyLong(), anyLong(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(List.of());
         when(projectService.listMembers(anyString(), anyLong(), anyLong())).thenReturn(List.of());
         when(projectService.listProjectTeams(anyString(), anyLong(), anyLong())).thenReturn(List.of());
         when(projectService.listLabels(anyString(), anyLong(), anyLong())).thenReturn(List.of());
 
         mockMvc.perform(get(P).with(a)).andExpect(status().isOk());
-        mockMvc.perform(get(P + "/activity").with(a)).andExpect(status().isOk());
         mockMvc.perform(get(P + "/members").with(a)).andExpect(status().isOk());
         mockMvc.perform(get(P + "/teams").with(a)).andExpect(status().isOk());
         mockMvc.perform(get(P + "/labels").with(a)).andExpect(status().isOk());

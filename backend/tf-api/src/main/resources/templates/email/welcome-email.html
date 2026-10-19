@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bienvenue sur TaskForce</title>
+    <title>Welcome to TaskForce</title>
     <style>
         * {
             margin: 0;
@@ -151,62 +151,49 @@
         </div>
         
         <div class="content">
-            <div class="greeting">Bienvenue <span th:text="${firstName}">Prénom</span> 🎉</div>
-            <div class="subtitle">Votre compte a été créé avec succès</div>
+            <div class="greeting">Welcome, <span th:text="${firstName}">there</span></div>
+            <div class="subtitle">Your account is ready</div>
             
             <p style="color: #737373; font-size: 15px; margin-bottom: 24px;">
-                Nous sommes ravis de vous accueillir sur TaskForce. Vous pouvez maintenant commencer 
-                à organiser vos projets et collaborer avec votre équipe.
+                You can now organize your projects and work with your team.
             </p>
             
-            <a th:href="${appUrl}" class="button">Accéder à mon compte</a>
+            <a th:href="${appUrl}" class="button">Open TaskForce</a>
             
             <div class="features">
                 <div class="feature-card">
-                    <div class="feature-title">🚀 Gestion de projets</div>
+                    <div class="feature-title">🚀 Projects and issues</div>
                     <div class="feature-desc">
-                        Créez et organisez vos projets avec des outils intuitifs et puissants.
+                        Plan the work on boards, lists, cycles and a roadmap.
                     </div>
                 </div>
                 
                 <div class="feature-card">
-                    <div class="feature-title">👥 Collaboration d'équipe</div>
+                    <div class="feature-title">👥 Team work</div>
                     <div class="feature-desc">
-                        Invitez votre équipe et travaillez ensemble en temps réel.
+                        Invite your team and work together in real time.
                     </div>
                 </div>
                 
                 <div class="feature-card">
-                    <div class="feature-title">📊 Suivi des progrès</div>
+                    <div class="feature-title">📊 Progress</div>
                     <div class="feature-desc">
-                        Suivez l'avancement de vos tâches avec des tableaux de bord clairs.
+                        Follow the work on dashboards and analytics.
                     </div>
                 </div>
                 
                 <div class="feature-card">
-                    <div class="feature-title">🤖 Automatisations</div>
+                    <div class="feature-title">🤖 AI</div>
                     <div class="feature-desc">
-                        Automatisez vos workflows et gagnez du temps sur les tâches répétitives.
+                        Ask Cortex, keep your knowledge in Brain OS, delegate an issue to Claude Code.
                     </div>
                 </div>
             </div>
             
-            <div class="help-section">
-                <div class="help-title">Besoin d'aide ?</div>
-                <div class="help-text">
-                    Notre équipe est là pour vous accompagner dans votre découverte de TaskForce.
-                </div>
-                <a th:href="${supportUrl}" class="help-link">Consulter le centre d'aide →</a>
-            </div>
         </div>
         
         <div class="footer">
-            <p class="footer-text">© 2026 TaskForce. Tous droits réservés.</p>
-            <div class="footer-links">
-                <a th:href="${supportUrl}" class="footer-link">Centre d'aide</a>
-                <a href="#" class="footer-link">Confidentialité</a>
-                <a th:href="${contactUrl}" class="footer-link">Contact</a>
-            </div>
+            <p class="footer-text">Sent by TaskForce, open-source project management.</p>
         </div>
     </div>
 </body>

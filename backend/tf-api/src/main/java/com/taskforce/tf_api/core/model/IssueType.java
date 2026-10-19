@@ -55,7 +55,7 @@ public class IssueType {
 
     @Column(nullable = false, length = 30)
     @Builder.Default
-    private String color = "#6366f1";
+    private String color = "#2f6bf6";
 
     /** Nom d'icône Lucide (ex: "bug", "circle-dot", "zap") */
     @Column(nullable = false, length = 50)

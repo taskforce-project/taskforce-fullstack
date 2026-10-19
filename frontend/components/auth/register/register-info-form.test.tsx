@@ -26,9 +26,9 @@ vi.mock('sonner', () => ({
 // Real French constants (importActual avoids the vi.mock hoisting trap) - keeps text queries valid
 // and drift-proof; also feeds the embedded <AuthStepper/>, which now reads the store.
 vi.mock('@/lib/store/preferences-store', async () => {
-  const { CONSTANTS_FR } = await vi.importActual<typeof import('@/lib/constants_fr')>('@/lib/constants_fr');
+  const { CONSTANTS_EN } = await vi.importActual<typeof import('@/lib/constants_en')>('@/lib/constants_en');
   return {
-    usePreferencesStore: () => ({ t: CONSTANTS_FR }),
+    usePreferencesStore: () => ({ t: CONSTANTS_EN }),
   };
 });
 
@@ -51,32 +51,32 @@ describe('SignupForm - Step 1: Information Form', () => {
     it('should render all form fields', () => {
       render(<SignupForm />);
 
-      expect(screen.getByLabelText(/^prénom$/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/^nom$/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^first name$/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^last name$/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/^email$/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/^mot de passe$/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/^confirmer$/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^confirm$/i)).toBeInTheDocument();
     });
 
     it('should render submit button', () => {
       render(<SignupForm />);
 
-      expect(screen.getByRole('button', { name: /continuer/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /continue/i })).toBeInTheDocument();
     });
 
     it('should render progress indicator showing step 1', () => {
       render(<SignupForm />);
 
       // Le fil d'étapes est à l'étape 1 : chaque étape porte son libellé d'un mot, l'aria annonce la position.
-      expect(screen.getByText('Compte')).toBeInTheDocument();
+      expect(screen.getByText('Account')).toBeInTheDocument();
       expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1');
     });
 
     it('should render login link', () => {
       render(<SignupForm />);
 
-      expect(screen.getByText(/vous avez déjà un compte/i)).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /se connecter/i })).toHaveAttribute('href', '/auth/login');
+      expect(screen.getByText(/already have an account/i)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /^sign in$/i })).toHaveAttribute('href', '/auth/login');
     });
   });
 
@@ -84,7 +84,7 @@ describe('SignupForm - Step 1: Information Form', () => {
     it('should show error when submitting empty form', async () => {
       render(<SignupForm />);
 
-      const submitButton = screen.getByRole('button', { name: /continuer/i });
+      const submitButton = screen.getByRole('button', { name: /continue/i });
       
       // HTML5 validation prevents submission of empty required fields
       // This test verifies button exists and is not disabled when form is empty
@@ -101,20 +101,20 @@ describe('SignupForm - Step 1: Information Form', () => {
       render(<SignupForm />);
 
       // Fill all required fields but with invalid firstName
-      await user.type(screen.getByLabelText(/^prénom$/i), 'X'); // Too short
-      await user.type(screen.getByLabelText(/^nom$/i), 'Doe');
+      await user.type(screen.getByLabelText(/^first name$/i), 'X'); // Too short
+      await user.type(screen.getByLabelText(/^last name$/i), 'Doe');
       await user.type(screen.getByLabelText(/^email$/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/^mot de passe$/i), 'StrongP@ssw0rd123');
-      await user.type(screen.getByLabelText(/^confirmer$/i), 'StrongP@ssw0rd123');
+      await user.type(screen.getByLabelText(/^password$/i), 'StrongP@ssw0rd123');
+      await user.type(screen.getByLabelText(/^confirm$/i), 'StrongP@ssw0rd123');
 
-      const submitButton = screen.getByRole('button', { name: /continuer/i });
+      const submitButton = screen.getByRole('button', { name: /continue/i });
       await user.click(submitButton);
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Erreur',
+          'Error',
           expect.objectContaining({
-            description: expect.stringContaining('prénom'),
+            description: expect.stringContaining('First name'),
           })
         );
       });
@@ -124,20 +124,20 @@ describe('SignupForm - Step 1: Information Form', () => {
       const user = userEvent.setup();
       render(<SignupForm />);
 
-      await user.type(screen.getByLabelText(/^prénom$/i), 'John');
-      await user.type(screen.getByLabelText(/^nom$/i), 'D'); // Too short
+      await user.type(screen.getByLabelText(/^first name$/i), 'John');
+      await user.type(screen.getByLabelText(/^last name$/i), 'D'); // Too short
       await user.type(screen.getByLabelText(/^email$/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/^mot de passe$/i), 'StrongP@ssw0rd123');
-      await user.type(screen.getByLabelText(/^confirmer$/i), 'StrongP@ssw0rd123');
+      await user.type(screen.getByLabelText(/^password$/i), 'StrongP@ssw0rd123');
+      await user.type(screen.getByLabelText(/^confirm$/i), 'StrongP@ssw0rd123');
 
-      const submitButton = screen.getByRole('button', { name: /continuer/i });
+      const submitButton = screen.getByRole('button', { name: /continue/i });
       await user.click(submitButton);
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Erreur',
+          'Error',
           expect.objectContaining({
-            description: expect.stringContaining('nom'),
+            description: expect.stringContaining('Last name'),
           })
         );
       });
@@ -149,20 +149,20 @@ describe('SignupForm - Step 1: Information Form', () => {
       const user = userEvent.setup();
       render(<SignupForm />);
 
-      await user.type(screen.getByLabelText(/^prénom$/i), 'John');
-      await user.type(screen.getByLabelText(/^nom$/i), 'Doe');
+      await user.type(screen.getByLabelText(/^first name$/i), 'John');
+      await user.type(screen.getByLabelText(/^last name$/i), 'Doe');
       await user.type(screen.getByLabelText(/^email$/i), 'test@tempmail.com');
-      await user.type(screen.getByLabelText(/^mot de passe$/i), 'Test@2024!');
-      await user.type(screen.getByLabelText(/^confirmer$/i), 'Test@2024!');
+      await user.type(screen.getByLabelText(/^password$/i), 'Test@2024!');
+      await user.type(screen.getByLabelText(/^confirm$/i), 'Test@2024!');
 
-      const submitButton = screen.getByRole('button', { name: /continuer/i });
+      const submitButton = screen.getByRole('button', { name: /continue/i });
       await user.click(submitButton);
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Erreur',
+          'Error',
           expect.objectContaining({
-            description: "Les adresses email temporaires ne sont pas autorisées",
+            description: "Temporary email addresses are not allowed",
           })
         );
       });
@@ -174,20 +174,20 @@ describe('SignupForm - Step 1: Information Form', () => {
       const user = userEvent.setup();
       render(<SignupForm />);
 
-      await user.type(screen.getByLabelText(/^prénom$/i), 'John');
-      await user.type(screen.getByLabelText(/^nom$/i), 'Doe');
+      await user.type(screen.getByLabelText(/^first name$/i), 'John');
+      await user.type(screen.getByLabelText(/^last name$/i), 'Doe');
       await user.type(screen.getByLabelText(/^email$/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/^mot de passe$/i), 'Test@2024!');
-      await user.type(screen.getByLabelText(/^confirmer$/i), 'Different@2024!');
+      await user.type(screen.getByLabelText(/^password$/i), 'Test@2024!');
+      await user.type(screen.getByLabelText(/^confirm$/i), 'Different@2024!');
 
-      const submitButton = screen.getByRole('button', { name: /continuer/i });
+      const submitButton = screen.getByRole('button', { name: /continue/i });
       await user.click(submitButton);
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Erreur',
+          'Error',
           expect.objectContaining({
-            description: 'Les mots de passe ne correspondent pas',
+            description: "Passwords don't match",
           })
         );
       });
@@ -197,13 +197,13 @@ describe('SignupForm - Step 1: Information Form', () => {
       const user = userEvent.setup();
       render(<SignupForm />);
 
-      await user.type(screen.getByLabelText(/^prénom$/i), 'John');
-      await user.type(screen.getByLabelText(/^nom$/i), 'Doe');
+      await user.type(screen.getByLabelText(/^first name$/i), 'John');
+      await user.type(screen.getByLabelText(/^last name$/i), 'Doe');
       await user.type(screen.getByLabelText(/^email$/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/^mot de passe$/i), 'test@2024!');
-      await user.type(screen.getByLabelText(/^confirmer$/i), 'test@2024!');
+      await user.type(screen.getByLabelText(/^password$/i), 'test@2024!');
+      await user.type(screen.getByLabelText(/^confirm$/i), 'test@2024!');
 
-      const submitButton = screen.getByRole('button', { name: /continuer/i });
+      const submitButton = screen.getByRole('button', { name: /continue/i });
       await user.click(submitButton);
 
       await waitFor(() => {
@@ -213,22 +213,22 @@ describe('SignupForm - Step 1: Information Form', () => {
   });
 
   describe('Successful Submission', () => {
-    it('should store data and redirect to plan selection on valid form', async () => {
+    it('should store data and go to verification on valid form', async () => {
       const user = userEvent.setup();
       
       render(<SignupForm />);
 
-      await user.type(screen.getByLabelText(/^prénom$/i), 'John');
-      await user.type(screen.getByLabelText(/^nom$/i), 'Doe');
+      await user.type(screen.getByLabelText(/^first name$/i), 'John');
+      await user.type(screen.getByLabelText(/^last name$/i), 'Doe');
       await user.type(screen.getByLabelText(/^email$/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/^mot de passe$/i), 'StrongP@ssw0rd!');
-      await user.type(screen.getByLabelText(/^confirmer$/i), 'StrongP@ssw0rd!');
+      await user.type(screen.getByLabelText(/^password$/i), 'StrongP@ssw0rd!');
+      await user.type(screen.getByLabelText(/^confirm$/i), 'StrongP@ssw0rd!');
 
-      const submitButton = screen.getByRole('button', { name: /continuer/i });
+      const submitButton = screen.getByRole('button', { name: /continue/i });
       await user.click(submitButton);
 
       // `challengeToken` s'ajoute à la charge stockée : le jeton de vérification humaine est émis au
-      // chargement de cette étape mais consommé à l'étape 3, il doit donc transiter par la session.
+      // chargement de cette étape mais consommé à l'étape 2, il doit donc transiter par la session.
       // Vide ici, la requête de défi n'étant pas simulée dans ce test.
       await waitFor(() => {
         expect(mockSetRegisterData).toHaveBeenCalledWith({
@@ -236,7 +236,6 @@ describe('SignupForm - Step 1: Information Form', () => {
           lastName: 'Doe',
           email: 'test@example.com',
           password: 'StrongP@ssw0rd!',
-          planType: 'FREE',
           challengeToken: '',
           turnstileToken: '',
         });
@@ -258,13 +257,13 @@ describe('SignupForm - Step 1: Information Form', () => {
       render(<SignupForm />);
 
       // Utiliser des noms valides (pas de caractères spéciaux HTML qui seraient rejetés par validateName)
-      await user.type(screen.getByLabelText(/^prénom$/i), 'Jean-Paul');
-      await user.type(screen.getByLabelText(/^nom$/i), "O'Connor");
+      await user.type(screen.getByLabelText(/^first name$/i), 'Jean-Paul');
+      await user.type(screen.getByLabelText(/^last name$/i), "O'Connor");
       await user.type(screen.getByLabelText(/^email$/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/^mot de passe$/i), 'StrongP@ssw0rd!');
-      await user.type(screen.getByLabelText(/^confirmer$/i), 'StrongP@ssw0rd!');
+      await user.type(screen.getByLabelText(/^password$/i), 'StrongP@ssw0rd!');
+      await user.type(screen.getByLabelText(/^confirm$/i), 'StrongP@ssw0rd!');
 
-      const submitButton = screen.getByRole('button', { name: /continuer/i });
+      const submitButton = screen.getByRole('button', { name: /continue/i });
       await user.click(submitButton);
 
       await waitFor(() => {
@@ -284,13 +283,13 @@ describe('SignupForm - Step 1: Information Form', () => {
       const user = userEvent.setup();
       render(<SignupForm />);
 
-      await user.type(screen.getByLabelText(/^prénom$/i), 'John');
-      await user.type(screen.getByLabelText(/^nom$/i), 'Doe');
+      await user.type(screen.getByLabelText(/^first name$/i), 'John');
+      await user.type(screen.getByLabelText(/^last name$/i), 'Doe');
       await user.type(screen.getByLabelText(/^email$/i), 'test@example.com');
-      await user.type(screen.getByLabelText(/^mot de passe$/i), 'StrongP@ssw0rd!');
-      await user.type(screen.getByLabelText(/^confirmer$/i), 'StrongP@ssw0rd!');
+      await user.type(screen.getByLabelText(/^password$/i), 'StrongP@ssw0rd!');
+      await user.type(screen.getByLabelText(/^confirm$/i), 'StrongP@ssw0rd!');
 
-      const submitButton = screen.getByRole('button', { name: /continuer/i });
+      const submitButton = screen.getByRole('button', { name: /continue/i });
       await user.click(submitButton);
 
       // Verify the form was submitted (mockSetRegisterData was called)
@@ -304,11 +303,11 @@ describe('SignupForm - Step 1: Information Form', () => {
     it('should have proper labels for all inputs', () => {
       render(<SignupForm />);
 
-      expect(screen.getByLabelText(/^prénom$/i)).toHaveAccessibleName();
-      expect(screen.getByLabelText(/^nom$/i)).toHaveAccessibleName();
+      expect(screen.getByLabelText(/^first name$/i)).toHaveAccessibleName();
+      expect(screen.getByLabelText(/^last name$/i)).toHaveAccessibleName();
       expect(screen.getByLabelText(/^email$/i)).toHaveAccessibleName();
-      expect(screen.getByLabelText(/^mot de passe$/i)).toHaveAccessibleName();
-      expect(screen.getByLabelText(/^confirmer$/i)).toHaveAccessibleName();
+      expect(screen.getByLabelText(/^password$/i)).toHaveAccessibleName();
+      expect(screen.getByLabelText(/^confirm$/i)).toHaveAccessibleName();
     });
   });
 });

@@ -1,115 +1,105 @@
 ---
 title: Conventions
-subtitle: Enveloppe, méthodes, erreurs, pagination, codes HTTP.
+subtitle: Errors, pagination, rate limits and formats, for every endpoint.
 ---
 
-Ces règles s'appliquent à **tous** les endpoints. Les connaître dispense de les relire sur chaque
-route.
+## Methods
 
-## Le préfixe `/api`
-
-Toute route porte le préfixe **`/api`**. Il n'y a pas de version dans le chemin — la référence OpenAPI
-fait foi pour le contrat courant.
-
-## Méthodes HTTP
-
-L'API suit les conventions REST habituelles :
-
-| Méthode | Usage |
+| Method | Use |
 | --- | --- |
-| **GET** | Lire une ressource ou une liste. Sans effet de bord. |
-| **POST** | Créer une ressource, ou déclencher une action. |
-| **PUT / PATCH** | Mettre à jour (remplacement / modification partielle). |
-| **DELETE** | Supprimer. |
+| **GET** | Read a resource or a list, without side effects. |
+| **POST** | Create a resource, or run an action. |
+| **PUT** / **PATCH** | Change a resource. |
+| **DELETE** | Delete a resource. |
 
-## L'enveloppe `ApiResponse<T>`
+Most creations return `201`, other successes `200`.
 
-Succès comme erreur, le corps suit la même forme :
+## Errors
+
+Read the HTTP status first. The body of an error has a `message` that says what went wrong, in one of two shapes.
+
+Most errors, validation included:
 
 ```json
 {
-  "success": true,
-  "message": "…",
-  "data": { },
-  "timestamp": "2026-08-25T14:12:00"
+  "status": 400,
+  "error": "Validation Error",
+  "message": "Invalid input data",
+  "path": "/api/workspaces/acme/projects/12/issues",
+  "timestamp": "2026-10-19T14:12:00",
+  "validationErrors": { "title": ["The title is required"] }
 }
 ```
 
-- **`success`** — booléen, l'issue de la requête.
-- **`message`** — libellé lisible (utile pour l'affichage / le log).
-- **`data`** — **la charge utile** (objet, liste, ou `null` en cas d'erreur).
-- **`timestamp`** — l'horodatage de la réponse.
+`validationErrors` lists, for each invalid field, what is wrong with it. Some endpoints, sign-in among them, answer
+with the envelope of successful responses instead, with `"success": false`, the reason in `message` and
+`"data": null`.
 
-## Codes de statut
-
-| Code | Quand |
+| Code | When |
 | --- | --- |
-| **200 / 201** | Succès (201 à la création). |
-| **400 Bad Request** | Corps invalide — échec de validation. |
-| **401 / 403** | Non authentifié / droits insuffisants. → [Authentification](/api/api-authentification) |
-| **404 Not Found** | Ressource introuvable ou hors de votre périmètre. |
-| **409 Conflict** | Conflit d'état (ex. doublon, contrainte). |
-| **429 Too Many Requests** | Limite de débit atteinte (voir ci-dessous). |
-| **5xx** | Erreur serveur. |
-
-En cas d'erreur applicative, l'enveloppe passe `success: false` et **`message`** décrit le problème
-(`data` vaut alors `null`) :
-
-```json
-{
-  "success": false,
-  "message": "La priorité doit être l'une de : NONE, LOW, MEDIUM, HIGH, URGENT",
-  "data": null,
-  "timestamp": "2026-08-25T14:12:00"
-}
-```
-
-Traitez donc **tout non-2xx** comme une erreur, et affichez / journalisez `message`.
+| **400** | Invalid body or parameters, or a request the current state does not allow. |
+| **401** | Not signed in, or the token expired. See [Authentication](/api/api-authentication). |
+| **403** | Signed in, but the role does not allow the action. |
+| **404** | The resource does not exist, or is not visible to this account. |
+| **409** | A conflict with the current state, such as a duplicate. |
+| **413** | The uploaded file is too large. |
+| **429** | Too many requests: see below. |
+| **5xx** | A server error. Retry later; the instance's logs say more. |
 
 ## Pagination
 
-Les listes volumineuses sont **paginées**. Passez ces paramètres de requête :
-
-```
-?page=0&size=30&sort=createdAt,desc
-```
-
-- **`page`** — index de page, à partir de `0` (défaut `0`).
-- **`size`** — taille de page (défaut `30`).
-- **`sort`** — champ + sens (`asc` / `desc`).
-
-La réponse place un **`PageResponse<T>`** dans `data` — il contient les éléments (`content`), la page
-courante et sa taille (`pageNumber`, `pageSize`), et le total (nombre d'éléments et de pages) :
+Lists return all their items at once, except the issues of a project, which can also be read page by page with
+`GET /api/workspaces/{slug}/projects/{projectId}/issues/paged`. It takes `page` (from `0`) and `size` (default `30`,
+at most `100`), and returns a page in `data`:
 
 ```json
 {
-  "success": true,
-  "data": {
-    "content": [ /* … */ ],
-    "pageNumber": 0,
-    "pageSize": 30,
-    "totalElements": 128,
-    "totalPages": 5
-  }
+  "content": [],
+  "pageNumber": 0,
+  "pageSize": 30,
+  "totalElements": 128,
+  "totalPages": 5,
+  "first": true,
+  "last": false,
+  "empty": false
 }
 ```
 
-## Limite de débit
+Read the next pages until `last` is `true`.
 
-L'API applique une **limite de débit par IP**. Deux en-têtes vous guident :
+## Rate limits
 
-- **`X-RateLimit-Remaining`** — le crédit restant (présent sur les réponses) : levez le pied avant le mur.
-- **`Retry-After`** — sur un **429**, le nombre de **secondes** à attendre avant de réessayer.
+Each IP address has a budget per minute:
 
-<Note>
-  Le corps d'un **429** provient d'un filtre en amont et adopte une forme courte
-  (`{"error":"Too Many Requests","message":"…"}`) plutôt que l'enveloppe `ApiResponse`. Fiez-vous au
-  **code 429** et à l'en-tête **`Retry-After`**.
-</Note>
+| Requests | Per minute |
+| --- | --- |
+| Sign-in, sign-up, password reset and verification codes | 10 |
+| Token refresh | 20 |
+| AI assistant and Smart Assign | 20 |
+| Everything else | 200 |
+
+Each response carries `X-RateLimit-Remaining`. Past the limit, the API answers `429` with `Retry-After`, the number
+of seconds to wait, and a short body:
+
+```json
+{ "error": "Too Many Requests", "message": "Rate limit reached. Retry in 12s.", "retryAfterSeconds": 12 }
+```
+
+Wait for `Retry-After` before retrying, and back off when you retry several times.
+
+AI features also share a budget per minute across the instance (`429` with `Retry-After`), and the instance may
+cap each workspace owner's AI use per month: past that cap, AI calls return `409` until the first day of next month.
 
 ## Formats
 
-- **Identifiants** : numériques (ex. `projectId`, `issueId`) ; certaines ressources ont aussi un
-  **identifiant lisible** (ex. tâche `WEB-42`).
-- **Dates** : au format **ISO 8601**.
-- **Périmètre** : `slug` d'espace et `id` d'opération dans le chemin, selon la ressource.
+- **Identifiers** are numbers (`projectId`, `issueId`). Issues also have a readable identifier made of the project's
+  key and a number (`WEB-42`).
+- **Dates** are ISO 8601. Date-times are in UTC, written without a time zone (`2026-10-19T14:12:00`): add the `Z`
+  before converting them to local time.
+- **Text** in issues, comments and Brain OS pages is Markdown.
+
+## Good habits
+
+- Make your calls safe to repeat: after a network error or a `429`, the same call may run twice.
+- Generate a client from the OpenAPI description rather than writing each call by hand: contract changes then show up
+  when you regenerate it.

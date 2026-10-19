@@ -48,7 +48,7 @@ public class RedistributionController {
     ) {
         Long userId = resolveUserId(jwt);
         RedistributionPlanResponse plan = redistributionService.preview(slug, userId, targetUserId);
-        return ResponseEntity.ok(ApiResponse.success("Plan de redistribution calculé", plan));
+        return ResponseEntity.ok(ApiResponse.success("Redistribution plan computed", plan));
     }
 
     @PostMapping("/apply")
@@ -59,13 +59,13 @@ public class RedistributionController {
     ) {
         Long userId = resolveUserId(jwt);
         ApplyRedistributionResponse result = redistributionService.apply(slug, userId, request);
-        return ResponseEntity.ok(ApiResponse.success("Redistribution appliquée", result));
+        return ResponseEntity.ok(ApiResponse.success("Redistribution applied", result));
     }
 
     private Long resolveUserId(Jwt jwt) {
         String email = identityResolver.resolveEmail(jwt);
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

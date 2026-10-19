@@ -1,7 +1,10 @@
 package com.taskforce.tf_api.core.service.delivery;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.ClientResource;
@@ -44,9 +47,15 @@ public class RunnerProvisioningService {
     static final String OWNER_MAPPER_NAME = "tf-runner-owner";
     private static final String HARDCODED_CLAIM_MAPPER = "oidc-hardcoded-claim-mapper";
 
+    /** Présence d'un runner, relue au plus toutes les minutes : la liste des agents et Smart Assign la consultent. */
+    static final Duration PRESENCE_TTL = Duration.ofMinutes(1);
+
     private final Keycloak keycloak;
     private final LocalRunnerSettings settings;
     private final String realm;
+    private final Map<Long, Presence> presence = new ConcurrentHashMap<>();
+
+    private record Presence(boolean exists, Instant checkedAt) {}
 
     public RunnerProvisioningService(
         Keycloak keycloakAdminClient,
@@ -65,6 +74,26 @@ public class RunnerProvisioningService {
         return new RunnerStatusResponse(exists, clientId, owner.getEmail().toLowerCase());
     }
 
+    /**
+     * La personne a-t-elle un runner ? Lu dans Keycloak, gardé une minute. Keycloak injoignable : réponse « oui »,
+     * pour ne pas bloquer une délégation sur une panne passagère (un run jamais réclamé est clos de toute façon).
+     */
+    public boolean hasRunner(Long userId) {
+        Presence known = presence.get(userId);
+        if (known != null && known.checkedAt().plus(PRESENCE_TTL).isAfter(Instant.now())) {
+            return known.exists();
+        }
+        try {
+            boolean exists = !keycloak.realm(realm).clients()
+                .findByClientId(runnerClientId(settings.clientPrefix(), userId)).isEmpty();
+            presence.put(userId, new Presence(exists, Instant.now()));
+            return exists;
+        } catch (RuntimeException e) {
+            log.warn("Présence du runner de {} non vérifiée : {}", userId, e.getMessage());
+            return true;
+        }
+    }
+
     /** Provisionne (ou re-provisionne, en régénérant le secret) le runner de {@code owner}. */
     public RunnerProvisionResponse provision(User owner) {
         String ownerEmail = owner.getEmail().toLowerCase();
@@ -77,6 +106,7 @@ public class RunnerProvisioningService {
         setOwnerMapper(client, settings.ownerClaim(), ownerEmail);
 
         String secret = client.generateNewSecret().getValue();
+        presence.put(owner.getId(), new Presence(true, Instant.now()));
         log.info("Runner provisionné : client {} (propriétaire {})", clientId, ownerEmail);
         return new RunnerProvisionResponse(clientId, secret, ownerEmail);
     }
@@ -90,7 +120,7 @@ public class RunnerProvisioningService {
         try {
             realmResource.roles().get(roleName).toRepresentation();
         } catch (NotFoundException e) {
-            realmResource.roles().create(new RoleRepresentation(roleName, "Runner local de délégation (ADR-013)", false));
+            realmResource.roles().create(new RoleRepresentation(roleName, "Local delegation runner (ADR-013)", false));
             log.info("Rôle Keycloak '{}' créé", roleName);
         }
     }
@@ -103,7 +133,7 @@ public class RunnerProvisioningService {
         if (existing.isEmpty()) {
             try (Response response = realmResource.clients().create(rep)) {
                 if (response.getStatus() >= 300) {
-                    throw new IllegalStateException("Création du client runner refusée (HTTP " + response.getStatus() + ")");
+                    throw new IllegalStateException("The identity provider refused to create the runner client (HTTP " + response.getStatus() + ")");
                 }
             }
             uuid = realmResource.clients().findByClientId(clientId).get(0).getId();
@@ -144,7 +174,7 @@ public class RunnerProvisioningService {
         rep.setStandardFlowEnabled(false);
         rep.setImplicitFlowEnabled(false);
         rep.setDirectAccessGrantsEnabled(false);
-        rep.setDescription("Runner local (ADR-013) - propriétaire : " + ownerEmail);
+        rep.setDescription("Local runner (ADR-013), owner: " + ownerEmail);
         return rep;
     }
 

@@ -28,19 +28,19 @@ public class CreateIssueTool implements AgentTool {
     @Override public String name() { return "create_issue"; }
 
     @Override public String description() {
-        return "Crée une issue dans un projet TaskForce. Requiert projectId (voir list_projects) et title. "
-            + "Optionnels : description, priority (NONE, LOW, MEDIUM, HIGH, URGENT). C'est l'action TaskForce "
-            + "par défaut ; pour créer côté externe, utiliser l'outil « <service>__ » dédié.";
+        return "Creates an issue in a TaskForce project. Requires projectId (see list_projects) and title. "
+            + "Optional: description, priority (NONE, LOW, MEDIUM, HIGH, URGENT). This is the default TaskForce "
+            + "action; to create it in an external tool, use the matching \"<service>__\" tool.";
     }
 
     @Override public Map<String, Object> parametersSchema() {
         return Map.of(
             "type", "object",
             "properties", Map.of(
-                "projectId",   Map.of("type", "integer", "description", "Projet cible (voir list_projects)"),
-                "title",       Map.of("type", "string", "description", "Titre de l'issue"),
-                "description", Map.of("type", "string", "description", "Description markdown (optionnel)"),
-                "priority",    Map.of("type", "string", "description", "NONE|LOW|MEDIUM|HIGH|URGENT (optionnel)")
+                "projectId",   Map.of("type", "integer", "description", "Target project (see list_projects)"),
+                "title",       Map.of("type", "string", "description", "Issue title"),
+                "description", Map.of("type", "string", "description", "Markdown description (optional)"),
+                "priority",    Map.of("type", "string", "description", "NONE|LOW|MEDIUM|HIGH|URGENT (optional)")
             ),
             "required", List.of("projectId", "title")
         );
@@ -48,9 +48,9 @@ public class CreateIssueTool implements AgentTool {
 
     @Override public String execute(Map<String, Object> args, AgentContext ctx) {
         Long projectId = asLong(args.get("projectId"));
-        if (projectId == null) return "projectId manquant : appelle d'abord list_projects pour le trouver.";
+        if (projectId == null) return "projectId is missing: call list_projects first to find it.";
         String title = args.get("title") != null ? String.valueOf(args.get("title")).trim() : "";
-        if (title.isEmpty()) return "title manquant : impossible de créer une issue sans titre.";
+        if (title.isEmpty()) return "title is missing: an issue needs a title.";
 
         CreateIssueRequest req = new CreateIssueRequest();
         req.setTitle(title);
@@ -59,8 +59,8 @@ public class CreateIssueTool implements AgentTool {
         if (priority != null) req.setPriority(priority);
 
         IssueResponse issue = issueService.createIssue(ctx.slug(), projectId, req, ctx.userId());
-        return "Issue créée dans TaskForce : " + issue.getIdentifier() + " « " + issue.getTitle()
-            + " » (id " + issue.getId() + ").";
+        return "Issue created in TaskForce: " + issue.getIdentifier() + " \"" + issue.getTitle()
+            + "\" (id " + issue.getId() + ").";
     }
 
     private static IssuePriority parsePriority(Object o) {

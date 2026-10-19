@@ -52,13 +52,11 @@ import {
 } from "@/components/ui/select"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { planLimit } from "@/lib/config/plan-limits"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useUserStore } from "@/lib/store/user-store"
-import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
-import { getWorkspaceUsage, type WorkspaceMember, type WorkspaceRole, type WorkspaceUsage } from "@/lib/api/workspace-service"
+import { type WorkspaceMember, type WorkspaceRole } from "@/lib/api/workspace-service"
 import {
   createInvitation,
   listPendingInvitations,
@@ -66,6 +64,7 @@ import {
   type Invitation,
 } from "@/lib/api/invitation-service"
 import { listSkillProfiles, type MemberSkillProfile } from "@/lib/api/skill-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 import { RedistributionDialog } from "@/components/dialogs/redistribution-dialog"
 
 const SENIORITY_LABEL: Record<string, string> = {
@@ -83,13 +82,13 @@ type RoleFilter = "all" | WorkspaceRole
 const ROLE_CONFIG: Record<WorkspaceRole, { label: string; badgeClass: string; icon: React.ReactNode }> = {
   OWNER: {
     label: "Owner",
-    badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/20",
-    icon: <Crown className="size-3 text-amber-400" />,
+    badgeClass: "bg-shape-yellow/15 text-ink-yellow border-shape-yellow/20",
+    icon: <Crown className="size-3 text-ink-yellow" />,
   },
   ADMIN: {
     label: "Admin",
-    badgeClass: "bg-violet-500/15 text-violet-400 border-violet-500/20",
-    icon: <Shield className="size-3 text-violet-400" />,
+    badgeClass: "bg-primary/15 text-ink-blue border-primary/20",
+    icon: <Shield className="size-3 text-ink-blue" />,
   },
   MEMBER: {
     label: "Member",
@@ -458,12 +457,10 @@ export default function MembersPage() {
   const [projectFilter, setProjectFilter] = useState<string>("all")
   const [invitationRefresh, setInvitationRefresh] = useState(0)
   const [profilesByUser, setProfilesByUser] = useState<Record<number, MemberSkillProfile>>({})
-  const [usage, setUsage] = useState<WorkspaceUsage | null>(null)
 
   const { members, membersLoading, membersError, fetchMembers, workspace } = useWorkspaceStore()
   const { projects, fetchProjects } = useProjectStore()
   const currentUser = useUserStore((s) => s.user)
-  const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
 
   useEffect(() => {
     fetchMembers()
@@ -497,9 +494,6 @@ export default function MembersPage() {
         setProfilesByUser(Object.fromEntries(profiles.map((p) => [p.userId, p])))
       })
       .catch(() => { /* non bloquant */ })
-    getWorkspaceUsage(slug)
-      .then((u) => { if (active) setUsage(u) })
-      .catch(() => { /* non bloquant - fallback plan-limits.ts */ })
     return () => { active = false }
   }, [workspace?.slug])
 
@@ -628,10 +622,10 @@ export default function MembersPage() {
       icon: <CalendarDays className="size-3.5" />,
       align: "right",
       className: "hidden lg:table-cell w-32",
-      sortValue: (m) => new Date(m.joinedAt).getTime(),
+      sortValue: (m) => parseServerDate(m.joinedAt).getTime(),
       render: (m) => (
         <span className="text-xs text-muted-foreground">
-          {new Date(m.joinedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+          {parseServerDate(m.joinedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
         </span>
       ),
     },
@@ -665,29 +659,9 @@ export default function MembersPage() {
             {memberCountLabel}
           </p>
         </div>
-        {canManage && (() => {
-          // Source de vérité = endpoint usage back (PROD-4.2) ; fallback plan-limits.ts si non chargé.
-          const used = usage?.membersUsed ?? members.length
-          const rawLimit = usage ? usage.membersLimit : planLimit(currentUser?.planType, "members")
-          const unlimited = rawLimit === -1 || !Number.isFinite(rawLimit)
-          const atLimit = !unlimited && used >= rawLimit
-          return (
-            <div className="flex flex-col items-end gap-1.5">
-              {!unlimited && (
-                <span className={cn("text-xs", atLimit ? "text-amber-500 font-medium" : "text-muted-foreground")}>
-                  {used}/{rawLimit} members
-                </span>
-              )}
-              {atLimit ? (
-                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openUpgrade()}>
-                  <Crown className="size-3.5 text-amber-500" /> Upgrade plan
-                </Button>
-              ) : (
-                <InviteMemberDialog onInvited={() => setInvitationRefresh((n) => n + 1)} />
-              )}
-            </div>
-          )
-        })()}
+        {canManage && (
+          <InviteMemberDialog onInvited={() => setInvitationRefresh((n) => n + 1)} />
+        )}
       </div>
 
       {/* Toolbar */}
@@ -771,7 +745,7 @@ export default function MembersPage() {
         // se confondre avec « No members found », qui laissait croire à un workspace vide.
         <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16 text-center shadow-sm">
           <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-muted">
-            <AlertTriangle className="size-5 text-amber-500" />
+            <AlertTriangle className="size-5 text-ink-yellow" />
           </div>
           <p className="text-base font-medium text-foreground">Could not load members</p>
           <p className="mt-1 text-sm text-muted-foreground">Something went wrong while loading this workspace.</p>
@@ -793,54 +767,6 @@ export default function MembersPage() {
       {canManage && workspace?.slug && (
         <PendingInvitations slug={workspace.slug} refreshKey={invitationRefresh} />
       )}
-
-      {/* Plan info - limite réelle selon le plan (QA2-20 : plus de « /5 » codé en dur) */}
-      {workspace && (() => {
-        const rawLimit = usage ? usage.membersLimit : planLimit(currentUser?.planType, "members")
-        const unlimited = rawLimit === -1 || !Number.isFinite(rawLimit)
-        const planLabel =
-          currentUser?.planType === "ENTERPRISE" ? "Enterprise"
-          : currentUser?.planType === "BUSINESS" ? "Business"
-          : currentUser?.planType === "BASIC" ? "Basic"
-          : "Free"
-        const atLimit = !unlimited && memberCount >= rawLimit
-        return (
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                {memberCount} member{memberCount === 1 ? "" : "s"} in <span className="font-semibold">{workspace.name}</span>
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {unlimited
-                  ? `${planLabel} plan - unlimited members.`
-                  : `${planLabel} plan - up to ${rawLimit} members.${atLimit ? " Limit reached." : ""}`}
-              </p>
-            </div>
-            {unlimited ? (
-              <Badge variant="secondary" className="gap-1.5 shrink-0">
-                <Crown className="size-3.5 text-amber-500" /> {planLabel}
-              </Badge>
-            ) : (
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="flex items-center gap-2">
-                  <div className="w-32 h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={cn("h-full rounded-full transition-all", atLimit ? "bg-amber-500" : "bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300")}
-                      style={{ width: `${Math.min((memberCount / rawLimit) * 100, 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground">{memberCount}/{rawLimit}</span>
-                </div>
-                {atLimit && (
-                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openUpgrade()}>
-                    <Crown className="size-3.5 text-amber-500" /> Upgrade
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        )
-      })()}
     </PageContainer>
   )
 }

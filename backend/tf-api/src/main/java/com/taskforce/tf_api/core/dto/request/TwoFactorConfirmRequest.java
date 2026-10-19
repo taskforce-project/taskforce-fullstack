@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TwoFactorConfirmRequest {
 
-    @NotBlank(message = "Le code est obligatoire")
-    @Pattern(regexp = "\\d{6}", message = "Le code doit contenir 6 chiffres")
+    @NotBlank(message = "The code is required")
+    @Pattern(regexp = "\\d{6}", message = "The code must be 6 digits")
     private String code;
 }

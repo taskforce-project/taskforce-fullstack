@@ -1,20 +1,18 @@
-"""AI Gateway — génération / tool-calling déléguée au LLM local (Ollama)."""
+"""Complétion (avec outils) déléguée au fournisseur configuré."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.dependencies import get_ollama_gateway
 from app.schemas import ChatRequest, ChatResponse
-from app.services.ollama_gateway import OllamaGateway, OllamaGatewayError
+from app.security import require_token
+from app.services.provider import ProviderError
 
-router = APIRouter(prefix="/v1", tags=["chat"])
+router = APIRouter(prefix="/v1", tags=["chat"], dependencies=[Depends(require_token)])
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat(
-    payload: ChatRequest,
-    gateway: OllamaGateway = Depends(get_ollama_gateway),
-) -> ChatResponse:
+def chat(payload: ChatRequest, request: Request) -> ChatResponse:
+    gateway = request.app.state.gateway
     try:
         model, message, usage = gateway.chat(
             payload.messages,
@@ -25,6 +23,6 @@ def chat(
             tier=payload.tier,
             think=payload.think,
         )
-    except OllamaGatewayError as exc:
+    except ProviderError as exc:  # IA coupée ou fournisseur indisponible
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return ChatResponse(model=model, message=message, usage=usage)

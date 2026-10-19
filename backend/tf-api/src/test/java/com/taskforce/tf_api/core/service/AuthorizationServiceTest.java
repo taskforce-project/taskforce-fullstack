@@ -82,7 +82,7 @@ class AuthorizationServiceTest {
 
             assertThatThrownBy(() -> service.requireMember(WS_ID, USER_ID))
                 .isInstanceOf(ForbiddenException.class)
-                .hasMessageContaining("pas membre");
+                .hasMessageContaining("not a member");
         }
     }
 
@@ -109,7 +109,7 @@ class AuthorizationServiceTest {
 
             assertThatThrownBy(() -> service.requireRole(WS_ID, USER_ID, WorkspaceRole.OWNER))
                 .isInstanceOf(ForbiddenException.class)
-                .hasMessageContaining("Permission insuffisante");
+                .hasMessageContaining("permission for this action");
         }
 
         @Test
@@ -119,7 +119,7 @@ class AuthorizationServiceTest {
 
             assertThatThrownBy(() -> service.requireRole(WS_ID, USER_ID, WorkspaceRole.MEMBER))
                 .isInstanceOf(ForbiddenException.class)
-                .hasMessageContaining("pas membre");
+                .hasMessageContaining("not a member");
         }
 
         @Test
@@ -129,7 +129,7 @@ class AuthorizationServiceTest {
 
             assertThatThrownBy(() -> service.requireRole(WS_ID, USER_ID))
                 .isInstanceOf(ForbiddenException.class)
-                .hasMessageContaining("Permission insuffisante");
+                .hasMessageContaining("permission for this action");
         }
     }
 
@@ -156,7 +156,7 @@ class AuthorizationServiceTest {
 
             assertThatThrownBy(() -> service.requireManager(WS_ID, USER_ID))
                 .isInstanceOf(ForbiddenException.class)
-                .hasMessageContaining("Permission insuffisante");
+                .hasMessageContaining("permission for this action");
         }
     }
 

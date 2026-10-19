@@ -46,13 +46,13 @@ public class SkillSuggestionController {
         Long requesterId = resolveUserId(jwt);
         List<String> suggestions = suggestionService.suggest(
             slug, request.getRole(), request.getExistingSkills(), requesterId);
-        return ResponseEntity.ok(ApiResponse.success("Suggestions de compétences", suggestions));
+        return ResponseEntity.ok(ApiResponse.success("Skill suggestions", suggestions));
     }
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         return userRepository.findByEmail(email)
             .map(User::getId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 }

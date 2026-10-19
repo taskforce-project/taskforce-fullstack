@@ -83,6 +83,18 @@ class AuthControllerWebMvcTest {
         when(authService.register(any())).thenReturn(null);
 
         mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"a@b.dev\",\"password\":\"password1\",\"firstName\":\"John\",\"lastName\":\"Doe\"}"))
+            .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/register d'un client qui envoie encore planType → 2xx (champ ignoré)")
+    void register_legacy_plan_field_2xx() throws Exception {
+        // Un onglet ouvert avant la mise à jour envoie encore le forfait retiré (ADR-016) : l'inscription
+        // aboutit quand même, le champ est simplement ignoré.
+        when(authService.register(any())).thenReturn(null);
+
+        mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"a@b.dev\",\"password\":\"password1\",\"firstName\":\"John\",\"lastName\":\"Doe\",\"planType\":\"FREE\"}"))
             .andExpect(status().is2xxSuccessful());
     }
@@ -116,7 +128,7 @@ class AuthControllerWebMvcTest {
     @DisplayName("POST /api/auth/register mot de passe trop court (@Size) → 400")
     void register_short_password_400() throws Exception {
         mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"a@b.dev\",\"password\":\"short\",\"firstName\":\"John\",\"lastName\":\"Doe\",\"planType\":\"FREE\"}"))
+                .content("{\"email\":\"a@b.dev\",\"password\":\"short\",\"firstName\":\"John\",\"lastName\":\"Doe\"}"))
             .andExpect(status().isBadRequest());
     }
 
@@ -141,16 +153,6 @@ class AuthControllerWebMvcTest {
             .andExpect(jsonPath("$.data.accessToken").value("a"))
             // Le refresh token part désormais en cookie HttpOnly, plus dans le corps JSON.
             .andExpect(header().string("Set-Cookie", containsString("tf_refresh=")));
-    }
-
-    @Test
-    @DisplayName("POST /api/auth/select-plan valide → 2xx")
-    void select_plan_2xx() throws Exception {
-        when(authService.selectPlan(any())).thenReturn(null);
-
-        mockMvc.perform(post("/api/auth/select-plan").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"a@b.dev\",\"planType\":\"PRO\"}"))
-            .andExpect(status().is2xxSuccessful());
     }
 
     @Test
@@ -205,7 +207,7 @@ class AuthControllerWebMvcTest {
     @DisplayName("POST /api/auth/register email invalide (@Email) → 400")
     void register_invalid_email_400() throws Exception {
         mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"not-an-email\",\"password\":\"password1\",\"firstName\":\"John\",\"lastName\":\"Doe\",\"planType\":\"FREE\"}"))
+                .content("{\"email\":\"not-an-email\",\"password\":\"password1\",\"firstName\":\"John\",\"lastName\":\"Doe\"}"))
             .andExpect(status().isBadRequest());
     }
 
@@ -215,26 +217,7 @@ class AuthControllerWebMvcTest {
         when(authService.register(any())).thenThrow(new RuntimeException("Email déjà utilisé"));
 
         mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"a@b.dev\",\"password\":\"password1\",\"firstName\":\"John\",\"lastName\":\"Doe\",\"planType\":\"FREE\"}"))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.success").value(false));
-    }
-
-    @Test
-    @DisplayName("POST /api/auth/select-plan plan invalide (@Pattern) → 400")
-    void select_plan_invalid_400() throws Exception {
-        mockMvc.perform(post("/api/auth/select-plan").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"a@b.dev\",\"planType\":\"GOLD\"}"))
-            .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("POST /api/auth/select-plan service lève → 400")
-    void select_plan_service_error_400() throws Exception {
-        when(authService.selectPlan(any())).thenThrow(new RuntimeException("Plan indisponible"));
-
-        mockMvc.perform(post("/api/auth/select-plan").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"a@b.dev\",\"planType\":\"PRO\"}"))
+                .content("{\"email\":\"a@b.dev\",\"password\":\"password1\",\"firstName\":\"John\",\"lastName\":\"Doe\"}"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.success").value(false));
     }

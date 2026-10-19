@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 
 <head>
     <meta charset="UTF-8">
@@ -156,38 +156,32 @@
         </div>
 
         <div class="content">
-            <div class="greeting">Invitation à rejoindre <span th:text="${workspaceName}">Workspace</span></div>
+            <div class="greeting">Join <span th:text="${workspaceName}">Workspace</span></div>
 
             <div class="message">
-                <strong th:text="${inviterName}">Quelqu'un</strong> vous invite à rejoindre l'espace de
-                travail <strong th:text="${workspaceName}">Workspace</strong> sur TaskForce.
+                <strong th:text="${inviterName}">Someone</strong> invited you to join the
+                <strong th:text="${workspaceName}">Workspace</strong> workspace on TaskForce.
             </div>
 
             <div style="text-align:center; margin:32px 0">
                 <a th:href="${acceptUrl}" href="#"
                    style="display:inline-block; background:#171717; color:#ffffff; text-decoration:none; padding:14px 28px; border-radius:8px; font-weight:600; font-size:15px">
-                    Rejoindre <span th:text="${workspaceName}">Workspace</span>
+                    Join <span th:text="${workspaceName}">Workspace</span>
                 </a>
             </div>
 
             <div class="info-box">
-                Si vous n'avez pas encore de compte, vous pourrez en créer un — votre invitation sera
-                appliquée automatiquement.
+                No account yet? Create one from the link: the invitation is applied automatically.
             </div>
 
             <div class="security-note">
-                ⏱️ Ce lien expire dans <strong>7 jours</strong>. Si vous n'attendiez pas cette invitation,
-                ignorez simplement cet email.
+                ⏱️ This link expires in <strong>7 days</strong>. If you weren't expecting this invitation,
+                you can ignore this email.
             </div>
         </div>
 
         <div class="footer">
-            <p class="footer-text">© 2026 TaskForce. Tous droits réservés.</p>
-            <div class="footer-links">
-                <a href="#" class="footer-link">Centre d'aide</a>
-                <a href="#" class="footer-link">Confidentialité</a>
-                <a href="#" class="footer-link">Contact</a>
-            </div>
+            <p class="footer-text">Sent by TaskForce, open-source project management.</p>
         </div>
     </div>
 </body>

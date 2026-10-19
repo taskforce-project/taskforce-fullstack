@@ -101,7 +101,7 @@ class DeliveryRunRepositoryIntegrationTest extends AbstractIntegrationTest {
     void list_is_scoped_ordered_and_fetches_issue_and_project() {
         DeliveryRun older = persistRun(webIssue, PROVIDER, DeliveryRunStatus.DONE, pierre, 60);
         DeliveryRun newer = persistRun(webIssue, PROVIDER, DeliveryRunStatus.FAILED, pierre, 5);
-        persistRun(apiIssue, "cursor", DeliveryRunStatus.RUNNING, pierre, 1); // autre projet : hors liste
+        persistRun(apiIssue, "other-agent", DeliveryRunStatus.RUNNING, pierre, 1); // autre projet : hors liste
         em.clear();
 
         List<DeliveryRun> runs = runRepository.findByProjectIds(List.of(web.getId()), PageRequest.of(0, 200));
@@ -136,7 +136,7 @@ class DeliveryRunRepositoryIntegrationTest extends AbstractIntegrationTest {
         DeliveryRun second = persistRun(webIssue, PROVIDER, DeliveryRunStatus.QUEUED, pierre, 10);
         DeliveryRun first = persistRun(apiIssue, PROVIDER, DeliveryRunStatus.QUEUED, pierre, 40);
         persistRun(webIssue, PROVIDER, DeliveryRunStatus.QUEUED, mallory, 50);  // autre délégant
-        persistRun(webIssue, "cursor", DeliveryRunStatus.QUEUED, pierre, 50);   // autre provider
+        persistRun(webIssue, "other-agent", DeliveryRunStatus.QUEUED, pierre, 50);   // autre provider
         persistRun(webIssue, PROVIDER, DeliveryRunStatus.DONE, pierre, 50);     // déjà terminé
         em.clear();
 

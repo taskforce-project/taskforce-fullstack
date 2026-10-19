@@ -92,12 +92,12 @@ class McpTokenServiceTest {
     }
 
     @Test
-    @DisplayName("storeInitialTokens : ecrit mcpUrl + issuer + tokens dans le config")
+    @DisplayName("storeInitialTokens : ecrit mcpUrl + nom + issuer + tokens, et retire un jeton colle precedent")
     void storeInitial() throws Exception {
-        ConnectorConnection c = conn("{}");
+        ConnectorConnection c = conn("{\"mcpToken\":\"old\",\"mcpHeader\":\"X-Api-Key\"}");
         service.storeInitialTokens(c,
             om.readTree("{\"access_token\":\"AT\",\"refresh_token\":\"RT\",\"expires_in\":3600}"),
-            "https://mcp.ex/mcp", "https://as.ex", "cid", "csecret", "https://as.ex/token");
+            "https://mcp.ex/mcp", "Team docs", "https://as.ex", "cid", "csecret", "https://as.ex/token");
 
         verify(repository).save(c);
         assertThat(c.getConfig())
@@ -106,6 +106,8 @@ class McpTokenServiceTest {
             .contains("\"mcpAccessToken\":\"AT\"")
             .contains("\"mcpRefreshToken\":\"RT\"")
             .contains("\"mcpClientId\":\"cid\"")
-            .contains("\"mcpTokenEndpoint\":\"https://as.ex/token\"");
+            .contains("\"mcpTokenEndpoint\":\"https://as.ex/token\"")
+            .contains("\"mcpName\":\"Team docs\"")
+            .doesNotContain("mcpToken\"").doesNotContain("mcpHeader");
     }
 }

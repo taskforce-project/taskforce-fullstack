@@ -1,149 +1,138 @@
 # taskforce-runner
 
-Runner **local** de délégation TaskForce (ADR-013). Il fait le pont entre le bouton « Claude Code » du menu
-d'assignation et Claude Code installé sur ton poste.
+The **local** delegation runner of TaskForce (ADR-013). It connects the "Claude Code" choice of the assignee menu to
+the Claude Code installed on your machine.
 
 ```
-TaskForce : issue -> Assignee -> Claude Code          run QUEUED
-runner    : claim -> worktree git -> claude -p + MCP TaskForce (session déléguée)
-          -> commits -> push + pull request -> résultat posté
-TaskForce : run DONE (résumé + lien de la PR), issue en « In review by AI »
+TaskForce : issue -> Assignee -> Claude Code             run QUEUED
+runner    : claim -> git worktree -> claude -p + MCP server of the instance (delegated session)
+          -> live timeline and approvals in TaskForce -> commits -> push + pull request -> result posted
+TaskForce : run DONE (summary + pull request link), issue in "In review by AI"
 ```
 
-Le backend ne peut pas joindre un poste local : c'est le runner qui vient chercher le travail (modèle
-« pull »). Il ne fusionne jamais rien. La décision reste humaine.
+The TaskForce server cannot reach your machine, so the runner comes to fetch the work ("pull" model). It never
+merges anything: the decision stays human.
 
-## Ce que l'agent a le droit de faire
+## What the agent may do
 
-| Où | Droits |
+| Where | Rights |
 |---|---|
-| Dépôt | Un **worktree isolé** sur une branche neuve `tf/<clé>-<titre>-r<run>`. Ton checkout et ta branche courante ne sont jamais touchés. |
-| Poste | Mode `dontAsk` de Claude Code + liste fermée d'outils : lire, éditer, `git status/diff/log/add/commit/mv/rm`. Pas de shell libre, pas de réseau, pas de `git push`, pas de `gh`. Les réglages du dépôt cloné (`.claude/settings*.json` : hooks, URL d'API) sont ignorés (`--setting-sources user`) : seuls les tiens et ceux du runner s'appliquent. |
-| TaskForce | Par le MCP, **au nom de la personne qui a délégué**, avec ses droits pour plafond, resserrés à : le workspace du run en lecture, les issues du projet du run en écriture, jamais de suppression. |
-| GitHub | Rien. C'est le **runner** qui pousse la branche et ouvre la PR, après l'agent. |
+| Repository | An **isolated worktree** on a new branch `tf/<key>-<title>-r<run>`. Your checkout and your current branch are never touched. |
+| Machine | Pre-approved without asking: read, edit, `git status/diff/log/add/commit/mv/rm`, and the TaskForce MCP tools of the run. **Anything else** (running tests, installing a package, network access) waits for **your approval in TaskForce**, on the issue: Allow or Deny. No answer within 10 minutes means denied. `git push` and `gh` are always refused: the runner pushes and opens the pull request itself, after the agent. The settings of the cloned repository (`.claude/settings*.json`: hooks, API URL) are ignored (`--setting-sources user`): only yours and the runner's apply. |
+| TaskForce | Through the MCP server of the instance, **as the person who delegated**, with their rights as a ceiling, narrowed to: the run's workspace for reading, the issues of the run's project for writing, never a deletion. |
+| GitHub | Nothing. The **runner** pushes the branch and opens the pull request, after the agent. |
 
-Le texte d'une issue ou d'une note est écrit par d'autres personnes. Le brief le présente à l'agent comme
-une donnée de la tâche, jamais comme une instruction, et le périmètre ci-dessus borne ce qu'une
-instruction glissée dans ce texte pourrait obtenir.
+The text of an issue or a note is written by other people. The brief presents it to the agent as task data, never
+as an instruction, and the scope above bounds what an instruction slipped into that text could obtain.
 
-### Tâches sans dépôt (non-code)
+While the agent works, the issue shows its **live timeline** (each tool call, each failure, each denial) and the
+**approval requests**. Only the person who delegated can answer them: the action runs on their machine. TaskForce
+notifies them when an approval is needed, and when the run finishes or fails.
 
-TaskForce n'est pas réservé au code. Si le projet n'a **pas** de dépôt lié, la tâche est traitée en mode
-« sans dépôt » : Claude Code travaille dans un dossier temporaire jetable (`<home>/scratch/run-<id>`, jamais
-ta machine), et **rend son travail en commentaire** sur l'issue (`taskforce_add_comment`), sans git, sans
-branche, sans pull request. Le périmètre de la session déléguée reste le même (lecture du workspace, écriture
-sur les issues du projet), et une consigne du type « écris un fichier sur le bureau » glissée dans l'issue
-sort du périmètre et est ignorée. Pour n'accepter que des tâches de code, mettre `acceptRepoless: false` dans
-`runner.config.json`.
+### Tasks without a repository (non-code)
 
-## Installation
+TaskForce is not only for code. When the project has **no** linked repository, the task runs in "repo-less" mode:
+Claude Code works in a throwaway folder (`<home>/scratch/run-<id>`), and **delivers its work as a comment** on the
+issue (`add_comment`), without git, branch or pull request. The delegated scope is the same. To accept code tasks
+only, set `acceptRepoless: false` in `runner.config.json`.
 
-Prérequis : Node 20+, `git`, `gh` connecté (`gh auth status`), le CLI Claude Code
-(`npm install -g @anthropic-ai/claude-code`, puis `claude` une fois pour te connecter), le backend dev
-démarré avec `delivery.local-runner.enabled=true` (défaut en dev).
+## Install
 
-```bash
-cd taskforce-mcp && npm install && npm run build      # le serveur MCP que l'agent utilisera
-cd ../taskforce-runner && npm install
-```
+Requirements: Node 20+, `git`, `gh` signed in (`gh auth status`), **Claude Code 2.1.293 or later**
+(`npm install -g @anthropic-ai/claude-code`, then run `claude` once to sign in), and a TaskForce instance with the
+local runner enabled (`DELIVERY_LOCAL_RUNNER_ENABLED=true`, the default in dev).
 
-1. **Identité machine** (Keycloak). Depuis la racine du monorepo, avec l'e-mail de TON compte TaskForce :
+1. **Runner identity.** In TaskForce, open **Settings > Agents > Local runner** and set up your runner. TaskForce
+   creates your machine identity and shows, once, the `.env` file to save as `taskforce-runner/.env`. The runner only
+   picks up the tasks **you** delegate.
 
-   ```powershell
-   .\scripts\keycloak-runner.ps1 -Owner toi@exemple.fr -Name pierre
-   ```
-
-   Le script crée le client `tf-runner-pierre` (compte de service, `client_credentials` uniquement, rôle
-   `delivery-runner`, propriétaire signé dans le jeton) et écrit `taskforce-runner/.env`. Le secret n'est
-   jamais affiché. Le runner ne réclamera que les tâches déléguées **par ce compte**.
-
-2. **Dépôts : rien à déclarer.** Le dépôt se crée ou se lie dans TaskForce, à la création du projet (section
-   « Code repository », GitHub connecté en un clic). À la première tâche, le runner le clone lui-même avec ton
-   `gh` (donc tes droits, dépôts privés compris) dans `~/.taskforce-runner/repos/<owner>/<name>`, puis
-   réutilise ce clone. Déclare un dépôt dans `runner.config.json` seulement pour le faire travailler dans un
-   checkout que tu as déjà, ou pour lui donner des commandes `setup`.
-
-3. **Vérifier**, puis lancer :
+2. **Get the runner:**
 
    ```bash
-   npm run check     # jeton, git, gh, claude, serveur MCP, dépôts : chaque maillon, sans rien réclamer
-   npm run dev       # à l'écoute ; Ctrl+C sort après le run en cours
-   npm run once      # traite au plus un run puis sort
+   git clone --depth 1 https://github.com/taskforce-project/taskforce-fullstack.git
+   cd taskforce-fullstack/taskforce-runner && npm install
+   ```
+
+3. **Repositories: nothing to declare.** A repository is created or linked in TaskForce, on the project (section
+   "Code repository", GitHub connected in one click). On the first task, the runner clones it with your `gh` (so your
+   rights, private repositories included) into `~/.taskforce-runner/repos/<owner>/<name>`, then reuses that clone.
+   Declare a repository in `runner.config.json` only to work in a checkout you already have, or to give it `setup`
+   commands.
+
+4. **Check, then start:**
+
+   ```bash
+   npm run check     # token, git, gh, claude version, repositories: each link, without claiming anything
+   npm run dev       # listening; Ctrl+C exits after the current run
+   npm run once      # handles at most one run, then exits
    ```
 
 ## Configuration (`runner.config.json`)
 
-| Clé | Défaut | Rôle |
+| Key | Default | Role |
 |---|---|---|
-| `repos["owner/name"]` | (aucun) | `path` (absolu), `baseBranch` (`main`), `setup` (commandes avant l'agent, chacune en tableau d'arguments, ex. `[["npm", "ci"]]` : un worktree neuf n'a pas de dépendances). |
-| `autoClone` | `true` | Dépôt non déclaré : cloné à la demande dans le dossier du runner. `false` = seuls les dépôts déclarés sont acceptés. |
-| `pollSeconds` | 5 | Fréquence du claim. |
-| `push` / `openPullRequest` | `true` / `true` | `push: false` : rien ne sort du poste, le travail reste sur une branche locale. |
-| `keepWorktree` | `false` | Garder le worktree après un succès. Un run en échec le garde toujours (seule trace du travail). |
-| `acceptRepoless` | `true` | Tâche déléguée d'un projet **sans dépôt** (non-code) : l'agent travaille dans un dossier temporaire jetable et rend son résultat **en commentaire** sur l'issue, jamais de PR. `false` = ce runner ne prend que des tâches de code (dépôt requis). |
-| `agent.auth` | `subscription` | Voir ci-dessous. |
-| `agent.model` | `null` | `null` = le modèle choisi à la délégation. |
-| `agent.maxTurns` / `agent.timeoutMinutes` | 60 / 45 | Bornes de l'agent. La durée est aussi plafonnée par la durée de vie du jeton de session. |
-| `agent.attribution` | `false` | `false` = pas de « Co-Authored-By: Claude » dans les commits de l'agent. |
-| `agent.extraAllowedTools` | `[]` | Outils en plus du socle, ex. `["Bash(npm test *)", "Bash(npm run lint *)"]`. |
+| `repos["owner/name"]` | (none) | `path` (absolute), `baseBranch` (`main`), `setup` (commands run before the agent, each an array of arguments, e.g. `[["npm", "ci"]]`: a new worktree has no dependencies). |
+| `autoClone` | `true` | A repository that is not declared is cloned on demand into the runner's folder. `false` = declared repositories only. |
+| `pollSeconds` | 5 | How often the runner asks for work. |
+| `push` / `openPullRequest` | `true` / `true` | `push: false`: nothing leaves the machine, the work stays on a local branch. |
+| `keepWorktree` | `false` | Keep the worktree after a success. A failed run always keeps it (the only trace of the work). |
+| `acceptRepoless` | `true` | Accept tasks of projects **without a repository** (delivered as a comment). |
+| `agent.auth` | `subscription` | See below. |
+| `agent.model` | `null` | `null` = the model chosen when delegating. |
+| `agent.maxTurns` / `agent.timeoutMinutes` | 60 / 45 | Agent bounds. The duration is also capped by the lifetime of the session token. |
+| `agent.approvalTimeoutMinutes` | 10 | How long an action waits for your answer in TaskForce (60 at most). Then it is denied. |
+| `agent.attribution` | `false` | `false` = no "Co-Authored-By: Claude" in the agent's commits. |
+| `agent.extraAllowedTools` | `[]` | Pre-approved tools on top of the base set, e.g. `["Bash(npm test *)", "Bash(npm run lint *)"]`: they no longer ask for approval. |
 
-## Abonnement ou clé API
+## Subscription or API key
 
-Le choix appartient à la personne qui fait tourner le runner, le runner n'en retire aucun :
+The choice belongs to the person running the runner:
 
-- `agent.auth: "subscription"` : Claude Code tourne avec **son** login claude.ai, sur **son** poste. La clé
-  `ANTHROPIC_API_KEY` ambiante est alors retirée de l'environnement de l'agent, sinon Claude Code la
-  préférerait et facturerait le compte API sans prévenir.
-- `agent.auth: "api-key"` : `ANTHROPIC_API_KEY`, facturé à l'usage.
+- `agent.auth: "subscription"`: Claude Code runs with **their** claude.ai login, on **their** machine. An ambient
+  `ANTHROPIC_API_KEY` is removed from the agent's environment, otherwise Claude Code would prefer it and bill the API
+  account without warning.
+- `agent.auth: "api-key"`: `ANTHROPIC_API_KEY`, billed per use.
 
-**Ce que disent les conditions d'Anthropic** (page « Legal and compliance » de Claude Code, relue le
-20/09/2026 ; à relire avant toute mise sur le marché, je ne suis pas juriste) :
+**What Anthropic's terms say** (the "Legal and compliance" page of Claude Code, read on 20/09/2026; read it again
+before any commercial use, this is not legal advice):
 
-- Chaque personne peut se connecter au binaire Claude Code **non modifié** avec **son propre** abonnement, y
-  compris quand une plateforme fait tourner Claude Code pour elle. C'est exactement ce que fait le runner :
-  il lance le Claude Code de la personne, TaskForce ne voit jamais ses identifiants Claude.
-- Un produit ne peut pas proposer le login claude.ai dans sa propre application, ni collecter, stocker ou
-  relayer les identifiants ou les jetons Claude de ses utilisateurs, ni payer, revendre ou intermédier leur
-  usage : chacun s'authentifie lui-même, et son usage lui est facturé.
-- Le binaire ne doit pas être modifié, ni aucune de ses méthodes d'authentification retirée ou restreinte.
-- Intégrer Claude Code à une offre suppose d'accepter les Commercial Terms d'Anthropic. On peut écrire en
-  texte que le produit fait tourner Claude Code, pas en faire un nom de fonctionnalité ni utiliser le logo
-  sans permission.
-- Les limites des abonnements supposent un usage ordinaire et individuel. Anthropic peut faire respecter ces
-  règles sans préavis, et renvoie vers son équipe commerciale pour valider un cas d'usage.
+- Each person may sign in to the **unmodified** Claude Code binary with **their own** subscription, including when a
+  platform runs Claude Code for them. That is what the runner does: it starts the person's Claude Code, and
+  TaskForce never sees their Claude credentials.
+- A product may not offer the claude.ai login in its own application, nor collect, store or relay its users' Claude
+  credentials or tokens, nor pay for, resell or broker their usage: each person signs in themselves and is billed for
+  their own usage.
+- The binary must not be modified, and none of its authentication methods removed or restricted.
+- Building Claude Code into an offering requires accepting Anthropic's Commercial Terms. A product may say in text
+  that it runs Claude Code, not make it a feature name or use the logo without permission.
 
-Le détail est dans l'ADR-013.
+The details are in ADR-013.
 
-## Éprouver la chaîne sans consommer Claude
+## Test the chain without using Claude
 
-`test/fixtures/stub-agent` (`.cmd` sous Windows) se lance à la place de `claude` : il passe par le **vrai**
-serveur MCP en session déléguée, lit et commente l'issue, vérifie que ce qui doit être refusé l'est, puis
-laisse un commit. Il suffit de le désigner dans `agent.command`. Jamais en production.
+`test/fixtures/stub-agent` (`.cmd` on Windows) runs instead of `claude`: it goes through the **real** MCP server of
+the instance in a delegated session, reads and comments the issue, checks that what must be refused is refused,
+asks for one approval through the real hook, then leaves a commit. Point `agent.command` to it. Never in production.
 
 ```bash
-npm test          # tests unitaires (nommage de branche, config, frontière d'outils, lecture du résultat)
+npm test          # unit tests: branch names, config, tool boundary, live timeline, approvals, result parsing
 ```
 
-## Dépannage
+## Troubleshooting
 
-- **`claude` : « The specified executable is not a valid application for this OS platform »** (Windows, juste
-  après `npm install -g @anthropic-ai/claude-code`). Le paquet npm n'est qu'une enveloppe : `bin/claude.exe` y
-  est un fichier bouche-trou que le script d'installation remplace par le binaire natif (~240 Mo), livré dans un
-  paquet optionnel. Si ce gros paquet n'est pas arrivé (réseau lent, téléchargement coupé), le bouche-trou reste
-  en place. Relancer `npm install -g @anthropic-ai/claude-code` suffit ; `claude --version` doit répondre un
-  numéro de version. En dernier recours, l'installeur natif d'Anthropic ne passe pas par npm.
-- **`npm run check`** dit quel maillon manque : jeton machine, `git`, `gh`, `claude`, serveur MCP, dépôts.
-- **Versions.** Les options que le runner passe à `claude -p` ont été vérifiées contre Claude Code 2.1.278,
-  puis 2.1.293 pour `--setting-sources user`
-  (`--max-turns` n'apparaît plus dans `claude --help`, mais reste acceptée ; une option inconnue, elle, est
-  refusée net).
-- Un run en échec garde son worktree dans `~/.taskforce-runner/worktrees/run-<id>` : c'est la trace de ce que
-  l'agent a fait. Le message d'échec s'affiche dans le panneau « AI Workflows » de TaskForce.
+- **`claude`: "The specified executable is not a valid application for this OS platform"** (Windows, right after
+  `npm install -g @anthropic-ai/claude-code`). The npm package is a wrapper: `bin/claude.exe` is a placeholder that
+  the install script replaces with the native binary, shipped in an optional package. If that package did not
+  arrive, run `npm install -g @anthropic-ai/claude-code` again; `claude --version` must print a version number.
+- **`npm run check`** says which link is missing: machine token, `git`, `gh`, `claude` (and its version),
+  repositories.
+- **Versions.** The options the runner passes to `claude -p` (`--permission-mode manual`, `--permission-prompts none`,
+  the HTTP `PermissionRequest` hook, `--setting-sources user`) were checked against Claude Code 2.1.293.
+- A failed run keeps its worktree in `~/.taskforce-runner/worktrees/run-<id>`: it is the trace of what the agent did.
+  The failure message shows on the issue and in the "AI Workflows" panel.
 
-## Révoquer un runner
+## Revoke a runner
 
-Désactiver ou supprimer le client `tf-runner-<nom>` dans Keycloak : plus aucun jeton n'est émis.
-`-RotateSecret` régénère le secret. Attention, la révocation n'est pas instantanée : un jeton déjà émis
-reste valide jusqu'à son expiration (durée de vie des access tokens du realm, affichée par
-`npm run check`) et peut encore réclamer un run délégué par le propriétaire. Pour couper tout de suite,
-ne rien déléguer à Claude Code pendant ce délai, ou passer `delivery.local-runner.enabled` à `false`.
+In **Settings > Agents > Local runner**, "Regenerate secret" replaces the secret: a runner started with the old one
+stops working. An administrator can also disable the `tf-runner-*` client in Keycloak. A token already issued stays
+valid until it expires (lifetime of the realm's access tokens, shown by `npm run check`).

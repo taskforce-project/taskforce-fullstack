@@ -105,7 +105,7 @@ public class MemberSkillProfileService {
             || requester.getRole() == WorkspaceRole.ADMIN;
         if (!isSelf && !isManager) {
             throw new ForbiddenException(
-                "Seul le membre concerné ou un administrateur peut modifier ce profil de compétences");
+                "Only the member or an admin can edit this skill profile");
         }
 
         List<String> skills = normalizeSkills(request.getSkills());
@@ -151,17 +151,17 @@ public class MemberSkillProfileService {
 
     private Workspace resolveWorkspace(String slug) {
         return workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
     }
 
     private WorkspaceMember requireMember(Long workspaceId, Long userId) {
         return workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
-            .orElseThrow(() -> new ForbiddenException("Accès refusé au workspace"));
+            .orElseThrow(() -> new ForbiddenException("Access denied to this workspace"));
     }
 
     private void requireTargetMember(Long workspaceId, Long userId) {
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, userId)) {
-            throw new ResourceNotFoundException("Membre introuvable dans ce workspace");
+            throw new ResourceNotFoundException("Member not found in this workspace");
         }
     }
 

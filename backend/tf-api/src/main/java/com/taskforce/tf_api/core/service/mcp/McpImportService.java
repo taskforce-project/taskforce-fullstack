@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -15,6 +14,7 @@ import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.service.AiMeter;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.ProjectService;
@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
  * les <b>normalise</b> en une passe LLM (générique, quel que soit le serveur), crée un projet <b>natif</b>
  * TaskForce et y recrée les issues en masse. C'est le « importer son boulot ici » du wizard.
  *
- * <p>Autorisation (membre + BUSINESS+ + manager) faite en amont par le contrôleur. Réutilise
+ * <p>Autorisation (membre + gestionnaire) faite en amont par le contrôleur. Réutilise
  * {@link WorkspaceMcpService} pour le fetch (session + token OAuth gérés), donc aucun code par service.
  */
 @Service
@@ -45,9 +45,7 @@ public class McpImportService {
     private final IssueService issueService;
     private final LlmClient llm;
     private final ObjectMapper objectMapper;
-
-    @Value("${ai.model.assistant:gateway-default}")
-    private String model;
+    private final AiMeter aiMeter; // quota et comptage des tokens de la normalisation
 
     /** Résultat d'un import : le projet créé + le nombre d'issues importées / trouvées. */
     public record ImportResult(Long projectId, String projectIdentifier, String projectName,
@@ -60,13 +58,13 @@ public class McpImportService {
      * Importe les issues du connecteur MCP {@code connectorKey} dans un nouveau projet {@code targetName}.
      */
     public ImportResult importProject(Workspace ws, Long userId, String connectorKey, String targetName) {
-        if (connectorKey == null || connectorKey.isBlank()) throw new BusinessException("connectorKey requis");
-        if (targetName == null || targetName.isBlank()) throw new BusinessException("Nom du projet cible requis");
+        if (connectorKey == null || connectorKey.isBlank()) throw new BusinessException("connectorKey is required");
+        if (targetName == null || targetName.isBlank()) throw new BusinessException("The target project name is required");
 
         String issuesTool = findIssuesTool(ws.getId(), connectorKey);
         // L'import est réservé aux gestionnaires (contrôleur, authorizeManager) : écriture admise.
         String raw = workspaceMcp.execute(ws.getId(), connectorKey + "__" + issuesTool, Map.of(), true);
-        List<NormalizedIssue> issues = normalize(raw);
+        List<NormalizedIssue> issues = normalize(ws.getId(), raw);
 
         ProjectResponse project = projectService.createProject(ws.getSlug(), userId, projectRequest(targetName));
         int imported = 0;
@@ -89,24 +87,24 @@ public class McpImportService {
             .filter(s -> connectorKey.equals(s.connectorKey()) && s.reachable())
             .findFirst()
             .map(WorkspaceMcpService.McpServerStatus::tools)
-            .orElseThrow(() -> new BusinessException("Serveur MCP « " + connectorKey + " » non connecté ou injoignable"));
+            .orElseThrow(() -> new BusinessException("The MCP server \"" + connectorKey + "\" is not connected or not reachable"));
         return tools.stream().filter(t -> t.equalsIgnoreCase("list_issues")).findFirst()
             .or(() -> tools.stream().filter(t -> containsAll(t, "issue", "list")).findFirst())
             .or(() -> tools.stream().filter(t -> t.toLowerCase(Locale.ROOT).contains("issue")).findFirst())
-            .orElseThrow(() -> new BusinessException("« " + connectorKey + " » n'expose pas d'outil de liste d'issues"));
+            .orElseThrow(() -> new BusinessException("\"" + connectorKey + "\" has no tool to list issues"));
     }
 
-    private List<NormalizedIssue> normalize(String raw) {
+    private List<NormalizedIssue> normalize(Long workspaceId, String raw) {
         if (raw == null || raw.isBlank()) return List.of();
         String payload = raw.length() > RAW_CHAR_LIMIT ? raw.substring(0, RAW_CHAR_LIMIT) : raw;
         String json;
         if (llm.isConfigured()) {
-            String system = "Tu extrais les issues d'un projet depuis des données brutes d'un outil externe. "
-                + "Réponds STRICTEMENT en JSON, sans aucun texte autour : "
+            String system = "You extract the issues of a project from the raw data of an external tool. "
+                + "Answer STRICTLY in JSON, with no text around it: "
                 + "{\"issues\":[{\"title\":\"...\",\"description\":\"...\",\"priority\":\"NONE|LOW|MEDIUM|HIGH|URGENT\"}]}. "
-                + "title est obligatoire ; description et priority sont facultatifs.";
+                + "title is required; description and priority are optional.";
             try {
-                json = llm.chatCompletion(model, system, "Données:\n" + payload, true);
+                json = aiMeter.metered(workspaceId, () -> llm.chatCompletion(system, "Data:\n" + payload, true, null));
             } catch (Exception e) {
                 log.warn("Normalisation LLM échouée, tentative de parse direct : {}", e.getMessage());
                 json = payload;

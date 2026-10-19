@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.enums.OtpStatus;
 import com.taskforce.tf_api.core.enums.OtpType;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.OtpVerification;
 import com.taskforce.tf_api.core.repository.OtpVerificationRepository;
 
@@ -47,10 +46,9 @@ public class OtpService {
         String firstName,
         OtpType otpType,
         Long userId,
-        String keycloakId,
-        PlanType planType
+        String keycloakId
     ) {
-        log.info("Génération d'un OTP pour : {} avec plan : {}", email, planType);
+        log.info("Génération d'un OTP pour : {}", email);
 
         // Vérifier le nombre de tentatives récentes (protection spam)
         long recentAttempts = otpRepository.countRecentOtpAttempts(
@@ -59,7 +57,7 @@ public class OtpService {
         );
 
         if (recentAttempts >= MAX_OTP_ATTEMPTS_PER_HOUR) {
-            throw new RuntimeException("Trop de tentatives. Veuillez réessayer dans une heure.");
+            throw new RuntimeException("Too many attempts. Please try again in an hour.");
         }
 
         // Expirer tous les OTP en attente pour cet email
@@ -68,7 +66,7 @@ public class OtpService {
         // Générer un nouveau code OTP
         String otpCode = generateOtpCode();
 
-        // Créer l'enregistrement OTP avec le plan sélectionné
+        // Créer l'enregistrement OTP
         OtpVerification otp = OtpVerification.builder()
             .userId(userId)
             .keycloakId(keycloakId)
@@ -79,11 +77,10 @@ public class OtpService {
             .attempts(0)
             .maxAttempts(5)
             .expiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES))
-            .planType(planType != null ? planType.toString() : null)
             .build();
 
         otp = otpRepository.save(otp);
-        log.info("OTP créé avec succès pour : {} avec plan {}", email, planType);
+        log.info("OTP créé avec succès pour : {}", email);
 
         // Envoyer l'email selon le type d'OTP.
         // En dev (devFallbackLog), si le SMTP n'est pas configuré, l'envoi lève une exception :
@@ -240,45 +237,10 @@ public class OtpService {
     }
 
     /**
-     * Met à jour le planType dans un OTP existant
-     * Utilisé lors de la sélection du plan (étape 2 de l'inscription)
-     */
-    @Transactional
-    public boolean updatePlanType(String email, String keycloakId, String planType) {
-        log.info("Mise à jour du plan {} pour : {}", planType, email);
-
-        // Récupérer l'OTP en attente pour cet email
-        Optional<OtpVerification> otpOpt = otpRepository.findPendingOtpByEmail(email);
-
-        if (otpOpt.isEmpty()) {
-            log.warn("Aucun OTP en attente trouvé pour : {}", email);
-            return false;
-        }
-
-        OtpVerification otp = otpOpt.get();
-
-        // Mettre à jour le plan
-        otp.setPlanType(planType);
-        otpRepository.save(otp);
-
-        log.info("Plan {} enregistré dans l'OTP pour : {}", planType, email);
-        return true;
-    }
-
-    /**
      * Récupère le dernier OTP en attente pour un email
-     * Utilisé pour récupérer le plan lors du renvoi d'OTP
      */
     public OtpVerification getLatestPendingOtp(String email) {
         return otpRepository.findPendingOtpByEmail(email).orElse(null);
-    }
-
-    /**
-     * Récupère le dernier OTP pour un email (peu importe le status)
-     * Utilisé pour récupérer le plan lors du resend même si l'OTP précédent est expiré
-     */
-    public OtpVerification getLatestOtp(String email) {
-        return otpRepository.findLatestOtpByEmail(email).orElse(null);
     }
 
     /**

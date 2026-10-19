@@ -10,10 +10,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,7 +20,6 @@ import com.taskforce.tf_api.core.dto.request.SmartAssignPreviewRequest;
 import com.taskforce.tf_api.core.dto.response.BulkSmartAssignItemResponse;
 import com.taskforce.tf_api.core.dto.response.SmartAssignCandidateResponse;
 import com.taskforce.tf_api.core.dto.response.SmartAssignResponse;
-import com.taskforce.tf_api.core.enums.AiGenerationKind;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.model.Issue;
@@ -35,8 +33,11 @@ import com.taskforce.tf_api.core.repository.ProjectMemberRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.delivery.ClaudeCodeProvider;
 import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProvider;
 import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProviderRegistry;
+import com.taskforce.tf_api.core.service.delivery.DeliveryContext;
+import com.taskforce.tf_api.core.service.delivery.GitHubCopilotProvider;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -80,9 +81,12 @@ public class SmartAssignService {
     private static final int AGENT_RECOMMEND_THRESHOLD = 65;
     /** Entre les deux : l'agent est proposé en alternative (l'humain reste recommandé). */
     private static final int AGENT_ALTERNATIVE_THRESHOLD = 45;
-    /** Ordre de préférence du provider selon qu'un dépôt est lié (agents qui ouvrent une PR d'abord). */
-    private static final List<String> AGENT_PREF_WITH_REPO = List.of("cursor", "github-copilot", "claude-api", "stub");
-    private static final List<String> AGENT_PREF_NO_REPO   = List.of("claude-api", "github-copilot", "stub");
+    /**
+     * Ordre de préférence du provider selon qu'un dépôt est lié. Claude Code (runner local) sait faire les
+     * deux : pull request avec un dépôt, réponse écrite sans.
+     */
+    private static final List<String> AGENT_PREF_WITH_REPO = List.of(ClaudeCodeProvider.KEY, GitHubCopilotProvider.KEY);
+    private static final List<String> AGENT_PREF_NO_REPO   = List.of(ClaudeCodeProvider.KEY);
 
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
@@ -93,44 +97,41 @@ public class SmartAssignService {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final AiMeter aiMeter; // gate quota + capture/enregistrement de la conso tokens du scoring LLM
-    private final AiGenerationService aiGenerationService; // data flywheel : capture des recos smart-assign (draft)
     private final DeliveryAgentProviderRegistry agentRegistry; // A3 : agents candidats a la delegation
+    private final TransactionTemplate transactionTemplate;
+    private final AiStatusService aiStatus; // nom du modèle réellement utilisé, tracé dans ai_runs
 
-    @Value("${ai.model.smart-assign:gateway-default}")
-    private String modelName;
+    /**
+     * Ce qui décrit l'issue à classer, lu en base dans une transaction courte. Les entités {@code workspace}
+     * et {@code project} servent ensuite détachées : seuls leurs champs simples sont lus.
+     */
+    private record IssueInput(Workspace workspace, Project project, Long issueId, String text, List<String> labels,
+                              IssuePriority priority, Integer storyPoints, boolean hasSpec) {}
 
-    // NB: read-write (PAS readOnly) — la méthode écrit ai_runs + assignment_events.
-    // Sous readOnly, l'INSERT échouait (SQLSTATE 25006) et l'historique n'était jamais persisté.
-    @Transactional
+    /**
+     * Recommandation pour une issue existante. <b>Aucune transaction n'englobe l'appel au modèle</b> : la lecture
+     * se fait avant (transaction courte), les écritures de suivi ({@code ai_runs}, {@code assignment_events})
+     * après, en JDBC.
+     */
     public SmartAssignResponse recommend(String workspaceSlug, Long projectId, Long issueId, Long requestingUserId) {
-        Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
-        assertWorkspaceMember(workspace.getId(), requestingUserId);
-
-        Project project = projectRepository.findById(projectId)
-            .filter(p -> p.getWorkspace().getId().equals(workspace.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable"));
-
-        Issue issue = issueRepository.findById(issueId)
-            .filter(i -> i.getProject().getId().equals(project.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Issue introuvable"));
-
-        List<String> issueLabels = issue.getLabels().stream()
-            .map(l -> l.getName().toLowerCase())
-            .toList();
-        String issueText = buildIssueText(issue, issueLabels);
+        IssueInput input = transactionTemplate.execute(status -> {
+            Workspace workspace = resolveWorkspace(workspaceSlug, requestingUserId);
+            Project project = resolveProject(workspace, projectId);
+            Issue issue = issueRepository.findById(issueId)
+                .filter(i -> i.getProject().getId().equals(project.getId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
+            return issueInput(workspace, project, issue);
+        });
 
         SmartAssignResponse response = computeRecommendation(
-            workspace, project, issueText, issueLabels, issue.getPriority(), issue.getStoryPoints(),
-            hasText(issue.getDescription()), true, true);
+            input.workspace(), input.project(), input.text(), input.labels(), input.priority(), input.storyPoints(),
+            input.hasSpec(), true, requestingUserId);
 
         SmartAssignCandidateResponse recommended = response.getRecommended();
-        // On ne trace un assignment_event / draft que pour une reco HUMAINE (userId non nul) : une reco
-        // d'agent est une delegation, pas une affectation (elle n'alimente pas le flywheel Smart Assign).
+        // On ne trace un assignment_event que pour une reco HUMAINE (userId non nul) : une reco d'agent
+        // est une délégation, pas une affectation.
         if (recommended != null && recommended.getUserId() != null) {
-            logAssignmentEvent(workspace.getId(), issue.getId(), recommended.getUserId(), requestingUserId, recommended);
-            // Data flywheel : capture la reco (top-1) comme draft ; finalisé à l'affectation réelle (updateIssue).
-            recordSmartAssignDraft(workspace.getId(), issue.getId(), recommended, requestingUserId);
+            logAssignmentEvent(input.workspace().getId(), issueId, recommended.getUserId(), requestingUserId, recommended);
         }
         return response;
     }
@@ -140,17 +141,10 @@ public class SmartAssignService {
      * on score les candidats à partir d'un brouillon (titre/description/labels/priorité).
      * Ne persiste aucun {@code assignment_events} (pas d'issue à référencer).
      */
-    // read-write : computeRecommendation écrit ai_runs (logAiRun).
-    @Transactional
     public SmartAssignResponse preview(String workspaceSlug, Long projectId,
                                        Long requestingUserId, SmartAssignPreviewRequest request) {
-        Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
-        assertWorkspaceMember(workspace.getId(), requestingUserId);
-
-        Project project = projectRepository.findById(projectId)
-            .filter(p -> p.getWorkspace().getId().equals(workspace.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable"));
+        Workspace workspace = resolveWorkspace(workspaceSlug, requestingUserId);
+        Project project = transactionTemplate.execute(status -> resolveProject(workspace, projectId));
 
         List<String> issueLabels = request.getLabels() == null ? List.of()
             : request.getLabels().stream()
@@ -166,23 +160,18 @@ public class SmartAssignService {
         // A la creation, pas d'agent : on ne peut pas encore deleguer une issue inexistante (assignation
         // humaine seulement ; la delegation se fait depuis une issue existante).
         return computeRecommendation(workspace, project, issueText, issueLabels, priority, null,
-            hasText(request.getDescription()), true, false);
+            hasText(request.getDescription()), true, null);
     }
 
     /**
      * Recommandation Smart Assign <b>en lot</b> (multi-assign) : pour chaque issue (typiquement
-     * non assignée), renvoie le meilleur candidat. Réutilise {@link #computeRecommendation}.
+     * non assignée), renvoie le meilleur candidat. Réutilise {@link #computeRecommendation} ; chaque issue
+     * est lue dans sa propre transaction courte, le modèle est appelé hors transaction.
      */
-    @Transactional
     public List<BulkSmartAssignItemResponse> bulkRecommend(String workspaceSlug, Long projectId,
                                                            Long requestingUserId, List<Long> issueIds) {
-        Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
-        assertWorkspaceMember(workspace.getId(), requestingUserId);
-
-        Project project = projectRepository.findById(projectId)
-            .filter(p -> p.getWorkspace().getId().equals(workspace.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable"));
+        Workspace workspace = resolveWorkspace(workspaceSlug, requestingUserId);
+        Project project = transactionTemplate.execute(status -> resolveProject(workspace, projectId));
 
         if (issueIds == null || issueIds.isEmpty()) {
             return List.of();
@@ -190,18 +179,16 @@ public class SmartAssignService {
 
         List<BulkSmartAssignItemResponse> results = new ArrayList<>();
         for (Long issueId : issueIds) {
-            Issue issue = issueRepository.findById(issueId)
+            IssueInput input = transactionTemplate.execute(status -> issueRepository.findById(issueId)
                 .filter(i -> i.getProject().getId().equals(project.getId()))
-                .orElse(null);
-            if (issue == null) {
+                .map(issue -> issueInput(workspace, project, issue))
+                .orElse(null));
+            if (input == null) {
                 continue;
             }
-            List<String> labels = issue.getLabels().stream()
-                .map(l -> l.getName().toLowerCase())
-                .toList();
             SmartAssignResponse rec = computeRecommendation(
-                workspace, project, buildIssueText(issue, labels), labels, issue.getPriority(), issue.getStoryPoints(),
-                hasText(issue.getDescription()), true, true); // A4 : le bulk considère aussi les agents
+                workspace, project, input.text(), input.labels(), input.priority(), input.storyPoints(),
+                input.hasSpec(), true, requestingUserId); // A4 : le bulk considère aussi les agents
             results.add(BulkSmartAssignItemResponse.builder()
                 .issueId(issueId)
                 .recommended(rec.getRecommended())
@@ -227,24 +214,73 @@ public class SmartAssignService {
         // d'agent ici (la redistribution rééquilibre la CHARGE entre humains ; un agent n'a pas de charge).
         return computeRecommendation(
             workspace, project, buildIssueText(issue, labels), labels, issue.getPriority(), issue.getStoryPoints(),
-            hasText(issue.getDescription()), false, false);
+            hasText(issue.getDescription()), false, null);
     }
 
+    private Workspace resolveWorkspace(String workspaceSlug, Long requestingUserId) {
+        Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
+        assertWorkspaceMember(workspace.getId(), requestingUserId);
+        return workspace;
+    }
+
+    private Project resolveProject(Workspace workspace, Long projectId) {
+        return projectRepository.findById(projectId)
+            .filter(p -> p.getWorkspace().getId().equals(workspace.getId()))
+            .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+    }
+
+    /** À appeler dans une transaction : lit les labels (collection paresseuse) de l'issue. */
+    private IssueInput issueInput(Workspace workspace, Project project, Issue issue) {
+        List<String> labels = issue.getLabels().stream()
+            .map(l -> l.getName().toLowerCase())
+            .toList();
+        return new IssueInput(workspace, project, issue.getId(), buildIssueText(issue, labels), labels,
+            issue.getPriority(), issue.getStoryPoints(), hasText(issue.getDescription()));
+    }
+
+    /** Candidats, métriques et agent éventuel : tout ce qui vient de la base avant l'appel au modèle. */
+    private record Prepared(SmartAssignCandidateResponse agent, List<User> shortlist,
+                            Map<Long, CandidateMetrics> metricsByUser) {}
+
     /**
-     * Cœur partagé entre {@link #recommend} et {@link #preview} :
-     * pré-filtre Java + scoring Groq (avec repli) + classement. Persiste un {@code ai_runs}.
+     * Cœur partagé entre {@link #recommend}, {@link #preview}, {@link #bulkRecommend} et
+     * {@link #rankForRedistribution} : pré-filtre Java + scoring par le modèle (avec repli) + classement.
+     * Persiste un {@code ai_runs}. Les lectures se font dans une transaction courte (ou dans celle de
+     * l'appelant s'il en a une), l'appel au modèle hors transaction.
      */
     private SmartAssignResponse computeRecommendation(Workspace workspace, Project project,
                                                       String issueText, List<String> issueLabels,
                                                       IssuePriority priority, Integer issueStoryPoints,
-                                                      boolean hasSpec, boolean useAi, boolean considerAgents) {
-        // A3 : la tâche se prête-t-elle a une délégation a un agent (bien cadree, faible risque) ? Si oui
-        // et qu'un agent est disponible, l'agent devient un candidat (recommande ou alternative).
-        SmartAssignCandidateResponse agent = considerAgents
-            ? buildAgentCandidate(project, issueLabels, issueText, priority, issueStoryPoints, hasSpec) : null;
+                                                      boolean hasSpec, boolean useAi, Long agentsFor) {
+        Prepared prepared = transactionTemplate.execute(status -> {
+            // A3 : la tâche se prête-t-elle a une délégation a un agent (bien cadree, faible risque) ? Si oui
+            // et qu'un agent est disponible, l'agent devient un candidat (recommande ou alternative).
+            // Seuls les agents prêts pour la personne qui demande sont proposés (OSS-5.7) ; {@code agentsFor} null = aucun.
+            SmartAssignCandidateResponse agentCandidate = agentsFor != null
+                ? buildAgentCandidate(new DeliveryContext(agentsFor, workspace, project), issueLabels, issueText, priority,
+                    issueStoryPoints, hasSpec) : null;
 
-        List<User> candidates = resolveCandidates(workspace, project);
-        if (candidates.isEmpty()) {
+            List<User> candidates = resolveCandidates(workspace, project);
+            if (candidates.isEmpty()) {
+                return new Prepared(agentCandidate, List.of(), Map.of());
+            }
+            Map<Long, CandidateMetrics> metrics =
+                buildCandidateMetrics(workspace, issueLabels, candidates, issueStoryPoints, priority, project.isGrowthMode());
+
+            // Pré-filtre HEURISTIQUE avant le LLM : on ne fait rerank par le modèle que les N meilleurs
+            // candidats (skills + charge + dispo + historique) plutôt que TOUS les membres du workspace →
+            // prompt et génération bien plus courts = smart-assign nettement plus rapide, sans perdre en
+            // qualité (les candidats manifestement mauvais sont écartés en Java, gratuitement).
+            List<User> top = candidates.stream()
+                .sorted((x, y) -> Integer.compare(preScore(metrics.get(y.getId())), preScore(metrics.get(x.getId()))))
+                .limit(SHORTLIST_SIZE)
+                .toList();
+            return new Prepared(agentCandidate, top, metrics);
+        });
+
+        SmartAssignCandidateResponse agent = prepared.agent();
+        if (prepared.shortlist().isEmpty()) {
             // Aucun humain : si un agent est bien adapte, on le recommande quand meme.
             return SmartAssignResponse.builder()
                 .recommended(agent != null && agent.getScore() >= AGENT_ALTERNATIVE_THRESHOLD ? agent : null)
@@ -253,18 +289,8 @@ public class SmartAssignService {
                 .fallbackUsed(agent == null)
                 .build();
         }
-
-        Map<Long, CandidateMetrics> metricsByUser =
-            buildCandidateMetrics(workspace, issueLabels, candidates, issueStoryPoints, priority, project.isGrowthMode());
-
-        // Pré-filtre HEURISTIQUE avant le LLM : on ne fait rerank par le modèle que les N meilleurs
-        // candidats (skills + charge + dispo + historique) plutôt que TOUS les membres du workspace →
-        // prompt et génération bien plus courts = smart-assign nettement plus rapide, sans perdre en
-        // qualité (les candidats manifestement mauvais sont écartés en Java, gratuitement).
-        List<User> shortlist = candidates.stream()
-            .sorted((a, b) -> Integer.compare(preScore(metricsByUser.get(b.getId())), preScore(metricsByUser.get(a.getId()))))
-            .limit(SHORTLIST_SIZE)
-            .toList();
+        List<User> shortlist = prepared.shortlist();
+        Map<Long, CandidateMetrics> metricsByUser = prepared.metricsByUser();
 
         GroqResult groq = GroqResult.empty();
         boolean fallbackUsed = false;
@@ -277,7 +303,7 @@ public class SmartAssignService {
                     () -> fetchGroqScores(project, issueText, priority, shortlist, metricsByUser));
             } catch (Exception ex) {
                 fallbackUsed = true;
-                log.warn("Smart assign Groq fallback triggered: {}", ex.getMessage());
+                log.warn("Smart assign AI fallback triggered: {}", ex.getMessage());
             }
         }
 
@@ -305,12 +331,14 @@ public class SmartAssignService {
             alternatives = alts.stream().limit(4).toList();
         }
 
-        logAiRun(workspace.getId(), fallbackUsed, ranked.size());
+        String fastModel = aiStatus.current().fastModel();
+        logAiRun(workspace.getId(), !useAi ? "heuristic" : fastModel != null ? fastModel : "unavailable",
+            fallbackUsed, ranked.size());
 
         return SmartAssignResponse.builder()
             .recommended(recommended)
             .alternatives(alternatives)
-            .strategy(!useAi ? "java-rules (heuristique, sans IA)"
+            .strategy(!useAi ? "java-rules (heuristic, no AI)"
                 : fallbackUsed ? "java-fallback" : "java-rules + ai-semantic + ai-history")
             .fallbackUsed(fallbackUsed)
             .build();
@@ -322,14 +350,15 @@ public class SmartAssignService {
      * Construit le candidat "agent" si la tâche s'y prête et qu'un agent est disponible, sinon null.
      * Score = adéquation de la TÂCHE a une délégation (indépendant des humains).
      */
-    private SmartAssignCandidateResponse buildAgentCandidate(Project project, List<String> labels, String issueText,
+    private SmartAssignCandidateResponse buildAgentCandidate(DeliveryContext context, List<String> labels, String issueText,
                                                              IssuePriority priority, Integer points, boolean hasSpec) {
+        Project project = context.project();
         boolean repoLinked = project != null && project.getRepoFullName() != null && !project.getRepoFullName().isBlank();
         int suitability = agentSuitability(labels, issueText, priority, points, hasSpec, repoLinked);
         if (suitability < AGENT_ALTERNATIVE_THRESHOLD) {
             return null;
         }
-        DeliveryAgentProvider provider = pickAgent(repoLinked);
+        DeliveryAgentProvider provider = pickAgent(repoLinked, context);
         if (provider == null) {
             return null;
         }
@@ -400,12 +429,15 @@ public class SmartAssignService {
     }
 
     /** Choisit le provider d'agent disponible le mieux adapté (ordre de préférence selon le dépôt lié). */
-    private DeliveryAgentProvider pickAgent(boolean repoLinked) {
+    /** Premier agent prêt dans l'ordre de préférence, sinon le premier agent prêt tout court, sinon aucun. */
+    private DeliveryAgentProvider pickAgent(boolean repoLinked, DeliveryContext context) {
         for (String key : (repoLinked ? AGENT_PREF_WITH_REPO : AGENT_PREF_NO_REPO)) {
             DeliveryAgentProvider p = agentRegistry.get(key);
-            if (p != null && p.available()) return p;
+            if (p != null && p.available() && p.unavailableReason(context) == null) return p;
         }
-        return agentRegistry.all().stream().filter(DeliveryAgentProvider::available).findFirst().orElse(null);
+        return agentRegistry.all().stream()
+            .filter(p -> p.available() && p.unavailableReason(context) == null)
+            .findFirst().orElse(null);
     }
 
     private boolean hasText(String s) {
@@ -421,7 +453,7 @@ public class SmartAssignService {
 
     private void assertWorkspaceMember(Long workspaceId, Long userId) {
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, userId)) {
-            throw new ResourceNotFoundException("Accès refusé au workspace");
+            throw new ResourceNotFoundException("Access denied to this workspace");
         }
     }
 
@@ -725,7 +757,7 @@ public class SmartAssignService {
         }
 
         // Tier "fast" (8B) : le smart-assign doit rester réactif (notamment en preview à la création).
-        String raw = llm.chatCompletion(modelName, systemPrompt, userMsg.toString(), true, "fast");
+        String raw = llm.chatCompletion(systemPrompt, userMsg.toString(), true, "fast");
 
         try {
             JsonNode root   = objectMapper.readTree(raw);
@@ -815,7 +847,7 @@ public class SmartAssignService {
                     factors.add("Strong delivery history");
                 }
                 if (growthBonus > 0) {
-                    factors.add("🌱 Tâche stretch (montée en compétence)");
+                    factors.add("Stretch task (growing a skill)");
                 }
 
                 String groqReason = reasons.get(u.getId());
@@ -853,7 +885,7 @@ public class SmartAssignService {
         return clamp((int) Math.round(value * 100.0));
     }
 
-    private void logAiRun(Long workspaceId, boolean fallbackUsed, int candidateCount) {
+    private void logAiRun(Long workspaceId, String modelName, boolean fallbackUsed, int candidateCount) {
         Map<String, Object> meta = new HashMap<>();
         meta.put("candidateCount", candidateCount);
         meta.put("fallbackUsed", fallbackUsed);
@@ -878,18 +910,6 @@ public class SmartAssignService {
         } catch (Exception ex) {
             log.warn("Unable to persist ai_runs for smart assign: {}", ex.getMessage());
         }
-    }
-
-    /** Data flywheel : capture la reco smart-assign (top-1) comme draft (ligne ouverte, opt-in workspace). */
-    private void recordSmartAssignDraft(Long workspaceId, Long issueId, SmartAssignCandidateResponse top, Long userId) {
-        Map<String, Object> draft = new HashMap<>();
-        draft.put("userId", top.getUserId());
-        draft.put("score", top.getScore());
-        draft.put("displayName", top.getDisplayName());
-        aiGenerationService.record(AiGenerationService.Capture.builder()
-            .workspaceId(workspaceId).kind(AiGenerationKind.SMART_ASSIGN).requestRef(String.valueOf(issueId))
-            .draft(draft).model(modelName).userId(userId)
-            .build());
     }
 
     private void logAssignmentEvent(Long workspaceId, Long issueId, Long assigneeUserId, Long assignedByUserId,

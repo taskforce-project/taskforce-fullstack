@@ -50,6 +50,6 @@ class ListProjectsToolTest {
     @DisplayName("execute : aucun projet → message clair")
     void execute_empty() {
         when(projectService.listProjects(eq("acme"), eq(7L))).thenReturn(List.of());
-        assertThat(tool().execute(Map.of(), new AgentContext("acme", 1L, 7L))).contains("Aucun projet");
+        assertThat(tool().execute(Map.of(), new AgentContext("acme", 1L, 7L))).contains("No project");
     }
 }

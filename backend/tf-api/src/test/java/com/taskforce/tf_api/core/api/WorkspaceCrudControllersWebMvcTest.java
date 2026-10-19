@@ -14,6 +14,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import com.taskforce.tf_api.core.dto.response.CreatedWebhookResponse;
+import com.taskforce.tf_api.core.dto.response.WebhookDeliveryResponse;
+import com.taskforce.tf_api.core.dto.response.WebhookResponse;
+import com.taskforce.tf_api.core.dto.response.WebhookSecretResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
@@ -36,6 +40,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -122,10 +127,50 @@ class WorkspaceCrudControllersWebMvcTest {
     }
 
     @Test
-    @DisplayName("GET webhooks → 200")
+    @DisplayName("GET webhooks → 200, pour l'utilisateur du jeton (le service vérifie son rôle)")
     void webhooks_list_200() throws Exception {
-        when(webhookService.list(anyString())).thenReturn(List.of());
+        when(webhookService.list("acme", 7L)).thenReturn(List.of());
         mockMvc.perform(get("/api/workspaces/acme/webhooks").with(auth())).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("POST webhook → 201, avec le secret de signature montré une fois")
+    void webhooks_create_201_with_secret() throws Exception {
+        var webhook = new WebhookResponse(3L, "https://hooks.example.com/x", List.of("issue.created"), true, null, null, null);
+        when(webhookService.create(anyString(), any(), any())).thenReturn(new CreatedWebhookResponse(webhook, "whsec_abc"));
+        mockMvc.perform(post("/api/workspaces/acme/webhooks")
+                .with(auth())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"url\":\"https://hooks.example.com/x\",\"eventTypes\":[\"issue.created\"]}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.secret").value("whsec_abc"))
+            .andExpect(jsonPath("$.data.webhook.id").value(3));
+    }
+
+    @Test
+    @DisplayName("POST webhook sans URL → 400")
+    void webhooks_create_without_url_400() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/webhooks")
+                .with(auth())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"eventTypes\":[]}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("POST secret, POST test et GET deliveries d'un webhook → 200")
+    void webhooks_secret_test_and_deliveries_200() throws Exception {
+        when(webhookService.regenerateSecret("acme", 3L, 7L)).thenReturn(new WebhookSecretResponse("whsec_new"));
+        when(webhookService.sendTest("acme", 3L, 7L)).thenReturn(new WebhookDeliveryResponse(
+            "d-1", "ping", "DELIVERED", 1, 204, null, null, null, null));
+        when(webhookService.deliveries("acme", 3L, 7L)).thenReturn(List.of());
+
+        mockMvc.perform(post("/api/workspaces/acme/webhooks/3/secret").with(auth()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.secret").value("whsec_new"));
+        mockMvc.perform(post("/api/workspaces/acme/webhooks/3/test").with(auth()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.lastStatus").value(204));
+        mockMvc.perform(get("/api/workspaces/acme/webhooks/3/deliveries").with(auth()))
+            .andExpect(status().isOk());
     }
 
     @Test

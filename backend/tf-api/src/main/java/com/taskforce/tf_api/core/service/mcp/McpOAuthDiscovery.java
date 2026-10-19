@@ -56,13 +56,13 @@ public class McpOAuthDiscovery {
         JsonNode as = client.getJsonOrNull(wellKnown(asBase, "oauth-authorization-server"));
         if (as == null) as = client.getJsonOrNull(wellKnown(asBase, "openid-configuration"));
         if (as == null) {
-            throw new BusinessException("Metadata OAuth introuvable pour " + mcpUrl
-                + " (le serveur n'expose pas de flux OAuth ?)");
+            throw new BusinessException("OAuth metadata not found for " + mcpUrl
+                + " (the server exposes no OAuth flow?)");
         }
         String authEp = text(as, "authorization_endpoint");
         String tokenEp = text(as, "token_endpoint");
         if (authEp == null || tokenEp == null) {
-            throw new BusinessException("Endpoints OAuth incomplets pour " + mcpUrl);
+            throw new BusinessException("Incomplete OAuth endpoints for " + mcpUrl);
         }
         return new DiscoveredAuth(
             as.path("issuer").asText(asBase),

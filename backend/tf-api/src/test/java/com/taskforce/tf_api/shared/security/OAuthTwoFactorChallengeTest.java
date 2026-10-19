@@ -47,7 +47,9 @@ class OAuthTwoFactorChallengeTest {
     void opaque() {
         String challenge = at(KEY, T0).seal(PENDING);
 
-        assertThat(challenge).doesNotContain("access-token").doesNotContain("refresh-token").doesNotContain("Ada");
+        // Des marqueurs assez longs pour qu'un défi aléatoire ne les contienne jamais par hasard : avec « Ada » (trois
+        // caractères), le texte chiffré en base64 contenait la séquence environ une fois sur 700 (test instable).
+        assertThat(challenge).doesNotContain("access-token").doesNotContain("refresh-token").doesNotContain("Lovelace");
     }
 
     @Test

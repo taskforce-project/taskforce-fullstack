@@ -42,9 +42,9 @@ describe('register-storage', () => {
         password: 'StrongP@ssw0rd!',
       });
 
-      // Then, add plan data
+      // Then, add the human-check token
       setRegisterData({
-        plan: 'pro',
+        challengeToken: 'tok-1',
       });
 
       const stored = getRegisterData();
@@ -53,7 +53,7 @@ describe('register-storage', () => {
         lastName: 'Doe',
         email: 'test@example.com',
         password: 'StrongP@ssw0rd!',
-        plan: 'pro',
+        challengeToken: 'tok-1',
       });
     });
 
@@ -79,7 +79,7 @@ describe('register-storage', () => {
       setRegisterData({ lastName: 'Doe' });
       setRegisterData({ email: 'test@example.com' });
       setRegisterData({ password: 'StrongP@ssw0rd!' });
-      setRegisterData({ plan: 'enterprise' });
+      setRegisterData({ challengeToken: 'tok-2' });
 
       const stored = getRegisterData();
       expect(stored).toEqual({
@@ -87,7 +87,7 @@ describe('register-storage', () => {
         lastName: 'Doe',
         email: 'test@example.com',
         password: 'StrongP@ssw0rd!',
-        plan: 'enterprise',
+        challengeToken: 'tok-2',
       });
     });
 
@@ -111,7 +111,6 @@ describe('register-storage', () => {
         lastName: 'Smith',
         email: 'jane@example.com',
         password: 'SecureP@ss123',
-        plan: 'free',
       };
 
       setRegisterData(testData);
@@ -241,16 +240,16 @@ describe('register-storage', () => {
       expect(hasRegisterData()).toBe(true);
       let data = getRegisterData();
       expect(data?.firstName).toBe('Alice');
-      expect(data?.plan).toBeUndefined();
+      expect(data?.challengeToken).toBeUndefined();
 
-      // Step 2: Plan selection
-      setRegisterData({ plan: 'pro' });
+      // Step 1 (end): human check passed
+      setRegisterData({ challengeToken: 'tok-3' });
 
       data = getRegisterData();
       expect(data?.firstName).toBe('Alice');
-      expect(data?.plan).toBe('pro');
+      expect(data?.challengeToken).toBe('tok-3');
 
-      // Step 3: Verification (clear after success)
+      // Step 2: Verification (clear after success)
       clearRegisterData();
 
       expect(hasRegisterData()).toBe(false);
@@ -280,7 +279,6 @@ describe('register-storage', () => {
         lastName: 'Chaplin',
         email: 'charlie@example.com',
         password: 'SilentFilm@1920',
-        plan: 'enterprise',
       };
 
       setRegisterData(originalData);
@@ -382,18 +380,6 @@ describe('register-storage', () => {
         lastName: '',
         email: '',
         password: '',
-      });
-    });
-
-    it('should handle all plan types', () => {
-      const plans: Array<'free' | 'pro' | 'enterprise'> = ['free', 'pro', 'enterprise'];
-
-      plans.forEach(plan => {
-        clearRegisterData();
-        setRegisterData({ plan });
-        
-        const retrieved = getRegisterData();
-        expect(retrieved?.plan).toBe(plan);
       });
     });
   });

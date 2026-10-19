@@ -19,10 +19,10 @@ function Progress({
       )}
       {...props}
     >
-      {/* Bleu de référence - aligné sur la jauge de consommation IA (cortex-usage / settings) */}
+      {/* Aplat bleu, comme la jauge de consommation IA (cortex-usage / réglages). */}
       <ProgressPrimitive.Indicator
         data-slot="progress-indicator"
-        className="h-full w-full flex-1 rounded-full transition-all bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300"
+        className="h-full w-full flex-1 rounded-full transition-all bg-primary"
         style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
       />
     </ProgressPrimitive.Root>

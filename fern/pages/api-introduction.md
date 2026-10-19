@@ -1,85 +1,68 @@
 ---
 title: Introduction
-subtitle: L'API REST de TaskForce, en bref.
+subtitle: The TaskForce REST API, in short.
 ---
 
-TaskForce expose une **API REST** décrite en **OpenAPI 3.1**. La [référence](/api) — endpoints,
-schémas, exemples de corps — est **générée depuis cette spécification**, donc toujours alignée sur le
-comportement réel du serveur. Les guides de cette section en donnent les **règles communes**, celles
-qui s'appliquent partout et qu'on ne relit pas sur chaque route.
+Everything the app does goes through a REST API described in OpenAPI 3.1. The API reference, at the end of this
+menu, is generated from that description, and the guides of this section give the rules that apply to every endpoint.
 
-## Base & format
+## Base address
 
-- **Toutes les routes sont préfixées par `/api`**. Exemple : `GET /api/workspaces/{slug}/projects`.
-- Les échanges sont en **JSON** (`Content-Type: application/json`).
-- Il n'y a **pas de version dans le chemin** : la référence OpenAPI fait foi pour le contrat courant.
+The API of an instance is served at its API address followed by `/api`. On a self-hosted instance with the default
+settings, that is `http://localhost:8080/api` (`TF_API_URL` in `.env`).
 
-### Le scoping des ressources
+Requests and responses are JSON. There is no version in the path: the OpenAPI description of the release you run is
+the contract.
 
-La plupart des routes sont **imbriquées** et portent leur contexte dans le chemin : le **slug de
-l'espace**, puis souvent un **id d'opération**, puis la ressource. La hiérarchie de l'URL reflète celle
-du produit :
+Most paths start with the workspace's slug, then the resource:
 
 ```
 /api/workspaces/{slug}/projects/{projectId}/issues/{issueId}
-        └ espace       └ opération        └ tâche
 ```
 
-## L'enveloppe de réponse
+## Responses
 
-Chaque réponse — succès **ou** erreur — est encapsulée dans une enveloppe `ApiResponse<T>`. **Le corps
-utile est dans `data`** :
+A successful response wraps its payload in an envelope, and the payload is in `data`:
 
 ```json
 {
   "success": true,
   "message": "Issue created",
   "data": { "id": 42, "identifier": "WEB-42", "title": "Fix login" },
-  "timestamp": "2026-08-25T14:12:00"
+  "timestamp": "2026-10-19T14:12:00"
 }
 ```
 
-Côté client : lisez la charge utile via **`data`**, contrôlez **`success`**, affichez ou journalisez
-**`message`**. Le détail (erreurs, pagination, codes) est dans [Conventions](/api/api-conventions).
+Errors are described in [Conventions](/api/api-conventions).
 
-## Un appel de bout en bout
+## A first call
 
 ```bash
-curl -X POST https://<instance>/api/workspaces/acme/projects/12/issues \
-  -H "Authorization: Bearer <jeton_jwt>" \
+curl -X POST http://localhost:8080/api/workspaces/acme/projects/12/issues \
+  -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{ "title": "Fix login", "priority": "HIGH" }'
 ```
 
-→ réponse `201 Created`, l'issue créée dans `data`.
+The access token comes from signing in: see [Authentication](/api/api-authentication).
 
-## Ce que couvre la référence
+## The OpenAPI description
 
-La [référence](/api) regroupe les **~235 opérations** de l'API par domaine — parmi lesquels :
-
-- **Workspaces, Projects, Issues, Cycles, Pages, Roadmap** — le cœur du travail ;
-- **Teams, Users, Invitations, Members, Assignments, Notifications** — la collaboration ;
-- **AI assistant, AI analysis, Smart Assign, Brain OS** — les capacités Cortex ;
-- **Analytics, Dashboard, Integrations, Webhooks, Billing** — le pilotage et l'écosystème.
-
-## Pour commencer
+The description is in the repository, at
+[`fern/openapi/openapi.json`](https://github.com/taskforce-project/taskforce-fullstack/blob/main/fern/openapi/openapi.json).
+Give it to a client generator or to Postman, Insomnia or Bruno rather than writing each call by hand.
 
 <CardGroup cols={2}>
-  <Card title="Authentification" icon="key" href="/api/api-authentification">
-    Obtenir un jeton et l'envoyer à chaque requête.
+  <Card title="Authentication" icon="key" href="/api/api-authentication">
+    Sign in, send the token, refresh it.
   </Card>
   <Card title="Conventions" icon="list-check" href="/api/api-conventions">
-    Enveloppe, erreurs, pagination, codes HTTP.
+    Errors, pagination, rate limits, dates.
   </Card>
-  <Card title="Bonnes pratiques" icon="shield-halved" href="/api/api-bonnes-pratiques">
-    Limites de débit, reprises, robustesse.
+  <Card title="Webhooks" icon="bolt" href="/api/api-webhooks">
+    Receive events and check their signature.
   </Card>
-  <Card title="Référence API" icon="code" href="/api">
-    Tous les endpoints, générés depuis l'OpenAPI.
+  <Card title="MCP server" icon="robot" href="/api/api-mcp">
+    Work on your issues from Claude Code.
   </Card>
 </CardGroup>
-
-<Tip>
-  La spécification OpenAPI est le **contrat**. Donnez-la à un générateur de client (SDK, collection
-  Postman/Insomnia) pour créer vos appels sans les écrire à la main.
-</Tip>

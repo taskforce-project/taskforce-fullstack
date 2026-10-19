@@ -63,7 +63,7 @@ class CreateIssueToolTest {
     @DisplayName("execute : projectId manquant → message, aucun appel service")
     void execute_missing_project() {
         String out = tool().execute(Map.of("title", "X"), new AgentContext("acme", 1L, 7L));
-        assertThat(out).contains("projectId manquant");
+        assertThat(out).contains("projectId is missing");
         org.mockito.Mockito.verifyNoInteractions(issueService);
     }
 

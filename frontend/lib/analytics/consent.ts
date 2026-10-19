@@ -59,6 +59,14 @@ export function analyticsAllowed(): boolean {
   return readConsent()?.analytics === true
 }
 
+/**
+ * Mesure d'audience configurée pour cette instance (clé PostHog fournie au build). Sans clé, rien n'est mesuré :
+ * aucun consentement à demander, ni bandeau ni lien « Manage cookies ».
+ */
+export function analyticsConfigured(): boolean {
+  return Boolean(process.env.NEXT_PUBLIC_POSTHOG_KEY)
+}
+
 /** Rouvre le panneau de préférences (révocation/modification depuis le footer). */
 export function openConsentPreferences(): void {
   try {

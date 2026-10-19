@@ -74,6 +74,10 @@ public class IssueGitHubLink {
     @Builder.Default
     private GitHubLinkStatus status = GitHubLinkStatus.OPEN;
 
+    /** Dernière relecture du statut d'une PR chez GitHub (V99) ; null tant qu'il n'a pas été relu. */
+    @Column(name = "status_checked_at")
+    private LocalDateTime statusCheckedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "linked_by")
     private User linkedBy;

@@ -22,16 +22,16 @@ public class SearchBrainTool implements AgentTool {
     @Override public String name() { return "search_brain"; }
 
     @Override public String description() {
-        return "Recherche sémantique dans la mémoire de connaissance (Brain OS) du workspace : "
-            + "décisions, ADR, runbooks, notes. À utiliser pour fonder une réponse sur le contexte réel.";
+        return "Searches the knowledge memory (Brain OS) of the workspace: decisions, ADRs, runbooks, "
+            + "notes. Use it to ground an answer in the real context.";
     }
 
     @Override public Map<String, Object> parametersSchema() {
         return Map.of(
             "type", "object",
             "properties", Map.of(
-                "query", Map.of("type", "string", "description", "La requête de recherche"),
-                "topK", Map.of("type", "integer", "description", "Nombre de résultats (défaut 5)")
+                "query", Map.of("type", "string", "description", "The search query"),
+                "topK", Map.of("type", "integer", "description", "Number of results (default 5)")
             ),
             "required", List.of("query")
         );
@@ -41,14 +41,14 @@ public class SearchBrainTool implements AgentTool {
         String query = String.valueOf(args.getOrDefault("query", ""));
         int topK = args.get("topK") instanceof Number n ? n.intValue() : 5;
         List<KnowledgeNode> hits = search.retrieveRelevant(ctx.workspaceId(), query, topK);
-        if (hits.isEmpty()) return "Aucune note pertinente trouvée.";
-        StringBuilder sb = new StringBuilder("Notes pertinentes :\n");
+        if (hits.isEmpty()) return "No relevant note found.";
+        StringBuilder sb = new StringBuilder("Relevant notes:\n");
         for (KnowledgeNode n : hits) {
             sb.append("- [").append(n.getDomain()).append("] ").append(n.getTitle());
             String c = n.getContent();
             if (c != null && !c.isBlank()) {
                 String snippet = (c.length() > 200 ? c.substring(0, 200) + "…" : c).replace("\n", " ");
-                sb.append(" — ").append(snippet);
+                sb.append(": ").append(snippet);
             }
             sb.append("\n");
         }

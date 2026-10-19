@@ -57,6 +57,12 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
     /** En-tête qui désigne le run dont la requête emprunte la session. */
     public static final String RUN_HEADER = "X-TaskForce-Delivery-Run";
 
+    /** Claims du principal délégué : run, runner, et la portée (workspace, projet) que le serveur MCP rejuge. */
+    public static final String RUN_CLAIM = "tf_delivery_run";
+    public static final String RUNNER_CLAIM = "tf_delivery_runner";
+    public static final String WORKSPACE_CLAIM = "tf_delivery_workspace";
+    public static final String PROJECT_CLAIM = "tf_delivery_project";
+
     /** Endpoints machine du runner : authentifiés par son identité propre, sans délégation. */
     public static final String RUNNER_API_PREFIX = "/api/delivery/runner/";
 
@@ -90,11 +96,11 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
             RunnerIdentity runner = identityResolver.resolve(token.getToken());
             session = localRunnerService.openSession(parseRunId(request.getHeader(RUN_HEADER)), runner);
         } catch (ForbiddenException e) {
-            deny(response, path, "session refusée");
+            deny(response, path, "session refused");
             return;
         }
         if (!DeliverySessionScope.allows(request.getMethod(), path, session.workspaceSlug(), session.projectId())) {
-            deny(response, path, "hors périmètre (run " + session.runId() + ")");
+            deny(response, path, "out of scope (run " + session.runId() + ")");
             return;
         }
 
@@ -116,8 +122,10 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
             .header("alg", "none")
             .claim("email", session.ownerEmail())
             .claim("preferred_username", session.ownerEmail())
-            .claim("tf_delivery_run", session.runId())
-            .claim("tf_delivery_runner", session.runnerClientId());
+            .claim(RUN_CLAIM, session.runId())
+            .claim(RUNNER_CLAIM, session.runnerClientId())
+            .claim(WORKSPACE_CLAIM, session.workspaceSlug())
+            .claim(PROJECT_CLAIM, session.projectId());
         if (machine.getIssuedAt() != null) {
             builder.issuedAt(machine.getIssuedAt());
         }
@@ -132,12 +140,12 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
 
     private Long parseRunId(String header) {
         if (header == null || header.isBlank() || header.length() > 19) {
-            throw new ForbiddenException("En-tête de session absent");
+            throw new ForbiddenException("Missing session header");
         }
         try {
             return Long.valueOf(header.trim());
         } catch (NumberFormatException e) {
-            throw new ForbiddenException("En-tête de session illisible");
+            throw new ForbiddenException("Unreadable session header");
         }
     }
 
@@ -154,6 +162,6 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        response.getWriter().write("{\"success\":false,\"message\":\"Accès refusé : hors de la session de délégation\"}");
+        response.getWriter().write("{\"success\":false,\"message\":\"Access denied: outside the delegation session\"}");
     }
 }

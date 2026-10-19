@@ -6,14 +6,6 @@ import type { Project } from "@/lib/api/project-service";
 
 export type OperationHealth = "healthy" | "atRisk" | "critical" | "paused";
 
-/** Libellé + pastille par état de santé - source unique (rose aligné sur la SegmentBar). */
-export const HEALTH_META: Record<OperationHealth, { label: string; dot: string }> = {
-  healthy: { label: "Sur les rails", dot: "bg-emerald-500" },
-  atRisk: { label: "À risque", dot: "bg-amber-500" },
-  critical: { label: "Critique", dot: "bg-rose-500" },
-  paused: { label: "En pause", dot: "bg-muted-foreground/50" },
-};
-
 export function healthOf(p: Pick<Project, "status" | "openIssues" | "totalIssues">): OperationHealth {
   if (p.status === "PAUSED" || p.status === "ARCHIVED") return "paused";
   if (p.totalIssues === 0) return "healthy";

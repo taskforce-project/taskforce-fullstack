@@ -19,13 +19,11 @@ import com.taskforce.tf_api.core.dto.request.LoginRequest;
 import com.taskforce.tf_api.core.dto.request.RefreshTokenRequest;
 import com.taskforce.tf_api.core.dto.request.RegisterRequest;
 import com.taskforce.tf_api.core.dto.request.ResendOtpRequest;
-import com.taskforce.tf_api.core.dto.request.SelectPlanRequest;
 import com.taskforce.tf_api.core.dto.request.VerifyOtpRequest;
 import com.taskforce.tf_api.core.dto.request.ForgotPasswordRequest;
 import com.taskforce.tf_api.core.dto.request.ResetPasswordRequest;
 import com.taskforce.tf_api.core.dto.response.AuthResponse;
 import com.taskforce.tf_api.core.dto.response.RegisterResponse;
-import com.taskforce.tf_api.core.dto.response.SelectPlanResponse;
 import com.taskforce.tf_api.core.dto.response.VerifyOtpResponse;
 import com.taskforce.tf_api.core.service.AuthService;
 import com.taskforce.tf_api.shared.security.HumanChallengeService;
@@ -40,7 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Controller REST pour l'authentification
- * Tous les appels à Keycloak et Stripe passent par l'API Java
+ * Tous les appels à Keycloak passent par l'API Java
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -75,11 +73,11 @@ public class AuthController {
             "turnstileSiteKey", turnstileSiteKey == null ? "" : turnstileSiteKey,
             "turnstileRequired", turnstileService.isEnabled()
         );
-        return ResponseEntity.ok(ApiResponse.success("Défi émis", payload));
+        return ResponseEntity.ok(ApiResponse.success("Challenge issued", payload));
     }
 
     /**
-     * Inscription d'un nouvel utilisateur (Étape 1/3)
+     * Inscription d'un nouvel utilisateur (Étape 1/2)
      * Crée le compte dans Keycloak et envoie l'OTP
      * POST /api/auth/register
      */
@@ -92,9 +90,9 @@ public class AuthController {
 
         // Turnstile est vérifié ICI, et non dans AuthService, pour deux raisons. D'abord l'adresse de
         // l'appelant n'existe qu'au niveau de la requête HTTP, et elle améliore le jugement rendu par
-        // Cloudflare. Ensuite c'est une préoccupation de bordure — comme la signature du webhook
-        // Stripe, vérifiée dans son contrôleur : on rejette au plus tôt, avant d'entrer dans le
-        // domaine. Le défi signé, lui, reste dans AuthService, où il garde l'inscription elle-même.
+        // Cloudflare. Ensuite c'est une préoccupation de bordure : on rejette au plus tôt, avant
+        // d'entrer dans le domaine. Le défi signé, lui, reste dans AuthService, où il garde
+        // l'inscription elle-même.
         String refusTurnstile = turnstileService.verify(
             request.getTurnstileToken(), clientIp(httpRequest));
         if (refusTurnstile != null) {
@@ -106,7 +104,7 @@ public class AuthController {
             RegisterResponse response = authService.register(request);
 
             return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Inscription réussie. Veuillez vérifier votre email.", response));
+                .body(ApiResponse.success("Account created. Please verify your email.", response));
 
         } catch (Exception e) {
             log.error("Erreur lors de l'inscription : {}", e.getMessage());
@@ -116,33 +114,8 @@ public class AuthController {
     }
 
     /**
-     * Sélection du plan (Étape 2/3)
-     * Enregistre le plan choisi et renvoie l'OTP
-     * POST /api/auth/select-plan
-     */
-    @PostMapping("/select-plan")
-    public ResponseEntity<ApiResponse<SelectPlanResponse>> selectPlan(
-        @Valid @RequestBody SelectPlanRequest request
-    ) {
-        log.info("Requête de sélection de plan reçue pour : {}", request.getEmail());
-
-        try {
-            SelectPlanResponse response = authService.selectPlan(request);
-
-            return ResponseEntity.ok(
-                ApiResponse.success("Plan sélectionné avec succès", response)
-            );
-
-        } catch (Exception e) {
-            log.error("Erreur lors de la sélection du plan : {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(e.getMessage()));
-        }
-    }
-
-    /**
-     * Vérification du code OTP et finalisation de l'inscription (Étape 3/3)
-     * Vérifie l'OTP et crée l'utilisateur en DB avec le plan choisi
+     * Vérification du code OTP et finalisation de l'inscription (Étape 2/2)
+     * Vérifie l'OTP et crée l'utilisateur en DB
      * POST /api/auth/verify-otp
      */
     @PostMapping("/verify-otp")
@@ -155,7 +128,7 @@ public class AuthController {
             VerifyOtpResponse response = authService.verifyOtpAndCompleteRegistration(request);
 
             return ResponseEntity.ok(
-                ApiResponse.success("Email vérifié avec succès", response)
+                ApiResponse.success("Email verified", response)
             );
 
         } catch (Exception e) {
@@ -179,7 +152,7 @@ public class AuthController {
             RegisterResponse response = authService.resendOtp(request.getEmail());
 
             return ResponseEntity.ok(
-                ApiResponse.success("Code de vérification renvoyé", response)
+                ApiResponse.success("Verification code resent", response)
             );
 
         } catch (Exception e) {
@@ -201,7 +174,7 @@ public class AuthController {
 
         try {
             AuthResponse response = authService.login(request);
-            return withRefreshCookie(response, "Connexion réussie");
+            return withRefreshCookie(response, "Signed in");
 
         } catch (Exception e) {
             log.error("Erreur lors de la connexion : {}", e.getMessage());
@@ -240,7 +213,7 @@ public class AuthController {
             authService.forgotPassword(request.getEmail());
 
             return ResponseEntity.ok(
-                ApiResponse.<Void>success("Un code de vérification a été envoyé à votre adresse email", null)
+                ApiResponse.<Void>success("A verification code has been sent to your email address", null)
             );
 
         } catch (Exception e) {
@@ -264,7 +237,7 @@ public class AuthController {
             authService.resetPassword(request.getEmail(), request.getOtpCode(), request.getNewPassword());
 
             return ResponseEntity.ok(
-                ApiResponse.<Void>success("Mot de passe réinitialisé avec succès", null)
+                ApiResponse.<Void>success("Password reset", null)
             );
 
         } catch (Exception e) {
@@ -298,7 +271,7 @@ public class AuthController {
 
         try {
             AuthResponse response = authService.refreshToken(refresh);
-            return withRefreshCookie(response, "Token rafraîchi avec succès");
+            return withRefreshCookie(response, "Token refreshed");
 
         } catch (Exception e) {
             log.error("Erreur lors du rafraîchissement du token : {}", e.getMessage());
@@ -325,7 +298,7 @@ public class AuthController {
 
             return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.clear().toString())
-                .body(ApiResponse.<Void>success("Déconnexion réussie", null));
+                .body(ApiResponse.<Void>success("Signed out", null));
 
         } catch (Exception e) {
             log.error("Erreur lors de la déconnexion : {}", e.getMessage());

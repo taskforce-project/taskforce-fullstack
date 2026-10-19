@@ -46,7 +46,7 @@ public class DashboardCardController {
         @PathVariable String slug,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Cartes du dashboard récupérées",
+        return ResponseEntity.ok(ApiResponse.success("Dashboard cards retrieved",
             dashboardCardService.list(slug, resolveUserId(jwt))));
     }
 
@@ -56,7 +56,7 @@ public class DashboardCardController {
         @Valid @RequestBody CreateDashboardCardRequest request,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Carte ajoutée",
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Card added",
             dashboardCardService.create(slug, resolveUserId(jwt), request)));
     }
 
@@ -67,7 +67,7 @@ public class DashboardCardController {
         @Valid @RequestBody UpdateDashboardCardRequest request,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Carte mise à jour",
+        return ResponseEntity.ok(ApiResponse.success("Card updated",
             dashboardCardService.update(slug, resolveUserId(jwt), id, request)));
     }
 
@@ -77,7 +77,7 @@ public class DashboardCardController {
         @Valid @RequestBody ReorderDashboardCardsRequest request,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Cartes réordonnées",
+        return ResponseEntity.ok(ApiResponse.success("Cards reordered",
             dashboardCardService.reorder(slug, resolveUserId(jwt), request.getOrderedIds())));
     }
 
@@ -88,13 +88,13 @@ public class DashboardCardController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         dashboardCardService.delete(slug, resolveUserId(jwt), id);
-        return ResponseEntity.ok(ApiResponse.success("Carte retirée", null));
+        return ResponseEntity.ok(ApiResponse.success("Card removed", null));
     }
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

@@ -21,8 +21,8 @@ export interface ToolProps {
 
 const STATUS: Record<ToolStatus, { label: string; cls: string; icon: React.ElementType; spin?: boolean }> = {
   pending: { label: "Pending", cls: "text-muted-foreground", icon: Wrench },
-  running: { label: "Running", cls: "text-amber-500", icon: Loader2, spin: true },
-  success: { label: "Completed", cls: "text-emerald-500", icon: Check },
+  running: { label: "Running", cls: "text-ink-yellow", icon: Loader2, spin: true },
+  success: { label: "Completed", cls: "text-ink-green", icon: Check },
   error: { label: "Error", cls: "text-destructive", icon: X },
 }
 

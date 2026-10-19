@@ -1,7 +1,6 @@
 package com.taskforce.tf_api.shared.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -11,6 +10,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import io.github.bucket4j.distributed.proxy.ProxyManager;
+import io.swagger.v3.oas.models.OpenAPI;
 
 /**
  * Smoke tests des classes {@code @Configuration} du package shared.
@@ -31,10 +31,25 @@ class SharedConfigBeanTest {
     }
 
     @Test
-    @DisplayName("OpenApiConfig — customOpenAPI() se construit")
+    @DisplayName("CorsConfig - le CORS passe avant le rate limiting (sinon un 429 part sans en-têtes CORS)")
+    @SuppressWarnings("unchecked")
+    void corsConfig_runsBeforeRateLimiting() {
+        CorsConfig cors = new CorsConfig();
+        var corsRegistration = cors.corsFilterRegistration(cors.corsFilter());
+        ObjectProvider<ProxyManager<String>> provider = mock(ObjectProvider.class);
+        var rateLimitRegistration = new RateLimitConfig().rateLimitFilter(provider);
+
+        assertThat(corsRegistration.getOrder()).isLessThan(rateLimitRegistration.getOrder());
+    }
+
+    @Test
+    @DisplayName("OpenApiConfig — customOpenAPI() nomme le projet et renvoie à son dépôt")
     void openApiConfig_customOpenAPI() {
-        OpenApiConfig cfg = new OpenApiConfig();
-        assertThat(cfg.customOpenAPI()).isNotNull();
+        OpenAPI api = new OpenApiConfig().customOpenAPI();
+        assertThat(api.getInfo().getTitle()).isEqualTo("TaskForce API");
+        // Pas d'adresse e-mail sur un domaine que le projet ne possède pas : la spec publiée renvoie au dépôt.
+        assertThat(api.getInfo().getContact().getEmail()).isNull();
+        assertThat(api.getInfo().getContact().getUrl()).isEqualTo("https://github.com/taskforce-project/taskforce-fullstack");
     }
 
     @Test
@@ -80,20 +95,12 @@ class SharedConfigBeanTest {
     }
 
     @Test
-    @DisplayName("OAuth2Config — tous les beans (RestTemplates, endpoints, ObjectMapper) se construisent")
+    @DisplayName("OAuth2Config — les beans (RestTemplates, ObjectMapper) se construisent")
     void oauth2Config_beans() {
         OAuth2Config cfg = new OAuth2Config();
-        ReflectionTestUtils.setField(cfg, "keycloakUrl", "http://localhost:8081");
-        ReflectionTestUtils.setField(cfg, "realm", "taskforce");
-        ReflectionTestUtils.setField(cfg, "clientId", "tf-api");
-        ReflectionTestUtils.setField(cfg, "clientSecret", "secret");
 
         assertThat(cfg.keycloakRestTemplate()).isNotNull();
         assertThat(cfg.restTemplate()).isNotNull();
-        assertThat(cfg.keycloakTokenEndpoint()).isNotNull();
-        assertThat(cfg.keycloakLogoutEndpoint()).isNotNull();
-        assertThat(cfg.keycloakUserinfoEndpoint()).isNotNull();
-        assertThat(cfg.keycloakIntrospectEndpoint()).isNotNull();
         assertThat(cfg.objectMapper()).isNotNull();
     }
 
@@ -110,19 +117,5 @@ class SharedConfigBeanTest {
         ReflectionTestUtils.setField(cfg, "expirationMinutes", 10);
         ReflectionTestUtils.setField(cfg, "length", 6);
         assertThat(cfg).isNotNull();
-    }
-
-    @Test
-    @DisplayName("StripeConfig — init() (@PostConstruct) ne lève aucune exception")
-    void stripeConfig_init() {
-        StripeConfig cfg = new StripeConfig();
-        ReflectionTestUtils.setField(cfg, "apiKey", "sk_test_dummy");
-        ReflectionTestUtils.setField(cfg, "webhookSecret", "whsec_dummy");
-        ReflectionTestUtils.setField(cfg, "freePriceId", null);
-        ReflectionTestUtils.setField(cfg, "basicPriceId", "price_basic");
-        ReflectionTestUtils.setField(cfg, "businessPriceId", "price_business");
-        ReflectionTestUtils.setField(cfg, "enterprisePriceId", "price_ent");
-
-        assertThatCode(cfg::init).doesNotThrowAnyException();
     }
 }

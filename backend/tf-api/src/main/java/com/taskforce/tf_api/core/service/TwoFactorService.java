@@ -61,9 +61,9 @@ public class TwoFactorService {
     public void confirm(String email, String code) {
         User user = requireUser(email);
         UserTwoFactor row = repository.findByUserId(user.getId())
-            .orElseThrow(() -> new BusinessException("Aucune activation 2FA en attente — relancez la configuration"));
+            .orElseThrow(() -> new BusinessException("No two-factor setup is in progress: start the setup again"));
         if (!totp.verify(row.getSecret(), code)) {
-            throw new BusinessException("Code invalide — vérifiez l'heure de votre téléphone et réessayez");
+            throw new BusinessException("Invalid code: check your phone's clock and try again");
         }
         row.setEnabled(true);
         row.setConfirmedAt(LocalDateTime.now());
@@ -100,15 +100,15 @@ public class TwoFactorService {
         long now = System.currentTimeMillis();
         long[] f = totpFails.get(userId);
         if (f != null && f[0] >= MAX_TOTP_FAILS && (now - f[1]) < TOTP_WINDOW_MS) {
-            throw new BusinessException("Trop de codes erronés. Patientez une minute et réessayez");
+            throw new BusinessException("Too many wrong codes. Wait a minute and try again");
         }
         UserTwoFactor row = repository.findByUserId(userId)
             .filter(UserTwoFactor::isEnabled)
-            .orElseThrow(() -> new BusinessException("2FA non configuré"));
+            .orElseThrow(() -> new BusinessException("Two-factor authentication is not set up"));
         if (!totp.verify(row.getSecret(), code)) {
             totpFails.compute(userId, (k, v) ->
                 (v == null || (now - v[1]) >= TOTP_WINDOW_MS) ? new long[]{1, now} : new long[]{v[0] + 1, v[1]});
-            throw new BusinessException("Code d'authentification invalide");
+            throw new BusinessException("Invalid authentication code");
         }
         totpFails.remove(userId); // succès → on oublie les échecs
     }
@@ -123,6 +123,6 @@ public class TwoFactorService {
 
     private User requireUser(String email) {
         return userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 }

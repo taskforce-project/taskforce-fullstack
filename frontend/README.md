@@ -121,7 +121,6 @@ Langue par défaut : Français
 - [ ] Vérification email
 - [ ] Gestion des sessions
 - [ ] Tests unitaires et E2E
-- [ ] Intégration Stripe pour paiements
 - [ ] Dashboard principal
 - [ ] Gestion des boards (style Trello)
 

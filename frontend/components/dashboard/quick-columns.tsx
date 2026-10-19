@@ -10,9 +10,10 @@ import { ProjectIcon } from "@/components/ui/project-icon"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useCreateProjectStore } from "@/lib/store/create-project-store"
+import { useNotificationStore } from "@/lib/store/notification-store"
 import { listMyIssuesQuiet } from "@/lib/api/dashboard-card-service"
 import type { Issue } from "@/lib/api/issue-service"
-import { listNotifications, type NotificationResponse } from "@/lib/api/notification-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 const MAX_ROWS = 5
 
@@ -118,7 +119,7 @@ function MyQueueColumn({ slug }: { readonly slug: string }) {
 
   const open = (issues ?? [])
     .filter((i) => !i.archived && i.status.category !== "COMPLETED" && i.status.category !== "CANCELLED")
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .sort((a, b) => parseServerDate(b.updatedAt).getTime() - parseServerDate(a.updatedAt).getTime())
     .slice(0, MAX_ROWS)
 
   return (
@@ -141,35 +142,31 @@ function MyQueueColumn({ slug }: { readonly slug: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Récents - 5 dernières notifications (endpoint notifications réel)
+// Récents - 5 dernières notifications (store partagé avec la cloche du topbar)
 // ---------------------------------------------------------------------------
 
 function RecentColumn({ slug }: { readonly slug: string }) {
-  const [notifs, setNotifs] = useState<NotificationResponse[] | null>(null)
-  const [failed, setFailed] = useState(false)
+  // Même liste que la cloche (chargement, sondage 60 s, push temps réel) : la colonne ne refait plus son
+  // propre appel, qui doublait `/notifications` à chaque arrivée sur le dashboard.
+  const storeSlug = useNotificationStore((s) => s.slug)
+  const signals = useNotificationStore((s) => s.signals)
+  const fetchedAt = useNotificationStore((s) => s.fetchedAt)
+  const error = useNotificationStore((s) => s.error)
+  const ensureNotifications = useNotificationStore((s) => s.ensureNotifications)
 
   useEffect(() => {
-    if (!slug) return
-    let alive = true
-    setNotifs(null)
-    setFailed(false)
-    // listNotifications est déjà silencieux (pattern cloche du topbar).
-    listNotifications(slug)
-      .then((d) => {
-        if (alive) setNotifs(d)
-      })
-      .catch(() => {
-        if (alive) {
-          setNotifs([])
-          setFailed(true)
-        }
-      })
-    return () => {
-      alive = false
-    }
-  }, [slug])
+    if (slug) void ensureNotifications(slug)
+  }, [slug, ensureNotifications])
 
-  const rows = (notifs ?? []).slice(0, MAX_ROWS)
+  // Liste d'un autre workspace : jamais affichée. null = chargement en cours (distinct d'une liste vide).
+  const ours = storeSlug === slug
+  const failed = ours && fetchedAt === null && error !== null
+  const notifs = ours && fetchedAt !== null ? signals : failed ? [] : null
+
+  // Le store trie par urgence (ordre de l'inbox) ; la colonne veut les plus récentes.
+  const rows = [...(notifs ?? [])]
+    .sort((a, b) => parseServerDate(b.createdAt).getTime() - parseServerDate(a.createdAt).getTime())
+    .slice(0, MAX_ROWS)
 
   return (
     <SectionCard title="Recent" href="./inbox" bodyClassName="p-0">
@@ -183,7 +180,7 @@ function RecentColumn({ slug }: { readonly slug: string }) {
             <>
               <span className="min-w-0 flex-1 truncate text-sm text-foreground">{n.title}</span>
               <span className="shrink-0 text-[11px] text-muted-foreground">
-                {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                {formatDistanceToNow(parseServerDate(n.createdAt), { addSuffix: true })}
               </span>
             </>
           )

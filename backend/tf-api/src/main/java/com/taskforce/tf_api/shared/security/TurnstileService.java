@@ -89,7 +89,7 @@ public class TurnstileService {
             return null;
         }
         if (token == null || token.isBlank()) {
-            return "Vérification anti-robot manquante. Rechargez la page et réessayez.";
+            return "The anti-robot check is missing. Reload the page and try again.";
         }
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
@@ -128,6 +128,6 @@ public class TurnstileService {
 
         Object codes = body.get("error-codes");
         log.warn("Turnstile a refusé le jeton. Codes : {}", codes);
-        return "Vérification anti-robot échouée. Rechargez la page et réessayez.";
+        return "The anti-robot check failed. Reload the page and try again.";
     }
 }

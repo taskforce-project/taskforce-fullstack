@@ -1,5 +1,5 @@
-# Documentation TaskForce (Fern) — doc PRODUIT (guides) + RÉFÉRENCE API au même endroit.
-# Publier : `fern login` puis `fern generate --docs` (voir fern/README.md).
+# TaskForce documentation (Fern): guides and API reference on docs.taskforce-project.fr.
+# Publishing: see fern/README.md.
 
 instances:
   - url: taskforce.docs.buildwithfern.com
@@ -14,171 +14,112 @@ logo:
   height: 26
   href: https://taskforce-project.fr
 
-# Palette de marque TaskForce, reprise 1:1 des design tokens de l'app (frontend/app/globals.css,
-# palette « Cloudflare-flat »). On ne peut pas injecter le globals.css tel quel (Fern n'est pas
-# Tailwind/shadcn) : on mappe donc les primitives de marque sur les couleurs natives de Fern.
-# Police : l'app utilise Inter, qui est aussi la police par defaut de Fern -> deja aligne.
+# Brand colors, taken from the app's design tokens (frontend/app/globals.css).
 colors:
   accent-primary:
-    light: "#2563eb"   # --primary (blue-600)
-    dark: "#3b82f6"    # --primary dark (blue-500)
+    light: "#2563eb"
+    dark: "#3b82f6"
   background:
-    light: "#fbfbfc"   # --background
+    light: "#fbfbfc"
     dark: "#0b0b0c"
   sidebar-background:
-    light: "#fbfbfc"   # --sidebar (= background, pas de rupture, facon Cloudflare)
+    light: "#fbfbfc"
     dark: "#0b0b0c"
   header-background:
     light: "#fbfbfc"
     dark: "#0b0b0c"
   card-background:
-    light: "#ffffff"   # --card
+    light: "#ffffff"
     dark: "#161617"
   border:
-    light: "#e6e6e9"   # --border
+    light: "#e6e6e9"
     dark: "#2a2a2c"
 
 navbar-links:
-  - type: minimal
-    text: Ouvrir l'app
-    url: https://app.taskforce-project.fr
   - type: github
-    value: https://github.com/taskforce-project
+    value: https://github.com/taskforce-project/taskforce-fullstack
 
 tabs:
   guides:
     display-name: Guides
     icon: "fa-solid fa-book-open"
+    slug: guides
   api:
-    display-name: Référence API
+    display-name: API
     icon: "fa-solid fa-code"
+    slug: api
 
 navigation:
   - tab: guides
     layout:
-      - section: Découvrir
+      - section: Get started
         skip-slug: true
         contents:
-          - page: Bienvenue
-            path: ./pages/index.md
-            slug: bienvenue
-          - page: Concepts clés
-            path: ./pages/concepts-cles.md
-            slug: concepts-cles
-          - page: Premiers pas
-            path: ./pages/premiers-pas.md
-            slug: premiers-pas
-          - page: Onboarding & profil
-            path: ./pages/onboarding-et-profil.md
-            slug: onboarding-et-profil
-          - page: Tour de l'interface
-            path: ./pages/tour-interface.md
-            slug: tour-interface
-      - section: Organiser le travail
+          - page: Welcome
+            path: ./pages/welcome.md
+            slug: welcome
+          - page: Self-hosting
+            path: ./pages/self-hosting.md
+            slug: self-hosting
+          - page: Concepts
+            path: ./pages/concepts.md
+            slug: concepts
+      - section: Features
         skip-slug: true
         contents:
-          - page: Espaces & projets
-            path: ./pages/espaces-et-projets.md
-            slug: espaces-et-projets
-          - page: Issues & tableaux
-            path: ./pages/issues-et-tableaux.md
-            slug: issues-et-tableaux
-          - page: Cycles
-            path: ./pages/cycles.md
-            slug: cycles
-          - page: Roadmap
-            path: ./pages/roadmap.md
-            slug: roadmap
-          - page: Pages
-            path: ./pages/pages.md
-            slug: pages
-      - section: Mon quotidien
-        skip-slug: true
-        contents:
-          - page: Tableau de bord
-            path: ./pages/tableau-de-bord.md
-            slug: tableau-de-bord
-          - page: Boîte de réception
-            path: ./pages/inbox.md
-            slug: inbox
-          - page: Mon travail
-            path: ./pages/mon-travail.md
-            slug: mon-travail
-          - page: Accepter ou refuser une assignation
-            path: ./pages/assignations.md
-            slug: assignations
-      - section: Collaborer
-        skip-slug: true
-        contents:
-          - page: Membres & rôles
-            path: ./pages/membres-et-roles.md
-            slug: membres-et-roles
-          - page: Inviter son équipe
-            path: ./pages/inviter-son-equipe.md
-            slug: inviter-son-equipe
-          - page: Équipes
-            path: ./pages/equipes.md
-            slug: equipes
-          - page: Notifications & préférences
-            path: ./pages/notifications.md
-            slug: notifications
-      - section: L'IA — Cortex
-        skip-slug: true
-        contents:
-          - page: Vue d'ensemble de l'IA
-            path: ./pages/ia-vue-ensemble.md
-            slug: ia-vue-ensemble
-          - page: Assistant
-            path: ./pages/ia-assistant.md
-            slug: ia-assistant
-          - page: Workflows
-            path: ./pages/ia-workflows.md
-            slug: ia-workflows
-          - page: Génération de spec
-            path: ./pages/ia-generation-spec.md
-            slug: ia-generation-spec
-          - page: Smart Assign
-            path: ./pages/smart-assign.md
-            slug: smart-assign
-          - page: Mémoire (Brain OS)
-            path: ./pages/memoire.md
-            slug: memoire
-      - section: Piloter & intégrer
-        skip-slug: true
-        contents:
-          - page: Analytics
-            path: ./pages/analytics.md
-            slug: analytics
-          - page: Intégrations
+          - page: Coding agents
+            path: ./pages/coding-agents.md
+            slug: coding-agents
+          - page: AI
+            path: ./pages/ai.md
+            slug: ai
+          - page: Integrations
             path: ./pages/integrations.md
             slug: integrations
-      - section: Compte & offres
-        skip-slug: true
-        contents:
-          - page: Profil & sécurité
-            path: ./pages/profil-et-securite.md
-            slug: profil-et-securite
-          - page: Offres, facturation & IA
-            path: ./pages/offres-et-ia.md
-            slug: offres-et-ia
   - tab: api
     layout:
-      - section: Guide développeur
+      - section: Guides
         skip-slug: true
         contents:
           - page: Introduction
             path: ./pages/api-introduction.md
             slug: api-introduction
-          - page: Authentification
-            path: ./pages/api-authentification.md
-            slug: api-authentification
+          - page: Authentication
+            path: ./pages/api-authentication.md
+            slug: api-authentication
           - page: Conventions
             path: ./pages/api-conventions.md
             slug: api-conventions
-          - page: Bonnes pratiques
-            path: ./pages/api-bonnes-pratiques.md
-            slug: api-bonnes-pratiques
-          - page: Piloter depuis un agent (MCP)
+          - page: Webhooks
+            path: ./pages/api-webhooks.md
+            slug: api-webhooks
+          - page: MCP server
             path: ./pages/api-mcp.md
             slug: api-mcp
-      - api: Référence API
+      - api: API reference
+        slug: api-reference
+
+# Addresses of the former French guides (until October 2026).
+redirects:
+  - source: /guides/bienvenue
+    destination: /guides/welcome
+  - source: /guides/premiers-pas
+    destination: /guides/self-hosting
+  - source: /guides/concepts-cles
+    destination: /guides/concepts
+  - source: /guides/memoire
+    destination: /guides/concepts
+  - source: /guides/smart-assign
+    destination: /guides/concepts
+  - source: /guides/ia-vue-ensemble
+    destination: /guides/ai
+  - source: /guides/ia-assistant
+    destination: /guides/ai
+  - source: /reference-api/api-introduction
+    destination: /api/api-introduction
+  - source: /reference-api/api-authentification
+    destination: /api/api-authentication
+  - source: /reference-api/api-conventions
+    destination: /api/api-conventions
+  - source: /reference-api/api-mcp
+    destination: /api/api-mcp

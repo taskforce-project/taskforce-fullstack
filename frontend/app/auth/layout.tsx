@@ -12,14 +12,13 @@ import { SITE_URL } from "@/lib/config/urls";
 /**
  * Coquille des pages d'authentification - **ecran scinde**.
  *
- * A GAUCHE (>= 1024px) un panneau de marque : fond sombre, grain recree en interne (feTurbulence, aucune
- * dependance), titre produit et une **capture reelle de l'app**. A DROITE le formulaire, sur fond de
+ * A GAUCHE (>= 1024px) un panneau de marque : papier doux et filet (direction artistique), titre produit
+ * et une **capture reelle de l'app**. A DROITE le formulaire, sur fond de
  * theme, en trois bandes (barre · contenu centre · mention legale). Sous 1024px le panneau cede la place
  * et le formulaire prend toute la largeur (la marque revient alors dans la barre). Hauteur 100svh, sans
  * defilement : ces pages restent un passage.
  *
- * Le panneau gauche est un decor de marque volontairement sombre dans les deux themes ; seule la colonne
- * formulaire suit le theme clair/sombre.
+ * Les deux colonnes suivent le theme clair/sombre.
  */
 export default function AuthLayout({
   children,
@@ -48,18 +47,17 @@ export default function AuthLayout({
 
   return (
     <div className="auth-shell">
-      {/* ── Panneau de marque (gauche, desktop) : grain interne + capture reelle de l'app ── */}
+      {/* ── Panneau de marque (gauche, desktop) : titre + capture reelle de l'app ── */}
       <aside className="auth-aside">
-        <div className="auth-aside-noise" />
         <div className="auth-aside-content">
-          <a href={siteUrl} className="auth-aside-brand" aria-label="TaskForce, retour au site">
+          <a href={siteUrl} className="auth-aside-brand" aria-label="TaskForce, back to the website">
             <Image
               src="/assets/logo/logo_taskforce_tp.png"
               alt="TaskForce"
               width={150}
               height={100}
               priority
-              className="h-16 w-auto"
+              className="h-16 w-auto dark:invert"
             />
           </a>
 
@@ -84,7 +82,7 @@ export default function AuthLayout({
       {/* ── Colonne formulaire (droite) : barre · contenu · footer ── */}
       <div className="auth-formcol">
         <header className="auth-topbar">
-          <a href={siteUrl} className="auth-brand-mobile" aria-label="TaskForce, retour au site">
+          <a href={siteUrl} className="auth-brand-mobile" aria-label="TaskForce, back to the website">
             <Image
               src="/assets/logo/logo_taskforce_tp.png"
               alt=""

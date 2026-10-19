@@ -26,7 +26,7 @@ export function sanitizeInput(input: string): string {
     const DOMPurify = require("isomorphic-dompurify");
     return DOMPurify.sanitize(input, { ALLOWED_TAGS: [] });
   } catch (error) {
-    console.warn("DOMPurify non disponible, retour de l'input brut:", error);
+    console.warn("DOMPurify unavailable, returning the raw input:", error);
     return input;
   }
 }
@@ -61,27 +61,27 @@ export function validatePassword(password: string): {
 
   // Longueur minimale
   if (password.length < 8) {
-    errors.push("Le mot de passe doit contenir au moins 8 caractères");
+    errors.push("Password must contain at least 8 characters");
   }
 
   // Au moins une majuscule
   if (!/[A-Z]/.test(password)) {
-    errors.push("Le mot de passe doit contenir au moins une majuscule");
+    errors.push("Password must contain at least one uppercase letter");
   }
 
   // Au moins une minuscule
   if (!/[a-z]/.test(password)) {
-    errors.push("Le mot de passe doit contenir au moins une minuscule");
+    errors.push("Password must contain at least one lowercase letter");
   }
 
   // Au moins un chiffre
   if (!/[0-9]/.test(password)) {
-    errors.push("Le mot de passe doit contenir au moins un chiffre");
+    errors.push("Password must contain at least one digit");
   }
 
   // Au moins un caractère spécial
   if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-    errors.push("Le mot de passe doit contenir au moins un caractère spécial");
+    errors.push("Password must contain at least one special character");
   }
 
   // Calculer la force du mot de passe
@@ -143,7 +143,7 @@ export function validateInput(
     return {
       isValid: false,
       sanitized: "",
-      error: `Le champ ne peut pas dépasser ${maxLength} caractères`,
+      error: `This field can't exceed ${maxLength} characters`,
     };
   }
 
@@ -163,7 +163,7 @@ export function validateInput(
     return {
       isValid: false,
       sanitized: sanitizeInput(input),
-      error: "Le contenu contient des caractères non autorisés",
+      error: "The content contains characters that aren't allowed",
     };
   }
 

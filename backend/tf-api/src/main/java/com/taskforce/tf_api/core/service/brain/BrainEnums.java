@@ -16,26 +16,26 @@ public final class BrainEnums {
 
     public static NodeType type(String v) {
         try { return NodeType.valueOf(v.trim().toUpperCase()); }
-        catch (Exception e) { throw new IllegalArgumentException("Type de node invalide: " + v); }
+        catch (Exception e) { throw new IllegalArgumentException("Invalid page type: " + v); }
     }
 
     public static NodeDomain domain(String v) {
         try { return NodeDomain.valueOf(v.trim().toUpperCase()); }
-        catch (Exception e) { throw new IllegalArgumentException("Domaine invalide: " + v); }
+        catch (Exception e) { throw new IllegalArgumentException("Invalid domain: " + v); }
     }
 
     public static NodeStatus status(String v) {
         try { return NodeStatus.valueOf(v.trim().toUpperCase()); }
-        catch (Exception e) { throw new IllegalArgumentException("Statut invalide: " + v); }
+        catch (Exception e) { throw new IllegalArgumentException("Invalid status: " + v); }
     }
 
     public static NodeRefType refType(String v) {
         try { return NodeRefType.valueOf(v.trim().toUpperCase()); }
-        catch (Exception e) { throw new IllegalArgumentException("refType invalide: " + v); }
+        catch (Exception e) { throw new IllegalArgumentException("Invalid refType: " + v); }
     }
 
     public static EdgeRelation relation(String v) {
         try { return EdgeRelation.valueOf(v.trim().toUpperCase()); }
-        catch (Exception e) { throw new IllegalArgumentException("Type de relation invalide: " + v); }
+        catch (Exception e) { throw new IllegalArgumentException("Invalid relation type: " + v); }
     }
 }

@@ -22,6 +22,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.util.AbstractIntegrationTest;
+import com.taskforce.tf_api.util.TransactionTemplateTestConfig;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * URL OAuth, statut (déconnecté), disconnect, liens issue↔GitHub (CRUD).
  */
 @DisplayName("GitHubIntegrationService (intégration Postgres)")
-@Import({GitHubIntegrationService.class, ProjectVisibilityGuard.class})
+@Import({GitHubIntegrationService.class, ProjectVisibilityGuard.class, TransactionTemplateTestConfig.class})
 class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private GitHubIntegrationService service;
@@ -43,6 +44,7 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private com.taskforce.tf_api.core.repository.IntegrationRepository integrationRepository;
     @Autowired private com.taskforce.tf_api.core.repository.OAuthStateRepository oauthStateRepository;
+    @Autowired private com.taskforce.tf_api.core.repository.IssueGitHubLinkRepository linkRepository;
     @MockitoBean private RestTemplate restTemplate;
     // Collaborateurs Brain OS de sync() : non exerces ici, juste requis pour cabler le contexte.
     @MockitoBean private KnowledgeService knowledgeService;
@@ -194,7 +196,7 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class));
 
-        String redirect = service.handleCallback("the-code", pendingState());
+        String redirect = service.handleCallback("the-code", pendingState(), null);
 
         assertThat(redirect).contains("/" + SLUG + "/settings").contains("github=connected");
         var status = service.getStatus(SLUG);
@@ -226,7 +228,7 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
             .returnTo("/" + SLUG + "?newProject=repo")
             .build()).getState();
 
-        String redirect = service.handleCallback("the-code", state);
+        String redirect = service.handleCallback("the-code", state, null);
 
         // Retour sur le dialogue de création de projet, pas sur Settings ; le drapeau s'ajoute avec « & ».
         assertThat(redirect).endsWith("/" + SLUG + "?newProject=repo&github=connected");
@@ -235,7 +237,7 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("handleCallback lève une erreur si la réponse token ne contient pas d'access_token")
+    @DisplayName("handleCallback : pas d'access_token → retour dans l'app avec github=error, rien d'enregistré")
     void handle_callback_fails_without_token() {
         org.mockito.Mockito.doReturn(org.springframework.http.ResponseEntity.ok(java.util.Map.of("error", "bad_code")))
             .when(restTemplate).exchange(org.mockito.ArgumentMatchers.anyString(),
@@ -243,7 +245,42 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class));
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.handleCallback("bad", pendingState()))
-            .isInstanceOf(RuntimeException.class);
+        assertThat(service.handleCallback("bad", pendingState(), null))
+            .contains("/" + SLUG + "/settings").contains("github=error");
+        assertThat(service.getStatus(SLUG).connected()).isFalse();
+    }
+
+    @Test
+    @DisplayName("getLinks relit le statut d'une PR chez GitHub et l'enregistre (fusionnée, date de lecture)")
+    void get_links_persists_refreshed_status() {
+        connectGitHub();
+        service.addLink(SLUG, issueId,
+            new GitHubLinkRequest("PR", "o/r", 1, "https://github.com/o/r/pull/1", null, null, "Fix"), owner);
+        org.mockito.Mockito.doReturn(org.springframework.http.ResponseEntity.ok(
+                java.util.Map.of("state", "closed", "merged", true, "title", "Fix login")))
+            .when(restTemplate).exchange(org.mockito.ArgumentMatchers.eq("https://api.github.com/repos/o/r/pulls/1"),
+                org.mockito.ArgumentMatchers.eq(org.springframework.http.HttpMethod.GET),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class));
+
+        assertThat(service.getLinks(SLUG, issueId, owner)).singleElement()
+            .satisfies(l -> assertThat(l.status()).isEqualTo("MERGED"));
+        linkRepository.flush();
+        assertThat(linkRepository.findByIssueIdOrderByLinkedAtDesc(issueId)).singleElement().satisfies(l -> {
+            assertThat(l.getStatus().name()).isEqualTo("MERGED");
+            assertThat(l.getTitle()).isEqualTo("Fix login");
+            assertThat(l.getStatusCheckedAt()).isNotNull();
+        });
+    }
+
+    @Test
+    @DisplayName("addLink refuse un dépôt mal formé et une PR sans numéro")
+    void add_link_validates_its_input() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.addLink(SLUG, issueId,
+                new GitHubLinkRequest("PR", "o/r?x=1", 1, null, null, null, "Fix"), owner))
+            .isInstanceOf(com.taskforce.tf_api.shared.exception.BusinessException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.addLink(SLUG, issueId,
+                new GitHubLinkRequest("PR", "o/r", null, null, null, null, "Fix"), owner))
+            .isInstanceOf(com.taskforce.tf_api.shared.exception.BusinessException.class);
     }
 }

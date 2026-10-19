@@ -25,11 +25,6 @@ export function parseIssueTarget(url: string | null | undefined): IssueSheetTarg
   return match ? { projectId: Number(match[1]), issueId: Number(match[2]) } : null
 }
 
-const AVATAR_COLORS = [
-  "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
-  "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
-]
-
 function formatDate(iso: string | null): string | null {
   if (!iso) return null
   try {
@@ -55,8 +50,6 @@ export function toSheetIssue(issue: Issue): SheetIssue {
     statusCategory: issue.status.category,
     assignee:       issue.assignee
       ? {
-          initials: issue.assignee.email.slice(0, 2).toUpperCase(),
-          color:    AVATAR_COLORS[issue.assignee.id % AVATAR_COLORS.length],
           name:     issue.assignee.displayName ?? issue.assignee.email,
           email:    issue.assignee.email,
           userId:   issue.assignee.id,
@@ -69,7 +62,7 @@ export function toSheetIssue(issue: Issue): SheetIssue {
     archived:    issue.archived,
     dueDate:     formatDate(issue.dueDate),
     storyPoints: null,
-    createdAt:   formatDate(issue.createdAt) ?? issue.createdAt,
+    createdAt:   issue.createdAt,
   }
 }
 

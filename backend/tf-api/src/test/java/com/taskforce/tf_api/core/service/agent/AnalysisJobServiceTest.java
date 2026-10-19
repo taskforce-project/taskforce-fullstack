@@ -35,7 +35,6 @@ import com.taskforce.tf_api.core.repository.DecisionPriorityRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
-import com.taskforce.tf_api.core.service.AiGenerationService;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
@@ -73,7 +72,6 @@ class AnalysisJobServiceTest {
     @Mock private SimpMessagingTemplate messagingTemplate;
     @Spy  private ObjectMapper objectMapper = new ObjectMapper();
     @Mock private ProjectVisibilityGuard visibilityGuard;
-    @Mock private AiGenerationService aiGenerationService;
     @InjectMocks private AnalysisJobService service;
 
     private final Workspace ws = Workspace.builder().id(5L).slug("acme").build();

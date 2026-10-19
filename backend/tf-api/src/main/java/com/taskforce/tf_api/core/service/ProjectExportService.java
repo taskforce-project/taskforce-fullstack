@@ -40,7 +40,7 @@ public class ProjectExportService {
 
         Project project = workspaceRepository.findBySlug(slug)
             .flatMap(ws -> projectRepository.findByIdAndWorkspaceId(projectId, ws.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         List<IssueExport> detailed = issues.stream()
             .map(i -> new IssueExport(

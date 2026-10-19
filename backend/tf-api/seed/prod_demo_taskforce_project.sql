@@ -47,16 +47,16 @@ BEGIN
     INSERT INTO projects (workspace_id, name, identifier, description, created_by, color, icon_url, growth_mode)
     VALUES (v_ws, 'TaskForce', 'TF',
             'Le produit TaskForce lui-meme : l AI Delivery OS. Suivi des chantiers reels (backend Spring, front Next.js, IA, infra).',
-            v_owner, 'bg-blue-500', 'lucide:Rocket', true)
+            v_owner, 'bg-shape-blue', 'lucide:Rocket', true)
     RETURNING id INTO v_proj;
 
     INSERT INTO issue_statuses (project_id, name, color, category, position, is_default) VALUES
-        (v_proj, 'Backlog',     '#94a3b8', 'BACKLOG'::issue_status_category,   0, false),
-        (v_proj, 'Todo',        '#6366f1', 'UNSTARTED'::issue_status_category, 1, true),
-        (v_proj, 'In Progress', '#f59e0b', 'STARTED'::issue_status_category,   2, false),
-        (v_proj, 'In Review',   '#8b5cf6', 'STARTED'::issue_status_category,   3, false),
-        (v_proj, 'Done',        '#10b981', 'COMPLETED'::issue_status_category, 4, false),
-        (v_proj, 'Cancelled',   '#ef4444', 'CANCELLED'::issue_status_category, 5, false);
+        (v_proj, 'Backlog',     '#736e67', 'BACKLOG'::issue_status_category,   0, false),
+        (v_proj, 'Todo',        '#2f6bf6', 'UNSTARTED'::issue_status_category, 1, true),
+        (v_proj, 'In Progress', '#ffaa0d', 'STARTED'::issue_status_category,   2, false),
+        (v_proj, 'In Review',   '#a3336c', 'STARTED'::issue_status_category,   3, false),
+        (v_proj, 'Done',        '#418b5c', 'COMPLETED'::issue_status_category, 4, false),
+        (v_proj, 'Cancelled',   '#e14322', 'CANCELLED'::issue_status_category, 5, false);
     SELECT id INTO v_backlog FROM issue_statuses WHERE project_id=v_proj AND name='Backlog';
     SELECT id INTO v_todo    FROM issue_statuses WHERE project_id=v_proj AND name='Todo';
     SELECT id INTO v_prog    FROM issue_statuses WHERE project_id=v_proj AND name='In Progress';
@@ -65,18 +65,18 @@ BEGIN
     SELECT id INTO v_cancel  FROM issue_statuses WHERE project_id=v_proj AND name='Cancelled';
 
     INSERT INTO issue_types (project_id, name, color, icon, is_default) VALUES
-        (v_proj, 'Task',    '#6366f1', 'circle-dot', true),
-        (v_proj, 'Bug',     '#ef4444', 'bug',        false),
-        (v_proj, 'Feature', '#10b981', 'zap',        false);
+        (v_proj, 'Task',    '#2f6bf6', 'circle-dot', true),
+        (v_proj, 'Bug',     '#e14322', 'bug',        false),
+        (v_proj, 'Feature', '#418b5c', 'zap',        false);
     SELECT id INTO v_task FROM issue_types WHERE project_id=v_proj AND name='Task';
     SELECT id INTO v_bug  FROM issue_types WHERE project_id=v_proj AND name='Bug';
     SELECT id INTO v_feat FROM issue_types WHERE project_id=v_proj AND name='Feature';
 
     INSERT INTO project_labels (project_id, name, color) VALUES
-        (v_proj, 'backend',   '#ef4444'), (v_proj, 'frontend', '#06b6d4'),
-        (v_proj, 'ia',        '#8b5cf6'), (v_proj, 'infra',    '#10b981'),
-        (v_proj, 'securite',  '#f59e0b'), (v_proj, 'rgpd',     '#3b82f6'),
-        (v_proj, 'billing',   '#ec4899'), (v_proj, 'ux',       '#f97316');
+        (v_proj, 'backend',   '#e14322'), (v_proj, 'frontend', '#1e4fc4'),
+        (v_proj, 'ia',        '#a3336c'), (v_proj, 'infra',    '#418b5c'),
+        (v_proj, 'securite',  '#ffaa0d'), (v_proj, 'rgpd',     '#2f6bf6'),
+        (v_proj, 'billing',   '#a3336c'), (v_proj, 'ux',       '#8a5300');
 
     INSERT INTO project_members (project_id, user_id, role, added_by) VALUES
         (v_proj, v_owner,  'LEAD'::project_role,   NULL),

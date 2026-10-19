@@ -36,17 +36,17 @@ import { CardEmpty, CardError } from "./card-states"
 
 // Palette sémantique des séries (miroir de chart-explorer - le backend n'envoie que la clé).
 const SERIES_META: Record<string, { label: string; color: string }> = {
-  resolved: { label: "Resolved", color: "#10b981" },
-  opened: { label: "Opened", color: "#3b82f6" },
-  remaining: { label: "Remaining", color: "#f43f5e" },
-  ideal: { label: "Ideal", color: "#94a3b8" },
-  openIssues: { label: "Open issues", color: "#6366f1" },
-  completion: { label: "Completion (%)", color: "#6366f1" },
-  done: { label: "Done", color: "#10b981" },
-  open: { label: "Open", color: "#f59e0b" },
+  resolved: { label: "Resolved", color: "var(--chart-3)" },
+  opened: { label: "Opened", color: "var(--chart-1)" },
+  remaining: { label: "Remaining", color: "var(--chart-2)" },
+  ideal: { label: "Ideal", color: "var(--subtle)" },
+  openIssues: { label: "Open issues", color: "var(--chart-1)" },
+  completion: { label: "Completion (%)", color: "var(--chart-1)" },
+  done: { label: "Done", color: "var(--chart-3)" },
+  open: { label: "Open", color: "var(--chart-4)" },
 }
 
-const FALLBACK_COLORS = ["#3b82f6", "#10b981", "#f43f5e", "#6366f1", "#f59e0b", "#14b8a6"]
+const FALLBACK_COLORS = ["var(--chart-1)", "var(--chart-3)", "var(--chart-2)", "var(--chart-4)", "var(--chart-5)", "var(--subtle)"]
 
 const DATASET_XKEY: Record<string, string> = {
   throughput: "week",
@@ -82,8 +82,8 @@ export function DashboardSpecChart({ slug, spec, refreshToken = 0, preferInlineD
   if (spec.mode === "unsupported" || spec.unsupported) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
-        <AlertCircle className="size-4 text-amber-500" />
-        <p className="text-xs text-muted-foreground">{spec.unsupported ?? "Demande non satisfiable."}</p>
+        <AlertCircle className="size-4 text-ink-yellow" />
+        <p className="text-xs text-muted-foreground">{spec.unsupported ?? "This request can't be charted."}</p>
       </div>
     )
   }
@@ -136,8 +136,8 @@ function BreakdownBody({
   const data = rows ?? spec.data ?? []
   if (data.length === 0) return <CardEmpty message="No data for this breakdown" />
 
-  const color = "#6366f1"
-  const yName = spec.yLabel ?? "Valeur"
+  const color = "var(--chart-1)"
+  const yName = spec.yLabel ?? "Value"
   const margin = { top: 4, right: 0, left: 0, bottom: 0 }
 
   if (spec.chartType === "line") {

@@ -38,7 +38,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
   useEffect(() => {
     // Récupérer les données des étapes précédentes et envoyer l'inscription
     const registerData = getRegisterData();
-    if (!registerData?.email || !registerData?.password || !registerData?.firstName || !registerData?.lastName || !registerData?.planType) {
+    if (!registerData?.email || !registerData?.password || !registerData?.firstName || !registerData?.lastName) {
       toast.error(t.auth.ui.verifySessionExpired, {
         description: t.auth.ui.verifySessionExpiredDesc,
       });
@@ -55,18 +55,25 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
       
       const sendRegistration = async () => {
         try {
-          await authService.register({
+          const result = await authService.register({
             email: registerData.email,
             password: registerData.password,
             firstName: registerData.firstName,
             lastName: registerData.lastName,
-            planType: registerData.planType || "FREE",
             // Émis au chargement de l'étape 1, ils ne sont consommés qu'ici : c'est le seul appel
             // d'inscription réellement envoyé au serveur.
             challengeToken: registerData.challengeToken,
             turnstileToken: registerData.turnstileToken,
           });
-          
+
+          // Instance sans vérification d'e-mail : le compte est déjà prêt, aucun code ne viendra.
+          if (result?.otpSent === false) {
+            clearRegisterData();
+            toast.success(t.auth.ui.accountReadyTitle, { description: t.auth.ui.accountReadyDesc });
+            router.push('/auth/login');
+            return;
+          }
+
           toast.success(t.auth.ui.verifyCodeSentTitle, {
             description: t.auth.ui.verifyCodeSentDesc,
           });
@@ -142,17 +149,8 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
       // Rafraîchir l'état d'authentification dans le contexte
       refreshUser();
 
-      // Si checkout URL présente (plan payant), rediriger vers Stripe
-      if (result.checkoutSessionUrl) {
-        toast.info(t.auth.ui.verifyRedirectPayment, {
-          description: t.auth.ui.verifyRedirectPaymentDesc,
-        });
-        globalThis.window.location.href = result.checkoutSessionUrl;
-        return;
-      }
-
-      // Plan gratuit : compte vérifié, mais plus d'auto-login (tokens émis par Keycloak,
-      // qui exige le mot de passe). On redirige vers la connexion.
+      // Compte vérifié, mais pas d'auto-login (tokens émis par Keycloak, qui exige le mot de
+      // passe). On redirige vers la connexion.
       toast.success(t.auth.ui.verifySuccessTitle, {
         description: t.auth.ui.verifySuccessDesc,
       });
@@ -160,7 +158,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       toast.error(t.common.error, {
-        description: errorMessage || "Code de vérification invalide",
+        description: errorMessage || "Invalid verification code",
       });
     } finally {
       setIsLoading(false);

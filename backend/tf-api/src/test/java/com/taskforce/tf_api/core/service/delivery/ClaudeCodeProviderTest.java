@@ -8,6 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.beans.factory.ObjectProvider;
 
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.DeliveryRun;
@@ -25,10 +26,35 @@ import static org.mockito.Mockito.when;
 class ClaudeCodeProviderTest {
 
     private final DeliveryRunRepository runRepository = mock(DeliveryRunRepository.class);
+    private final RunnerProvisioningService provisioning = mock(RunnerProvisioningService.class);
+
+    @SuppressWarnings("unchecked")
+    private ClaudeCodeProvider provider(boolean enabled, RunnerProvisioningService service) {
+        ObjectProvider<RunnerProvisioningService> beans = mock(ObjectProvider.class);
+        when(beans.getIfAvailable()).thenReturn(service);
+        return new ClaudeCodeProvider(
+            new LocalRunnerSettings(enabled, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15), runRepository, beans);
+    }
 
     private ClaudeCodeProvider provider(boolean enabled) {
-        return new ClaudeCodeProvider(
-            new LocalRunnerSettings(enabled, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15), runRepository);
+        return provider(enabled, provisioning);
+    }
+
+    @Test
+    @DisplayName("prêt seulement pour une personne qui a créé son runner (OSS-5.7)")
+    void ready_only_with_a_runner() {
+        DeliveryContext ada = new DeliveryContext(7L, null, null);
+        when(provisioning.hasRunner(7L)).thenReturn(false, true);
+
+        assertThat(provider(true).unavailableReason(ada)).contains("Set up your local runner first");
+        assertThat(provider(true).unavailableReason(ada)).isNull();
+        assertThat(provider(false).unavailableReason(ada)).contains("isn't enabled on this instance");
+    }
+
+    @Test
+    @DisplayName("sans service de provisionnement (runner coupé au démarrage) : pas de vérification de plus")
+    void ready_without_provisioning_bean() {
+        assertThat(provider(true, null).unavailableReason(new DeliveryContext(7L, null, null))).isNull();
     }
 
     @Test

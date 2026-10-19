@@ -63,6 +63,6 @@ describe('profile-store', () => {
     });
 
     expect(useProfileStore.getState().loading).toBe(false);
-    expect(useProfileStore.getState().error).toBe('Impossible de charger le profil');
+    expect(useProfileStore.getState().error).toBe("Couldn't load the profile");
   });
 });

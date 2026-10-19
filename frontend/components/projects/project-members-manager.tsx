@@ -30,15 +30,16 @@ import { toast } from "sonner"
 import { listProjectMembers, removeProjectMember } from "@/lib/api/project-service"
 import type { ProjectMember, ProjectRole } from "@/lib/api/project-service"
 import { useUserStore } from "@/lib/store/user-store"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
 const ROLE_CONFIG: Record<ProjectRole, { label: string; badgeClass: string; icon: React.ReactNode }> = {
-  LEAD:   { label: "Lead",   badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/20",   icon: <Crown className="h-3 w-3 text-amber-400" /> },
+  LEAD:   { label: "Lead",   badgeClass: "bg-shape-yellow/15 text-ink-yellow border-shape-yellow/20",   icon: <Crown className="h-3 w-3 text-ink-yellow" /> },
   MEMBER: { label: "Member", badgeClass: "bg-muted text-muted-foreground border-border",         icon: <User className="h-3 w-3 text-muted-foreground" /> },
-  VIEWER: { label: "Viewer", badgeClass: "bg-violet-500/15 text-violet-400 border-violet-500/20", icon: <Shield className="h-3 w-3 text-violet-400" /> },
+  VIEWER: { label: "Viewer", badgeClass: "bg-primary/15 text-ink-blue border-primary/20", icon: <Shield className="h-3 w-3 text-ink-blue" /> },
 }
 
 /** Au-delà de ce seuil, la liste est paginée (« si y a masse monde »). */
@@ -46,7 +47,7 @@ const PAGE_SIZE = 8
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    return parseServerDate(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
   } catch {
     return iso
   }

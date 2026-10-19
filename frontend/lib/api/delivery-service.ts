@@ -6,18 +6,23 @@
 import { apiClient } from "./client";
 import { DELIVERY_ROUTES } from "../config/api-routes";
 
-/** Provider d'agent de livraison exposé au picker. `available=false` = affiché « à venir ». */
+/**
+ * Agent de la délégation. `available=false` = coupé sur l'instance ; `ready=false` = pas encore utilisable par la
+ * personne connectée (ou sur ce projet), `reason` dit quoi faire.
+ */
 export interface DeliveryProvider {
   key: string;
   displayName: string;
   logoKey: string;
   available: boolean;
   models: string[];
+  ready: boolean;
+  reason: string | null;
 }
 
-/** Liste les providers délégables du workspace (Claude Code / Copilot / Cursor...). */
-export async function getDeliveryProviders(slug: string): Promise<DeliveryProvider[]> {
-  const res = await apiClient.get<{ data: DeliveryProvider[] }>(DELIVERY_ROUTES.PROVIDERS(slug));
+/** Agents de la délégation pour la personne connectée, et pour ce projet si `projectId` est donné. */
+export async function getDeliveryProviders(slug: string, projectId?: number): Promise<DeliveryProvider[]> {
+  const res = await apiClient.get<{ data: DeliveryProvider[] }>(DELIVERY_ROUTES.PROVIDERS(slug, projectId));
   return res.data.data;
 }
 
@@ -70,36 +75,44 @@ export async function listWorkspaceRuns(slug: string): Promise<DeliveryRun[]> {
   return res.data.data ?? [];
 }
 
-/** Providers de délégation dont l'exécution dépend d'une clé API stockée par workspace. */
-export type DeliveryKeyProvider = "anthropic" | "cursor";
-
-/** État de la connexion d'une clé API de délégation (Anthropic, Cursor... TF-AGENT-DELIVERY). */
-export interface DeliveryKeyStatus {
-  /** Une clé est connectée (délégation vers ce provider possible). */
-  connected: boolean;
-  /** Indice non sensible pour reconnaître la clé (4 derniers caractères, ex. "...AB12"), ou null. */
-  keyHint: string | null;
+/** Un événement de la chronologie d'un run du runner local (lot 5). */
+export interface DeliveryRunEvent {
+  seq: number;
+  kind: "start" | "text" | "tool" | "error" | "denied";
+  tool: string | null;
+  text: string;
+  at: string | null;
 }
 
-/** Lit l'état d'une clé de délégation du workspace (la clé n'est jamais renvoyée en clair). */
-export async function getDeliveryKey(slug: string, provider: DeliveryKeyProvider): Promise<DeliveryKeyStatus> {
-  const res = await apiClient.get<{ data: DeliveryKeyStatus }>(DELIVERY_ROUTES.KEY(slug, provider));
+export type DeliveryApprovalStatus = "PENDING" | "ALLOWED" | "DENIED" | "EXPIRED";
+
+/** Demande de validation d'une action de l'agent. `canDecide` : c'est à la personne connectée de répondre. */
+export interface DeliveryRunApproval {
+  id: number;
+  tool: string;
+  summary: string;
+  status: DeliveryApprovalStatus;
+  createdAt: string | null;
+  expiresAt: string | null;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  canDecide: boolean;
+}
+
+export interface DeliveryRunActivity {
+  events: DeliveryRunEvent[];
+  approvals: DeliveryRunApproval[];
+}
+
+/** Chronologie d'un run après l'événement `after`, et ses demandes. Lu en boucle pendant le run : jamais de toast. */
+export async function getRunActivity(slug: string, runId: number, after: number): Promise<DeliveryRunActivity> {
+  const res = await apiClient.get<{ data: DeliveryRunActivity }>(DELIVERY_ROUTES.ACTIVITY(slug, runId, after), { silentError: true });
   return res.data.data;
 }
 
-/** Connecte (ou remplace) une clé de délégation du workspace (OWNER/ADMIN). */
-export async function connectDeliveryKey(
-  slug: string,
-  provider: DeliveryKeyProvider,
-  apiKey: string,
-): Promise<DeliveryKeyStatus> {
-  const res = await apiClient.post<{ data: DeliveryKeyStatus }>(DELIVERY_ROUTES.KEY(slug, provider), { apiKey });
-  return res.data.data;
-}
-
-/** Déconnecte une clé de délégation du workspace (OWNER/ADMIN). */
-export async function disconnectDeliveryKey(slug: string, provider: DeliveryKeyProvider): Promise<void> {
-  await apiClient.delete(DELIVERY_ROUTES.KEY(slug, provider));
+/** Autorise ou refuse une action demandée par l'agent. */
+export async function decideApproval(slug: string, runId: number, approvalId: number, allow: boolean): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.DECIDE(slug, runId, approvalId), { decision: allow ? "ALLOW" : "DENY" });
 }
 
 /** Runner local de l'utilisateur (ADR-013), tel que le serveur le connaît. Ne contient jamais de secret. */

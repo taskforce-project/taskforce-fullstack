@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import {
   X, RefreshCw, Clock, CheckCircle2, AlertTriangle, CircleDot,
   Flag, Tag, Calendar, Layers, GitBranch, Activity,
@@ -33,6 +33,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { PRIORITY_DOT } from "@/lib/palette"
 import { AssigneeMenu } from "@/components/smart-assign/assignee-menu"
 import { DelegateAgentControl } from "@/components/sheets/delegate-agent-control"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
@@ -53,12 +54,14 @@ import { useIssueStore } from "@/lib/store/issue-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { useLabelStore } from "@/lib/store/label-store"
 import { useIntegrationStore } from "@/lib/store/integration-store"
+import { githubUrl, isCommitSha, isGitHubRepoFullName, isPullRequestNumber } from "@/lib/utils/github"
 import { listProjectMembers, type ProjectMember } from "@/lib/api/project-service"
 import { listCycles, addIssueToCycle, removeIssueFromCycle, listIssueCycles, type Cycle } from "@/lib/api/cycle-service"
 import type { IssueComment, IssueActivity, IssueLabel, IssueStatus as ApiIssueStatus, Issue, IssueRelation, IssueRelationType, ChecklistItem, Worklog } from "@/lib/api/issue-service"
 import { listChildIssues, listRelations, addRelation, deleteRelation,
          listChecklist, addChecklistItem, updateChecklistItem, deleteChecklistItem,
          listWorklogs, addWorklog, deleteWorklog } from "@/lib/api/issue-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -75,11 +78,12 @@ export interface SheetIssue {
   statusId: number
   statusName: string
   statusCategory: IssueStatusCategory
-  assignee: { initials: string; color: string; name: string; userId: number; email?: string | null; avatarUrl?: string | null } | null
+  assignee: { name: string; userId: number; email?: string | null; avatarUrl?: string | null } | null
   assigneeId: number | null
   labels: IssueLabel[]
   dueDate: string | null
   storyPoints: number | null
+  /** Date-heure de création telle que l'API la renvoie (UTC, sans fuseau) : la fiche la formate. */
   createdAt: string
   description?: string
   pinned?: boolean
@@ -91,18 +95,18 @@ export interface SheetIssue {
 // ---------------------------------------------------------------------------
 
 const PRIORITY_CONFIG: Record<IssuePriority, { dot: string; label: string }> = {
-  URGENT:  { dot: "bg-red-400",               label: "Urgent" },
-  HIGH:    { dot: "bg-orange-400",             label: "High" },
-  MEDIUM:  { dot: "bg-yellow-400",             label: "Medium" },
-  LOW:     { dot: "bg-slate-400",              label: "Low" },
-  NONE:    { dot: "bg-muted-foreground/30",    label: "None" },
+  URGENT:  { dot: PRIORITY_DOT.URGENT, label: "Urgent" },
+  HIGH:    { dot: PRIORITY_DOT.HIGH,   label: "High" },
+  MEDIUM:  { dot: PRIORITY_DOT.MEDIUM, label: "Medium" },
+  LOW:     { dot: PRIORITY_DOT.LOW,    label: "Low" },
+  NONE:    { dot: PRIORITY_DOT.NONE,   label: "None" },
 }
 
 const STATUS_CATEGORY_CONFIG: Record<IssueStatusCategory, { icon: React.ReactNode; label: string; color: string }> = {
   BACKLOG:   { icon: <CircleDot className="size-3.5" />,    label: "Backlog",     color: "text-muted-foreground" },
   UNSTARTED: { icon: <CircleDot className="size-3.5" />,    label: "Todo",        color: "text-muted-foreground" },
-  STARTED:   { icon: <RefreshCw className="size-3.5" />,    label: "In Progress", color: "text-blue-400" },
-  COMPLETED: { icon: <CheckCircle2 className="size-3.5" />, label: "Done",        color: "text-emerald-400" },
+  STARTED:   { icon: <RefreshCw className="size-3.5" />,    label: "In Progress", color: "text-ink-blue" },
+  COMPLETED: { icon: <CheckCircle2 className="size-3.5" />, label: "Done",        color: "text-ink-green" },
   CANCELLED: { icon: <X className="size-3.5" />,            label: "Cancelled",   color: "text-muted-foreground" },
 }
 
@@ -110,21 +114,10 @@ function getStatusCfg(category: IssueStatusCategory) {
   return STATUS_CATEGORY_CONFIG[category] ?? STATUS_CATEGORY_CONFIG.BACKLOG
 }
 
-const AVATAR_COLORS = [
-  "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
-  "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
-]
-function memberColor(id: number): string { return AVATAR_COLORS[id % AVATAR_COLORS.length] }
-function memberInitials(m: ProjectMember): string {
-  if (m.displayName) return m.displayName.slice(0, 2).toUpperCase()
-  return m.email.slice(0, 2).toUpperCase()
-}
 function formatCommentTime(iso: string): string {
   try {
-    // Le backend renvoie un LocalDateTime UTC sans offset ("...T12:00:00") : sans "Z",
-    // new Date() le parse en heure locale et un commentaire récent reste bloqué sur
-    // "just now" (diff ≤ 0). On force UTC si aucun fuseau n'est présent. Cf. ISS-09.
-    const d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + "Z")
+    // Date-heure du backend sans fuseau, lue en UTC (sinon un commentaire récent reste sur "just now", ISS-09).
+    const d = parseServerDate(iso)
     const now = new Date()
     const diff = Math.floor((now.getTime() - d.getTime()) / 1000)
     if (diff < 60) return "just now"
@@ -203,6 +196,8 @@ function CollapsibleSection({
 
 function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; workspaceSlug: string }>) {
   const { githubStatus, githubLinks, fetchGitHubLinks, addGitHubLink, removeGitHubLink } = useIntegrationStore()
+  const openSettings = useSettingsStore((s) => s.openSettings)
+  const connected = Boolean(githubStatus?.connected)
   const links = githubLinks[issueId] ?? []
   const [loading, setLoading] = useState(false)
 
@@ -217,39 +212,46 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
   const [linkTitle,     setLinkTitle]     = useState("")
   const [submitting,    setSubmitting]    = useState(false)
 
+  // Les liens (et le statut de leurs PR, relu chez GitHub) ne se lisent qu'avec une connexion GitHub.
   useEffect(() => {
+    if (!connected) return
     setLoading(true)
     fetchGitHubLinks(workspaceSlug, issueId).catch(() => null).finally(() => setLoading(false))
-  }, [workspaceSlug, issueId, fetchGitHubLinks])
+  }, [workspaceSlug, issueId, connected, fetchGitHubLinks])
+
+  const repo = repoFullName.trim()
+  const ref = linkType === "PR" ? prNumber.trim() : commitSha.trim()
+  const canAdd = isGitHubRepoFullName(repo) && (linkType === "PR" ? isPullRequestNumber(ref) : isCommitSha(ref))
 
   async function handleAdd() {
+    if (!canAdd) return
     setSubmitting(true)
     try {
-      await addGitHubLink(workspaceSlug, issueId, {
-        linkType,
-        repoFullName: repoFullName.trim(),
-        prNumber:    linkType === "PR"     ? Number(prNumber)  : undefined,
-        prUrl:       linkType === "PR"     ? prUrl.trim()      : undefined,
-        commitSha:   linkType === "COMMIT" ? commitSha.trim()  : undefined,
-        commitUrl:   linkType === "COMMIT" ? commitUrl.trim()  : undefined,
-        title: linkTitle.trim() || undefined,
-      })
+      // Un lien laissé vide est déduit du dépôt : le backend n'accepte que des pages github.com.
+      await addGitHubLink(workspaceSlug, issueId, linkType === "PR"
+        ? { linkType, repoFullName: repo, prNumber: Number(ref), prUrl: prUrl.trim() || githubUrl(repo, "pull", ref),
+            title: linkTitle.trim() || undefined }
+        : { linkType, repoFullName: repo, commitSha: ref, commitUrl: commitUrl.trim() || githubUrl(repo, "commit", ref),
+            title: linkTitle.trim() || undefined })
       toast.success("GitHub link added")
       setShowForm(false)
       setRepoFullName(""); setPrNumber(""); setPrUrl(""); setCommitSha(""); setCommitUrl(""); setLinkTitle("")
-    } catch {
-      toast.error("Could not add link")
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     } finally {
       setSubmitting(false)
     }
   }
 
-  if (!githubStatus?.connected) {
+  if (!connected) {
     return (
       <div className="flex flex-col items-center gap-3 py-8 text-center">
         <GitBranch className="size-8 text-muted-foreground/40" />
         <p className="text-sm text-muted-foreground">GitHub not connected</p>
-        <p className="text-xs text-muted-foreground/60">Connect GitHub in Workspace Settings → Integrations.</p>
+        <p className="text-xs text-muted-foreground/60">Connect GitHub to link pull requests and commits to this issue.</p>
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => openSettings("integrations")}>
+          Open integrations
+        </Button>
       </div>
     )
   }
@@ -271,8 +273,8 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
                 <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 text-muted-foreground">{link.linkType}</Badge>
                 {link.status && (
                   <Badge variant="outline" className={cn("text-xs px-1.5 py-0 h-4",
-                    link.status === "OPEN"   ? "text-emerald-400 border-emerald-500/20 bg-emerald-500/10" :
-                    link.status === "MERGED" ? "text-purple-400 border-purple-500/20 bg-purple-500/10" :
+                    link.status === "OPEN"   ? "text-ink-green border-shape-green/20 bg-shape-green/10" :
+                    link.status === "MERGED" ? "text-ink-pink border-shape-pink/20 bg-shape-pink/10" :
                     "text-muted-foreground"
                   )}>{link.status}</Badge>
                 )}
@@ -299,7 +301,7 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
               className="text-muted-foreground hover:text-destructive transition-colors"
               onClick={async () => {
                 try { await removeGitHubLink(workspaceSlug, issueId, link.id); toast.success("Link deleted") }
-                catch { toast.error("Could not delete link") }
+                catch (e) { toast.error(getErrorMessage(e)) }
               }}
             >
               <Trash2 className="size-3.5" />
@@ -357,7 +359,7 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
               />
               <Input
                 className="h-8 w-full text-xs"
-                placeholder="PR URL (optional)"
+                placeholder="PR link (optional, found from the number)"
                 value={prUrl}
                 onChange={(e) => setPrUrl(e.target.value)}
               />
@@ -373,7 +375,7 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
               />
               <Input
                 className="h-8 w-full text-xs"
-                placeholder="Commit URL (optional)"
+                placeholder="Commit link (optional, found from the hash)"
                 value={commitUrl}
                 onChange={(e) => setCommitUrl(e.target.value)}
               />
@@ -387,7 +389,7 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
           />
           <div className="flex justify-end gap-2 mt-1">
             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button size="sm" className="h-7 text-xs" disabled={!repoFullName || submitting} onClick={handleAdd}>
+            <Button size="sm" className="h-7 text-xs" disabled={!canAdd || submitting} onClick={handleAdd}>
               {submitting ? "Adding…" : "Add"}
             </Button>
           </div>
@@ -431,7 +433,7 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
   const entries: FeedEntry[] = [
     ...comments.map((c) => ({ kind: "comment" as const, at: c.createdAt, data: c })),
     ...activity.map((a) => ({ kind: "event"   as const, at: a.createdAt, data: a })),
-  ].sort((x, y) => new Date(y.at).getTime() - new Date(x.at).getTime()) // plus récent d'abord
+  ].sort((x, y) => parseServerDate(y.at).getTime() - parseServerDate(x.at).getTime()) // plus récent d'abord
   const shown = entries.slice(0, visible)
   const remaining = entries.length - shown.length
 
@@ -482,7 +484,7 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
                       <span className="text-xs text-muted-foreground">{formatCommentTime(c.createdAt)}</span>
                       {c.isEdited && <span className="text-[10px] italic text-muted-foreground/60">(edited)</span>}
                       {isMe && (
-                        <button type="button" onClick={() => onDelete(c.id)} title="Delete comment" className="ml-auto rounded p-0.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400">
+                        <button type="button" onClick={() => onDelete(c.id)} title="Delete comment" className="ml-auto rounded p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
                           <Trash2 className="size-3" />
                         </button>
                       )}
@@ -654,7 +656,7 @@ export function AttachmentsTab({ issueId, projectId, workspaceSlug }: Readonly<A
                 <button
                   type="button"
                   onClick={() => void handleDelete(a)}
-                  className="p-1 rounded hover:bg-red-500/10 transition-colors text-muted-foreground hover:text-red-400"
+                  className="p-1 rounded hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
                   title="Delete"
                 >
                   <Trash2 className="size-3.5" />
@@ -826,7 +828,7 @@ function ChecklistTab({
       {items.length > 0 && (
         <div className="flex items-center gap-2">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full transition-all bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300" style={{ width: `${pct}%` }} />
+            <div className="h-full rounded-full transition-all bg-primary" style={{ width: `${pct}%` }} />
           </div>
           <span className="text-[10px] text-muted-foreground">{doneCount}/{items.length}</span>
         </div>
@@ -843,7 +845,7 @@ function ChecklistTab({
             aria-label={item.done ? "Uncheck" : "Check"}
             className={cn(
               "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
-              item.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-border hover:border-foreground/40"
+              item.done ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-foreground/40"
             )}
           >
             {item.done && <CheckIcon className="size-3" />}
@@ -1122,7 +1124,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
           archiveIssue, pinIssue, fetchStatuses, fetchIssue,
           comments: storeComments, activity: storeActivity, statuses: storeStatuses } = useIssueStore()
   const { labelsByProject, fetchLabels } = useLabelStore()
-  const { githubLinks, githubStatus, fetchGitHubLinks, fetchGitHubStatus, connectGitHub } = useIntegrationStore()
+  const { githubLinks, githubStatus, fetchGitHubStatus, fetchGitHubLinks } = useIntegrationStore()
   const openSettings = useSettingsStore((s) => s.openSettings)
 
   const initDescription = issue?.description ?? ""
@@ -1163,41 +1165,12 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const [sectionCounts, setSectionCounts] = useState({ checklist: 0, attachments: 0, relations: 0 })
 
   // Agents de délégation : proposés DANS le menu Assignee (déléguer = comme assigner une personne).
-  const deliveryProviders = useDeliveryStore((s) => s.providers)
-  const fetchDeliveryProviders = useDeliveryStore((s) => s.fetchProviders)
+  const deliveryProviders = useDeliveryStore((s) => (projectId ? s.projectProviders[projectId] : undefined))
+  const fetchDeliveryProviders = useDeliveryStore((s) => s.fetchProjectProviders)
   const delegateToAgent = useDeliveryStore((s) => s.delegate)
   const fetchDeliveryRun = useDeliveryStore((s) => s.fetchRun)
-  const fetchDeliveryKey = useDeliveryStore((s) => s.fetchKey)
-  const deliveryKeys = useDeliveryStore((s) => s.keys)
-  const availableAgents = deliveryProviders.filter((p) => p.available)
-
-  // Delegation : verifie la connexion requise par l'agent AVANT de deleguer. Si absente, on ne cree
-  // pas de run en echec : on renvoie un "gate" que l'appelant transforme en toast ACTIONNABLE (bouton
-  // Connect) - GitHub en 1 clic (OAuth) pour Copilot, sinon saut vers Reglages > Agents pour les cles.
-  async function checkAgentConnection(agentKey: string, slug: string):
-    Promise<{ message: string; actionLabel: string; onConnect: () => void } | null> {
-    if (agentKey === "github-copilot") {
-      let st = githubStatus
-      if (!st) { await fetchGitHubStatus(slug).catch(() => {}); st = useIntegrationStore.getState().githubStatus }
-      if (st?.connected) return null
-      return {
-        message: "GitHub isn't connected - Copilot runs under your GitHub account.",
-        actionLabel: "Connect GitHub",
-        onConnect: () => { connectGitHub(slug).catch(() => {}) }, // OAuth 1-clic (redirige)
-      }
-    }
-    const keyProvider = agentKey === "claude-api" ? "anthropic" : agentKey === "cursor" ? "cursor" : null
-    if (keyProvider) {
-      const st = deliveryKeys[keyProvider] ?? (await fetchDeliveryKey(slug, keyProvider))
-      if (st?.connected) return null
-      return {
-        message: `Connect your ${keyProvider === "anthropic" ? "Anthropic" : "Cursor"} key to delegate.`,
-        actionLabel: "Connect",
-        onConnect: () => openSettings("agents"), // ouvre le modal Reglages > Agents en place
-      }
-    }
-    return null // stub / claude-code : aucune connexion requise
-  }
+  // Seuls les agents prêts pour la personne et pour ce projet sont proposés (lot 5) : runner créé, dépôt lié...
+  const availableAgents = useMemo(() => (deliveryProviders ?? []).filter((p) => p.available && p.ready), [deliveryProviders])
 
   useEffect(() => { if (editingTitle) titleRef.current?.focus() }, [editingTitle])
 
@@ -1228,8 +1201,13 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
       .catch(() => { /* silent */ })
     fetchLabels(workspaceSlug, projectId)
       .catch(() => { /* silent */ })
-    fetchDeliveryProviders(workspaceSlug).catch(() => { /* silent */ })
+    if (projectId) fetchDeliveryProviders(workspaceSlug, projectId).catch(() => { /* silent */ })
   }, [open, workspaceSlug, projectId, fetchStatuses, fetchLabels, fetchDeliveryProviders])
+
+  // Connexion GitHub du workspace : conditionne la section GitHub (liens de PR et de commits).
+  useEffect(() => {
+    if (open && workspaceSlug) fetchGitHubStatus(workspaceSlug).catch(() => { /* silent */ })
+  }, [open, workspaceSlug, fetchGitHubStatus])
 
   // Cycles du projet (options du sélecteur) + cycle courant de l'issue - CYC-03b.
   useEffect(() => {
@@ -1278,7 +1256,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   // Use real statuses from store if loaded, fallback to category-based config
   const displayStatuses: ApiIssueStatus[] = storeStatuses
   // Couleur réelle de la colonne courante (reflète la couleur personnalisée du board)
-  const currentStatusColor = displayStatuses.find((s) => s.id === statusId)?.color ?? "#94a3b8"
+  const currentStatusColor = displayStatuses.find((s) => s.id === statusId)?.color ?? "#736e67"
 
   async function callUpdate(payload: Parameters<typeof updateIssue>[3]): Promise<boolean> {
     if (!workspaceSlug || !projectId) return false
@@ -1460,7 +1438,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
           </DropdownMenu>
 
           {pinned && (
-            <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-500">
+            <span className="flex items-center gap-1 rounded-full bg-shape-yellow/10 px-2 py-0.5 text-[10px] font-medium text-ink-yellow">
               <Pin className="size-3" /> Pinned
             </span>
           )}
@@ -1662,7 +1640,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                     const m = projectMembers.find((x) => x.userId === userId)
                     if (!m) return
                     const name = m.displayName ?? m.email
-                    setAssignee({ initials: memberInitials(m), color: memberColor(m.userId), name, userId: m.userId, email: m.email, avatarUrl: m.avatarUrl })
+                    setAssignee({ name, userId: m.userId, email: m.email, avatarUrl: m.avatarUrl })
                     await callUpdate({ assigneeId: m.userId })
                     toast.success(`Assigned to ${name}`)
                   }}
@@ -1674,12 +1652,6 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                   onDelegate={async (agentKey) => {
                     const agent = availableAgents.find((a) => a.key === agentKey)
                     const name = agent?.displayName ?? "agent"
-                    // Connexion requise absente -> toast actionnable (bouton Connect), pas de run en echec.
-                    const gate = await checkAgentConnection(agentKey, workspaceSlug)
-                    if (gate) {
-                      toast.error(gate.message, { action: { label: gate.actionLabel, onClick: gate.onConnect } })
-                      return
-                    }
                     const res = await delegateToAgent(workspaceSlug, issueId, agentKey)
                     if (res) {
                       toast.success(`Delegated to ${name}`)
@@ -1821,10 +1793,10 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                 value={dueIso}
                 onChange={saveDueDate}
                 placeholder="-"
-                className={cn(isOverdue && "border-red-500/40 text-red-400 hover:text-red-400")}
+                className={cn(isOverdue && "border-destructive/40 text-destructive hover:text-destructive")}
               />
               {isOverdue && (
-                <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-red-400">
+                <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-destructive">
                   <AlertTriangle className="size-3" /> Overdue
                 </span>
               )}
@@ -1832,7 +1804,9 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
             {/* Created - read-only (reste dans la liste de propriétés) */}
             <MetaRow icon={<Activity className="size-3.5" />} label="Created">
-              <span className="text-xs text-muted-foreground">{issue.createdAt}</span>
+              <span className="text-xs text-muted-foreground">
+                {parseServerDate(issue.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              </span>
             </MetaRow>
 
             {/* Suivi du temps - bloc dédié en bas (plus lourd que les propriétés → isolé sous un séparateur) */}

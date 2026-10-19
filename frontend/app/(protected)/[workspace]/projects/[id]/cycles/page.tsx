@@ -26,9 +26,9 @@ import type { Cycle, CycleStatus } from "@/lib/api/cycle-service"
 // ---------------------------------------------------------------------------
 
 const CYCLE_STATUS_CONFIG: Record<CycleStatus, { badgeClass: string; label: string; icon: React.ReactNode }> = {
-  ACTIVE:    { badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20", label: "Active",    icon: <RefreshCw className="h-3.5 w-3.5 text-emerald-400" /> },
-  DRAFT:     { badgeClass: "bg-blue-500/15 text-blue-400 border-blue-500/20",         label: "Draft",     icon: <Clock className="h-3.5 w-3.5 text-blue-400" /> },
-  COMPLETED: { badgeClass: "bg-muted text-muted-foreground border-border",             label: "Completed", icon: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> },
+  ACTIVE:    { badgeClass: "bg-shape-green/15 text-ink-green border-shape-green/20", label: "Active",    icon: <RefreshCw className="h-3.5 w-3.5 text-ink-green" /> },
+  DRAFT:     { badgeClass: "bg-primary/15 text-ink-blue border-primary/20",         label: "Draft",     icon: <Clock className="h-3.5 w-3.5 text-ink-blue" /> },
+  COMPLETED: { badgeClass: "bg-muted text-muted-foreground border-border",             label: "Completed", icon: <CheckCircle2 className="h-3.5 w-3.5 text-ink-green" /> },
 }
 
 function formatDate(iso: string | null | undefined): string {
@@ -72,7 +72,7 @@ function CycleCard({ cycle, href }: { readonly cycle: Cycle; readonly href: stri
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">
           {formatDate(cycle.startDate)} → {formatDate(cycle.endDate)}
-          {left !== null && <span className="ml-2 text-amber-400">{left}d left</span>}
+          {left !== null && <span className="ml-2 text-ink-yellow">{left}d left</span>}
         </p>
       </div>
 
@@ -81,7 +81,7 @@ function CycleCard({ cycle, href }: { readonly cycle: Cycle; readonly href: stri
           {cycle.issueCount} issue{cycle.issueCount !== 1 ? "s" : ""}
         </span>
       ) : (
-        <span className="text-xs text-amber-400/80 hidden md:block shrink-0">No issues - add some</span>
+        <span className="text-xs text-ink-yellow/80 hidden md:block shrink-0">No issues - add some</span>
       )}
 
       <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />

@@ -6,7 +6,6 @@ import { Loader2 } from "lucide-react"
 
 import { useAuth } from "@/lib/contexts/auth-context"
 import { AppShell } from "@/components/layout/app-shell"
-import { LabShell } from "@/components/layout/lab-shell"
 import { LoginIntro } from "@/components/layout/login-intro"
 import { TwoFactorNudge } from "@/components/security/two-factor-nudge"
 
@@ -71,10 +70,10 @@ export default function ProtectedLayout({
         )
       ) : blocked ? null : (
         <>
-          {/* LabShell : bandeau « sandbox » en haut + coins arrondis sur les zones Labs (sinon transparent). */}
-          <LabShell>
+          {/* Conteneur pleine hauteur : c'est lui qui donne sa hauteur à l'app (l'AppShell est en h-full). */}
+          <div className="h-svh">
             <AppShell>{children}</AppShell>
-          </LabShell>
+          </div>
           {/* Nudge sécurité 2FA (best-effort, une fois par session) - ne rend rien, déclenche un toast. */}
           <TwoFactorNudge />
         </>

@@ -132,12 +132,12 @@ class ProjectServiceIntegrationTest extends AbstractIntegrationTest {
 
             UpdateProjectRequest upd = new UpdateProjectRequest();
             upd.setName("New Name");
-            upd.setColor("bg-emerald-500");
+            upd.setColor("bg-shape-green");
             projectService.updateProject(SLUG, created.getId(), owner.getId(), upd);
 
             Project reloaded = projectRepository.findById(created.getId()).orElseThrow();
             assertThat(reloaded.getName()).isEqualTo("New Name");
-            assertThat(reloaded.getColor()).isEqualTo("bg-emerald-500");
+            assertThat(reloaded.getColor()).isEqualTo("bg-shape-green");
         }
 
         @Test
@@ -297,14 +297,6 @@ class ProjectServiceIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
-        @DisplayName("getProjectActivity renvoie des points d'activité (parcourt la fenêtre de jours)")
-        void should_get_project_activity() {
-            ProjectResponse project = projectService.createProject(SLUG, owner.getId(), req("Act", "ACT"));
-
-            assertThat(projectService.getProjectActivity(SLUG, project.getId(), owner.getId(), 14)).isNotEmpty();
-        }
-
-        @Test
         @DisplayName("updateProject applique tous les champs (desc/status/public/icon/couleur/growth)")
         void should_update_all_fields() {
             ProjectResponse created = projectService.createProject(SLUG, owner.getId(), req("Full", "FUL"));
@@ -315,7 +307,7 @@ class ProjectServiceIntegrationTest extends AbstractIntegrationTest {
             upd.setStatus(com.taskforce.tf_api.core.enums.ProjectStatus.PAUSED);
             upd.setIsPublic(true);
             upd.setIconUrl("icon.png");
-            upd.setColor("bg-rose-500");
+            upd.setColor("bg-shape-red");
             upd.setGrowthMode(true);
 
             projectService.updateProject(SLUG, created.getId(), owner.getId(), upd);
@@ -453,71 +445,6 @@ class ProjectServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThatThrownBy(() -> projectService.detachTeam(SLUG, project.getId(), team.getId(), owner.getId()))
                 .isInstanceOf(ResourceNotFoundException.class);
-        }
-    }
-
-    // =========================================================================
-    @Nested
-    @DisplayName("plafond collaborateurs projet privé (façon GitHub)")
-    class PrivateProjectSeatLimit {
-
-        private Workspace ws() { return workspaceRepository.findBySlug(SLUG).orElseThrow(); }
-
-        /** Crée un utilisateur, l'ajoute au workspace, renvoie son email. */
-        private String wsMember(String tag) {
-            User u = userRepository.save(User.builder()
-                .keycloakId("kc-" + tag).email(tag + "@it.dev").displayName(tag).isActive(true).build());
-            workspaceMemberRepository.save(WorkspaceMember.builder()
-                .workspace(ws()).user(u).role(WorkspaceRole.MEMBER).build());
-            return u.getEmail();
-        }
-
-        private void addMember(Long projectId, String email) {
-            var add = new com.taskforce.tf_api.core.dto.request.AddProjectMemberRequest();
-            add.setEmail(email);
-            add.setRole(ProjectRole.MEMBER);
-            projectService.addMember(SLUG, projectId, owner.getId(), add);
-        }
-
-        @Test
-        @DisplayName("Free + projet privé : plafonné à 5 collaborateurs (créateur inclus), le 6e est refusé (409)")
-        void free_private_caps_at_five() {
-            // owner = FREE par défaut ; projet privé par défaut (isPublic=false)
-            ProjectResponse p = projectService.createProject(SLUG, owner.getId(), req("Priv", "PRV"));
-            // créateur = 1 membre (LEAD) → on ajoute 4 collaborateurs pour atteindre 5
-            addMember(p.getId(), wsMember("p1"));
-            addMember(p.getId(), wsMember("p2"));
-            addMember(p.getId(), wsMember("p3"));
-            addMember(p.getId(), wsMember("p4"));
-            assertThat(projectService.listMembers(SLUG, p.getId(), owner.getId())).hasSize(5);
-
-            String sixth = wsMember("p5");
-            assertThatThrownBy(() -> addMember(p.getId(), sixth))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("projets privés");
-        }
-
-        @Test
-        @DisplayName("Projet PUBLIC : aucun plafond, même en Free")
-        void public_project_is_unlimited() {
-            ProjectResponse p = projectService.createProject(SLUG, owner.getId(), req("Pub", "PUB"));
-            var upd = new com.taskforce.tf_api.core.dto.request.UpdateProjectRequest();
-            upd.setIsPublic(true);
-            projectService.updateProject(SLUG, p.getId(), owner.getId(), upd);
-
-            for (int i = 1; i <= 5; i++) addMember(p.getId(), wsMember("pub" + i)); // 6 au total > 5
-            assertThat(projectService.listMembers(SLUG, p.getId(), owner.getId())).hasSize(6);
-        }
-
-        @Test
-        @DisplayName("Forfait payant : projet privé illimité")
-        void paid_private_is_unlimited() {
-            owner.setPlanType(com.taskforce.tf_api.core.enums.PlanType.BUSINESS);
-            userRepository.save(owner);
-
-            ProjectResponse p = projectService.createProject(SLUG, owner.getId(), req("Biz", "BIZ"));
-            for (int i = 1; i <= 5; i++) addMember(p.getId(), wsMember("biz" + i)); // 6 au total > 5
-            assertThat(projectService.listMembers(SLUG, p.getId(), owner.getId())).hasSize(6);
         }
     }
 

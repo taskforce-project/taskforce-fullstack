@@ -24,7 +24,7 @@ export function MatchReasoning({
         <div className="flex flex-wrap items-center gap-1">
           <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">Matches</span>
           {skills.map((s) => (
-            <Badge key={s} className="h-4 px-1.5 text-[0.6875rem] bg-emerald-500/15 text-emerald-400 border-0">{s}</Badge>
+            <Badge key={s} className="h-4 px-1.5 text-[0.6875rem] bg-shape-green/15 text-ink-green border-0">{s}</Badge>
           ))}
         </div>
       )}

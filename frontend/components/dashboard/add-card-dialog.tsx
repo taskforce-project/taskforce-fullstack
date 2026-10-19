@@ -168,7 +168,7 @@ export function AddCardDialog({ slug, open, onOpenChange }: AddCardDialogProps) 
               Generate
             </Button>
           </div>
-          {genError && <p className="text-[11px] text-rose-500">Generation failed, try again.</p>}
+          {genError && <p className="text-[11px] text-destructive">Generation failed, try again.</p>}
 
           {spec && (
             <div className="space-y-2 rounded-lg border border-border p-3">
