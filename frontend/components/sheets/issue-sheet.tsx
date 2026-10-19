@@ -83,6 +83,7 @@ export interface SheetIssue {
   labels: IssueLabel[]
   dueDate: string | null
   storyPoints: number | null
+  /** Date-heure de création telle que l'API la renvoie (UTC, sans fuseau) : la fiche la formate. */
   createdAt: string
   description?: string
   pinned?: boolean
@@ -1803,7 +1804,9 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
             {/* Created - read-only (reste dans la liste de propriétés) */}
             <MetaRow icon={<Activity className="size-3.5" />} label="Created">
-              <span className="text-xs text-muted-foreground">{issue.createdAt}</span>
+              <span className="text-xs text-muted-foreground">
+                {parseServerDate(issue.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              </span>
             </MetaRow>
 
             {/* Suivi du temps - bloc dédié en bas (plus lourd que les propriétés → isolé sous un séparateur) */}
