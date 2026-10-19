@@ -84,7 +84,14 @@ export default function LegalNoticesPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">6. Intellectual property</h2>
             <p>
-              The TaskForce platform, its design, and its source code are proprietary. You retain all rights to the content (issues, pages, documents) you create within your workspace. By using the platform, you grant TaskForce a limited, non-exclusive license to store and display your content solely to provide the service.
+              TaskForce is free software: its source code is published under the GNU Affero General Public License v3.0 (AGPL-3.0). The TaskForce name and logo are not covered by that license. You retain all rights to the content (issues, pages, documents) you create within your workspace. By using the platform, you grant TaskForce a limited, non-exclusive license to store and display your content solely to provide the service.
+            </p>
+            <p className="mt-3">
+              The painting on the sign-in pages comes from the collection of the Art Institute of Chicago, which{" "}
+              <a href="https://unsplash.com/photos/AckZaYtIq3I" className="text-foreground underline underline-offset-2">
+                publishes it on Unsplash
+              </a>
+              .
             </p>
           </section>
 
