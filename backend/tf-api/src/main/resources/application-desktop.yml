@@ -95,8 +95,8 @@ app:
 mail:
   host: ""
   port: 587
-  username: ""
-  password: ""
+  username: ${MAIL_USERNAME:}
+  password: ${MAIL_PASSWORD:}
   from: noreply@taskforce-project.fr
   from-name: TaskForce
   properties:

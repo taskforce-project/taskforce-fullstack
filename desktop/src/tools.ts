@@ -56,7 +56,7 @@ export function spawnTool(command: string, args: string[]): ChildProcess {
     return spawn(resolved.file, args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
   }
   const line = [quoteForCmd(resolved.file), ...args.map(quoteForCmd)].join(" ");
-  return spawn(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `"${line}"`], {
+  return spawn("cmd.exe", ["/d", "/s", "/c", `"${line}"`], {
     windowsHide: true,
     windowsVerbatimArguments: true,
     stdio: ["ignore", "pipe", "pipe"],

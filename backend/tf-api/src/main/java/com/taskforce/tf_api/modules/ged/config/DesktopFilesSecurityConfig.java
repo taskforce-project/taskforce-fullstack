@@ -24,7 +24,6 @@ public class DesktopFilesSecurityConfig {
     public SecurityFilterChain desktopSignedFilesFilterChain(HttpSecurity http) throws Exception {
         http
             .securityMatcher(LocalObjectStorage.OBJECT_ROUTE)
-            .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authz -> authz.anyRequest().permitAll());
         return http.build();

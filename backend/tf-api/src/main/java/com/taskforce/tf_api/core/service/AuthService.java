@@ -238,7 +238,7 @@ public class AuthService {
         // Keycloak lui-même, avec le mot de passe. On le demande donc avant tout appel, comme pour le 2FA de l'app.
         boolean keycloakOneTimeCode = hasKeycloakOneTimeCode(request.getEmail());
         if (keycloakOneTimeCode && (request.getTotp() == null || request.getTotp().isBlank())) {
-            log.info("Code de l'application d'authentification requis pour : {}", request.getEmail());
+            log.info("Connexion : code de l'application d'authentification requis");
             return AuthResponse.builder().twoFactorRequired(true).build();
         }
 

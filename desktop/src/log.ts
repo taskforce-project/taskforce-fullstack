@@ -9,8 +9,13 @@ export function initLog(dir: string): void {
   logFile = join(dir, "desktop.log");
 }
 
+/** Message sur une seule ligne : sauts de ligne et guillemets échappés comme dans une chaîne JSON. */
+function oneLine(message: string): string {
+  return JSON.stringify(message).slice(1, -1);
+}
+
 function write(level: string, message: string): void {
-  const line = `${new Date().toISOString()} ${level} ${message}`;
+  const line = `${new Date().toISOString()} ${level} ${oneLine(message)}`;
   if (logFile) {
     try {
       appendFileSync(logFile, line + "\n");

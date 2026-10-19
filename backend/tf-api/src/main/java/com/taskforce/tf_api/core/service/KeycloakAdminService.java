@@ -66,7 +66,7 @@ public class KeycloakAdminService implements KeycloakService {
      */
     @Override
     public String createUser(String email, String password, String firstName, String lastName) {
-        log.info("Création d'un utilisateur Keycloak : {}", email);
+        log.info("Création d'un utilisateur Keycloak");
 
         UserRepresentation user = new UserRepresentation();
         user.setEmail(email);
@@ -131,7 +131,7 @@ public class KeycloakAdminService implements KeycloakService {
      */
     @Override
     public UserRepresentation getUserByEmail(String email) {
-        log.info("Recherche de l'utilisateur Keycloak par email : {}", email);
+        log.debug("Recherche d'un utilisateur Keycloak par e-mail");
         List<UserRepresentation> users = realmResource.users().search(email, true);
 
         if (users.isEmpty()) {
@@ -155,7 +155,7 @@ public class KeycloakAdminService implements KeycloakService {
      */
     @Override
     public boolean emailExists(String email) {
-        log.info("Vérification de l'existence de l'email dans Keycloak : {}", email);
+        log.debug("Vérification d'une adresse e-mail dans Keycloak");
         List<UserRepresentation> users = realmResource.users().search(email, true);
         return !users.isEmpty();
     }
