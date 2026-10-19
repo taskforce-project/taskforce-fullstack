@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import Link from "next/link"
 import { useAuth } from "@/lib/contexts/auth-context"
+import { afterSignInPath } from "@/lib/auth/desktop-handoff"
 import { sanitizeInput, globalRateLimiter } from "@/lib/utils/validation"
 import { loginSchema, firstZodError } from "@/lib/validation/auth-schemas"
 import { Loader2 } from "lucide-react"
@@ -111,7 +112,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         toast.success(t.auth.success.loginSuccess)
       }
       // Direct vers l'onboarding si non fait - évite que l'app « flashe » avant le wizard.
-      router.replace(result.user?.onboardingCompleted === false ? "/onboarding" : "/")
+      // Connexion demandée par l'app desktop : retour sur son accord plutôt que dans la webapp.
+      router.replace(afterSignInPath(result.user?.onboardingCompleted === false ? "/onboarding" : "/"))
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       toast.error(t.common.error, { description: errorMessage || t.auth.errors.loginFailed })

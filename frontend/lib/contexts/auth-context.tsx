@@ -11,6 +11,7 @@ import { authService, type AuthResponse } from "../api/auth-service";
 import { useUserStore } from "../store/user-store";
 import { desktopBridge, IS_DESKTOP } from "../desktop";
 import type { AuthUser, LoginCredentials } from "../auth";
+import { afterSignInPath } from "../auth/desktop-handoff";
 
 /**
  * Type du contexte d'authentification
@@ -96,7 +97,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Sortie de la page login : on route direct vers l'onboarding si non fait - pas de passage par
     // l'app avant (sinon elle « flashe » le temps que la garde ci-dessus se déclenche).
     if (path === "/auth/login") {
-      router.replace(user.onboardingCompleted === false ? "/onboarding" : "/");
+      router.replace(afterSignInPath(user.onboardingCompleted === false ? "/onboarding" : "/"));
     }
   }, [user, isLoading, router, pathname]);
 

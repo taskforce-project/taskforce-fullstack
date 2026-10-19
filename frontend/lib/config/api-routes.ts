@@ -57,6 +57,20 @@ export const DELIVERY_ROUTES = {
 } as const;
 
 /**
+ * Sessions de l'app desktop de la personne connectée : l'accord donné sur /auth/desktop, puis la liste des ordinateurs
+ * connectés, que les réglages de sécurité déconnectent.
+ * Backend: @RequestMapping("/api/users/me/desktop-sessions")
+ */
+export const DESKTOP_SESSION_ROUTES = {
+  /** POST = accord à l'app desktop : rend son adresse de retour, avec un code à usage unique. */
+  AUTHORIZE: "/api/users/me/desktop-sessions/authorize",
+  /** GET = ordinateurs connectés (jamais de jeton). */
+  SESSIONS: "/api/users/me/desktop-sessions",
+  /** DELETE = déconnecte cet ordinateur. */
+  SESSION: (sessionId: number) => `/api/users/me/desktop-sessions/${sessionId}`,
+} as const;
+
+/**
  * Jetons personnels de la personne connectée (lot 5) : ils ne servent qu'au serveur MCP de l'instance.
  * Backend: @RequestMapping("/api/users/me/tokens")
  */
