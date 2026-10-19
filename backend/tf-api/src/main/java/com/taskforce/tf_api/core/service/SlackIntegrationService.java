@@ -12,20 +12,23 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import com.taskforce.tf_api.core.dto.request.CreateKnowledgeNodeRequest;
@@ -35,6 +38,7 @@ import com.taskforce.tf_api.core.dto.response.SlackChannelResponse;
 import com.taskforce.tf_api.core.dto.response.SlackHistoryMessage;
 import com.taskforce.tf_api.core.dto.response.SlackSyncResponse;
 import com.taskforce.tf_api.core.enums.IntegrationProvider;
+import com.taskforce.tf_api.core.enums.WebhookEventType;
 import com.taskforce.tf_api.core.model.Integration;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.OAuthState;
@@ -85,6 +89,7 @@ public class SlackIntegrationService {
     private final KnowledgeNodeRepository nodeRepository;
     private final BrainSearchService      brainSearch;
     private final JdbcTemplate            jdbcTemplate;
+    private final TransactionTemplate     tx;
 
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final int STATE_TTL_MINUTES = 10;
@@ -94,6 +99,17 @@ public class SlackIntegrationService {
     private static final int MIN_MESSAGE_LEN = 4;
     /** Borne de securite sur le contenu ingere. */
     private static final int MAX_BODY = 6000;
+    /**
+     * Portées demandées au bot : publier ({@code chat:write}, et dans un canal public sans y être invité,
+     * {@code chat:write.public}), lister et lire les canaux pour la synchro du Brain OS ({@code channels:read},
+     * {@code channels:history}), nommer les auteurs ({@code users:read}), choisir un canal à l'installation
+     * ({@code incoming-webhook}). L'app Slack de l'instance doit les déclarer.
+     */
+    static final String BOT_SCOPES = "chat:write,chat:write.public,channels:read,channels:history,users:read,incoming-webhook";
+    /** Identifiant de canal Slack ({@code C0123456789}) : il finit dans l'URL de l'API Slack. */
+    private static final Pattern CHANNEL_ID = Pattern.compile("[A-Z0-9]{9,20}");
+    /** Événements envoyés à un canal choisi à l'installation (ceux du formulaire par défaut). */
+    private static final String[] DEFAULT_CHANNEL_EVENTS = {WebhookEventType.ISSUE_CREATED.key()};
 
     /** Cache des noms d'utilisateurs Slack résolus (clé : {@code workspaceId:slackUserId}). */
     private final Map<String, String> slackUserNameCache = new java.util.concurrent.ConcurrentHashMap<>();
@@ -125,23 +141,43 @@ public class SlackIntegrationService {
         String url = SLACK_OAUTH_AUTHORIZE
             + "?client_id=" + encode(clientId)
             + "&redirect_uri=" + encode(callbackUrl)
-            + "&scope=chat:write,channels:read,incoming-webhook"
+            + "&scope=" + encode(BOT_SCOPES)
             + "&state=" + encode(state);
         return URI.create(url);
     }
 
+    /**
+     * Retour de Slack. Renvoie toujours une URL de l'application, avec {@code slack=connected} ou {@code slack=error}
+     * (accès refusé, state expiré, échange échoué) : le navigateur ne reste plus sur une erreur JSON de l'API.
+     */
     @Transactional
-    public String handleCallback(String code, String state) {
-        // 0. Résoudre + valider le state
-        OAuthState oauthState = oauthStateRepository.findById(state)
+    public String handleCallback(String code, String state, String error) {
+        OAuthState oauthState = state == null || state.isBlank() ? null : oauthStateRepository.findById(state)
             .filter(s -> s.getProvider() == IntegrationProvider.SLACK)
-            .orElseThrow(() -> new BusinessException("Invalid OAuth state"));
-        if (oauthState.getExpiresAt().isBefore(LocalDateTime.now())) {
-            oauthStateRepository.delete(oauthState);
-            throw new BusinessException("The OAuth state expired: start the connection again");
-        }
+            .orElse(null);
+        if (oauthState == null) return frontendUrl + "/?slack=error"; // state inconnu : workspace inconnu
         Workspace workspace = oauthState.getWorkspace();
+        User installedBy = oauthState.getUser();
+        boolean expired = oauthState.getExpiresAt().isBefore(LocalDateTime.now());
+        oauthStateRepository.delete(oauthState); // usage unique, même en échec
+        String settings = frontendUrl + "/" + workspace.getSlug() + "/settings?section=integrations&slack=";
+        try {
+            if (error != null && !error.isBlank()) throw new BusinessException("Slack authorization refused: " + error);
+            if (expired) throw new BusinessException("OAuth state expired");
+            if (code == null || code.isBlank()) throw new BusinessException("Missing authorization code");
+            connect(workspace, installedBy, code);
+            return settings + "connected";
+        } catch (RuntimeException e) {
+            log.warn("Slack connection failed for workspace {}: {}", workspace.getId(), e.getMessage());
+            return settings + "error";
+        }
+    }
 
+    /**
+     * Échange le code, enregistre la connexion du workspace et, s'il est nouveau, le canal choisi sur l'écran
+     * d'installation de Slack : les notifications marchent sans saisir d'identifiant de canal.
+     */
+    private void connect(Workspace workspace, User installedBy, String code) {
         // 1. Exchange code for token
         Map<String, Object> tokenResponse = exchangeCodeForToken(code);
 
@@ -165,12 +201,22 @@ public class SlackIntegrationService {
         );
         integration.setAccessToken(botToken);
         integration.setMeta(meta);
-        integration.setInstalledBy(oauthState.getUser());
+        integration.setInstalledBy(installedBy);
         integrationRepository.save(integration);
 
-        oauthStateRepository.delete(oauthState);
-
-        return frontendUrl + "/" + workspace.getSlug() + "/settings?section=integrations&slack=connected";
+        // 3. Canal choisi à l'installation (portée incoming-webhook)
+        String channelId = extractPath(tokenResponse, "incoming_webhook.channel_id");
+        String channelName = extractPath(tokenResponse, "incoming_webhook.channel").replaceFirst("^#", "");
+        if (CHANNEL_ID.matcher(channelId).matches()
+            && !slackChannelRepository.existsByWorkspaceIdAndChannelId(workspace.getId(), channelId)) {
+            slackChannelRepository.save(SlackChannel.builder()
+                .workspace(workspace)
+                .channelId(channelId)
+                .channelName(channelName.isBlank() ? channelId : channelName)
+                .eventTypes(DEFAULT_CHANNEL_EVENTS.clone())
+                .active(true)
+                .build());
+        }
     }
 
     private String newState() {
@@ -179,11 +225,36 @@ public class SlackIntegrationService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    @Transactional
+    /**
+     * Déconnecte Slack : supprime la connexion et ses canaux (ils appartiennent à l'équipe Slack connectée, une
+     * reconnexion à une autre équipe les aurait repris), puis révoque le jeton chez Slack, hors transaction et
+     * sans bloquer la déconnexion si Slack ne répond pas.
+     */
     public void disconnect(String workspaceSlug) {
-        Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + workspaceSlug));
-        integrationRepository.deleteByWorkspaceIdAndProvider(workspace.getId(), IntegrationProvider.SLACK);
+        String token = tx.execute(status -> {
+            Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
+                .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + workspaceSlug));
+            String current = integrationRepository
+                .findByWorkspaceIdAndProvider(workspace.getId(), IntegrationProvider.SLACK)
+                .map(Integration::getAccessToken)
+                .orElse(null);
+            integrationRepository.deleteByWorkspaceIdAndProvider(workspace.getId(), IntegrationProvider.SLACK);
+            slackChannelRepository.deleteByWorkspaceId(workspace.getId());
+            return current;
+        });
+        if (token != null) revokeToken(token);
+    }
+
+    /** {@code auth.revoke} : invalide le jeton du bot (best-effort). */
+    private void revokeToken(String token) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(token);
+            restTemplate.exchange("https://slack.com/api/auth.revoke", HttpMethod.POST,
+                new HttpEntity<>(headers), new ParameterizedTypeReference<Map<String, Object>>() {});
+        } catch (RestClientException e) {
+            log.warn("Slack token not revoked at disconnect: {}", e.getMessage());
+        }
     }
 
     public IntegrationStatusResponse getStatus(String workspaceSlug) {
@@ -203,12 +274,23 @@ public class SlackIntegrationService {
     public SlackChannelResponse addChannel(String workspaceSlug, SlackChannelRequest req) {
         Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
             .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + workspaceSlug));
+        String channelId = requireChannelId(req.channelId());
+        if (slackChannelRepository.existsByWorkspaceIdAndChannelId(workspace.getId(), channelId)) {
+            throw new BusinessException("This Slack channel is already set up. Remove it first to change its events");
+        }
+        List<String> events = req.eventTypes() != null ? req.eventTypes() : List.of();
+        List<String> known = WebhookEventType.subscribable();
+        List<String> unknown = events.stream().filter(e -> !known.contains(e)).toList();
+        if (!unknown.isEmpty()) {
+            throw new BusinessException("Unknown event: " + String.join(", ", unknown)
+                + ". Known events: " + String.join(", ", known));
+        }
 
         SlackChannel channel = SlackChannel.builder()
             .workspace(workspace)
-            .channelId(req.channelId())
+            .channelId(channelId)
             .channelName(req.channelName())
-            .eventTypes(req.eventTypes() != null ? req.eventTypes().toArray(new String[0]) : new String[]{})
+            .eventTypes(events.stream().distinct().toArray(String[]::new))
             .active(true)
             .build();
 
@@ -260,17 +342,6 @@ public class SlackIntegrationService {
                     .forEach(c -> postMessage(integration.getAccessToken(), c.getChannelId(), text)));
     }
 
-    /** Envoi direct sur le 1er canal actif (utilitaire ; ne filtre pas par type d'événement). */
-    public void sendNotification(Long workspaceId, String text) {
-        integrationRepository
-            .findByWorkspaceIdAndProvider(workspaceId, IntegrationProvider.SLACK)
-            .ifPresent(integration ->
-                slackChannelRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId).stream()
-                    .filter(SlackChannel::getActive)
-                    .findFirst()
-                    .ifPresent(channel -> postMessage(integration.getAccessToken(), channel.getChannelId(), text)));
-    }
-
     // ----------------------------------------------------------------
     // Miroir (pull) : lecture de l'historique + résolution des noms
     // ----------------------------------------------------------------
@@ -278,12 +349,14 @@ public class SlackIntegrationService {
     /**
      * Récupère l'historique d'un canal Slack (conversations.history) depuis {@code oldestTs} (exclu),
      * en ordre chronologique. Ne garde que les messages texte d'utilisateurs (ignore les sous-types
-     * système join/leave/bot). Retourne une liste vide si Slack répond {@code ok:false}.
+     * système join/leave/bot). Un refus de Slack ({@code ok:false}) devient un message qui dit quoi faire, au lieu
+     * d'une synchro silencieusement vide.
      */
     @SuppressWarnings("unchecked")
     public List<SlackHistoryMessage> fetchHistory(Long workspaceId, String slackChannelId, String oldestTs) {
+        String channelId = requireChannelId(slackChannelId);
         String token = requireToken(workspaceId);
-        String url = "https://slack.com/api/conversations.history?channel=" + slackChannelId + "&limit=100"
+        String url = "https://slack.com/api/conversations.history?channel=" + channelId + "&limit=100"
             + (oldestTs != null && !oldestTs.isBlank() ? "&oldest=" + oldestTs : "");
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
@@ -291,9 +364,10 @@ public class SlackIntegrationService {
             url, HttpMethod.GET, new HttpEntity<>(headers),
             new ParameterizedTypeReference<Map<String, Object>>() {});
         Map<String, Object> body = resp.getBody();
-        if (body == null || Boolean.FALSE.equals(body.get("ok")) || !(body.get("messages") instanceof List<?> list)) {
-            return List.of();
+        if (body == null || !Boolean.TRUE.equals(body.get("ok"))) {
+            throw slackRefusal(body == null ? "no_response" : str(body.get("error")));
         }
+        if (!(body.get("messages") instanceof List<?> list)) return List.of();
         List<SlackHistoryMessage> out = new java.util.ArrayList<>();
         for (Object o : list) {
             if (!(o instanceof Map<?, ?> m) || m.get("subtype") != null) continue;
@@ -436,6 +510,28 @@ public class SlackIntegrationService {
         return s != null && s.length() > max ? s.substring(0, max) : s;
     }
 
+    private static String requireChannelId(String value) {
+        String id = value == null ? "" : value.trim();
+        if (!CHANNEL_ID.matcher(id).matches()) {
+            throw new BusinessException("Invalid Slack channel ID (it looks like C0123456789)");
+        }
+        return id;
+    }
+
+    /** Refus de Slack à la lecture d'un canal, traduit en action à faire. */
+    static BusinessException slackRefusal(String error) {
+        return switch (error == null ? "" : error) {
+            case "missing_scope" -> new BusinessException(
+                "Slack doesn't let TaskForce read this channel yet: reconnect Slack to grant it");
+            case "not_in_channel" -> new BusinessException(
+                "Add the TaskForce app to this channel in Slack, then sync again");
+            case "channel_not_found" -> new BusinessException("Slack channel not found");
+            case "invalid_auth", "token_revoked", "account_inactive" -> new BusinessException(
+                "Slack refused the workspace connection: reconnect Slack in Settings > Integrations");
+            default -> new BusinessException("Slack refused to read the channel (" + error + ")");
+        };
+    }
+
     private String requireToken(Long workspaceId) {
         return integrationRepository.findByWorkspaceIdAndProvider(workspaceId, IntegrationProvider.SLACK)
             .map(Integration::getAccessToken)
@@ -490,7 +586,7 @@ public class SlackIntegrationService {
 
         Map<String, Object> responseBody = response.getBody();
         if (responseBody == null || Boolean.FALSE.equals(responseBody.get("ok"))) {
-            throw new RuntimeException("Failed to obtain Slack access token: " +
+            throw new BusinessException("Slack didn't return an access token: " +
                 (responseBody != null ? responseBody.get("error") : "null response"));
         }
         return responseBody;

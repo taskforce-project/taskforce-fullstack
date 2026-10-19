@@ -314,7 +314,7 @@ class IntegrationControllerWebMvcTest {
     @Test
     @DisplayName("GET slack/callback public → 302")
     void slack_callback_302() throws Exception {
-        when(slackService.handleCallback(anyString(), anyString()))
+        when(slackService.handleCallback(anyString(), anyString(), org.mockito.ArgumentMatchers.isNull()))
             .thenReturn("http://localhost:3000/acme/settings?slack=connected");
 
         mockMvc.perform(get("/api/integrations/slack/callback").param("code", "c").param("state", "acme"))

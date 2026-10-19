@@ -214,12 +214,14 @@ public class IntegrationController {
     }
 
     /** Callback appelé par Slack — endpoint PUBLIC. {@code state} = token aléatoire. */
+    /** Retour de Slack : toujours une redirection vers l'app ({@code slack=connected} ou {@code slack=error}). */
     @GetMapping("/api/integrations/slack/callback")
     public ResponseEntity<Void> slackCallback(
-        @RequestParam String code,
-        @RequestParam String state
+        @RequestParam(required = false) String code,
+        @RequestParam(required = false) String state,
+        @RequestParam(required = false) String error
     ) {
-        String redirectUrl = slackService.handleCallback(code, state);
+        String redirectUrl = slackService.handleCallback(code, state, error);
         return ResponseEntity.status(HttpStatus.FOUND)
             .location(URI.create(redirectUrl))
             .build();

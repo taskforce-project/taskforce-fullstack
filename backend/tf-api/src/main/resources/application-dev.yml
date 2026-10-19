@@ -155,10 +155,6 @@ integrations:
   slack:
     client-id: ${SLACK_CLIENT_ID:}
     client-secret: ${SLACK_CLIENT_SECRET:}
-    # Miroir Slack → chat : poller de sync auto des canaux miroir
-    mirror:
-      poll-enabled: ${SLACK_MIRROR_POLL_ENABLED:true}
-      poll-interval-ms: ${SLACK_MIRROR_POLL_INTERVAL_MS:60000}
   # MCP — TaskForce = hôte MCP : Cortex pilote des serveurs MCP externes (cf. McpClient / WorkspaceMcpService)
   mcp:
     connect-timeout-ms: ${MCP_CONNECT_TIMEOUT_MS:10000}

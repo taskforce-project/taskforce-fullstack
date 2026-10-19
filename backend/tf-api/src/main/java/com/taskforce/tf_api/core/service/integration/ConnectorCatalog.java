@@ -84,7 +84,7 @@ public class ConnectorCatalog {
 
         // ── Communication ────────────────────────────────────────────────────
         nativeIntegration("slack", "Slack", ConnectorCategory.COMMUNICATION, ConnectorAuthType.OAUTH2,
-            "Channels, messages, issue mirroring", "https://api.slack.com",
+            "Issue notifications in your channels, channel history in the Brain OS", "https://api.slack.com",
             "One-click connect: you are redirected to Slack to authorize the app. Nothing to copy.",
             List.of(), List.of("observe", "act"), "https://slack.com");
 
