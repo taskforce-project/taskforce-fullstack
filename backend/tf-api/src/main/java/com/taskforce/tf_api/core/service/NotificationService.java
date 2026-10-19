@@ -62,15 +62,6 @@ public class NotificationService {
         return page.stream().map(this::toResponse).toList();
     }
 
-    /**
-     * Compte les notifications non lues d'un utilisateur dans un workspace.
-     */
-    @Transactional(readOnly = true)
-    public long countUnread(String workspaceSlug, Long userId) {
-        Workspace workspace = resolveWorkspace(workspaceSlug);
-        return notificationRepository.countByRecipientIdAndWorkspaceIdAndReadFalse(userId, workspace.getId());
-    }
-
     // =========================================================================
     // Actions
     // =========================================================================
@@ -81,10 +72,10 @@ public class NotificationService {
     @Transactional
     public NotificationResponse markAsRead(Long notificationId, Long userId) {
         Notification notif = notificationRepository.findById(notificationId)
-            .orElseThrow(() -> new ResourceNotFoundException("Notification introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
 
         if (!notif.getRecipient().getId().equals(userId)) {
-            throw new ResourceNotFoundException("Notification introuvable");
+            throw new ResourceNotFoundException("Notification not found");
         }
 
         notif.setRead(true);
@@ -97,10 +88,10 @@ public class NotificationService {
     @Transactional
     public NotificationResponse acknowledge(Long notificationId, Long userId) {
         Notification notif = notificationRepository.findById(notificationId)
-            .orElseThrow(() -> new ResourceNotFoundException("Notification introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
 
         if (!notif.getRecipient().getId().equals(userId)) {
-            throw new ResourceNotFoundException("Notification introuvable");
+            throw new ResourceNotFoundException("Notification not found");
         }
 
         notif.setRead(true);
@@ -152,7 +143,7 @@ public class NotificationService {
         if (assignedBy == null) return;
         String declinerName = decliner.getDisplayName() != null ? decliner.getDisplayName() : decliner.getEmail();
         Notification notif = buildNotification(issue, decliner, assignedBy, "assignmentDeclined", "warning",
-            declinerName + " declined \"" + issue.getTitle() + "\" — reassign needed", null);
+            declinerName + " declined \"" + issue.getTitle() + "\": reassign needed", null);
         dispatch(notif);
     }
 
@@ -187,7 +178,7 @@ public class NotificationService {
                 type = "completed";
             }
             Notification notif = buildNotification(issue, actor, recipient, type, urgency,
-                title + " — moved to " + newStatusName, null);
+                title + ": moved to " + newStatusName, null);
             dispatch(notif);
         }
     }
@@ -227,7 +218,7 @@ public class NotificationService {
         String urgency = overdue ? "critical" : "warning";
         // Libellés en anglais : ils sont rendus TELS QUELS par le Signal Center (pas de clé i18n
         // côté notification), donc c'est ici que se joue la langue de l'inbox.
-        String title   = issue.getTitle() + (overdue ? " — deadline breached" : " — due soon");
+        String title   = issue.getTitle() + (overdue ? ": deadline breached" : ": due soon");
         // Alerte système : pas d'acteur (actor null)
         Notification notif = buildNotification(issue, null, assignee, type, urgency, title, null);
         dispatch(notif);
@@ -273,6 +264,29 @@ public class NotificationService {
         }
     }
 
+    /**
+     * L'agent de code demande à exécuter une action hors de son socle (OSS-5.4) : seule la personne qui a délégué
+     * peut répondre, puisque l'action tourne sur sa machine. Le lien mène à l'issue, où se trouvent les boutons.
+     */
+    @Transactional
+    public void notifyAgentApproval(Issue issue, User delegator, String tool, String summary) {
+        if (delegator == null) return;
+        Notification notif = buildNotification(issue, null, delegator, "agentApproval", "warning",
+            issue.getTitle() + ": Claude Code asks to run " + tool, truncate(summary, 200));
+        dispatch(notif);
+    }
+
+    /** Run d'un agent de code terminé ou en échec (OSS-5.5), pour la personne qui a délégué. */
+    @Transactional
+    public void notifyAgentRunFinished(Issue issue, User delegator, String agentName, boolean done, String detail) {
+        if (delegator == null) return;
+        Notification notif = buildNotification(issue, null, delegator, done ? "agentDone" : "agentFailed",
+            done ? "info" : "warning",
+            issue.getTitle() + (done ? ": " + agentName + " finished, ready for your review" : ": " + agentName + " failed"),
+            truncate(detail, 200));
+        dispatch(notif);
+    }
+
     // =========================================================================
     // Helpers privés
     // =========================================================================
@@ -286,7 +300,7 @@ public class NotificationService {
      * </ul>
      * Ni le push ni l'email ne doivent casser la transaction métier appelante.
      *
-     * <p>Note : si in-app est OFF et email ON, aucune ligne n'est persistée — donc pas de déduplication
+     * <p>Note : si in-app est OFF et email ON, aucune ligne n'est persistée, donc pas de déduplication
      * pour les alertes récurrentes (dueDate/overload), l'email peut alors se répéter au rythme du
      * scheduler. Le défaut (in-app ON) évite ce cas ; c'est un choix assumé plutôt que persister une
      * ligne « fantôme » invisible dans la cloche.</p>
@@ -342,6 +356,9 @@ public class NotificationService {
             case "dueSoon"       -> "Due soon";
             case "overdue"       -> "Overdue";
             case "overload"      -> "Workload alert";
+            case "agentApproval" -> "Approval needed";
+            case "agentDone"     -> "Agent finished";
+            case "agentFailed"   -> "Agent failed";
             default              -> "Notification";
         };
     }
@@ -391,7 +408,7 @@ public class NotificationService {
 
     private Workspace resolveWorkspace(String slug) {
         return workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable : " + slug));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + slug));
     }
 
     // =========================================================================

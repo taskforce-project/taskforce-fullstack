@@ -74,7 +74,7 @@ public class WorkspaceAccessInterceptor implements HandlerInterceptor {
 
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, userId)) {
             log.warn("Accès refusé (non-membre) : user {} → workspace '{}'", userId, slug);
-            throw new ForbiddenException("Accès refusé : vous n'êtes pas membre de cet espace de travail");
+            throw new ForbiddenException("Access denied: you're not a member of this workspace");
         }
         return true;
     }

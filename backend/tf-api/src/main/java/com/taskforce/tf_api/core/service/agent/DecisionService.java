@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,9 +45,6 @@ public class DecisionService {
     private final LlmClient          llm;
     private final ObjectMapper       objectMapper;
 
-    @Value("${ai.model.assistant:gateway-default}")
-    private String model;
-
     private static final int DUE_SOON_DAYS = 7;
     private static final int RAG_TOPK = 6;
 
@@ -63,11 +59,10 @@ public class DecisionService {
         }
     }
 
-    /** Contexte Brain OS pertinent pour le projet (RAG). */
-    @Transactional(readOnly = true)
+    /** Contexte Brain OS pertinent pour le projet (RAG). Sans transaction : la recherche appelle le modèle d'embeddings. */
     public List<KnowledgeNode> retrieveContext(Long workspaceId, String projectName) {
         return search.retrieveRelevant(workspaceId,
-            projectName + " vision objectifs roadmap risques priorités", RAG_TOPK);
+            projectName + " vision goals roadmap risks priorities", RAG_TOPK);
     }
 
     /**
@@ -86,7 +81,7 @@ public class DecisionService {
             return new Analysis(fallbackBrief(project, snap), null);
         }
         try {
-            // Défaut = tier "fast" (8B) ; "deep" (14B + thinking) = bouton « Approfondir ».
+            // Défaut = tier "fast" (petit modèle) ; "deep" (modèle principal qui raisonne) = bouton « Approfondir ».
             JsonNode json = callLlm(project, snap, hits, deep ? "deep" : "fast", clarification, allowQuestion);
 
             if (allowQuestion) {
@@ -96,7 +91,7 @@ public class DecisionService {
             String situation = json.path("situation").asText("").trim();
             List<String> risks = readStrings(json.path("risks"));
             List<Priority> priorities = readPriorities(json.path("priorities"));
-            if (situation.isEmpty() && priorities.isEmpty()) throw new IllegalStateException("réponse LLM vide");
+            if (situation.isEmpty() && priorities.isEmpty()) throw new IllegalStateException("empty model answer");
             return new Analysis(new DecisionBrief(situation, risks, priorities, snap, "generated"), null);
         } catch (Exception ex) {
             log.warn("Décision IA indisponible (projet={}): {}", project.getId(), ex.getMessage());
@@ -133,37 +128,36 @@ public class DecisionService {
     private JsonNode callLlm(Project project, Snapshot s, List<KnowledgeNode> hits, String tier,
                              String clarification, boolean allowQuestion) throws Exception {
         String content = llm.chatCompletion(
-            model, systemPrompt(hits, allowQuestion), userPrompt(project, s, clarification), true, tier);
+            systemPrompt(hits, allowQuestion), userPrompt(project, s, clarification), true, tier);
         return objectMapper.readTree(content);
     }
 
     private String systemPrompt(List<KnowledgeNode> hits, boolean allowQuestion) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Tu es Taskforce AI, le COO du produit. À partir des métriques réelles d'un projet et du ")
-          .append("contexte (Brain OS : vision, specs, données ingérées), tu produis une décision actionnable.\n\n")
-          .append("Réponds STRICTEMENT en JSON (aucun texte hors JSON), avec ces clés :\n")
-          .append("- \"situation\" (string markdown court) : où en est le projet, fondé sur les chiffres.\n")
-          .append("- \"risks\" (array de strings) : risques concrets (retards, charge, dérive de scope…).\n")
-          .append("- \"priorities\" (array de 3 objets) : les 3 actions les plus importantes pour demain, ")
-          .append("chaque objet = {\"title\": string (action concrète, à l'impératif), \"rationale\": string ")
-          .append("(pourquoi maintenant), \"level\": \"HIGH\"|\"MEDIUM\"|\"LOW\"}.\n\n");
+        sb.append("You are TaskForce AI, the COO of the product. From the real metrics of a project and its ")
+          .append("context (Brain OS: vision, specs, ingested data), you produce an actionable decision.\n\n")
+          .append("Answer STRICTLY in JSON (no text outside the JSON), with these keys:\n")
+          .append("- \"situation\" (short markdown string): where the project stands, grounded in the numbers.\n")
+          .append("- \"risks\" (array of strings): concrete risks (delays, workload, scope creep...).\n")
+          .append("- \"priorities\" (array of 3 objects): the 3 most important actions for tomorrow, ")
+          .append("each object = {\"title\": string (concrete action, imperative), \"rationale\": string ")
+          .append("(why now), \"level\": \"HIGH\"|\"MEDIUM\"|\"LOW\"}.\n\n");
         if (allowQuestion) {
             // Une seule question, et seulement si elle change la décision : sinon le workflow
             // s'arrête pour rien et l'humain paie une interruption sans valeur.
-            sb.append("EXCEPTION — si, et seulement si, un élément de contexte manquant t'empêche de ")
-              .append("trancher entre plusieurs priorités radicalement différentes, réponds à la place ")
-              .append("avec la SEULE clé \"question\" (string) : une question courte, fermée, adressée à ")
-              .append("l'humain qui pilote le projet. Ne pose pas de question dont la réponse est déjà ")
-              .append("dans les métriques ou le contexte. Dans le doute, décide sans poser de question.\n\n");
+            sb.append("EXCEPTION: if, and only if, a missing piece of context prevents you from choosing ")
+              .append("between radically different priorities, answer instead with the SINGLE key \"question\" ")
+              .append("(string): a short, closed question for the person who runs the project. Do not ask ")
+              .append("anything the metrics or the context already answer. When in doubt, decide without asking.\n\n");
         }
-        sb.append("Sois concret et priorise l'impact. N'invente pas de données absentes du contexte. Langue : français.");
+        sb.append("Be concrete and prioritize impact. Do not invent data missing from the context. Language: English.");
         if (!hits.isEmpty()) {
-            sb.append("\n\nContexte projet (Brain OS) :\n");
+            sb.append("\n\nProject context (Brain OS):\n");
             for (KnowledgeNode n : hits) {
                 String c = n.getContent() != null ? n.getContent() : "";
                 if (c.length() > 400) c = c.substring(0, 400) + "…";
                 sb.append("- [").append(n.getDomain()).append("] ").append(n.getTitle())
-                  .append(" : ").append(c.replace("\n", " ")).append("\n");
+                  .append(": ").append(c.replace("\n", " ")).append("\n");
             }
         }
         return sb.toString();
@@ -171,19 +165,19 @@ public class DecisionService {
 
     private String userPrompt(Project project, Snapshot s, String clarification) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Projet : ").append(project.getName()).append("\n")
-          .append("Métriques (aujourd'hui) :\n")
-          .append("- issues totales : ").append(s.total()).append("\n")
-          .append("- ouvertes : ").append(s.open()).append(" (dont en cours : ").append(s.inProgress()).append(")\n")
-          .append("- terminées : ").append(s.completed()).append("\n")
-          .append("- en retard (assignées) : ").append(s.overdue()).append("\n")
-          .append("- à échéance sous ").append(DUE_SOON_DAYS).append(" j : ").append(s.dueSoon()).append("\n");
+        sb.append("Project: ").append(project.getName()).append("\n")
+          .append("Metrics (today):\n")
+          .append("- total issues: ").append(s.total()).append("\n")
+          .append("- open: ").append(s.open()).append(" (in progress: ").append(s.inProgress()).append(")\n")
+          .append("- done: ").append(s.completed()).append("\n")
+          .append("- overdue (assigned): ").append(s.overdue()).append("\n")
+          .append("- due within ").append(DUE_SOON_DAYS).append(" days: ").append(s.dueSoon()).append("\n");
         if (clarification != null && !clarification.isBlank()) {
-            sb.append("\nPrécision apportée par l'humain qui pilote le projet : ")
+            sb.append("\nClarification from the person who runs the project: ")
               .append(clarification.trim())
-              .append("\nTiens-en compte et décide maintenant (ne pose plus de question).\n");
+              .append("\nTake it into account and decide now (do not ask another question).\n");
         }
-        sb.append("Donne la situation, les risques, et les 3 priorités de demain.");
+        sb.append("Give the situation, the risks, and the 3 priorities for tomorrow.");
         return sb.toString();
     }
 
@@ -193,23 +187,23 @@ public class DecisionService {
 
     public DecisionBrief fallbackBrief(Project project, Snapshot s) {
         double progress = s.total() > 0 ? (100.0 * s.completed() / s.total()) : 0;
-        String situation = String.format(
-            "**%s** : %d issues (%d ouvertes, %d en cours, %d terminées — %.0f%% d'avancement).%s",
+        String situation = String.format(java.util.Locale.ROOT,
+            "**%s**: %d issues (%d open, %d in progress, %d done, %.0f%% complete).%s",
             project.getName(), s.total(), s.open(), s.inProgress(), s.completed(), progress,
-            s.overdue() > 0 ? " ⚠️ " + s.overdue() + " en retard." : "");
+            s.overdue() > 0 ? " " + s.overdue() + " overdue." : "");
 
         List<String> risks = new ArrayList<>();
-        if (s.overdue() > 0) risks.add(s.overdue() + " issue(s) en retard — risque de dérive du planning.");
-        if (s.dueSoon() > 0) risks.add(s.dueSoon() + " issue(s) à échéance sous " + DUE_SOON_DAYS + " jours.");
-        if (s.inProgress() > 5) risks.add("Beaucoup d'issues en parallèle (" + s.inProgress() + ") — WIP élevé.");
-        if (risks.isEmpty()) risks.add("Pas de signal de risque fort dans les métriques.");
+        if (s.overdue() > 0) risks.add(s.overdue() + " overdue issue(s): the schedule may slip.");
+        if (s.dueSoon() > 0) risks.add(s.dueSoon() + " issue(s) due within " + DUE_SOON_DAYS + " days.");
+        if (s.inProgress() > 5) risks.add("Many issues in parallel (" + s.inProgress() + "): high work in progress.");
+        if (risks.isEmpty()) risks.add("No strong risk signal in the metrics.");
 
         List<Priority> priorities = new ArrayList<>();
         if (s.overdue() > 0)
-            priorities.add(new Priority("Traiter les " + s.overdue() + " issues en retard", "Débloquer le planning avant d'ouvrir de nouveaux chantiers.", "HIGH"));
+            priorities.add(new Priority("Handle the " + s.overdue() + " overdue issues", "Unblock the schedule before starting new work.", "HIGH"));
         if (s.dueSoon() > 0)
-            priorities.add(new Priority("Sécuriser les échéances de la semaine", s.dueSoon() + " issue(s) arrivent à terme sous " + DUE_SOON_DAYS + " j.", "MEDIUM"));
-        priorities.add(new Priority("Revue de priorisation du backlog", "Aligner les prochaines issues sur la vision (LLM local requis pour l'analyse fine).", "LOW"));
+            priorities.add(new Priority("Secure this week's deadlines", s.dueSoon() + " issue(s) are due within " + DUE_SOON_DAYS + " days.", "MEDIUM"));
+        priorities.add(new Priority("Review the backlog priorities", "Align the next issues with the vision (the detailed analysis needs AI).", "LOW"));
 
         return new DecisionBrief(situation, risks, priorities.subList(0, Math.min(3, priorities.size())), s, "fallback");
     }

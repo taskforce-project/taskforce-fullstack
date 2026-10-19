@@ -145,9 +145,6 @@ export function SignupForm({
       lastName: sanitizeInput(formData.lastName),
       email: sanitizeInput(formData.email),
       password: formData.password,
-      // Tout le monde démarre en FREE (modèle Linear) : le choix d'un forfait payant est un upgrade
-      // in-app (Réglages → Facturation), une fois le compte créé. Plus d'étape « plan » à l'inscription.
-      planType: "FREE",
       // Transportés jusqu'à la vérification, seul moment où l'inscription part vers le serveur.
       challengeToken: challenge.token,
       turnstileToken,

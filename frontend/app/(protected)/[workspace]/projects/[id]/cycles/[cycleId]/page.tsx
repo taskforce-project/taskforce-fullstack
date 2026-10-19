@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { cn } from "@/lib/utils"
+import { PRIORITY_DOT } from "@/lib/palette"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty"
@@ -53,23 +54,15 @@ import type { Issue, IssuePriority, IssueStatusCategory } from "@/lib/api/issue-
 // ---------------------------------------------------------------------------
 
 const CYCLE_STATUS_CONFIG: Record<CycleStatus, { label: string; badgeClass: string; icon: React.ReactNode }> = {
-  ACTIVE:    { label: "Active",    badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20", icon: <RefreshCw className="h-3.5 w-3.5 text-emerald-400" /> },
-  DRAFT:     { label: "Draft",     badgeClass: "bg-blue-500/15 text-blue-400 border-blue-500/20",         icon: <Clock className="h-3.5 w-3.5 text-blue-400" /> },
-  COMPLETED: { label: "Completed", badgeClass: "bg-muted text-muted-foreground border-border",             icon: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> },
-}
-
-const PRIORITY_DOT: Record<IssuePriority, string> = {
-  URGENT: "bg-red-400",
-  HIGH:   "bg-orange-400",
-  MEDIUM: "bg-yellow-400",
-  LOW:    "bg-slate-400",
-  NONE:   "bg-muted-foreground/30",
+  ACTIVE:    { label: "Active",    badgeClass: "bg-shape-green/15 text-ink-green border-shape-green/20", icon: <RefreshCw className="h-3.5 w-3.5 text-ink-green" /> },
+  DRAFT:     { label: "Draft",     badgeClass: "bg-primary/15 text-ink-blue border-primary/20",         icon: <Clock className="h-3.5 w-3.5 text-ink-blue" /> },
+  COMPLETED: { label: "Completed", badgeClass: "bg-muted text-muted-foreground border-border",             icon: <CheckCircle2 className="h-3.5 w-3.5 text-ink-green" /> },
 }
 
 function getCategoryIcon(category: IssueStatusCategory): React.ReactNode {
   switch (category) {
-    case "STARTED":   return <RefreshCw className="h-3.5 w-3.5 text-blue-400" />
-    case "COMPLETED": return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+    case "STARTED":   return <RefreshCw className="h-3.5 w-3.5 text-ink-blue" />
+    case "COMPLETED": return <CheckCircle2 className="h-3.5 w-3.5 text-ink-green" />
     default:          return <CircleDot className="h-3.5 w-3.5 text-muted-foreground" />
   }
 }
@@ -407,7 +400,7 @@ export default function CycleDetailPage() {
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Calendar className="h-3 w-3" />
                   {formatDate(cycle.startDate)} → {formatDate(cycle.endDate)}
-                  {left !== null && <span className="text-amber-400 font-medium ml-1">{left}d left</span>}
+                  {left !== null && <span className="text-ink-yellow font-medium ml-1">{left}d left</span>}
                 </span>
               </div>
               {cycle.description && (
@@ -424,7 +417,7 @@ export default function CycleDetailPage() {
                   <p className="text-xs text-muted-foreground">Complete</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-emerald-400" />
+                  <TrendingUp className="h-4 w-4 text-ink-green" />
                   <div className="text-center">
                     <p className="text-lg font-semibold text-foreground tabular-nums">{completedCount}/{totalCount}</p>
                     <p className="text-xs text-muted-foreground">Issues done</p>

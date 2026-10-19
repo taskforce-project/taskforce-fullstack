@@ -10,7 +10,7 @@ import lombok.Data;
 @Data
 public class CreateLabelRequest {
 
-    @NotBlank(message = "Le nom du label est obligatoire")
+    @NotBlank(message = "The label name is required")
     @Size(min = 1, max = 50)
     private String name;
 

@@ -47,7 +47,7 @@ public class TeamController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         List<TeamResponse> teams = teamService.listTeams(slug);
-        return ResponseEntity.ok(ApiResponse.success("Équipes récupérées", teams));
+        return ResponseEntity.ok(ApiResponse.success("Teams retrieved", teams));
     }
 
     @PostMapping
@@ -58,7 +58,7 @@ public class TeamController {
     ) {
         Long userId = resolveUserId(jwt);
         TeamResponse team = teamService.createTeam(slug, userId, request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Équipe créée", team));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Team created", team));
     }
 
     @GetMapping("/{teamId}")
@@ -68,7 +68,7 @@ public class TeamController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         TeamResponse team = teamService.getTeam(slug, teamId);
-        return ResponseEntity.ok(ApiResponse.success("Équipe récupérée", team));
+        return ResponseEntity.ok(ApiResponse.success("Team retrieved", team));
     }
 
     @PatchMapping("/{teamId}")
@@ -79,7 +79,7 @@ public class TeamController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         TeamResponse team = teamService.updateTeam(slug, teamId, request);
-        return ResponseEntity.ok(ApiResponse.success("Équipe mise à jour", team));
+        return ResponseEntity.ok(ApiResponse.success("Team updated", team));
     }
 
     @DeleteMapping("/{teamId}")
@@ -89,7 +89,7 @@ public class TeamController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         teamService.deleteTeam(slug, teamId);
-        return ResponseEntity.ok(ApiResponse.success("Équipe supprimée", null));
+        return ResponseEntity.ok(ApiResponse.success("Team deleted", null));
     }
 
     // =========================================================================
@@ -103,7 +103,7 @@ public class TeamController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         List<TeamMemberResponse> members = teamService.listMembers(slug, teamId);
-        return ResponseEntity.ok(ApiResponse.success("Membres récupérés", members));
+        return ResponseEntity.ok(ApiResponse.success("Members retrieved", members));
     }
 
     @PostMapping("/{teamId}/members")
@@ -114,7 +114,7 @@ public class TeamController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         TeamMemberResponse member = teamService.addMember(slug, teamId, request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Membre ajouté", member));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Member added", member));
     }
 
     @DeleteMapping("/{teamId}/members/{userId}")
@@ -125,7 +125,7 @@ public class TeamController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         teamService.removeMember(slug, teamId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Membre retiré", null));
+        return ResponseEntity.ok(ApiResponse.success("Member removed", null));
     }
 
     // =========================================================================
@@ -135,7 +135,7 @@ public class TeamController {
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

@@ -23,19 +23,19 @@ describe("loginSchema", () => {
   it("rejette un email mal formé", () => {
     const r = loginSchema.safeParse({ email: "pas-un-email", password: "x" });
     expect(r.success).toBe(false);
-    if (!r.success) expect(firstZodError(r.error)).toBe("Format d'email invalide");
+    if (!r.success) expect(firstZodError(r.error)).toBe("Invalid email format");
   });
 
   it("rejette un email vide (champ requis)", () => {
     const r = loginSchema.safeParse({ email: "", password: "x" });
     expect(r.success).toBe(false);
-    if (!r.success) expect(firstZodError(r.error)).toBe("Veuillez remplir tous les champs");
+    if (!r.success) expect(firstZodError(r.error)).toBe("Please fill in all fields");
   });
 
   it("rejette un mot de passe vide (champ requis)", () => {
     const r = loginSchema.safeParse({ email: "jean@example.com", password: "" });
     expect(r.success).toBe(false);
-    if (!r.success) expect(firstZodError(r.error)).toBe("Veuillez remplir tous les champs");
+    if (!r.success) expect(firstZodError(r.error)).toBe("Please fill in all fields");
   });
 });
 
@@ -48,32 +48,32 @@ describe("registerSchema", () => {
   it("rejette un prénom invalide (chiffres)", () => {
     const r = registerSchema.safeParse({ ...validRegister, firstName: "Jean1" });
     expect(r.success).toBe(false);
-    if (!r.success) expect(firstZodError(r.error)).toContain("prénom n'est pas valide");
+    if (!r.success) expect(firstZodError(r.error)).toContain("First name is not valid");
   });
 
   it("rejette un nom invalide (trop court)", () => {
     const r = registerSchema.safeParse({ ...validRegister, lastName: "D" });
     expect(r.success).toBe(false);
-    if (!r.success) expect(firstZodError(r.error)).toContain("nom n'est pas valide");
+    if (!r.success) expect(firstZodError(r.error)).toContain("Last name is not valid");
   });
 
   it("rejette un email de domaine jetable", () => {
     const r = registerSchema.safeParse({ ...validRegister, email: "jean@mailinator.com" });
     expect(r.success).toBe(false);
-    if (!r.success) expect(firstZodError(r.error)).toContain("temporaires");
+    if (!r.success) expect(firstZodError(r.error)).toContain("Temporary email addresses");
   });
 
   it("rejette un mot de passe qui ne respecte pas les règles", () => {
     const r = registerSchema.safeParse({ ...validRegister, password: "faible", confirmPassword: "faible" });
     expect(r.success).toBe(false);
-    if (!r.success) expect(firstZodError(r.error)).toContain("majuscule");
+    if (!r.success) expect(firstZodError(r.error)).toContain("uppercase");
   });
 
   it("rejette une confirmation qui ne correspond pas (rattachée à confirmPassword)", () => {
     const r = registerSchema.safeParse({ ...validRegister, confirmPassword: "P@ssw0rd456!" });
     expect(r.success).toBe(false);
     if (!r.success) {
-      const issue = r.error.issues.find((i) => i.message.includes("ne correspondent pas"));
+      const issue = r.error.issues.find((i) => i.message.includes("don't match"));
       expect(issue).toBeDefined();
       expect(issue?.path).toContain("confirmPassword");
     }
@@ -85,10 +85,10 @@ describe("firstZodError", () => {
     // email (déclaré avant password) échoue en premier → son message ressort.
     const r = loginSchema.safeParse({ email: "pas-un-email", password: "" });
     expect(r.success).toBe(false);
-    if (!r.success) expect(firstZodError(r.error)).toBe("Format d'email invalide");
+    if (!r.success) expect(firstZodError(r.error)).toBe("Invalid email format");
   });
 
   it("a un repli si la liste d'erreurs est vide", () => {
-    expect(firstZodError(new ZodError([]))).toBe("Formulaire invalide");
+    expect(firstZodError(new ZodError([]))).toBe("Invalid form");
   });
 });

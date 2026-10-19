@@ -16,9 +16,9 @@ const zoneVariants = cva("overflow-hidden rounded-xl border", {
   variants: {
     variant: {
       neutral: "border-border",
-      info: "border-sky-500/30",
-      success: "border-emerald-500/30",
-      warning: "border-amber-500/30",
+      info: "border-primary/30",
+      success: "border-shape-green/30",
+      warning: "border-shape-yellow/30",
       danger: "border-destructive/40",
     },
   },
@@ -30,18 +30,18 @@ type ZoneVariant = NonNullable<VariantProps<typeof zoneVariants>["variant"]>
 /** Teinte de l'en-tête (bordure basse + léger fond) par variante. */
 const HEADER_TINT: Record<ZoneVariant, string> = {
   neutral: "border-border/70",
-  info: "border-sky-500/20 bg-sky-500/5",
-  success: "border-emerald-500/20 bg-emerald-500/5",
-  warning: "border-amber-500/20 bg-amber-500/5",
+  info: "border-primary/20 bg-primary/5",
+  success: "border-shape-green/20 bg-shape-green/5",
+  warning: "border-shape-yellow/20 bg-shape-yellow/5",
   danger: "border-destructive/25 bg-destructive/5",
 }
 
 /** Couleur du titre par variante. */
 const TITLE_TINT: Record<ZoneVariant, string> = {
   neutral: "text-foreground",
-  info: "text-sky-600 dark:text-sky-400",
-  success: "text-emerald-600 dark:text-emerald-400",
-  warning: "text-amber-600 dark:text-amber-500",
+  info: "text-ink-blue",
+  success: "text-ink-green",
+  warning: "text-ink-yellow",
   danger: "text-destructive",
 }
 

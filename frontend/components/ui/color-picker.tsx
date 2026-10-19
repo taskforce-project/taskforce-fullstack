@@ -2,20 +2,20 @@
 
 import { cn } from "@/lib/utils"
 
-/** Palette de presets partagée (colonnes, labels…). */
+/** Préréglages partagés (statuts, libellés…) : formes et encres de la palette, en hex (stockés en base). */
 export const COLOR_PRESETS: readonly string[] = [
-  "#94a3b8", // slate
-  "#6366f1", // indigo
-  "#3b82f6", // blue
-  "#06b6d4", // cyan
-  "#10b981", // emerald
-  "#22c55e", // green
-  "#eab308", // yellow
-  "#f59e0b", // amber
-  "#f97316", // orange
-  "#ef4444", // red
-  "#ec4899", // pink
-  "#8b5cf6", // violet
+  "#736e67", // gris
+  "#2f6bf6", // bleu
+  "#a9c6ff", // ciel
+  "#418b5c", // vert
+  "#e2f78c", // citron
+  "#ffaa0d", // jaune
+  "#e14322", // rouge
+  "#f99bc3", // rose
+  "#1e4fc4", // encre bleue
+  "#2d6b45", // encre verte
+  "#8a5300", // encre jaune
+  "#a3336c", // encre rose
 ]
 
 const HEX_RE = /^#([0-9a-fA-F]{6})$/
@@ -64,7 +64,7 @@ export function ColorPicker({
             const next = e.target.value.startsWith("#") ? e.target.value : `#${e.target.value}`
             onChange(next.slice(0, 7))
           }}
-          placeholder="#6366f1"
+          placeholder="#2f6bf6"
           spellCheck={false}
           className="h-7 flex-1 rounded-md border border-border bg-transparent px-2 text-xs font-mono outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />

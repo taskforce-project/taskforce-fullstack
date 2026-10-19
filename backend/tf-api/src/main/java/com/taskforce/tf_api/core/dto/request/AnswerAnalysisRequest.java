@@ -8,7 +8,7 @@ import lombok.Data;
 @Data
 public class AnswerAnalysisRequest {
 
-    @NotBlank(message = "La réponse est obligatoire")
-    @Size(max = 2000, message = "La réponse ne peut pas dépasser 2000 caractères")
+    @NotBlank(message = "The answer is required")
+    @Size(max = 2000, message = "The answer can't exceed 2000 characters")
     private String answer;
 }

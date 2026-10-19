@@ -16,9 +16,12 @@ function ScrollArea({
       className={cn("relative", className)}
       {...props}
     >
+      {/* Radix enveloppe le contenu dans un `display: table` qui s'élargit au texte le plus long : un titre long
+          poussait alors la liste à droite (défilement horizontal, `truncate` inopérant). En bloc, le contenu prend la
+          largeur de la zone ; aucune zone de l'app ne défile à l'horizontale. */}
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
-        className="focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1"
+        className="focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1 [&>div]:!block"
       >
         {children}
       </ScrollAreaPrimitive.Viewport>

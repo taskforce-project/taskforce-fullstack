@@ -40,30 +40,30 @@ public final class AnalysisPlan {
     public static AnalysisPlan initial(ObjectMapper mapper, boolean deep) {
         AnalysisPlan plan = new AnalysisPlan(mapper.createArrayNode());
 
-        plan.addTask(OBSERVE, "Observer le projet",
-            "Lire les métriques réelles : issues par statut, retards, échéances proches.", null)
-            .subtask("Compter les issues par statut", "Total, ouvertes, en cours, terminées.", "metrics")
-            .subtask("Repérer les retards", "Issues assignées dépassées ou à échéance sous 7 jours.", "metrics");
+        plan.addTask(OBSERVE, "Observe the project",
+            "Read the real metrics: issues by status, delays, upcoming deadlines.", null)
+            .subtask("Count the issues by status", "Total, open, in progress, done.", "metrics")
+            .subtask("Spot the delays", "Assigned issues overdue or due within 7 days.", "metrics");
 
-        plan.addTask(CONTEXT, "Récupérer le contexte",
-            "Recherche sémantique dans le Brain OS : vision, specs, données ingérées.", OBSERVE)
-            .subtask("Recherche sémantique", "Les 6 nodes les plus proches du projet.", "brain-search");
+        plan.addTask(CONTEXT, "Gather the context",
+            "Search the Brain OS: vision, specs, ingested data.", OBSERVE)
+            .subtask("Search", "The 6 notes closest to the project.", "brain-search");
 
-        plan.addTask(ANALYZE, "Analyser et décider",
-            deep ? "Modèle 14B avec raisonnement — situation, risques, 3 priorités."
-                 : "Modèle 8B — situation, risques, 3 priorités.", CONTEXT)
-            .subtask("Interroger le modèle", deep ? "Tier « deep »." : "Tier « fast ».", "llm");
+        plan.addTask(ANALYZE, "Analyze and decide",
+            deep ? "Main model, with reasoning: situation, risks, 3 priorities."
+                 : "Fast model: situation, risks, 3 priorities.", CONTEXT)
+            .subtask("Ask the model", deep ? "Deep tier." : "Fast tier.", "llm");
 
         if (deep) {
-            plan.addTask(CLARIFY, "Clarifier avec l'humain",
-                "Le modèle peut poser une question s'il lui manque un élément décisif.", ANALYZE)
-                .subtask("Question de clarification", "Suspend le workflow jusqu'à la réponse.", "hitl");
+            plan.addTask(CLARIFY, "Clarify with the person",
+                "The model can ask a question when a decisive piece is missing.", ANALYZE)
+                .subtask("Clarifying question", "Pauses the workflow until the answer.", "hitl");
         }
 
-        plan.addTask(PERSIST, "Enregistrer la décision",
-            "Persister le brief et ses priorités, actionnables depuis la page Analytics.",
+        plan.addTask(PERSIST, "Save the decision",
+            "Store the brief and its priorities, actionable from the Analytics page.",
             deep ? CLARIFY : ANALYZE)
-            .subtask("Écrire le brief", "Situation, risques et 3 priorités.", "db");
+            .subtask("Write the brief", "Situation, risks and 3 priorities.", "db");
 
         return plan;
     }

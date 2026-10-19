@@ -19,12 +19,12 @@ import {
 /** Seuil de robustesse minimal au moment de la soumission (aligné sur la règle métier existante). */
 export const STRENGTH_FLOOR = 50;
 
-const REQUIRED = "Veuillez remplir tous les champs";
+const REQUIRED = "Please fill in all fields";
 const PASSWORD_RULES =
-  "Le mot de passe doit faire 8+ caractères, avec majuscule, minuscule, chiffre et caractère spécial";
+  "Password must be at least 8 characters, with an uppercase letter, a lowercase letter, a digit and a special character";
 
 export const loginSchema = z.object({
-  email: z.string().min(1, REQUIRED).refine(validateEmail, "Format d'email invalide"),
+  email: z.string().min(1, REQUIRED).refine(validateEmail, "Invalid email format"),
   password: z.string().min(1, REQUIRED),
 });
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -34,34 +34,34 @@ export const registerSchema = z
     firstName: z
       .string()
       .min(1, REQUIRED)
-      .refine(validateName, "Le prénom n'est pas valide (2-50 caractères, lettres uniquement)"),
+      .refine(validateName, "First name is not valid (2-50 characters, letters only)"),
     lastName: z
       .string()
       .min(1, REQUIRED)
-      .refine(validateName, "Le nom n'est pas valide (2-50 caractères, lettres uniquement)"),
+      .refine(validateName, "Last name is not valid (2-50 characters, letters only)"),
     email: z
       .string()
       .min(1, REQUIRED)
-      .refine(validateEmail, "Format d'email invalide")
-      .refine((e) => !isDisposableEmail(e), "Les adresses email temporaires ne sont pas autorisées"),
+      .refine(validateEmail, "Invalid email format")
+      .refine((e) => !isDisposableEmail(e), "Temporary email addresses are not allowed"),
     password: z
       .string()
       .min(1, REQUIRED)
       .refine((p) => validatePassword(p).isValid, PASSWORD_RULES)
       .refine(
         (p) => calculatePasswordStrength(p) >= STRENGTH_FLOOR,
-        "Le mot de passe est trop faible. Utilisez un mot de passe plus complexe.",
+        "This password is too weak. Use a more complex password.",
       ),
     confirmPassword: z.string().min(1, REQUIRED),
   })
   // Vérification croisée : la confirmation doit correspondre. Rattachée au champ `confirmPassword`.
   .refine((d) => d.password === d.confirmPassword, {
-    message: "Les mots de passe ne correspondent pas",
+    message: "Passwords don't match",
     path: ["confirmPassword"],
   });
 export type RegisterInput = z.infer<typeof registerSchema>;
 
 /** Premier message d'erreur d'un `ZodError` (pour un toast unique, comme l'UX actuelle). */
 export function firstZodError(error: z.ZodError): string {
-  return error.issues[0]?.message ?? "Formulaire invalide";
+  return error.issues[0]?.message ?? "Invalid form";
 }

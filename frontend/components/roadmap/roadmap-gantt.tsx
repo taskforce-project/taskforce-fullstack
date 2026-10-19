@@ -9,6 +9,7 @@ import {
   ZoomOut,
   CalendarRange,
 } from "lucide-react"
+import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -18,12 +19,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { seriesColor } from "@/lib/palette"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useCycleStore } from "@/lib/store/cycle-store"
 import type { Cycle as ApiCycle } from "@/lib/api/cycle-service"
 import type { Project } from "@/lib/api/project-service"
 import { getScheduledIssues } from "@/lib/api/issue-service"
 import type { Issue as ApiIssue } from "@/lib/api/issue-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -46,19 +49,11 @@ interface RoadmapItem {
 // Config
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PROJECT_COLORS = [
-  "bg-blue-500", "bg-violet-500", "bg-emerald-500", "bg-amber-500",
-  "bg-slate-500", "bg-orange-500", "bg-pink-500", "bg-cyan-500",
-]
-
-function projectColor(id: number): string {
-  return PROJECT_COLORS[id % PROJECT_COLORS.length]
-}
 
 const TYPE_COLORS: Record<RoadmapItem["type"], string> = {
   project:   "border-border/40 text-muted-foreground",
-  cycle:     "border-blue-500/30 bg-blue-500/10 text-blue-400",
-  milestone: "border-amber-500/30 bg-amber-500/10 text-amber-400",
+  cycle:     "border-primary/30 bg-primary/10 text-ink-blue",
+  milestone: "border-shape-yellow/30 bg-shape-yellow/10 text-ink-yellow",
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -159,7 +154,7 @@ function GanttBar({ item, viewStart, totalDays, dayPx }: Readonly<GanttBarProps>
   if (isMile) {
     return (
       <div
-        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3.5 w-3.5 rotate-45 border-2 border-amber-400 bg-amber-400/30 z-10"
+        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3.5 w-3.5 rotate-45 border-2 border-shape-yellow bg-shape-yellow/30 z-10"
         style={{ left }}
         title={item.title}
       />
@@ -193,11 +188,11 @@ function mapProjectCycles(cycles: ApiCycle[], p: Project): RoadmapItem[] {
       id:        `cycle-${c.id}`,
       title:     c.name,
       type:      "cycle" as const,
-      project:   { name: p.name, emoji: p.identifier.slice(0, 2), color: projectColor(p.id) },
+      project:   { name: p.name, emoji: p.identifier.slice(0, 2), color: seriesColor(p.id) },
       startDate: c.startDate!,
       endDate:   c.endDate!,
       progress:  c.issueCount > 0 ? Math.round((c.completedCount / c.issueCount) * 100) : 0,
-      color:     projectColor(p.id),
+      color:     seriesColor(p.id),
     }))
 }
 
@@ -215,11 +210,11 @@ function mapScheduledIssue(issue: ApiIssue, projectsById: Map<number, Project>):
     id:        `issue-${issue.id}`,
     title:     issue.title,
     type:      isMilestone ? "milestone" : "cycle",
-    project:   { name: proj.name, emoji: proj.identifier.slice(0, 2), color: projectColor(proj.id) },
+    project:   { name: proj.name, emoji: proj.identifier.slice(0, 2), color: seriesColor(proj.id) },
     startDate: start,
     endDate:   end,
     progress:  issue.status.category === "COMPLETED" ? 100 : 0,
-    color:     projectColor(proj.id),
+    color:     seriesColor(proj.id),
   }
 }
 
@@ -253,11 +248,11 @@ export function RoadmapGantt({ slug, projectId }: { readonly slug: string; reado
         id:        `project-${p.id}`,
         title:     p.name,
         type:      "project",
-        project:   { name: p.name, emoji: p.identifier.slice(0, 2), color: projectColor(p.id) },
-        startDate: p.createdAt.slice(0, 10),
-        endDate:   p.updatedAt.slice(0, 10),
+        project:   { name: p.name, emoji: p.identifier.slice(0, 2), color: seriesColor(p.id) },
+        startDate: format(parseServerDate(p.createdAt), "yyyy-MM-dd"),
+        endDate:   format(parseServerDate(p.updatedAt), "yyyy-MM-dd"),
         progress:  p.totalIssues > 0 ? Math.round((p.totalIssues - p.openIssues) / p.totalIssues * 100) : 0,
-        color:     projectColor(p.id),
+        color:     seriesColor(p.id),
       }))
 
       const [cycleResults, scheduledIssues] = await Promise.all([
@@ -555,9 +550,9 @@ export function RoadmapGantt({ slug, projectId }: { readonly slug: string; reado
         {/* Échantillon « une couleur par projet » */}
         <span className="flex items-center gap-1.5">
           <span className="inline-flex">
-            <span className="size-2.5 rounded-full bg-blue-500 inline-block" />
-            <span className="size-2.5 rounded-full bg-violet-500 -ml-1 inline-block" />
-            <span className="size-2.5 rounded-full bg-emerald-500 -ml-1 inline-block" />
+            <span className="size-2.5 rounded-full bg-chart-1 inline-block" />
+            <span className="size-2.5 rounded-full bg-chart-2 -ml-1 inline-block" />
+            <span className="size-2.5 rounded-full bg-chart-3 -ml-1 inline-block" />
           </span>
           One color per project
         </span>
@@ -572,7 +567,7 @@ export function RoadmapGantt({ slug, projectId }: { readonly slug: string; reado
           </span>
           Lighter fill = progress
         </span>
-        <span className="flex items-center gap-1.5"><span className="h-3 w-3 rotate-45 border-2 border-amber-400 bg-amber-400/30 inline-block" />Milestone</span>
+        <span className="flex items-center gap-1.5"><span className="h-3 w-3 rotate-45 border-2 border-shape-yellow bg-shape-yellow/30 inline-block" />Milestone</span>
         <span className="flex items-center gap-1.5"><span className="h-4 w-px bg-primary/60 inline-block" />Today</span>
       </div>
     </div>

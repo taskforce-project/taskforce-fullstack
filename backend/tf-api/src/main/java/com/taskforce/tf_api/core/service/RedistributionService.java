@@ -75,7 +75,7 @@ public class RedistributionService {
     @Transactional
     public RedistributionPlanResponse preview(String slug, Long requestingUserId, Long targetUserId) {
         Workspace workspace = workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         authorizationService.requireManager(workspace.getId(), requestingUserId);
 
         List<Project> projects = projectRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspace.getId());
@@ -176,7 +176,7 @@ public class RedistributionService {
     @Transactional
     public ApplyRedistributionResponse apply(String slug, Long requestingUserId, ApplyRedistributionRequest request) {
         Workspace workspace = workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         authorizationService.requireManager(workspace.getId(), requestingUserId);
 
         int applied = 0;

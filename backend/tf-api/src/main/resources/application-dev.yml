@@ -128,37 +128,6 @@ keycloak:
     password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
     client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
 
-  # OAuth2/OIDC Endpoints
-  endpoints:
-    # Token Endpoint : Pour obtenir access_token et refresh_token (Password Grant)
-    token: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/token
-    # Logout Endpoint : Pour révoquer les tokens
-    logout: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/logout
-    # UserInfo Endpoint : Pour récupérer les infos de l'utilisateur authentifié
-    userinfo: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/userinfo
-    # Token Introspection : Pour valider un token
-    introspect: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/token/introspect
-    # JWK Set : Clés publiques pour vérifier les signatures JWT
-    certs: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/certs
-
-# Stripe Configuration
-stripe:
-  api-key: ${STRIPE_SECRET_KEY:sk_test_your_stripe_key_here}
-  publishable-key: ${STRIPE_PUBLIC_KEY:pk_test_your_publishable_key_here}
-  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_your_webhook_secret_here}
-  plans:
-    basic:
-      price-id: ${STRIPE_PRICE_ID_BASIC:price_basic_test}
-      yearly-price-id: ${STRIPE_PRICE_ID_BASIC_YEARLY:}
-    business:
-      price-id: ${STRIPE_PRICE_ID_BUSINESS:price_business_test}
-      yearly-price-id: ${STRIPE_PRICE_ID_BUSINESS_YEARLY:}
-    enterprise:
-      price-id: ${STRIPE_ENTERPRISE_PRICE_ID:price_enterprise_test}
-  checkout:
-    success-url: ${STRIPE_SUCCESS_URL:http://localhost:3000/payment/success}
-    cancel-url: ${STRIPE_CANCEL_URL:http://localhost:3000/payment/cancel}
-
 # Application Configuration
 app:
   name: ${APP_NAME:TaskForce}
@@ -186,18 +155,24 @@ integrations:
   slack:
     client-id: ${SLACK_CLIENT_ID:}
     client-secret: ${SLACK_CLIENT_SECRET:}
-    # Miroir Slack → chat : poller de sync auto des canaux miroir
-    mirror:
-      poll-enabled: ${SLACK_MIRROR_POLL_ENABLED:true}
-      poll-interval-ms: ${SLACK_MIRROR_POLL_INTERVAL_MS:60000}
   # MCP — TaskForce = hôte MCP : Cortex pilote des serveurs MCP externes (cf. McpClient / WorkspaceMcpService)
   mcp:
     connect-timeout-ms: ${MCP_CONNECT_TIMEOUT_MS:10000}
     read-timeout-ms: ${MCP_READ_TIMEOUT_MS:60000}
     tools-cache-ttl-ms: ${MCP_TOOLS_CACHE_TTL_MS:60000}   # cache tools/list par workspace
-    confirm-writes: ${MCP_CONFIRM_WRITES:true}            # écritures externes proposées (validation humaine)
     tool-tier: ${MCP_TOOL_TIER:fast}                      # tier LLM des tours avec outils externes (fast|standard|deep)
     allow-private-network: ${MCP_ALLOW_PRIVATE_NETWORK:false} # true = serveurs MCP du réseau interne admis (on-premise)
+# Webhooks sortants (OSS-6.2) : envois signés HMAC-SHA256, tentés jusqu'à 6 fois sur 9 h environ.
+taskforce:
+  # Inscription : adresse vérifiée par un code envoyé par e-mail. false = compte prêt tout de suite, pour une instance
+  # sans SMTP (auto-hébergement, SELF_HOSTING.md) ; personne ne prouve alors que l'adresse est la sienne.
+  signup:
+    email-verification: ${SIGNUP_EMAIL_VERIFICATION:true}
+  webhooks:
+    dispatch-interval-ms: ${WEBHOOKS_DISPATCH_INTERVAL_MS:5000}       # fréquence de la file d'envoi
+    timeout-ms: ${WEBHOOKS_TIMEOUT_MS:10000}                          # attente de la réponse du destinataire
+    allow-private-network: ${WEBHOOKS_ALLOW_PRIVATE_NETWORK:false}    # true = destinataires du réseau interne admis (n8n auto-hébergé)
+
 # Runner local de délégation (ADR-013) : Claude Code exécuté sur le poste de l'utilisateur.
 # Activé en dev ; le client Keycloak du runner se crée avec scripts/keycloak-runner.ps1.
 delivery:
@@ -205,14 +180,6 @@ delivery:
     enabled: ${DELIVERY_LOCAL_RUNNER_ENABLED:true}
     session-ttl-minutes: ${DELIVERY_RUNNER_SESSION_TTL_MINUTES:120}          # durée de vie max d'une session déléguée
     heartbeat-timeout-minutes: ${DELIVERY_RUNNER_HEARTBEAT_TIMEOUT_MINUTES:10} # runner muet au-delà = run en échec
-# JWT Configuration
-jwt:
-  secret: ${JWT_SECRET:myVerySecretKeyForJWTTokenGenerationThatIsLongEnoughToBeSecure256Bits}
-  access-token:
-    expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600}  # 1 heure en secondes
-  refresh-token:
-    expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:2592000}  # 30 jours en secondes
-
 # OTP Configuration
 otp:
   expiration-minutes: ${OTP_EXPIRATION_MINUTES:15}
@@ -240,19 +207,7 @@ server:
 
 # AI Configuration (Phase 4)
 ai:
-  # Un seul chemin LLM : l'AI Gateway (service Python ai-service) → notre modèle local Ollama, gratuit.
-  # Le bloc `groq` et la clé `provider` ont été SUPPRIMÉS le 16/07 (TF-AI-GROQ-CLEANUP) : Groq était
-  # bloqué sur ce réseau (403), écarté par la décision du 07/07, et son client n'implémentait pas la
-  # capture d'usage → le sélectionner désarmait silencieusement tout le quota IA.
-  model:
-    # Décoratif : l'AI Gateway IGNORE volontairement le modèle qu'on lui passe (AiGatewayClient.callChat)
-    # et applique le sien (OLLAMA_MODEL, routé par tier fast/standard/deep dans l'ai-service).
-    # Conservé parce que LlmClient.chatCompletion(model, …) le prend encore en paramètre.
-    assistant: ${AI_ASSISTANT_MODEL:gateway-default}
-    smart-assign: ${AI_SMART_ASSIGN_MODEL:gateway-default}
-  # Le routing modèle + l'URL Ollama vivent dans l'ai-service (OLLAMA_BASE_URL/OLLAMA_MODEL).
-  gateway:
-    base-url: ${AI_GATEWAY_BASE_URL:http://ai-service:8000}
+  # Fournisseur, modèles et URL de l'ai-service : cf. application.yml (ai.service) et la config de l'ai-service.
   # Garde-debit IA par minute (AiRateGuard) : protege le budget LLM partage (Groq gpt-oss-120b ~8000 TPM,
   # partage par TOUTE l'org) contre les pics de concurrence. Fenetres-minute Redis (globale + par compte) ;
   # 429 propre au depassement, fail-open sans Redis. 0 = fenetre desactivee. A remonter en Groq Dev / Ollama.

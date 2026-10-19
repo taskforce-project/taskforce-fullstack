@@ -4,8 +4,10 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
@@ -16,6 +18,14 @@ import org.springframework.web.filter.CorsFilter;
  */
 @Configuration
 public class CorsConfig {
+
+    /**
+     * Rang du filtre CORS dans la chaîne servlet : avant tout filtre qui peut répondre seul, à commencer
+     * par le rate limiting ({@link RateLimitConfig}). Un 429 écrit avant le CORS partait sans
+     * {@code Access-Control-Allow-Origin} : le navigateur masquait la réponse et l'app affichait une
+     * panne réseau au lieu de « trop de requêtes » (PC-053).
+     */
+    public static final int FILTER_ORDER = Ordered.HIGHEST_PRECEDENCE + 5;
 
     /**
      * Origines autorisées, lues depuis {@code cors.allowed-origins} (CSV). PC-027 : la liste était
@@ -79,6 +89,21 @@ public class CorsConfig {
         source.registerCorsConfiguration("/**", config);
 
         return new CorsFilter(source);
+    }
+
+    /**
+     * Place {@link #corsFilter()} en tête de la chaîne servlet ({@link #FILTER_ORDER}). Sans cet
+     * enregistrement, Spring Boot le mettait en dernier (rang par défaut d'un bean {@code Filter}) : seules
+     * les chaînes Spring Security, plus loin, posaient les en-têtes, et une réponse écrite avant elles en
+     * était privée. Les chaînes de sécurité gardent ce même filtre ({@code .cors(...)} le retrouve par son
+     * nom de bean) ; il ne s'applique qu'une fois par requête.
+     */
+    @Bean
+    public FilterRegistrationBean<CorsFilter> corsFilterRegistration(CorsFilter corsFilter) {
+        FilterRegistrationBean<CorsFilter> registration = new FilterRegistrationBean<>(corsFilter);
+        registration.setOrder(FILTER_ORDER);
+        registration.setName("corsFilter");
+        return registration;
     }
 }
 

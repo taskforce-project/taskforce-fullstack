@@ -8,8 +8,8 @@ import lombok.Data;
 @Data
 public class GenerateChartRequest {
 
-    @NotBlank(message = "La demande est obligatoire")
-    @Size(max = 500, message = "La demande ne peut pas dépasser 500 caractères")
+    @NotBlank(message = "The request is required")
+    @Size(max = 500, message = "The request can't exceed 500 characters")
     private String prompt;
 
     /** Restreint l'analyse à un projet (null = tout l'espace de travail). */

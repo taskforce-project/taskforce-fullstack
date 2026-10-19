@@ -50,48 +50,54 @@ const TAG_MAP = {
   "mcp-action-controller": "MCP actions",
   "integration-controller": "Integrations",
   "webhook-controller": "Webhooks",
-  "billing-controller": "Billing",
-  "stripe-controller": "Stripe",
-  "stripe-webhook-controller": "Stripe webhooks",
-  "sales-controller": "Sales",
   "gdpr-controller": "GDPR",
   "attachment-controller": "Attachments",
   "file-controller": "Files",
-  "feedback-controller": "Feedback",
   "client-log-controller": "Client logs",
   "status-controller": "Status",
+  "ai-status-controller": "AI status",
+  "delivery-controller": "Coding agents",
+  "runner-provisioning-controller": "Coding agent runners",
+  "mcp-server-controller": "MCP server",
+  "personal-access-token-controller": "Personal access tokens",
+  "project-export-controller": "Project export",
 };
 
 // Ordre d'affichage des sections dans la référence (les tags absents d'ici sont ajoutés à la fin).
 const TAG_ORDER = [
   "Authentication", "OAuth login",
-  "Workspaces", "Projects", "Issues", "Cycles", "Pages", "Roadmap",
-  "Teams", "Users", "Member skills", "Membership", "Profile", "Invitations",
+  "Workspaces", "Projects", "Project export", "Issues", "Cycles", "Pages", "Roadmap",
+  "Teams", "Users", "Member skills", "Membership", "Profile", "Personal access tokens", "Invitations",
   "Assignments", "Assignment redistribution", "My work", "Notifications", "Notification preferences",
   "AI assistant", "AI analysis (workflows)", "Skill suggestions", "Brain OS", "Brain OS attachments", "AI usage",
+  "AI status", "Coding agents", "Coding agent runners", "MCP server",
   "Dashboard", "Analytics",
   "Integrations", "Webhooks", "MCP actions",
-  "Billing", "Stripe", "Stripe webhooks", "Sales", "GDPR",
-  "Files", "Attachments", "Feedback", "Client logs", "Status",
+  "GDPR",
+  "Files", "Attachments", "Client logs", "Status",
 ];
 
 // Descriptions courtes des sections principales (facultatif, améliore la référence).
 const TAG_DESC = {
-  "Authentication": "Inscription, connexion, vérification et gestion de session.",
-  "Workspaces": "Espaces de travail : création, membres, réglages.",
-  "Projects": "Opérations : projets, visibilité, statuts et types de tâches.",
-  "Issues": "Tâches : CRUD, statut, priorité, relations, sous-tâches, commentaires.",
-  "Cycles": "Sprints : périodes bornées et leur avancement.",
-  "Pages": "Documents rattachés à une opération.",
-  "Roadmap": "Feuille de route : éléments planifiés dans le temps.",
-  "Assignments": "Acceptation et refus des assignations de tâches.",
-  "Notifications": "Signaux in-app et leur état.",
-  "AI assistant": "Cortex : conversations et assistance IA.",
-  "AI analysis (workflows)": "Traitements agentiques : plan, exécution, reprise.",
-  "Brain OS": "Base de connaissance de l'espace (graphe).",
-  "Analytics": "Indicateurs : débit, vélocité, charge, burndown.",
-  "Integrations": "Connexion des outils externes (GitHub, Slack…).",
-  "Billing": "Forfaits et facturation.",
+  "Authentication": "Sign-up, sign-in, verification codes and sessions.",
+  "Workspaces": "Workspaces: creation, members and settings.",
+  "Projects": "Projects, their visibility, statuses and issue types.",
+  "Issues": "Issues: status, priority, relations, subtasks and comments.",
+  "Cycles": "Cycles: time-boxed iterations and their progress.",
+  "Pages": "Documents attached to a project.",
+  "Roadmap": "Work planned over time.",
+  "Assignments": "Accepting and declining issue assignments.",
+  "Notifications": "In-app notifications (Signals) and their state.",
+  "AI assistant": "Cortex: conversations and AI help.",
+  "AI analysis (workflows)": "AI analysis jobs: plan, run and resume.",
+  "Brain OS": "The workspace's knowledge base: Markdown pages, links, tags, search and ingestion.",
+  "Coding agents": "Delegating an issue to a coding agent (Claude Code, GitHub Copilot) and following the run.",
+  "Coding agent runners": "Each person's local runner identity, created once, its secret shown once.",
+  "MCP server": "The workspace's MCP server (JSON-RPC over HTTP), for Claude Code with a personal access token.",
+  "Personal access tokens": "Personal access tokens, valid on the MCP server only.",
+  "Webhooks": "Signed outgoing webhooks (HMAC-SHA256): events, test and delivery history.",
+  "Analytics": "Indicators: throughput, velocity, workload and burndown.",
+  "Integrations": "Connecting external tools: GitHub, Slack, Plane and MCP servers.",
 };
 
 const prettify = (kebab) =>
@@ -109,17 +115,14 @@ for (const p of Object.keys(spec.paths ?? {})) {
 }
 
 // 1b. Retirer les endpoints INTERNES de la doc publique (décision sécu : ne pas exposer la surface
-// qui n'est pas destinée aux consommateurs de l'API). Télémétrie, feedback, ventes, RGPD in-app et
-// tout le cluster paiement sortent ; la gestion de webhooks (feature API légitime) RESTE.
+// qui n'est pas destinée aux consommateurs de l'API). Télémétrie, feedback et RGPD in-app sortent ;
+// la gestion de webhooks (feature API légitime) RESTE.
 // Filtrage sur les tags BRUTS springdoc (« xxx-controller »), donc AVANT le renommage.
 const HIDE = new Set([
   "client-log-controller",
-  "feedback-controller",
-  "sales-controller",
   "gdpr-controller",
-  "billing-controller",
-  "stripe-controller",
-  "stripe-webhook-controller",
+  // Retour du navigateur après le consentement OAuth d'un serveur MCP : une redirection, pas une API à appeler.
+  "mcp-o-auth-callback-controller",
   // Endpoints MACHINE du runner local de délégation (ADR-013) : réservés à un compte de service
   // Keycloak, sans intérêt pour un consommateur de l'API. La spec vient du backend DEV, où ils existent.
   "delivery-runner-controller",
@@ -158,9 +161,8 @@ spec.tags = ordered.map((name) => (TAG_DESC[name] ? { name, description: TAG_DES
 spec.info ??= {};
 spec.info.title = "TaskForce API";
 spec.info.description ??=
-  "API REST de TaskForce. Toutes les routes sont préfixées par `/api` et renvoient une enveloppe " +
-  "`ApiResponse<T>` (le corps utile est dans `data`). Authentification par jeton Bearer (JWT). " +
-  "Voir les guides Authentification et Conventions.";
+  "REST API of TaskForce. Every path starts with `/api`; a successful response wraps its payload in `data`. " +
+  "Authentication with a Bearer access token: see the Authentication and Conventions guides.";
 
 writeFileSync(SPEC, JSON.stringify(spec, null, 2) + "\n", { encoding: "utf8" });
 

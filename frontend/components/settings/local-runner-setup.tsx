@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Check, Copy, Loader2, TerminalSquare } from "lucide-react"
+import { Loader2, TerminalSquare } from "lucide-react"
 import { toast } from "sonner"
 
+import { CopyableCode } from "@/components/settings/copyable-code"
 import { Button } from "@/components/ui/button"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import type { RunnerProvision } from "@/lib/api/delivery-service"
@@ -19,13 +20,15 @@ import { API_URL } from "@/lib/config/urls"
  * propre compte : TaskForce ne voit jamais son login Claude (conditions d'Anthropic, cf. ADR-013).</p>
  */
 
-/** Dépôt public d'où l'on récupère le runner et le serveur MCP (accès anticipé : pas encore publiés sur npm). */
+/**
+ * Dépôt public d'où l'on récupère le runner (accès anticipé : pas encore publié sur npm). Le serveur MCP n'est plus à
+ * installer : le runner branche l'agent sur celui de l'instance.
+ */
 const REPO_URL = "https://github.com/taskforce-project/taskforce-fullstack.git"
 
 const INSTALL_COMMANDS = [
   `git clone --depth 1 ${REPO_URL}`,
-  "cd taskforce-fullstack/taskforce-mcp && npm install && npm run build",
-  "cd ../taskforce-runner && npm install",
+  "cd taskforce-fullstack/taskforce-runner && npm install",
 ].join("\n")
 
 const RUN_COMMANDS = ["npm run check", "npm run dev"].join("\n")
@@ -98,7 +101,7 @@ export function LocalRunnerSetup() {
       )}
 
       {confirming && (
-        <div className="flex flex-col gap-1.5 rounded border border-amber-500/30 bg-amber-500/5 p-2">
+        <div className="flex flex-col gap-1.5 rounded border border-shape-yellow/30 bg-shape-yellow/5 p-2">
           <span className="text-[11px] text-foreground">
             A new secret replaces the current one: a runner already started stops working until you paste the new
             secret.
@@ -116,15 +119,16 @@ export function LocalRunnerSetup() {
 
       {credentials && (
         <div className="flex flex-col gap-2">
-          <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+          <p className="text-[11px] font-medium text-ink-yellow">
             Copy it now: the secret is shown only once.
           </p>
-          <CodeBlock label="1. Get the runner (Node 20+, git)" text={INSTALL_COMMANDS} />
-          <CodeBlock label="2. Save as taskforce-runner/.env" text={runnerEnvFile(credentials)} />
-          <CodeBlock label="3. Check, then start" text={RUN_COMMANDS} />
+          <CopyableCode label="1. Get the runner (Node 20+, git)" text={INSTALL_COMMANDS} />
+          <CopyableCode label="2. Save as taskforce-runner/.env" text={runnerEnvFile(credentials)} />
+          <CopyableCode label="3. Check, then start" text={RUN_COMMANDS} />
           <p className="text-[10px] text-muted-foreground">
-            Needs Claude Code installed and signed in once (npm install -g @anthropic-ai/claude-code, then claude),
-            and gh signed in so the runner can open pull requests.
+            Needs Claude Code 2.1.293 or later, installed and signed in once (npm install -g @anthropic-ai/claude-code,
+            then claude), and gh signed in so the runner can open pull requests. While it works, follow it live on the
+            issue, and allow or deny the actions it asks for.
           </p>
           <div>
             <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setCredentials(null)}>
@@ -133,33 +137,6 @@ export function LocalRunnerSetup() {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-function CodeBlock({ label, text }: Readonly<{ label: string; text: string }>) {
-  const [copied, setCopied] = useState(false)
-
-  async function onCopy() {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch {
-      toast.error("Couldn't copy. Select the text and copy it by hand.")
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] text-muted-foreground">{label}</span>
-        <Button variant="ghost" size="sm" className="h-6 gap-1 px-1.5 text-[10px]" onClick={onCopy} aria-label={`Copy: ${label}`}>
-          {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-          {copied ? "Copied" : "Copy"}
-        </Button>
-      </div>
-      <pre className="overflow-x-auto rounded bg-muted px-2 py-1.5 font-mono text-[11px] leading-relaxed text-foreground">{text}</pre>
     </div>
   )
 }

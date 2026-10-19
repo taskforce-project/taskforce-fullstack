@@ -62,6 +62,6 @@ class ListIssuesToolTest {
     @DisplayName("aucune issue → message clair")
     void empty_message() {
         when(issueService.listMyIssues(eq("acme"), eq(7L))).thenReturn(List.of());
-        assertThat(tool().execute(Map.of(), new AgentContext("acme", 1L, 7L))).contains("Aucune issue");
+        assertThat(tool().execute(Map.of(), new AgentContext("acme", 1L, 7L))).contains("No issue");
     }
 }

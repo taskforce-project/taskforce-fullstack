@@ -1,14 +1,13 @@
 /**
  * Service consommation IA : `GET /api/workspaces/{slug}/ai/usage`.
- * Renvoie la conso du mois courant + le plafond du plan (façon Claude : conso vs quota).
+ * Renvoie la conso du mois courant + le plafond posé par l'instance (illimité par défaut).
  */
 import { apiClient } from "./client"
 import { AI_ROUTES } from "../config/api-routes"
 
 export interface AiUsage {
-  plan: string
   usedTokens: number
-  /** -1 = illimité (plan ENTERPRISE). */
+  /** -1 = illimité (défaut : l'instance ne pose pas de plafond). */
   limitTokens: number
   promptTokens: number
   completionTokens: number

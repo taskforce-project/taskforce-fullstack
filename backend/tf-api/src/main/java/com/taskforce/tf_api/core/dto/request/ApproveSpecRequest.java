@@ -9,7 +9,7 @@ import jakarta.validation.constraints.NotBlank;
  * <b>éventuellement édité</b> ; l'approbation persiste un node {@code SPEC} lié à l'issue.
  */
 public record ApproveSpecRequest(
-    @NotBlank(message = "La spec est obligatoire") String spec,
+    @NotBlank(message = "The spec is required") String spec,
     String executionPrompt,
     List<String> breakdown,
     /** Si vrai, injecte le découpage comme checklist de l'issue (suivi d'avancement). */

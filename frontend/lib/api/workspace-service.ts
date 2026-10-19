@@ -52,8 +52,6 @@ export interface CreateWorkspacePayload {
   description?: string;
   /** Contexte metier (« que fait l'entreprise / equipe ? ») - alimente le Brain OS. */
   activity?: string;
-  /** Gabarit d'amorçage du Brain OS : BLANK | SAAS | ECOMMERCE | MARKETPLACE | AGENTIC. */
-  brainTemplate?: string;
 }
 
 export interface InviteMemberPayload {
@@ -105,21 +103,6 @@ export async function inviteMember(slug: string, payload: InviteMemberPayload): 
   return response.data.data;
 }
 
-/** Usage vs limites du plan (PROD-4.2, source de vérité back). `-1` = illimité. */
-export interface WorkspaceUsage {
-  plan: string;
-  membersUsed: number;
-  membersLimit: number;
-  workspacesUsed: number;
-  workspacesLimit: number;
-}
-
-export async function getWorkspaceUsage(slug: string): Promise<WorkspaceUsage> {
-  // Enrichissement (badges d'usage) : échec silencieux - pas de toast si la métrique n'est pas dispo.
-  const response = await apiClient.get<{ data: WorkspaceUsage }>(WORKSPACE_ROUTES.USAGE(slug), { silentError: true });
-  return response.data.data;
-}
-
 /** Entrée du journal d'audit (RGPD C11.1 / sécurité C21, OWNER/ADMIN). */
 export interface AuditLogEntry {
   id: number;
@@ -159,11 +142,5 @@ export async function removeMember(slug: string, memberId: number): Promise<void
 /** Supprime le workspace (OWNER uniquement) - cascade côté DB. */
 export async function deleteWorkspace(slug: string): Promise<void> {
   await apiClient.delete(WORKSPACE_ROUTES.BY_SLUG(slug));
-}
-
-/** Rétrocompatibilité - récupère le workspace courant (owner lookup) */
-export async function getCurrentWorkspace(): Promise<Workspace> {
-  const response = await apiClient.get<{ data: Workspace }>(WORKSPACE_ROUTES.CURRENT);
-  return response.data.data;
 }
 

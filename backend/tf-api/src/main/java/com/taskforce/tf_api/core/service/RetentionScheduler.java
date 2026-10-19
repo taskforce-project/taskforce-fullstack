@@ -7,8 +7,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import com.taskforce.tf_api.core.repository.McpOAuthStateRepository;
 import com.taskforce.tf_api.core.repository.OAuthStateRepository;
+import com.taskforce.tf_api.core.repository.WebhookDeliveryRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceInvitationRepository;
+import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,8 +25,8 @@ import lombok.extern.slf4j.Slf4j;
  * {@link OtpService#cleanupExpiredOtps()} portait même la mention « à appeler périodiquement via
  * un scheduler » — ce scheduler n'avait jamais été écrit.</p>
  *
- * <h2>Périmètre : ce qui porte déjà une échéance</h2>
- * Les trois traitements purgés ici ont en commun de <b>porter leur propre date d'expiration</b>.
+ * <h2>Périmètre : ce qui porte déjà une échéance, ou n'a plus de finalité</h2>
+ * Les quatre premiers traitements purgés ici ont en commun de <b>porter leur propre date d'expiration</b>.
  * Les supprimer une fois expirés n'invente aucune politique de rétention : cela applique
  * l'échéance que la donnée déclare elle-même.
  * <ul>
@@ -31,9 +34,16 @@ import lombok.extern.slf4j.Slf4j;
  *   <li><b>States OAuth</b> — jetons anti-CSRF à usage unique. Le nettoyage opportuniste existant
  *       (à l'émission d'un nouveau state) laissait s'accumuler ceux d'un workspace qui ne
  *       reconnecte plus d'intégration.</li>
+ *   <li><b>States OAuth des serveurs MCP</b> — même rôle, avec en plus le vérificateur PKCE et le
+ *       secret client DCR (chiffrés) ; jusqu'au lot 6, rien ne les purgeait.</li>
  *   <li><b>Invitations sans suite</b> — l'e-mail d'une personne qui n'est jamais devenue
  *       utilisatrice ; c'est la donnée la plus exposée des trois.</li>
  * </ul>
+ * Les <b>envois de webhook</b> terminés (livrés ou abandonnés) sont gardés 30 jours pour l'historique de l'écran
+ * des webhooks : leur corps reprend le contenu des issues et des commentaires.
+ * S'y ajoutent les <b>identifiants sans serveur MCP</b> (minimisation, art. 5.1.c) : clés saisies dans le
+ * formulaire générique d'intégrations retiré au lot 6, qu'aucun code ne lisait (cf.
+ * {@link WorkspaceMcpService#purgeConnectionsWithoutServer()}).
  *
  * <h2>Hors périmètre, volontairement : le journal d'audit</h2>
  * Sa durée est notée « à définir en prod » au registre, et la table y est déclarée <b>immuable</b>.
@@ -51,6 +61,9 @@ public class RetentionScheduler {
     private final OtpService                    otpService;
     private final OAuthStateRepository          oauthStateRepository;
     private final WorkspaceInvitationRepository invitationRepository;
+    private final McpOAuthStateRepository       mcpOauthStateRepository;
+    private final WorkspaceMcpService           workspaceMcp;
+    private final WebhookDeliveryRepository     webhookDeliveryRepository;
 
     /**
      * Délai de grâce après expiration d'une invitation, avant purge. Non nul pour qu'un
@@ -58,6 +71,10 @@ public class RetentionScheduler {
      */
     @Value("${taskforce.retention.invitation-grace-days:30}")
     private int invitationGraceDays;
+
+    /** Durée de conservation d'un envoi de webhook terminé (historique de l'écran des webhooks). */
+    @Value("${taskforce.retention.webhook-delivery-days:30}")
+    private int webhookDeliveryDays;
 
     /**
      * Tous les jours à 03:30 (fuseau serveur, UTC en dev) — décalé des jobs d'alerte de 08:00 et
@@ -70,16 +87,28 @@ public class RetentionScheduler {
      */
     @Scheduled(cron = "${taskforce.retention.cron:0 30 3 * * *}")
     public void applyRetentionPolicies() {
-        int otps        = purge("codes OTP expirés",       otpService::cleanupExpiredOtps);
-        int states      = purge("states OAuth expirés",    this::purgeOauthStates);
-        int invitations = purge("invitations sans suite",  this::purgeStaleInvitations);
+        int otps        = purge("expired OTP codes",          otpService::cleanupExpiredOtps);
+        int states      = purge("expired OAuth states",       this::purgeOauthStates);
+        int mcpStates   = purge("expired MCP OAuth states",   this::purgeMcpOauthStates);
+        int invitations = purge("unanswered invitations",     this::purgeStaleInvitations);
+        int credentials = purge("credentials without an MCP server", workspaceMcp::purgeConnectionsWithoutServer);
+        int deliveries  = purge("finished webhook deliveries", this::purgeWebhookDeliveries);
 
-        log.info("Rétention appliquée : {} OTP, {} states OAuth, {} invitations supprimés",
-            otps, states, invitations);
+        log.info("Rétention appliquée : {} OTP, {} states OAuth, {} states OAuth MCP, {} invitations, "
+            + "{} identifiants sans serveur MCP, {} envois de webhook supprimés",
+            otps, states, mcpStates, invitations, credentials, deliveries);
     }
 
     private int purgeOauthStates() {
         return (int) oauthStateRepository.deleteByExpiresAtBefore(LocalDateTime.now());
+    }
+
+    private int purgeMcpOauthStates() {
+        return (int) mcpOauthStateRepository.deleteByExpiresAtBefore(LocalDateTime.now());
+    }
+
+    private int purgeWebhookDeliveries() {
+        return webhookDeliveryRepository.deleteFinishedBefore(LocalDateTime.now().minusDays(webhookDeliveryDays));
     }
 
     private int purgeStaleInvitations() {

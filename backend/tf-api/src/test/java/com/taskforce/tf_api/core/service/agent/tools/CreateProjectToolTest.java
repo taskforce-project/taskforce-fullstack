@@ -76,7 +76,7 @@ class CreateProjectToolTest {
     @DisplayName("execute : name manquant → message, aucun appel service")
     void execute_missing_name() {
         String out = tool().execute(Map.of(), new AgentContext("acme", 1L, 7L));
-        assertThat(out).contains("name manquant");
+        assertThat(out).contains("name is missing");
         org.mockito.Mockito.verifyNoInteractions(projectService);
     }
 }

@@ -18,13 +18,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CreateKnowledgeNodeRequest {
 
-    @NotNull(message = "Le type est obligatoire")
+    @NotNull(message = "The type is required")
     private String type;        // NodeType
 
-    @NotNull(message = "Le domaine est obligatoire")
+    @NotNull(message = "The domain is required")
     private String domain;      // NodeDomain
 
-    @NotBlank(message = "Le titre est obligatoire")
+    @NotBlank(message = "The title is required")
     @Size(max = 300)
     private String title;
 
@@ -39,14 +39,6 @@ public class CreateKnowledgeNodeRequest {
 
     /** Tags explicites (les #tags du contenu sont aussi détectés automatiquement). */
     private List<String> tags;
-
-    /**
-     * Projets auxquels la note appartient — <b>plusieurs</b> possibles : une connaissance est
-     * souvent transverse (une décision d'archi vaut pour le web et l'API). C'est ce qui interdit un
-     * simple champ {@code projectId}, et ce que le graphe rend par des régions qui se chevauchent.
-     * Stocké dans {@code metadata.projects}.
-     */
-    private List<Long> projects;
 
     private Map<String, Object> metadata;
 }

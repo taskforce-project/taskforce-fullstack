@@ -17,7 +17,6 @@ import {
   Plus,
   User,
   Bell,
-  Zap,
   Sun,
   Moon,
   Search,
@@ -28,11 +27,14 @@ import {
   ArrowRight,
   Brain,
   FileText,
+  Bug,
+  Compass,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import { cn } from "@/lib/utils"
 import { useCreateProjectStore } from "@/lib/store/create-project-store"
+import { useSettingsStore } from "@/lib/store/settings-store"
 import { useBrainStore } from "@/lib/store/brain-store"
 import { sendAssistantMessage } from "@/lib/api/assistant-service"
 
@@ -45,6 +47,9 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command"
+
+/** Les bugs et idées se signalent sur le dépôt du projet (open source), pas dans l'instance. */
+const REPORT_ISSUE_URL = "https://github.com/taskforce-project/taskforce-fullstack/issues/new/choose"
 
 // ─── Hook IA - appelle le VRAI assistant (Cortex), plus de mock ──────────────
 //
@@ -78,7 +83,6 @@ interface CommandAction {
   label: string
   group: string
   icon: React.ReactNode
-  shortcut?: string
   action: () => void
 }
 
@@ -92,6 +96,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
+  const openSettings = useSettingsStore((s) => s.openSettings)
   const { setTheme } = useTheme()
 
   // ─── État mode IA ──────────────────────────────────────────────────────────
@@ -124,38 +129,47 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
       const q = aiInput.trim()
       if (q && !isRunning) setAiQuery(q)
     }
-    if (e.key === "Escape") { if (aiQuery) { setAiQuery(null); setAiInput("") } else { exitAiMode() } }
-  }, [aiInput, aiQuery, isRunning])
+  }, [aiInput, isRunning])
+
+  // Échap en mode IA, où que soit le focus (la zone de saisie disparaît une fois la question posée) :
+  // efface d'abord la réponse, puis revient aux commandes. La palette ne se ferme qu'en mode commandes.
+  const handleEscape = (e: globalThis.KeyboardEvent) => {
+    if (!aiMode) return
+    e.preventDefault()
+    if (aiQuery) { setAiQuery(null); setAiInput("") } else { exitAiMode() }
+  }
 
   // ─── Navigation ────────────────────────────────────────────────────────────
   // Les routes sont scopées au workspace (/{slug}/…) - on préfixe le slug courant. (QA Q-24)
   function go(path: string) { router.push(slug ? `/${slug}${path}` : path); onOpenChange(false) }
+  // Réglages et profil s'ouvrent en place, comme depuis la barre latérale. Passer par les routes
+  // `/settings` ou `/profile` (qui ouvrent le modal puis renvoient au dashboard) démontait la page
+  // courante, le <main> de l'AppShell étant indexé sur le chemin, et relançait tous ses chargements.
+  function openSettingsHere(section?: string) { openSettings(section); onOpenChange(false) }
 
   const ACTIONS: CommandAction[] = [
     // Navigation
-    { id: "dashboard",     label: "Go to Dashboard",    group: "Navigation", icon: <LayoutDashboard className="h-4 w-4" />, shortcut: "G D", action: () => go("/dashboard") },
-    { id: "inbox",         label: "Go to Inbox",         group: "Navigation", icon: <Inbox className="h-4 w-4" />,           shortcut: "G I", action: () => go("/inbox") },
-    { id: "my-work",       label: "Go to My Work",       group: "Navigation", icon: <ClipboardCheck className="h-4 w-4" />, shortcut: "G W", action: () => go("/my-work") },
-    { id: "projects",      label: "Go to Projects",      group: "Navigation", icon: <FolderKanban className="h-4 w-4" />,   shortcut: "G P", action: () => go("/projects") },
-    { id: "issues",        label: "Go to Issues",        group: "Navigation", icon: <CircleDot className="h-4 w-4" />,       shortcut: "G U", action: () => go("/my-work/issues") },
-    { id: "cycles",        label: "Go to Cycles",        group: "Navigation", icon: <Repeat className="h-4 w-4" />,          shortcut: "G C", action: () => go("/cycles") },
-    { id: "roadmap",       label: "Go to Roadmap",       group: "Navigation", icon: <CalendarRange className="h-4 w-4" />,   shortcut: "G R", action: () => go("/roadmap") },
-    { id: "members",       label: "Go to Members",       group: "Navigation", icon: <Users className="h-4 w-4" />,           shortcut: "G T", action: () => go("/members") },
-    { id: "settings",      label: "Go to Settings",      group: "Navigation", icon: <Settings className="h-4 w-4" />,       shortcut: "G S", action: () => go("/settings") },
-    { id: "profile",       label: "View my profile",     group: "Navigation", icon: <User className="h-4 w-4" />,           shortcut: "G F", action: () => go("/profile") },
-    // Labs - accès rapide aux fonctionnalités en finition. Mêmes icônes que la sidebar (Activity / Brain),
-    // en couleur normale (pas de dégradé) : la carte « Labs » suffit à les signaler.
-    { id: "intelligence",  label: "Intelligence",        group: "Labs",       icon: <Activity className="h-4 w-4" />, shortcut: "G A", action: () => go("/analytics") },
-    { id: "brain",         label: "Brain OS",            group: "Labs",       icon: <Brain className="h-4 w-4" />,                     action: () => go("/brain") },
+    { id: "dashboard",     label: "Go to Dashboard",    group: "Navigation", icon: <LayoutDashboard className="h-4 w-4" />, action: () => go("/dashboard") },
+    { id: "inbox",         label: "Go to Inbox",         group: "Navigation", icon: <Inbox className="h-4 w-4" />, action: () => go("/inbox") },
+    { id: "my-work",       label: "Go to My Work",       group: "Navigation", icon: <ClipboardCheck className="h-4 w-4" />, action: () => go("/my-work") },
+    { id: "projects",      label: "Go to Projects",      group: "Navigation", icon: <FolderKanban className="h-4 w-4" />, action: () => go("/projects") },
+    { id: "issues",        label: "Go to Issues",        group: "Navigation", icon: <CircleDot className="h-4 w-4" />, action: () => go("/my-work/issues") },
+    { id: "cycles",        label: "Go to Cycles",        group: "Navigation", icon: <Repeat className="h-4 w-4" />, action: () => go("/cycles") },
+    { id: "roadmap",       label: "Go to Roadmap",       group: "Navigation", icon: <CalendarRange className="h-4 w-4" />, action: () => go("/roadmap") },
+    { id: "members",       label: "Go to Members",       group: "Navigation", icon: <Users className="h-4 w-4" />, action: () => go("/members") },
+    { id: "settings",      label: "Go to Settings",      group: "Navigation", icon: <Settings className="h-4 w-4" />, action: () => openSettingsHere() },
+    { id: "profile",       label: "View my profile",     group: "Navigation", icon: <User className="h-4 w-4" />, action: () => openSettingsHere("profile") },
+    { id: "intelligence",  label: "Go to Intelligence",  group: "Navigation", icon: <Activity className="h-4 w-4" />, action: () => go("/analytics") },
+    { id: "brain",         label: "Go to Brain OS",      group: "Navigation", icon: <Brain className="h-4 w-4" />,            action: () => go("/brain") },
     // Actions
-    { id: "ask-ai",        label: "Ask AI",              group: "Actions",    icon: <Sparkles className="h-4 w-4" />,        shortcut: "A",   action: enterAiMode },
+    { id: "ask-ai",        label: "Ask AI",              group: "Actions",    icon: <Sparkles className="h-4 w-4" />,   action: enterAiMode },
     // La création d'issue est propre à un projet : on mène à la liste des projets, où chacun porte
     // son propre bouton « New issue » - plutôt qu'un dialogue de création sans projet.
-    { id: "new-issue",     label: "Create issue",     group: "Actions",    icon: <Plus className="h-4 w-4" />,            shortcut: "C",   action: () => go("/projects") },
+    { id: "new-issue",     label: "Create issue",     group: "Actions",    icon: <Plus className="h-4 w-4" />,   action: () => go("/projects") },
     { id: "new-project",   label: "Create project",     group: "Actions",    icon: <Plus className="h-4 w-4" />,                             action: () => { openCreateProject(); onOpenChange(false) } },
     { id: "notifications", label: "Open notifications", group: "Actions", icon: <Bell className="h-4 w-4" />,                          action: () => go("/inbox") },
-    // « Voir les forfaits » → page des plans (facturation), pas les réglages génériques.
-    { id: "upgrade",       label: "View plans",   group: "Actions",    icon: <Zap className="h-4 w-4" />,                              action: () => go("/billing") },
+    { id: "tour",          label: "Replay the product tour", group: "Actions", icon: <Compass className="h-4 w-4" />, action: () => go("/dashboard?tour=1") },
+    { id: "report-issue",  label: "Report an issue on GitHub", group: "Actions", icon: <Bug className="h-4 w-4" />, action: () => { window.open(REPORT_ISSUE_URL, "_blank", "noopener,noreferrer"); onOpenChange(false) } },
     // Appearance
     { id: "theme-light",   label: "Switch to light mode", group: "Appearance", icon: <Sun className="h-4 w-4" />,    action: () => { setTheme("light"); onOpenChange(false) } },
     { id: "theme-dark",    label: "Switch to dark mode",  group: "Appearance", icon: <Moon className="h-4 w-4" />,   action: () => { setTheme("dark"); onOpenChange(false) } },
@@ -173,7 +187,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
   )
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange} showCloseButton={false} className="max-w-2xl overflow-hidden rounded-xl border shadow-2xl">
+    <CommandDialog open={open} onOpenChange={onOpenChange} onEscapeKeyDown={handleEscape} showCloseButton={false} className="max-w-2xl overflow-hidden rounded-xl border shadow-2xl">
       {/* ── Mode IA ────────────────────────────────────────────────────────── */}
       {aiMode ? (
         <div className="flex flex-col">
@@ -204,7 +218,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
                 <p className="text-sm leading-relaxed flex-1">
                   {aiError
                     ? <span className="text-destructive">{aiError}</span>
-                    : <span className="text-foreground">{aiText || (isRunning ? <TextShimmerWave as="span">Cortex is thinking…</TextShimmerWave> : "")}</span>}
+                    : <span className="text-foreground">{aiText || (isRunning ? <TextShimmerWave>Cortex is thinking…</TextShimmerWave> : "")}</span>}
                 </p>
               </div>
               {!isRunning && (
@@ -252,23 +266,14 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
                     <CommandItem
                       key={action.id}
                       onSelect={action.action}
-                      className={cn("group gap-3", action.group === "Labs" && "lab-cmd-row")}
+                      className="group gap-3"
                     >
                       <span className={action.id === "ask-ai" ? "text-primary" : "text-muted-foreground"}>
                         {action.icon}
                       </span>
                       <span className={action.id === "ask-ai" ? "font-medium" : ""}>{action.label}</span>
-                      {/* Côté droit façon Cloudflare : raccourci + flèche visible sur la ligne active */}
-                      <span className="ml-auto flex items-center gap-2 pl-2">
-                        {action.shortcut && (
-                          <span className="flex items-center gap-1">
-                            {action.shortcut.split(" ").map((k) => (
-                              <kbd key={k} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{k}</kbd>
-                            ))}
-                          </span>
-                        )}
-                        <ArrowRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-data-[selected=true]:opacity-100" />
-                      </span>
+                      {/* Côté droit façon Cloudflare : flèche visible sur la ligne active */}
+                      <ArrowRight className="ml-auto size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-data-[selected=true]:opacity-100" />
                     </CommandItem>
                   ))}
                 </CommandGroup>

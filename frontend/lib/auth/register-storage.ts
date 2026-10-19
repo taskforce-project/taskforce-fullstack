@@ -7,20 +7,14 @@ export type RegisterData = {
   firstName: string;
   lastName: string;
   email: string;
-  plan?: "free" | "pro" | "enterprise";
-  planType?: string;
   password: string;
-  // Champs optionnels pour le plan ENTERPRISE
-  companyName?: string;
-  phoneNumber?: string;
-  enterpriseMessage?: string;
   /**
    * Jeton de vérification humaine. Émis et validé par la case cochée à l'étape 1, mais consommé à
-   * l'étape 3, seul moment où l'inscription est réellement envoyée au serveur : il doit donc
-   * traverser le choix de la formule.
+   * l'étape 2, seul moment où l'inscription est réellement envoyée au serveur : il doit donc
+   * traverser jusqu'à la vérification.
    */
   challengeToken?: string;
-  /** Jeton Cloudflare Turnstile - même trajet que le défi signé : émis étape 1, consommé étape 3. */
+  /** Jeton Cloudflare Turnstile - même trajet que le défi signé : émis étape 1, consommé étape 2. */
   turnstileToken?: string;
 };
 

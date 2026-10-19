@@ -15,6 +15,7 @@ import com.taskforce.tf_api.core.dto.response.CycleResponse;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.dto.response.MyWorkCycleResponse;
 import com.taskforce.tf_api.core.enums.CycleStatus;
+import com.taskforce.tf_api.core.enums.WebhookEventType;
 import com.taskforce.tf_api.core.event.CycleCompletedEvent;
 import com.taskforce.tf_api.core.model.Cycle;
 import com.taskforce.tf_api.core.model.CycleIssue;
@@ -29,6 +30,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.webhook.WorkspaceWebhookEvent;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -77,7 +79,7 @@ public class CycleService {
     @Transactional(readOnly = true)
     public List<MyWorkCycleResponse> listWorkspaceCycles(String workspaceSlug, Long userId) {
         Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         assertWorkspaceMember(workspace.getId(), userId);
 
         List<Long> viewableProjectIds = visibilityGuard.viewableProjectIds(workspace.getId(), userId);
@@ -110,7 +112,7 @@ public class CycleService {
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
 
         if (cycleRepository.existsByNameAndProjectId(request.getName(), project.getId())) {
-            throw new BusinessException("Un cycle avec ce nom existe déjà dans ce projet");
+            throw new BusinessException("A cycle with this name already exists in this project");
         }
 
         User actor = resolveUser(userId);
@@ -148,7 +150,7 @@ public class CycleService {
         if (request.getName() != null) {
             if (!request.getName().equals(cycle.getName())
                     && cycleRepository.existsByNameAndProjectId(request.getName(), project.getId())) {
-                throw new BusinessException("Un cycle avec ce nom existe déjà dans ce projet");
+                throw new BusinessException("A cycle with this name already exists in this project");
             }
             cycle.setName(request.getName());
         }
@@ -159,25 +161,33 @@ public class CycleService {
             try {
                 cycle.setStatus(CycleStatus.valueOf(request.getStatus()));
             } catch (IllegalArgumentException e) {
-                throw new BusinessException("Statut de cycle invalide : " + request.getStatus());
+                throw new BusinessException("Invalid cycle status: " + request.getStatus());
             }
         }
 
         cycle = cycleRepository.save(cycle);
 
         // Push Slack à la transition vers COMPLETED (une seule fois)
-        if (cycle.getStatus() == CycleStatus.COMPLETED && previousStatus != CycleStatus.COMPLETED) {
+        boolean completedNow = cycle.getStatus() == CycleStatus.COMPLETED && previousStatus != CycleStatus.COMPLETED;
+        if (completedNow) {
             slackService.notifyEvent(project.getWorkspace().getId(), "cycle.completed",
-                "🏁 Cycle *" + cycle.getName() + "* terminé");
+                "🏁 Cycle *" + cycle.getName() + "* completed");
             // … et le Brain OS écrit la rétro du cycle. Publié ici (même garde « une seule fois »),
             // consommé après commit et hors requête — cf. BrainIngestionListener.
             events.publishEvent(new CycleCompletedEvent(
                 workspaceSlug, project.getWorkspace().getId(), project.getId(), cycle.getId(), userId));
         }
 
-        return toResponse(cycle,
+        CycleResponse response = toResponse(cycle,
             cycleIssueRepository.countByCycleId(cycle.getId()),
             cycleIssueRepository.countCompletedByCycleId(cycle.getId()));
+        if (completedNow) {
+            // Webhooks sortants (OSS-6.2) : envois écrits avant le commit, envoyés ensuite.
+            events.publishEvent(new WorkspaceWebhookEvent(project.getWorkspace().getId(),
+                WebhookEventType.CYCLE_COMPLETED, userId, Map.of("cycle", response),
+                "/" + workspaceSlug + "/projects/" + project.getId() + "/cycles/" + cycle.getId()));
+        }
+        return response;
     }
 
     @Transactional
@@ -209,7 +219,7 @@ public class CycleService {
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
         Issue issue = issueRepository.findById(issueId)
             .filter(i -> i.getProject().getId().equals(project.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Issue introuvable dans ce projet"));
+            .orElseThrow(() -> new ResourceNotFoundException("Issue not found in this project"));
         return cycleIssueRepository.findByIssueId(issue.getId()).stream()
             .map(ci -> toResponse(ci.getCycle(),
                 cycleIssueRepository.countByCycleId(ci.getCycle().getId()),
@@ -226,10 +236,10 @@ public class CycleService {
 
         Issue issue = issueRepository.findById(request.getIssueId())
             .filter(i -> i.getProject().getId().equals(project.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Issue introuvable dans ce projet"));
+            .orElseThrow(() -> new ResourceNotFoundException("Issue not found in this project"));
 
         if (cycleIssueRepository.existsByCycleIdAndIssueId(cycle.getId(), issue.getId())) {
-            throw new BusinessException("Cette issue fait déjà partie du cycle");
+            throw new BusinessException("This issue is already in the cycle");
         }
 
         User actor = resolveUser(userId);
@@ -247,7 +257,7 @@ public class CycleService {
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
         resolveCycle(cycleId, project.getId());
         CycleIssue ci = cycleIssueRepository.findByCycleIdAndIssueId(cycleId, issueId)
-            .orElseThrow(() -> new ResourceNotFoundException("Issue non trouvée dans ce cycle"));
+            .orElseThrow(() -> new ResourceNotFoundException("Issue not found in this cycle"));
         cycleIssueRepository.delete(ci);
     }
 
@@ -258,22 +268,22 @@ public class CycleService {
     private Project resolveProject(String workspaceSlug, Long projectId) {
         return workspaceRepository.findBySlug(workspaceSlug)
             .flatMap(ws -> projectRepository.findByIdAndWorkspaceId(projectId, ws.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
     }
 
     private Cycle resolveCycle(Long cycleId, Long projectId) {
         return cycleRepository.findByIdAndProjectId(cycleId, projectId)
-            .orElseThrow(() -> new ResourceNotFoundException("Cycle introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Cycle not found"));
     }
 
     private User resolveUser(Long userId) {
         return userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
     private void assertWorkspaceMember(Long workspaceId, Long userId) {
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, userId)) {
-            throw new BusinessException("Accès refusé");
+            throw new BusinessException("Access denied");
         }
     }
 

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/contexts/auth-context";
 import { I18nProvider } from "@/lib/i18n";
@@ -11,21 +11,22 @@ import { PostHogProvider } from "@/components/analytics/posthog-provider";
 import { A11yFilters } from "@/components/a11y/a11y-filters";
 import { Toaster } from "@/components/ui/sonner";
 
-const inter = Inter({
-  variable: "--font-inter",
+// Geist et Geist Mono (Vercel, licence SIL Open Font) : polices de la direction artistique 2026.
+const geist = Geist({
+  variable: "--font-geist",
   subsets: ["latin"],
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
   display: "swap",
 });
 
 export const metadata: Metadata = {
   title: "TaskForce",
-  description: "AI-native operations platform for service companies.",
+  description: "Open-source project management where people and AI agents work together.",
 };
 
 export default function RootLayout({
@@ -34,10 +35,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
-      >
+    // Variables de police sur <html> : --font-sans (globals.css, :root) les référence ; posées sur <body>,
+    // elles n'existaient pas au niveau racine et la police retombait sur celle du système.
+    <html lang="en" className={`${geist.variable} ${geistMono.variable}`} suppressHydrationWarning>
+      <body className="font-sans antialiased">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

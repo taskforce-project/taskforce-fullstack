@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
-import Link from "next/link"
-import { Send, Sparkles, MessageSquare, ChevronDown, Plus, Trash2, ArrowUpRight, Plug } from "lucide-react"
+import { Send, Sparkles, MessageSquare, ChevronDown, Plus, Trash2, Plug, Play, CircleAlert } from "lucide-react"
 import {
   Message, Steps, Reasoning, Tool, Sources, ThinkingBar, FeedbackBar, PromptSuggestion, TokenMeter,
   type ToolStatus,
@@ -11,12 +10,13 @@ import {
 import { Markdown } from "@/components/ui/lightweight-markdown"
 import { cn } from "@/lib/utils"
 import { sendAgentMessage, type AssistantAnswer } from "@/lib/api/assistant-service"
-import { getErrorStatus } from "@/lib/api/client"
+import { getErrorMessage, getErrorStatus } from "@/lib/api/client"
 import {
   listConversations, getConversation, deleteConversation,
   type ConversationSummary, type ConversationMessage,
 } from "@/lib/api/ai-conversation-service"
-import { getMcpServers } from "@/lib/api/integration-service"
+import { executeMcpAction, getMcpServers } from "@/lib/api/integration-service"
+import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { CortexUsage } from "./cortex-usage"
 
 interface Turn {
@@ -52,10 +52,10 @@ function messagesToTurns(messages: ConversationMessage[]): Turn[] {
 }
 
 /**
- * Plafond de tokens IA atteint (HTTP 409) - carte d'**information** (pas d'erreur) avec un **CTA**
- * clair vers la page d'abonnement. Rendue en tour assistant pour rester dans le fil.
+ * Plafond mensuel de tokens IA de l'instance atteint (HTTP 409) - carte d'**information** (pas
+ * d'erreur). Rendue en tour assistant pour rester dans le fil.
  */
-function QuotaNotice({ slug }: Readonly<{ slug: string }>) {
+function QuotaNotice() {
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-primary/25 bg-primary/5 p-3">
       <div className="flex items-center gap-2">
@@ -65,17 +65,70 @@ function QuotaNotice({ slug }: Readonly<{ slug: string }>) {
         <p className="text-sm font-medium text-foreground">Monthly AI limit reached</p>
       </div>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        You&apos;ve used all of Cortex&apos;s tokens for this month on your current plan.
-        Upgrade to keep chatting and unlock a larger monthly allowance.
+        Cortex has used this instance&apos;s monthly token allowance. It resets on the first day of
+        next month, and an administrator can raise it.
       </p>
-      {slug && (
-        <Link
-          href={`/${slug}/billing`}
-          className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
+    </div>
+  )
+}
+
+/**
+ * L'instance n'a pas de modèle joignable : Cortex cherche quand même dans le Brain OS, mais ne rédige pas.
+ * Carte d'information, pas d'erreur : l'état vient de GET /api/ai/status.
+ */
+function AiUnavailableNotice() {
+  return (
+    <div className="flex w-full flex-col gap-1.5 border border-border bg-muted/40 p-3 text-left">
+      <p className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+        <CircleAlert className="size-3.5 shrink-0 text-ink-yellow" /> AI is not configured
+      </p>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Cortex still searches the Brain OS and cites the notes it finds. To get written answers, an
+        administrator connects a model to the AI service: Ollama on this machine, or any OpenAI-compatible API.
+      </p>
+    </div>
+  )
+}
+
+/**
+ * Écriture sur un outil externe (MCP) proposée par Cortex. Rien n'est fait sans le clic de l'utilisateur :
+ * l'action passe alors par la même route que la console MCP (réservée aux gestionnaires du workspace).
+ */
+function PendingAction({ slug, toolRef, input }: { slug: string; toolRef: string; input: string | null }) {
+  const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle")
+  const [output, setOutput] = useState<string | null>(null)
+
+  const run = async () => {
+    setState("running")
+    try {
+      const args = input ? (JSON.parse(input) as Record<string, unknown>) : {}
+      setOutput(await executeMcpAction(slug, toolRef, args))
+      setState("done")
+    } catch (e) {
+      setOutput(getErrorMessage(e))
+      setState("error")
+    }
+  }
+
+  return (
+    <div className="my-2 flex flex-col gap-2 border border-shape-yellow/35 bg-shape-yellow/[0.06] p-2.5 text-xs">
+      <p className="text-muted-foreground">
+        Cortex proposes to run <span className="font-mono text-foreground">{toolRef}</span> on a connected tool.
+        Nothing is sent until you approve it.
+      </p>
+      {state === "idle" || state === "running" ? (
+        <button
+          type="button"
+          onClick={run}
+          disabled={state === "running"}
+          className="flex h-7 w-fit items-center gap-1.5 bg-primary px-2.5 font-medium text-primary-foreground shadow-key transition-colors hover:bg-primary-hover disabled:opacity-60"
         >
-          Upgrade plan
-          <ArrowUpRight className="size-3.5" />
-        </Link>
+          <Play className="size-3" /> {state === "running" ? "Running…" : "Approve and run"}
+        </button>
+      ) : (
+        <p className={cn("whitespace-pre-wrap break-words", state === "error" ? "text-destructive" : "text-ink-green")}>
+          {state === "done" ? "Done. " : "The action failed: "}{output}
+        </p>
       )}
     </div>
   )
@@ -109,6 +162,10 @@ export function AgentChat() {
   const startRef = useRef<number>(0)
   const bottomRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+
+  const aiStatus = useAiStatusStore((s) => s.status)
+  const fetchAiStatus = useAiStatusStore((s) => s.fetchStatus)
+  useEffect(() => { void fetchAiStatus() }, [fetchAiStatus])
 
   const loadConversations = useCallback(async () => {
     if (!slug) return
@@ -293,6 +350,7 @@ export function AgentChat() {
                 Taskforce&apos;s AI agent, built on your workspace&apos;s Brain OS. It cites its sources.
               </p>
             </div>
+            {aiStatus && !aiStatus.chatAvailable && <AiUnavailableNotice />}
             <div className="mt-2 flex w-full flex-col gap-1.5">
               {SUGGESTIONS.map((s) => (
                 <PromptSuggestion key={s} onClick={() => send(s)}>{s}</PromptSuggestion>
@@ -300,7 +358,7 @@ export function AgentChat() {
             </div>
 
             {/* Outils externes (MCP) live : montre que Cortex peut AGIR, pas seulement citer le Brain.
-                N'apparaît que si un serveur MCP joignable est connecté (plan BUSINESS+). */}
+                N'apparaît que si un serveur MCP joignable est connecté. */}
             {mcpTools.length > 0 && (
               <div className="mt-1 w-full rounded-lg border border-border/60 bg-muted/30 p-2.5 text-left">
                 <p className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
@@ -329,11 +387,11 @@ export function AgentChat() {
               <Message key={t.id} role="user" content={t.text} />
             ) : t.kind === "quota" ? (
               <Message key={t.id} role="assistant">
-                <QuotaNotice slug={slug} />
+                <QuotaNotice />
               </Message>
             ) : (
               <Message key={t.id} role="assistant">
-                {t.answer && <AgentAnswerView answer={t.answer} />}
+                {t.answer && <AgentAnswerView answer={t.answer} slug={slug} />}
               </Message>
             ),
           )
@@ -389,7 +447,7 @@ export function AgentChat() {
 }
 
 /** Rend la réponse structurée : étapes → raisonnement → outils → texte → sources → feedback. */
-function AgentAnswerView({ answer }: { answer: AssistantAnswer }) {
+function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: string }) {
   const hasBreakdown = answer.usage && (answer.usage.promptTokens > 0 || answer.usage.completionTokens > 0)
   return (
     <div className="space-y-1">
@@ -398,7 +456,13 @@ function AgentAnswerView({ answer }: { answer: AssistantAnswer }) {
       )}
       {answer.reasoning && <Reasoning content={answer.reasoning} />}
       {answer.toolCalls.map((tc, i) => (
-        <Tool key={i} name={tc.name} status={tc.status as ToolStatus} input={tc.input ?? undefined} output={tc.output ?? undefined} />
+        <div key={i}>
+          <Tool name={tc.name} status={tc.status as ToolStatus} input={tc.input ?? undefined} output={tc.output ?? undefined} />
+          {/* Écriture externe proposée (outil « <service>__… ») : validation explicite de l'utilisateur. */}
+          {tc.status === "pending" && tc.name.includes("__") && (
+            <PendingAction slug={slug} toolRef={tc.name} input={tc.input} />
+          )}
+        </div>
       ))}
       <Markdown content={answer.answer} />
       {answer.sources.length > 0 && (

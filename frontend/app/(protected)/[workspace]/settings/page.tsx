@@ -27,6 +27,9 @@ import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { getGitHubRepos, getGitHubRepoIssues, syncGitHub, syncSlack, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { IntegrationsCatalog } from "@/components/integrations/integrations-catalog"
+import { DisconnectConfirmDialog, DISCONNECT_CONSEQUENCES } from "@/components/integrations/disconnect-confirm-dialog"
+import { WebhooksPanel } from "@/components/settings/webhooks-panel"
+import { EventPicker } from "@/components/settings/event-picker"
 import { AgentsPanel } from "@/components/settings/agents-panel"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { ProfileOverview } from "@/components/profile/profile-overview"
@@ -44,9 +47,10 @@ import {
   type NotificationEventKey,
 } from "@/lib/api/notification-service"
 import { getSystemStatus, type SystemStatus } from "@/lib/api/status-service"
-import { apiClient } from "@/lib/api/client"
+import { apiClient, getErrorMessage } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
 import { cn } from "@/lib/utils"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 export type SettingsSection =
   | "profile"
@@ -75,7 +79,7 @@ export const SECTIONS: SectionConfig[] = [
   { key: "notifications", label: "Notifications",  icon: <Bell className="h-4 w-4" />,       group: "Personal" },
   { key: "security",      label: "Security",       icon: <Key className="h-4 w-4" />,        group: "Personal" },
   { key: "workspace",     label: "General",        icon: <Globe className="h-4 w-4" />,      group: "Workspace" },
-  { key: "usage",         label: "Usage Cortex",   icon: <Gauge className="h-4 w-4" />,       group: "Workspace" },
+  { key: "usage",         label: "Cortex usage",   icon: <Gauge className="h-4 w-4" />,       group: "Workspace" },
   { key: "integrations",  label: "Integrations",   icon: <Webhook className="h-4 w-4" />,    group: "Workspace" },
   { key: "agents",        label: "Agents",         icon: <Bot className="h-4 w-4" />,        group: "Workspace" },
   { key: "status",        label: "Status",         icon: <Activity className="h-4 w-4" />,    group: "Workspace" },
@@ -357,7 +361,7 @@ function AccountPanel() {
     setDeleting(true)
     try {
       const scheduledPurgeAt = await deleteMyAccount()
-      const when = new Date(scheduledPurgeAt)
+      const when = parseServerDate(scheduledPurgeAt)
       const label = Number.isNaN(when.getTime())
         ? null
         : when.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })
@@ -396,7 +400,7 @@ function AccountPanel() {
   const scheduled = Boolean(purgeAt)
   const purgeLabel = (() => {
     if (!purgeAt) return null
-    const d = new Date(purgeAt)
+    const d = parseServerDate(purgeAt)
     return Number.isNaN(d.getTime())
       ? null
       : d.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })
@@ -445,7 +449,7 @@ function AccountPanel() {
               variant="outline"
               onClick={handleRestore}
               disabled={restoring}
-              className="h-8 shrink-0 gap-2 border-amber-500/50 text-xs"
+              className="h-8 shrink-0 gap-2 border-shape-yellow/50 text-xs"
             >
               {restoring ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <RotateCcw className="size-3.5" aria-hidden />}
               Restore account
@@ -590,8 +594,8 @@ function AppearancePanel() {
                 className={cn(
                   "h-8 w-12 rounded",
                   opt === "light" && "bg-white border border-border",
-                  opt === "dark" && "bg-zinc-900",
-                  opt === "system" && "bg-gradient-to-r from-white to-zinc-900 border border-border"
+                  opt === "dark" && "bg-night",
+                  opt === "system" && "bg-gradient-to-r from-white to-night border border-border"
                 )}
               />
               <span className="text-xs font-medium text-foreground">{opt}</span>
@@ -677,7 +681,7 @@ function AppearancePanel() {
   )
 }
 
-/** Événements réglables (regroupent les 8 `type` de notifications back). */
+/** Événements réglables (regroupent les 12 `type` de notifications back). */
 const NOTIF_EVENTS: { key: NotificationEventKey; label: string; description: string }[] = [
   { key: "assigned",      label: "Assigned to you", description: "When an issue is assigned to you" },
   { key: "mention",       label: "Mentions",        description: "When someone @mentions you in a comment" },
@@ -685,6 +689,7 @@ const NOTIF_EVENTS: { key: NotificationEventKey; label: string; description: str
   { key: "statusChanged", label: "Status changes",  description: "When an issue you're involved in changes status or is completed" },
   { key: "dueDate",       label: "Due dates",       description: "Reminders when your issues are due soon or overdue" },
   { key: "overload",      label: "Team overload",   description: "When a teammate's workload gets too high (managers)" },
+  { key: "agent",         label: "Coding agents",   description: "When an agent you delegated to asks for approval, finishes or fails" },
 ]
 
 /**
@@ -807,7 +812,7 @@ function NotificationsPanel() {
 function SecurityPanel() {
   // Le métier auth est piloté par Keycloak via son API admin - l'utilisateur ne voit jamais Keycloak.
   // Reset mot de passe → parcours brandé de l'app (`/auth/forgot-password` : code par email templaté,
-  // puis nouveau mot de passe). 2FA (TOTP) → encore la page Keycloak (à internaliser : secret + QR côté app).
+  // puis nouveau mot de passe). 2FA (TOTP) → gérée par l'app (secret + QR, V79).
   const router = useRouter()
   const [twoFa, setTwoFa] = useState<boolean | null>(null)
   const [busy, setBusy] = useState(false)
@@ -839,7 +844,7 @@ function SecurityPanel() {
     <div className="flex flex-col gap-4">
       <SectionCard
         title="Authentication & security"
-        description="Your sign-in is secured by Keycloak. Manage your password and two-factor authentication here."
+        description="Manage your password and two-factor authentication."
       >
         <div className="flex flex-col divide-y divide-border/50">
           {/* Mot de passe */}
@@ -1090,7 +1095,7 @@ function StatusPanel() {
       : health ? kind(health.status)
       : "DEGRADED"
   const dotClass = (s: Row["state"]) =>
-    s === "UP" ? "bg-emerald-500" : s === "DOWN" ? "bg-red-500" : s === "DEGRADED" ? "bg-amber-500" : "bg-muted-foreground/40"
+    s === "UP" ? "bg-shape-green" : s === "DOWN" ? "bg-shape-red" : s === "DEGRADED" ? "bg-shape-yellow" : "bg-muted-foreground/40"
 
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
@@ -1101,9 +1106,9 @@ function StatusPanel() {
 
       <div className={cn(
         "flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium",
-        overall === "UP" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
-          : overall === "DOWN" ? "border-red-500/30 bg-red-500/10 text-red-500"
-          : "border-amber-500/30 bg-amber-500/10 text-amber-500"
+        overall === "UP" ? "border-shape-green/30 bg-shape-green/10 text-ink-green"
+          : overall === "DOWN" ? "border-destructive/30 bg-destructive/10 text-destructive"
+          : "border-shape-yellow/30 bg-shape-yellow/10 text-ink-yellow"
       )}>
         {overall === "UP" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
         {overall === "CHECKING" ? "Checking service health…"
@@ -1141,7 +1146,7 @@ function StatusPanel() {
                   {l.entityType ? `${l.entityType}${l.entityId ? ` #${l.entityId}` : ""}` : (l.details ?? "-")}
                 </span>
                 <span className="shrink-0 text-[10px] text-muted-foreground/70">
-                  {new Date(l.createdAt).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}
+                  {parseServerDate(l.createdAt).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}
                 </span>
               </div>
             ))
@@ -1166,7 +1171,7 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
     setLoadingRepos(true)
     getGitHubRepos(slug)
       .then((r) => { if (active) setRepos(r) })
-      .catch(() => { if (active) toast.error("Couldn't load GitHub repositories") })
+      .catch((e) => { if (active) toast.error(getErrorMessage(e)) })
       .finally(() => { if (active) setLoadingRepos(false) })
     return () => { active = false }
   }, [slug])
@@ -1178,7 +1183,7 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
     setLoadingIssues(true)
     getGitHubRepoIssues(slug, full)
       .then(setIssues)
-      .catch(() => toast.error("Couldn't load the repository's issues"))
+      .catch((e) => toast.error(getErrorMessage(e)))
       .finally(() => setLoadingIssues(false))
   }
 
@@ -1188,8 +1193,8 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
     try {
       const r = await syncGitHub(slug, repo)
       toast.success(`Ingested into the Brain OS: ${r.created} created, ${r.updated} updated`)
-    } catch {
-      toast.error("Couldn't sync this repository")
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     } finally {
       setSyncing(false)
     }
@@ -1236,11 +1241,11 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
               rel="noopener noreferrer"
               className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted/40"
             >
-              <Badge variant="outline" className={cn("h-4 px-1.5 text-[10px]", i.pullRequest ? "text-violet-400 border-violet-500/30" : "text-muted-foreground")}>
+              <Badge variant="outline" className={cn("h-4 px-1.5 text-[10px]", i.pullRequest ? "text-ink-pink border-shape-pink/30" : "text-muted-foreground")}>
                 {i.pullRequest ? "PR" : "Issue"} #{i.number}
               </Badge>
               <span className="flex-1 truncate text-foreground">{i.title}</span>
-              <span className={cn("text-[10px]", i.state === "open" ? "text-emerald-400" : "text-muted-foreground")}>{i.state}</span>
+              <span className={cn("text-[10px]", i.state === "open" ? "text-ink-green" : "text-muted-foreground")}>{i.state}</span>
             </a>
           ))}
         </div>
@@ -1253,32 +1258,26 @@ function IntegrationsPanel() {
   const { activeWorkspace } = useWorkspaceStore()
   const slug = activeWorkspace?.slug ?? ""
   const {
-    githubStatus, slackStatus, slackChannels, webhooks,
+    githubStatus, slackStatus, slackChannels,
     fetchGitHubStatus, disconnectGitHub,
     fetchSlackStatus, disconnectSlack,
     fetchSlackChannels, addSlackChannel, removeSlackChannel,
-    fetchWebhooks, addWebhook, removeWebhook,
   } = useIntegrationStore()
 
   // Slack channel form
   const [channelId,   setChannelId]   = useState("")
   const [channelName, setChannelName] = useState("")
+  const [channelEvents, setChannelEvents] = useState<string[]>(["issue.created"])
   const [addingChannel, setAddingChannel] = useState(false)
   const [syncingChannel, setSyncingChannel] = useState<string | null>(null)
-
-  // Webhook form
-  const [webhookUrl,    setWebhookUrl]    = useState("")
-  const [webhookEvents, setWebhookEvents] = useState<string[]>(["issue.created"])
-  const [addingWebhook, setAddingWebhook] = useState(false)
-
-  const ALL_EVENTS = ["issue.created", "issue.updated", "issue.deleted", "cycle.completed", "comment.created"]
+  // Déconnexion en attente de confirmation (elle révoque l'accès chez le service).
+  const [confirmDisconnect, setConfirmDisconnect] = useState<"github" | "slack" | null>(null)
 
   useEffect(() => {
     if (!slug) return
     fetchGitHubStatus(slug).catch(() => null)
     fetchSlackStatus(slug).catch(() => null)
-    fetchWebhooks(slug).catch(() => null)
-  }, [slug, fetchGitHubStatus, fetchSlackStatus, fetchWebhooks])
+  }, [slug, fetchGitHubStatus, fetchSlackStatus])
 
   useEffect(() => {
     if (slug && slackStatus?.connected) {
@@ -1286,21 +1285,14 @@ function IntegrationsPanel() {
     }
   }, [slug, slackStatus?.connected, fetchSlackChannels])
 
-  async function handleDisconnectGitHub() {
+  async function handleDisconnect(provider: "github" | "slack") {
+    const name = provider === "github" ? "GitHub" : "Slack"
     try {
-      await disconnectGitHub(slug)
-      toast.success("GitHub disconnected")
-    } catch {
-      toast.error("Couldn't disconnect GitHub")
-    }
-  }
-
-  async function handleDisconnectSlack() {
-    try {
-      await disconnectSlack(slug)
-      toast.success("Slack disconnected")
-    } catch {
-      toast.error("Couldn't disconnect Slack")
+      if (provider === "github") await disconnectGitHub(slug)
+      else await disconnectSlack(slug)
+      toast.success(`${name} disconnected`)
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     }
   }
 
@@ -1308,12 +1300,12 @@ function IntegrationsPanel() {
     if (!channelId.trim() || !channelName.trim()) return
     setAddingChannel(true)
     try {
-      await addSlackChannel(slug, { channelId: channelId.trim(), channelName: channelName.trim(), eventTypes: ["issue.created"] })
+      await addSlackChannel(slug, { channelId: channelId.trim(), channelName: channelName.trim(), eventTypes: channelEvents })
       setChannelId("")
       setChannelName("")
       toast.success("Slack channel added")
-    } catch {
-      toast.error("Couldn't add the channel")
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     } finally {
       setAddingChannel(false)
     }
@@ -1324,37 +1316,17 @@ function IntegrationsPanel() {
     try {
       const r = await syncSlack(slug, chId)
       toast.success(`Ingested into the Brain OS: ${r.created} created, ${r.updated} updated`)
-    } catch {
-      toast.error("Couldn't sync this channel")
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     } finally {
       setSyncingChannel(null)
     }
   }
 
-  async function handleAddWebhook() {
-    if (!webhookUrl.trim()) return
-    setAddingWebhook(true)
-    try {
-      await addWebhook(slug, { url: webhookUrl.trim(), eventTypes: webhookEvents })
-      setWebhookUrl("")
-      toast.success("Webhook added")
-    } catch {
-      toast.error("Invalid or unreachable URL")
-    } finally {
-      setAddingWebhook(false)
-    }
-  }
-
-  function toggleEvent(event: string) {
-    setWebhookEvents((prev) =>
-      prev.includes(event) ? prev.filter((e) => e !== event) : [...prev, event]
-    )
-  }
-
   return (
     <div className="flex flex-col gap-4">
       {/* ---- Catalogue (le pool générique) ---- */}
-      <SectionCard title="Integrations catalog" description="Connect your tools to the Brain OS. Deep sync for GitHub, Slack and Plane; MCP for the rest (ⓘ help on hover).">
+      <SectionCard title="Integrations catalog" description="GitHub, Slack and Plane sync natively; any other tool connects through its MCP server.">
 
         {slug && <IntegrationsCatalog slug={slug} />}
       </SectionCard>
@@ -1374,8 +1346,8 @@ function IntegrationsPanel() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/20 bg-emerald-500/10">Connected</Badge>
-              <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDisconnectGitHub}>
+              <Badge variant="outline" className="text-xs text-ink-green border-shape-green/20 bg-shape-green/10">Connected</Badge>
+              <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setConfirmDisconnect("github")}>
                 Disconnect
               </Button>
             </div>
@@ -1399,8 +1371,8 @@ function IntegrationsPanel() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/20 bg-emerald-500/10">Connected</Badge>
-                <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDisconnectSlack}>
+                <Badge variant="outline" className="text-xs text-ink-green border-shape-green/20 bg-shape-green/10">Connected</Badge>
+                <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setConfirmDisconnect("slack")}>
                   Disconnect
                 </Button>
               </div>
@@ -1417,7 +1389,7 @@ function IntegrationsPanel() {
                 <div key={ch.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
                   <div>
                     <p className="text-sm font-medium text-foreground">#{ch.channelName}</p>
-                    <p className="text-xs text-muted-foreground">{ch.eventTypes.join(", ")}</p>
+                    <p className="text-xs text-muted-foreground">{ch.eventTypes.length === 0 ? "All events" : ch.eventTypes.join(", ")}</p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <Button
@@ -1461,74 +1433,28 @@ function IntegrationsPanel() {
                   {addingChannel ? "Adding…" : "Add"}
                 </Button>
               </div>
+              <EventPicker value={channelEvents} onChange={setChannelEvents} />
             </div>
           </div>
         </SectionCard>
       )}
 
-      {/* ---- Webhooks ---- */}
-      <SectionCard title="Webhooks" description="Receive HTTP POST events for workspace activity.">
-        <div className="flex flex-col gap-3">
-          {webhooks.length > 0 && (
-            <div className="flex flex-col gap-2 mb-1">
-              {webhooks.map((wh) => (
-                <div key={wh.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
-                  <div className="min-w-0 mr-2">
-                    <p className="text-sm font-mono text-foreground truncate">{wh.url}</p>
-                    <p className="text-xs text-muted-foreground">{wh.eventTypes.join(", ")}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {wh.lastStatus && (
-                      <Badge variant="outline" className={cn("text-xs", wh.lastStatus < 300 ? "text-emerald-400 border-emerald-500/20" : "text-destructive border-destructive/20")}>
-                        {wh.lastStatus}
-                      </Badge>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                      onClick={async () => {
-                        try { await removeWebhook(slug, wh.id); toast.success("Webhook removed") }
-                        catch { toast.error("Couldn't remove the webhook") }
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex gap-2">
-            <StyledInput
-              type="url"
-              placeholder="https://example.com/webhook"
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-            />
-            <Button size="sm" className="h-control text-xs shrink-0" disabled={!webhookUrl || addingWebhook} onClick={handleAddWebhook}>
-              {addingWebhook ? "Adding…" : "Add webhook"}
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {ALL_EVENTS.map((event) => (
-              <button
-                key={event}
-                type="button"
-                onClick={() => toggleEvent(event)}
-                className={cn(
-                  "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
-                  webhookEvents.includes(event)
-                    ? "border-primary/50 bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground hover:border-primary/30"
-                )}
-              >
-                {event}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* ---- Webhooks sortants (OSS-6.2) ---- */}
+      <SectionCard title="Webhooks" description="Send workspace events to n8n, Zapier, Make or your own endpoint.">
+        {slug && <WebhooksPanel slug={slug} />}
       </SectionCard>
+
+      <DisconnectConfirmDialog
+        open={confirmDisconnect !== null}
+        onOpenChange={(open) => { if (!open) setConfirmDisconnect(null) }}
+        name={confirmDisconnect === "slack" ? "Slack" : "GitHub"}
+        consequence={DISCONNECT_CONSEQUENCES[confirmDisconnect ?? "github"]}
+        onConfirm={() => {
+          const provider = confirmDisconnect
+          setConfirmDisconnect(null)
+          if (provider) handleDisconnect(provider)
+        }}
+      />
     </div>
   )
 }
@@ -1567,7 +1493,6 @@ function PrivacyPanel() {
           <li>• <strong className="text-foreground">Account</strong>: name, email, profile picture</li>
           <li>• <strong className="text-foreground">Workspace activity</strong>: issues, projects, comments, pages</li>
           <li>• <strong className="text-foreground">Authentication tokens</strong>: stored in your browser&apos;s local storage (never shared)</li>
-          <li>• <strong className="text-foreground">Billing</strong>: subscription plan status (card details are held by Stripe only)</li>
         </ul>
         <p className="text-xs text-muted-foreground mt-3">
           Read our full{" "}
@@ -1616,7 +1541,7 @@ function PrivacyPanel() {
 }
 
 // ---------------------------------------------------------------------------
-// Usage IA Panel (conso tokens réelle du mois vs plafond du plan)
+// Usage IA Panel (conso tokens réelle du mois vs plafond de l'instance)
 // ---------------------------------------------------------------------------
 
 function MiniStat({ label, value }: Readonly<{ label: string; value: number }>) {
@@ -1630,17 +1555,8 @@ function MiniStat({ label, value }: Readonly<{ label: string; value: number }>) 
 
 function UsagePanel() {
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
-  const router = useRouter()
-  const closeSettings = useSettingsStore((s) => s.closeSettings)
   const [usage, setUsage] = useState<AiUsage | null>(null)
   const [loading, setLoading] = useState(true)
-
-  // Upgrade = navigation vers la page des forfaits (pas un 2e modal par-dessus les réglages). Ferme
-  // d'abord le modal Settings si ouvert, sinon il resterait affiché par-dessus la page facturation.
-  const goToPlans = () => {
-    closeSettings()
-    if (slug) router.push(`/${slug}/billing`)
-  }
 
   useEffect(() => {
     if (!slug) return
@@ -1661,24 +1577,14 @@ function UsagePanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <SectionCard title="Cortex usage" description="Tokens used by the Cortex agent this month, and your plan's cap.">
+      <SectionCard title="Cortex usage" description="Tokens used by the Cortex agent this month, and the monthly cap of this instance, if it sets one.">
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : !usage ? (
           <p className="text-sm text-muted-foreground">Usage unavailable right now.</p>
         ) : (
           <div className="flex flex-col gap-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-foreground">Plan <span className="uppercase">{usage.plan}</span></p>
-                <p className="text-xs text-muted-foreground mt-0.5">Period {usage.period} · resets on {usage.resetAt}</p>
-              </div>
-              {usage.plan !== "BUSINESS" && usage.plan !== "ENTERPRISE" && (
-                <Button size="sm" className="h-8 text-xs gap-1.5 shrink-0" onClick={goToPlans}>
-                  <Zap className="h-3.5 w-3.5" /> View plans
-                </Button>
-              )}
-            </div>
+            <p className="text-xs text-muted-foreground">Period {usage.period} · resets on {usage.resetAt}</p>
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-sm">
@@ -1689,7 +1595,7 @@ function UsagePanel() {
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className={cn("h-full rounded-full transition-[width] duration-500", pct >= 90 ? "bg-rose-500" : pct >= 70 ? "bg-amber-500" : "bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300")}
+                  className={cn("h-full rounded-full transition-[width] duration-500", pct >= 90 ? "bg-shape-red" : pct >= 70 ? "bg-shape-yellow" : "bg-primary")}
                   style={{ width: `${unlimited ? 4 : pct}%` }}
                 />
               </div>
@@ -1702,8 +1608,8 @@ function UsagePanel() {
             </div>
 
             <p className="text-xs text-muted-foreground leading-relaxed">
-              AI cost is deliberately low (local model ≈ server cost). Caps are indicative and will be adjusted
-              with the final pricing; only AI compute will be top-up-able on demand.
+              Unlimited by default. An instance backed by a paid AI API can set a monthly cap per account
+              (AI_MONTHLY_TOKENS_PER_ACCOUNT); the count resets on the first day of each month.
             </p>
           </div>
         )}
@@ -1814,7 +1720,8 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
  * Route `/settings` - la page standalone a été RETIRÉE (redondante avec le modal Settings, monté
  * globalement dans `app-shell` et ouvrable depuis n'importe quel CTA via `useSettingsStore`). Cette
  * route se contente désormais d'OUVRIR le modal par-dessus le dashboard, en préservant le deep-link
- * `?section=` et le retour OAuth GitHub/Slack (toast + ouverture directe sur « Integrations »).
+ * `?section=` et le retour OAuth GitHub, Slack et serveurs MCP (toast + ouverture directe sur
+ * « Integrations »). Le toast se fait ici : l'URL est remplacée avant que le catalogue ne la lise.
  * Les briques (`SECTIONS`, `SettingsNav`, `SettingsPanels`, panneaux) restent exportées ci-dessus
  * et sont réutilisées par le modal.
  */
@@ -1829,9 +1736,15 @@ export default function SettingsPage() {
     const section = searchParams.get("section")
     const github = searchParams.get("github")
     const slack = searchParams.get("slack")
-    if (github === "connected") toast.success("GitHub connected successfully!")
-    if (slack === "connected") toast.success("Slack connected successfully!")
-    const target = github || slack
+    const mcp = searchParams.get("mcp")
+    // Un id par service : l'effet peut repasser avant que router.replace n'ait retiré les paramètres, un seul toast.
+    if (github === "connected") toast.success("GitHub connected successfully!", { id: "oauth-github" })
+    if (github === "error") toast.error("GitHub wasn't connected. Try again, and accept the access on GitHub.", { id: "oauth-github" })
+    if (slack === "connected") toast.success("Slack connected successfully!", { id: "oauth-slack" })
+    if (slack === "error") toast.error("Slack wasn't connected. Try again, and allow the access on Slack.", { id: "oauth-slack" })
+    if (mcp === "connected") toast.success("MCP server connected", { id: "oauth-mcp" })
+    if (mcp === "error") toast.error("The MCP server connection failed. Try again, or connect it with a token.", { id: "oauth-mcp" })
+    const target = github || slack || mcp
       ? "integrations"
       : section && SECTIONS.some((s) => s.key === section)
         ? section

@@ -88,7 +88,7 @@ export function CardShell({
             <button
               type="button"
               {...(dragAttributes ?? {})}
-              aria-label={`Déplacer la carte ${title}`}
+              aria-label={`Move the ${title} card`}
               className="-ml-1 shrink-0 cursor-grab rounded text-muted-foreground/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
             >
               <GripVertical className="size-3.5" />
@@ -104,7 +104,7 @@ export function CardShell({
               variant="ghost"
               size="icon"
               className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-              aria-label="Options de la carte"
+              aria-label="Card options"
               // Ne pas démarrer un drag depuis le bouton de menu.
               onPointerDown={(e) => e.stopPropagation()}
             >
@@ -146,7 +146,7 @@ export function CardShell({
             </DropdownMenuSub>
 
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 text-xs text-rose-500 focus:text-rose-500" onClick={onRemove}>
+            <DropdownMenuItem className="gap-2 text-xs text-destructive focus:text-destructive" onClick={onRemove}>
               <Trash2 className="size-3.5" /> Remove
             </DropdownMenuItem>
           </DropdownMenuContent>

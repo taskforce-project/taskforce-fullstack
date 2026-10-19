@@ -1,11 +1,14 @@
 package com.taskforce.tf_api.core.service.mcp;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -13,15 +16,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.taskforce.tf_api.core.enums.PlanFeature;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.ConnectorConnection;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
-import com.taskforce.tf_api.core.service.PlanFeatureService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
+import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -36,13 +37,15 @@ import lombok.extern.slf4j.Slf4j;
  * ces outils externes avec les outils internes.
  *
  * <p>Un connecteur du workspace est considéré « serveur MCP » si sa config (déchiffrée) porte un champ
- * {@code mcpUrl} (+ {@code mcpToken} optionnel, relayé en pass-through). La découverte fait un
+ * {@code mcpUrl} (+ {@code mcpToken} optionnel, relayé en {@code Authorization: Bearer} ou dans l'en-tête
+ * {@code mcpHeader}). Sa clé est celle d'un préréglage du catalogue, ou {@code custom-<slug>} pour un serveur
+ * ajouté à la main, dont le nom est gardé dans {@code mcpName} (ADR-020). La découverte fait un
  * {@code initialize}+{@code tools/list} par serveur ; le résultat est <b>mis en cache (TTL court)</b>.
  * Un serveur en échec est <b>ignoré</b> (log) sans casser l'agent.
  *
- * <p><b>Gating</b> : les outils externes ne sont exposés que si le plan du <b>propriétaire</b> du
- * workspace couvre {@link PlanFeature#INTEGRATIONS} (BUSINESS+). {@link #execute} sert le bouton
- * d'approbation humaine des écritures externes (l'agent <i>propose</i>, l'utilisateur <i>valide</i>).
+ * <p>Les outils externes sont exposés à tout workspace, sans condition de plan (ADR-016). {@link #execute}
+ * sert le bouton d'approbation humaine des écritures externes (l'agent <i>propose</i>, l'utilisateur
+ * <i>valide</i>) ; les écritures sont réservées aux propriétaires et administrateurs (OSS-1.5).
  */
 @Service
 @RequiredArgsConstructor
@@ -54,11 +57,34 @@ public class WorkspaceMcpService {
     static final String CONFIG_TOKEN = "mcpToken";
     /** Allow-list optionnelle (CSV de noms d'outils d'origine) : si présente, seuls ces outils sont exposés. */
     static final String CONFIG_ALLOW = "mcpAllow";
+    /** Nom affiché d'un serveur personnalisé. */
+    static final String CONFIG_NAME = "mcpName";
+    /** En-tête qui porte {@code mcpToken} tel quel (ex. {@code X-API-Key}) ; absent = {@code Authorization: Bearer}. */
+    static final String CONFIG_HEADER = "mcpHeader";
+    /** Clé demandée par le client pour un nouveau serveur personnalisé ; la clé définitive dérive du nom. */
+    public static final String NEW_CUSTOM_KEY = "custom";
+    private static final String CUSTOM_PREFIX = "custom-";
+    private static final Pattern CUSTOM_KEY = Pattern.compile("custom-[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?");
+    private static final int MAX_NAME = 60;
+    private static final int MAX_SLUG = 32;
+    private static final Pattern HEADER_NAME = Pattern.compile("[A-Za-z0-9-]{1,64}");
+    /** En-têtes que le transport pose lui-même, ou que le client HTTP du JDK refuse. */
+    private static final Set<String> RESERVED_HEADERS = Set.of("accept", "connection", "content-length",
+        "content-type", "expect", "host", "keep-alive", "mcp-protocol-version", "mcp-session-id", "te", "trailer",
+        "transfer-encoding", "upgrade");
     /** Séparateur de namespace des outils externes : {@code <connecteur>__<outil>}. */
     static final String NS = "__";
 
     /** Statut d'un serveur MCP connecté (pour l'UI de gestion des connexions). */
-    public record McpServerStatus(String connectorKey, String url, boolean reachable, List<String> tools, String error) {}
+    public record McpServerStatus(String connectorKey, String name, String url, boolean reachable,
+                                  List<String> tools, String error) {}
+
+    /** Serveur MCP enregistré sur le workspace, lu sans appel réseau (pour le catalogue). {@code name} : serveur
+     *  personnalisé seulement. */
+    public record ConnectedServer(String connectorKey, String name, String url) {}
+
+    /** Clé et nom sous lesquels enregistrer un serveur ({@code name} nul pour un préréglage). */
+    public record ServerIdentity(String connectorKey, String name) {}
 
     /**
      * Outil MCP <b>riche</b> (schéma d'arguments inclus) — alimente la console d'actions (TF-MCP-06).
@@ -69,11 +95,10 @@ public class WorkspaceMcpService {
                               com.fasterxml.jackson.databind.JsonNode inputSchema, boolean readOnly) {}
 
     private final ConnectorConnectionRepository repository;
-    private final WorkspaceRepository workspaceRepository;
-    private final PlanFeatureService planFeatureService;
     private final McpClient client;
     private final ObjectMapper objectMapper;
     private final McpTokenService tokenService; // OAuth (TF-MCP-02) : access token géré + refresh auto
+    private final ConnectorCatalog catalog;
 
     @Value("${integrations.mcp.tools-cache-ttl-ms:60000}")
     private long cacheTtlMs;
@@ -84,8 +109,7 @@ public class WorkspaceMcpService {
 
     /**
      * Outils externes (MCP) disponibles pour le workspace du contexte. Jamais {@code null} ; liste
-     * vide si le plan ne couvre pas les intégrations, si aucun serveur MCP n'est connecté, ou si tous
-     * sont injoignables. Résultat caché (TTL).
+     * vide si aucun serveur MCP n'est connecté ou si tous sont injoignables. Résultat caché (TTL).
      */
     public List<AgentTool> toolsFor(AgentContext ctx) {
         Long wsId = ctx.workspaceId();
@@ -94,9 +118,21 @@ public class WorkspaceMcpService {
         if (cached != null && cached.expiresAt() > now) {
             return cached.tools();
         }
-        List<AgentTool> tools = entitled(ctx.slug()) ? discover(wsId) : List.of();
+        List<AgentTool> tools = discover(wsId);
         cache.put(wsId, new Cached(now + cacheTtlMs, tools));
         return tools;
+    }
+
+    /** Serveurs MCP enregistrés sur le workspace (connecteurs portant un {@code mcpUrl}), sans les sonder. */
+    @Transactional(readOnly = true)
+    public List<ConnectedServer> connectedServers(Long workspaceId) {
+        List<ConnectedServer> out = new ArrayList<>();
+        for (ConnectorConnection conn : repository.findByWorkspaceId(workspaceId)) {
+            Map<String, String> config = readConfig(conn.getConfig());
+            String url = config.getOrDefault(CONFIG_URL, "").trim();
+            if (!url.isEmpty()) out.add(new ConnectedServer(conn.getConnectorKey(), config.get(CONFIG_NAME), url));
+        }
+        return out;
     }
 
     /** Invalide le cache d'un workspace (après (dé)connexion d'un serveur MCP). */
@@ -109,69 +145,150 @@ public class WorkspaceMcpService {
      * toolRef} = nom namespacé {@code <connecteur>__<outil>}. L'appartenance au workspace est vérifiée en
      * amont par le contrôleur.
      *
+     * <p>Cortex nomme l'outil par son nom exposé (assaini et borné, cf. {@link ExternalMcpTool}), la console
+     * par son nom d'origine : les deux formes sont reconnues, et le serveur est toujours appelé avec le nom
+     * d'origine. Sans cela, un outil au nom pointé ({@code issues.create}) proposé par Cortex échouait à la
+     * validation.</p>
+     *
      * <p>OSS-1.5 : un outil qui modifie des données (sans indice {@code readOnlyHint}, donc traité comme une
      * écriture) n'est exécuté que si {@code canWrite} (propriétaire ou administrateur du workspace). L'outil
      * doit aussi figurer dans l'allow-list du connecteur quand elle existe, comme pour la liste affichée.</p>
      */
     public String execute(Long workspaceId, String toolRef, Map<String, Object> args, boolean canWrite) {
         int sep = toolRef == null ? -1 : toolRef.indexOf(NS);
-        if (sep <= 0) throw new BusinessException("Référence d'outil invalide : " + toolRef);
+        if (sep <= 0) throw new BusinessException("Invalid tool reference: " + toolRef);
         String connectorKey = toolRef.substring(0, sep);
         String toolName = toolRef.substring(sep + NS.length());
 
         ConnectorConnection conn = repository.findByWorkspaceIdAndConnectorKey(workspaceId, connectorKey)
-            .orElseThrow(() -> new ResourceNotFoundException("Connecteur MCP non connecté : " + connectorKey));
+            .orElseThrow(() -> new ResourceNotFoundException("MCP connector not connected: " + connectorKey));
         McpClient.ServerRef ref = toServerRef(conn);
-        if (ref == null) throw new BusinessException("Le connecteur " + connectorKey + " n'est pas un serveur MCP (mcpUrl manquant)");
+        if (ref == null) throw new BusinessException("The connector " + connectorKey + " is not an MCP server (mcpUrl missing)");
 
+        // Allow-list (noms d'origine) : refus sans ouvrir de session si aucun outil autorisé ne porte ce nom.
         Set<String> allow = allowList(conn);
-        if (!allow.isEmpty() && !allow.contains(toolName)) {
+        if (!allow.isEmpty() && allow.stream().noneMatch(a -> refersTo(a, connectorKey, toolName, toolRef))) {
             throw new ForbiddenException("This tool is not enabled for this workspace: " + toolName);
         }
 
         McpClient.Session session = client.initialize(ref);
         try {
-            McpClient.ToolDef def = client.listTools(session).stream()
-                .filter(t -> t.name().equals(toolName))
-                .findFirst()
+            // Seuls les outils activés comptent (ceux que voit Cortex) ; à nom assaini égal, le nom d'origine
+            // identique à la référence l'emporte.
+            List<McpClient.ToolDef> candidates = client.listTools(session).stream()
+                .filter(t -> allow.isEmpty() || allow.contains(t.name()))
+                .filter(t -> refersTo(t.name(), connectorKey, toolName, toolRef))
+                .toList();
+            McpClient.ToolDef def = candidates.stream().filter(t -> t.name().equals(toolName)).findFirst()
+                .or(() -> candidates.stream().findFirst())
                 .orElseThrow(() -> new ResourceNotFoundException("MCP tool not found: " + toolName));
             if (!def.readOnly() && !canWrite) {
                 throw new ForbiddenException(
                     "Only workspace owners and admins can run an action that changes data in an external tool.");
             }
-            return client.callTool(session, toolName, args);
+            return client.callTool(session, def.name(), args);
         } finally {
             client.close(session);
         }
     }
 
+    /** Le nom d'origine {@code originalName} est-il celui que désigne la référence, brute ou exposée à Cortex ? */
+    private static boolean refersTo(String originalName, String connectorKey, String toolName, String toolRef) {
+        return originalName.equals(toolName) || ExternalMcpTool.buildName(connectorKey, originalName).equals(toolRef);
+    }
+
     /**
-     * Connecte (ou reconfigure) un serveur MCP sur le workspace : persiste {@code mcpUrl}
-     * (+ {@code mcpToken}/{@code mcpAllow} optionnels) en JSON <b>chiffré</b> et invalide le cache.
-     * Autorisation + gate plan faits en amont par le contrôleur.
+     * Clé et nom sous lesquels enregistrer un serveur MCP. Un préréglage du catalogue garde sa clé (son nom est
+     * celui du catalogue). Un serveur personnalisé exige un nom : {@link #NEW_CUSTOM_KEY} en crée un nouveau, dont
+     * la clé {@code custom-<slug>} dérive du nom (suffixée si elle est prise) ; une clé {@code custom-…} le
+     * reconfigure. Une intégration native ou toute autre clé est refusée : la première a son propre flux, la
+     * seconde ne désigne rien.
+     */
+    @Transactional(readOnly = true)
+    public ServerIdentity resolveServer(Long workspaceId, String connectorKey, String name) {
+        if (catalog.isMcpPreset(connectorKey)) return new ServerIdentity(connectorKey, null);
+        boolean isNew = NEW_CUSTOM_KEY.equals(connectorKey);
+        if (!isNew && (connectorKey == null || !CUSTOM_KEY.matcher(connectorKey).matches())) {
+            throw new BusinessException("Unknown MCP server: " + connectorKey);
+        }
+        String clean = name == null ? "" : name.strip();
+        if (clean.isEmpty()) throw new BusinessException("Give your MCP server a name");
+        if (clean.length() > MAX_NAME) {
+            throw new BusinessException("The name of an MCP server is limited to " + MAX_NAME + " characters");
+        }
+        return new ServerIdentity(isNew ? freeCustomKey(workspaceId, clean) : connectorKey, clean);
+    }
+
+    /**
+     * Connecte (ou reconfigure) un serveur MCP sur le workspace : persiste {@code mcpUrl}, le nom d'un serveur
+     * personnalisé et, au choix, un jeton relayé en {@code Authorization: Bearer} ou dans l'en-tête nommé
+     * {@code authHeader}, en JSON <b>chiffré</b>, puis invalide le cache. Autorisation faite en amont par le
+     * contrôleur. Renvoie la clé et le nom retenus.
      */
     @Transactional
-    public void connectServer(Workspace ws, String connectorKey, String mcpUrl, String mcpToken, String mcpAllow) {
-        if (mcpUrl == null || mcpUrl.isBlank()) throw new BusinessException("Champ requis : mcpUrl");
+    public ServerIdentity connectServer(Workspace ws, String connectorKey, String name, String mcpUrl,
+                                        String mcpToken, String authHeader, String mcpAllow) {
+        if (mcpUrl == null || mcpUrl.isBlank()) throw new BusinessException("Required field: mcpUrl");
         // Refus immédiat d'une URL vers le réseau interne (OSS-1.2) ; le client revérifie avant chaque appel.
         client.assertAllowed(mcpUrl.trim());
+        ServerIdentity id = resolveServer(ws.getId(), connectorKey, name);
+        String token = mcpToken == null ? "" : mcpToken.trim();
+        String header = authHeader == null ? "" : authHeader.trim();
+        if (!header.isEmpty()) {
+            if (!HEADER_NAME.matcher(header).matches() || RESERVED_HEADERS.contains(header.toLowerCase(Locale.ROOT))) {
+                throw new BusinessException("This header can't carry the token: " + header);
+            }
+            if (token.isEmpty()) throw new BusinessException("Enter the value of the " + header + " header");
+        }
+
         Map<String, String> config = new LinkedHashMap<>();
         config.put(CONFIG_URL, mcpUrl.trim());
-        if (mcpToken != null && !mcpToken.isBlank()) config.put(CONFIG_TOKEN, mcpToken.trim());
+        if (id.name() != null) config.put(CONFIG_NAME, id.name());
+        if (!token.isEmpty()) config.put(CONFIG_TOKEN, token);
+        if (!header.isEmpty()) config.put(CONFIG_HEADER, header);
         if (mcpAllow != null && !mcpAllow.isBlank()) config.put(CONFIG_ALLOW, mcpAllow.trim());
 
-        ConnectorConnection conn = repository.findByWorkspaceIdAndConnectorKey(ws.getId(), connectorKey)
-            .orElseGet(() -> ConnectorConnection.builder().workspace(ws).connectorKey(connectorKey).build());
+        ConnectorConnection conn = repository.findByWorkspaceIdAndConnectorKey(ws.getId(), id.connectorKey())
+            .orElseGet(() -> ConnectorConnection.builder().workspace(ws).connectorKey(id.connectorKey()).build());
         conn.setConfig(writeJson(config));
         repository.save(conn);
         invalidate(ws.getId());
+        return id;
+    }
+
+    /** {@code custom-<slug du nom>}, suffixé {@code -2}, {@code -3}… si un serveur du workspace l'utilise déjà. */
+    private String freeCustomKey(Long workspaceId, String name) {
+        String ascii = Normalizer.normalize(name, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        String slug = ascii.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
+        if (slug.length() > MAX_SLUG) slug = slug.substring(0, MAX_SLUG).replaceAll("-+$", "");
+        String base = CUSTOM_PREFIX + (slug.isEmpty() ? "server" : slug);
+        String key = base;
+        for (int n = 2; repository.existsByWorkspaceIdAndConnectorKey(workspaceId, key); n++) key = base + "-" + n;
+        return key;
+    }
+
+    /**
+     * Supprime les connexions sans serveur MCP : identifiants saisis dans le formulaire générique retiré au lot 6
+     * (OSS-6.1), qu'aucun code ne lisait. Toute connexion enregistrée depuis porte un {@code mcpUrl}. Une config
+     * illisible (chiffrée avec une autre clé, corrompue) est gardée : le convertisseur la rend telle quelle, et
+     * rien ne prouve alors qu'elle n'a pas de serveur.
+     */
+    @Transactional
+    public int purgeConnectionsWithoutServer() {
+        List<ConnectorConnection> stale = new ArrayList<>();
+        for (ConnectorConnection conn : repository.findAll()) {
+            Map<String, String> config = parseConfig(conn.getConfig());
+            if (config != null && config.getOrDefault(CONFIG_URL, "").isBlank()) stale.add(conn);
+        }
+        repository.deleteAll(stale);
+        return stale.size();
     }
 
     /** Déconnecte un serveur MCP du workspace (supprime la ligne connecteur) + invalide le cache. */
     @Transactional
     public void disconnectServer(Long workspaceId, String connectorKey) {
         if (!repository.existsByWorkspaceIdAndConnectorKey(workspaceId, connectorKey)) {
-            throw new ResourceNotFoundException("Serveur MCP non connecté : " + connectorKey);
+            throw new ResourceNotFoundException("MCP server not connected: " + connectorKey);
         }
         repository.deleteByWorkspaceIdAndConnectorKey(workspaceId, connectorKey);
         invalidate(workspaceId);
@@ -187,11 +304,6 @@ public class WorkspaceMcpService {
         }
     }
 
-    /** Le propriétaire du workspace a-t-il un plan couvrant les intégrations (BUSINESS+) ? */
-    private boolean entitled(String slug) {
-        PlanType plan = workspaceRepository.findOwnerPlanBySlug(slug).orElse(PlanType.FREE);
-        return planFeatureService.has(plan, PlanFeature.INTEGRATIONS);
-    }
 
     private List<AgentTool> discover(Long workspaceId) {
         List<AgentTool> tools = new ArrayList<>();
@@ -231,6 +343,7 @@ public class WorkspaceMcpService {
             McpClient.ServerRef ref = toServerRef(conn);
             if (ref == null) continue;
             Set<String> allow = allowList(conn);
+            String name = readConfig(conn.getConfig()).get(CONFIG_NAME);
             try {
                 McpClient.Session session = client.initialize(ref);
                 try {
@@ -238,12 +351,12 @@ public class WorkspaceMcpService {
                         .map(McpClient.ToolDef::name)
                         .filter(n -> allow.isEmpty() || allow.contains(n))
                         .toList();
-                    out.add(new McpServerStatus(ref.connectorKey(), ref.serverUrl(), true, names, null));
+                    out.add(new McpServerStatus(ref.connectorKey(), name, ref.serverUrl(), true, names, null));
                 } finally {
                     client.close(session);
                 }
             } catch (Exception e) {
-                out.add(new McpServerStatus(ref.connectorKey(), ref.serverUrl(), false, List.of(), e.getMessage()));
+                out.add(new McpServerStatus(ref.connectorKey(), name, ref.serverUrl(), false, List.of(), e.getMessage()));
             }
         }
         return out;
@@ -256,9 +369,9 @@ public class WorkspaceMcpService {
      */
     public List<McpToolInfo> serverTools(Long workspaceId, String connectorKey) {
         ConnectorConnection conn = repository.findByWorkspaceIdAndConnectorKey(workspaceId, connectorKey)
-            .orElseThrow(() -> new ResourceNotFoundException("Connecteur MCP non connecté : " + connectorKey));
+            .orElseThrow(() -> new ResourceNotFoundException("MCP connector not connected: " + connectorKey));
         McpClient.ServerRef ref = toServerRef(conn);
-        if (ref == null) throw new BusinessException("Le connecteur " + connectorKey + " n'est pas un serveur MCP (mcpUrl manquant)");
+        if (ref == null) throw new BusinessException("The connector " + connectorKey + " is not an MCP server (mcpUrl missing)");
         Set<String> allow = allowList(conn);
         McpClient.Session session = client.initialize(ref);
         try {
@@ -290,23 +403,33 @@ public class WorkspaceMcpService {
         Map<String, String> config = readConfig(conn.getConfig());
         String url = config.getOrDefault(CONFIG_URL, "").trim();
         if (url.isEmpty()) return null;
-        // OAuth (TF-MCP-02) : access token géré (refresh auto) ; sinon token collé (bring-your-own).
+        // OAuth (TF-MCP-02) : access token géré (refresh auto), en Bearer ; sinon jeton collé, en Bearer ou dans
+        // l'en-tête choisi.
         String token;
+        String header = null;
         if (tokenService.isOAuth(config)) {
             token = tokenService.validAccessToken(conn);
         } else {
             String pasted = config.getOrDefault(CONFIG_TOKEN, "").trim();
             token = pasted.isEmpty() ? null : pasted;
+            String named = config.getOrDefault(CONFIG_HEADER, "").trim();
+            header = named.isEmpty() ? null : named;
         }
-        return new McpClient.ServerRef(conn.getConnectorKey(), url, token);
+        return new McpClient.ServerRef(conn.getConnectorKey(), url, token, header);
     }
 
     private Map<String, String> readConfig(String json) {
+        Map<String, String> config = parseConfig(json);
+        return config != null ? config : Map.of();
+    }
+
+    /** Config lue, ou {@code null} si elle ne se lit pas (à distinguer d'une config vide). */
+    private Map<String, String> parseConfig(String json) {
         if (json == null || json.isBlank()) return Map.of();
         try {
             return objectMapper.readValue(json, new TypeReference<Map<String, String>>() {});
         } catch (Exception ex) {
-            return Map.of();
+            return null;
         }
     }
 }

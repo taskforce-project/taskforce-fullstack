@@ -19,7 +19,8 @@ import lombok.RequiredArgsConstructor;
  * Outil interne (TF-MCP-03, Pilier 3) : cherche une intégration dans le catalogue TaskForce par nom
  * ou mot-clé, et dit si elle est <b>déjà connectée</b>, <b>disponible mais à connecter</b>, ou
  * <b>absente</b>. Permet à l'agent de <b>guider vers la connexion</b> (« connecte X ») au lieu de
- * prétendre l'absence d'accès ou d'inventer. Générique : piloté par le catalogue, aucun service en dur.
+ * prétendre l'absence d'accès ou d'inventer. Un outil absent du catalogue se branche encore par son
+ * propre serveur MCP (ADR-020) : la réponse le dit.
  */
 @Component
 @RequiredArgsConstructor
@@ -32,17 +33,17 @@ public class FindIntegrationTool implements AgentTool {
     @Override public String name() { return "find_integration"; }
 
     @Override public String description() {
-        return "Cherche une intégration dans le catalogue TaskForce (par nom ou mot-clé : « stripe », "
-            + "« paiement », « github »…). Dit si elle est déjà connectée, disponible (à connecter), ou "
-            + "absente. À utiliser AVANT d'affirmer que tu n'as pas accès à un système : il suffit peut-être "
-            + "que l'utilisateur le connecte.";
+        return "Looks up an integration in the TaskForce catalog (by name or keyword: \"stripe\", "
+            + "\"payments\", \"github\"...). Says whether it is already connected, available (to connect), or "
+            + "missing. Use it BEFORE saying you have no access to a system: the user may only need to "
+            + "connect it.";
     }
 
     @Override public Map<String, Object> parametersSchema() {
         return Map.of(
             "type", "object",
             "properties", Map.of(
-                "query", Map.of("type", "string", "description", "Nom ou mot-clé du service recherché")
+                "query", Map.of("type", "string", "description", "Name or keyword of the service")
             ),
             "required", List.of("query")
         );
@@ -50,7 +51,7 @@ public class FindIntegrationTool implements AgentTool {
 
     @Override public String execute(Map<String, Object> args, AgentContext ctx) {
         String query = args.get("query") != null ? String.valueOf(args.get("query")).trim().toLowerCase() : "";
-        if (query.isEmpty()) return "Précise le service recherché (ex. « stripe », « paiement »).";
+        if (query.isEmpty()) return "Name the service you are looking for (e.g. \"stripe\", \"payments\").";
 
         IntegrationCatalogResponse catalog = catalogService.getCatalog(ctx.slug(), ctx.userId());
         List<String> hits = new ArrayList<>();
@@ -58,7 +59,7 @@ public class FindIntegrationTool implements AgentTool {
             for (ConnectorView c : group.tools()) {
                 if (matches(c, group, query)) {
                     hits.add("- " + c.name() + " (" + group.label() + ") : "
-                        + (c.connected() ? "déjà connecté" : "disponible, NON connecté"));
+                        + (c.connected() ? "already connected" : "available, NOT connected"));
                     if (hits.size() >= MAX_HITS) break;
                 }
             }
@@ -66,12 +67,13 @@ public class FindIntegrationTool implements AgentTool {
         }
 
         if (hits.isEmpty()) {
-            return "Aucune intégration ne correspond à « " + query + " » dans le catalogue TaskForce. "
-                + "Dis-le franchement à l'utilisateur : pas d'intégration pour ça pour l'instant.";
+            return "No integration matches \"" + query + "\" in the TaskForce catalog. "
+                + "Tell the user plainly, and add that any tool with an MCP server can still be connected: "
+                + "Settings > Integrations > Connect an MCP server.";
         }
-        StringBuilder sb = new StringBuilder("Intégrations correspondant à « " + query + " » :");
+        StringBuilder sb = new StringBuilder("Integrations matching \"" + query + "\":");
         for (String h : hits) sb.append("\n").append(h);
-        sb.append("\nPour en connecter une : Réglages > Intégrations.");
+        sb.append("\nTo connect one: Settings > Integrations.");
         return sb.toString();
     }
 

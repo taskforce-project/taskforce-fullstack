@@ -11,20 +11,20 @@ import lombok.Data;
 @Data
 public class CreateProjectRequest {
 
-    @NotBlank(message = "Le nom du projet est obligatoire")
-    @Size(min = 1, max = 150, message = "Le nom doit contenir entre 1 et 150 caractères")
+    @NotBlank(message = "The project name is required")
+    @Size(min = 1, max = 150, message = "The name must be 1 to 150 characters long")
     private String name;
 
     /**
      * Identifiant court unique dans le workspace (ex: "WEB", "API-V2").
      * Lettres majuscules, chiffres et tirets, 2–10 caractères.
      */
-    @NotBlank(message = "L'identifiant est obligatoire")
-    @Size(min = 2, max = 10, message = "L'identifiant doit contenir entre 2 et 10 caractères")
-    @Pattern(regexp = "^[A-Z0-9][A-Z0-9-]*$", message = "L'identifiant ne peut contenir que des lettres majuscules, chiffres et tirets")
+    @NotBlank(message = "The identifier is required")
+    @Size(min = 2, max = 10, message = "The identifier must be 2 to 10 characters long")
+    @Pattern(regexp = "^[A-Z0-9][A-Z0-9-]*$", message = "The identifier can only contain uppercase letters, digits and hyphens")
     private String identifier;
 
-    @Size(max = 1000, message = "La description ne peut pas dépasser 1000 caractères")
+    @Size(max = 1000, message = "The description can't exceed 1000 characters")
     private String description;
 
     /** true = visible par tous les membres du workspace, false = membres explicites seulement */
@@ -33,7 +33,7 @@ public class CreateProjectRequest {
     /** URL de l'icône/logo (image uploadée, emoji unicode ou lucide:IconName). Optionnel. */
     private String iconUrl;
 
-    /** Couleur d'accent (classe Tailwind, ex: "bg-violet-500"). Optionnel. */
-    @Size(max = 50, message = "La couleur ne peut pas dépasser 50 caractères")
+    /** Couleur d'accent (classe Tailwind, ex: "bg-shape-blue"). Optionnel. */
+    @Size(max = 50, message = "The color can't exceed 50 characters")
     private String color;
 }

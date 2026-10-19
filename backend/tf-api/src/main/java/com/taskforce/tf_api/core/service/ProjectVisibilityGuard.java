@@ -48,7 +48,7 @@ public class ProjectVisibilityGuard {
     /** Lève {@link ResourceNotFoundException} (→ 404) si l'utilisateur ne peut pas voir le projet. */
     public void assertCanView(Project project, Long userId) {
         if (!canView(project, userId)) {
-            throw new ResourceNotFoundException("Projet introuvable");
+            throw new ResourceNotFoundException("Project not found");
         }
     }
 
@@ -79,7 +79,7 @@ public class ProjectVisibilityGuard {
     public void assertCanWrite(Project project, Long userId) {
         assertCanView(project, userId); // 404 si invisible (projet privé) — avant même de parler de rôle
         if (!canWrite(project, userId)) {
-            throw new BusinessException("Droits insuffisants pour modifier ce projet (rôle lecture seule).");
+            throw new BusinessException("You don't have the rights to edit this project (read-only role).");
         }
     }
 

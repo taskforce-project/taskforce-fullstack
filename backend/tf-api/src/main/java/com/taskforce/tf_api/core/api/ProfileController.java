@@ -42,7 +42,7 @@ public class ProfileController {
     ) {
         Long userId = resolveUserId(jwt);
         ProfileResponse profile = profileService.getProfile(slug, userId);
-        return ResponseEntity.ok(ApiResponse.success("Profil récupéré", profile));
+        return ResponseEntity.ok(ApiResponse.success("Profile retrieved", profile));
     }
 
     // -------------------------------------------------------------------------
@@ -50,7 +50,7 @@ public class ProfileController {
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

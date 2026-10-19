@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { ProjectMembersManager } from "@/components/projects/project-members-manager"
+import { ProjectRepositoryCard } from "@/components/projects/project-repository-card"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import {
   Select,
@@ -100,7 +101,7 @@ export default function ProjectSettingsPage() {
 
   // Labels state
   const [newLabelName,  setNewLabelName]  = useState("")
-  const [newLabelColor, setNewLabelColor] = useState("#6366f1")
+  const [newLabelColor, setNewLabelColor] = useState("#2f6bf6")
   const [newLabelDesc,  setNewLabelDesc]  = useState("")
   const [addingLabel,   setAddingLabel]   = useState(false)
   const [editingLabelId, setEditingLabelId] = useState<number | null>(null)
@@ -181,7 +182,7 @@ export default function ProjectSettingsPage() {
       await addLabel(workspace, projectId, { name: newLabelName.trim(), color: newLabelColor, description: newLabelDesc.trim() || undefined })
       // On ne vide les champs qu'en cas de succès (sinon on perd la saisie sur un échec).
       setNewLabelName("")
-      setNewLabelColor("#6366f1")
+      setNewLabelColor("#2f6bf6")
       setNewLabelDesc("")
       toast.success("Label created")
     } catch (e) {
@@ -243,7 +244,7 @@ export default function ProjectSettingsPage() {
             onClick={() => setSection("danger")}
             className={cn(
               "flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-              section === "danger" ? "bg-red-500/10 font-medium text-red-400" : "text-muted-foreground hover:bg-red-500/5 hover:text-red-400",
+              section === "danger" ? "bg-destructive/10 font-medium text-destructive" : "text-muted-foreground hover:bg-destructive/5 hover:text-destructive",
             )}
           >
             <AlertTriangle className="size-4 shrink-0" /> Danger zone
@@ -317,12 +318,12 @@ export default function ProjectSettingsPage() {
               <SelectContent>
                 <SelectItem value="ACTIVE">
                   <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />Active
+                    <span className="h-2 w-2 rounded-full bg-shape-green inline-block" />Active
                   </span>
                 </SelectItem>
                 <SelectItem value="PAUSED">
                   <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-amber-500 inline-block" />Paused
+                    <span className="h-2 w-2 rounded-full bg-shape-yellow inline-block" />Paused
                   </span>
                 </SelectItem>
                 <SelectItem value="ARCHIVED">
@@ -394,7 +395,7 @@ export default function ProjectSettingsPage() {
                 placeholder="Description (optional)"
               />
               <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleSaveEditLabel(l.id)} title="Save">
-                <Check className="h-3.5 w-3.5 text-emerald-400" />
+                <Check className="h-3.5 w-3.5 text-ink-green" />
               </Button>
               <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingLabelId(null)} title="Cancel">
                 <X className="h-3.5 w-3.5 text-muted-foreground" />
@@ -419,7 +420,7 @@ export default function ProjectSettingsPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 w-7 p-0 shrink-0 hover:text-red-400"
+                className="h-7 w-7 p-0 shrink-0 hover:text-destructive"
                 onClick={() => handleDeleteLabel(l.id)}
                 title="Delete"
               >
@@ -459,10 +460,12 @@ export default function ProjectSettingsPage() {
       </section>
       )}
 
-      {/* ── Integrations → gérées au niveau workspace ── */}
+      {/* ── Integrations : le dépôt de code du projet, puis les intégrations (gérées au niveau workspace) ── */}
       {section === "integrations" && (
       <section>
-        <SectionTitle icon={GitBranch} title="Integrations" description="Managed once for the whole workspace" />
+        <SectionTitle icon={GitBranch} title="Integrations" description="This project's code repository, and the tools connected to the workspace" />
+        <div className="flex flex-col gap-4">
+        <ProjectRepositoryCard workspace={workspace} projectId={projectId} />
         <div className="flex flex-col items-start gap-4 rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             {["github", "slack", "linear", "notion", "figma"].map((k) => (
@@ -470,14 +473,15 @@ export default function ProjectSettingsPage() {
                 <BrandLogo slug={k} name={k} className="size-full" />
               </div>
             ))}
-            <span className="ml-1 text-xs text-muted-foreground">+40 others</span>
+            <span className="ml-1 text-xs text-muted-foreground">and any MCP server</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            GitHub, Slack and all connectors plug in at the <span className="font-medium text-foreground">workspace</span> level, then apply to this project - a single place to manage.
+            GitHub, Slack, Plane and MCP servers connect at the <span className="font-medium text-foreground">workspace</span> level, then apply to this project: a single place to manage them.
           </p>
           <Button className="gap-2" onClick={() => openSettings("integrations")}>
             <Plug className="size-4" /> Manage integrations
           </Button>
+        </div>
         </div>
       </section>
       )}
@@ -485,11 +489,11 @@ export default function ProjectSettingsPage() {
       {/* ── Danger Zone ── */}
       {section === "danger" && (
       <section>
-        <div className="rounded-xl border border-red-500/30 bg-red-500/5 overflow-hidden">
-          <div className="px-4 py-3 border-b border-red-500/20">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 overflow-hidden">
+          <div className="px-4 py-3 border-b border-destructive/20">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-400" />
-              <h2 className="text-sm font-semibold text-red-400">Danger zone</h2>
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <h2 className="text-sm font-semibold text-destructive">Danger zone</h2>
             </div>
           </div>
           <div className="p-4 flex flex-col gap-4">
@@ -503,7 +507,7 @@ export default function ProjectSettingsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="shrink-0 gap-2 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                className="shrink-0 gap-2 border-shape-yellow/30 text-ink-yellow hover:bg-shape-yellow/10"
                 onClick={handleArchive}
               >
                 <Archive className="h-3.5 w-3.5" />
@@ -511,7 +515,7 @@ export default function ProjectSettingsPage() {
               </Button>
             </div>
 
-            <Separator className="bg-red-500/10" />
+            <Separator className="bg-destructive/10" />
 
             {/* Delete */}
             <div className="flex items-center justify-between gap-4">
@@ -528,7 +532,7 @@ export default function ProjectSettingsPage() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2 text-red-400">
+                    <DialogTitle className="flex items-center gap-2 text-destructive">
                       <AlertTriangle className="h-5 w-5" />
                       Delete project
                     </DialogTitle>

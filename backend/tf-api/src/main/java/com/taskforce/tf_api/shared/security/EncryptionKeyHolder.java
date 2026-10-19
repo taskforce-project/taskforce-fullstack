@@ -37,11 +37,11 @@ public class EncryptionKeyHolder {
 
         if (absente && production) {
             throw new IllegalStateException("""
-                Chiffrement au repos impossible : « security.encryption-key » est vide alors que le \
-                profil « prod » est actif. Renseigner TF_ENCRYPTION_KEY (phrase secrète longue et \
-                aléatoire, cf. .env.prod.example). Démarrer sans clé écrirait les jetons OAuth et les \
-                identifiants de connecteurs EN CLAIR en base, sans aucune erreur : l'échec au \
-                démarrage est délibéré.""");
+                Encryption at rest is impossible: security.encryption-key is empty while the prod \
+                profile is active. Set TF_ENCRYPTION_KEY (a long random passphrase, see \
+                .env.prod.example). Starting without a key would store OAuth tokens and connector \
+                credentials IN PLAIN TEXT in the database, without any error: failing at startup is \
+                deliberate.""");
         }
 
         EncryptedStringConverter.configure(encryptionKey);
@@ -50,11 +50,11 @@ public class EncryptionKeyHolder {
         // Sans cette trace, une clé absente ne se manifeste nulle part et les écritures partent en
         // clair sans le moindre signal — c'est précisément le défaut trouvé le 24/07/2026.
         if (absente) {
-            log.warn("Chiffrement au repos INACTIF : « security.encryption-key » est vide. "
-                + "Les colonnes sensibles seront écrites EN CLAIR. Acceptable en développement, "
-                + "impossible en production — où l'absence de clé empêche désormais le démarrage.");
+            log.warn("Encryption at rest is OFF: security.encryption-key is empty. "
+                + "Sensitive columns are stored IN PLAIN TEXT. Acceptable in development, "
+                + "never in production, where a missing key stops the startup.");
         } else {
-            log.info("Chiffrement au repos actif (AES-256-GCM).");
+            log.info("Encryption at rest is on (AES-256-GCM).");
         }
     }
 }

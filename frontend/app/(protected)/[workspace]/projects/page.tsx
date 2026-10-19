@@ -56,6 +56,7 @@ import { useProjectStore } from "@/lib/store/project-store"
 import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { getProjectsHealthHistory, getWorkspaceProjectsActivity } from "@/lib/api/project-service"
 import type { Project } from "@/lib/api/project-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 /** Activité par projet : `projectId` → nombre d'issues créées par jour (série continue). */
 type ActivityMap = ReadonlyMap<number, readonly number[]>
@@ -88,12 +89,12 @@ function deriveHealth(project: Project): HealthLevel {
 function deriveVelocity(project: Project): number | null {
   if (project.totalIssues === 0) return null
   const completedIssues = project.totalIssues - project.openIssues
-  const ageWeeks = Math.max(1, (Date.now() - new Date(project.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 7))
+  const ageWeeks = Math.max(1, (Date.now() - parseServerDate(project.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 7))
   const rate = completedIssues / ageWeeks
   const target = (project.totalIssues / 10) * 2
   if (target === 0) return null
   const pct = Math.round(((rate - target) / target) * 100)
-  const daysSinceUpdate = (Date.now() - new Date(project.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+  const daysSinceUpdate = (Date.now() - parseServerDate(project.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
   if (daysSinceUpdate > 7 && pct > 0) return 0
   return Math.max(-99, Math.min(99, pct))
 }
@@ -102,7 +103,7 @@ function deriveRiskSignal(project: Project): string | null {
   const health = deriveHealth(project)
   if (health === "healthy" || health === "paused") return null
   const ratio = project.totalIssues > 0 ? project.openIssues / project.totalIssues : 0
-  const daysSinceUpdate = (Date.now() - new Date(project.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+  const daysSinceUpdate = (Date.now() - parseServerDate(project.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
   if (ratio > 0.85) return `${Math.round(ratio * 100)}% of issues still open`
   if (daysSinceUpdate > 14) return `No updates in ${Math.round(daysSinceUpdate)} days`
   if (daysSinceUpdate > 7) return "No updates in 7+ days"
@@ -117,9 +118,9 @@ function progressPct(project: Project): number {
 }
 
 const HEALTH_META: Record<HealthLevel, { label: string; dot: string }> = {
-  healthy:   { label: "Healthy",  dot: "bg-emerald-500" },
-  "at-risk": { label: "At risk",  dot: "bg-amber-500" },
-  critical:  { label: "Critical", dot: "bg-rose-500" },
+  healthy:   { label: "Healthy",  dot: "bg-shape-green" },
+  "at-risk": { label: "At risk",  dot: "bg-shape-yellow" },
+  critical:  { label: "Critical", dot: "bg-shape-red" },
   paused:    { label: "Paused",   dot: "bg-muted-foreground" },
 }
 
@@ -145,7 +146,7 @@ function VelocityCell({ delta }: { readonly delta: number | null }) {
   }
   const positive = delta > 0
   return (
-    <span className={cn("inline-flex items-center gap-1 text-xs font-medium tabular-nums", positive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+    <span className={cn("inline-flex items-center gap-1 text-xs font-medium tabular-nums", positive ? "text-ink-green" : "text-destructive")}>
       {positive ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
       {positive ? "+" : ""}{delta}%
     </span>
@@ -225,17 +226,17 @@ function StatsStrip({
     <SectionCard title="Overview" bodyClassName="p-0">
       <MetricSplit>
         <Metric label="Total operations" value={total} />
-        <Metric label="Active" value={active} valueClassName="text-emerald-600 dark:text-emerald-400" />
+        <Metric label="Active" value={active} valueClassName="text-ink-green" />
         <Metric
           label="At risk"
           value={atRisk}
-          valueClassName={atRisk > 0 ? "text-amber-600 dark:text-amber-400" : undefined}
+          valueClassName={atRisk > 0 ? "text-ink-yellow" : undefined}
           chart={history.length > 0 ? riskTrend("red", "atRisk") : undefined}
         />
         <Metric
           label="Critical"
           value={critical}
-          valueClassName={critical > 0 ? "text-rose-600 dark:text-rose-400" : undefined}
+          valueClassName={critical > 0 ? "text-destructive" : undefined}
           chart={history.length > 0 ? riskTrend("red", "critical") : undefined}
         />
         <Metric label="Avg progress" value={`${avgProgress}%`} />
@@ -288,7 +289,7 @@ function OperationRow({
       <TableCell className="hidden md:table-cell">
         {riskSignal ? (
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-            <AlertTriangle className="size-3 shrink-0 text-amber-500" />
+            <AlertTriangle className="size-3 shrink-0 text-ink-yellow" />
             {riskSignal}
           </span>
         ) : (
@@ -315,11 +316,11 @@ function OperationRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            className={cn(project.isFavorite ? "text-amber-500" : "text-muted-foreground")}
+            className={cn(project.isFavorite ? "text-shape-yellow" : "text-muted-foreground")}
             title={project.isFavorite ? "Unpin" : "Pin"}
             onClick={(e) => { e.stopPropagation(); toggleFavorite(slug, project.id, !project.isFavorite) }}
           >
-            <Star className={cn("size-4", project.isFavorite && "fill-amber-400 text-amber-400")} />
+            <Star className={cn("size-4", project.isFavorite && "fill-shape-yellow text-shape-yellow")} />
           </Button>
           {/* Archive / Réactiver - action directe (QA2-22 : plus cachée dans le « … ») */}
           {project.status === "ARCHIVED" ? (
@@ -414,10 +415,10 @@ function ProjectCard({
           onClick={(e) => { e.stopPropagation(); toggleFavorite(slug, project.id, !project.isFavorite) }}
           className={cn(
             "shrink-0 rounded p-1 transition-colors hover:bg-muted",
-            project.isFavorite ? "text-amber-500" : "text-muted-foreground/50 hover:text-foreground"
+            project.isFavorite ? "text-shape-yellow" : "text-muted-foreground/50 hover:text-foreground"
           )}
         >
-          <Star className={cn("size-4", project.isFavorite && "fill-amber-400 text-amber-400")} />
+          <Star className={cn("size-4", project.isFavorite && "fill-shape-yellow text-shape-yellow")} />
         </button>
       </div>
 
@@ -563,7 +564,7 @@ export default function ProjectsPage() {
     const healthOrder: Record<HealthLevel, number> = { critical: 0, "at-risk": 1, healthy: 2, paused: 3 }
     const comparators: Record<SortKey, (a: Project, b: Project) => number> = {
       health: (a, b) => healthOrder[deriveHealth(a)] - healthOrder[deriveHealth(b)],
-      recent: (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      recent: (a, b) => parseServerDate(b.updatedAt).getTime() - parseServerDate(a.updatedAt).getTime(),
       name: (a, b) => a.name.localeCompare(b.name),
       progress: (a, b) => progressPct(b) - progressPct(a),
       open: (a, b) => b.openIssues - a.openIssues,

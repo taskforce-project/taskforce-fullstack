@@ -1,7 +1,8 @@
 [CmdletBinding()]
-param(
-    [switch]$SkipRuntime
-)
+param()
+
+# Badges du README, recalculés depuis le dépôt : version produit, stack et versions des serveurs que
+# l'installation auto-hébergée démarre. Lancé par le workflow sync-readme-badges sur `dev`.
 
 $ErrorActionPreference = "Stop"
 
@@ -9,7 +10,9 @@ $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $readmePath = Join-Path $repoRoot "README.md"
 $pomPath = Join-Path $repoRoot "backend/tf-api/pom.xml"
 $frontendPkgPath = Join-Path $repoRoot "frontend/package.json"
-$landingPkgPath = Join-Path $repoRoot "landing-page/package.json"
+$productVersionPath = Join-Path $repoRoot "frontend/product-version.json"
+$composePath = Join-Path $repoRoot "docker-compose.yml"
+$utf8 = New-Object System.Text.UTF8Encoding $false
 
 function Get-BadgeToken([string]$text) {
     if ([string]::IsNullOrWhiteSpace($text)) {
@@ -25,83 +28,40 @@ function New-Badge([string]$label, [string]$value, [string]$color) {
     return "![$label](https://img.shields.io/badge/$labelToken-$valueToken-$color.svg)"
 }
 
-function Get-ProjectRuntimeStatus {
-    if ($SkipRuntime -or $env:CI -eq "true") {
-        return @{ Value = "ci"; Color = "blueviolet" }
-    }
-
-    try {
-        $dockerVersion = docker --version 2>$null
-        if (-not $dockerVersion) {
-            return @{ Value = "unknown"; Color = "lightgrey" }
-        }
-
-        $psJson = docker compose -f "docker-compose.dev.yml" ps --format json 2>$null
-        if (-not $psJson) {
-            return @{ Value = "down"; Color = "critical" }
-        }
-
-        $services = $psJson | ConvertFrom-Json
-        if (-not $services) {
-            return @{ Value = "down"; Color = "critical" }
-        }
-
-        $runningCount = 0
-        foreach ($service in $services) {
-            if ($service.State -eq "running" -or $service.Status -match "^running") {
-                $runningCount++
-            }
-        }
-
-        if ($runningCount -ge 4) {
-            return @{ Value = "up"; Color = "brightgreen" }
-        }
-
-        if ($runningCount -gt 0) {
-            return @{ Value = "partial"; Color = "yellow" }
-        }
-
-        return @{ Value = "down"; Color = "critical" }
-    }
-    catch {
-        return @{ Value = "unknown"; Color = "lightgrey" }
-    }
+# Version d'une image du compose d'auto-hébergement (ex. « quay.io/keycloak/keycloak:26.5.2 » -> « 26.5.2 »).
+function Get-ComposeImageTag([string]$compose, [string]$image) {
+    $match = [regex]::Match($compose, "image:\s*" + [regex]::Escape($image) + ":(\S+)")
+    if ($match.Success) { return $match.Groups[1].Value }
+    return "unknown"
 }
 
-[xml]$pomXml = Get-Content -Path $pomPath
-$frontendPkg = Get-Content -Path $frontendPkgPath | ConvertFrom-Json
-$landingPkg = Get-Content -Path $landingPkgPath | ConvertFrom-Json
+[xml]$pomXml = [System.IO.File]::ReadAllText($pomPath, $utf8)
+$frontendPkg = [System.IO.File]::ReadAllText($frontendPkgPath, $utf8) | ConvertFrom-Json
+$productVersion = ([System.IO.File]::ReadAllText($productVersionPath, $utf8) | ConvertFrom-Json).version
+$compose = [System.IO.File]::ReadAllText($composePath, $utf8)
 
-$backendVersion = [string]$pomXml.project.version
 $springBootVersion = [string]$pomXml.project.parent.version
 $javaVersion = [string]$pomXml.project.properties."java.version"
-$keycloakVersion = [string]$pomXml.project.properties."keycloak.version"
-$frontendVersion = [string]$frontendPkg.version
-$landingVersion = [string]$landingPkg.version
-$nextVersion = [string]$frontendPkg.dependencies.next
-$nextVersion = $nextVersion.TrimStart('^', '~')
-
-$runtime = Get-ProjectRuntimeStatus
+$nextVersion = ([string]$frontendPkg.dependencies.next).TrimStart('^', '~')
+$keycloakVersion = Get-ComposeImageTag $compose "quay.io/keycloak/keycloak"
+$postgresVersion = (Get-ComposeImageTag $compose "pgvector/pgvector").TrimStart('p', 'g')
 
 $badges = @(
-    New-Badge -label "Version" -value "0.2.0-rc1" -color "blue"
+    New-Badge -label "Version" -value $productVersion -color "blue"
     New-Badge -label "License" -value "AGPL-3.0" -color "blue"
     New-Badge -label "Java" -value $javaVersion -color "orange"
     New-Badge -label "Spring Boot" -value $springBootVersion -color "brightgreen"
     New-Badge -label "Next.js" -value $nextVersion -color "black"
-    New-Badge -label "TailwindCSS" -value "4" -color "38bdf8"
+    New-Badge -label "PostgreSQL" -value $postgresVersion -color "blue"
     New-Badge -label "Keycloak" -value $keycloakVersion -color "blue"
-    New-Badge -label "PostgreSQL" -value "16" -color "blue"
-    New-Badge -label "Docker" -value "Ready" -color "blue"
-    New-Badge -label "Backend App" -value $backendVersion -color "6f42c1"
-    New-Badge -label "Frontend App" -value $frontendVersion -color "0ea5e9"
-    New-Badge -label "Landing App" -value $landingVersion -color "f59e0b"
-    New-Badge -label "Runtime" -value $runtime.Value -color $runtime.Color
+    New-Badge -label "Self-hosted" -value "Docker" -color "blue"
 )
 
 $startMarker = "<!-- BADGES:START -->"
 $endMarker = "<!-- BADGES:END -->"
-$readmeContent = Get-Content -Path $readmePath -Raw
+# Lecture et écriture en UTF-8 sans BOM : Get-Content et Set-Content de Windows PowerShell 5.1 passent par
+# la page de codes ANSI et abîmeraient les caractères non ASCII du README.
+$readmeContent = [System.IO.File]::ReadAllText($readmePath, $utf8)
 
 $pattern = "(?s)" + [regex]::Escape($startMarker) + ".*?" + [regex]::Escape($endMarker)
 $newBadgeBlock = ($startMarker + "`n" + ($badges -join "`n") + "`n" + $endMarker)
@@ -111,6 +71,6 @@ if ($readmeContent -notmatch $pattern) {
 }
 
 $updated = [regex]::Replace($readmeContent, $pattern, [System.Text.RegularExpressions.MatchEvaluator]{ param($m) $newBadgeBlock }, 1)
-Set-Content -Path $readmePath -Value $updated -NoNewline
+[System.IO.File]::WriteAllText($readmePath, $updated, $utf8)
 
 Write-Host "README badges updated successfully." -ForegroundColor Green

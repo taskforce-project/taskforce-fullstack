@@ -2,7 +2,6 @@ package com.taskforce.tf_api.core.service;
 
 import com.taskforce.tf_api.core.enums.OtpStatus;
 import com.taskforce.tf_api.core.enums.OtpType;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.OtpVerification;
 import com.taskforce.tf_api.core.repository.OtpVerificationRepository;
 import com.taskforce.tf_api.util.TestDataBuilder;
@@ -63,7 +62,7 @@ class OtpServiceTest {
 
             // When
             OtpVerification result = otpService.generateAndSendOtp(
-                    email, firstName, OtpType.EMAIL_VERIFICATION, null, keycloakId, PlanType.FREE);
+                    email, firstName, OtpType.EMAIL_VERIFICATION, null, keycloakId);
 
             // Then
             assertThat(result).isNotNull();
@@ -71,7 +70,6 @@ class OtpServiceTest {
             assertThat(result.getOtpType()).isEqualTo(OtpType.EMAIL_VERIFICATION);
             assertThat(result.getOtpStatus()).isEqualTo(OtpStatus.PENDING);
             assertThat(result.getOtpCode()).hasSize(6);
-            assertThat(result.getPlanType()).isEqualTo(PlanType.FREE.toString());
 
             verify(otpRepository).expireAllPendingOtpsByEmail(email);
             verify(otpRepository).save(any(OtpVerification.class));
@@ -87,7 +85,7 @@ class OtpServiceTest {
             when(otpRepository.save(any(OtpVerification.class))).thenAnswer(i -> i.getArgument(0));
 
             // When
-            otpService.generateAndSendOtp(email, "Test", OtpType.EMAIL_VERIFICATION, null, "keycloak-123", PlanType.FREE);
+            otpService.generateAndSendOtp(email, "Test", OtpType.EMAIL_VERIFICATION, null, "keycloak-123");
 
             // Then
             verify(otpRepository).expireAllPendingOtpsByEmail(email);
@@ -102,28 +100,12 @@ class OtpServiceTest {
 
             // When/Then
             assertThatThrownBy(() -> otpService.generateAndSendOtp(
-                    email, "Test", OtpType.EMAIL_VERIFICATION, null, "keycloak-123", PlanType.FREE))
+                    email, "Test", OtpType.EMAIL_VERIFICATION, null, "keycloak-123"))
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Trop de tentatives");
+                    .hasMessageContaining("Too many attempts");
 
             verify(otpRepository, never()).save(any());
             verify(emailService, never()).sendOtpEmail(any(), any(), any());
-        }
-
-        @Test
-        @DisplayName("devrait créer OTP avec plan PRO")
-        void generateAndSendOtp_withProPlan_shouldCreateOtpWithProPlan() {
-            // Given
-            String email = "pro@test.com";
-            when(otpRepository.countRecentOtpAttempts(eq(email), any(LocalDateTime.class))).thenReturn(0L);
-            when(otpRepository.save(any(OtpVerification.class))).thenAnswer(i -> i.getArgument(0));
-
-            // When
-            OtpVerification result = otpService.generateAndSendOtp(
-                    email, "Pro User", OtpType.EMAIL_VERIFICATION, null, "keycloak-pro", PlanType.BUSINESS);
-
-            // Then
-            assertThat(result.getPlanType()).isEqualTo(PlanType.BUSINESS.toString());
         }
 
         @Test
@@ -136,7 +118,7 @@ class OtpServiceTest {
 
             // When
             OtpVerification result = otpService.generateAndSendOtp(
-                    email, "Test", OtpType.EMAIL_VERIFICATION, null, "keycloak-123", PlanType.FREE);
+                    email, "Test", OtpType.EMAIL_VERIFICATION, null, "keycloak-123");
 
             // Then
             assertThat(result.getExpiresAt()).isAfter(LocalDateTime.now().plusMinutes(14));
@@ -252,47 +234,6 @@ class OtpServiceTest {
             // Then
             assertThat(result).isNull();
             verify(otpRepository).findPendingOtpByEmail(email);
-            verify(otpRepository, never()).save(any());
-        }
-    }
-
-    @Nested
-    @DisplayName("Update Plan Type Tests")
-    class UpdatePlanTypeTests {
-
-        @Test
-        @DisplayName("devrait mettre à jour le plan avec succès")
-        void updatePlanType_withExistingOtp_shouldUpdatePlan() {
-            // Given
-            String email = "test@example.com";
-            String keycloakId = "keycloak-123";
-            String planType = PlanType.BUSINESS.toString();
-            OtpVerification otp = TestDataBuilder.buildOtp(email, "123456", OtpType.EMAIL_VERIFICATION);
-
-            when(otpRepository.findPendingOtpByEmail(email)).thenReturn(Optional.of(otp));
-            when(otpRepository.save(any(OtpVerification.class))).thenReturn(otp);
-
-            // When
-            boolean result = otpService.updatePlanType(email, keycloakId, planType);
-
-            // Then
-            assertThat(result).isTrue();
-            verify(otpRepository).save(otpCaptor.capture());
-            assertThat(otpCaptor.getValue().getPlanType()).isEqualTo(planType);
-        }
-
-        @Test
-        @DisplayName("devrait retourner false si OTP non trouvé")
-        void updatePlanType_withNoOtp_shouldReturnFalse() {
-            // Given
-            String email = "test@example.com";
-            when(otpRepository.findPendingOtpByEmail(email)).thenReturn(Optional.empty());
-
-            // When
-            boolean result = otpService.updatePlanType(email, "keycloak-123", PlanType.BUSINESS.toString());
-
-            // Then
-            assertThat(result).isFalse();
             verify(otpRepository, never()).save(any());
         }
     }
@@ -424,12 +365,11 @@ class OtpServiceTest {
 
             // When
             OtpVerification result = otpService.generateAndSendOtp(
-                    email, firstName, OtpType.PASSWORD_RESET, 42L, "kc-reset", null);
+                    email, firstName, OtpType.PASSWORD_RESET, 42L, "kc-reset");
 
             // Then
             assertThat(result.getOtpType()).isEqualTo(OtpType.PASSWORD_RESET);
             assertThat(result.getUserId()).isEqualTo(42L);
-            assertThat(result.getPlanType()).isNull();
             verify(emailService).sendResetPasswordEmail(eq(email), anyString(), eq(firstName));
             verify(emailService, never()).sendOtpEmail(any(), any(), any());
         }
@@ -444,7 +384,7 @@ class OtpServiceTest {
 
             // When
             OtpVerification result = otpService.generateAndSendOtp(
-                    email, "Test", OtpType.EMAIL_VERIFICATION, null, "kc", PlanType.FREE);
+                    email, "Test", OtpType.EMAIL_VERIFICATION, null, "kc");
 
             // Then
             assertThat(result.getOtpCode()).matches("\\d{6}");
@@ -657,40 +597,6 @@ class OtpServiceTest {
 
             // Then
             verify(otpRepository).expireAllPendingOtpsByEmail(email);
-        }
-    }
-
-    @Nested
-    @DisplayName("Get Latest OTP Tests")
-    class GetLatestOtpTests {
-
-        @Test
-        @DisplayName("devrait retourner le dernier OTP peu importe le statut")
-        void getLatestOtp_withExistingOtp_shouldReturnOtp() {
-            // Given
-            String email = "latest@example.com";
-            OtpVerification otp = TestDataBuilder.buildOtp();
-            when(otpRepository.findLatestOtpByEmail(email)).thenReturn(Optional.of(otp));
-
-            // When
-            OtpVerification result = otpService.getLatestOtp(email);
-
-            // Then
-            assertThat(result).isEqualTo(otp);
-        }
-
-        @Test
-        @DisplayName("devrait retourner null si aucun OTP")
-        void getLatestOtp_withNoOtp_shouldReturnNull() {
-            // Given
-            String email = "latest@example.com";
-            when(otpRepository.findLatestOtpByEmail(email)).thenReturn(Optional.empty());
-
-            // When
-            OtpVerification result = otpService.getLatestOtp(email);
-
-            // Then
-            assertThat(result).isNull();
         }
     }
 }

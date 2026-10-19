@@ -35,7 +35,6 @@ vi.mock('@/lib/api/auth-service', () => ({
   authService: {
     login: vi.fn(),
     register: vi.fn(),
-    selectPlan: vi.fn(),
     verifyOtp: vi.fn(),
     resendOtp: vi.fn(),
     forgotPassword: vi.fn(),
@@ -190,31 +189,6 @@ describe('Integration Tests - Authentication Flow', () => {
       expect(newResult.current.theme).toBe('dark');
     });
 
-    it('should update translations when language changes', async () => {
-      const { usePreferencesStore } = await import('@/lib/store/preferences-store');
-      const { renderHook, act } = await import('@testing-library/react');
-      
-      const { result } = renderHook(() => usePreferencesStore());
-      
-      act(() => {
-        result.current.setLanguage('en');
-      });
-      const enTranslations = result.current.t;
-
-      act(() => {
-        result.current.setLanguage('fr');
-      });
-      const frTranslations = result.current.t;
-
-      // Translations should be different
-      expect(frTranslations).not.toBe(enTranslations);
-      expect(result.current.language).toBe('fr');
-
-      // Restore default - the preferences store is a module singleton and leaks across tests.
-      act(() => {
-        result.current.setLanguage('en');
-      });
-    });
   });
 
   describe('API Service Integration', () => {
@@ -289,14 +263,7 @@ describe('Integration Tests - Authentication Flow', () => {
         email: 'newuser@example.com',
       });
       
-      // Mock Step 2: Select Plan
-      vi.mocked(authService.selectPlan).mockResolvedValue({
-        email: 'newuser@example.com',
-        planType: 'FREE',
-        message: 'Plan selected successfully',
-      });
-      
-      // Mock Step 3: Verify OTP
+      // Mock Step 2: Verify OTP
       vi.mocked(authService.verifyOtp).mockResolvedValue({
         verified: true,
         message: 'OTP verified successfully',
@@ -320,17 +287,11 @@ describe('Integration Tests - Authentication Flow', () => {
         password: 'NewUser@2024!',
         firstName: 'New',
         lastName: 'User',
-        planType: 'FREE',
       });
       expect(registerResponse.userId).toBe('mock-user-id');
       expect(authService.register).toHaveBeenCalledTimes(1);
       
-      // Step 2: Select Plan
-      const planResponse = await authService.selectPlan('mock-user-id', 'FREE');
-      expect(planResponse.message).toBe('Plan selected successfully');
-      expect(authService.selectPlan).toHaveBeenCalledWith('mock-user-id', 'FREE');
-      
-      // Step 3: Verify OTP
+      // Step 2: Verify OTP
       const otpResponse = await authService.verifyOtp('newuser@example.com', '123456');
       expect(otpResponse.verified).toBe(true);
       expect(otpResponse.authData).toBeDefined();

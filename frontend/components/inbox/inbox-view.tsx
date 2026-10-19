@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation"
 import {
   Radio, AtSign, ShieldAlert, ClipboardList,
   CheckCheck, Flame, AlertTriangle, Clock, CheckCircle2,
-  MessageSquare, ArrowRight, ArrowUpRight, X, RefreshCw,
+  MessageSquare, ArrowRight, ArrowUpRight, X, RefreshCw, ShieldQuestion, Bot, OctagonX,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -35,14 +35,17 @@ const URGENCY_ORDER: Record<Urgency, number> = {
 type TypeCfg = { icon: React.ElementType; label: string; color: string }
 
 const TYPE_CONFIG: Partial<Record<string, TypeCfg>> = {
-  overdue:       { icon: Flame,         label: "Deadline breached", color: "text-rose-500" },
-  dueSoon:       { icon: Clock,         label: "Deadline risk",     color: "text-amber-500" },
-  mention:       { icon: AtSign,        label: "Mentioned you",     color: "text-violet-500" },
-  assigned:      { icon: ClipboardList, label: "Assigned to you",   color: "text-blue-500" },
+  overdue:       { icon: Flame,         label: "Deadline breached", color: "text-destructive" },
+  dueSoon:       { icon: Clock,         label: "Deadline risk",     color: "text-ink-yellow" },
+  mention:       { icon: AtSign,        label: "Mentioned you",     color: "text-ink-pink" },
+  assigned:      { icon: ClipboardList, label: "Assigned to you",   color: "text-ink-blue" },
   commented:     { icon: MessageSquare, label: "Commented",         color: "text-muted-foreground" },
   statusChanged: { icon: ArrowRight,    label: "Status updated",    color: "text-muted-foreground" },
-  completed:     { icon: CheckCircle2,  label: "Completed",         color: "text-emerald-500" },
-  overload:      { icon: AlertTriangle, label: "Overload",          color: "text-amber-500" },
+  completed:     { icon: CheckCircle2,  label: "Completed",         color: "text-ink-green" },
+  overload:      { icon: AlertTriangle, label: "Overload",          color: "text-ink-yellow" },
+  agentApproval: { icon: ShieldQuestion, label: "Approval needed",  color: "text-ink-yellow" },
+  agentDone:     { icon: Bot,            label: "Agent finished",   color: "text-ink-green" },
+  agentFailed:   { icon: OctagonX,       label: "Agent failed",     color: "text-destructive" },
 }
 
 // Fallback pour tout type non mappé → évite le crash si le backend renvoie un type inconnu.
@@ -79,7 +82,7 @@ function EmptyState({ tab }: { readonly tab: NotifTab }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border bg-card py-16 text-center">
       <div className="flex size-12 items-center justify-center rounded-xl bg-muted">
-        <CheckCircle2 className="size-5 text-emerald-500" />
+        <CheckCircle2 className="size-5 text-ink-green" />
       </div>
       <div className="space-y-1">
         <p className="text-sm font-semibold text-foreground">{title}</p>
@@ -115,7 +118,7 @@ function ErrorState({ onRetry }: { readonly onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border bg-card py-16 text-center">
       <div className="flex size-12 items-center justify-center rounded-xl bg-muted">
-        <AlertTriangle className="size-5 text-amber-500" />
+        <AlertTriangle className="size-5 text-ink-yellow" />
       </div>
       <div className="space-y-1">
         <p className="text-sm font-semibold text-foreground">Could not load signals</p>

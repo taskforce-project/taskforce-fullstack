@@ -18,8 +18,8 @@ const loaderStyles = cva("relative", {
       current: "text-current",
       primary: "text-primary",
       secondary: "text-muted-foreground",
-      success: "text-emerald-500",
-      warning: "text-amber-500",
+      success: "text-ink-green",
+      warning: "text-ink-yellow",
       danger: "text-destructive",
     },
     size: {
@@ -101,7 +101,7 @@ interface LoaderProps
 function Loader({ className, variant = DEFAULT_SPINNER, intent, size, ...props }: LoaderProps) {
   const LoaderPrimitive = LOADERS[variant in LOADERS ? variant : DEFAULT_SPINNER]
   return (
-    <span role="progressbar" aria-label={props["aria-label"] ?? "Chargement…"} data-slot="loader"
+    <span role="progressbar" aria-label={props["aria-label"] ?? "Loading…"} data-slot="loader"
           className="inline-flex">
       <LoaderPrimitive
         role="presentation"

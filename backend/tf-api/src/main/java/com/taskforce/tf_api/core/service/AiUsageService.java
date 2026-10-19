@@ -4,16 +4,15 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Optional;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.dto.response.AiUsageResponse;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.AiTokenUsage;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.AiTokenUsageRepository;
-import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.exception.AiRateLimitedException;
@@ -32,9 +31,16 @@ public class AiUsageService {
 
     private final AiTokenUsageRepository repository;
     private final WorkspaceRepository workspaceRepository;
-    private final UserRepository userRepository;
     private final BrainAccessGuard access;
     private final AiRateGuard rateGuard;
+
+    /**
+     * Plafond mensuel de tokens IA par compte, réglé par l'instance ({@code AI_MONTHLY_TOKENS_PER_ACCOUNT}).
+     * 0 (défaut) = illimité. Plus de plafond par plan (ADR-016) : une instance auto-hébergée avec un modèle
+     * local n'a aucune raison de brider ; une instance publique, ou adossée à une API payante, pose sa limite.
+     */
+    @Value("${ai.quota.monthly-tokens-per-account:0}")
+    private long monthlyTokenLimit;
 
     private static String currentPeriod() {
         return YearMonth.now().toString(); // 'YYYY-MM'
@@ -73,21 +79,19 @@ public class AiUsageService {
 
     /**
      * Conso du mois courant du **compte** (propriétaire du workspace, agrégée sur tous ses workspaces)
-     * + plafond de son plan. Un membre non-propriétaire voit donc la conso/quota du compte qui l'héberge.
+     * + plafond de l'instance. Un membre non-propriétaire voit donc la conso/quota du compte qui l'héberge.
      */
     @Transactional(readOnly = true)
     public AiUsageResponse getUsage(String slug, Long userId) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         User owner = ws.getOwner();
-        PlanType plan = (owner != null && owner.getPlanType() != null)
-            ? owner.getPlanType() : PlanType.FREE;
         String period = currentPeriod();
         Optional<AiTokenUsage> row = (owner != null)
             ? repository.findByAccountIdAndPeriod(owner.getId(), period)
             : Optional.empty();
         String resetAt = LocalDate.now().plusMonths(1).withDayOfMonth(1).toString();
 
-        long limit = limitFor(plan);
+        long limit = monthlyTokenLimit > 0 ? monthlyTokenLimit : -1L;
         long realTotal = row.map(AiTokenUsage::getTotalTokens).orElse(0L);
         long realPrompt = row.map(AiTokenUsage::getPromptTokens).orElse(0L);
         long realCompletion = row.map(AiTokenUsage::getCompletionTokens).orElse(0L);
@@ -105,7 +109,6 @@ public class AiUsageService {
         }
 
         return new AiUsageResponse(
-            plan.name(),
             shownTotal,
             limit,
             shownPrompt,
@@ -117,8 +120,8 @@ public class AiUsageService {
     }
 
     /**
-     * Bloque (→ 409) si le <b>compte</b> a atteint son plafond mensuel de tokens IA. No-op si le plan est
-     * illimité (Enterprise) ou si le compte/plafond est introuvable. Appelé <b>avant</b> chaque génération
+     * Bloque (→ 409) si le <b>compte</b> a atteint le plafond mensuel de tokens IA de l'instance. No-op si le
+     * plafond est illimité (défaut) ou si le compte est introuvable. Appelé <b>avant</b> chaque génération
      * LLM (cf. {@code AgentService.run}) : c'est le gate de l'IA (façon Claude, l'IA est métrée par tokens).
      *
      * <p><b>{@code noRollbackFor = IllegalStateException}</b> : ce gate est appelé DANS la transaction de
@@ -144,40 +147,15 @@ public class AiUsageService {
         // AiRateLimitedException -> 429 (pic de concurrence, distinct du quota mensuel -> 409). Meme
         // raison de noRollbackFor : ce gate est un pur signal, il ne doit jamais forcer de rollback.
         rateGuard.assertWithinRate(accountId);
-        PlanType plan = userRepository.findById(accountId).map(User::getPlanType).orElse(PlanType.FREE);
-        long limit = limitFor(plan);
-        if (limit < 0) {
-            return; // illimité
+        if (monthlyTokenLimit <= 0) {
+            return; // illimité (défaut)
         }
         long used = repository.findByAccountIdAndPeriod(accountId, currentPeriod())
             .map(AiTokenUsage::getTotalTokens).orElse(0L);
-        if (used >= limit) {
+        if (used >= monthlyTokenLimit) {
             throw new IllegalStateException(
-                "Quota IA mensuel atteint (" + limit + " tokens) sur votre forfait. "
-                + "Passez à un forfait supérieur pour continuer à utiliser Cortex.");
+                "The monthly AI limit of this instance is reached (" + monthlyTokenLimit + " tokens). "
+                + "It resets on the first day of next month.");
         }
-    }
-
-    /**
-     * Plafond mensuel de tokens IA par plan ({@code -1} = illimité). Métrage <b>par tokens</b> (façon
-     * Claude) : une action lourde (analyse « deep » = gros modèle + raisonnement + boucle d'outils) coûte
-     * déjà plus de quota qu'un smart-assign « fast » car elle <b>génère plus de tokens</b> — le routing
-     * modèle par fonctionnalité (tier {@code fast}/{@code standard}/{@code deep} côté gateway) n'appelle
-     * donc <b>aucune pondération</b> ici.
-     *
-     * <p><b>Recalibré le 07/09/2026 sur le budget Groq réel</b> (gpt-oss-120b, tier gratuit) :
-     * 200k tokens/JOUR = ~6M tokens/mois <b>partagés par toute l'org</b>. Découpé pour ~10 comptes avec
-     * marge (la somme des plafonds des comptes actifs reste bien sous 6M) : FREE 50k / BASIC 300k /
-     * BUSINESS 800k / ENTERPRISE ∞. Ancien barème (100k/500k/2M, QA-46) non dérivé de Groq : 3 comptes
-     * BUSINESS suffisaient à vider le mois entier. Le pic de concurrence (8000 TPM) est géré à part par
-     * {@link AiRateGuard} (429). À remonter quand on passe en Groq Dev tier ou Ollama local (illimité).
-     */
-    private long limitFor(PlanType plan) {
-        return switch (plan) {
-            case FREE -> 50_000L;        // 50k tokens/mois
-            case BASIC -> 300_000L;      // 300k tokens/mois
-            case BUSINESS -> 800_000L;   // 800k tokens/mois
-            case ENTERPRISE -> -1L;      // illimité
-        };
     }
 }

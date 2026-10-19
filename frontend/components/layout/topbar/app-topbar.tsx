@@ -23,12 +23,10 @@ import { NotificationBell } from "@/components/layout/topbar/notification-bell"
 import { WorkflowsButton } from "@/components/workflows/workflows-button"
 import { useProjectStore } from "@/lib/store/project-store"
 import { usePanelStore } from "@/lib/store/panel-store"
-import { useUserStore } from "@/lib/store/user-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
-import { planHasFeature } from "@/lib/config/plan-features"
 import { AgentChat } from "@/components/agent/agent-chat"
-import { toast } from "sonner"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { useModKeyLabel } from "@/lib/hooks/use-mod-key"
 
 /**
  * Map a URL segment (slug) to a display label.
@@ -116,16 +114,10 @@ function useBreadcrumbs() {
 export function AppTopbar() {
   const breadcrumbs = useBreadcrumbs()
   const { t } = usePreferencesStore()
+  const modKey = useModKeyLabel()
   const [cmdOpen, setCmdOpen] = React.useState(false)
   const togglePanel = usePanelStore((s) => s.togglePanel)
-  const planType = useUserStore((s) => s.user?.planType)
-  const aiEntitled = planHasFeature(planType, "AI_ASSISTANT")
-
   const openAssistant = React.useCallback(() => {
-    if (!aiEntitled) {
-      toast.info(t.shell.aiProFeature)
-      return
-    }
     togglePanel({
       id: "assistant",
       side: "right",
@@ -133,7 +125,7 @@ export function AppTopbar() {
       icon: <Sparkles className="size-4 text-primary" />,
       content: <AgentChat />,
     })
-  }, [togglePanel, aiEntitled, t])
+  }, [togglePanel])
 
   // Global Ctrl+K / Cmd+K shortcut
   React.useEffect(() => {
@@ -192,7 +184,7 @@ export function AppTopbar() {
           <Search className="size-3.5" />
           <span className="hidden lg:inline">{t.shell.search}</span>
           <Kbd className="hidden lg:inline-flex gap-0.5">
-            <span>⌘</span><span>K</span>
+            <span>{modKey}</span><span>K</span>
           </Kbd>
         </button>
 

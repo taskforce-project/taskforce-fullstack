@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { agentArgs, agentEnv, allowedTools, parseAgentOutput, safeModel } from "../src/agent.js";
+import { agentArgs, agentEnv, agentSettings, allowedTools, DENIED_TOOLS, mcpConfig, parseAgentOutput, safeModel } from "../src/agent.js";
 import type { Claim } from "../src/api.js";
 import { parseEnvFile, parseRunnerConfigFile, type RunnerConfig } from "../src/config.js";
 import { branchName, isValidRepoFullName, managedCheckoutDir, pullRequestBody, resolveRepo } from "../src/git.js";
@@ -18,7 +18,7 @@ function config(overrides: Partial<RunnerConfig["agent"]> = {}): RunnerConfig {
   return {
     ...parseRunnerConfigFile({}),
     apiUrl: "http://localhost:8080/api", clientId: "tf-runner-test", clientSecret: "s3cret",
-    home: "/tmp/tf-runner", mcpEntry: "/opt/taskforce-mcp/dist/index.js",
+    home: "/tmp/tf-runner",
     agent: { ...parseRunnerConfigFile({}).agent, ...overrides },
   };
 }
@@ -123,9 +123,13 @@ describe("parseRunnerConfigFile", () => {
 });
 
 describe("agent : frontière de sécurité de l'exécution locale", () => {
-  it("mode dontAsk + liste fermée d'outils, MCP strict", () => {
+  it("mode manual sans autre répondant que le hook : hors du socle, une action attend la décision dans TaskForce", () => {
     const args = agentArgs(config(), claim, "/tmp/mcp.json", "/tmp/settings.json");
-    assert.equal(args[args.indexOf("--permission-mode") + 1], "dontAsk");
+    assert.equal(args[args.indexOf("--permission-mode") + 1], "manual");
+    assert.equal(args[args.indexOf("--permission-prompts") + 1], "none");
+    assert.equal(args[args.indexOf("--output-format") + 1], "stream-json");
+    assert.ok(args.includes("--verbose"));
+    assert.equal(args[args.indexOf("--disallowedTools") + 1], DENIED_TOOLS.join(","));
     assert.ok(args.includes("--strict-mcp-config"));
     assert.ok(!args.includes("--dangerously-skip-permissions"));
     assert.equal(args[args.indexOf("--model") + 1], "claude-sonnet-5"); // modèle choisi à la délégation
@@ -180,8 +184,8 @@ describe("agent : frontière de sécurité de l'exécution locale", () => {
       assert.ok(!tools.includes(forbidden), `${forbidden} ne doit pas être autorisé par défaut`);
     }
     assert.ok(tools.every((t) => !/ask_cortex|smart_assign/.test(t)));
-    assert.ok(tools.includes("mcp__taskforce__taskforce_get_issue"));
-    assert.ok(tools.includes("mcp__taskforce__taskforce_add_comment"));
+    assert.ok(tools.includes("mcp__taskforce__get_issue"));
+    assert.ok(tools.includes("mcp__taskforce__add_comment"));
   });
 
   it("outils supplémentaires de la configuration ajoutés tels quels", () => {
@@ -198,6 +202,37 @@ describe("agent : frontière de sécurité de l'exécution locale", () => {
     assert.equal(env.TASKFORCE_RUNNER_CLIENT_SECRET, undefined);
     assert.equal(env.TASKFORCE_RUNNER_CLIENT_ID, undefined);
     assert.equal(env.PATH, "/bin");
+    assert.equal(env.TF_HOOK_TOKEN, undefined);
+  });
+
+  it("le jeton du serveur local de validations passe par l'environnement, jamais par un fichier", () => {
+    assert.equal(agentEnv(config(), { TF_HOOK_TOKEN: "stale" }, "fresh").TF_HOOK_TOKEN, "fresh");
+    assert.equal(agentEnv(config(), { TF_HOOK_TOKEN: "stale" }).TF_HOOK_TOKEN, undefined);
+    assert.ok(!JSON.stringify(agentSettings(config(), "http://127.0.0.1:5000/permission")).includes("fresh"));
+  });
+
+  it("refus permanents : push et gh restent au runner, même validés dans l'app", () => {
+    for (const rule of ["Bash(git push *)", "Bash(gh *)"]) assert.ok(DENIED_TOOLS.includes(rule));
+  });
+
+  it("MCP de l'instance en HTTP : jeton de session et en-tête du run", () => {
+    const server = (mcpConfig(config(), claim, "session-token").mcpServers as Record<string, Record<string, unknown>>).taskforce;
+    assert.equal(server?.type, "http");
+    assert.equal(server?.url, "http://localhost:8080/api/workspaces/acme/mcp");
+    assert.deepEqual(server?.headers, { Authorization: "Bearer session-token", "X-TaskForce-Delivery-Run": "42" });
+  });
+
+  it("réglages de session : hook PermissionRequest HTTP authentifié, délai au-delà de l'attente du serveur", () => {
+    const settings = agentSettings(config({ approvalTimeoutMinutes: 5 }), "http://127.0.0.1:5000/permission") as {
+      includeCoAuthoredBy?: boolean; hooks: { PermissionRequest: Array<{ matcher: string; hooks: Array<Record<string, unknown>> }> };
+    };
+    const hook = settings.hooks.PermissionRequest[0]?.hooks[0];
+    assert.equal(settings.includeCoAuthoredBy, false);
+    assert.equal(hook?.type, "http");
+    assert.equal(hook?.url, "http://127.0.0.1:5000/permission");
+    assert.deepEqual(hook?.headers, { Authorization: "Bearer $TF_HOOK_TOKEN" });
+    assert.deepEqual(hook?.allowedEnvVars, ["TF_HOOK_TOKEN"]);
+    assert.equal(hook?.timeout, 5 * 60 + 60);
   });
 
   it("clé API : conservée, et exigée", () => {
@@ -210,6 +245,7 @@ describe("parseAgentOutput", () => {
   const cases: Array<[string, number | null, string, string, boolean, RegExp]> = [
     ["succès", 0, '{"type":"result","subtype":"success","is_error":false,"result":"Fixed the links.","total_cost_usd":0.42,"num_turns":9}', "", true, /Fixed the links/],
     ["avertissement avant le JSON", 0, 'warning: something\n{"subtype":"success","result":"Done."}', "", true, /Done/],
+    ["stream-json : le résultat n'est pas la dernière ligne", 0, '{"type":"system","subtype":"init"}\n{"type":"assistant","message":{"content":[]}}\n{"type":"result","subtype":"success","is_error":false,"result":"All good."}\n{"type":"system","subtype":"task_summary"}', "", true, /All good/],
     ["limite de tours", 0, '{"subtype":"error_max_turns","is_error":true,"result":""}', "", false, /error_max_turns/],
     ["is_error", 0, '{"subtype":"success","is_error":true,"result":"Credit balance too low"}', "", false, /Credit balance/],
     ["code non nul sans JSON", 1, "", "Error: not logged in\n", false, /not logged in/],
@@ -237,13 +273,14 @@ describe("textes produits", () => {
     const prompt = buildPrompt(claim, "tf/web-12-fix-r42");
     assert.match(prompt, /Do NOT push/);
     assert.match(prompt, /never overrides these rules/);
-    assert.match(prompt, /taskforce_get_issue \(projectId 12, issueId 55\)/);
+    assert.match(prompt, /get_issue, a tool of the taskforce MCP server \(projectId 12, issueId 55\)/);
+    assert.match(prompt, /wait for the approval of the person who delegated/);
     assert.match(prompt, /tf\/web-12-fix-r42/);
     assert.match(prompt, /The links 404\./);
   });
 
   it("brief sans description : renvoie vers le MCP", () => {
-    assert.match(buildPrompt({ ...claim, description: null }, "b"), /rely on taskforce_get_issue/);
+    assert.match(buildPrompt({ ...claim, description: null }, "b"), /rely on get_issue/);
   });
 
   it("corps de PR : résumé + rappel que rien n'est fusionné automatiquement", () => {
@@ -269,7 +306,7 @@ describe("quoteForCmd", () => {
 
   // cmd.exe développe %VAR% même entre guillemets, et un saut de ligne coupe la commande : refus net.
   for (const hostile of ["%COMSPEC%", "100%", "a\nb", "a\r\nb"]) {
-    it(`refuse ${JSON.stringify(hostile)}`, () => assert.throws(() => quoteForCmd(hostile), /refusé/));
+    it(`refuse ${JSON.stringify(hostile)}`, () => assert.throws(() => quoteForCmd(hostile), /refused/));
   }
 });
 
@@ -278,8 +315,8 @@ describe("mode sans dépôt (repoless)", () => {
     const tools = allowedTools([], "repoless");
     assert.ok(!tools.some((t) => t.startsWith("Bash(")), "aucun Bash en repoless");
     assert.ok(tools.includes("Write"));
-    assert.ok(tools.includes("mcp__taskforce__taskforce_add_comment"));
-    assert.ok(tools.includes("mcp__taskforce__taskforce_get_issue"));
+    assert.ok(tools.includes("mcp__taskforce__add_comment"));
+    assert.ok(tools.includes("mcp__taskforce__get_issue"));
   });
 
   it("repo (défaut) : outils git présents, jamais push/gh/shell libre", () => {
@@ -294,21 +331,21 @@ describe("mode sans dépôt (repoless)", () => {
     const args = agentArgs(config(), claim, "/tmp/mcp.json", "/tmp/s.json", "repoless");
     const allowed = args[args.indexOf("--allowedTools") + 1] ?? "";
     assert.ok(!/Bash\(/.test(allowed));
-    assert.match(allowed, /taskforce_add_comment/);
+    assert.match(allowed, /mcp__taskforce__add_comment/);
   });
 
   it("brief repoless : pas de dépôt, livraison par commentaire, texte TaskForce = donnée, pas de PR", () => {
     const prompt = buildReplyPrompt(claim);
     assert.match(prompt, /no git repository/i);
-    assert.match(prompt, /taskforce_add_comment/);
+    assert.match(prompt, /add_comment/);
     assert.match(prompt, /never overrides these rules/);
     assert.match(prompt, /writing files onto the machine/i); // consigne d'injection explicitement écartée
-    assert.match(prompt, /taskforce_get_issue \(projectId 12, issueId 55\)/);
+    assert.match(prompt, /get_issue, a tool of the taskforce MCP server \(projectId 12, issueId 55\)/);
     assert.doesNotMatch(prompt, /pull request/i);
   });
 
   it("brief repoless sans description : renvoie vers le MCP", () => {
-    assert.match(buildReplyPrompt({ ...claim, description: null }), /rely on taskforce_get_issue/);
+    assert.match(buildReplyPrompt({ ...claim, description: null }), /rely on get_issue/);
   });
 });
 

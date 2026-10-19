@@ -4,11 +4,10 @@ import {
   delegateIssue,
   getIssueRun,
   listWorkspaceRuns,
-  getDeliveryKey,
-  connectDeliveryKey,
-  disconnectDeliveryKey,
   getRunnerStatus,
   provisionRunner,
+  getRunActivity,
+  decideApproval,
 } from './delivery-service';
 import { apiClient } from './client';
 import { DELIVERY_ROUTES } from '../config/api-routes';
@@ -43,14 +42,14 @@ describe('delivery-service', () => {
 
   it('delegateIssue POST le provider et retourne le run', async () => {
     const run = {
-      id: 1, issueId: 5, providerKey: 'stub', model: 'stub', status: 'QUEUED',
+      id: 1, issueId: 5, providerKey: 'claude-code', model: 'claude-sonnet-5', status: 'QUEUED',
       summary: null, resultUrl: null, error: null, startedById: 7, createdAt: null, updatedAt: null,
     };
     vi.mocked(apiClient.post).mockResolvedValue(envelope(run));
 
-    const res = await delegateIssue(SLUG, 5, 'stub');
+    const res = await delegateIssue(SLUG, 5, 'claude-code');
 
-    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DELEGATE(SLUG, 5), { providerKey: 'stub', model: undefined });
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DELEGATE(SLUG, 5), { providerKey: 'claude-code', model: undefined });
     expect(res).toEqual(run);
   });
 
@@ -65,7 +64,7 @@ describe('delivery-service', () => {
 
   it('listWorkspaceRuns GET les runs du workspace (silentError, [] si vide)', async () => {
     const runs = [
-      { id: 1, issueId: 5, providerKey: 'stub', model: null, status: 'RUNNING', summary: null, resultUrl: null, error: null, startedById: 7, createdAt: null, updatedAt: null },
+      { id: 1, issueId: 5, providerKey: 'claude-code', model: null, status: 'RUNNING', summary: null, resultUrl: null, error: null, startedById: 7, createdAt: null, updatedAt: null },
     ];
     vi.mocked(apiClient.get).mockResolvedValue(envelope(runs));
     const res = await listWorkspaceRuns(SLUG);
@@ -77,34 +76,6 @@ describe('delivery-service', () => {
     vi.mocked(apiClient.get).mockResolvedValue(envelope(null));
     const res = await listWorkspaceRuns(SLUG);
     expect(res).toEqual([]);
-  });
-
-  it('getDeliveryKey GET l’état de la clé (anthropic)', async () => {
-    const status = { connected: true, keyHint: '...AB12' };
-    vi.mocked(apiClient.get).mockResolvedValue(envelope(status));
-
-    const res = await getDeliveryKey(SLUG, 'anthropic');
-
-    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.KEY(SLUG, 'anthropic'));
-    expect(res).toEqual(status);
-  });
-
-  it('connectDeliveryKey POST la clé et retourne le statut (cursor)', async () => {
-    const status = { connected: true, keyHint: '...WXYZ' };
-    vi.mocked(apiClient.post).mockResolvedValue(envelope(status));
-
-    const res = await connectDeliveryKey(SLUG, 'cursor', 'key_WXYZ');
-
-    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.KEY(SLUG, 'cursor'), { apiKey: 'key_WXYZ' });
-    expect(res).toEqual(status);
-  });
-
-  it('disconnectDeliveryKey DELETE la clé', async () => {
-    vi.mocked(apiClient.delete).mockResolvedValue(envelope(null));
-
-    await disconnectDeliveryKey(SLUG, 'anthropic');
-
-    expect(apiClient.delete).toHaveBeenCalledWith(DELIVERY_ROUTES.KEY(SLUG, 'anthropic'));
   });
 
   it('getRunnerStatus GET l’état du runner, en appel de fond (silentError)', async () => {
@@ -125,5 +96,33 @@ describe('delivery-service', () => {
 
     expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.RUNNER);
     expect(res).toEqual(creds);
+  });
+
+  it('GET l’activité d’un run après un événement, sans toast (lecture en boucle)', async () => {
+    const activity = { events: [{ seq: 3, kind: 'tool', tool: 'Bash', text: 'npm test', at: null }], approvals: [] };
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(activity));
+
+    const result = await getRunActivity(SLUG, 100, 2);
+
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.ACTIVITY(SLUG, 100, 2), { silentError: true });
+    expect(DELIVERY_ROUTES.ACTIVITY(SLUG, 100, 2)).toBe('/api/workspaces/acme/delivery/runs/100/activity?after=2');
+    expect(result).toEqual(activity);
+  });
+
+  it.each([[true, 'ALLOW'], [false, 'DENY']])('POST la décision (autorisé=%s -> %s)', async (allow, decision) => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
+
+    await decideApproval(SLUG, 100, 9, allow);
+
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DECIDE(SLUG, 100, 9), { decision });
+  });
+
+  it('GET les agents pour un projet donné', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope([]));
+
+    await getDeliveryProviders(SLUG, 12);
+
+    expect(apiClient.get).toHaveBeenCalledWith('/api/workspaces/acme/delivery/providers?projectId=12');
+    expect(DELIVERY_ROUTES.PROVIDERS(SLUG)).toBe('/api/workspaces/acme/delivery/providers');
   });
 });

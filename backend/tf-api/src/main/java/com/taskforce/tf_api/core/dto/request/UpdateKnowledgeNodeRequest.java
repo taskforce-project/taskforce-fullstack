@@ -29,8 +29,5 @@ public class UpdateKnowledgeNodeRequest {
     /** Reparentage (arbre facon Notion) : non-null = deplace sous cette page ; null = inchange. */
     private Long parentNodeId;
 
-    /** Projets de rattachement (plusieurs = note transverse) → {@code metadata.projects}. Voir {@link CreateKnowledgeNodeRequest}. */
-    private List<Long> projects;
-
     private Map<String, Object> metadata;
 }

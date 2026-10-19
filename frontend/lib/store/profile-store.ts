@@ -79,7 +79,7 @@ export const useProfileStore = create<ProfileState>((set) => ({
       });
     } catch (err) {
       console.error("[ProfileStore] fetchProfile error:", err);
-      set({ loading: false, error: "Impossible de charger le profil" });
+      set({ loading: false, error: "Couldn't load the profile" });
     }
   },
 }));

@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,11 +18,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * {@link LlmClient} vers l'**AI Gateway** (service Python {@code ai-service}) qui route vers le LLM
- * local **Ollama** (Qwen). Le backend ne connaît pas le modèle : il parle au gateway ({@code /v1/chat}),
- * qui possède le routing modèle. Réponse du gateway : {@code {model, message}} (format OpenAI).
+ * {@link LlmClient} vers l'ai-service ({@code POST /v1/chat}), qui parle au fournisseur configuré (Ollama par
+ * défaut, ou toute API compatible OpenAI) et choisit le modèle selon le tier. Appels authentifiés par le
+ * secret partagé {@code AI_SERVICE_TOKEN}.
  *
- * <p>Timeout large : la génération locale d'un 14B peut prendre plusieurs dizaines de secondes.</p>
+ * <p>Quand l'IA n'est pas disponible ({@link AiStatusService}), l'appel échoue tout de suite au lieu d'attendre
+ * le délai de lecture : les appelants passent à leur repli sans bloquer la requête.</p>
  */
 @Service
 @Slf4j
@@ -29,30 +31,32 @@ public class AiGatewayClient implements LlmClient {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final AiStatusService status;
+    private final String chatUrl;
+    private final String token;
 
     /** Accumulateur d'usage par thread : [prompt, completion, total]. {@code null} = capture inactive. */
     private final ThreadLocal<long[]> usageAccumulator = new ThreadLocal<>();
 
-    @Value("${ai.gateway.base-url:http://ai-service:8000}")
-    private String baseUrl;
-
-    public AiGatewayClient(ObjectMapper objectMapper,
-                           @Value("${ai.gateway.read-timeout-ms:300000}") int readTimeoutMs) {
-        // Timeout large : une analyse APPROFONDIE sur le 14B local peut dépasser plusieurs minutes.
-        // Doit rester ≥ OLLAMA_TIMEOUT de l'ai-service, sinon Java coupe avant la fin de génération.
-        // Surchargeable sans rebuild via env AI_GATEWAY_READ_TIMEOUT_MS.
+    public AiGatewayClient(ObjectMapper objectMapper, AiStatusService status,
+                           @Value("${ai.service.url:http://ai-service:8000}") String serviceUrl,
+                           @Value("${ai.service.token:}") String token,
+                           @Value("${ai.service.read-timeout-ms:150000}") int readTimeoutMs) {
+        // Le délai de lecture doit rester au-dessus de AI_TIMEOUT de l'ai-service (120 s par défaut) :
+        // sinon Java coupe pendant que le modèle termine sa réponse.
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5000);
+        factory.setConnectTimeout(5_000);
         factory.setReadTimeout(readTimeoutMs);
-        this.restTemplate = new RestTemplate();
-        this.restTemplate.setRequestFactory(factory);
+        this.restTemplate = new RestTemplate(factory);
         this.objectMapper = objectMapper;
+        this.status = status;
+        this.chatUrl = serviceUrl.replaceAll("/+$", "") + "/v1/chat";
+        this.token = token;
     }
 
-    /** Actif dès qu'il est sélectionné (provider=ollama) ; les échecs d'appel retombent en repli côté agent. */
     @Override
     public boolean isConfigured() {
-        return true;
+        return status.current().chatAvailable();
     }
 
     // ── Capture d'usage (tokens) — cf. LlmClient ─────────────────────────────
@@ -74,12 +78,7 @@ public class AiGatewayClient implements LlmClient {
     }
 
     @Override
-    public String chatCompletion(String model, String systemPrompt, String userPrompt, boolean jsonMode) {
-        return chatCompletion(model, systemPrompt, userPrompt, jsonMode, null);
-    }
-
-    @Override
-    public String chatCompletion(String model, String systemPrompt, String userPrompt, boolean jsonMode, String tier) {
+    public String chatCompletion(String systemPrompt, String userPrompt, boolean jsonMode, String tier) {
         JsonNode message = callChat(
             List.of(Map.of("role", "system", "content", systemPrompt),
                     Map.of("role", "user",   "content", userPrompt)),
@@ -88,17 +87,15 @@ public class AiGatewayClient implements LlmClient {
     }
 
     @Override
-    public JsonNode rawChat(String model, List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
-        return callChat(messages, tools, false, null);
-    }
-
-    @Override
-    public JsonNode rawChat(String model, List<Map<String, Object>> messages, List<Map<String, Object>> tools, String tier) {
+    public JsonNode rawChat(List<Map<String, Object>> messages, List<Map<String, Object>> tools, String tier) {
         return callChat(messages, tools, false, tier);
     }
 
     private JsonNode callChat(List<?> messages, List<Map<String, Object>> tools, boolean jsonMode, String tier) {
-        Map<String, Object> body = new java.util.HashMap<>();
+        if (!isConfigured()) {
+            throw new LlmException("AI is not available on this instance", null);
+        }
+        Map<String, Object> body = new HashMap<>();
         body.put("messages", messages);
         body.put("json_mode", jsonMode);
         if (tier != null) {
@@ -107,18 +104,18 @@ public class AiGatewayClient implements LlmClient {
         if (tools != null && !tools.isEmpty()) {
             body.put("tools", tools);
         }
-        // model volontairement omis → le gateway utilise son modèle par défaut (Ollama OLLAMA_MODEL).
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(token == null ? "" : token);
         try {
-            String raw = restTemplate.postForObject(baseUrl + "/v1/chat",
-                new HttpEntity<>(body, headers), String.class);
+            String raw = restTemplate.postForObject(chatUrl, new HttpEntity<>(body, headers), String.class);
             JsonNode root = objectMapper.readTree(raw);
             accumulateUsage(root.path("usage"));
             return root.path("message");
         } catch (Exception ex) {
-            log.error("AI Gateway error: {}", ex.getMessage());
-            throw new LlmException("AI Gateway indisponible: " + ex.getMessage(), ex);
+            log.error("AI service call failed: {}", ex.getMessage());
+            status.invalidate(); // le fournisseur est peut-être tombé : on relira son état au prochain appel
+            throw new LlmException("AI service unavailable: " + ex.getMessage(), ex);
         }
     }
 

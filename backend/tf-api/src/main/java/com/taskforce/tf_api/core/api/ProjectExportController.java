@@ -61,6 +61,6 @@ public class ProjectExportController {
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         return userRepository.findByEmail(email).map(User::getId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 }

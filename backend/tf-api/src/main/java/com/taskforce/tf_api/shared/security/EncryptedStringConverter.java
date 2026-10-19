@@ -68,7 +68,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
             byte[] combined = ByteBuffer.allocate(iv.length + ciphertext.length).put(iv).put(ciphertext).array();
             return PREFIX + Base64.getEncoder().encodeToString(combined);
         } catch (Exception ex) {
-            throw new IllegalStateException("Échec du chiffrement au repos", ex);
+            throw new IllegalStateException("Encryption at rest failed", ex);
         }
     }
 

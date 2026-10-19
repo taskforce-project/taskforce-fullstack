@@ -78,41 +78,14 @@ emojis dans l'interface · valeurs en dur · données mock.
 
 - Fait : 9 primitives ui/ + 41 contrôles de pages/composants sur les tokens ; lignes de liste à 37 px (issues,
   backlog, issues projet, fiche membre). Mesuré sur la stack dev, validé par le CEO le 20/09.
-- Laissé à dessein (23 occurrences) : icônes, avatars, logos, spinners, le bandeau Labs (`lab-shell`, sa hauteur
-  de 36 px est couplée au décalage de la sidebar dans `globals.css`).
+- Laissé à dessein : icônes, avatars, logos, spinners.
 - À faire : `projects/[id]/list/page.tsx` (même pattern `py-2.5`, fichier en cours côté CEO).
-- Visuels d'app du site (`landing-page/public/screens/`) : recapturés le 20/09 avec l'outil `design-assets`
-  (`npm run capture`). Attention : les étapes de `capture/film.mjs` MODIFIENT la base de dev (elles appliquent
+- Captures de l'app (README, site) : outil `design-assets` (`npm run capture`). Attention : les étapes de `capture/film.mjs` MODIFIENT la base de dev (elles appliquent
   les assignations) : sauvegarder puis restaurer les lignes concernées autour de la capture.
 
-## 7. La landing : même grammaire, un cran d'air (20/09)
+## 7. Le site
 
-Le site partage le système de l'app, pas sa densité : c'est du marketing, on respire.
-
-| | App | Site |
-| --- | --- | --- |
-| Hauteurs de contrôle (sm / défaut / lg) | 28 / 32 / 36 | 32 / 36 / 40 |
-| Radius effectif (sm / md / lg) | 6 / 8 / 10 | 6 / 8 / 10 (`--radius` 8 px, mapping décalé d'un cran) |
-| Ombres | flat (`--shadow-lg` = 0 4px 12px à 8 %) | les mêmes valeurs |
-| CTA marketing | sans objet | boutons « pill » 42 / 48, hors échelle de contrôle |
-
-- Source unique : `landing-page/src/styles/global.css` ; utilitaires `h-control*`, `size-control*`,
-  `min-w-control*` ; clés déclarées dans tailwind-merge (`landing-page/src/lib/utils.ts`).
-- Un formulaire = une seule hauteur (démo : tout à 40).
-- Piège rencontré deux fois dans ce fichier : une variable CSS redéclarée plus bas dans le même `:root` écrase
-  la première EN SILENCE (`--radius`, puis 5 niveaux d'ombre). Avant d'ajouter un token, chercher s'il existe.
-- Vérifier : mesure DOM, `npm run lint`, puis un build de prod (`astro build`) et chercher `.h-control` dans
-  `dist/_astro/*.css` : le mode dev ne prouve pas que l'utilitaire est émis en prod.
-- **Échelle des titres (25/09)** : `t-h1` (H1, Sora 40 → 56), `t-h2` (sections, 30 → 40), `t-h3` (20), puis
-  `t-h4` (titre de carte, 16 / 600) et `t-h5` (carte dense, ligne de liste, 14 / 600). Jamais de
-  `text-[15px] font-semibold` sur un titre : un titre de carte prend `t-h4` ou `t-h5`. Ces tokens sont
-  hors couche, ils l'emportent sur les utilitaires (une marge `mt-*` s'ajoute, une taille ne s'écrase pas).
-- **Titres de section révélés au scroll** : tout `h2.t-h2` est traité par `src/scripts/reveal-titles.ts`
-  (mots gris → noirs au défilement). Exclure un titre : l'envelopper dans `[data-no-reveal]`. Pages
-  `/legal/` exclues d'office. Plancher d'opacité 0.55 (≥ 3:1 même sur `--secondary`) : un mot non
-  révélé reste lisible et conforme AA, ne jamais le baisser pour « plus d'effet ».
-- **Ponctuation** : ni tiret long, ni tiret de liaison « - » entre deux propositions dans les titres, les
-  leads et les metas. Choisir la vraie ponctuation (virgule, deux-points, point, parenthèses). Un lead
-  existe sous trois formes : l'attribut `lead=` des composants, le paragraphe `<p class="t-lead">` des
-  pages et le `support=` des CalloutBand. Un contrôle qui n'en lit qu'une rate les autres (25/09 : 40
-  oublis rattrapés dans une 2e passe).
+Depuis le 19/10, le site a sa propre direction (app desktop : peintures de musées, coins modestes, filets
+légers) : voir [`site-desktop.md`](./site-desktop.md). Une règle reste commune à l'app et au site : ni tiret
+long, ni tiret de liaison « - » entre deux propositions dans les titres, les leads et les metas ; choisir la
+vraie ponctuation (virgule, deux-points, point, parenthèses).

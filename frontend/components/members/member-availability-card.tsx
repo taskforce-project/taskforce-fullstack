@@ -20,9 +20,9 @@ import { useAvailabilityStore } from "@/lib/store/availability-store"
 import type { LeaveType } from "@/lib/api/availability-service"
 
 const LEAVE_META: Record<LeaveType, { label: string; className: string }> = {
-  VACATION: { label: "Vacation",   className: "bg-blue-500/15 text-blue-400 border-blue-500/20" },
-  SICK:     { label: "Sick",       className: "bg-rose-500/15 text-rose-400 border-rose-500/20" },
-  REMOTE:   { label: "Remote",     className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" },
+  VACATION: { label: "Vacation",   className: "bg-primary/15 text-ink-blue border-primary/20" },
+  SICK:     { label: "Sick",       className: "bg-destructive/15 text-destructive border-destructive/20" },
+  REMOTE:   { label: "Remote",     className: "bg-shape-green/15 text-ink-green border-shape-green/20" },
   OTHER:    { label: "Other",      className: "bg-muted text-muted-foreground border-border" },
 }
 
@@ -109,7 +109,7 @@ export function MemberAvailabilityCard({ slug, userId, canEdit }: MemberAvailabi
     <section className="rounded-xl border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <CalendarOff className="h-4 w-4 text-amber-400" />
+          <CalendarOff className="h-4 w-4 text-ink-yellow" />
           Availability
           <span className="text-xs font-normal text-muted-foreground">· leave &amp; unavailability</span>
         </h2>
@@ -184,7 +184,7 @@ export function MemberAvailabilityCard({ slug, userId, canEdit }: MemberAvailabi
                     <button
                       type="button"
                       onClick={() => handleRemove(leave.id)}
-                      className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-rose-500"
+                      className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
                       aria-label="Remove unavailability"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

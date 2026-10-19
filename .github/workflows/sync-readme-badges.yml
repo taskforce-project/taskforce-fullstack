@@ -13,9 +13,9 @@ on:
       - README.md
       - backend/tf-api/pom.xml
       - frontend/package.json
-      - landing-page/package.json
+      - frontend/product-version.json
       - scripts/update-readme-badges.ps1
-      - docker-compose.dev.yml
+      - docker-compose.yml
   workflow_dispatch:
 
 permissions:
@@ -33,7 +33,7 @@ jobs:
 
       - name: Update README badges
         shell: pwsh
-        run: ./scripts/update-readme-badges.ps1 -SkipRuntime
+        run: ./scripts/update-readme-badges.ps1
 
       - name: Commit and push if changed
         shell: pwsh

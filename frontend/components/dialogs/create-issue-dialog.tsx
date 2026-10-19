@@ -46,6 +46,7 @@ import {
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { PRIORITY_DOT } from "@/lib/palette"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { createProjectLabel } from "@/lib/api/project-service"
@@ -70,16 +71,17 @@ interface CreateIssueDialogProps {
 // ---------------------------------------------------------------------------
 
 const PRIORITY_OPTIONS: { value: IssuePriority; label: string; dotClass: string }[] = [
-  { value: "URGENT", label: "Urgent",      dotClass: "bg-red-400" },
-  { value: "HIGH",   label: "High",        dotClass: "bg-orange-400" },
-  { value: "MEDIUM", label: "Medium",      dotClass: "bg-yellow-400" },
-  { value: "LOW",    label: "Low",         dotClass: "bg-slate-400" },
-  { value: "NONE",   label: "No priority", dotClass: "bg-muted-foreground/30" },
+  { value: "URGENT", label: "Urgent",      dotClass: PRIORITY_DOT.URGENT },
+  { value: "HIGH",   label: "High",        dotClass: PRIORITY_DOT.HIGH },
+  { value: "MEDIUM", label: "Medium",      dotClass: PRIORITY_DOT.MEDIUM },
+  { value: "LOW",    label: "Low",         dotClass: PRIORITY_DOT.LOW },
+  { value: "NONE",   label: "No priority", dotClass: PRIORITY_DOT.NONE },
 ]
 
+// Teintes de la palette, sans les plus claires : le libellé sélectionné s'affiche en blanc dessus.
 const LABEL_COLORS = [
-  "#ef4444", "#f97316", "#eab308", "#22c55e",
-  "#3b82f6", "#8b5cf6", "#ec4899", "#64748b",
+  "#e14322", "#4b6412", "#418b5c", "#2f6bf6",
+  "#1e4fc4", "#a3336c", "#8a5300", "#736e67",
 ]
 
 function getCategoryIcon(category: IssueStatusCategory, color: string) {
@@ -397,7 +399,7 @@ export function CreateIssueDialog({
                   </span>
                   <div className="flex items-center gap-2">
                     {suggestion.fallbackUsed && (
-                      <span className="text-[10px] text-amber-500">AI fallback</span>
+                      <span className="text-[10px] text-ink-yellow">AI fallback</span>
                     )}
                     <span className="text-sm font-bold text-primary tabular-nums">{suggestion.recommended.score}%</span>
                   </div>

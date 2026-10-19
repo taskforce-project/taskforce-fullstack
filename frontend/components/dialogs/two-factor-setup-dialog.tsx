@@ -91,7 +91,7 @@ export function TwoFactorSetupDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ShieldCheck className="size-4 text-blue-500" /> {t.auth.ui.twoFactorSetupTitle}
+            <ShieldCheck className="size-4 text-ink-blue" /> {t.auth.ui.twoFactorSetupTitle}
           </DialogTitle>
           <DialogDescription>{t.auth.ui.twoFactorSetupDesc}</DialogDescription>
         </DialogHeader>
@@ -114,7 +114,7 @@ export function TwoFactorSetupDialog({
               className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2.5 py-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
             >
               {secret.replace(/(.{4})/g, "$1 ").trim()}
-              {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+              {copied ? <Check className="size-3 text-ink-green" /> : <Copy className="size-3" />}
             </button>
           )}
 

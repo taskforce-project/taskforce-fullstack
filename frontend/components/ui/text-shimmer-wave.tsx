@@ -1,11 +1,9 @@
 'use client';
-import { useMemo, type JSX } from 'react';
 import { motion, Transition } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 type TextShimmerWave = {
   children: string;
-  as?: React.ElementType;
   className?: string;
   duration?: number;
   zDistance?: number;
@@ -19,7 +17,6 @@ type TextShimmerWave = {
 
 export function TextShimmerWave({
   children,
-  as: Component = 'p',
   className,
   duration = 1,
   zDistance = 10,
@@ -30,20 +27,13 @@ export function TextShimmerWave({
   rotateYDistance = 10,
   transition,
 }: TextShimmerWave) {
-  // `motion.create` DOIT être mémoïsé : appelé pendant le render, il recrée un composant à chaque
-  // rendu → React remonte l'élément à chaque fois et l'animation « gèle » dans les contextes qui
-  // re-render souvent (ex. le chat avec son timer). Mémoïsé par `Component`, il n'est créé qu'une fois.
-  const MotionComponent = useMemo(
-    () => motion.create(Component as keyof JSX.IntrinsicElements),
-    [Component]
-  );
-
+  // Toujours un `motion.span` : tous les appelants l'affichent en ligne. Un élément choisi par
+  // prop obligeait à créer le composant animé pendant le rendu (`motion.create`).
   return (
-    <MotionComponent
+    <motion.span
       className={cn(
         'relative inline-block [perspective:500px]',
-        '[--base-color:#a1a1aa] [--base-gradient-color:#000]',
-        'dark:[--base-color:#71717a] dark:[--base-gradient-color:#ffffff]',
+        '[--base-color:var(--subtle)] [--base-gradient-color:var(--foreground)]',
         className
       )}
       style={{ color: 'var(--base-color)' }}
@@ -88,6 +78,6 @@ export function TextShimmerWave({
           </motion.span>
         );
       })}
-    </MotionComponent>
+    </motion.span>
   );
 }

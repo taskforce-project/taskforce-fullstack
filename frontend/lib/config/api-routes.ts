@@ -19,7 +19,6 @@ export const AUTH_ROUTES = {
   OAUTH_CALLBACK: "/api/auth/oauth/callback",
   /** Connexion externe avec 2FA actif : défi scellé + code TOTP contre une session TaskForce. */
   OAUTH_TWO_FACTOR: "/api/auth/oauth/2fa",
-  SELECT_PLAN: "/api/auth/select-plan",
   VERIFY_OTP: "/api/auth/verify-otp",
   RESEND_OTP: "/api/auth/resend-otp",
   FORGOT_PASSWORD: "/api/auth/forgot-password",
@@ -29,48 +28,43 @@ export const AUTH_ROUTES = {
 } as const;
 
 /**
- * Routes Stripe (paiements et abonnements)
- * Backend: @RequestMapping("/api/stripe")
- */
-export const STRIPE_ROUTES = {
-  CREATE_CHECKOUT: "/api/stripe/create-checkout",
-  VERIFY_SESSION: "/api/stripe/verify-session",
-  CANCEL_SUBSCRIPTION: "/api/stripe/cancel",
-  WEBHOOK: "/api/stripe/webhook",
-} as const;
-
-/**
- * Routes facturation self-service (Stripe Customer Portal) - chemin protégé.
- * Backend: @RequestMapping("/api/billing")
- */
-export const BILLING_ROUTES = {
-  PORTAL: "/api/billing/portal",
-  SUBSCRIPTION: "/api/billing/subscription",
-  CHECKOUT: "/api/billing/checkout",
-  /** Change le forfait d'un abonnement existant in-app (upgrade/rétrogradation, proration auto). */
-  CHANGE_PLAN: "/api/billing/change-plan",
-} as const;
-
-/**
  * Délégation à un agent de livraison (coding agent) - TF-AGENT-DELIVERY.
  * Backend: @RequestMapping("/api/workspaces/{slug}/delivery")
  */
 export const DELIVERY_ROUTES = {
-  /** Providers délégables (Claude Code / Copilot / Cursor...) pour le picker. */
-  PROVIDERS: (slug: string) => `/api/workspaces/${slug}/delivery/providers`,
+  /** Providers délégables (aujourd'hui Claude Code) pour le picker. */
+  PROVIDERS: (slug: string, projectId?: number) =>
+    `/api/workspaces/${slug}/delivery/providers${projectId ? `?projectId=${projectId}` : ""}`,
   /** Délègue une issue à un agent (POST). */
   DELEGATE: (slug: string, issueId: number) => `/api/workspaces/${slug}/delivery/issues/${issueId}/delegate`,
   /** Dernier run de délégation d'une issue (GET). */
   RUN: (slug: string, issueId: number) => `/api/workspaces/${slug}/delivery/issues/${issueId}/run`,
   /** Runs de délégation du workspace (GET) - vue « workflow » (agents en parallèle). */
   RUNS: (slug: string) => `/api/workspaces/${slug}/delivery/runs`,
-  /** Clé API de délégation d'un provider (GET état / POST connecter / DELETE déconnecter) - `provider` = "anthropic" | "cursor". */
-  KEY: (slug: string, provider: string) => `/api/workspaces/${slug}/delivery/${provider}`,
+  /** Chronologie en direct d'un run après l'événement `after`, et ses demandes de validation (GET, lot 5). */
+  ACTIVITY: (slug: string, runId: number, after: number) =>
+    `/api/workspaces/${slug}/delivery/runs/${runId}/activity?after=${after}`,
+  /** Autorise ou refuse une action de l'agent (POST, réservé à la personne qui a délégué). */
+  DECIDE: (slug: string, runId: number, approvalId: number) =>
+    `/api/workspaces/${slug}/delivery/runs/${runId}/approvals/${approvalId}`,
+  /** Serveur MCP de l'instance pour ce workspace (adresse à donner à Claude Code, pas appelée par le front). */
+  MCP_SERVER: (slug: string) => `/api/workspaces/${slug}/mcp`,
   /**
    * Runner local de l'utilisateur connecté (ADR-013) : GET = état, jamais de secret ; POST = provisionner ou
    * régénérer le secret. Sans slug : l'identité d'un runner est liée à la personne, pas au workspace.
    */
   RUNNER: "/api/delivery/runners",
+} as const;
+
+/**
+ * Jetons personnels de la personne connectée (lot 5) : ils ne servent qu'au serveur MCP de l'instance.
+ * Backend: @RequestMapping("/api/users/me/tokens")
+ */
+export const ACCESS_TOKEN_ROUTES = {
+  /** GET = liste (jamais de valeur), POST = création (la valeur n'est rendue qu'ici). */
+  TOKENS: "/api/users/me/tokens",
+  /** DELETE = révocation, effet immédiat. */
+  TOKEN: (tokenId: number) => `/api/users/me/tokens/${tokenId}`,
 } as const;
 
 /**
@@ -80,9 +74,7 @@ export const DELIVERY_ROUTES = {
 export const USER_ROUTES = {
   ME: "/api/users/me",
   AVATAR: "/api/users/me/avatar",
-  DATA_REQUEST: "/api/users/me/data-request",
-  /** Sécurité (métier Keycloak) : reset mot de passe + 2FA. */
-  PASSWORD_RESET: "/api/users/me/password/reset",
+  /** Sécurité : 2FA TOTP gérée par l'app. */
   TWO_FACTOR: "/api/users/me/2fa",
   TWO_FACTOR_SETUP: "/api/users/me/2fa/setup",
   TWO_FACTOR_CONFIRM: "/api/users/me/2fa/confirm",
@@ -97,14 +89,6 @@ export const USER_ROUTES = {
  */
 export const STATUS_ROUTES = {
   SYSTEM: "/api/status",
-} as const;
-
-/**
- * Retours utilisateur (« Give feedback »).
- * Backend: @RequestMapping("/api/feedback")
- */
-export const FEEDBACK_ROUTES = {
-  SUBMIT: "/api/feedback",
 } as const;
 
 /**
@@ -127,7 +111,6 @@ export const WORKSPACE_ROUTES = {
   // Par slug
   BY_SLUG: (slug: string) => `/api/workspaces/${slug}`,
   MEMBERS: (slug: string) => `/api/workspaces/${slug}/members`,
-  USAGE: (slug: string) => `/api/workspaces/${slug}/usage`,
   AUDIT: (slug: string) => `/api/workspaces/${slug}/audit`,
   INVITE: (slug: string) => `/api/workspaces/${slug}/members/invite`,
   MEMBER_ROLE: (slug: string, memberId: number) => `/api/workspaces/${slug}/members/${memberId}/role`,
@@ -141,7 +124,6 @@ export const WORKSPACE_ROUTES = {
   // Journalisation des erreurs client (E25) - logs serveur classiques
   CLIENT_LOG: "/api/logs/client",
   // Rétrocompatibilité
-  CURRENT: "/api/workspaces/current",
 } as const;
 
 /**
@@ -208,7 +190,6 @@ export const PROJECT_ROUTES = {
   TEAMS:   (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/teams`,
   TEAM:    (slug: string, id: number, teamId: number) => `/api/workspaces/${slug}/projects/${id}/teams/${teamId}`,
   // Activité quotidienne (QA2-32)
-  ACTIVITY: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/activity`,
 } as const;
 
 /**
@@ -334,10 +315,11 @@ export const ASSISTANT_ROUTES = {
 } as const;
 
 /**
- * Consommation IA (tokens) du workspace - mois courant + plafond du plan.
- * Backend: @RequestMapping("/api/workspaces/{slug}/ai")
+ * Consommation IA (tokens) du workspace - mois courant + plafond de l'instance (illimité par défaut).
+ * Backend: @RequestMapping("/api/workspaces/{slug}/ai"). État de l'IA de l'instance : GET /api/ai/status.
  */
 export const AI_ROUTES = {
+  STATUS: "/api/ai/status",
   USAGE: (slug: string) => `/api/workspaces/${slug}/ai/usage`,
   CONVERSATIONS: (slug: string) => `/api/workspaces/${slug}/ai/conversations`,
   CONVERSATION: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}`,
@@ -349,7 +331,6 @@ export const AI_ROUTES = {
  */
 export const NOTIFICATION_ROUTES = {
   LIST:            (slug: string) => `/api/workspaces/${slug}/notifications`,
-  UNREAD_COUNT:    (slug: string) => `/api/workspaces/${slug}/notifications/unread-count`,
   MARK_READ:       (slug: string, id: number) => `/api/workspaces/${slug}/notifications/${id}/read`,
   MARK_ALL_READ:   (slug: string) => `/api/workspaces/${slug}/notifications/read-all`,
   ACKNOWLEDGE:     (slug: string, id: number) => `/api/workspaces/${slug}/notifications/${id}/acknowledge`,
@@ -393,9 +374,6 @@ export const TEAM_ROUTES = {
   REMOVE_MEMBER:  (slug: string, teamId: number, userId: number) => `/api/workspaces/${slug}/teams/${teamId}/members/${userId}`,
 } as const;
 
-// Base backend pour les redirections navigateur (OAuth) - PAS pour les appels Axios.
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-
 /**
  * Routes intégrations (GitHub / Slack / Webhooks)
  * Backend: IntegrationController + WebhookController
@@ -406,12 +384,13 @@ export const INTEGRATION_ROUTES = {
   GITHUB_ISSUES:     (slug: string, repo: string) => `/api/workspaces/${slug}/integrations/github/issues?repo=${encodeURIComponent(repo)}`,
   /** Ingestion Brain OS : issues + PR d'un depot -> nodes de connaissance */
   GITHUB_SYNC:       (slug: string, repo: string) => `/api/workspaces/${slug}/integrations/github/sync?repo=${encodeURIComponent(repo)}`,
-  GITHUB_CONNECT:    (slug: string) => `${API_BASE}/api/workspaces/${slug}/integrations/github/connect`,
+  /** Appel Axios qui renvoie l'URL d'autorisation : relative, comme les autres (base du client HTTP). */
+  GITHUB_CONNECT:    (slug: string) => `/api/workspaces/${slug}/integrations/github/connect`,
   GITHUB_DISCONNECT: (slug: string) => `/api/workspaces/${slug}/integrations/github`,
   GITHUB_LINKS:      (slug: string, issueId: number) => `/api/workspaces/${slug}/integrations/github/issues/${issueId}/links`,
   GITHUB_LINK:       (slug: string, linkId: number) => `/api/workspaces/${slug}/integrations/github/links/${linkId}`,
   SLACK_STATUS:      (slug: string) => `/api/workspaces/${slug}/integrations/slack/status`,
-  SLACK_CONNECT:     (slug: string) => `${API_BASE}/api/workspaces/${slug}/integrations/slack/connect`,
+  SLACK_CONNECT:     (slug: string) => `/api/workspaces/${slug}/integrations/slack/connect`,
   SLACK_DISCONNECT:  (slug: string) => `/api/workspaces/${slug}/integrations/slack`,
   SLACK_CHANNELS:    (slug: string) => `/api/workspaces/${slug}/integrations/slack/channels`,
   SLACK_CHANNEL:     (slug: string, channelId: number) => `/api/workspaces/${slug}/integrations/slack/channels/${channelId}`,
@@ -419,10 +398,14 @@ export const INTEGRATION_ROUTES = {
   SLACK_SYNC:        (slug: string, channel: string) => `/api/workspaces/${slug}/integrations/slack/sync?channel=${encodeURIComponent(channel)}`,
   WEBHOOKS:          (slug: string) => `/api/workspaces/${slug}/webhooks`,
   WEBHOOK:           (slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}`,
-  /** Catalogue générique : le pool d'outils + statut de connexion */
+  /** Nouveau secret de signature (montré une fois) */
+  WEBHOOK_SECRET:    (slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}/secret`,
+  /** Envoi immédiat de l'événement de test « ping » */
+  WEBHOOK_TEST:      (slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}/test`,
+  /** 20 derniers envois d'un webhook */
+  WEBHOOK_DELIVERIES:(slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}/deliveries`,
+  /** Catalogue : intégrations natives, préréglages MCP, serveurs MCP du workspace, avec leur statut */
   CATALOG:           (slug: string) => `/api/workspaces/${slug}/integrations/catalog`,
-  /** Connexion générique d'un connecteur du catalogue (POST config / DELETE) */
-  CONNECTOR:         (slug: string, key: string) => `/api/workspaces/${slug}/integrations/connectors/${key}`,
   /** Serveurs MCP externes du workspace (GET statut · POST connect · DELETE par clé) → outils live dans Cortex */
   MCP_SERVERS:       (slug: string) => `/api/workspaces/${slug}/mcp/servers`,
   MCP_SERVER:        (slug: string, key: string) => `/api/workspaces/${slug}/mcp/servers/${key}`,
@@ -477,8 +460,6 @@ export const BRAIN_ROUTES = {
   NODES:       (slug: string) => `/api/workspaces/${slug}/brain/nodes`,
   NODE:        (slug: string, nodeId: number) => `/api/workspaces/${slug}/brain/nodes/${nodeId}`,
   NODE_MOVE:   (slug: string, nodeId: number) => `/api/workspaces/${slug}/brain/nodes/${nodeId}/move`,
-  EDGES:       (slug: string) => `/api/workspaces/${slug}/brain/edges`,
-  EDGE:        (slug: string, edgeId: number) => `/api/workspaces/${slug}/brain/edges/${edgeId}`,
   FILES:       (slug: string) => `/api/workspaces/${slug}/brain/files`,
 } as const;
 
@@ -487,7 +468,6 @@ export const BRAIN_ROUTES = {
  */
 export const API_ROUTES = {
   AUTH: AUTH_ROUTES,
-  STRIPE: STRIPE_ROUTES,
   USER: USER_ROUTES,
   WORKSPACE: WORKSPACE_ROUTES,
   ANALYTICS: ANALYTICS_ROUTES,

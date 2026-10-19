@@ -18,10 +18,10 @@ const EMPTY_CELL = "bg-muted/40"
 function cellClass(count: number, max: number): string {
   if (count <= 0 || max <= 0) return EMPTY_CELL
   const ratio = count / max
-  if (ratio <= 0.25) return "bg-amber-500/30"
-  if (ratio <= 0.5) return "bg-amber-500/55"
-  if (ratio <= 0.75) return "bg-orange-500/70"
-  return "bg-rose-500/85"
+  if (ratio <= 0.25) return "bg-shape-yellow/30"
+  if (ratio <= 0.5) return "bg-shape-yellow/60"
+  if (ratio <= 0.75) return "bg-shape-red/60"
+  return "bg-shape-red/85"
 }
 
 function dayLabel(iso: string): { dow: string; dom: string } {
@@ -95,10 +95,10 @@ export function WorkloadHeatmap({ data }: { readonly data: Workload | null }) {
             <span className="mr-1 font-medium uppercase tracking-wide">Due dates / day</span>
             <span>less</span>
             <span className={cn("size-3 rounded-sm", EMPTY_CELL)} />
-            <span className="size-3 rounded-sm bg-amber-500/30" />
-            <span className="size-3 rounded-sm bg-amber-500/55" />
-            <span className="size-3 rounded-sm bg-orange-500/70" />
-            <span className="size-3 rounded-sm bg-rose-500/85" />
+            <span className="size-3 rounded-sm bg-shape-yellow/30" />
+            <span className="size-3 rounded-sm bg-shape-yellow/60" />
+            <span className="size-3 rounded-sm bg-shape-red/60" />
+            <span className="size-3 rounded-sm bg-shape-red/85" />
             <span>more</span>
             <span className="ml-auto tabular-nums">peak: {peak}</span>
           </div>

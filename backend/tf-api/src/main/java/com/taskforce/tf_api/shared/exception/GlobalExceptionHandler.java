@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -227,7 +228,7 @@ public class GlobalExceptionHandler {
         ErrorResponse error = ErrorResponse.of(
                 HttpStatus.CONFLICT.value(),
                 "Conflict",
-                "Cette ressource existe déjà ou entre en conflit avec une autre.",
+                "This resource already exists or conflicts with another one.",
                 request.getRequestURI()
         );
 
@@ -248,11 +249,35 @@ public class GlobalExceptionHandler {
         ErrorResponse error = ErrorResponse.of(
                 HttpStatus.NOT_FOUND.value(),
                 "Not Found",
-                "Ressource introuvable.",
+                "Resource not found.",
                 request.getRequestURI()
         );
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    /**
+     * Méthode HTTP non prise en charge sur une route qui existe (ex. GET sur une route POST seulement) → 405,
+     * avec l'en-tête {@code Allow}. Sans ce handler, l'exception tombait dans le fourre-tout {@code Exception}
+     * ci-dessous : 500 « Unexpected error » et une trace d'erreur au journal pour une simple requête mal formée.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse error = ErrorResponse.of(
+                HttpStatus.METHOD_NOT_ALLOWED.value(),
+                "Method Not Allowed",
+                "This method is not allowed on this resource.",
+                request.getRequestURI()
+        );
+
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+        if (ex.getSupportedHttpMethods() != null && !ex.getSupportedHttpMethods().isEmpty()) {
+            response.allow(ex.getSupportedHttpMethods().toArray(org.springframework.http.HttpMethod[]::new));
+        }
+        return response.body(error);
     }
 
     /**
@@ -277,10 +302,8 @@ public class GlobalExceptionHandler {
 
     /**
      * Échec d'un appel au fournisseur d'identité (Keycloak) via son client JAX-RS — le seul client
-     * {@code jakarta.ws.rs} de l'app. Typiquement l'envoi d'un email d'action (reset mot de passe,
-     * configuration 2FA) via {@code executeActionsEmail} quand <b>le SMTP du realm Keycloak n'est pas
-     * configuré</b> (Keycloak renvoie alors un 500). Sans ce handler, cela remontait en <b>500 « erreur
-     * inattendue »</b> effrayant ; on renvoie un <b>502</b> clair et actionnable.
+     * {@code jakarta.ws.rs} de l'app (API d'administration : comptes, mots de passe, profils). Sans ce
+     * handler, cela remontait en <b>500 « erreur inattendue »</b> ; on renvoie un <b>502</b> clair.
      */
     @ExceptionHandler(WebApplicationException.class)
     public ResponseEntity<ErrorResponse> handleIdentityProviderError(
@@ -293,7 +316,7 @@ public class GlobalExceptionHandler {
         ErrorResponse error = ErrorResponse.of(
                 HttpStatus.BAD_GATEWAY.value(),
                 "Bad Gateway",
-                "Le service d'authentification n'a pas pu envoyer l'email (SMTP indisponible). Réessaie plus tard.",
+                "The identity service is unavailable. Please try again later.",
                 request.getRequestURI()
         );
 

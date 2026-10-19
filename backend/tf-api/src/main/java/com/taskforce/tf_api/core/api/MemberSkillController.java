@@ -45,7 +45,7 @@ public class MemberSkillController {
     ) {
         Long requesterId = resolveUserId(jwt);
         List<MemberSkillProfileResponse> profiles = skillService.listProfiles(slug, requesterId);
-        return ResponseEntity.ok(ApiResponse.success("Profils de compétences récupérés", profiles));
+        return ResponseEntity.ok(ApiResponse.success("Skill profiles retrieved", profiles));
     }
 
     @GetMapping("/members/{userId}/skills")
@@ -56,7 +56,7 @@ public class MemberSkillController {
     ) {
         Long requesterId = resolveUserId(jwt);
         MemberSkillProfileResponse profile = skillService.getProfile(slug, userId, requesterId);
-        return ResponseEntity.ok(ApiResponse.success("Profil de compétences récupéré", profile));
+        return ResponseEntity.ok(ApiResponse.success("Skill profile retrieved", profile));
     }
 
     @PutMapping("/members/{userId}/skills")
@@ -68,13 +68,13 @@ public class MemberSkillController {
     ) {
         Long requesterId = resolveUserId(jwt);
         MemberSkillProfileResponse profile = skillService.upsert(slug, userId, request, requesterId);
-        return ResponseEntity.ok(ApiResponse.success("Profil de compétences mis à jour", profile));
+        return ResponseEntity.ok(ApiResponse.success("Skill profile updated", profile));
     }
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

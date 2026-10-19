@@ -3,15 +3,16 @@
  * Runner local de délégation TaskForce (ADR-013).
  *
  *   TaskForce (« Assign to Claude Code »)  ->  run QUEUED
- *   runner : claim  ->  worktree git  ->  Claude Code sans interface + MCP TaskForce (session déléguée)
- *          ->  commits  ->  push + pull request  ->  résultat posté  ->  issue en « In review by AI »
+ *   runner : claim  ->  worktree git  ->  Claude Code sans interface + serveur MCP de l'instance (session déléguée)
+ *          ->  chronologie en direct et validations dans l'app  ->  commits  ->  push + pull request
+ *          ->  résultat posté  ->  issue en « In review by AI »
  *
  * Modèle « pull » : le backend ne peut pas joindre un poste local, c'est le runner qui vient chercher le
  * travail. Il ne fusionne jamais rien : la décision reste humaine.
  *
  * Options : `--check` (vérifie l'installation, ne réclame rien), `--once` (traite au plus un run puis sort).
  */
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
@@ -21,6 +22,7 @@ import { loadConfig, type RepoConfig, type RunnerConfig } from "./config.js";
 import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWorktree, resolveRepo, runSetup, type Worktree } from "./git.js";
 import { log } from "./log.js";
 import { resolveCommand, run } from "./proc.js";
+import { MIN_CLAUDE_CODE, supportsApprovals } from "./version.js";
 
 const HEARTBEAT_MS = 30_000;
 /** Marge gardée sur la durée de vie du jeton de session : l'agent doit finir avant son expiration. */
@@ -43,22 +45,22 @@ async function startAgentSession(config: RunnerConfig, api: TaskforceApi): Promi
   const budgetMs = session.expiresAt - Date.now() - TOKEN_SAFETY_MS;
   const timeoutMinutes = Math.max(1, Math.min(config.agent.timeoutMinutes, Math.floor(budgetMs / 60_000)));
   if (timeoutMinutes < config.agent.timeoutMinutes) {
-    log.warn(`Durée de l'agent ramenée à ${timeoutMinutes} min : c'est la durée de vie du jeton de session.`);
+    log.warn(`Agent time limit lowered to ${timeoutMinutes} min: that is the lifetime of the session token.`);
   }
   return { agentConfig: { ...config, agent: { ...config.agent, timeoutMinutes } }, token: session.token };
 }
 
 function logOutcome(outcome: AgentOutcome): void {
-  const meta = [outcome.turns !== null ? `${outcome.turns} tours` : "", outcome.costUsd !== null ? `${outcome.costUsd.toFixed(2)} USD` : ""]
+  const meta = [outcome.turns !== null ? `${outcome.turns} turn${outcome.turns === 1 ? "" : "s"}` : "", outcome.costUsd !== null ? `${outcome.costUsd.toFixed(2)} USD` : ""]
     .filter(Boolean).join(", ");
-  log.info(`Claude Code a terminé (${outcome.ok ? "succès" : "échec"}${meta ? `, ${meta}` : ""})`);
+  log.info(`Claude Code finished (${outcome.ok ? "success" : "failure"}${meta ? `, ${meta}` : ""})`);
 }
 
 /** Traite un run réclamé, jusqu'au résultat posté. Ne lève jamais : tout échec devient un résultat FAILED. */
 async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim): Promise<void> {
-  log.info(`Run #${claim.runId} réclamé : ${claim.issueKey} - ${claim.title}`);
+  log.info(`Run #${claim.runId} claimed: ${claim.issueKey} - ${claim.title}`);
   const heartbeat = setInterval(() => {
-    api.heartbeat(claim.runId).catch((e: unknown) => log.warn(`Signe de vie refusé : ${(e as Error).message}`));
+    api.heartbeat(claim.runId).catch((e: unknown) => log.warn(`Heartbeat refused: ${(e as Error).message}`));
   }, HEARTBEAT_MS);
 
   let result: RunResult;
@@ -69,12 +71,12 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim)
     if (claim.repoFullName) {
       repo = await resolveRepo(config.repos, config.autoClone, config.home, claim.repoFullName);
       worktree = await prepareWorktree(repo, claim, config.home);
-      log.info(`Worktree prêt : ${worktree.path} (branche ${worktree.branch}, base ${worktree.base})`);
+      log.info(`Worktree ready: ${worktree.path} (branch ${worktree.branch}, base ${worktree.base})`);
       await runSetup(worktree, repo.setup);
 
       const { agentConfig, token } = await startAgentSession(config, api);
-      log.info("Claude Code au travail...");
-      const outcome = await runAgent(agentConfig, claim, worktree.path, token, { mode: "repo", branch: worktree.branch });
+      log.info("Claude Code at work (follow it live in TaskForce)...");
+      const outcome = await runAgent(agentConfig, claim, worktree.path, token, { mode: "repo", branch: worktree.branch }, api);
       logOutcome(outcome);
       if (!outcome.ok) throw new Error(outcome.text);
 
@@ -90,7 +92,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim)
         await pushBranch(worktree);
         const url = config.openPullRequest ? await openPullRequest(worktree, repo, claim, outcome.text, config.home) : undefined;
         result = { status: "DONE", summary: outcome.text.slice(0, 7900), resultUrl: url };
-        log.info(url ? `Pull request ouverte : ${url}` : `Branche poussée : ${worktree.branch}`);
+        log.info(url ? `Pull request opened: ${url}` : `Branch pushed: ${worktree.branch}`);
       }
     } else {
       // Projet sans dépôt (tâche non-code) : l'agent travaille dans un dossier jetable et rend son travail
@@ -99,18 +101,18 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim)
         throw new Error("This project has no linked repository, and this runner only takes code tasks (acceptRepoless is off). Link a repository to the project, or enable repo-less tasks on the runner.");
       }
       scratch = prepareScratch(config.home, claim.runId);
-      log.info(`Espace de travail sans dépôt : ${scratch}`);
+      log.info(`Repo-less workspace: ${scratch}`);
 
       const { agentConfig, token } = await startAgentSession(config, api);
-      log.info("Claude Code au travail (tâche sans dépôt)...");
-      const outcome = await runAgent(agentConfig, claim, scratch, token, { mode: "repoless" });
+      log.info("Claude Code at work on a repo-less task (follow it live in TaskForce)...");
+      const outcome = await runAgent(agentConfig, claim, scratch, token, { mode: "repoless" }, api);
       logOutcome(outcome);
       if (!outcome.ok) throw new Error(outcome.text);
       result = { status: "DONE", summary: outcome.text.slice(0, 7900) };
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    log.error(`Run #${claim.runId} en échec : ${message}`);
+    log.error(`Run #${claim.runId} failed: ${message}`);
     result = { status: "FAILED", error: message.slice(0, 3900) };
   } finally {
     clearInterval(heartbeat);
@@ -118,9 +120,9 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim)
 
   try {
     await api.result(claim.runId, result);
-    log.info(`Run #${claim.runId} : résultat ${result.status} posté`);
+    log.info(`Run #${claim.runId}: ${result.status} result posted`);
   } catch (e) {
-    log.error(`Résultat du run #${claim.runId} non posté : ${(e as Error).message}`);
+    log.error(`Result of run #${claim.runId} not posted: ${(e as Error).message}`);
   }
 
   // Un dossier de travail en échec est gardé : c'est la seule trace locale de ce que l'agent a fait.
@@ -134,17 +136,17 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim)
 async function check(config: RunnerConfig, api: TaskforceApi): Promise<boolean> {
   let ok = true;
   const line = (good: boolean, label: string, detail = ""): void => {
-    console.log(`  ${good ? "[ok]" : "[KO]"} ${label}${detail ? ` : ${detail}` : ""}`);
+    console.log(`  ${good ? "[ok]" : "[KO]"} ${label}${detail ? `: ${detail}` : ""}`);
     if (!good) ok = false;
   };
 
   console.log(`Runner ${config.clientId} -> ${config.apiUrl}`);
   try {
     const { expiresAt } = await api.token(true);
-    line(true, "Jeton machine (Keycloak, relayé par le backend)", `valide ${Math.round((expiresAt - Date.now()) / 60_000)} min`);
+    line(true, "Machine token (Keycloak, relayed by TaskForce)", `valid for ${Math.round((expiresAt - Date.now()) / 60_000)} min`);
   } catch (e) {
     const status = e instanceof ApiError ? ` (HTTP ${e.status})` : "";
-    line(false, "Jeton machine", `${(e as Error).message}${status}. Backend démarré ? delivery.local-runner.enabled=true ? client créé par scripts/keycloak-runner.ps1 ?`);
+    line(false, "Machine token", `${(e as Error).message}${status}. Is TaskForce reachable at this URL, with the local runner enabled (DELIVERY_LOCAL_RUNNER_ENABLED=true)? Are the credentials in .env the latest ones?`);
   }
 
   for (const tool of ["git", "gh", config.agent.command]) {
@@ -152,27 +154,29 @@ async function check(config: RunnerConfig, api: TaskforceApi): Promise<boolean> 
     const found = probe !== null && probe.code === 0;
     const where = resolveCommand(tool).file;
     const needed = tool !== "gh" || (config.push && config.openPullRequest);
-    const why = probe === null ? `introuvable (${where})` : `« ${where} --version » a rendu le code ${probe.code}`;
-    if (found) line(true, tool, probe.stdout.trim().split(/\r?\n/)[0] ?? "");
+    const why = probe === null ? `not found (${where})` : `"${where} --version" exited with code ${probe.code}`;
+    const version = found ? (probe.stdout.trim().split(/\r?\n/)[0] ?? "") : "";
+    if (found && tool === config.agent.command && !supportsApprovals(version)) {
+      line(false, tool, `${version}: Claude Code ${MIN_CLAUDE_CODE} or later is needed for approvals in TaskForce (npm install -g @anthropic-ai/claude-code)`);
+    } else if (found) line(true, tool, version);
     else if (needed) line(false, tool, why);
-    else console.log(`  [--] ${tool} : ${why}, non requis ici`);
+    else console.log(`  [--] ${tool}: ${why}, not needed here`);
   }
-
-  line(existsSync(config.mcpEntry), "Serveur MCP TaskForce", existsSync(config.mcpEntry) ? config.mcpEntry : `${config.mcpEntry} absent : cd taskforce-mcp ; npm install ; npm run build`);
 
   const repos = Object.entries(config.repos);
   if (config.autoClone) {
-    console.log(`  [ok] Dépôts : clonés à la demande dans ${join(config.home, "repos")} (rien à configurer)`);
+    console.log(`  [ok] Repositories: cloned on demand into ${join(config.home, "repos")} (nothing to configure)`);
   } else if (repos.length === 0) {
-    line(false, "Dépôts", "aucun dans runner.config.json, et autoClone est désactivé");
+    line(false, "Repositories", "none in runner.config.json, and autoClone is off");
   }
   for (const [name, repo] of repos) {
     const probe = await run("git", ["-C", repo.path, "rev-parse", "--is-inside-work-tree"]).catch(() => null);
-    line(probe !== null && probe.code === 0, `Dépôt ${name}`, `${repo.path} (base ${repo.baseBranch})`);
+    line(probe !== null && probe.code === 0, `Repository ${name}`, `${repo.path} (base ${repo.baseBranch})`);
   }
-  console.log(`  Authentification de Claude Code : ${config.agent.auth === "subscription" ? "abonnement (le login de la personne, dans son Claude Code)" : "clé API"}`);
-  console.log(`  Sortie du poste : ${config.push ? (config.openPullRequest ? "push + pull request" : "push seul") : "aucune (branche locale)"}`);
-  console.log(`  Tâches sans dépôt (non-code) : ${config.acceptRepoless ? "acceptées, résultat rendu en commentaire" : "refusées (code uniquement)"}`);
+  console.log(`  Claude Code sign-in: ${config.agent.auth === "subscription" ? "subscription (the person's own login, in their Claude Code)" : "API key"}`);
+  console.log(`  Leaving the machine: ${config.push ? (config.openPullRequest ? "push + pull request" : "push only") : "nothing (local branch)"}`);
+  console.log(`  Repo-less tasks (non-code): ${config.acceptRepoless ? "accepted, result posted as a comment" : "refused (code only)"}`);
+  console.log(`  Approvals: actions outside the pre-approved set wait up to ${config.agent.approvalTimeoutMinutes} min for your answer in TaskForce, then are denied`);
   return ok;
 }
 
@@ -189,10 +193,10 @@ async function main(): Promise<void> {
   process.on("SIGINT", () => {
     if (stopping) process.exit(130);
     stopping = true;
-    log.info("Arrêt demandé : le runner sort après le run en cours (Ctrl+C à nouveau pour forcer).");
+    log.info("Stop requested: the runner exits after the current run (Ctrl+C again to force).");
   });
 
-  log.info(`Runner ${config.clientId} à l'écoute de ${config.apiUrl} (toutes les ${config.pollSeconds} s)`);
+  log.info(`Runner ${config.clientId} listening to ${config.apiUrl} (every ${config.pollSeconds} s)`);
   let lastError = "";
   while (!stopping) {
     try {
@@ -204,13 +208,13 @@ async function main(): Promise<void> {
         continue;
       }
       if (args.has("--once")) {
-        log.info("Aucun run en attente.");
+        log.info("No run is waiting.");
         break;
       }
     } catch (e) {
       // Backend redémarré, réseau coupé : on réessaie, sans noyer le journal du même message.
       const message = e instanceof Error ? e.message : String(e);
-      if (message !== lastError) log.warn(`TaskForce injoignable ou refus : ${message}`);
+      if (message !== lastError) log.warn(`TaskForce unreachable or refused: ${message}`);
       lastError = message;
       if (args.has("--once")) process.exit(1);
     }

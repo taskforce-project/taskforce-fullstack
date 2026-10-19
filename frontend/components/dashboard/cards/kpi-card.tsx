@@ -12,7 +12,7 @@ import { CardError, CardSkeleton } from "../card-states"
 /** Ligne de delta façon page Analytics : +N vs mois dernier, vert/rouge/neutre. */
 function DeltaLine({ delta, suffix }: { readonly delta: number; readonly suffix: string }) {
   const DeltaIcon = delta === 0 ? Minus : delta > 0 ? TrendingUp : TrendingDown
-  const cls = delta === 0 ? "text-muted-foreground" : delta > 0 ? "text-emerald-500" : "text-rose-500"
+  const cls = delta === 0 ? "text-muted-foreground" : delta > 0 ? "text-ink-green" : "text-destructive"
   return (
     <div className={cn("flex items-center gap-1 text-xs font-medium tabular-nums", cls)}>
       <DeltaIcon className="size-3.5" />
@@ -37,7 +37,7 @@ function KpiBody({
         <span className="text-3xl font-semibold tabular-nums tracking-tight">{value}</span>
         <span className="text-xs text-muted-foreground">{unit}</span>
       </div>
-      {delta !== undefined && <DeltaLine delta={delta} suffix="vs mois dernier" />}
+      {delta !== undefined && <DeltaLine delta={delta} suffix="vs last month" />}
     </div>
   )
 }
@@ -73,9 +73,9 @@ export function KpiCard({ slug, card, refreshToken }: DashboardCardBodyProps) {
   if (error || !kpis) return <CardError onRetry={() => setRetry((n) => n + 1)} />
 
   if (card.cardType === "kpi-velocity") {
-    return <KpiBody value={String(kpis.velocity)} unit="7 derniers jours" delta={kpis.velocityDelta} />
+    return <KpiBody value={String(kpis.velocity)} unit="last 7 days" delta={kpis.velocityDelta} />
   }
-  return <KpiBody value={String(kpis.tasksResolved)} unit="ce mois-ci" delta={kpis.tasksResolvedDelta} />
+  return <KpiBody value={String(kpis.tasksResolved)} unit="this month" delta={kpis.tasksResolvedDelta} />
 }
 
 /**

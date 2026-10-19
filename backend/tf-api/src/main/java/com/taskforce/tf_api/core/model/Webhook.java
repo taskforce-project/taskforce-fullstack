@@ -4,7 +4,10 @@ import java.time.LocalDateTime;
 
 import org.hibernate.annotations.CreationTimestamp;
 
+import com.taskforce.tf_api.shared.security.EncryptedStringConverter;
+
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -45,7 +48,9 @@ public class Webhook {
     @Column(name = "url", nullable = false, length = 512)
     private String url;
 
-    @Column(name = "secret", length = 128)
+    /** Secret de signature HMAC des envois (OSS-6.2), généré par l'instance, chiffré au repos. */
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(name = "secret", columnDefinition = "TEXT")
     private String secret;
 
     @org.hibernate.annotations.Array(length = 32)

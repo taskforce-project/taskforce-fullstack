@@ -9,30 +9,29 @@ vi.mock('../api/delivery-service', () => ({
   getIssueRun: vi.fn(),
   listWorkspaceRuns: vi.fn(),
   delegateIssue: vi.fn(),
-  getDeliveryKey: vi.fn(),
-  connectDeliveryKey: vi.fn(),
-  disconnectDeliveryKey: vi.fn(),
   getRunnerStatus: vi.fn(),
   provisionRunner: vi.fn(),
+  getRunActivity: vi.fn(),
+  decideApproval: vi.fn(),
 }));
 
 function makeRun(overrides: Partial<DeliveryRun> = {}): DeliveryRun {
   return {
     id: 1, issueId: 5, issueKey: 'WEB-5', issueTitle: 'Fix the footer', projectId: 12, projectName: 'Website',
-    providerKey: 'stub', model: 'stub', status: 'QUEUED',
+    providerKey: 'claude-code', model: 'claude-sonnet-5', status: 'QUEUED',
     summary: null, resultUrl: null, error: null, startedById: 7, createdAt: null, updatedAt: null,
     ...overrides,
   };
 }
 
 const PROVIDERS: DeliveryProvider[] = [
-  { key: 'stub', displayName: 'Demo agent (stub)', logoKey: 'sparkles', available: true, models: ['stub'] },
+  { key: 'claude-code', displayName: 'Claude Code', logoKey: 'anthropic', available: true, models: ['claude-sonnet-5'], ready: true, reason: null },
 ];
 
 describe('delivery-store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    act(() => useDeliveryStore.setState({ providers: [], providersLoading: false, runs: {}, workspaceRuns: [], keys: {}, runner: null }));
+    act(() => useDeliveryStore.setState({ providers: [], projectProviders: {}, providersLoading: false, runs: {}, workspaceRuns: [], runner: null, activity: {} }));
   });
 
   it('fetchProviders loads the providers', async () => {
@@ -87,61 +86,17 @@ describe('delivery-store', () => {
     const run = makeRun({ id: 2, status: 'QUEUED' });
     vi.mocked(svc.delegateIssue).mockResolvedValue(run);
     let res: DeliveryRun | null = null;
-    await act(async () => { res = await useDeliveryStore.getState().delegate('acme', 5, 'stub'); });
+    await act(async () => { res = await useDeliveryStore.getState().delegate('acme', 5, 'claude-code'); });
     expect(res).toEqual(run);
     expect(useDeliveryStore.getState().runs[5]).toEqual(run);
-    expect(svc.delegateIssue).toHaveBeenCalledWith('acme', 5, 'stub', undefined);
+    expect(svc.delegateIssue).toHaveBeenCalledWith('acme', 5, 'claude-code', undefined);
   });
 
   it('delegate returns null on failure', async () => {
     vi.mocked(svc.delegateIssue).mockRejectedValue(new Error('x'));
     let res: DeliveryRun | null = makeRun();
-    await act(async () => { res = await useDeliveryStore.getState().delegate('acme', 5, 'stub'); });
+    await act(async () => { res = await useDeliveryStore.getState().delegate('acme', 5, 'claude-code'); });
     expect(res).toBeNull();
-  });
-
-  it('fetchKey stores the key status by provider', async () => {
-    vi.mocked(svc.getDeliveryKey).mockResolvedValue({ connected: true, keyHint: '...AB12' });
-    await act(async () => { await useDeliveryStore.getState().fetchKey('acme', 'anthropic'); });
-    expect(useDeliveryStore.getState().keys.anthropic).toEqual({ connected: true, keyHint: '...AB12' });
-    expect(svc.getDeliveryKey).toHaveBeenCalledWith('acme', 'anthropic');
-  });
-
-  it('fetchKey returns null on failure', async () => {
-    vi.mocked(svc.getDeliveryKey).mockRejectedValue(new Error('x'));
-    let res: unknown;
-    await act(async () => { res = await useDeliveryStore.getState().fetchKey('acme', 'cursor'); });
-    expect(res).toBeNull();
-  });
-
-  it('connectKey stores the returned status under the provider (cursor)', async () => {
-    vi.mocked(svc.connectDeliveryKey).mockResolvedValue({ connected: true, keyHint: '...WXYZ' });
-    await act(async () => { await useDeliveryStore.getState().connectKey('acme', 'cursor', 'key_WXYZ'); });
-    expect(useDeliveryStore.getState().keys.cursor).toEqual({ connected: true, keyHint: '...WXYZ' });
-    expect(svc.connectDeliveryKey).toHaveBeenCalledWith('acme', 'cursor', 'key_WXYZ');
-  });
-
-  it('connectKey returns null on failure', async () => {
-    vi.mocked(svc.connectDeliveryKey).mockRejectedValue(new Error('x'));
-    let res: unknown;
-    await act(async () => { res = await useDeliveryStore.getState().connectKey('acme', 'anthropic', 'bad'); });
-    expect(res).toBeNull();
-  });
-
-  it('disconnectKey clears the provider status and returns true', async () => {
-    act(() => useDeliveryStore.setState({ keys: { anthropic: { connected: true, keyHint: '...AB12' } } }));
-    vi.mocked(svc.disconnectDeliveryKey).mockResolvedValue(undefined);
-    let ok: boolean = false;
-    await act(async () => { ok = await useDeliveryStore.getState().disconnectKey('acme', 'anthropic'); });
-    expect(ok).toBe(true);
-    expect(useDeliveryStore.getState().keys.anthropic).toEqual({ connected: false, keyHint: null });
-  });
-
-  it('disconnectKey returns false on failure', async () => {
-    vi.mocked(svc.disconnectDeliveryKey).mockRejectedValue(new Error('x'));
-    let ok: boolean = true;
-    await act(async () => { ok = await useDeliveryStore.getState().disconnectKey('acme', 'cursor'); });
-    expect(ok).toBe(false);
   });
 
   it('fetchRunner stores the runner status', async () => {
@@ -176,5 +131,74 @@ describe('delivery-store', () => {
     let res: unknown = 'unset';
     await act(async () => { res = await useDeliveryStore.getState().provisionRunner(); });
     expect(res).toBeNull();
+  });
+
+  // ---- activité d'un run (lot 5) ----
+
+  const approval = (status: 'PENDING' | 'ALLOWED', canDecide = true) => ({
+    id: 9, tool: 'Bash', summary: 'npm install lodash', status, createdAt: null, expiresAt: null, decidedAt: null,
+    decidedBy: null, canDecide,
+  });
+  const event = (seq: number) => ({ seq, kind: 'tool' as const, tool: 'Bash', text: `step ${seq}`, at: null });
+
+  it('fetchActivity reads after the last known event and appends without duplicates', async () => {
+    vi.mocked(svc.getRunActivity)
+      .mockResolvedValueOnce({ events: [event(1), event(2)], approvals: [approval('PENDING')] })
+      .mockResolvedValueOnce({ events: [event(2), event(3)], approvals: [approval('ALLOWED', false)] });
+
+    await act(async () => { await useDeliveryStore.getState().fetchActivity('acme', 100); });
+    await act(async () => { await useDeliveryStore.getState().fetchActivity('acme', 100); });
+
+    expect(svc.getRunActivity).toHaveBeenNthCalledWith(1, 'acme', 100, 0);
+    expect(svc.getRunActivity).toHaveBeenNthCalledWith(2, 'acme', 100, 2);
+    const activity = useDeliveryStore.getState().activity[100];
+    expect(activity?.events.map((e) => e.seq)).toEqual([1, 2, 3]);
+    expect(activity?.approvals[0]?.status).toBe('ALLOWED');
+  });
+
+  it('fetchActivity returns null on failure and keeps what it had', async () => {
+    act(() => useDeliveryStore.setState({ activity: { 100: { events: [event(1)], approvals: [] } } }));
+    vi.mocked(svc.getRunActivity).mockRejectedValue(new Error('x'));
+    let res: unknown = 'unset';
+    await act(async () => { res = await useDeliveryStore.getState().fetchActivity('acme', 100); });
+    expect(res).toBeNull();
+    expect(useDeliveryStore.getState().activity[100]?.events).toHaveLength(1);
+  });
+
+  it('decideApproval sends the decision then refreshes the activity', async () => {
+    vi.mocked(svc.decideApproval).mockResolvedValue(undefined);
+    vi.mocked(svc.getRunActivity).mockResolvedValue({ events: [], approvals: [approval('ALLOWED', false)] });
+    let ok = false;
+    await act(async () => { ok = await useDeliveryStore.getState().decideApproval('acme', 100, 9, true); });
+    expect(ok).toBe(true);
+    expect(svc.decideApproval).toHaveBeenCalledWith('acme', 100, 9, true);
+    expect(useDeliveryStore.getState().activity[100]?.approvals[0]?.status).toBe('ALLOWED');
+  });
+
+  it('decideApproval returns false when the server refuses', async () => {
+    vi.mocked(svc.decideApproval).mockRejectedValue(new Error('expired'));
+    let ok = true;
+    await act(async () => { ok = await useDeliveryStore.getState().decideApproval('acme', 100, 9, false); });
+    expect(ok).toBe(false);
+  });
+
+  // ---- agents par projet (lot 5) ----
+
+  it('fetchProjectProviders keeps the list of each project apart', async () => {
+    const notReady = [{ ...PROVIDERS[0]!, ready: false, reason: 'Set up your local runner first' }];
+    vi.mocked(svc.getDeliveryProviders).mockResolvedValueOnce(PROVIDERS).mockResolvedValueOnce(notReady);
+    await act(async () => { await useDeliveryStore.getState().fetchProjectProviders('acme', 12); });
+    await act(async () => { await useDeliveryStore.getState().fetchProjectProviders('acme', 13); });
+    expect(svc.getDeliveryProviders).toHaveBeenNthCalledWith(1, 'acme', 12);
+    expect(useDeliveryStore.getState().projectProviders[12]?.[0]?.ready).toBe(true);
+    expect(useDeliveryStore.getState().projectProviders[13]?.[0]?.reason).toBe('Set up your local runner first');
+    expect(useDeliveryStore.getState().providers).toEqual([]);
+  });
+
+  it('fetchProjectProviders returns [] on failure', async () => {
+    vi.mocked(svc.getDeliveryProviders).mockRejectedValue(new Error('x'));
+    let res = PROVIDERS;
+    await act(async () => { res = await useDeliveryStore.getState().fetchProjectProviders('acme', 12); });
+    expect(res).toEqual([]);
   });
 });

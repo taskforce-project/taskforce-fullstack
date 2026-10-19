@@ -41,6 +41,8 @@ class AiConversationServiceTest {
     @Mock private AiMessageRepository messageRepository;
     @Mock private com.taskforce.tf_api.core.service.LlmClient llm;
     @Mock private AiMeter aiMeter;
+    @org.mockito.Spy private org.springframework.transaction.support.TransactionTemplate transactionTemplate =
+        new com.taskforce.tf_api.util.InlineTransactionTemplate();
 
     @InjectMocks private AiConversationService service;
 
@@ -55,7 +57,6 @@ class AiConversationServiceTest {
     @Test
     @DisplayName("compressIfNeeded : au-delà du seuil, condense les anciens et pose le filigrane")
     void compressIfNeeded_summarizes_over_threshold() throws Exception {
-        ReflectionTestUtils.setField(service, "model", "m");
         // AiMeter en pass-through : exécute le résumé LLM sans gate ni comptage réel.
         when(aiMeter.metered(any(), any())).thenAnswer(inv -> ((AiMeter.AiCall<?>) inv.getArgument(1)).call());
         when(llm.isConfigured()).thenReturn(true);
@@ -69,7 +70,7 @@ class AiConversationServiceTest {
             unsummarized.add(msg(i, i % 2 == 1 ? "user" : "assistant", "msg" + i));
         }
         when(messageRepository.findByConversationIdAndIdGreaterThanOrderByIdAsc(1L, 0L)).thenReturn(unsummarized);
-        when(llm.chatCompletion(anyString(), anyString(), anyString(), anyBoolean(), anyString()))
+        when(llm.chatCompletion(anyString(), anyString(), anyBoolean(), anyString()))
             .thenReturn("Résumé compact des 7 premiers échanges.");
 
         service.compressIfNeeded(1L);
@@ -88,14 +89,13 @@ class AiConversationServiceTest {
 
         service.compressIfNeeded(1L);
 
-        verify(llm, never()).chatCompletion(anyString(), anyString(), anyString(), anyBoolean(), anyString());
+        verify(llm, never()).chatCompletion(anyString(), anyString(), anyBoolean(), anyString());
         verify(conversationRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
     @DisplayName("compressIfNeeded : rien de neuf au-delà des récents → no-op")
     void compressIfNeeded_noop_when_nothing_new_beyond_recent() {
-        ReflectionTestUtils.setField(service, "model", "m");
         when(llm.isConfigured()).thenReturn(true);
         when(messageRepository.countByConversationId(1L)).thenReturn(13);
 
@@ -111,7 +111,7 @@ class AiConversationServiceTest {
 
         service.compressIfNeeded(1L);
 
-        verify(llm, never()).chatCompletion(anyString(), anyString(), anyString(), anyBoolean(), anyString());
+        verify(llm, never()).chatCompletion(anyString(), anyString(), anyBoolean(), anyString());
         verify(conversationRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
 

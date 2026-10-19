@@ -3,6 +3,7 @@
 import * as LucideIcons from "lucide-react"
 import { FolderKanban } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { inkOnShape } from "@/lib/palette"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,8 +56,8 @@ export function ProjectIcon({ iconUrl, className, size = 40, color }: ProjectIco
     tinted ? cn(color, "border-transparent") : "bg-muted border-border",
     className
   )
-  // Sur fond teinté, l'icône passe en blanc ; sinon teinte neutre.
-  const glyphClass = tinted ? "text-white" : "text-muted-foreground"
+  // Sur fond teinté, l'encre lisible de la forme (blanc ou bleu nuit) ; sinon teinte neutre.
+  const glyphClass = tinted ? inkOnShape(color as string) : "text-muted-foreground"
 
   // Image (base64 or URL)
   if (iconUrl && (iconUrl.startsWith("data:") || iconUrl.startsWith("http"))) {

@@ -22,7 +22,6 @@ import com.taskforce.tf_api.core.dto.request.UpdateWorkspaceRequest;
 import com.taskforce.tf_api.core.dto.response.AuditLogResponse;
 import com.taskforce.tf_api.core.dto.response.WorkspaceMemberResponse;
 import com.taskforce.tf_api.core.dto.response.WorkspaceResponse;
-import com.taskforce.tf_api.core.dto.response.WorkspaceUsageResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.WorkspaceService;
@@ -61,7 +60,7 @@ public class WorkspaceController {
     ) {
         Long userId = resolveUserId(jwt);
         List<WorkspaceResponse> workspaces = workspaceService.listWorkspacesByUser(userId);
-        return ResponseEntity.ok(ApiResponse.success("Workspaces récupérés", workspaces));
+        return ResponseEntity.ok(ApiResponse.success("Workspaces retrieved", workspaces));
     }
 
     /**
@@ -76,7 +75,7 @@ public class WorkspaceController {
         Long userId = resolveUserId(jwt);
         WorkspaceResponse response = workspaceService.createNewWorkspace(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Workspace créé", response));
+            .body(ApiResponse.success("Workspace created", response));
     }
 
     // -------------------------------------------------------------------------
@@ -94,7 +93,7 @@ public class WorkspaceController {
     ) {
         Long userId = resolveUserId(jwt);
         WorkspaceResponse response = workspaceService.getWorkspaceBySlug(slug, userId);
-        return ResponseEntity.ok(ApiResponse.success("Workspace récupéré", response));
+        return ResponseEntity.ok(ApiResponse.success("Workspace retrieved", response));
     }
 
     /**
@@ -110,19 +109,7 @@ public class WorkspaceController {
         Long userId = resolveUserId(jwt);
         WorkspaceResponse ws = workspaceService.getWorkspaceBySlug(slug, userId);
         WorkspaceResponse response = workspaceService.updateWorkspace(ws.getId(), userId, request);
-        return ResponseEntity.ok(ApiResponse.success("Workspace mis à jour", response));
-    }
-
-    /**
-     * GET /api/workspaces/:slug/usage — usage vs limites du plan (PROD-4.2, anti-drift).
-     */
-    @GetMapping("/{slug}/usage")
-    public ResponseEntity<ApiResponse<WorkspaceUsageResponse>> getUsage(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable String slug
-    ) {
-        Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success("Usage récupéré", workspaceService.getUsage(slug, userId)));
+        return ResponseEntity.ok(ApiResponse.success("Workspace updated", response));
     }
 
     /**
@@ -149,7 +136,7 @@ public class WorkspaceController {
         Long userId = resolveUserId(jwt);
         WorkspaceResponse ws = workspaceService.getWorkspaceBySlug(slug, userId);
         List<WorkspaceMemberResponse> members = workspaceService.getMembers(ws.getId(), userId);
-        return ResponseEntity.ok(ApiResponse.success("Membres récupérés", members));
+        return ResponseEntity.ok(ApiResponse.success("Members retrieved", members));
     }
 
     /**
@@ -166,7 +153,7 @@ public class WorkspaceController {
         WorkspaceResponse ws = workspaceService.getWorkspaceBySlug(slug, userId);
         WorkspaceMemberResponse member = workspaceService.inviteMember(ws.getId(), userId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Membre ajouté", member));
+            .body(ApiResponse.success("Member added", member));
     }
 
     /**
@@ -182,7 +169,7 @@ public class WorkspaceController {
         Long userId = resolveUserId(jwt);
         WorkspaceResponse ws = workspaceService.getWorkspaceBySlug(slug, userId);
         WorkspaceMemberResponse member = workspaceService.updateMemberRole(ws.getId(), userId, memberId, request);
-        return ResponseEntity.ok(ApiResponse.success("Rôle mis à jour", member));
+        return ResponseEntity.ok(ApiResponse.success("Role updated", member));
     }
 
     /**
@@ -197,7 +184,7 @@ public class WorkspaceController {
         Long userId = resolveUserId(jwt);
         WorkspaceResponse ws = workspaceService.getWorkspaceBySlug(slug, userId);
         workspaceService.removeMember(ws.getId(), userId, memberId);
-        return ResponseEntity.ok(ApiResponse.success("Membre retiré", null));
+        return ResponseEntity.ok(ApiResponse.success("Member removed", null));
     }
 
     /**
@@ -211,24 +198,7 @@ public class WorkspaceController {
         Long userId = resolveUserId(jwt);
         WorkspaceResponse ws = workspaceService.getWorkspaceBySlug(slug, userId);
         workspaceService.deleteWorkspace(ws.getId(), userId);
-        return ResponseEntity.ok(ApiResponse.success("Workspace supprimé", null));
-    }
-
-    // -------------------------------------------------------------------------
-    // Rétrocompatibilité
-    // -------------------------------------------------------------------------
-
-    /**
-     * GET /api/workspaces/current — rétrocompatibilité
-     * Retourne le premier workspace de l'utilisateur.
-     */
-    @GetMapping("/current")
-    public ResponseEntity<ApiResponse<WorkspaceResponse>> getCurrent(
-        @AuthenticationPrincipal Jwt jwt
-    ) {
-        Long userId = resolveUserId(jwt);
-        WorkspaceResponse response = workspaceService.getWorkspaceByUserId(userId);
-        return ResponseEntity.ok(ApiResponse.success("Workspace récupéré", response));
+        return ResponseEntity.ok(ApiResponse.success("Workspace deleted", null));
     }
 
     // -------------------------------------------------------------------------
@@ -238,7 +208,7 @@ public class WorkspaceController {
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

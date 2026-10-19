@@ -27,8 +27,4 @@ public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember
 
     @Query("SELECT COUNT(m) FROM WorkspaceMember m WHERE m.workspace.slug = :slug")
     long countByWorkspaceSlug(@Param("slug") String slug);
-
-    /** Nb de membres distincts (= sièges facturables) sur tous les workspaces d'un propriétaire. */
-    @Query("SELECT COUNT(DISTINCT m.user.id) FROM WorkspaceMember m WHERE m.workspace.owner.id = :ownerId")
-    long countDistinctMembersByOwnerId(@Param("ownerId") Long ownerId);
 }

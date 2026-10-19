@@ -8,7 +8,7 @@ describe("BrandLogo", () => {
   it.each([
     // [slug, nom affiché, initiales attendues]
     ["anthropic", "Claude Code", "CL"],
-    ["anthropic", "Claude (API)", "CL"],
+    ["anthropic", "Claude Code", "CL"],
     ["marque-inconnue", "Acme", "AC"],
   ])("« %s » (%s) : repli neutre en initiales, aucun fichier de logo chargé", (slug, name, expected) => {
     const { container } = render(<BrandLogo slug={slug} name={name} />);

@@ -9,7 +9,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -17,7 +16,6 @@ import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthService;
-import com.taskforce.tf_api.core.service.StripeWebhookService;
 import com.taskforce.tf_api.core.service.TwoFactorService;
 import com.taskforce.tf_api.core.service.UserService;
 import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
@@ -36,15 +34,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Tranche web des points d'entrée publics (connexion externe OAuth, webhook Stripe) et
- * utilisateur. Vérifie le routage et les gardes de bordure : liste blanche des fournisseurs,
- * état anti-CSRF, signature Stripe, exigence d'authentification. Le webhook et l'OAuth sont dans
- * PUBLIC_MATCHERS (chaîne @Order(1)) → aucun JWT attendu ; /users/** reste authentifié.
+ * Tranche web des points d'entrée publics (connexion externe OAuth) et utilisateur. Vérifie le
+ * routage et les gardes de bordure : liste blanche des fournisseurs, état anti-CSRF, exigence
+ * d'authentification. L'OAuth est dans PUBLIC_MATCHERS (chaîne @Order(1)) → aucun JWT attendu ;
+ * /users/** reste authentifié.
  */
-@WebMvcTest({OAuthLoginController.class, UserController.class, StripeWebhookController.class})
+@WebMvcTest({OAuthLoginController.class, UserController.class})
 @Import({SecurityConfig.class, RefreshTokenCookie.class})
 @ActiveProfiles("test")
-@TestPropertySource(properties = "stripe.webhook-secret=whsec_test_dummy")
 @DisplayName("Controllers publics + utilisateur (@WebMvcTest)")
 class AuthUserControllersWebMvcTest {
 
@@ -55,7 +52,6 @@ class AuthUserControllersWebMvcTest {
     @MockitoBean private UserService userService;
     @MockitoBean private TwoFactorService twoFactorService;
     @MockitoBean private JwtIdentityResolver identityResolver;
-    @MockitoBean private StripeWebhookService stripeWebhookService;
     // Requis pour instancier WorkspaceAccessInterceptor (WebMvcConfig chargé dans la slice), même si
     // aucune route testée ici n'est sous /api/workspaces/** → l'intercepteur ne s'applique pas.
     @MockitoBean private UserRepository userRepository;
@@ -115,24 +111,5 @@ class AuthUserControllersWebMvcTest {
     @DisplayName("GET /users/me sans JWT → 401")
     void user_me_unauthenticated_401() throws Exception {
         mockMvc.perform(get("/api/users/me")).andExpect(status().isUnauthorized());
-    }
-
-    // ── Webhook Stripe (public, signature vérifiée dans le controller) ───────────
-
-    @Test
-    @DisplayName("POST webhook sans en-tête de signature → 400")
-    void stripe_webhook_missing_signature_400() throws Exception {
-        mockMvc.perform(post("/api/webhooks/stripe")
-                .contentType(MediaType.APPLICATION_JSON).content("{}"))
-            .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("POST webhook avec signature invalide → 400")
-    void stripe_webhook_bad_signature_400() throws Exception {
-        mockMvc.perform(post("/api/webhooks/stripe")
-                .header("Stripe-Signature", "t=1,v1=deadbeef")
-                .contentType(MediaType.APPLICATION_JSON).content("{}"))
-            .andExpect(status().isBadRequest());
     }
 }

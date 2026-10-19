@@ -89,7 +89,7 @@ public class Project {
     @Column(name = "icon_url", columnDefinition = "TEXT")
     private String iconUrl;
 
-    /** Couleur d'accent (classe Tailwind, ex: "bg-violet-500"). Défaut neutre. */
+    /** Couleur d'accent (classe Tailwind, ex: "bg-shape-blue"). Défaut neutre. */
     @Column(nullable = false, length = 50)
     @Builder.Default
     private String color = "bg-primary";

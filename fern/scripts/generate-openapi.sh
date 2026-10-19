@@ -27,4 +27,7 @@ if command -v jq >/dev/null 2>&1; then
 else
   cp /tmp/tf-openapi.json "${OUT}"
 fi
+
+# Meme nettoyage que generate-openapi.ps1 : actuator et endpoints internes retires, sections nommees et decrites.
+node "$(dirname "$0")/clean-openapi.mjs"
 echo "OK -> ${OUT}"

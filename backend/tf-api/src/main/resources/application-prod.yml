@@ -46,16 +46,8 @@ spring:
       use-key-prefix: true
       cache-null-values: false
 
-  # Security Configuration
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM:taskforce}
-          jwk-set-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM:taskforce}/protocol/openid-connect/certs
-      # Pas de bloc `client` : le client OAuth2 de Spring n'est consommé nulle part (la connexion
-      # externe passe par OAuthLoginService, en appels maison lisant `keycloak.*`). Sa présence
-      # déclenchait une découverte OIDC au démarrage, incompatible avec un realm à issuer fixe.
+  # Pas de bloc `security.oauth2` : le décodeur JWT est fourni par SecurityConfig.jwtDecoder() (issuer
+  # public, JWKS interne, lus dans `keycloak.*`), et la connexion externe passe par OAuthLoginService.
   web:
     error:
       include-stacktrace: never
@@ -98,13 +90,6 @@ keycloak:
     username: ${KEYCLOAK_ADMIN_USERNAME}
     password: ${KEYCLOAK_ADMIN_PASSWORD}
     client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
-  # Endpoints OIDC (dérivés de keycloak.url/realm) — consommés par KeycloakAuthService / OAuthLoginService.
-  endpoints:
-    token: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/token
-    logout: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/logout
-    userinfo: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/userinfo
-    introspect: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/token/introspect
-    certs: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/certs
 
 # Application URLs (OAuth callbacks, liens e-mail)
 app:
@@ -115,7 +100,7 @@ app:
   api-url: ${APP_API_URL:${APP_URL}}
 
 # ── Blocs ajoutés le 18/08/2026 (1er déploiement VM) : absents du profil prod alors que le code les
-#    lit (MailConfig / MinioConfig / StripeConfig / OtpService) → le backend ne DÉMARRAIT PAS sans eux.
+#    lit (MailConfig / MinioConfig / OtpService) → le backend ne DÉMARRAIT PAS sans eux.
 #    Valeurs renseignées via .env.prod. ──
 # Email transactionnel (OTP, invitations, réinitialisation). Vide = SMTP inactif.
 mail:
@@ -141,24 +126,6 @@ minio:
   access-key: ${MINIO_ROOT_USER}
   secret-key: ${MINIO_ROOT_PASSWORD}
   bucket: ${MINIO_BUCKET:taskforce-attachments}
-
-# Paiement Stripe (vide = facturation inactive, l'app démarre quand même).
-stripe:
-  api-key: ${STRIPE_SECRET_KEY:}
-  publishable-key: ${STRIPE_PUBLIC_KEY:}
-  webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
-  plans:
-    basic:
-      price-id: ${STRIPE_PRICE_ID_BASIC:}
-      yearly-price-id: ${STRIPE_PRICE_ID_BASIC_YEARLY:}
-    business:
-      price-id: ${STRIPE_PRICE_ID_BUSINESS:}
-      yearly-price-id: ${STRIPE_PRICE_ID_BUSINESS_YEARLY:}
-    enterprise:
-      price-id: ${STRIPE_ENTERPRISE_PRICE_ID:}
-  # Le code lit stripe.success-url / stripe.cancel-url À PLAT (StripeConfig @Value), pas sous stripe.checkout.
-  success-url: ${STRIPE_SUCCESS_URL:${APP_URL}/settings/billing?success=true}
-  cancel-url: ${STRIPE_CANCEL_URL:${APP_URL}/settings/billing?canceled=true}
 
 # OTP (codes à usage unique). En prod, l'échec d'envoi BLOQUE l'inscription (pas de fallback log).
 otp:
@@ -205,6 +172,17 @@ integrations:
       redirect-base: ${APP_API_URL:${APP_URL}}   # base publique du BACKEND (recoit le callback OAuth)
       app-base: ${FRONTEND_URL}                   # base du FRONT (retour utilisateur apres callback)
 
+# Webhooks sortants (OSS-6.2) : envois signés HMAC-SHA256, tentés jusqu'à 6 fois sur 9 h environ.
+taskforce:
+  # Inscription : adresse vérifiée par un code envoyé par e-mail. false = compte prêt tout de suite, pour une instance
+  # sans SMTP (auto-hébergement, SELF_HOSTING.md) ; personne ne prouve alors que l'adresse est la sienne.
+  signup:
+    email-verification: ${SIGNUP_EMAIL_VERIFICATION:true}
+  webhooks:
+    dispatch-interval-ms: ${WEBHOOKS_DISPATCH_INTERVAL_MS:5000}       # fréquence de la file d'envoi
+    timeout-ms: ${WEBHOOKS_TIMEOUT_MS:10000}                          # attente de la réponse du destinataire
+    allow-private-network: ${WEBHOOKS_ALLOW_PRIVATE_NETWORK:false}    # true = destinataires du réseau interne admis (n8n auto-hébergé)
+
 # Runner local de délégation (ADR-013). DÉSACTIVÉ par défaut en prod : tant qu'il l'est, le provider
 # « Claude Code » reste affiché « à venir », et ni les endpoints machine ni le filtre de session déléguée
 # n'existent. L'activer suppose un client Keycloak par runner (scripts/keycloak-runner.ps1 en dev) ; avant
@@ -243,14 +221,14 @@ server:
   http2:
     enabled: true
 
-# Garde-debit IA par minute (AiRateGuard) - PROD. global-tpm = TPM Groq partage (tier courant).
-# account-rpm = requetes/minute/compte (throttle beta : ~5 users a 1 req/min tiennent dans le budget).
-# Tout overridable par variable d'env (AI_RATE_*). 0 = fenetre desactivee.
+# Garde-debit IA par minute (AiRateGuard). Désactivé par défaut (0) : le profil prod est aussi celui des
+# instances auto-hébergées, souvent sur un modèle local. Une instance adossée à une API à quota (Groq...)
+# le règle par variable d'env (AI_RATE_GLOBAL_TPM, AI_RATE_ACCOUNT_TPM, AI_RATE_ACCOUNT_RPM).
 ai:
   rate:
-    global-tpm: ${AI_RATE_GLOBAL_TPM:8000}
-    account-tpm: ${AI_RATE_ACCOUNT_TPM:6000}
-    account-rpm: ${AI_RATE_ACCOUNT_RPM:1}
+    global-tpm: ${AI_RATE_GLOBAL_TPM:0}
+    account-tpm: ${AI_RATE_ACCOUNT_TPM:0}
+    account-rpm: ${AI_RATE_ACCOUNT_RPM:0}
 
 # Actuator Production
 management:

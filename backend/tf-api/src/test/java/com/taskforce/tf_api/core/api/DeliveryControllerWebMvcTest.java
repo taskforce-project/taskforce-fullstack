@@ -7,25 +7,28 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.taskforce.tf_api.core.dto.response.DeliveryProviderResponse;
+import com.taskforce.tf_api.core.dto.response.DeliveryRunActivityResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
-import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProvider;
-import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProviderRegistry;
+import com.taskforce.tf_api.core.service.delivery.DeliveryActivityService;
 import com.taskforce.tf_api.core.service.delivery.DeliveryRunner;
 import com.taskforce.tf_api.core.service.delivery.DeliveryService;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -50,9 +53,9 @@ class DeliveryControllerWebMvcTest {
 
     @Autowired private MockMvc mockMvc;
 
-    @MockitoBean private DeliveryAgentProviderRegistry registry;
     @MockitoBean private DeliveryService deliveryService;
     @MockitoBean private DeliveryRunner deliveryRunner;
+    @MockitoBean private DeliveryActivityService activityService;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;             // WorkspaceAccessInterceptor
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository; // WorkspaceAccessInterceptor
@@ -65,39 +68,36 @@ class DeliveryControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("GET /delivery/providers → 200 + liste des providers")
+    @DisplayName("GET /delivery/providers?projectId= → 200 + agents prêts ou non pour la personne")
     void listProviders_200() throws Exception {
         var a = auth();
-        DeliveryAgentProvider p = Mockito.mock(DeliveryAgentProvider.class);
-        when(p.key()).thenReturn("claude-code");
-        when(p.displayName()).thenReturn("Claude Code");
-        when(p.logoKey()).thenReturn("claude");
-        when(p.available()).thenReturn(false);
-        when(p.models()).thenReturn(List.of("claude-opus"));
-        when(registry.all()).thenReturn(List.of(p));
+        when(deliveryService.listProviders("acme", 12L, 7L)).thenReturn(List.of(
+            new DeliveryProviderResponse("claude-code", "Claude Code", "anthropic", true, List.of("claude-opus-5"), false,
+                "Set up your local runner first (Settings > Agents), then start it on your machine.")));
 
-        mockMvc.perform(get("/api/workspaces/acme/delivery/providers").with(a))
+        mockMvc.perform(get("/api/workspaces/acme/delivery/providers").param("projectId", "12").with(a))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data[0].key").value("claude-code"))
-            .andExpect(jsonPath("$.data[0].displayName").value("Claude Code"))
-            .andExpect(jsonPath("$.data[0].available").value(false));
+            .andExpect(jsonPath("$.data[0].available").value(true))
+            .andExpect(jsonPath("$.data[0].ready").value(false))
+            .andExpect(jsonPath("$.data[0].reason").value(org.hamcrest.Matchers.containsString("local runner")));
     }
 
     @Test
     @DisplayName("POST /delivery/issues/{id}/delegate → 200 + run (QUEUED)")
     void delegate_200() throws Exception {
         var a = auth();
-        var run = new DeliveryRunResponse(1L, 5L, "WEB-5", "Fix the footer", 12L, "Website", "stub", "stub", "QUEUED",
+        var run = new DeliveryRunResponse(1L, 5L, "WEB-5", "Fix the footer", 12L, "Website", "claude-code", "claude-sonnet-5", "QUEUED",
             null, null, null, 7L, null, null);
         when(deliveryService.delegate(anyString(), anyLong(), anyString(), org.mockito.ArgumentMatchers.any(), anyLong()))
             .thenReturn(run);
 
         mockMvc.perform(post("/api/workspaces/acme/delivery/issues/5/delegate").with(a)
                 .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                .content("{\"providerKey\":\"stub\"}"))
+                .content("{\"providerKey\":\"claude-code\"}"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.providerKey").value("stub"))
+            .andExpect(jsonPath("$.data.providerKey").value("claude-code"))
             .andExpect(jsonPath("$.data.status").value("QUEUED"))
             // De quoi afficher et ouvrir le run hors de sa fiche d'issue (historique, canvas).
             .andExpect(jsonPath("$.data.issueKey").value("WEB-5"))
@@ -163,5 +163,42 @@ class DeliveryControllerWebMvcTest {
 
         verify(deliveryRunner, never()).refresh(anyLong());
         verify(deliveryService, times(1)).listRuns(anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("GET /runs/{id}/activity : chronologie après N et demandes du run")
+    void activity_200() throws Exception {
+        var a = auth();
+        when(activityService.activity("acme", 100L, 3, 7L)).thenReturn(new DeliveryRunActivityResponse(
+            List.of(new DeliveryRunActivityResponse.Event(4, "tool", "Bash", "npm test", null)),
+            List.of(new DeliveryRunActivityResponse.Approval(9L, "Bash", "npm install lodash", "PENDING", null, null, null, null, true))));
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/runs/100/activity").param("after", "3").with(a))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.events[0].seq").value(4))
+            .andExpect(jsonPath("$.data.approvals[0].canDecide").value(true));
+    }
+
+    @ParameterizedTest(name = "POST approval : {0} -> autorisé={1}")
+    @CsvSource({"ALLOW, true", "DENY, false"})
+    void decide_200(String decision, boolean allow) throws Exception {
+        var a = auth();
+
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/approvals/9").with(a)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"decision\":\"" + decision + "\"}"))
+            .andExpect(status().isOk());
+
+        verify(activityService).decide("acme", 100L, 9L, allow, 7L);
+    }
+
+    @Test
+    @DisplayName("POST approval : décision inconnue refusée (400)")
+    void decide_rejects_unknown_decision() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/approvals/9")
+                .with(jwt().jwt(b -> b.claim("email", EMAIL)))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"decision\":\"MAYBE\"}"))
+            .andExpect(status().isBadRequest());
+
+        verify(activityService, never()).decide(any(), any(), any(), anyBoolean(), any());
     }
 }

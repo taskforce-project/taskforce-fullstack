@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -50,9 +49,6 @@ public class ChartSpecService {
     private final ProjectVisibilityGuard visibilityGuard;
     private final AiMeter                aiMeter; // gate quota + comptage de la conso tokens de la génération de graphe
 
-    @Value("${ai.model.assistant:gateway-default}")
-    private String model;
-
     // ── Séries temporelles ───────────────────────────────────────────────────
 
     private record Dataset(String key, String defaultChartType, List<String> series, String describe) {}
@@ -60,16 +56,16 @@ public class ChartSpecService {
     private static final Map<String, Dataset> DATASETS = new LinkedHashMap<>();
     static {
         DATASETS.put("throughput", new Dataset("throughput", "area", List.of("opened", "resolved"),
-            "Tâches ouvertes et résolues au fil du temps (série temporelle ; bucket day|week)."));
+            "Opened and resolved tasks over time (time series; bucket day|week)."));
         DATASETS.put("burndown", new Dataset("burndown", "line", List.of("remaining", "ideal"),
-            "Reste à faire d'un sprint comparé à la trajectoire idéale, jour par jour."));
+            "Remaining work of a sprint against the ideal trajectory, day by day."));
         DATASETS.put("capacity", new Dataset("capacity", "bar", List.of("openIssues"),
-            "Nombre d'issues ouvertes par membre (comparaison catégorielle)."));
+            "Number of open issues per member (categorical comparison)."));
         DATASETS.put("workload", new Dataset("workload", "heatmap", List.of(),
-            "Intensité de charge par membre et par jour (heatmap ; pas de choix de séries)."));
+            "Workload intensity per member and per day (heatmap; no series to choose)."));
         DATASETS.put("projects", new Dataset("projects", "bar", List.of("completion", "done", "open"),
-            "Avancement par projet : « completion » = % de complétion (pour « niveau d'avancement »), "
-            + "« done »/« open » = issues terminées/ouvertes par projet."));
+            "Progress per project: \"completion\" = completion percentage (for \"progress level\"), "
+            + "\"done\"/\"open\" = done/open issues per project."));
     }
 
     private static final List<String> CHART_TYPES = List.of("area", "bar", "line");
@@ -97,7 +93,7 @@ public class ChartSpecService {
     public ChartSpecResponse runBreakdown(String slug, Long userId, String dimension, String measure, String scope) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         if (!queryService.isValidDimension(dimension)) {
-            return unsupported(null, "Dimension de répartition inconnue : " + dimension, List.of());
+            return unsupported(null, "Unknown breakdown dimension: " + dimension, List.of());
         }
         List<Long> projectIds = visibilityGuard.viewableProjectIds(ws.getId(), userId);
         return breakdown(projectIds, null, "", "bar", dimension, measure, scope);
@@ -109,7 +105,7 @@ public class ChartSpecService {
 
     /** Interroge le LLM et construit la réponse. Retourne null si sa sortie n'est pas exploitable. */
     private ChartSpecResponse callLlm(List<Long> projectIds, String prompt) throws Exception {
-        String content = llm.chatCompletion(model, systemPrompt(), prompt, true, "fast");
+        String content = llm.chatCompletion(systemPrompt(), prompt, true, "fast");
         JsonNode json = objectMapper.readTree(content);
 
         String unsupported = text(json, "unsupported");
@@ -144,40 +140,40 @@ public class ChartSpecService {
 
     private String systemPrompt() {
         StringBuilder sb = new StringBuilder();
-        sb.append("Tu es un assistant d'analyse pour Taskforce. Tu choisis COMMENT visualiser des ")
-          .append("données réelles de gestion de projet. Tu ne fabriques aucune donnée.\n\n")
-          .append("Tu as TROIS moyens :\n\n")
-          .append("A) RÉPARTITION « X par Y » — pour compter/regrouper des issues. Réponds avec :\n")
-          .append("   \"dimension\": un de [PROJECT, STATUS, ASSIGNEE, PRIORITY, TYPE] (grouper par),\n")
-          .append("   \"measure\": [COUNT] (nombre d'issues) ou [POINTS] (story points),\n")
-          .append("   \"scope\": [ALL] (toutes), [OPEN] (ouvertes) ou [DONE] (terminées),\n")
-          .append("   \"chartType\": \"bar\" (défaut) ou \"line\".\n")
-          .append("   Exemples : « nombre d'issues par projet » → dimension=PROJECT, measure=COUNT, scope=ALL ; ")
-          .append("« issues ouvertes par assigné » → ASSIGNEE/COUNT/OPEN ; « story points par statut » → STATUS/POINTS/ALL.\n\n")
-          .append("B) SÉRIE TEMPORELLE — jeux de données prédéfinis :\n");
+        sb.append("You are an analytics assistant for TaskForce. You choose HOW to visualize real project ")
+          .append("management data. You never make data up.\n\n")
+          .append("You have THREE options:\n\n")
+          .append("A) BREAKDOWN \"X by Y\", to count or group issues. Answer with:\n")
+          .append("   \"dimension\": one of [PROJECT, STATUS, ASSIGNEE, PRIORITY, TYPE] (group by),\n")
+          .append("   \"measure\": [COUNT] (number of issues) or [POINTS] (story points),\n")
+          .append("   \"scope\": [ALL] (all), [OPEN] (open) or [DONE] (done),\n")
+          .append("   \"chartType\": \"bar\" (default) or \"line\".\n")
+          .append("   Examples: \"number of issues per project\" gives dimension=PROJECT, measure=COUNT, scope=ALL; ")
+          .append("\"open issues by assignee\" gives ASSIGNEE/COUNT/OPEN; \"story points by status\" gives STATUS/POINTS/ALL.\n\n")
+          .append("B) TIME SERIES, predefined datasets:\n");
         for (Dataset d : DATASETS.values()) {
-            sb.append("   - \"").append(d.key()).append("\" : ").append(d.describe());
-            if (!d.series().isEmpty()) sb.append(" Séries : ").append(String.join(", ", d.series())).append(".");
+            sb.append("   - \"").append(d.key()).append("\": ").append(d.describe());
+            if (!d.series().isEmpty()) sb.append(" Series: ").append(String.join(", ", d.series())).append(".");
             sb.append("\n");
         }
-        sb.append("   Réponds avec \"dataset\": un identifiant ci-dessus, \"chartType\", \"bucket\" (throughput), \"series\".\n\n")
-          .append("C) PRÉDICTION — projections dérivées des données réelles (jamais inventées) :\n")
-          .append("   \"predict\": \"SUCCESS\" → score de succès (0-100) par projet, calculé sur le taux de complétion et les retards.\n")
-          .append("   Choisis-le pour « prédiction / chances de succès / réussite / santé / risque des projets ». ")
-          .append("Ce n'est pas de la voyance : c'est un score explicable sur données réelles.\n\n")
-          .append("Ajoute toujours \"title\" (court) et \"description\" (une phrase), tous deux **EN ANGLAIS** (l'UI est en anglais). Réponds STRICTEMENT en JSON.\n")
-          .append("Choisis A (répartition) pour « par projet/statut/assigné/priorité/type » ou « combien/nombre ». ")
-          .append("Choisis B pour une évolution dans le temps ou l'avancement des projets.\n\n")
+        sb.append("   Answer with \"dataset\": one of the ids above, \"chartType\", \"bucket\" (throughput), \"series\".\n\n")
+          .append("C) PREDICTION, projections derived from real data (never invented):\n")
+          .append("   \"predict\": \"SUCCESS\" gives a success score (0-100) per project, computed from the completion rate and delays.\n")
+          .append("   Pick it for \"prediction / chances of success / project health / risk\". ")
+          .append("It is not fortune telling: it is an explainable score on real data.\n\n")
+          .append("Always add \"title\" (short) and \"description\" (one sentence). Answer STRICTLY in JSON.\n")
+          .append("Pick A (breakdown) for \"by project/status/assignee/priority/type\" or \"how many\". ")
+          .append("Pick B for a trend over time or for project progress.\n\n")
           // Anti-refus : la plupart des demandes ont une vue proche. Ne PAS refuser par excès de prudence.
-          .append("IMPORTANT — RÉPONDS TOUJOURS par la vue la plus proche disponible plutôt que de refuser :\n")
-          .append("- « les personnes les plus chargées / charge par personne / qui a le plus de tâches » ")
-          .append("→ répartition ASSIGNEE/COUNT/OPEN (ou dataset \"capacity\").\n")
-          .append("- « charge sur 14 jours / dans le temps par membre » → dataset \"workload\" (c'EST la charge par membre sur 14 jours).\n")
-          .append("- une fenêtre temporelle (« sur 14 jours », « ce mois ») n'est PAS un obstacle : choisis workload ou throughput.\n\n")
-          .append("Ne réponds \"unsupported\" QUE si la donnée est vraiment absente de Taskforce (revenus, ventes, ")
-          .append("sources externes, satisfaction client…). Dans ce cas réponds : {\"unsupported\": string (ce qui manque, ")
-          .append("EN ANGLAIS), \"suggestions\": [{\"label\": string (bouton court, EN ANGLAIS), \"prompt\": string (une demande PROCHE ")
-          .append("et répondable)}]} — propose 2 à 3 reformulations que TU sais faire avec les données ci-dessus.");
+          .append("IMPORTANT: ALWAYS answer with the closest available view rather than refusing:\n")
+          .append("- \"most loaded people / workload per person / who has the most tasks\" ")
+          .append("gives breakdown ASSIGNEE/COUNT/OPEN (or dataset \"capacity\").\n")
+          .append("- \"workload over 14 days / over time per member\" gives dataset \"workload\" (it IS the workload per member over 14 days).\n")
+          .append("- a time window (\"over 14 days\", \"this month\") is NOT an obstacle: pick workload or throughput.\n\n")
+          .append("Answer \"unsupported\" ONLY if the data truly does not exist in TaskForce (revenue, sales, ")
+          .append("external sources, customer satisfaction...). In that case answer: {\"unsupported\": string (what is missing), ")
+          .append("\"suggestions\": [{\"label\": string (short button), \"prompt\": string (a CLOSE request you can answer)}]}, ")
+          .append("with 2 to 3 rephrasings that YOU can answer with the data above.");
         return sb.toString();
     }
 
@@ -208,7 +204,7 @@ public class ChartSpecService {
         List<NamedValue> data = queryService.predict(projectIds, kind);
         String finalTitle = title == null || title.isBlank() ? queryService.predictionTitle(kind) : title.trim();
         return new ChartSpecResponse(finalTitle, safe(description), "breakdown",
-            null, "bar", null, null, data, null, null, null, "Projet", queryService.predictionYLabel(kind), null, List.of());
+            null, "bar", null, null, data, null, null, null, "Project", queryService.predictionYLabel(kind), null, List.of());
     }
 
     private ChartSpecResponse timeseries(Dataset dataset, String title, String description,

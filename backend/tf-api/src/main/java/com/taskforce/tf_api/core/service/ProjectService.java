@@ -79,7 +79,6 @@ public class ProjectService {
      * Plafond « façon GitHub » : nombre max de collaborateurs sur un projet PRIVÉ en forfait Free
      * (créateur inclus). Les projets publics et les forfaits payants sont illimités.
      */
-    private static final long FREE_PRIVATE_PROJECT_MEMBER_LIMIT = 5;
 
     // -------------------------------------------------------------------------
     // Lecture
@@ -113,34 +112,6 @@ public class ProjectService {
         Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
         Project project = resolveViewableProject(projectId, workspace, requestingUserId);
         return toResponse(project, projectFavoriteRepository.existsByUserIdAndProjectId(requestingUserId, project.getId()));
-    }
-
-    /**
-     * Activité quotidienne d'un projet (QA2-32) sur les `days` derniers jours.
-     * Série continue : chaque jour de la fenêtre est présent (count = 0 si rien).
-     */
-    @Transactional(readOnly = true)
-    public List<ProjectActivityPointResponse> getProjectActivity(String workspaceSlug, Long projectId,
-                                                                 Long requestingUserId, int days) {
-        Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
-        Project project = resolveViewableProject(projectId, workspace, requestingUserId);
-
-        int window = Math.min(Math.max(days, 1), 90);
-        java.time.LocalDate today = java.time.LocalDate.now();
-        java.time.LocalDate from = today.minusDays(window - 1L);
-
-        java.util.Map<String, Long> counts = new java.util.HashMap<>();
-        for (Object[] row : issueRepository.countCreatedByDay(project.getId(), from.atStartOfDay())) {
-            counts.put((String) row[0], ((Number) row[1]).longValue());
-        }
-
-        List<ProjectActivityPointResponse> series = new java.util.ArrayList<>(window);
-        for (int i = 0; i < window; i++) {
-            java.time.LocalDate day = from.plusDays(i);
-            String key = day.toString(); // ISO 'YYYY-MM-DD'
-            series.add(new ProjectActivityPointResponse(key, counts.getOrDefault(key, 0L)));
-        }
-        return series;
     }
 
     /**
@@ -311,11 +282,11 @@ public class ProjectService {
 
     private void seedDefaultLabels(Project project) {
         String[][] defaults = {
-            { "Bug",         "#ef4444" },
-            { "Feature",     "#6366f1" },
-            { "Improvement", "#f59e0b" },
-            { "Documentation", "#10b981" },
-            { "Question",    "#64748b" },
+            { "Bug",         "#e14322" },
+            { "Feature",     "#2f6bf6" },
+            { "Improvement", "#ffaa0d" },
+            { "Documentation", "#418b5c" },
+            { "Question",    "#736e67" },
         };
         for (String[] entry : defaults) {
             ProjectLabel label = ProjectLabel.builder()
@@ -462,20 +433,18 @@ public class ProjectService {
 
         User invitee = userRepository.findByEmail(request.getEmail())
             .orElseThrow(() -> new ResourceNotFoundException(
-                "Aucun compte trouvé pour l'email : " + request.getEmail()));
+                "No account found for the email: " + request.getEmail()));
 
         // L'invité doit déjà être membre du workspace
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspace.getId(), invitee.getId())) {
             throw new BusinessException(
-                "L'utilisateur doit d'abord être membre du workspace pour rejoindre ce projet");
+                "The user must be a member of the workspace before joining this project");
         }
 
         if (projectMemberRepository.existsByProjectIdAndUserId(projectId, invitee.getId())) {
-            throw new BusinessException("Cet utilisateur est déjà membre du projet");
+            throw new BusinessException("This user is already a member of the project");
         }
 
-        // Plafond « façon GitHub » : projet privé + forfait Free = collaborateurs limités.
-        enforcePrivateProjectSeatLimit(project);
 
         User requester = resolveUser(requestingUserId);
         ProjectMember member = ProjectMember.builder()
@@ -511,17 +480,14 @@ public class ProjectService {
         assertCanManageProject(project, workspace, requestingUserId);
 
         Team team = teamRepository.findById(teamId)
-            .orElseThrow(() -> new ResourceNotFoundException("Équipe introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Team not found"));
         if (!team.getWorkspace().getId().equals(workspace.getId())) {
-            throw new BusinessException("Cette équipe n'appartient pas à ce workspace");
+            throw new BusinessException("This team doesn't belong to this workspace");
         }
         if (projectTeamRepository.existsByProjectIdAndTeamId(projectId, teamId)) {
-            throw new BusinessException("Cette équipe est déjà associée au projet");
+            throw new BusinessException("This team is already attached to the project");
         }
 
-        // Plafond « façon GitHub » : associer une équipe pleine à un projet privé Free ne doit pas
-        // contourner la limite de collaborateurs (les membres de l'équipe comptent).
-        enforcePrivateProjectSeatLimitForTeam(project, teamId);
 
         projectTeamRepository.save(ProjectTeam.builder().project(project).team(team).build());
         return ProjectTeamResponse.from(team, teamMemberRepository.countByTeamId(teamId));
@@ -535,7 +501,7 @@ public class ProjectService {
         assertCanManageProject(project, workspace, requestingUserId);
 
         if (!projectTeamRepository.existsByProjectIdAndTeamId(projectId, teamId)) {
-            throw new ResourceNotFoundException("Cette équipe n'est pas associée au projet");
+            throw new ResourceNotFoundException("This team isn't attached to the project");
         }
         projectTeamRepository.deleteByProjectIdAndTeamId(projectId, teamId);
     }
@@ -551,10 +517,10 @@ public class ProjectService {
         Project project = resolveProject(projectId, workspace.getId());
 
         ProjectMember target = projectMemberRepository.findById(memberId)
-            .orElseThrow(() -> new ResourceNotFoundException("Membre introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Member not found"));
 
         if (!target.getProject().getId().equals(projectId)) {
-            throw new IllegalArgumentException("Ce membre n'appartient pas à ce projet");
+            throw new IllegalArgumentException("This member doesn't belong to this project");
         }
 
         boolean isSelf = target.getUser().getId().equals(requestingUserId);
@@ -596,13 +562,13 @@ public class ProjectService {
         assertCanManageProject(project, workspace, requestingUserId);
 
         if (projectLabelRepository.existsByProjectIdAndName(projectId, request.getName())) {
-            throw new BusinessException("Un label avec ce nom existe déjà dans ce projet");
+            throw new BusinessException("A label with this name already exists in this project");
         }
 
         ProjectLabel label = ProjectLabel.builder()
             .project(project)
             .name(request.getName())
-            .color(request.getColor() != null ? request.getColor() : "#6366f1")
+            .color(request.getColor() != null ? request.getColor() : "#2f6bf6")
             .description(request.getDescription())
             .build();
 
@@ -620,14 +586,14 @@ public class ProjectService {
         assertCanManageProject(project, workspace, requestingUserId);
 
         ProjectLabel label = projectLabelRepository.findById(labelId)
-            .orElseThrow(() -> new ResourceNotFoundException("Label introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Label not found"));
 
         if (!label.getProject().getId().equals(projectId)) {
-            throw new IllegalArgumentException("Ce label n'appartient pas à ce projet");
+            throw new IllegalArgumentException("This label doesn't belong to this project");
         }
         if (request.getName() != null && !request.getName().equals(label.getName())) {
             if (projectLabelRepository.existsByProjectIdAndName(projectId, request.getName())) {
-                throw new BusinessException("Un label avec ce nom existe déjà dans ce projet");
+                throw new BusinessException("A label with this name already exists in this project");
             }
             label.setName(request.getName());
         }
@@ -651,10 +617,10 @@ public class ProjectService {
         assertCanManageProject(project, workspace, requestingUserId);
 
         ProjectLabel label = projectLabelRepository.findById(labelId)
-            .orElseThrow(() -> new ResourceNotFoundException("Label introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Label not found"));
 
         if (!label.getProject().getId().equals(projectId)) {
-            throw new IllegalArgumentException("Ce label n'appartient pas à ce projet");
+            throw new IllegalArgumentException("This label doesn't belong to this project");
         }
 
         projectLabelRepository.delete(label);
@@ -666,10 +632,10 @@ public class ProjectService {
 
     private Workspace resolveWorkspaceAndAssertMember(String slug, Long userId) {
         Workspace workspace = workspaceRepository.findBySlug(slug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable : " + slug));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + slug));
 
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspace.getId(), userId)) {
-            throw new BusinessException("Vous n'êtes pas membre de ce workspace");
+            throw new BusinessException("You're not a member of this workspace");
         }
 
         return workspace;
@@ -677,7 +643,7 @@ public class ProjectService {
 
     private Project resolveProject(Long projectId, Long workspaceId) {
         return projectRepository.findByIdAndWorkspaceId(projectId, workspaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
     }
 
     /** Résout un projet ET vérifie que l'utilisateur a le droit de le VOIR (visibilité projet privé). */
@@ -705,7 +671,7 @@ public class ProjectService {
 
     private User resolveUser(Long userId) {
         return userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
     /**
@@ -724,78 +690,7 @@ public class ProjectService {
         workspaceMemberRepository.findByWorkspaceIdAndUserId(workspace.getId(), userId)
             .filter(wm -> wm.getRole().name().equals("OWNER") || wm.getRole().name().equals("ADMIN"))
             .orElseThrow(() -> new BusinessException(
-                "Droits insuffisants pour gérer ce projet"));
-    }
-
-    /**
-     * Plafond « façon GitHub » : sur le forfait Free, un projet PRIVÉ est limité à
-     * {@value #FREE_PRIVATE_PROJECT_MEMBER_LIMIT} collaborateurs (créateur inclus).
-     * Les projets publics et les forfaits payants (BASIC/BUSINESS/ENTERPRISE) sont illimités.
-     * Lève une {@link IllegalStateException} (→ 409) pour déclencher l'upsell côté front,
-     * en miroir du plafond de workspaces de {@code WorkspaceService}.
-     */
-    /**
-     * Réutilisable (invitations projet) : rejette si ajouter un collaborateur dépasserait le plafond
-     * Free du projet privé. Même règle que l'ajout direct — l'invitation ne doit pas la contourner.
-     */
-    public void assertProjectSeatAvailable(Project project) {
-        enforcePrivateProjectSeatLimit(project);
-    }
-
-    private void enforcePrivateProjectSeatLimit(Project project) {
-        if (skipSeatLimit(project)) {
-            return;
-        }
-        if (effectiveCollaboratorIds(project).size() >= FREE_PRIVATE_PROJECT_MEMBER_LIMIT) {
-            throw seatLimitExceeded();
-        }
-    }
-
-    /**
-     * Variante pour l'association d'une ÉQUIPE : ses membres deviennent collaborateurs du projet.
-     * On rejette si l'attachement pousse le total de collaborateurs DISTINCTS au-delà du plafond —
-     * sinon on contourne la limite Free en passant par une équipe (cf. QA PROJ-03).
-     */
-    private void enforcePrivateProjectSeatLimitForTeam(Project project, Long teamId) {
-        if (skipSeatLimit(project)) {
-            return;
-        }
-        Set<Long> ids = effectiveCollaboratorIds(project);
-        teamMemberRepository.findByTeamId(teamId)
-            .forEach(tm -> { if (tm.getUser() != null) ids.add(tm.getUser().getId()); });
-        if (ids.size() > FREE_PRIVATE_PROJECT_MEMBER_LIMIT) {
-            throw seatLimitExceeded();
-        }
-    }
-
-    /** Projet public OU workspace payant = collaborateurs illimités (pas de plafond). */
-    private boolean skipSeatLimit(Project project) {
-        if (project.isPublic()) {
-            return true;
-        }
-        User owner = project.getWorkspace().getOwner();
-        return owner != null && owner.isPaid();
-    }
-
-    /**
-     * Collaborateurs EFFECTIFS et DISTINCTS : membres directs + membres de toutes les équipes
-     * associées, dédupliqués. C'est ce total qui est plafonné (sinon l'ajout via équipe contourne la limite).
-     */
-    private Set<Long> effectiveCollaboratorIds(Project project) {
-        Set<Long> ids = new HashSet<>();
-        projectMemberRepository.findByProjectId(project.getId())
-            .forEach(pm -> { if (pm.getUser() != null) ids.add(pm.getUser().getId()); });
-        projectTeamRepository.findByProjectId(project.getId())
-            .forEach(pt -> teamMemberRepository.findByTeamId(pt.getTeam().getId())
-                .forEach(tm -> { if (tm.getUser() != null) ids.add(tm.getUser().getId()); }));
-        return ids;
-    }
-
-    private IllegalStateException seatLimitExceeded() {
-        return new IllegalStateException(
-            "Les projets privés sont limités à " + FREE_PRIVATE_PROJECT_MEMBER_LIMIT
-            + " collaborateurs sur le forfait Free. Rendez ce projet public, "
-            + "ou passez à un forfait payant pour inviter sans limite.");
+                "You don't have the rights to manage this project"));
     }
 
     // -------------------------------------------------------------------------

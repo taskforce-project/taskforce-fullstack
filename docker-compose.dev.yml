@@ -96,13 +96,10 @@ services:
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:8180/realms/taskforce-dev}
       KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/taskforce-dev/protocol/openid-connect/certs}
 
-      # IA interne
+      # IA interne : ai-service, joint avec le secret partagé (valeur de dev par défaut, locale)
       AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-service:8000}
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-dev-ai-service-token}
       INTEGRATIONS_PLANE_API_BASE: ${INTEGRATIONS_PLANE_API_BASE:-https://api.plane.so}
-      # GROQ_MODEL retiré le 24/07/2026 : plus aucune propriété ne le lie côté backend. Le bloc
-      # `groq` et la clé `provider` ont été supprimés d'`application-dev.yml` le 16/07
-      # (TF-AI-GROQ-CLEANUP) ; cette variable survivait seule, sans lecteur.
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
 
       # Email Configuration (Mailtrap)
       MAIL_HOST: ${MAILTRAP_HOST:-sandbox.smtp.mailtrap.io}
@@ -192,17 +189,14 @@ services:
       - .env.dev
     environment:
       TZ: ${TZ:-America/New_York}
-      # AI Gateway → LLM local Ollama (sur l'hôte). host.docker.internal = la machine hôte.
+      # Secret partagé avec le backend (valeur de dev par défaut, locale).
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-dev-ai-service-token}
+      # Fournisseur d'IA (format générique compatible OpenAI, cf. ai-service/app/config.py). Rien de posé :
+      # Ollama sur la machine hôte (host.docker.internal), qwen3:8b pour les deux tiers, embeddings bge-m3.
+      # `.env.dev` (env_file ci-dessus) peut tout surcharger : AI_*, ou les alias GROQ_* et OLLAMA_*.
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b}
-      OLLAMA_MODEL_FAST: ${OLLAMA_MODEL_FAST:-qwen2.5:7b-instruct}
-      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-bge-m3}
-      # Analyse approfondie sur 14B local = longue → 300s (doit rester ≤ ai.gateway.read-timeout-ms côté backend).
-      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-300}
-      # Provider CHAT alternatif : GROQ_API_KEY / GROQ_MODEL / GROQ_MODEL_FAST sont fournis par `.env.dev`
-      # (env_file ci-dessus). Clé RENSEIGNÉE ⇒ le chat (smart-assign, Cortex, orchestration) bascule sur
-      # Groq (hébergé, zéro compute local → petite VM) ; clé VIDE ⇒ Ollama local. Détection auto dans
-      # ai-service/app/config.py (use_groq). Les EMBEDDINGS restent sur Ollama (Groq n'en fournit pas).
+      # Délai d'une réponse du modèle, sous ai.service.read-timeout-ms du backend (150 s).
+      AI_TIMEOUT: ${AI_TIMEOUT:-120}
       LOG_LEVEL: ${AI_SERVICE_LOG_LEVEL:-INFO}
     extra_hosts:
       - "host.docker.internal:host-gateway"

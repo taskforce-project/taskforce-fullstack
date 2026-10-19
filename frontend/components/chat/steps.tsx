@@ -35,8 +35,8 @@ const itemVariants: Variants = {
 }
 
 function StepIcon({ status }: { status: StepStatus }) {
-  if (status === "done") return <Check className="size-3.5 text-emerald-500" />
-  if (status === "active") return <Loader2 className="size-3.5 animate-spin text-amber-500" />
+  if (status === "done") return <Check className="size-3.5 text-ink-green" />
+  if (status === "active") return <Loader2 className="size-3.5 animate-spin text-ink-yellow" />
   if (status === "error") return <X className="size-3.5 text-destructive" />
   return <Circle className="size-3 text-muted-foreground/40" />
 }
@@ -59,7 +59,7 @@ export function Steps({ steps, className }: StepsProps) {
               <div className="relative flex size-6 items-center justify-center rounded-full border bg-background">
                 {status === "active" && !reduce && (
                   <motion.span
-                    className="absolute inset-0 rounded-full bg-amber-500/25"
+                    className="absolute inset-0 rounded-full bg-shape-yellow/25"
                     animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
                     transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut" }}
                   />
@@ -80,7 +80,7 @@ export function Steps({ steps, className }: StepsProps) {
               {!isLast && (
                 <div className="relative w-px flex-1 bg-border">
                   <motion.div
-                    className="absolute inset-0 origin-top bg-emerald-500/60"
+                    className="absolute inset-0 origin-top bg-shape-green/60"
                     initial={{ scaleY: 0 }}
                     animate={{ scaleY: done ? 1 : 0 }}
                     transition={{ duration: 0.3, ease: "easeOut" }}

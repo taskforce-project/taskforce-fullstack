@@ -21,10 +21,10 @@ function windowDays(timeRange: string | null, globalDays: number): number {
 function cellClass(count: number, max: number): string {
   if (count <= 0 || max <= 0) return "bg-muted/40"
   const ratio = count / max
-  if (ratio <= 0.25) return "bg-amber-500/30"
-  if (ratio <= 0.5) return "bg-amber-500/55"
-  if (ratio <= 0.75) return "bg-orange-500/70"
-  return "bg-rose-500/85"
+  if (ratio <= 0.25) return "bg-shape-yellow/30"
+  if (ratio <= 0.5) return "bg-shape-yellow/60"
+  if (ratio <= 0.75) return "bg-shape-red/60"
+  return "bg-shape-red/85"
 }
 
 /** Heatmap compacte membre × jour des échéances (endpoint analytics/workload réel). */
@@ -79,7 +79,7 @@ export function WorkloadCard({ slug, card, globalRange, refreshToken }: Dashboar
               <div
                 key={d.date}
                 className={cn("h-3 min-w-0 flex-1 rounded-[2px]", cellClass(d.count, peak))}
-                title={`${m.displayName} · ${d.date} : ${d.count}`}
+                title={`${m.displayName} · ${d.date}: ${d.count}`}
               />
             ))}
           </div>
@@ -87,8 +87,8 @@ export function WorkloadCard({ slug, card, globalRange, refreshToken }: Dashboar
         </div>
       ))}
       <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground/70">
-        <span>Échéances · {days} j</span>
-        {members.length > MAX_MEMBERS && <span>+{members.length - MAX_MEMBERS} membres</span>}
+        <span>Due dates · {days} d</span>
+        {members.length > MAX_MEMBERS && <span>+{members.length - MAX_MEMBERS} members</span>}
       </div>
     </div>
   )

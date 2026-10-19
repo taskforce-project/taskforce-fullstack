@@ -56,20 +56,45 @@ export interface SlackChannelPayload {
   eventTypes: string[];
 }
 
+/** Événements auxquels un webhook peut s'abonner (miroir de WebhookEventType côté backend). */
+export const WEBHOOK_EVENTS = ["issue.created", "issue.updated", "issue.deleted", "comment.created", "cycle.completed"] as const;
+
 export interface Webhook {
   id: number;
   url: string;
+  /** Vide = tous les événements. */
   eventTypes: string[];
+  /** Faux = en pause : rien n'est envoyé. */
   active: boolean;
   lastFiredAt: string | null;
+  /** Code HTTP du dernier envoi ; null si le serveur n'a pas répondu (ou rien d'envoyé, `lastFiredAt` null). */
   lastStatus: number | null;
   createdAt: string;
 }
 
 export interface WebhookPayload {
   url: string;
-  secret?: string;
   eventTypes: string[];
+  active?: boolean;
+}
+
+/** Webhook créé et son secret de signature, montré cette seule fois. */
+export interface CreatedWebhook {
+  webhook: Webhook;
+  secret: string;
+}
+
+/** Un envoi : en attente (nouvelle tentative le `nextAttemptAt`), livré ou abandonné. */
+export interface WebhookDelivery {
+  deliveryId: string;
+  eventType: string;
+  status: "PENDING" | "DELIVERED" | "FAILED";
+  attempts: number;
+  lastStatus: number | null;
+  lastError: string | null;
+  createdAt: string;
+  deliveredAt: string | null;
+  nextAttemptAt: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -216,8 +241,9 @@ export async function getWebhooks(slug: string): Promise<Webhook[]> {
   return res.data.data;
 }
 
-export async function createWebhook(slug: string, payload: WebhookPayload): Promise<Webhook> {
-  const res = await apiClient.post<{ data: Webhook }>(INTEGRATION_ROUTES.WEBHOOKS(slug), payload);
+/** Crée un webhook ; la réponse porte son secret de signature, montré cette seule fois. */
+export async function createWebhook(slug: string, payload: WebhookPayload): Promise<CreatedWebhook> {
+  const res = await apiClient.post<{ data: CreatedWebhook }>(INTEGRATION_ROUTES.WEBHOOKS(slug), payload);
   return res.data.data;
 }
 
@@ -230,8 +256,26 @@ export async function deleteWebhook(slug: string, id: number): Promise<void> {
   await apiClient.delete(INTEGRATION_ROUTES.WEBHOOK(slug, id));
 }
 
+/** Nouveau secret de signature (montré une fois) ; l'ancien ne signe plus rien. */
+export async function regenerateWebhookSecret(slug: string, id: number): Promise<string> {
+  const res = await apiClient.post<{ data: { secret: string } }>(INTEGRATION_ROUTES.WEBHOOK_SECRET(slug, id));
+  return res.data.data.secret;
+}
+
+/** Envoie tout de suite l'événement de test « ping » et renvoie le résultat de l'envoi. */
+export async function testWebhook(slug: string, id: number): Promise<WebhookDelivery> {
+  const res = await apiClient.post<{ data: WebhookDelivery }>(INTEGRATION_ROUTES.WEBHOOK_TEST(slug, id));
+  return res.data.data;
+}
+
+/** Les 20 derniers envois d'un webhook, du plus récent au plus ancien. */
+export async function getWebhookDeliveries(slug: string, id: number): Promise<WebhookDelivery[]> {
+  const res = await apiClient.get<{ data: WebhookDelivery[] }>(INTEGRATION_ROUTES.WEBHOOK_DELIVERIES(slug, id));
+  return res.data.data;
+}
+
 // ---------------------------------------------------------------------------
-// Catalogue générique (le « pool » d'outils)
+// Catalogue : 3 intégrations natives, préréglages MCP, serveurs MCP ajoutés par le workspace (ADR-020)
 // ---------------------------------------------------------------------------
 
 export interface ConnectorField {
@@ -245,8 +289,8 @@ export interface ConnectorView {
   key: string;
   name: string;
   category: string;
-  authType: "OAUTH2" | "API_KEY" | "TOKEN" | "CONFIG" | "NONE";
-  status: "AVAILABLE" | "PLANNED";
+  /** OAUTH2 et API_KEY : intégrations natives ; MCP : préréglage ou serveur ajouté par le workspace. */
+  authType: "OAUTH2" | "API_KEY" | "MCP";
   connected: boolean;
   fields: ConnectorField[];
   capabilities: string[];
@@ -256,8 +300,7 @@ export interface ConnectorView {
   setupHint: string | null;
   /** Site officiel du service (homepage) - affiché dans la fiche détaillée. */
   websiteUrl: string | null;
-  /** URL d'un serveur MCP distant hébergé (officiel), pré-remplie (éditable) dans le dialog Connect
-   *  → « MCP-ready » 1-clic. Null si l'outil n'expose pas d'endpoint MCP hébergé. */
+  /** URL du serveur MCP officiel d'un préréglage, préremplie (modifiable) dans le dialogue de connexion. */
   mcpSuggestedUrl: string | null;
 }
 
@@ -267,9 +310,11 @@ export interface CategoryGroup {
   tools: ConnectorView[];
 }
 
+/** Catégorie des serveurs MCP ajoutés à la main (clé `custom-…`). */
+export const CUSTOM_MCP_CATEGORY = "CUSTOM_MCP";
+
 export interface IntegrationCatalog {
   total: number;
-  available: number;
   connected: number;
   categories: CategoryGroup[];
 }
@@ -279,16 +324,6 @@ export async function getIntegrationCatalog(slug: string): Promise<IntegrationCa
   return res.data.data;
 }
 
-/** Connecte (ou reconfigure) un connecteur générique du catalogue - identifiants stockés chiffrés. */
-export async function connectConnector(slug: string, key: string, config: Record<string, string>): Promise<void> {
-  await apiClient.post(INTEGRATION_ROUTES.CONNECTOR(slug, key), { config });
-}
-
-/** Déconnecte un connecteur générique. */
-export async function disconnectConnector(slug: string, key: string): Promise<void> {
-  await apiClient.delete(INTEGRATION_ROUTES.CONNECTOR(slug, key));
-}
-
 // ---------------------------------------------------------------------------
 // MCP (serveur MCP externe → outils live dans Cortex, écritures validées)
 // ---------------------------------------------------------------------------
@@ -296,16 +331,26 @@ export async function disconnectConnector(slug: string, key: string): Promise<vo
 /** Statut d'un serveur MCP connecté : joignabilité + outils exposés (après allow-list). */
 export interface McpServerStatus {
   connectorKey: string;
+  /** Nom d'un serveur ajouté à la main ; null pour un préréglage. */
+  name: string | null;
   url: string;
   reachable: boolean;
   tools: string[];
   error: string | null;
 }
 
+/** Clé à envoyer pour un nouveau serveur ajouté à la main : le backend en dérive `custom-<slug>` du nom. */
+export const NEW_CUSTOM_MCP_KEY = "custom";
+
 export interface McpServerPayload {
+  /** Clé d'un préréglage, `custom` (nouveau serveur) ou `custom-…` (serveur existant). */
   connectorKey: string;
+  /** Obligatoire pour un serveur ajouté à la main. */
+  name?: string;
   mcpUrl: string;
+  /** Jeton envoyé en `Authorization: Bearer`, ou tel quel dans `headerName`. */
   mcpToken?: string;
+  headerName?: string;
   mcpAllow?: string;
 }
 
@@ -373,17 +418,18 @@ export async function executeMcpAction(
 /**
  * Démarre l'OAuth 1-clic d'un serveur MCP : renvoie l'URL d'autorisation (on y redirige le navigateur).
  * `returnTo` (chemin applicatif relatif optionnel) permet un retour fluide ailleurs que sur Settings
- * (ex. rouvrir le wizard de création de projet).
+ * (ex. rouvrir le wizard de création de projet). `name` : obligatoire pour un serveur ajouté à la main.
  */
 export async function startMcpOAuth(
   slug: string,
   connectorKey: string,
   mcpUrl: string,
   returnTo?: string,
+  name?: string,
 ): Promise<string> {
   const res = await apiClient.post<{ data: { authorizeUrl: string } }>(
     INTEGRATION_ROUTES.MCP_OAUTH_START(slug, connectorKey),
-    { mcpUrl, returnTo },
+    { mcpUrl, returnTo, name },
   );
   return res.data.data.authorizeUrl;
 }

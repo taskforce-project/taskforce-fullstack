@@ -64,7 +64,7 @@ public class BrainAttachmentController {
         String url = "/api/files/brain/" + ws.getId() + "/" + name;
         boolean isImage = contentType.startsWith("image/");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
-            "Fichier uploadé",
+            "File uploaded",
             new BrainFileResponse(url, original, contentType, file.getSize(), isImage)
         ));
     }
@@ -72,7 +72,7 @@ public class BrainAttachmentController {
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

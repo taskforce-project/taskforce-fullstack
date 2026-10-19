@@ -18,12 +18,12 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class VerifyOtpRequest {
 
-    @NotBlank(message = "L'email est obligatoire")
-    @Email(message = "Format d'email invalide")
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
     private String email;
 
-    @NotBlank(message = "Le code OTP est obligatoire")
-    @Size(min = 6, max = 6, message = "Le code OTP doit contenir 6 caractères")
-    @Pattern(regexp = "^[0-9]{6}$", message = "Le code OTP doit être composé de 6 chiffres")
+    @NotBlank(message = "The OTP code is required")
+    @Size(min = 6, max = 6, message = "The OTP code must be 6 characters")
+    @Pattern(regexp = "^[0-9]{6}$", message = "The OTP code must be 6 digits")
     private String otpCode;
 }

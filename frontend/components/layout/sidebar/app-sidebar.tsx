@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ChevronRight, Lock, FlaskConical } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 
 import {
   LayoutDashboardIcon,
@@ -66,11 +66,7 @@ type NavItem = {
   readonly url: string
   readonly aicon: AnimatedIconComponent
   readonly badge?: string
-  readonly comingSoon?: boolean
-  /** Feature en cours de finition → petite fiole bleue (info) dans la sidebar + bandeau « Lab » sur la page. */
-  readonly lab?: boolean
   readonly requiresRole?: readonly string[]
-  readonly requiresPlan?: readonly string[]
   readonly items?: readonly {
     readonly key: string
     readonly url: string
@@ -119,13 +115,11 @@ const NAV_WORK: readonly NavItem[] = [
     key: "nav.analytics",
     url: "/analytics",
     aicon: ActivityIcon,
-    lab: true, // Intelligence : données réelles mais en cours de finition (prédictions, dock, 3D).
   },
   {
     key: "nav.brain",
     url: "/brain",
     aicon: BrainIcon,
-    lab: true, // Brain OS : Phase 0, en construction.
   },
   // Agents retiré (11/07/2026) : non construit, aucune utilité pour l'instant.
 ]
@@ -183,33 +177,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return pathname === full || pathname.startsWith(`${full}/`)
   }
 
-  const canAccess = (item: NavItem) => {
-    if (item.requiresPlan && user?.planType) {
-      if (!item.requiresPlan.includes(user.planType)) return false
-    }
-    return true
-  }
-
   const renderItem = (item: NavItem) => {
-    if (item.comingSoon) {
-      return (
-        <SidebarMenuItem key={item.key}>
-          <SidebarMenuButton
-            tooltip={`${t(item.key)} - ${t("nav.comingSoon")}`}
-            aria-disabled
-            className="cursor-not-allowed opacity-60 hover:bg-transparent"
-          >
-            <AnimatedNavIcon icon={item.aicon} />
-            <span>{t(item.key)}</span>
-            <span className="ml-auto flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground group-data-[collapsible=icon]:hidden">
-              <Lock className="size-3" />
-              {t("nav.comingSoon")}
-            </span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      )
-    }
-
     if (item.items) {
       // Sidebar repliée : shadcn masque le sous-menu (`group-data-[collapsible=icon]:hidden` sur
       // SidebarMenuSub) et ce bouton n'est pas un lien → l'entrée serait totalement morte.
@@ -292,15 +260,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <>
         <AnimatedNavIcon icon={item.aicon} />
         <span>{t(item.key)}</span>
-        {item.lab && (
-          <FlaskConical
-            /* Identité Labs alignée sur le site : le TRAIT prend le dégradé (pêche→rose→bleu),
-               plus de violet plat. Cf. `.tf-labs-icon` + <LabsGradientDefs/>. */
-            className="tf-labs-icon ml-auto size-3.5 shrink-0 group-data-[collapsible=icon]:hidden"
-            strokeWidth={2}
-            aria-label="Feature being finalized"
-          />
-        )}
       </>
     )
 
@@ -334,7 +293,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarGroup>
           <SidebarGroupLabel>Command</SidebarGroupLabel>
           <SidebarMenu>
-            {NAV_COMMAND.filter(canAccess).map(renderItem)}
+            {NAV_COMMAND.map(renderItem)}
           </SidebarMenu>
         </SidebarGroup>
 
@@ -342,7 +301,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarGroup>
           <SidebarGroupLabel>Work</SidebarGroupLabel>
           <SidebarMenu>
-            {NAV_WORK.filter(canAccess).map(renderItem)}
+            {NAV_WORK.map(renderItem)}
           </SidebarMenu>
         </SidebarGroup>
 
@@ -350,7 +309,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarGroup>
           <SidebarGroupLabel>People</SidebarGroupLabel>
           <SidebarMenu>
-            {NAV_PEOPLE.filter(canAccess).map(renderItem)}
+            {NAV_PEOPLE.map(renderItem)}
           </SidebarMenu>
         </SidebarGroup>
 
@@ -372,7 +331,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {/* Settings / Help */}
         <SidebarGroup>
           <SidebarMenu>
-            {NAV_BOTTOM.filter(canAccess).map(renderItem)}
+            {NAV_BOTTOM.map(renderItem)}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>

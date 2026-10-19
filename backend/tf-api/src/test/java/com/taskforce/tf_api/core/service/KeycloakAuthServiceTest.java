@@ -120,7 +120,7 @@ class KeycloakAuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> keycloakAuthService.authenticate(email, password))
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Erreur lors de l'authentification");
+                    .hasMessageContaining("Authentication error");
         }
 
         @Test
@@ -135,7 +135,7 @@ class KeycloakAuthServiceTest {
                     keycloakAuthService.authenticate("test@example.com", "pass")
             )
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Erreur lors de l'authentification");
+                    .hasMessageContaining("Authentication error");
         }
 
         @Test
@@ -150,7 +150,7 @@ class KeycloakAuthServiceTest {
                     keycloakAuthService.authenticate("test@example.com", "pass")
             )
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Erreur lors de l'authentification");
+                    .hasMessageContaining("Authentication error");
         }
 
         @Test
@@ -165,7 +165,7 @@ class KeycloakAuthServiceTest {
                     keycloakAuthService.authenticate("test@example.com", "pass")
             )
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Erreur lors de l'authentification");
+                    .hasMessageContaining("Authentication error");
         }
     }
 
@@ -240,7 +240,7 @@ class KeycloakAuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> keycloakAuthService.refreshToken(invalidToken))
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Token de rafraîchissement invalide");
+                    .hasMessageContaining("Invalid refresh token");
         }
 
         @Test
@@ -253,7 +253,7 @@ class KeycloakAuthServiceTest {
             // When/Then
             assertThatThrownBy(() -> keycloakAuthService.refreshToken("token"))
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Token de rafraîchissement invalide");
+                    .hasMessageContaining("Invalid refresh token");
         }
     }
 

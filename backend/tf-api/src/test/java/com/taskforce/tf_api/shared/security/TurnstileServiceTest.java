@@ -63,7 +63,7 @@ class TurnstileServiceTest {
             .thenReturn(Map.of("success", false, "error-codes", java.util.List.of("invalid-input-response")));
 
         assertThat(actif().verify("jeton-bidon", null))
-            .containsIgnoringCase("échouée");
+            .containsIgnoringCase("failed");
     }
 
     @ParameterizedTest(name = "jeton = « {0} » → refusé sans appel réseau")
@@ -71,7 +71,7 @@ class TurnstileServiceTest {
     @NullAndEmptySource
     @ValueSource(strings = { "   " })
     void rejects_missing_token_without_calling_cloudflare(String token) {
-        assertThat(actif().verify(token, null)).containsIgnoringCase("manquante");
+        assertThat(actif().verify(token, null)).containsIgnoringCase("missing");
 
         // Inutile de déranger un tiers pour constater qu'un champ est vide.
         verify(restTemplate, never()).postForObject(any(String.class), any(), eq(Map.class));

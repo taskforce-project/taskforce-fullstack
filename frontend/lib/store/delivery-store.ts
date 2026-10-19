@@ -4,15 +4,13 @@ import {
   getIssueRun,
   listWorkspaceRuns,
   delegateIssue,
-  getDeliveryKey,
-  connectDeliveryKey,
-  disconnectDeliveryKey,
   getRunnerStatus,
+  getRunActivity,
+  decideApproval as decideApprovalApi,
   provisionRunner as provisionRunnerApi,
-  type DeliveryKeyProvider,
-  type DeliveryKeyStatus,
   type DeliveryProvider,
   type DeliveryRun,
+  type DeliveryRunActivity,
   type RunnerProvision,
   type RunnerStatus,
 } from "../api/delivery-service";
@@ -23,37 +21,42 @@ import {
 // ---------------------------------------------------------------------------
 
 interface DeliveryState {
-  /** Providers délégables du workspace (chargés à la demande). */
+  /** Agents de la délégation pour le workspace (chargés à la demande). */
   providers: DeliveryProvider[];
+  /** Agents par projet : prêts ou non selon le projet (dépôt lié pour Copilot). */
+  projectProviders: Record<number, DeliveryProvider[]>;
   providersLoading: boolean;
   /** Dernier run par issueId (`null` = chargé mais aucune délégation). */
   runs: Record<number, DeliveryRun | null>;
   /** Runs de délégation du workspace (vue « workflow »), les plus récents d'abord. */
   workspaceRuns: DeliveryRun[];
-  /** État des clés de délégation par provider ("anthropic" | "cursor"). Absent = pas encore chargé. */
-  keys: Record<string, DeliveryKeyStatus>;
   /** Runner local de l'utilisateur (ADR-013). `null` = pas encore chargé. Jamais de secret ici. */
   runner: RunnerStatus | null;
+  /** Activité par runId : chronologie cumulée (dans l'ordre) et demandes de validation du run (lot 5). */
+  activity: Record<number, DeliveryRunActivity>;
 
   fetchProviders: (slug: string) => Promise<DeliveryProvider[]>;
+  fetchProjectProviders: (slug: string, projectId: number) => Promise<DeliveryProvider[]>;
   fetchRun: (slug: string, issueId: number) => Promise<DeliveryRun | null>;
   fetchWorkspaceRuns: (slug: string) => Promise<DeliveryRun[]>;
   delegate: (slug: string, issueId: number, providerKey: string, model?: string) => Promise<DeliveryRun | null>;
-  fetchKey: (slug: string, provider: DeliveryKeyProvider) => Promise<DeliveryKeyStatus | null>;
-  connectKey: (slug: string, provider: DeliveryKeyProvider, apiKey: string) => Promise<DeliveryKeyStatus | null>;
-  disconnectKey: (slug: string, provider: DeliveryKeyProvider) => Promise<boolean>;
   fetchRunner: () => Promise<RunnerStatus | null>;
   /** Renvoie les identifiants (secret compris) à l'appelant SANS les garder : le secret ne vit pas dans l'état global. */
   provisionRunner: () => Promise<RunnerProvision | null>;
+  /** Lit la suite de la chronologie d'un run (après le dernier événement connu) et ses demandes. */
+  fetchActivity: (slug: string, runId: number) => Promise<DeliveryRunActivity | null>;
+  /** Autorise ou refuse une action de l'agent ; `true` si la décision est enregistrée. */
+  decideApproval: (slug: string, runId: number, approvalId: number, allow: boolean) => Promise<boolean>;
 }
 
-export const useDeliveryStore = create<DeliveryState>((set) => ({
+export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   providers: [],
+  projectProviders: {},
   providersLoading: false,
   runs: {},
   workspaceRuns: [],
-  keys: {},
   runner: null,
+  activity: {},
 
   fetchProviders: async (slug) => {
     set({ providersLoading: true });
@@ -63,6 +66,16 @@ export const useDeliveryStore = create<DeliveryState>((set) => ({
       return providers;
     } catch {
       set({ providersLoading: false });
+      return [];
+    }
+  },
+
+  fetchProjectProviders: async (slug, projectId) => {
+    try {
+      const providers = await getDeliveryProviders(slug, projectId);
+      set((state) => ({ projectProviders: { ...state.projectProviders, [projectId]: providers } }));
+      return providers;
+    } catch {
       return [];
     }
   },
@@ -97,36 +110,6 @@ export const useDeliveryStore = create<DeliveryState>((set) => ({
     }
   },
 
-  fetchKey: async (slug, provider) => {
-    try {
-      const status = await getDeliveryKey(slug, provider);
-      set((state) => ({ keys: { ...state.keys, [provider]: status } }));
-      return status;
-    } catch {
-      return null;
-    }
-  },
-
-  connectKey: async (slug, provider, apiKey) => {
-    try {
-      const status = await connectDeliveryKey(slug, provider, apiKey);
-      set((state) => ({ keys: { ...state.keys, [provider]: status } }));
-      return status;
-    } catch {
-      return null;
-    }
-  },
-
-  disconnectKey: async (slug, provider) => {
-    try {
-      await disconnectDeliveryKey(slug, provider);
-      set((state) => ({ keys: { ...state.keys, [provider]: { connected: false, keyHint: null } } }));
-      return true;
-    } catch {
-      return false;
-    }
-  },
-
   fetchRunner: async () => {
     try {
       const runner = await getRunnerStatus();
@@ -145,6 +128,33 @@ export const useDeliveryStore = create<DeliveryState>((set) => ({
       return provision;
     } catch {
       return null;
+    }
+  },
+
+  fetchActivity: async (slug, runId) => {
+    const known = get().activity[runId];
+    const after = known?.events.at(-1)?.seq ?? 0;
+    try {
+      const next = await getRunActivity(slug, runId, after);
+      const seen = new Set(known?.events.map((e) => e.seq) ?? []);
+      const merged: DeliveryRunActivity = {
+        events: [...(known?.events ?? []), ...next.events.filter((e) => !seen.has(e.seq))],
+        approvals: next.approvals,
+      };
+      set((state) => ({ activity: { ...state.activity, [runId]: merged } }));
+      return merged;
+    } catch {
+      return null;
+    }
+  },
+
+  decideApproval: async (slug, runId, approvalId, allow) => {
+    try {
+      await decideApprovalApi(slug, runId, approvalId, allow);
+      await get().fetchActivity(slug, runId);
+      return true;
+    } catch {
+      return false;
     }
   },
 }));

@@ -4,51 +4,78 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import com.taskforce.tf_api.core.service.AiStatusService.AiStatus;
+
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Client HTTP vers l'ai-service interne pour le calcul d'embeddings (POST /v1/embeddings).
+ * Embeddings via l'ai-service ({@code POST /v1/embeddings}), authentifiés par le secret partagé.
  *
- * <p>Best-effort : en cas d'indisponibilité (réseau, service down), renvoie {@code null}
- * et l'appelant ignore simplement l'embedding (le node reste utilisable, juste non indexé).
- * Le service Python bascule lui-même sur un vecteur lexical déterministe 1024d si Ollama
- * (BGE-M3) est indisponible — on récupère donc toujours des vecteurs de dimension cohérente.
+ * <p>Best-effort : sans modèle d'embeddings disponible, ou en cas d'échec, les méthodes renvoient
+ * {@code null} ; le Brain OS passe alors à la recherche plein texte. Les vecteurs portent le nom du modèle
+ * qui les a produits ({@link #currentModel()}) : on ne compare jamais des vecteurs de deux modèles.</p>
  */
 @Component
 @Slf4j
 public class EmbeddingClient {
 
-    /** Dimension attendue (BGE-M3 via Ollama). Doit matcher la colonne pgvector vector(1024) (V59). */
+    /** Dimension de la colonne pgvector {@code knowledge_nodes.embedding vector(1024)} (V59). */
     public static final int DIMENSIONS = 1024;
 
     private final RestTemplate http;
+    private final AiStatusService status;
     private final String embeddingsUrl;
+    private final String token;
 
-    public EmbeddingClient(@Value("${ai.service.url:http://ai-service:8000}") String aiServiceUrl) {
+    public EmbeddingClient(AiStatusService status,
+                           @Value("${ai.service.url:http://ai-service:8000}") String serviceUrl,
+                           @Value("${ai.service.token:}") String token) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(3_000);
-        factory.setReadTimeout(60_000); // 1er appel = téléchargement du modèle possible
+        factory.setReadTimeout(60_000); // premier appel : le fournisseur peut charger le modèle
         this.http = new RestTemplate(factory);
-        this.embeddingsUrl = aiServiceUrl.replaceAll("/+$", "") + "/v1/embeddings";
+        this.status = status;
+        this.embeddingsUrl = serviceUrl.replaceAll("/+$", "") + "/v1/embeddings";
+        this.token = token;
     }
 
-    /** Embedding d'un texte. Retourne null si l'ai-service est indisponible. */
+    /** Vrai si un modèle d'embeddings est disponible. */
+    public boolean isAvailable() {
+        return status.current().embeddingsAvailable();
+    }
+
+    /** Nom du modèle d'embeddings courant, {@code null} s'il n'est pas disponible. */
+    public String currentModel() {
+        AiStatus s = status.current();
+        return s.embeddingsAvailable() ? s.embeddingModel() : null;
+    }
+
+    /** Embedding d'un texte, {@code null} si indisponible. */
     public float[] embed(String text) {
         List<float[]> all = embedBatch(List.of(text == null ? "" : text));
         return (all == null || all.isEmpty()) ? null : all.get(0);
     }
 
-    /** Embedding par lot. Retourne null en cas d'échec (l'appelant gère gracieusement). */
+    /** Embeddings d'un lot de textes, dans l'ordre ; {@code null} si indisponible ou en cas d'échec. */
     @SuppressWarnings("unchecked")
     public List<float[]> embedBatch(List<String> texts) {
+        if (!isAvailable()) {
+            return null;
+        }
         try {
-            Map<String, Object> body = Map.of("texts", texts);
-            Map<String, Object> resp = http.postForObject(embeddingsUrl, body, Map.class);
-            if (resp == null || !(resp.get("vectors") instanceof List<?> vectors)) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(token == null ? "" : token);
+            Map<String, Object> resp = http.postForObject(embeddingsUrl,
+                new HttpEntity<>(Map.of("texts", texts), headers), Map.class);
+            if (resp == null || !(resp.get("vectors") instanceof List<?> vectors) || vectors.size() != texts.size()) {
                 return null;
             }
             return vectors.stream()
@@ -60,7 +87,8 @@ public class EmbeddingClient {
                 })
                 .toList();
         } catch (Exception ex) {
-            log.warn("ai-service embeddings indisponible: {}", ex.getMessage());
+            log.warn("Embeddings unavailable: {}", ex.getMessage());
+            status.invalidate();
             return null;
         }
     }

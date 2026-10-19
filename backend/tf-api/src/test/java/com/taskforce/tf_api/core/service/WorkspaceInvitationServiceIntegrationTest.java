@@ -50,7 +50,6 @@ class WorkspaceInvitationServiceIntegrationTest extends AbstractIntegrationTest 
 
     @MockitoBean private AuthorizationService authorizationService; // requireManager → no-op
     @MockitoBean private EmailService emailService;
-    @MockitoBean private ProjectService projectService; // assertProjectSeatAvailable → no-op en test
 
     private static final String SLUG = "ws-inv-it";
     private User owner;
@@ -257,7 +256,7 @@ class WorkspaceInvitationServiceIntegrationTest extends AbstractIntegrationTest 
             assertThatThrownBy(() -> service.createInvitation(SLUG, owner.getId(),
                     projectReq(dev.getEmail(), project.getId(), ProjectRole.MEMBER)))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("déjà membre du projet");
+                .hasMessageContaining("already a member of the project");
         }
     }
 }

@@ -40,19 +40,6 @@ public class UserService {
     @Value("${taskforce.account.deletion-grace-days:30}")
     private int graceDays;
 
-    @Transactional
-    public void processDataRequest(String email, String requestType) {
-        User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
-        if ("DELETION".equalsIgnoreCase(requestType)) {
-            user.setIsActive(false);
-            userRepository.save(user);
-            log.info("Compte désactivé suite à demande RGPD — email={}", email);
-        }
-        String firstName = keycloakService.getUserById(user.getKeycloakId()).getFirstName();
-        emailService.sendDataRequestEmail(user.getEmail(), firstName, requestType);
-    }
-
     /**
      * Clôt le parcours d'onboarding : enregistre le rôle déclaré et lève le drapeau
      * {@code onboarding_completed} pour que le front cesse d'afficher le wizard.
@@ -61,7 +48,7 @@ public class UserService {
     @Transactional
     public UserResponse completeOnboarding(String email, String jobTitle) {
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (jobTitle != null && !jobTitle.isBlank()) {
             user.setJobTitle(jobTitle.strip());
         }
@@ -79,7 +66,7 @@ public class UserService {
     @Transactional
     public UserResponse getByEmail(String email) {
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         UserRepresentation keycloakUser = keycloakService.getUserById(user.getKeycloakId());
 
@@ -111,7 +98,7 @@ public class UserService {
     @Transactional
     public UserResponse updateUserByEmail(String email, UpdateUserRequest request) {
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         // Patch partiel champs DB
         if (request.getDisplayName() != null) {
@@ -147,14 +134,14 @@ public class UserService {
     @Transactional
     public UserResponse uploadAvatar(String email, MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("Fichier avatar vide");
+            throw new IllegalArgumentException("The avatar file is empty");
         }
         if (file.getSize() > 3 * 1024 * 1024) {
             throw new IllegalArgumentException("Avatar trop volumineux — max 3 Mo");
         }
 
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         String objectKey = "avatars/" + user.getId() + "/avatar";
 
@@ -171,7 +158,7 @@ public class UserService {
                 minioService.upload(objectKey, new ByteArrayInputStream(original), original.length, file.getContentType());
             }
         } catch (Exception e) {
-            throw new RuntimeException("Échec de l'upload avatar : " + e.getMessage(), e);
+            throw new RuntimeException("Avatar upload failed: " + e.getMessage(), e);
         }
 
         String proxyUrl = "/api/files/avatars/" + user.getId();
@@ -182,37 +169,6 @@ public class UserService {
 
         UserRepresentation keycloakUser = keycloakService.getUserById(user.getKeycloakId());
         return buildUserResponse(user, keycloakUser);
-    }
-
-    // ---- Sécurité (mot de passe + 2FA) — UI TaskForce adossée au métier Keycloak ----------------
-
-    /** Déclenche l'email de réinitialisation du mot de passe (flux Keycloak). */
-    public void requestPasswordReset(String email) {
-        User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
-        keycloakService.sendPasswordResetEmail(user.getKeycloakId());
-    }
-
-    /** Le 2FA (TOTP) est-il actif pour l'utilisateur courant ? */
-    @Transactional(readOnly = true)
-    public boolean isTwoFactorEnabled(String email) {
-        User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
-        return keycloakService.isTotpEnabled(user.getKeycloakId());
-    }
-
-    /** Déclenche l'email de configuration du 2FA (l'utilisateur scanne le QR côté Keycloak). */
-    public void enableTwoFactor(String email) {
-        User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
-        keycloakService.sendConfigureTotpEmail(user.getKeycloakId());
-    }
-
-    /** Désactive le 2FA (supprime le credential TOTP). */
-    public void disableTwoFactor(String email) {
-        User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
-        keycloakService.disableTotp(user.getKeycloakId());
     }
 
     /**
@@ -240,11 +196,6 @@ public class UserService {
             .avatarUrl(user.getAvatarUrl())
             .jobTitle(user.getJobTitle())
             .onboardingCompleted(user.getOnboardingCompleted())
-            .planType(user.getPlanType())
-            .planStatus(user.getPlanStatus())
-            .subscriptionStartDate(user.getSubscriptionStartDate())
-            .subscriptionEndDate(user.getSubscriptionEndDate())
-            .trialEndDate(user.getTrialEndDate())
             .isActive(user.getIsActive())
             .createdAt(user.getCreatedAt())
             .scheduledPurgeAt(purgeAt)

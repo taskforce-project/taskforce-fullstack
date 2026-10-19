@@ -37,7 +37,7 @@ export default function ErrorPage({ error, reset }: Readonly<ErrorPageProps>) {
       />
 
       {/* Radial fade overlay */}
-      <div className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(ellipse_60%_60%_at_50%_50%,transparent_20%,hsl(var(--background))_80%)]" />
+      <div className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(ellipse_60%_60%_at_50%_50%,transparent_20%,var(--background)_80%)]" />
 
       {/* Content */}
       <div className="relative z-30 flex flex-col items-center gap-8 px-6 text-center">
@@ -48,7 +48,7 @@ export default function ErrorPage({ error, reset }: Readonly<ErrorPageProps>) {
             alt="TaskForce"
             width={44}
             height={44}
-            className="h-11 w-11 object-contain"
+            className="h-11 w-11 object-contain dark:invert"
           />
           <span className="text-lg font-semibold tracking-wide uppercase">
             TaskForce

@@ -16,7 +16,6 @@ import {
   listProjectTeams,
   attachProjectTeam,
   detachProjectTeam,
-  getProjectActivity,
   listProjectLabels,
   createProjectLabel,
   deleteProjectLabel,
@@ -248,30 +247,6 @@ describe('project-service', () => {
       await detachProjectTeam(SLUG, PROJECT_ID, 3);
 
       expect(apiClient.delete).toHaveBeenCalledWith(PROJECT_ROUTES.TEAM(SLUG, PROJECT_ID, 3));
-    });
-  });
-
-  describe('getProjectActivity', () => {
-    it('GET l’activité avec les params days par défaut (14)', async () => {
-      const points = [{ date: '2026-07-01', count: 2 }] as any;
-      vi.mocked(apiClient.get).mockResolvedValue(envelope(points));
-
-      const result = await getProjectActivity(SLUG, PROJECT_ID);
-
-      expect(apiClient.get).toHaveBeenCalledWith(PROJECT_ROUTES.ACTIVITY(SLUG, PROJECT_ID), {
-        params: { days: 14 },
-      });
-      expect(result).toEqual(points);
-    });
-
-    it('respecte un days personnalisé', async () => {
-      vi.mocked(apiClient.get).mockResolvedValue(envelope([]));
-
-      await getProjectActivity(SLUG, PROJECT_ID, 30);
-
-      expect(apiClient.get).toHaveBeenCalledWith(PROJECT_ROUTES.ACTIVITY(SLUG, PROJECT_ID), {
-        params: { days: 30 },
-      });
     });
   });
 

@@ -1,12 +1,16 @@
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 
+import { SelfHostedLegal, isSelfHosted } from "@/components/legal/self-hosted-legal"
+
 export const metadata = {
   title: "Privacy Policy - TaskForce",
   description: "How TaskForce collects, uses, and protects your personal data.",
 }
 
 export default function PrivacyPolicyPage() {
+  // Instance auto-hébergée : ses données sont chez son administrateur, sans mesure d'audience du projet.
+  if (isSelfHosted()) return <SelfHostedLegal kind="privacy" />
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-6 py-12">
@@ -41,7 +45,6 @@ export default function PrivacyPolicyPage() {
               <li><strong className="text-foreground">Account data:</strong> first name, last name, email address, profile picture (optional).</li>
               <li><strong className="text-foreground">Usage data:</strong> workspace activity, issues created/updated, project membership.</li>
               <li><strong className="text-foreground">Authentication data:</strong> hashed credentials managed via Keycloak, JWT access and refresh tokens stored locally in your browser.</li>
-              <li><strong className="text-foreground">Billing data:</strong> subscription plan, payment status. Card details are handled exclusively by Stripe and never stored on our servers.</li>
               <li><strong className="text-foreground">Integration data:</strong> OAuth tokens for GitHub and Slack, stored encrypted and used only to perform actions you explicitly authorize.</li>
             </ul>
           </section>
@@ -66,7 +69,6 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-lg font-semibold text-foreground mb-3">5. Data sharing</h2>
             <p>We do not sell your personal data. We share data only with the following sub-processors:</p>
             <ul className="list-disc pl-5 space-y-1.5 mt-2">
-              <li><strong className="text-foreground">Stripe</strong> - payment processing (EU data center).</li>
               <li><strong className="text-foreground">Mailtrap / transactional email provider</strong> - sending account and notification emails.</li>
               <li><strong className="text-foreground">MinIO</strong> - file attachment storage (self-hosted or configured cloud region).</li>
               <li><strong className="text-foreground">PostHog</strong> (EU Cloud) - product analytics, only after you consent (hosted in the EU, no data leaves the EU).</li>
@@ -76,8 +78,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">6. Data retention</h2>
             <ul className="list-disc pl-5 space-y-1.5">
-              <li>Account data is retained for the duration of your subscription plus 30 days after account deletion.</li>
-              <li>Billing records are retained for 10 years to comply with French accounting law.</li>
+              <li>Account data is retained while your account exists, and erased 30 days after you delete it.</li>
               <li>Workspace data (issues, projects, comments) is deleted within 30 days of a deletion request.</li>
             </ul>
           </section>

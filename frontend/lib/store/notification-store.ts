@@ -7,12 +7,12 @@ import { create } from "zustand";
 import type { NotificationResponse } from "../api/notification-service";
 import {
   listNotifications,
-  countUnread as countUnreadApi,
   markAsRead as markAsReadApi,
   markAllAsRead as markAllAsReadApi,
   acknowledge as acknowledgeApi,
   acknowledgeAll as acknowledgeAllApi,
 } from "../api/notification-service";
+import { parseServerDate } from "../utils/server-date";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,6 +36,8 @@ export interface Signal {
   issueId: string;
   issueUrl: string;
   timestamp: string;
+  /** Date de création renvoyée par l'API : ordre chronologique (colonne « Recent » du dashboard). */
+  createdAt: string;
   body?: string;
 }
 
@@ -45,7 +47,7 @@ export interface Signal {
 
 /** Conversion d'une date ISO en label relatif simple */
 function toRelativeTime(isoDate: string): string {
-  const diff = Date.now() - new Date(isoDate).getTime();
+  const diff = Date.now() - parseServerDate(isoDate).getTime();
   const seconds = Math.floor(diff / 1000);
   if (seconds < 60)       return "just now";
   if (seconds < 3600)     return `${Math.floor(seconds / 60)} min ago`;
@@ -76,6 +78,7 @@ function toSignal(n: NotificationResponse): Signal {
     issueId:      n.issueIdentifier,
     issueUrl:     n.issueUrl,
     timestamp:    toRelativeTime(n.createdAt),
+    createdAt:    n.createdAt,
     body:         n.body ?? undefined,
   };
 }
@@ -98,13 +101,23 @@ interface NotificationState {
   error: string | null;
   /** Horodatage de la dernière synchro réelle (fetch ou push STOMP) - alimente l'indicateur « Live ». */
   lastSyncAt: number | null;
+  /** Workspace auquel appartient la liste (null tant que rien n'a été demandé). */
+  slug: string | null;
+  /** Fin du dernier chargement réussi pour `slug` ; null si jamais chargé. Un push STOMP ne le pose pas. */
+  fetchedAt: number | null;
 
   /** Charge les notifications depuis le backend */
   fetchNotifications: (slug: string) => Promise<void>;
+  /**
+   * Charge la liste seulement si elle manque pour ce workspace et qu'aucun chargement n'est en cours.
+   * La cloche du topbar et la colonne « Recent » du dashboard l'appellent toutes deux au montage : le
+   * premier lance l'appel, l'autre le réutilise (`/notifications` partait deux fois). Le sondage et les
+   * resynchronisations après une action passent par `fetchNotifications`, qui recharge toujours.
+   */
+  ensureNotifications: (slug: string) => Promise<void>;
   /** Insère en tête une notification reçue en temps réel (STOMP). Dédup par id. */
   pushSignal: (notification: NotificationResponse) => void;
   /** Charge uniquement le compteur non-lu (ex. badge header) */
-  fetchUnreadCount: (slug: string) => Promise<void>;
   /** Marque une notification comme lue (API + optimistic) */
   markAsRead: (slug: string, id: string) => Promise<void>;
   /** Marque toutes comme lues (API + optimistic). Renvoie `false` si l'appel échoue (échec détectable côté appelant). */
@@ -121,17 +134,33 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   isLoading:   false,
   error:       null,
   lastSyncAt:  null,
+  slug:        null,
+  fetchedAt:   null,
 
   fetchNotifications: async (slug) => {
+    // Autre workspace : la liste en place n'est pas la sienne, elle ne doit pas s'afficher pendant le chargement.
+    if (get().slug !== slug) {
+      set({ slug, signals: [], unreadCount: 0, lastSyncAt: null, fetchedAt: null });
+    }
     set({ isLoading: true, error: null });
     try {
       const data = await listNotifications(slug);
+      // Réponse d'un workspace quitté entre-temps : elle écraserait la liste du nouveau.
+      if (get().slug !== slug) return;
       const signals = sortByUrgency(data.map(toSignal));
       const unreadCount = signals.filter((s) => !s.read).length;
-      set({ signals, unreadCount, isLoading: false, lastSyncAt: Date.now() });
+      const now = Date.now();
+      set({ signals, unreadCount, isLoading: false, lastSyncAt: now, fetchedAt: now });
     } catch {
+      if (get().slug !== slug) return;
       set({ isLoading: false, error: "Could not load notifications." });
     }
+  },
+
+  ensureNotifications: async (slug) => {
+    const state = get();
+    if (state.slug === slug && (state.isLoading || state.fetchedAt !== null)) return;
+    await get().fetchNotifications(slug);
   },
 
   pushSignal: (notification) => {
@@ -145,15 +174,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         lastSyncAt:  Date.now(),
       };
     });
-  },
-
-  fetchUnreadCount: async (slug) => {
-    try {
-      const count = await countUnreadApi(slug);
-      set({ unreadCount: count });
-    } catch {
-      // Silencieux - le badge n'est pas bloquant
-    }
   },
 
   markAsRead: async (slug, id) => {

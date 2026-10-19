@@ -83,7 +83,7 @@ public class OAuthTwoFactorChallenge {
             }
             return new SecretKeySpec(material, "AES");
         } catch (Exception ex) {
-            throw new IllegalStateException("Clé du défi 2FA indisponible", ex);
+            throw new IllegalStateException("The two-factor challenge key is unavailable", ex);
         }
     }
 
@@ -103,7 +103,7 @@ public class OAuthTwoFactorChallenge {
             out.writeBytes(sealed);
             return Base64.getUrlEncoder().withoutPadding().encodeToString(out.toByteArray());
         } catch (Exception ex) {
-            throw new IllegalStateException("Échec du scellement du défi 2FA", ex);
+            throw new IllegalStateException("Sealing the two-factor challenge failed", ex);
         }
     }
 

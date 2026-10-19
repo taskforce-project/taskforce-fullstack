@@ -29,7 +29,6 @@ import com.taskforce.tf_api.core.dto.request.SmartAssignPreviewRequest;
 import com.taskforce.tf_api.core.dto.response.BulkSmartAssignItemResponse;
 import com.taskforce.tf_api.core.dto.response.SmartAssignCandidateResponse;
 import com.taskforce.tf_api.core.dto.response.SmartAssignResponse;
-import com.taskforce.tf_api.core.enums.AiGenerationKind;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.model.Issue;
@@ -95,8 +94,8 @@ class SmartAssignServiceTest {
     @Mock private LlmClient llm;   // on mocke l'INTERFACE, jamais une impl concrete (TF-AI-GROQ-CLEANUP)
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private AiUsageService aiUsageService; // dép. du vrai AiMeter (pass-through en test)
-    @Mock private AiGenerationService aiGenerationService; // data flywheel : capture des recos (no-op en test)
     @Mock private DeliveryAgentProviderRegistry agentRegistry; // A3 : vide en test → aucune reco d'agent
+    @Mock private AiStatusService aiStatus; // nom du modèle tracé dans ai_runs
 
     private SmartAssignService service;
 
@@ -111,8 +110,9 @@ class SmartAssignServiceTest {
         service = new SmartAssignService(
             workspaceRepository, workspaceMemberRepository, projectRepository,
             projectMemberRepository, issueRepository, llm, jdbcTemplate, new ObjectMapper(), aiMeter,
-            aiGenerationService, agentRegistry);
-        ReflectionTestUtils.setField(service, "modelName", "test-model");
+            agentRegistry, new com.taskforce.tf_api.util.InlineTransactionTemplate(), aiStatus);
+        lenient().when(aiStatus.current()).thenReturn(
+            new AiStatusService.AiStatus(true, true, "main-model", "fast-model", true, "embed-model"));
 
         workspace = Workspace.builder().id(WS_ID).slug(SLUG).name("Demo").build();
         // public → resolveCandidates lit les membres du workspace (une seule source à stubber).
@@ -136,7 +136,7 @@ class SmartAssignServiceTest {
             .thenReturn(List.of());
 
         // Groq renvoie par défaut un JSON vide et valide → ranking déterministe piloté par les règles Java.
-        lenient().when(llm.chatCompletion(any(), any(), any(), anyBoolean(), any()))
+        lenient().when(llm.chatCompletion(any(), any(), anyBoolean(), any()))
             .thenReturn("{\"scores\":[]}");
     }
 
@@ -295,7 +295,7 @@ class SmartAssignServiceTest {
             User u = user(10L, "Alice");
             stubResolvedContext();
             stubWorkspaceMembers(u);
-            when(llm.chatCompletion(any(), any(), any(), anyBoolean(), any()))
+            when(llm.chatCompletion(any(), any(), anyBoolean(), any()))
                 .thenThrow(new RuntimeException("groq down"));
 
             SmartAssignResponse res = service.preview(SLUG, PROJECT_ID, REQUESTER, previewRequest(IssuePriority.MEDIUM));
@@ -318,7 +318,7 @@ class SmartAssignServiceTest {
             stubResolvedContext();
             stubWorkspaceMembers(alice, bob);
             stubSkills(10L, "java");
-            when(llm.chatCompletion(any(), any(), any(), anyBoolean(), any()))
+            when(llm.chatCompletion(any(), any(), anyBoolean(), any()))
                 .thenReturn("{\"scores\":[{\"candidate_id\":11,\"score\":0.99,\"reason\":\"great semantic fit\"}]}");
 
             SmartAssignResponse res = service.preview(SLUG, PROJECT_ID, REQUESTER, previewRequest(IssuePriority.MEDIUM, "java"));
@@ -357,7 +357,7 @@ class SmartAssignServiceTest {
             // usual=2 → stretch 4 ∈ [3,5] ; MEDIUM (pas urgent) ; dispo 100 ; skill react adjacent
             SmartAssignResponse res = previewGrowth(12L, IssuePriority.MEDIUM, 4, 2.0);
 
-            assertThat(res.getRecommended().getFactors()).anyMatch(f -> f.contains("stretch"));
+            assertThat(res.getRecommended().getFactors()).anyMatch(f -> f.toLowerCase().contains("stretch"));
         }
 
         @Test
@@ -407,13 +407,40 @@ class SmartAssignServiceTest {
             // assignment_events inséré (5 args) + ai_runs inséré
             verify(jdbcTemplate).update(contains("assignment_events"), any(), any(), any(), any(), any());
             verify(jdbcTemplate).update(contains("ai_runs"), any(), any(), any(), any(), any(), any(), any(), any());
+        }
 
-            // Data flywheel : le gate appelle record() avec la reco (top-1) comme draft SMART_ASSIGN.
-            ArgumentCaptor<AiGenerationService.Capture> capture = ArgumentCaptor.forClass(AiGenerationService.Capture.class);
-            verify(aiGenerationService).record(capture.capture());
-            assertThat(capture.getValue().kind()).isEqualTo(AiGenerationKind.SMART_ASSIGN);
-            assertThat(capture.getValue().requestRef()).isEqualTo("500");
-            assertThat(capture.getValue().draft()).containsEntry("userId", 10L);
+        @Test
+        @DisplayName("un agent n'est proposé que s'il est prêt pour la personne qui demande (OSS-5.7)")
+        void should_suggest_only_a_ready_agent() {
+            User alice = user(10L, "Alice");
+            stubResolvedContext();
+            stubWorkspaceMembers(alice);
+            stubSkills(10L, "java");
+            Issue bug = Issue.builder().id(ISSUE_ID).title("Fix the footer typo").description("Steps in the spec").project(project)
+                .status(IssueStatus.builder().category(IssueStatusCategory.BACKLOG).build())
+                .priority(IssuePriority.MEDIUM).storyPoints(1).labels(Set.of(label("bug"))).build();
+            when(issueRepository.findById(ISSUE_ID)).thenReturn(Optional.of(bug));
+            java.util.concurrent.atomic.AtomicBoolean runnerSetUp = new java.util.concurrent.atomic.AtomicBoolean(false);
+            com.taskforce.tf_api.core.service.delivery.DeliveryAgentProvider claude =
+                org.mockito.Mockito.mock(com.taskforce.tf_api.core.service.delivery.DeliveryAgentProvider.class);
+            when(claude.key()).thenReturn("claude-code");
+            lenient().when(claude.displayName()).thenReturn("Claude Code");
+            when(claude.available()).thenReturn(true);
+            when(claude.unavailableReason(any())).thenAnswer(inv -> runnerSetUp.get() ? null : "Set up your local runner first");
+            when(agentRegistry.get("claude-code")).thenReturn(claude);
+            lenient().when(agentRegistry.all()).thenReturn(List.of(claude));
+
+            SmartAssignResponse withoutRunner = service.recommend(SLUG, PROJECT_ID, ISSUE_ID, REQUESTER);
+            runnerSetUp.set(true);
+            SmartAssignResponse withRunner = service.recommend(SLUG, PROJECT_ID, ISSUE_ID, REQUESTER);
+
+            java.util.function.Function<SmartAssignResponse, List<String>> kinds = r -> java.util.stream.Stream
+                .concat(java.util.stream.Stream.of(r.getRecommended()), r.getAlternatives() == null ? java.util.stream.Stream.empty() : r.getAlternatives().stream())
+                .filter(java.util.Objects::nonNull).map(c -> c.getKind() == null ? "user" : c.getKind()).toList();
+            assertThat(kinds.apply(withoutRunner)).doesNotContain("agent");
+            assertThat(kinds.apply(withRunner)).contains("agent");
+            verify(claude, org.mockito.Mockito.atLeastOnce()).unavailableReason(org.mockito.ArgumentMatchers.argThat(
+                ctx -> Long.valueOf(REQUESTER).equals(ctx.userId()) && ctx.project() != null && ctx.workspace() != null));
         }
 
         @Test
@@ -467,7 +494,7 @@ class SmartAssignServiceTest {
 
             assertThatThrownBy(() -> service.preview(SLUG, PROJECT_ID, REQUESTER, previewRequest(IssuePriority.MEDIUM)))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Accès refusé");
+                .hasMessageContaining("Access denied");
             verify(projectRepository, never()).findById(anyLong());
         }
     }

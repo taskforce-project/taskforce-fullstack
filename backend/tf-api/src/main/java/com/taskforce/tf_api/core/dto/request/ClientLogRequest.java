@@ -16,7 +16,7 @@ public class ClientLogRequest {
     @Size(max = 16)
     private String level;
 
-    @NotBlank(message = "message requis")
+    @NotBlank(message = "message is required")
     @Size(max = 2000)
     private String message;
 

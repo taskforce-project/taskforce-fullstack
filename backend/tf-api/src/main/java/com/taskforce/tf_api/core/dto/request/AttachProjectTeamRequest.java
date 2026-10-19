@@ -9,6 +9,6 @@ import lombok.Data;
 @Data
 public class AttachProjectTeamRequest {
 
-    @NotNull(message = "teamId est obligatoire")
+    @NotNull(message = "teamId is required")
     private Long teamId;
 }

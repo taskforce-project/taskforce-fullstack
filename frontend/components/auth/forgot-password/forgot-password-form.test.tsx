@@ -27,9 +27,9 @@ vi.mock('@/lib/api/auth-service', () => ({
 // Real French constants (importActual avoids the vi.mock hoisting trap) - every French toast/label
 // asserted here is byte-identical to the constants, so the suite stays green and drift-proof.
 vi.mock('@/lib/store/preferences-store', async () => {
-  const { CONSTANTS_FR } = await vi.importActual<typeof import('@/lib/constants_fr')>('@/lib/constants_fr');
+  const { CONSTANTS_EN } = await vi.importActual<typeof import('@/lib/constants_en')>('@/lib/constants_en');
   return {
-    usePreferencesStore: () => ({ t: CONSTANTS_FR }),
+    usePreferencesStore: () => ({ t: CONSTANTS_EN }),
   };
 });
 
@@ -49,9 +49,9 @@ describe('ForgotPasswordForm', () => {
     it('should render email input initially', () => {
       render(<ForgotPasswordForm />);
 
-      expect(screen.getByRole('heading', { name: /Mot de passe oublié/i })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /Forgot password/i })).toBeInTheDocument();
       expect(screen.getByLabelText(/Email/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Envoyer le code/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Send the code/i })).toBeInTheDocument();
     });
 
     it('should require email input', () => {
@@ -69,15 +69,15 @@ describe('ForgotPasswordForm', () => {
       render(<ForgotPasswordForm />);
 
       const emailInput = screen.getByLabelText(/Email/i);
-      const submitButton = screen.getByRole('button', { name: /Envoyer le code/i });
+      const submitButton = screen.getByRole('button', { name: /Send the code/i });
 
       fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
       fireEvent.click(submitButton);
 
       await waitFor(() => {
         expect(authService.authService.forgotPassword).toHaveBeenCalledWith('test@example.com');
-        expect(toast.success).toHaveBeenCalledWith('Code envoyé', {
-          description: 'Vérifiez votre boîte de réception',
+        expect(toast.success).toHaveBeenCalledWith('Code sent', {
+          description: 'Check your inbox',
         });
       });
     });
@@ -90,7 +90,7 @@ describe('ForgotPasswordForm', () => {
       render(<ForgotPasswordForm />);
 
       const emailInput = screen.getByLabelText(/Email/i);
-      const submitButton = screen.getByRole('button', { name: /Envoyer le code/i });
+      const submitButton = screen.getByRole('button', { name: /Send the code/i });
 
       fireEvent.change(emailInput, { target: { value: 'unknown@example.com' } });
       fireEvent.click(submitButton);
@@ -108,13 +108,13 @@ describe('ForgotPasswordForm', () => {
       render(<ForgotPasswordForm />);
 
       const emailInput = screen.getByLabelText(/Email/i);
-      const submitButton = screen.getByRole('button', { name: /Envoyer le code/i });
+      const submitButton = screen.getByRole('button', { name: /Send the code/i });
 
       fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
       fireEvent.click(submitButton);
 
       expect(submitButton).toBeDisabled();
-      expect(submitButton).toHaveTextContent('Envoi en cours…');
+      expect(submitButton).toHaveTextContent('Sending…');
     });
   });
 
@@ -127,27 +127,27 @@ describe('ForgotPasswordForm', () => {
       render(<ForgotPasswordForm />);
 
       const emailInput = screen.getByLabelText(/Email/i);
-      const submitButton = screen.getByRole('button', { name: /Envoyer le code/i });
+      const submitButton = screen.getByRole('button', { name: /Send the code/i });
 
       fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/Code envoyé !/i)).toBeInTheDocument();
+        expect(screen.getByText(/Code sent!/i)).toBeInTheDocument();
       });
     });
 
     it('should render reset password form after sending OTP', () => {
-      expect(screen.getByLabelText(/Code de vérification/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Nouveau mot de passe/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Confirmer le mot de passe/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Réinitialiser le mot de passe/i })).toBeInTheDocument();
+      expect(screen.getByLabelText(/Verification code/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/New password/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Confirm password/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Reset password/i })).toBeInTheDocument();
     });
 
     it('should require all reset password fields', () => {
-      const otpInput = screen.getByLabelText(/Code de vérification/i);
-      const passwordInput = screen.getByLabelText(/Nouveau mot de passe/i);
-      const confirmInput = screen.getByLabelText(/Confirmer le mot de passe/i);
+      const otpInput = screen.getByLabelText(/Verification code/i);
+      const passwordInput = screen.getByLabelText(/New password/i);
+      const confirmInput = screen.getByLabelText(/Confirm password/i);
 
       expect(otpInput).toHaveAttribute('required');
       expect(passwordInput).toHaveAttribute('required');
@@ -155,10 +155,10 @@ describe('ForgotPasswordForm', () => {
     });
 
     it('should show error when OTP is invalid format', async () => {
-      const otpInput = screen.getByLabelText(/Code de vérification/i);
-      const passwordInput = screen.getByLabelText(/Nouveau mot de passe/i);
-      const confirmInput = screen.getByLabelText(/Confirmer le mot de passe/i);
-      const submitButton = screen.getByRole('button', { name: /Réinitialiser le mot de passe/i });
+      const otpInput = screen.getByLabelText(/Verification code/i);
+      const passwordInput = screen.getByLabelText(/New password/i);
+      const confirmInput = screen.getByLabelText(/Confirm password/i);
+      const submitButton = screen.getByRole('button', { name: /Reset password/i });
 
       fireEvent.change(otpInput, { target: { value: '123' } }); // Too short
       fireEvent.change(passwordInput, { target: { value: 'NewPass@2024!' } });
@@ -166,17 +166,17 @@ describe('ForgotPasswordForm', () => {
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith('Erreur', {
-          description: 'Le code OTP doit contenir 6 chiffres',
+        expect(toast.error).toHaveBeenCalledWith('Error', {
+          description: 'The OTP code must be 6 digits',
         });
       });
     });
 
     it('should show error when passwords do not match', async () => {
-      const otpInput = screen.getByLabelText(/Code de vérification/i);
-      const passwordInput = screen.getByLabelText(/Nouveau mot de passe/i);
-      const confirmInput = screen.getByLabelText(/Confirmer le mot de passe/i);
-      const submitButton = screen.getByRole('button', { name: /Réinitialiser le mot de passe/i });
+      const otpInput = screen.getByLabelText(/Verification code/i);
+      const passwordInput = screen.getByLabelText(/New password/i);
+      const confirmInput = screen.getByLabelText(/Confirm password/i);
+      const submitButton = screen.getByRole('button', { name: /Reset password/i });
 
       fireEvent.change(otpInput, { target: { value: '123456' } });
       fireEvent.change(passwordInput, { target: { value: 'NewPass@2024!' } });
@@ -184,17 +184,17 @@ describe('ForgotPasswordForm', () => {
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith('Erreur', {
-          description: 'Les mots de passe ne correspondent pas',
+        expect(toast.error).toHaveBeenCalledWith('Error', {
+          description: "Passwords do not match",
         });
       });
     });
 
     it('should show error when password is too short', async () => {
-      const otpInput = screen.getByLabelText(/Code de vérification/i);
-      const passwordInput = screen.getByLabelText(/Nouveau mot de passe/i);
-      const confirmInput = screen.getByLabelText(/Confirmer le mot de passe/i);
-      const submitButton = screen.getByRole('button', { name: /Réinitialiser le mot de passe/i });
+      const otpInput = screen.getByLabelText(/Verification code/i);
+      const passwordInput = screen.getByLabelText(/New password/i);
+      const confirmInput = screen.getByLabelText(/Confirm password/i);
+      const submitButton = screen.getByRole('button', { name: /Reset password/i });
 
       fireEvent.change(otpInput, { target: { value: '123456' } });
       fireEvent.change(passwordInput, { target: { value: 'Short1!' } }); // < 8 chars
@@ -202,8 +202,8 @@ describe('ForgotPasswordForm', () => {
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith('Erreur', {
-          description: 'Le mot de passe doit contenir au moins 8 caractères',
+        expect(toast.error).toHaveBeenCalledWith('Error', {
+          description: 'Password must be at least 8 characters',
         });
       });
     });
@@ -213,10 +213,10 @@ describe('ForgotPasswordForm', () => {
         message: 'Password reset successfully',
       });
 
-      const otpInput = screen.getByLabelText(/Code de vérification/i);
-      const passwordInput = screen.getByLabelText(/Nouveau mot de passe/i);
-      const confirmInput = screen.getByLabelText(/Confirmer le mot de passe/i);
-      const submitButton = screen.getByRole('button', { name: /Réinitialiser le mot de passe/i });
+      const otpInput = screen.getByLabelText(/Verification code/i);
+      const passwordInput = screen.getByLabelText(/New password/i);
+      const confirmInput = screen.getByLabelText(/Confirm password/i);
+      const submitButton = screen.getByRole('button', { name: /Reset password/i });
 
       fireEvent.change(otpInput, { target: { value: '123456' } });
       fireEvent.change(passwordInput, { target: { value: 'NewPass@2024!' } });
@@ -229,8 +229,8 @@ describe('ForgotPasswordForm', () => {
           '123456',
           'NewPass@2024!'
         );
-        expect(toast.success).toHaveBeenCalledWith('Mot de passe réinitialisé', {
-          description: 'Vous pouvez maintenant vous connecter',
+        expect(toast.success).toHaveBeenCalledWith('Password reset', {
+          description: 'You can now sign in',
         });
         expect(mockRouter.push).toHaveBeenCalledWith('/auth/login');
       });
@@ -241,10 +241,10 @@ describe('ForgotPasswordForm', () => {
         new Error('Invalid OTP code')
       );
 
-      const otpInput = screen.getByLabelText(/Code de vérification/i);
-      const passwordInput = screen.getByLabelText(/Nouveau mot de passe/i);
-      const confirmInput = screen.getByLabelText(/Confirmer le mot de passe/i);
-      const submitButton = screen.getByRole('button', { name: /Réinitialiser le mot de passe/i });
+      const otpInput = screen.getByLabelText(/Verification code/i);
+      const passwordInput = screen.getByLabelText(/New password/i);
+      const confirmInput = screen.getByLabelText(/Confirm password/i);
+      const submitButton = screen.getByRole('button', { name: /Reset password/i });
 
       fireEvent.change(otpInput, { target: { value: '000000' } });
       fireEvent.change(passwordInput, { target: { value: 'NewPass@2024!' } });
@@ -261,19 +261,19 @@ describe('ForgotPasswordForm', () => {
         message: 'OTP resent',
       });
 
-      const resendButton = screen.getByRole('button', { name: /Renvoyer/i });
+      const resendButton = screen.getByRole('button', { name: /Resend/i });
       fireEvent.click(resendButton);
 
       await waitFor(() => {
         expect(authService.authService.forgotPassword).toHaveBeenCalledWith('test@example.com');
-        expect(toast.success).toHaveBeenCalledWith('Code renvoyé', {
-          description: 'Un nouveau code a été envoyé à votre adresse email',
+        expect(toast.success).toHaveBeenCalledWith('Code resent', {
+          description: 'A new code has been sent to your email address',
         });
       });
     });
 
     it('should only accept numeric input for OTP', () => {
-      const otpInput = screen.getByLabelText(/Code de vérification/i) as HTMLInputElement;
+      const otpInput = screen.getByLabelText(/Verification code/i) as HTMLInputElement;
 
       fireEvent.change(otpInput, { target: { value: 'abc123def' } });
       

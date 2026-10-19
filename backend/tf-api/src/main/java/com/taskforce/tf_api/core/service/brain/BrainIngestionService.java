@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +28,7 @@ import com.taskforce.tf_api.core.repository.KnowledgeNodeRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AiMeter;
+import com.taskforce.tf_api.core.service.BrainTemplateService;
 import com.taskforce.tf_api.core.service.KnowledgeService;
 import com.taskforce.tf_api.core.service.LlmClient;
 
@@ -75,40 +75,34 @@ public class BrainIngestionService {
     private final LlmClient                llm;
     private final AiMeter                  aiMeter;
 
-    @Value("${ai.model.assistant:gateway-default}")
-    private String model; // ignoré par l'AI Gateway (Ollama impose son modèle) ; utile si provider=groq
-
-    /** Hub de domaine ciblé par un wikilink pour raccrocher la rétro au graphe (best-effort). */
-    private static final String HISTORIQUE_HUB = "16 · Historique des actions";
-
     /** Plafond d'issues listées par section (au-delà de ~20 KB le contenu partirait sur MinIO). */
     static final int LIST_CAP = 50;
 
     private static final List<String> TAGS = List.of("cycle", "retro", "ingestion-auto");
 
     /** Tags de la fiche projet (upsert par refType=PROJECT). */
-    private static final List<String> PROJECT_TAGS = List.of("project", "contexte", "ingestion-auto");
+    private static final List<String> PROJECT_TAGS = List.of("project", "context", "ingestion-auto");
 
     /** Tags de la fiche de contexte de l'espace (upsert par refType=WORKSPACE). */
-    private static final List<String> WORKSPACE_TAGS = List.of("contexte", "entreprise", "ingestion-auto");
+    private static final List<String> WORKSPACE_TAGS = List.of("context", "company", "ingestion-auto");
 
     private static final String SYNTHESIS_SYSTEM = """
-        Tu es l'analyste du Brain OS de TaskForce. On te donne les FAITS d'un cycle de développement,
-        extraits de la base de données. Tu produis une courte synthèse en markdown français.
+        You are the analyst of the TaskForce Brain OS. You are given the FACTS of a development cycle,
+        taken from the database. You write a short summary in English markdown.
 
-        RÈGLE ABSOLUE : n'ajoute AUCUN fait. Tu ne disposes que des faits fournis — ne suppose rien
-        sur les causes, les personnes, le code ou le contexte, et n'écris aucun chiffre qui ne figure
-        pas dans les faits. S'il te manque un élément pour conclure, dis-le au lieu de combler.
+        ABSOLUTE RULE: add NO fact. You only have the facts provided: assume nothing about causes,
+        people, code or context, and write no number that is not in the facts. If something is
+        missing to conclude, say so instead of filling the gap.
 
-        Structure ta réponse exactement ainsi, et rien d'autre :
-        ### Lecture des chiffres
-        2 à 4 puces fondées UNIQUEMENT sur les faits fournis.
+        Structure your answer exactly like this, and nothing else:
+        ### Reading the numbers
+        2 to 4 bullet points based ONLY on the facts provided.
 
-        ### Propositions pour le prochain cycle
-        2 à 3 puces d'actions concrètes, formulées à l'infinitif. Ce sont des propositions soumises
-        à l'équipe, pas des décisions actées.
+        ### Proposals for the next cycle
+        2 to 3 bullet points of concrete actions, starting with a verb. They are proposals for the
+        team, not decisions already made.
 
-        Pas de titre de niveau 1 ou 2, pas de préambule, pas de conclusion.
+        No level 1 or 2 heading, no preamble, no conclusion.
         """;
 
     // =========================================================================
@@ -175,7 +169,7 @@ public class BrainIngestionService {
             Issue issue = link.getIssue();
             if (issue == null) continue;
 
-            String assignee = issue.getAssignee() != null ? issue.getAssignee().getDisplayName() : "Non assignée";
+            String assignee = issue.getAssignee() != null ? issue.getAssignee().getDisplayName() : "Unassigned";
             Integer points  = issue.getStoryPoints();
             IssueFact fact  = new IssueFact(
                 issue.getId(),
@@ -195,7 +189,7 @@ public class BrainIngestionService {
             }
             if (points != null) pointsPlanned += points;
 
-            String type = issue.getType() != null ? issue.getType().getName() : "Sans type";
+            String type = issue.getType() != null ? issue.getType().getName() : "No type";
             byType.merge(type, 1, Integer::sum);
             byAssignee.merge(assignee, 1, Integer::sum);
         }
@@ -242,7 +236,7 @@ public class BrainIngestionService {
         if (!llm.isConfigured()) return null;
         try {
             String out = aiMeter.metered(workspaceId, () ->
-                llm.chatCompletion(model, SYNTHESIS_SYSTEM, synthesisPrompt(facts), false, "fast"));
+                llm.chatCompletion(SYNTHESIS_SYSTEM, synthesisPrompt(facts), false, "fast"));
             return out != null && !out.isBlank() ? out : null;
         } catch (Exception ex) {
             // Couvre le gate de quota (409) comme la panne LLM : la rétro sort quand même, en faits seuls.
@@ -253,28 +247,28 @@ public class BrainIngestionService {
 
     /** Le LLM ne reçoit QUE des faits — c'est ce qui l'empêche d'en inventer. */
     private String synthesisPrompt(CycleFacts f) {
-        StringBuilder sb = new StringBuilder("Faits du cycle « ").append(f.cycleName()).append(" » :\n");
-        sb.append("- Projet : ").append(f.projectName()).append("\n");
+        StringBuilder sb = new StringBuilder("Facts of the cycle \"").append(f.cycleName()).append("\":\n");
+        sb.append("- Project: ").append(f.projectName()).append("\n");
         if (f.startDate() != null && f.endDate() != null) {
-            sb.append("- Période : ").append(f.startDate()).append(" → ").append(f.endDate()).append("\n");
+            sb.append("- Period: ").append(f.startDate()).append(" to ").append(f.endDate()).append("\n");
         }
-        sb.append("- Issues : ").append(f.total()).append(" au total, ")
-          .append(f.delivered().size()).append(" livrées, ")
-          .append(f.slipped().size()).append(" non livrées, ")
-          .append(f.cancelled().size()).append(" annulées (complétion ").append(f.completionRate()).append(" %)\n");
-        sb.append("- Story points : ").append(f.pointsDelivered()).append(" livrés sur ")
-          .append(f.pointsPlanned()).append(" planifiés\n");
-        sb.append("- Répartition par type : ").append(flatten(f.byType())).append("\n");
-        sb.append("- Répartition par assigné : ").append(flatten(f.byAssignee())).append("\n");
+        sb.append("- Issues: ").append(f.total()).append(" in total, ")
+          .append(f.delivered().size()).append(" delivered, ")
+          .append(f.slipped().size()).append(" not delivered, ")
+          .append(f.cancelled().size()).append(" cancelled (completion ").append(f.completionRate()).append("%)\n");
+        sb.append("- Story points: ").append(f.pointsDelivered()).append(" delivered out of ")
+          .append(f.pointsPlanned()).append(" planned\n");
+        sb.append("- By type: ").append(flatten(f.byType())).append("\n");
+        sb.append("- By assignee: ").append(flatten(f.byAssignee())).append("\n");
         if (!f.slipped().isEmpty()) {
-            sb.append("- Non livrées : ").append(f.slipped().stream()
+            sb.append("- Not delivered: ").append(f.slipped().stream()
                 .limit(LIST_CAP).map(i -> i.key() + " (" + i.title() + ")").toList()).append("\n");
         }
         return sb.toString();
     }
 
     private String flatten(Map<String, Integer> counts) {
-        if (counts.isEmpty()) return "(aucune)";
+        if (counts.isEmpty()) return "(none)";
         List<String> parts = new ArrayList<>();
         counts.forEach((key, count) -> parts.add(key + " ×" + count));
         return String.join(", ", parts);
@@ -312,21 +306,18 @@ public class BrainIngestionService {
         CycleFacts facts = factsOf(cycle);
         String content = renderFacts(facts, workspaceId, closed);
         if (synthesis != null) {
-            content += "\n## Synthèse IA\n\n"
-                + "> [!tip] Propositions à valider — rédigées à partir des faits ci-dessus, jamais actées automatiquement.\n\n"
+            content += "\n## AI summary\n\n"
+                + "> [!tip] Suggestions to review, written from the facts above, never applied automatically.\n\n"
                 + synthesis.trim() + "\n";
         }
-        content += footer(closed && synthesis == null);
+        content += footer(facts.projectName(), closed && synthesis == null);
 
-        String title = truncate((closed ? "Rétro — " : "Cycle en cours — ")
+        String title = truncate((closed ? "Retro: " : "Cycle in progress: ")
             + facts.cycleName() + " (" + facts.projectIdentifier() + ")", 300);
 
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("cycleId", facts.cycleId());
         metadata.put("projectIdentifier", facts.projectIdentifier());
-        // Appartenance projet (liste = une note peut être transverse à plusieurs projets ; ici le
-        // cycle n'en a qu'un). Le graphe s'en sert pour dessiner les régions — cf. BrainGraph.
-        metadata.put("projects", List.of(cycle.getProject().getId()));
         metadata.put("generatedBy", "ingestion-auto");
         metadata.put("mode", synthesis != null ? "generated" : "facts-only");
         metadata.put("closed", closed);
@@ -371,8 +362,7 @@ public class BrainIngestionService {
      * Fiche de contexte d'un projet dans le Brain OS, ecrite a sa creation. Contrairement a la retro
      * de cycle, <b>aucun appel LLM</b> : le contexte est la description ecrite par l'equipe, on ne
      * paraphrase pas un texte deja fourni (gratuit, instantane). Upsert idempotent (un node par
-     * projet, {@code refType=PROJECT}) ; le node <b>ancre la region du projet</b> dans le graphe via
-     * {@code metadata.projects} (cf. BrainGraph / regions par projet).
+     * projet, {@code refType=PROJECT}).
      */
     @Transactional
     public void writeProjectNode(String slug, Long workspaceId, Long userId, Long projectId) {
@@ -393,9 +383,6 @@ public class BrainIngestionService {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("projectId", project.getId());
         metadata.put("projectIdentifier", project.getIdentifier());
-        // Appartenance projet (liste : une note peut etre transverse a plusieurs projets ; ici un seul).
-        // C'est ce champ qui ancre la region du projet dans le graphe (cf. BrainGraph).
-        metadata.put("projects", List.of(project.getId()));
         metadata.put("generatedBy", "ingestion-auto");
         metadata.put("mode", "facts-only");
 
@@ -436,12 +423,12 @@ public class BrainIngestionService {
         String name = project.getName();
         record Note(String suffix, String domain, String type, String body) {}
         List<Note> notes = List.of(
-            new Note("Architecture", "ARCHITECTURE", "DOC", "Vue technique du projet : composants, dependances, points d'integration."),
-            new Note("Backlog", "ROADMAP", "DOC", "Travaux a venir, priorises. Ce qui est livre migre vers « Fait & livre »."),
-            new Note("Fait & livre", "HISTORIQUE", "DOC", "Historique des livraisons et travaux termines du projet."),
-            new Note("Problemes connus", "AUDITS", "FINDING", "Bugs et limites identifies, avec contournement."),
-            new Note("Decisions (ADR)", "DECISIONS", "ADR", "Decisions d'architecture : Contexte, Options, Decision, Consequences."),
-            new Note("Runbook", "RUNBOOKS", "RUNBOOK", "Procedures d'exploitation : build, deploiement, incidents."));
+            new Note(BrainTemplateService.PROJECT_NOTE_SUFFIXES.get(0), "ARCHITECTURE", "DOC", "Technical view of the project: components, dependencies, integration points."),
+            new Note(BrainTemplateService.PROJECT_NOTE_SUFFIXES.get(1), "ROADMAP", "DOC", "Upcoming work, prioritized. What ships moves to \"Done & shipped\"."),
+            new Note(BrainTemplateService.PROJECT_NOTE_SUFFIXES.get(2), "HISTORIQUE", "DOC", "History of the deliveries and finished work of the project."),
+            new Note(BrainTemplateService.PROJECT_NOTE_SUFFIXES.get(3), "AUDITS", "FINDING", "Known bugs and limits, with their workaround."),
+            new Note(BrainTemplateService.PROJECT_NOTE_SUFFIXES.get(4), "DECISIONS", "ADR", "Architecture decisions: Context, Options, Decision, Consequences."),
+            new Note(BrainTemplateService.PROJECT_NOTE_SUFFIXES.get(5), "RUNBOOKS", "RUNBOOK", "How to run the project: build, deployment, incidents."));
         for (Note note : notes) {
             String title = truncate(name + " - " + note.suffix(), 300);
             knowledgeService.createNode(slug, userId, CreateKnowledgeNodeRequest.builder()
@@ -449,10 +436,10 @@ public class BrainIngestionService {
                 .domain(note.domain())
                 .title(title)
                 .content("# " + title + "\n\n" + note.body())
-                .refId(project.getId()) // meme galaxie que le projet dans le graphe (refId), sans refType
+                .refId(project.getId()) // rattachée au projet (refId), sans refType
                 .parentNodeId(projectNodeId)
-                .tags(List.of("projet", "ingestion-auto"))
-                .metadata(Map.of("generatedBy", "ingestion-auto", "projects", List.of(project.getId())))
+                .tags(List.of("project", "ingestion-auto"))
+                .metadata(Map.of("generatedBy", "ingestion-auto"))
                 .build());
         }
     }
@@ -460,8 +447,7 @@ public class BrainIngestionService {
     /**
      * Fiche de contexte metier de l'espace de travail (« que fait l'entreprise / equipe ? »), ecrite a
      * l'onboarding / a la creation. Aucun LLM (c'est le texte de l'equipe). Upsert idempotent
-     * ({@code refType=WORKSPACE}). Node <b>transverse</b> (pas de {@code metadata.projects}) : il se pose
-     * dans la « Base commune » au centre du graphe. Rien a ecrire si l'activite est vide.
+     * ({@code refType=WORKSPACE}). Rien a ecrire si l'activite est vide.
      */
     @Transactional
     public void writeWorkspaceNode(String slug, Long workspaceId, Long userId) {
@@ -480,7 +466,7 @@ public class BrainIngestionService {
         String title = truncate(ws.getName(), 300);
         String content = "# " + ws.getName() + "\n\n"
             + activity.trim() + "\n\n"
-            + "Socle transverse : [[Socle transverse]]. Chaque projet a son propre dossier ci-dessous.\n\n#contexte #entreprise\n";
+            + "Shared foundation: [[" + BrainTemplateService.SHARED_FOUNDATION_TITLE + "]]. Each project has its own folder below.\n\n#context #company\n";
 
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("workspaceLevel", true);
@@ -516,16 +502,16 @@ public class BrainIngestionService {
     /** Rendu deterministe de la fiche projet (format Obsidian). La description peut etre absente. */
     private String renderProjectContext(Project p) {
         StringBuilder sb = new StringBuilder();
-        sb.append("> [!info] Fiche projet - creee a l'ouverture du projet. Contexte fourni par l'equipe.\n\n");
-        sb.append("## Contexte\n\n");
-        sb.append("- **Projet** : ").append(p.getName()).append(" (`").append(p.getIdentifier()).append("`)\n");
+        sb.append("> [!info] Project sheet, written when the project was created. The context comes from the team.\n\n");
+        sb.append("## Context\n\n");
+        sb.append("- **Project**: ").append(p.getName()).append(" (`").append(p.getIdentifier()).append("`)\n");
         String desc = p.getDescription();
-        sb.append("- **Description** : ")
-          .append(desc != null && !desc.isBlank() ? desc.trim() : "(non renseignee)").append("\n");
+        sb.append("- **Description**: ")
+          .append(desc != null && !desc.isBlank() ? desc.trim() : "(none)").append("\n");
         if (p.getRepoFullName() != null && !p.getRepoFullName().isBlank()) {
-            sb.append("- **Depot** : `").append(p.getRepoFullName()).append("`\n");
+            sb.append("- **Repository**: `").append(p.getRepoFullName()).append("`\n");
         }
-        sb.append("\n#project #contexte\n");
+        sb.append("\n#project #context\n");
         return sb.toString();
     }
 
@@ -536,30 +522,30 @@ public class BrainIngestionService {
     private String renderFacts(CycleFacts f, Long workspaceId, boolean closed) {
         StringBuilder sb = new StringBuilder();
         sb.append(closed
-            ? "> [!info] Rétro écrite automatiquement à la clôture du cycle. Faits extraits de la base.\n\n"
-            : "> [!note] Cycle en cours — ce relevé se met à jour à chaque issue terminée.\n\n");
+            ? "> [!info] Retro written automatically when the cycle closed. The facts come from the database.\n\n"
+            : "> [!note] Cycle in progress: this summary updates each time an issue is done.\n\n");
 
-        sb.append("## Faits\n\n");
-        sb.append("- **Cycle** : ").append(f.cycleName());
+        sb.append("## Facts\n\n");
+        sb.append("- **Cycle**: ").append(f.cycleName());
         if (f.startDate() != null || f.endDate() != null) {
             sb.append(" (").append(f.startDate() != null ? f.startDate() : "?")
               .append(" → ").append(f.endDate() != null ? f.endDate() : "?").append(")");
         }
-        sb.append("\n- **Projet** : ").append(f.projectName()).append(" (`").append(f.projectIdentifier()).append("`)\n");
-        sb.append("- **Périmètre** : ").append(f.total()).append(" issues — ")
-          .append(f.delivered().size()).append(" livrées, ")
-          .append(f.slipped().size()).append(" non livrées, ")
-          .append(f.cancelled().size()).append(" annulées\n");
-        sb.append("- **Complétion** : ").append(f.completionRate()).append(" %\n");
-        sb.append("- **Effort** : ").append(f.pointsDelivered()).append(" points livrés sur ")
-          .append(f.pointsPlanned()).append(" planifiés\n\n");
+        sb.append("\n- **Project**: ").append(f.projectName()).append(" (`").append(f.projectIdentifier()).append("`)\n");
+        sb.append("- **Scope**: ").append(f.total()).append(" issues: ")
+          .append(f.delivered().size()).append(" delivered, ")
+          .append(f.slipped().size()).append(" not delivered, ")
+          .append(f.cancelled().size()).append(" cancelled\n");
+        sb.append("- **Completion**: ").append(f.completionRate()).append("%\n");
+        sb.append("- **Effort**: ").append(f.pointsDelivered()).append(" of ")
+          .append(f.pointsPlanned()).append(" planned points delivered\n\n");
 
-        appendIssueSection(sb, closed ? "Livrées" : "Terminées à ce stade", f.delivered(), workspaceId);
-        appendIssueSection(sb, closed ? "Non livrées (reportées)" : "Restantes", f.slipped(), workspaceId);
-        appendIssueSection(sb, "Annulées", f.cancelled(), workspaceId);
+        appendIssueSection(sb, closed ? "Delivered" : "Done so far", f.delivered(), workspaceId);
+        appendIssueSection(sb, closed ? "Not delivered (moved out)" : "Remaining", f.slipped(), workspaceId);
+        appendIssueSection(sb, "Cancelled", f.cancelled(), workspaceId);
 
-        appendCountTable(sb, "Répartition par type", "Type", f.byType());
-        appendCountTable(sb, "Répartition par assigné", "Assigné", f.byAssignee());
+        appendCountTable(sb, "By type", "Type", f.byType());
+        appendCountTable(sb, "By assignee", "Assignee", f.byAssignee());
 
         return sb.toString();
     }
@@ -574,7 +560,7 @@ public class BrainIngestionService {
         sb.append("### ").append(heading).append("\n\n");
         int shown = Math.min(issues.size(), LIST_CAP);
         for (IssueFact issue : issues.subList(0, shown)) {
-            sb.append("- `").append(issue.key()).append("` — ").append(issue.title());
+            sb.append("- `").append(issue.key()).append("`: ").append(issue.title());
             sb.append(" *(").append(issue.assignee());
             if (issue.points() != null) sb.append(", ").append(issue.points()).append(" pts");
             sb.append(")*");
@@ -583,7 +569,7 @@ public class BrainIngestionService {
             sb.append("\n");
         }
         if (issues.size() > shown) {
-            sb.append("- _… et ").append(issues.size() - shown).append(" autres (liste plafonnée à ")
+            sb.append("- _… and ").append(issues.size() - shown).append(" more (list capped at ")
               .append(LIST_CAP).append(")_\n");
         }
         sb.append("\n");
@@ -597,10 +583,10 @@ public class BrainIngestionService {
         sb.append("\n");
     }
 
-    /** Wikilink vers le hub de domaine + tags : c'est ce qui insère le node dans le réseau. */
-    private String footer(boolean synthesisMissing) {
-        return "\n---\n\nRattaché à [[" + HISTORIQUE_HUB + "]]"
-            + (synthesisMissing ? "\n\n_Synthèse IA indisponible — seuls les faits sont consignés._" : "")
+    /** Wikilink vers la note « Done & shipped » du projet + tags : c'est ce qui insère le relevé dans le réseau. */
+    private String footer(String projectName, boolean synthesisMissing) {
+        return "\n---\n\nFiled under [[" + projectName + " - " + BrainTemplateService.PROJECT_NOTE_SUFFIXES.get(2) + "]]"
+            + (synthesisMissing ? "\n\n_AI summary unavailable: only the facts are recorded._" : "")
             + "\n\n#cycle #retro #ingestion-auto\n";
     }
 

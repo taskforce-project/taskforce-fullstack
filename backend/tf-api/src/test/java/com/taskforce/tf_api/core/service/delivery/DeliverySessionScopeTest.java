@@ -36,6 +36,9 @@ class DeliverySessionScopeTest {
         "POST,  /api/workspaces/acme/projects/12/issues/5/comments",
         "PUT,   /api/workspaces/acme/projects/12/issues/5",
         "post,  /api/workspaces/acme/projects/12/issues/5/comments",
+        // Serveur MCP de l'instance : chaque outil y est rejugé sur son équivalent REST
+        "POST,  /api/workspaces/acme/mcp",
+        "GET,   /api/workspaces/acme/mcp",
     })
     void allows(String method, String path) {
         assertThat(DeliverySessionScope.allows(method, path, SLUG, PROJECT)).isTrue();
@@ -80,6 +83,11 @@ class DeliverySessionScopeTest {
         "DELETE, /api/workspaces/acme/projects/12/issues/5",
         "DELETE, /api/workspaces/acme/projects/12/issues/5/comments/3",
         "DELETE, /api/workspaces/acme/projects/12",
+        "DELETE, /api/workspaces/acme/mcp",
+        // Serveur MCP d'un autre workspace, ou autre méthode
+        "POST,   /api/workspaces/other/mcp",
+        "PATCH,  /api/workspaces/acme/mcp",
+        "POST,   /api/workspaces/acme/mcp/actions/execute",
         // Autres méthodes
         "OPTIONS, /api/workspaces/acme/projects/12/issues",
         "TRACE,   /api/workspaces/acme/projects",

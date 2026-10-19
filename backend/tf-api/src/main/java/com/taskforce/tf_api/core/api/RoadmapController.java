@@ -42,13 +42,13 @@ public class RoadmapController {
     ) {
         Long userId = resolveUserId(jwt);
         List<IssueResponse> issues = issueService.getScheduledIssues(slug, userId);
-        return ResponseEntity.ok(ApiResponse.success("Roadmap récupérée", issues));
+        return ResponseEntity.ok(ApiResponse.success("Roadmap retrieved", issues));
     }
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return user.getId();
     }
 }

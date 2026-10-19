@@ -15,6 +15,8 @@ export interface ProcOptions {
   /** Texte envoyé sur stdin (le prompt de l'agent : il ne passe jamais par une ligne de commande). */
   input?: string;
   timeoutMs?: number;
+  /** Appelé pour chaque ligne complète de stdout, au fil de l'eau (suivi en direct de l'agent). */
+  onStdoutLine?: (line: string) => void;
 }
 
 /**
@@ -48,7 +50,7 @@ export function resolveCommand(command: string, env: NodeJS.ProcessEnv = process
  */
 export function quoteForCmd(arg: string): string {
   if (/[%\r\n]/.test(arg)) {
-    throw new Error("Argument refusé pour cmd.exe : « % » ou saut de ligne");
+    throw new Error("Argument refused for cmd.exe: a % sign or a line break");
   }
   if (arg !== "" && !/[\s"&|<>^(),;=!]/.test(arg)) return arg;
   return `"${arg.replace(/"/g, '""')}"`;
@@ -87,6 +89,7 @@ export function run(command: string, args: string[], options: ProcOptions = {}):
 
     let stdout = "";
     let stderr = "";
+    let pending = "";
     let timedOut = false;
     const timer = options.timeoutMs
       ? setTimeout(() => {
@@ -96,7 +99,15 @@ export function run(command: string, args: string[], options: ProcOptions = {}):
         }, options.timeoutMs)
       : null;
 
-    child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString("utf8")));
+    child.stdout.on("data", (chunk: Buffer) => {
+      const text = chunk.toString("utf8");
+      stdout += text;
+      if (!options.onStdoutLine) return;
+      pending += text;
+      const lines = pending.split(/\r?\n/);
+      pending = lines.pop() ?? "";
+      for (const line of lines) if (line.trim()) options.onStdoutLine(line);
+    });
     child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString("utf8")));
     child.on("error", (err) => {
       if (timer) clearTimeout(timer);
@@ -104,6 +115,7 @@ export function run(command: string, args: string[], options: ProcOptions = {}):
     });
     child.on("close", (code) => {
       if (timer) clearTimeout(timer);
+      if (options.onStdoutLine && pending.trim()) options.onStdoutLine(pending);
       resolvePromise({ code, stdout, stderr, timedOut });
     });
 
@@ -117,7 +129,7 @@ export async function runOrThrow(command: string, args: string[], options: ProcO
   const result = await run(command, args, options);
   if (result.code !== 0) {
     const detail = (result.stderr || result.stdout).trim().split(/\r?\n/).slice(-5).join(" | ");
-    throw new Error(`${command} ${args.slice(0, 3).join(" ")} a échoué (code ${result.code}) : ${detail}`);
+    throw new Error(`${command} ${args.slice(0, 3).join(" ")} failed (code ${result.code}): ${detail}`);
   }
   return result.stdout.trim();
 }

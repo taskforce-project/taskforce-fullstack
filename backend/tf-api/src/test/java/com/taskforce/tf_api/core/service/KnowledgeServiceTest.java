@@ -175,7 +175,7 @@ class KnowledgeServiceTest {
         assertThatThrownBy(() -> service.updateNode(SLUG, 10L, USER,
             UpdateKnowledgeNodeRequest.builder().parentNodeId(20L).build()))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("cycle");
+            .hasMessageContaining("loop");
 
         verify(nodeRepository, never()).save(any());
     }

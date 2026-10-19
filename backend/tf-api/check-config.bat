@@ -32,14 +32,6 @@ echo.
 echo Verification des variables d'environnement critiques :
 echo.
 
-findstr /C:"STRIPE_API_KEY=sk_test_" .env.dev >nul 2>&1
-if %errorlevel% equ 0 (
-    echo [OK] STRIPE_API_KEY configuree
-) else (
-    echo [WARN] STRIPE_API_KEY non configuree ^(commence par sk_test_^)
-    echo        Consulte CREDENTIALS_GUIDE.md
-)
-
 findstr /C:"MAIL_USERNAME=XXXX" .env.dev >nul 2>&1
 if %errorlevel% equ 0 (
     echo [WARN] MAIL_USERNAME non configuree ^(encore a XXXX^)

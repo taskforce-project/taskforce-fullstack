@@ -81,7 +81,7 @@ public class PageService {
      */
     public List<MyWorkPageResponse> listWorkspacePages(String workspaceSlug, Long userId) {
         Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
 
         List<Long> viewableProjectIds = visibilityGuard.viewableProjectIds(workspace.getId(), userId);
         if (viewableProjectIds.isEmpty()) return List.of();
@@ -107,7 +107,7 @@ public class PageService {
         visibilityGuard.assertCanWrite(project, userId);
 
         User author = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         Page page = Page.builder()
             .project(project)
@@ -156,11 +156,11 @@ public class PageService {
     private Project resolveProject(String workspaceSlug, Long projectId) {
         return workspaceRepository.findBySlug(workspaceSlug)
             .flatMap(ws -> projectRepository.findByIdAndWorkspaceId(projectId, ws.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
     }
 
     private Page resolvePage(Long pageId, Long projectId) {
         return pageRepository.findByIdAndProjectId(pageId, projectId)
-            .orElseThrow(() -> new ResourceNotFoundException("Page introuvable"));
+            .orElseThrow(() -> new ResourceNotFoundException("Page not found"));
     }
 }

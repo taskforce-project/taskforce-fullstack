@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service.delivery;
 
 import java.time.Duration;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -24,7 +25,15 @@ public class LocalRunnerSettings {
     private final Duration sessionTtl;
     private final Duration heartbeatTimeout;
     private final Duration claimTimeout;
+    private final Duration approvalTimeout;
 
+    /** Réglages des tests : délai de validation par défaut (10 min). */
+    public LocalRunnerSettings(boolean enabled, String runnerRole, String clientPrefix, String ownerClaim,
+                               long sessionTtlMinutes, long heartbeatTimeoutMinutes, long claimTimeoutMinutes) {
+        this(enabled, runnerRole, clientPrefix, ownerClaim, sessionTtlMinutes, heartbeatTimeoutMinutes, claimTimeoutMinutes, 10);
+    }
+
+    @Autowired
     public LocalRunnerSettings(
         @Value("${delivery.local-runner.enabled:false}") boolean enabled,
         @Value("${delivery.local-runner.runner-role:delivery-runner}") String runnerRole,
@@ -32,7 +41,8 @@ public class LocalRunnerSettings {
         @Value("${delivery.local-runner.owner-claim:tf_runner_owner}") String ownerClaim,
         @Value("${delivery.local-runner.session-ttl-minutes:120}") long sessionTtlMinutes,
         @Value("${delivery.local-runner.heartbeat-timeout-minutes:10}") long heartbeatTimeoutMinutes,
-        @Value("${delivery.local-runner.claim-timeout-minutes:15}") long claimTimeoutMinutes
+        @Value("${delivery.local-runner.claim-timeout-minutes:15}") long claimTimeoutMinutes,
+        @Value("${delivery.local-runner.approval-timeout-minutes:10}") long approvalTimeoutMinutes
     ) {
         this.enabled = enabled;
         this.runnerRole = runnerRole;
@@ -41,6 +51,7 @@ public class LocalRunnerSettings {
         this.sessionTtl = Duration.ofMinutes(sessionTtlMinutes);
         this.heartbeatTimeout = Duration.ofMinutes(heartbeatTimeoutMinutes);
         this.claimTimeout = Duration.ofMinutes(claimTimeoutMinutes);
+        this.approvalTimeout = Duration.ofMinutes(approvalTimeoutMinutes);
     }
 
     public boolean enabled()            { return enabled; }
@@ -59,4 +70,10 @@ public class LocalRunnerSettings {
      * il est clos en échec avec un message qui dit quoi faire, au lieu de rester « en attente » pour toujours.
      */
     public Duration claimTimeout()      { return claimTimeout; }
+
+    /**
+     * Attente d'une décision sur une action de l'agent (OSS-5.4). Au-delà, la demande expire et l'action est
+     * refusée ; le runner applique de son côté la même attente par défaut.
+     */
+    public Duration approvalTimeout()   { return approvalTimeout; }
 }

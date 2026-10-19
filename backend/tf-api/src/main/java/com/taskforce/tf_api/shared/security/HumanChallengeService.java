@@ -62,7 +62,7 @@ public class HumanChallengeService {
     private static final Duration MIN_DWELL = Duration.ofSeconds(3);
 
     private static final String MSG_INVALIDE =
-        "Vérification humaine invalide. Rechargez la page et réessayez.";
+        "The human check is invalid. Reload the page and try again.";
 
     private final HmacSigner signer;
 
@@ -114,7 +114,7 @@ public class HumanChallengeService {
             return null;
         }
         if (token == null || token.isBlank()) {
-            return "Vérification humaine manquante. Rechargez la page et réessayez.";
+            return "The human check is missing. Reload the page and try again.";
         }
 
         Duration age = signer.ageOf(token);
@@ -122,11 +122,11 @@ public class HumanChallengeService {
             return MSG_INVALIDE;
         }
         if (age.isNegative() || age.compareTo(MAX_AGE) > 0) {
-            return "Vérification humaine expirée. Rechargez la page et réessayez.";
+            return "The human check expired. Reload the page and try again.";
         }
         if (age.compareTo(MIN_DWELL) < 0) {
             log.warn("Inscription refusée : soumission en {} ms, en deçà du délai humain minimal.", age.toMillis());
-            return "Formulaire soumis trop rapidement. Réessayez.";
+            return "The form was submitted too quickly. Please try again.";
         }
 
         return null;

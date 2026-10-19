@@ -82,13 +82,13 @@ public class AnalyticsQueryService {
     /** Libellé de la dimension (pour l'axe / le titre). */
     public String dimensionLabel(String key) {
         Dimension d = DIMENSIONS.get(up(key));
-        return d != null ? d.label : "Catégorie";
+        return d != null ? d.label : "Category";
     }
 
     /** Libellé de la mesure (pour l'axe / le titre). */
     public String measureLabel(String key) {
         Measure m = MEASURES.get(up(key));
-        return m != null ? m.label : "Valeur";
+        return m != null ? m.label : "Value";
     }
 
     /**

@@ -113,14 +113,6 @@ describe('API Client', () => {
       expect(config.headers.Authorization).toBeUndefined();
     });
 
-    it('traite /api/sales/ comme public', () => {
-      localStorage.setItem('accessToken', 'tok-123');
-
-      const config = onRequest({ url: '/api/sales/contact', headers: {} });
-
-      expect(config.headers.Authorization).toBeUndefined();
-    });
-
     it('propage une erreur de préparation de requête', async () => {
       const err = new Error('config invalide');
       await expect(onRequestError(err)).rejects.toThrow('config invalide');
@@ -269,31 +261,31 @@ describe('API Client', () => {
   });
 
   describe('Intercepteur de réponse - 429', () => {
-    it('annonce le délai d’attente lu dans Retry-After', async () => {
+    // Retry-After vient du backend (exposé par son CORS) ; une attente courte ou absente reste vague.
+    it.each([
+      ['42', 'Too many requests, try again in 42 seconds.'],
+      ['2', 'Too many requests, try again in a few seconds.'],
+      ['pas-un-nombre', 'Too many requests, try again in a few seconds.'],
+      [undefined, 'Too many requests, try again in a few seconds.'],
+    ])('Retry-After %s : « %s », jamais le toast de panne réseau', async (retryAfter, expected) => {
+      const headers = retryAfter === undefined ? {} : { 'retry-after': retryAfter };
+
+      await expect(onResponseError(axiosError({ response: { status: 429, headers } }))).rejects.toBeDefined();
+
+      expect(toast.warning).toHaveBeenCalledWith(expected, expect.objectContaining({ id: 'api-rate-limit' }));
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it('reste muet sur un 429 lors d’un appel de fond', async () => {
       const error = axiosError({
-        response: { status: 429, headers: { 'retry-after': '42' } },
+        response: { status: 429, headers: { 'retry-after': '2' } },
+        config: { url: '/api/workspaces/acme/notifications', silentError: true, headers: {} },
       });
 
       await expect(onResponseError(error)).rejects.toBeDefined();
 
-      expect(toast.warning).toHaveBeenCalledWith(
-        'Too many requests',
-        expect.objectContaining({
-          id: 'api-rate-limit',
-          description: expect.stringContaining('42s'),
-        }),
-      );
-    });
-
-    it('retombe sur une formulation vague sans en-tête exploitable', async () => {
-      const error = axiosError({ response: { status: 429, headers: {} } });
-
-      await expect(onResponseError(error)).rejects.toBeDefined();
-
-      expect(toast.warning).toHaveBeenCalledWith(
-        'Too many requests',
-        expect.objectContaining({ description: expect.stringContaining('a few seconds') }),
-      );
+      expect(toast.warning).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
     });
   });
 
@@ -315,6 +307,21 @@ describe('API Client', () => {
       expect(
         getErrorMessage({ isAxiosError: true, response: { data: { message: 'Custom API error message' } } }),
       ).toBe('Custom API error message');
+    });
+
+    it('dit d’un 429 la même chose que le toast global, quel que soit le corps renvoyé', () => {
+      vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+      expect(
+        getErrorMessage({
+          isAxiosError: true,
+          response: {
+            status: 429,
+            headers: { 'retry-after': '30' },
+            data: { message: 'Rate limit reached. Retry in 30s.' },
+          },
+        }),
+      ).toBe('Too many requests, try again in 30 seconds.');
     });
 
     it('retombe sur error.message quand la réponse ne porte rien', () => {

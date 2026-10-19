@@ -29,40 +29,14 @@ spring:
           starttls:
             enable: false
 
-# JWT Configuration
-jwt:
-  secret: testSecretKeyForJWTTokenGenerationThatIsVeryLongForTestingPurposes
-  access-token:
-    expiration: 3600
-  refresh-token:
-    expiration: 86400
-
 # Keycloak Configuration (mock)
 keycloak:
   realm: taskforce-test
-  auth-server-url: http://localhost:8080/auth
-  resource: taskforce-api-test
-  credentials:
-    secret: test-secret
   admin:
     client-id: admin-cli
     client-secret: test-admin-secret
     username: admin-test
     password: admin
-
-# Stripe Configuration (mock) — bloc unique (les 2 blocs `stripe:` dupliqués cassaient
-# le parse YAML strict de Boot 4 → tout @SpringBootTest/@WebMvcTest en profil `test` échouait).
-stripe:
-  api-key: sk_test_mock_key
-  success-url: http://localhost:3000/auth/verify-email?session_id={CHECKOUT_SESSION_ID}
-  cancel-url: http://localhost:3000/auth/register
-  plans:
-    pro:
-      price-id: price_test_pro
-    premium:
-      price-id: price_premium_test
-    enterprise:
-      price-id: price_enterprise_test
 
 # Intégrations — poller du miroir Slack désactivé en test (pas de @Scheduled parasite)
 integrations:

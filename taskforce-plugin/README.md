@@ -1,64 +1,54 @@
-# TaskForce - plugin Claude Code (mode interactif)
+# TaskForce plugin for Claude Code (interactive mode)
 
-Travaille tes tâches TaskForce **dans ton propre Claude Code**. Tu lances `/taskforce`, le plugin liste tes
-issues assignées, tu en prends une, Claude la traite avec toi (code ou rédaction) et laisse un commentaire sur
-l'issue. Tout passe par le serveur MCP TaskForce, authentifié **en tant que toi** (tes droits).
+Work on your TaskForce issues **in your own Claude Code**. Run `/taskforce`: the plugin lists the issues assigned to
+you, you pick one, Claude works on it with you (code or writing) and leaves a comment on the issue. Everything goes
+through the **MCP server of your TaskForce instance**, as you, with your rights.
 
-C'est le **pendant interactif** du runner local (`taskforce-runner/`) :
+It is the interactive counterpart of the local runner (`taskforce-runner/`):
 
-| | Runner local (`taskforce-runner`) | Ce plugin |
+| | Local runner (`taskforce-runner`) | This plugin |
 |---|---|---|
-| Modèle | Autonome : tu délègues dans l'app, il bosse en fond, ouvre une PR | Interactif : tu ouvres Claude Code, tu tires une tâche, tu regardes |
-| Process | Un démon qui tourne sur ton poste | Rien en plus : ta session Claude Code |
-| Identité | Compte de service Keycloak (`tf-runner-<toi>`) | **Toi** (ton jeton utilisateur) |
-| Livraison | Pull request | Commentaire sur l'issue (et code local si tu as ouvert le dépôt) |
+| Mode | Autonomous: you delegate in the app, it works in the background, opens a pull request | Interactive: you open Claude Code, take an issue, and watch |
+| Process | A small daemon on your machine | Nothing more: your Claude Code session |
+| Identity | The runner's service account, acting for you in a delegated session | **You** (your personal access token) |
+| Delivery | Pull request | A comment on the issue (and local code if you opened the repository) |
 
-## Prérequis
+## Requirements
 
-- Claude Code installé (`claude`).
-- Le serveur MCP TaskForce **construit** sur ton poste :
-  ```bash
-  cd taskforce-mcp && npm install && npm run build
-  ```
-  Note le chemin absolu de `taskforce-mcp/dist/index.js`, tu le donneras au plugin.
+- Claude Code installed (`claude`).
+- A **personal access token**: in TaskForce, **Settings > Agents > Claude Code in your terminal**, create a token. It
+  starts with `tfp_`, acts as you, only works with the MCP server, and can be revoked there at any time.
 
-## Installation
+## Install
 
-1. Ajoute ce dossier comme marketplace, puis installe le plugin (depuis Claude Code) :
+1. Add this folder as a marketplace, then install the plugin (from Claude Code):
+
    ```
-   /plugin marketplace add C:/Taskforce/taskforce-fullstack/taskforce-plugin
+   /plugin marketplace add <path to taskforce-fullstack>/taskforce-plugin
    /plugin install taskforce@taskforce
    ```
-2. À l'activation, Claude Code te demande la configuration :
-   - **Jeton TaskForce (Bearer)** : voir « Obtenir un jeton » ci-dessous.
-   - **Workspace (slug)** : le slug dans l'URL de l'app (ex. `taskforce-hq`).
-   - **URL de l'API** : `https://api.taskforce-project.fr/api` par défaut (en dev, `http://localhost:8080/api`).
-   - **Entrée du serveur MCP** : le chemin absolu vers `taskforce-mcp/dist/index.js`.
-3. Lance `/taskforce` (ou `/taskforce TF-28` pour une issue précise).
 
-## Obtenir un jeton (v1)
+2. When the plugin is enabled, Claude Code asks for its settings:
+   - **TaskForce API address**: `https://api.taskforce-project.fr` by default (`http://localhost:8080` for a local
+     instance), without `/api`.
+   - **Workspace**: the slug in the address of the app (e.g. `acme`).
+   - **Personal access token**: the `tfp_...` token. Claude Code stores it as a sensitive value.
 
-Il n'y a pas encore d'endpoint « jeton personnel » dans TaskForce, donc pour cette première version tu colles ton
-**jeton d'accès** courant :
+3. Run `/taskforce` (or `/taskforce WEB-28` for a given issue).
 
-- Connecte-toi à l'app, ouvre les DevTools du navigateur (onglet Réseau), regarde une requête vers l'API, copie la
-  valeur de l'en-tête `Authorization: Bearer <...>` (sans le mot `Bearer`).
+## Without the plugin
 
-⚠️ Ce jeton est **de courte durée** (≈ 30 min en prod). Quand il expire, le MCP renvoie des 401 : recolle un jeton
-frais via `/plugin` (reconfigurer). Le vrai correctif est un **jeton personnel durable** côté TaskForce (prochaine
-étape, voir ci-dessous).
+The MCP server is a plain Streamable HTTP endpoint, so any MCP client can use it. With Claude Code alone:
 
-## Ce que le plugin peut faire
+```bash
+claude mcp add --transport http taskforce https://api.taskforce-project.fr/api/workspaces/<workspace>/mcp --header "Authorization: Bearer <token>"
+```
 
-Il expose les outils MCP TaskForce (lire une issue et son fil, chercher dans le Brain OS, lister tes issues et
-projets, commenter, créer ou mettre à jour une issue, etc.), tous **avec tes droits**. La commande `/taskforce`
-cadre l'agent : contexte d'abord, travail, puis compte rendu en commentaire ; le texte des issues est traité comme
-une donnée, jamais comme une instruction.
+TaskForce shows this exact command when you create a token.
 
-## Feuille de route
+## What it can do
 
-- **Publier `taskforce-mcp` sur npm** : le champ « Entrée du serveur MCP » disparaît, remplacé par
-  `command: npx, args: ["-y", "taskforce-mcp"]` dans `plugin.json`. Installation en une commande, sans build local.
-- **Jeton personnel durable** : un endpoint TaskForce qui émet un jeton révocable de longue durée pour le MCP, à la
-  place du jeton d'accès collé. Supprime le seul point de friction de cette v1.
-- **Distribution par dépôt** : héberger le marketplace sur un dépôt Git (`/plugin marketplace add owner/repo`).
+The tools of the MCP server: read an issue and its thread, search the Brain OS, list your issues and the projects,
+comment, create or update an issue, get an assignee recommendation, ask Cortex. All of them **with your rights**.
+The `/taskforce` command frames the work: context first, then the task, then a summary as a comment. The text of
+issues is treated as data, never as instructions.
