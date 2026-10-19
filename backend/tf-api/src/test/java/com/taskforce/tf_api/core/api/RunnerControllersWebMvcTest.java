@@ -31,8 +31,8 @@ import com.taskforce.tf_api.core.service.delivery.LocalRunnerService;
 import com.taskforce.tf_api.core.service.delivery.LocalRunnerSettings;
 import com.taskforce.tf_api.core.service.delivery.RunnerIdentityResolver;
 import com.taskforce.tf_api.core.service.delivery.RunnerProvisioningService;
-import com.taskforce.tf_api.core.service.delivery.RunnerTokenService;
-import com.taskforce.tf_api.core.service.delivery.RunnerTokenService.InvalidRunnerCredentialsException;
+import com.taskforce.tf_api.core.service.delivery.RunnerTokenIssuer;
+import com.taskforce.tf_api.core.service.delivery.RunnerTokenIssuer.InvalidRunnerCredentialsException;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -62,7 +62,7 @@ class RunnerControllersWebMvcTest {
 
     @Autowired private MockMvc mockMvc;
 
-    @MockitoBean private RunnerTokenService tokenService;
+    @MockitoBean private RunnerTokenIssuer tokenService;
     @MockitoBean private RunnerProvisioningService provisioningService;
     @MockitoBean private LocalRunnerService localRunnerService;               // DeliverySessionFilter
     @MockitoBean private UserRepository userRepository;

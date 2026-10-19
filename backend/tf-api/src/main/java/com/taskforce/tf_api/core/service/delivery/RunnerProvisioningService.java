@@ -16,6 +16,7 @@ import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import com.taskforce.tf_api.core.dto.response.RunnerProvisionResponse;
@@ -41,6 +42,8 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Service
 @ConditionalOnProperty(name = LocalRunnerSettings.ENABLED_PROPERTY, havingValue = "true")
+// Identités Keycloak : dans l'app desktop, le runner est lancé par la coque, Claude Code est prêt dès qu'il est activé.
+@Profile("!desktop")
 @Slf4j
 public class RunnerProvisioningService {
 

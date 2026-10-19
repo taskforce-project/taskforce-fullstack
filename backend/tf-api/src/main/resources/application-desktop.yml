@@ -41,6 +41,8 @@ server:
 desktop:
   # Jeton tiré par la coque à chaque lancement, exigé sur chaque requête (DesktopLaunchTokenAuthenticator).
   launch-token: ${TF_DESKTOP_LAUNCH_TOKEN}
+  # Secret du runner de Claude Code que la coque lance, tiré lui aussi à chaque lancement (DesktopRunnerTokens).
+  runner-secret: ${TF_DESKTOP_RUNNER_SECRET:}
   # Dossier de données de l'app (fichiers, pièces jointes, Brain OS), propre au compte connecté.
   data-dir: ${TF_DESKTOP_DATA_DIR}
   # Compte TaskForce connecté, lu par la coque dans le jeton du compte hébergé.
