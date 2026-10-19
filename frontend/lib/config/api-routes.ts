@@ -76,7 +76,8 @@ export const USER_ROUTES = {
   AVATAR: "/api/users/me/avatar",
   /** Sécurité : 2FA TOTP gérée par l'app. */
   TWO_FACTOR: "/api/users/me/2fa",
-  ACCOUNT_PAGE: "/api/users/me/account-page",
+  TWO_FACTOR_SETUP: "/api/users/me/2fa/setup",
+  TWO_FACTOR_CONFIRM: "/api/users/me/2fa/confirm",
   SEARCH: (q: string) => `/api/users/search?q=${encodeURIComponent(q)}`,
   /** Clôture du parcours d'onboarding (rôle + drapeau). */
   ONBOARDING: "/api/users/me/onboarding",

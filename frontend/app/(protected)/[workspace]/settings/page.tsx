@@ -38,7 +38,8 @@ import { MemberSkillsCard } from "@/components/members/member-skills-card"
 import { MemberAvailabilityCard } from "@/components/members/member-availability-card"
 import { exportMyData, deleteMyAccount, deleteMyAccountImmediately, restoreMyAccount } from "@/lib/api/gdpr-service"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { getAccountPageUrl, getTwoFactorStatus } from "@/lib/api/user-service"
+import { getTwoFactorStatus, disableTwoFactor } from "@/lib/api/user-service"
+import { TwoFactorSetupDialog } from "@/components/dialogs/two-factor-setup-dialog"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
 import {
   getNotificationPreferences,
@@ -850,23 +851,41 @@ function NotificationsPanel() {
 }
 
 function SecurityPanel() {
-  // Mot de passe : parcours brandé de l'app (`/auth/forgot-password`, code par email puis nouveau mot de passe).
-  // Double authentification : sur le compte en ligne (application d'authentification), qui demande son code à chaque
-  // connexion, sur le web, dans l'app desktop et avec GitHub ou Google.
+  // Le métier auth est piloté par Keycloak via son API admin - l'utilisateur ne voit jamais Keycloak.
+  // Reset mot de passe → parcours brandé de l'app (`/auth/forgot-password` : code par email templaté,
+  // puis nouveau mot de passe). 2FA (TOTP) → gérée par l'app (secret + QR, V79).
   const router = useRouter()
   const [twoFa, setTwoFa] = useState<boolean | null>(null)
-  const [accountUrl, setAccountUrl] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     getTwoFactorStatus().then(setTwoFa).catch(() => setTwoFa(null))
-    getAccountPageUrl().then(setAccountUrl).catch(() => setAccountUrl(null))
   }, [])
+
+  const onResetPassword = () => {
+    // Réutilise le VRAI parcours brandé (`/auth/forgot-password`) : code OTP par email (template
+    // `reset-password-email`) → nouveau mot de passe → API admin Keycloak. Jamais de page Keycloak.
+    router.push("/auth/forgot-password")
+  }
+
+  const onDisable2fa = async () => {
+    setBusy(true)
+    try {
+      await disableTwoFactor()
+      setTwoFa(false)
+      toast.success("Two-factor authentication disabled.")
+    } catch {
+      toast.error("Couldn't disable two-factor authentication.")
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
       <SectionCard
         title="Authentication & security"
-        description="Manage your password and two-step verification."
+        description="Manage your password and two-factor authentication."
       >
         <div className="flex flex-col divide-y divide-border/50">
           {/* Mot de passe */}
@@ -880,38 +899,39 @@ function SecurityPanel() {
                 </p>
               </div>
             </div>
-            <Button size="sm" variant="outline" onClick={() => router.push("/auth/forgot-password")}>
+            <Button size="sm" variant="outline" onClick={onResetPassword} disabled={busy}>
               Reset password
             </Button>
           </div>
 
-          {/* Double authentification, sur le compte en ligne */}
+          {/* 2FA */}
           <div className="flex items-center justify-between gap-3 py-3 last:pb-0">
             <div className="flex items-start gap-3">
               <Shield className="size-4 text-muted-foreground mt-0.5 shrink-0" />
               <div>
                 <p className="text-sm font-medium text-foreground">
-                  Two-step verification
+                  Two-factor authentication (2FA)
                   {twoFa === true && (
-                    <Badge variant="secondary" className="ml-2 align-middle">On</Badge>
+                    <Badge variant="secondary" className="ml-2 align-middle">Enabled</Badge>
                   )}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {twoFa
-                    ? "TaskForce asks for the code of your authenticator app at every sign-in: web, desktop app, GitHub and Google."
-                    : "Add an authenticator app to your TaskForce account: TaskForce then asks for its code at every sign-in."}
+                    ? "An authenticator app is required at sign-in."
+                    : "Add an authenticator app (TOTP) for an extra layer of security."}
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">On your account page, open Account security, then Signing in.</p>
               </div>
             </div>
-            {twoFa === null && accountUrl === null ? (
+            {twoFa === null ? (
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
-            ) : (
-              <Button size="sm" variant={twoFa ? "outline" : "default"} asChild disabled={!accountUrl}>
-                <a href={accountUrl ?? undefined} target="_blank" rel="noreferrer">
-                  {twoFa ? "Manage" : "Set up"}
-                </a>
+            ) : twoFa ? (
+              <Button size="sm" variant="outline" onClick={onDisable2fa} disabled={busy}>
+                Disable
               </Button>
+            ) : (
+              <TwoFactorSetupDialog onEnabled={() => setTwoFa(true)}>
+                <Button size="sm">Enable 2FA</Button>
+              </TwoFactorSetupDialog>
             )}
           </div>
         </div>
