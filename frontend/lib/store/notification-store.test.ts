@@ -46,15 +46,104 @@ function makeSignal(overrides: Partial<Signal> = {}): Signal {
     issueId: 'TF-1',
     issueUrl: '/issue/1',
     timestamp: 'just now',
+    createdAt: '2026-10-18T21:41:00',
     ...overrides,
   };
+}
+
+/** Promesse que le test résout quand il veut (requête « en vol »). */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
 }
 
 describe('notification-store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     act(() => {
-      useNotificationStore.setState({ signals: [], unreadCount: 0, isLoading: false });
+      useNotificationStore.setState({
+        signals: [],
+        unreadCount: 0,
+        isLoading: false,
+        error: null,
+        lastSyncAt: null,
+        slug: null,
+        fetchedAt: null,
+      });
+    });
+  });
+
+  describe('chargement partagé (cloche + colonne « Recent » du dashboard)', () => {
+    it('deux demandes simultanées pour le même workspace ne font qu’un appel', async () => {
+      const pending = deferred<NotificationResponse[]>();
+      vi.mocked(svc.listNotifications).mockReturnValue(pending.promise);
+
+      const first = useNotificationStore.getState().ensureNotifications('acme');
+      const second = useNotificationStore.getState().ensureNotifications('acme');
+      await act(async () => {
+        pending.resolve([makeNotif({ id: 7, createdAt: '2026-10-18T21:41:00' })]);
+        await Promise.all([first, second]);
+      });
+
+      expect(svc.listNotifications).toHaveBeenCalledTimes(1);
+      expect(useNotificationStore.getState().signals[0].createdAt).toBe('2026-10-18T21:41:00');
+      expect(useNotificationStore.getState().fetchedAt).not.toBeNull();
+    });
+
+    it('ne recharge pas une liste déjà chargée ; un autre workspace repart d’une liste vide', async () => {
+      vi.mocked(svc.listNotifications).mockResolvedValue([makeNotif({ id: 1 })]);
+      await act(async () => {
+        await useNotificationStore.getState().fetchNotifications('acme');
+      });
+
+      await act(async () => {
+        await useNotificationStore.getState().ensureNotifications('acme');
+      });
+      expect(svc.listNotifications).toHaveBeenCalledTimes(1);
+
+      const beta = deferred<NotificationResponse[]>();
+      vi.mocked(svc.listNotifications).mockReturnValue(beta.promise);
+      const loading = useNotificationStore.getState().ensureNotifications('beta');
+
+      // Pendant le chargement de « beta », la liste de « acme » ne s'affiche plus.
+      expect(useNotificationStore.getState()).toMatchObject({ slug: 'beta', signals: [], fetchedAt: null });
+      await act(async () => {
+        beta.resolve([makeNotif({ id: 2 })]);
+        await loading;
+      });
+      expect(svc.listNotifications).toHaveBeenLastCalledWith('beta');
+      expect(useNotificationStore.getState().signals.map((s) => s.id)).toEqual(['2']);
+    });
+
+    it('ignore la réponse d’un workspace quitté entre-temps', async () => {
+      const acme = deferred<NotificationResponse[]>();
+      vi.mocked(svc.listNotifications).mockReturnValueOnce(acme.promise);
+      const late = useNotificationStore.getState().fetchNotifications('acme');
+
+      vi.mocked(svc.listNotifications).mockResolvedValueOnce([makeNotif({ id: 2 })]);
+      await act(async () => {
+        await useNotificationStore.getState().fetchNotifications('beta');
+        acme.resolve([makeNotif({ id: 1 })]);
+        await late;
+      });
+
+      expect(useNotificationStore.getState().slug).toBe('beta');
+      expect(useNotificationStore.getState().signals.map((s) => s.id)).toEqual(['2']);
+    });
+
+    it('un push temps réel ne tient pas lieu de chargement', async () => {
+      act(() => useNotificationStore.getState().pushSignal(makeNotif({ id: 10 })));
+      vi.mocked(svc.listNotifications).mockResolvedValue([makeNotif({ id: 10 }), makeNotif({ id: 11 })]);
+
+      await act(async () => {
+        await useNotificationStore.getState().ensureNotifications('acme');
+      });
+
+      expect(svc.listNotifications).toHaveBeenCalledWith('acme');
+      expect(useNotificationStore.getState().signals).toHaveLength(2);
     });
   });
 
