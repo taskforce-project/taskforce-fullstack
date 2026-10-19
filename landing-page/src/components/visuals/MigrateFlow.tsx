@@ -1,37 +1,28 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Check, ChevronDown, Download, FileJson, Lock } from "lucide-react";
+import { Check, KeyRound, Lock } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Cursor, Fit, MiniWindow, useSequence } from "./vignettes/parts";
 import { cn } from "@/lib/utils";
 
 /**
- * Le trajet d'un projet de la webapp vers l'app desktop, en boucle : le menu Export de la webapp (libellés réels :
- * « Full project export », « JSON (full) »), le fichier qui traverse, l'import dans l'app où les issues arrivent.
- * Côte à côte sur grand écran, l'une sous l'autre sur téléphone. Données d'exemple. Mouvement réduit : l'état final.
+ * Le passage de la webapp à l'app desktop, en boucle : on se connecte dans le navigateur avec le compte de la webapp,
+ * l'app voit qu'il a déjà des projets et propose de les rapatrier ; on accepte, ils arrivent sur l'ordinateur.
+ * Côte à côte sur grand écran, l'un sous l'autre sur téléphone. Données d'exemple. Mouvement réduit : l'état final.
  */
 
-const STEPS = [700, 700, 800, 1300, 900, 3200] as const;
+const STEPS = [900, 900, 700, 1200, 900, 3200] as const;
 
 type Box = { left: number; top: number; width: number; height: number };
-type Layout = {
-  w: number;
-  h: number;
-  web: Box;
-  app: Box;
-  chip: { left: number; top: number; dx: number; dy: number };
-  path: string;
-  cursor: { rest: [number, number]; exportBtn: [number, number]; json: [number, number] };
-};
+type Layout = { w: number; h: number; web: Box; app: Box; path: string; chip: { left: number; top: number; dx: number; dy: number } };
 
 const WIDE: Layout = {
   w: 1000,
   h: 420,
   web: { left: 0, top: 30, width: 380, height: 340 },
   app: { left: 620, top: 30, width: 380, height: 340 },
-  chip: { left: 420, top: 183, dx: 120, dy: 0 },
   path: "M 400 200 C 470 200, 530 200, 600 200",
-  cursor: { rest: [300, 330], exportBtn: [318, 88], json: [270, 186] },
+  chip: { left: 430, top: 183, dx: 70, dy: 0 },
 };
 
 const COMPACT: Layout = {
@@ -39,10 +30,13 @@ const COMPACT: Layout = {
   h: 640,
   web: { left: 20, top: 10, width: 380, height: 270 },
   app: { left: 20, top: 360, width: 380, height: 270 },
-  chip: { left: 140, top: 296, dx: 0, dy: 34 },
   path: "M 210 282 L 210 358",
-  cursor: { rest: [330, 250], exportBtn: [338, 68], json: [290, 166] },
+  chip: { left: 150, top: 296, dx: 0, dy: 30 },
 };
+
+/* Repères intérieurs, mesurés depuis le coin de chaque fenêtre : le curseur s'en sert dans les deux mises en page. */
+const SIGN_IN = { x: 190, y: 185 };
+const BRING = { x: 76, y: 141 };
 
 const ISSUES = [
   { k: "WEB-42", t: "Add dark mode to the settings page", s: "In review" },
@@ -73,125 +67,161 @@ export default function MigrateFlow({ host }: Readonly<{ host?: string }>) {
 
   const L = compact ? COMPACT : WIDE;
   const step = useSequence(STEPS, inView, reduce);
-  const menu = step >= 1 && step <= 2;
-  const picked = step >= 2;
-  const flying = step === 3;
-  const imported = step >= 4;
-  const [cx, cy] = step === 0 ? L.cursor.rest : step === 1 ? L.cursor.exportBtn : L.cursor.json;
+  const signedIn = step >= 2;
+  const asking = step >= 3 && step <= 4;
+  const bringing = step === 4;
+  const imported = step >= 5;
+  const cursor: [number, number] =
+    step <= 0
+      ? [L.web.left + 300, L.web.top + 290]
+      : step <= 2
+        ? [L.web.left + SIGN_IN.x + 6, L.web.top + SIGN_IN.y + 4]
+        : [L.app.left + BRING.x + 6, L.app.top + BRING.y + 4];
   const rows = compact ? 3 : 4;
 
   return (
     <div ref={ref} className="relative">
       <div className="wash wash-sky flex justify-center rounded-2xl px-3 py-8 sm:px-8 sm:py-12">
-        <div className="w-full" style={{ maxWidth: L.w }} aria-hidden="true">
+        <div className="w-full text-foreground" style={{ maxWidth: L.w }} aria-hidden="true">
           <Fit key={compact ? "c" : "w"} w={L.w} h={L.h}>
-            {/* la webapp, dans un navigateur */}
-            <div className="absolute overflow-hidden bg-white shadow-float rounded-xl" style={L.web}>
+            {/* la connexion, dans le navigateur, avec le compte de la webapp */}
+            <div className="absolute overflow-hidden rounded-xl bg-white shadow-float" style={L.web}>
               <div className="flex h-8 items-center gap-2 border-b border-black/[0.06] bg-paper px-3">
                 <span className="flex gap-1.5">
                   <span className="size-2.5 rounded-full bg-rule" />
                   <span className="size-2.5 rounded-full bg-rule" />
                   <span className="size-2.5 rounded-full bg-rule" />
                 </span>
-                <span className="ml-2 flex h-5 flex-1 items-center gap-1.5 bg-white px-2 font-mono text-[9.5px] text-subtle shadow-[inset_0_0_0_1px_var(--border)]">
+                <span className="ml-2 flex h-5 flex-1 items-center gap-1.5 rounded-md bg-white px-2 font-mono text-[9.5px] text-subtle shadow-[inset_0_0_0_1px_var(--border)]">
                   <Lock className="size-2.5" /> {host ?? "app.taskforce-project.fr"}
                 </span>
               </div>
-              <div className="p-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-[13px] font-medium">Website</p>
-                  <span className={cn("inline-flex h-7 items-center gap-1 border px-2 text-[11px]", menu ? "border-foreground/40" : "border-input")}>
-                    <Download className="size-3" /> Export <ChevronDown className="size-3" />
-                  </span>
-                </div>
-                <AnimatePresence>
-                  {menu && (
-                    <motion.div
-                      className="absolute top-[78px] right-4 z-10 w-[190px] border border-black/[0.06] bg-white p-1 text-[11px] shadow-xl rounded-lg"
-                      initial={{ opacity: 0, y: -6, scale: 0.97 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, transition: { duration: 0.15 } }}
-                      style={{ transformOrigin: "top right" }}
+              <AnimatePresence mode="wait" initial={false}>
+                {signedIn ? (
+                  <motion.div
+                    key="done"
+                    className="absolute inset-x-0 top-8 bottom-0 flex flex-col items-center justify-center gap-3 px-6 text-center"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.35 }}
+                  >
+                    <span className="flex size-10 items-center justify-center rounded-full bg-tint-green text-ink-green">
+                      <Check className="size-5" strokeWidth={2.6} />
+                    </span>
+                    <p className="text-[14px] font-medium">You're signed in</p>
+                    <p className="text-[11px] text-muted-foreground">You can go back to the TaskForce app.</p>
+                  </motion.div>
+                ) : (
+                  <motion.div key="form" className="absolute inset-x-0 top-8 px-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <p className="mt-[18px] text-[14px] font-medium">Sign in to TaskForce</p>
+                    <span className="absolute top-[52px] right-6 left-6 flex h-8 items-center rounded-md px-2.5 text-[11px] shadow-[inset_0_0_0_1px_var(--input)]">you@example.com</span>
+                    <span className="absolute top-[92px] right-6 left-6 flex h-8 items-center rounded-md px-2.5 text-[12px] tracking-[0.2em] text-subtle shadow-[inset_0_0_0_1px_var(--input)]">
+                      ••••••••••
+                    </span>
+                    <motion.span
+                      className="absolute top-[136px] right-6 left-6 flex h-[34px] items-center justify-center rounded-md bg-primary text-[12px] font-medium text-white"
+                      animate={{ scale: step === 2 ? 0.97 : 1 }}
+                      transition={{ duration: 0.15 }}
                     >
-                      <p className="px-2 pt-1 pb-1.5 text-[10px] text-subtle">Full project export</p>
-                      <p className="px-2 py-1.5">CSV (issues and details)</p>
-                      <p className={cn("px-2 py-1.5 transition-colors", picked ? "bg-accent text-accent-foreground" : "")}>JSON (full)</p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                <div className="mt-4 flex flex-col gap-2">
-                  {ISSUES.slice(0, rows).map((it) => (
-                    <div key={it.k} className="flex items-center gap-2 border border-black/[0.06] px-2.5 py-2 rounded-lg">
-                      <span className="font-mono text-[9.5px] text-subtle">{it.k}</span>
-                      <span className="truncate text-[11px]">{it.t}</span>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-3 text-[9px] text-subtle font-medium">The web app · closing</p>
-              </div>
+                      Sign in
+                    </motion.span>
+                    <p className="absolute top-[184px] right-6 left-6 text-center text-[10.5px] text-muted-foreground">Same account as the web app</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            {/* le fichier qui traverse */}
+            {/* la connexion qui revient à l'app */}
             <svg className="absolute inset-0" viewBox={`0 0 ${L.w} ${L.h}`} aria-hidden="true">
               <path d={L.path} fill="none" stroke="var(--ink-blue)" strokeOpacity="0.35" strokeWidth="1.5" strokeDasharray="5 5" />
             </svg>
             <motion.div
-              className="absolute z-10 flex items-center gap-1.5 bg-white px-2.5 py-2 font-mono text-[11px] shadow-lg"
+              className="absolute z-10 flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1.5 text-[11px] font-medium shadow-float"
               style={{ left: L.chip.left, top: L.chip.top }}
               initial={false}
-              animate={{
-                x: flying || imported ? L.chip.dx : 0,
-                y: flying || imported ? L.chip.dy : 0,
-                opacity: picked && !imported ? 1 : 0,
-                scale: flying ? 1.05 : 1,
-              }}
-              transition={{ duration: flying ? 1.1 : 0.35, ease: [0.22, 1, 0.36, 1] }}
+              animate={{ x: step >= 3 ? L.chip.dx : 0, y: step >= 3 ? L.chip.dy : 0, opacity: step === 2 || step === 3 ? 1 : 0 }}
+              transition={{ duration: step === 3 ? 0.9 : 0.3, ease: [0.22, 1, 0.36, 1] }}
             >
-              <FileJson className="size-4 text-primary" /> WEB-export.json
+              <KeyRound className="size-3.5 text-primary" /> Signed in
             </motion.div>
 
-            {/* l'app desktop */}
+            {/* l'app desktop : elle attend, propose de rapatrier les projets, puis les montre */}
             <MiniWindow title="TaskForce" style={L.app} bodyClassName="p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-[13px] font-medium">Website</p>
-                <AnimatePresence>
-                  {imported && (
-                    <motion.span
-                      initial={{ opacity: 0, x: 8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0 }}
-                      className="flex items-center gap-1 bg-tint-green px-2 py-1 text-[9px] text-ink-green font-medium rounded-md"
-                    >
-                      <Check className="size-3" strokeWidth={3} /> Imported
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              </div>
-              <div className="mt-4 flex flex-col gap-2">
-                {ISSUES.slice(0, rows).map((it, i) => (
-                  <motion.div
-                    key={it.k}
-                    className="flex items-center gap-2 border border-black/[0.06] px-2.5 py-2 rounded-lg"
-                    initial={false}
-                    animate={{ opacity: imported ? 1 : 0, y: imported ? 0 : 8 }}
-                    transition={{ duration: 0.4, delay: imported ? 0.12 * i : 0, ease: [0.22, 1, 0.36, 1] }}
-                  >
-                    <span className="font-mono text-[9.5px] text-subtle">{it.k}</span>
-                    <span className="truncate text-[11px]">{it.t}</span>
-                    <span className="ml-auto shrink-0 text-[9.5px] text-muted-foreground">{it.s}</span>
+              <AnimatePresence mode="wait" initial={false}>
+                {imported ? (
+                  <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[13px] font-medium">Website</p>
+                      <span className="flex items-center gap-1 rounded-md bg-tint-green px-2 py-1 text-[9px] font-medium text-ink-green">
+                        <Check className="size-3" strokeWidth={3} /> On this computer
+                      </span>
+                    </div>
+                    <div className="mt-4 flex flex-col gap-2">
+                      {ISSUES.slice(0, rows).map((it, i) => (
+                        <motion.div
+                          key={it.k}
+                          className="flex items-center gap-2 rounded-md px-2.5 py-2 shadow-[inset_0_0_0_1px_rgb(25_23_21/0.06)]"
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.4, delay: 0.1 * i, ease: [0.22, 1, 0.36, 1] }}
+                        >
+                          <span className="font-mono text-[9.5px] text-subtle">{it.k}</span>
+                          <span className="truncate text-[11px]">{it.t}</span>
+                          <span className="ml-auto shrink-0 text-[9.5px] text-muted-foreground">{it.s}</span>
+                        </motion.div>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-[10.5px] text-muted-foreground">With their comments and their history</p>
                   </motion.div>
-                ))}
-              </div>
-              <motion.p
-                className="mt-3 text-[10.5px] text-muted-foreground"
-                initial={false}
-                animate={{ opacity: imported ? 1 : 0 }}
-                transition={{ delay: 0.6 }}
-              >
-                With their comments and their history
-              </motion.p>
+                ) : asking ? (
+                  <motion.div
+                    key="ask"
+                    className="rounded-lg bg-white p-3 shadow-float"
+                    initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                    transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    <p className="text-[13px] font-medium">Welcome back</p>
+                    <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                      You already have 3 projects on the web app. Bring them to this computer?
+                    </p>
+                    <div className="mt-3 flex items-center gap-2">
+                      <motion.span
+                        className={cn("inline-flex h-[30px] w-[96px] items-center justify-center rounded-md text-[11px] font-medium text-white", bringing ? "bg-primary-hover" : "bg-primary")}
+                        animate={{ scale: bringing ? 0.96 : 1 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        Bring them
+                      </motion.span>
+                      <span className="inline-flex h-[30px] items-center rounded-md px-3 text-[11px] shadow-[inset_0_0_0_1px_var(--input)]">Not now</span>
+                    </div>
+                    <div className="mt-3 h-[3px] overflow-hidden rounded-full bg-muted">
+                      <motion.span
+                        className="block h-full origin-left bg-primary"
+                        initial={false}
+                        animate={{ scaleX: bringing ? 1 : 0 }}
+                        transition={{ duration: bringing ? 0.85 : 0, ease: "linear" }}
+                      />
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="wait"
+                    className="flex h-[200px] flex-col items-center justify-center gap-2 text-center"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <span className="size-2 rounded-full bg-primary anim-pulse" />
+                    <p className="text-[12px] font-medium">Sign in to continue</p>
+                    <p className="text-[10.5px] text-muted-foreground">Your browser opened the sign-in page.</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </MiniWindow>
-            <Cursor x={cx} y={cy} press={step === 1 || step === 2} show={!reduce && step <= 2} />
+            <Cursor x={cursor[0]} y={cursor[1]} press={step === 2 || step === 4} show={!reduce && step <= 4} />
           </Fit>
         </div>
       </div>

@@ -4,7 +4,7 @@
 
 You write your issues and keep your project notes (Brain OS) in TaskForce. When an issue is ready, you assign it to an agent. The agent reads the issue and the related notes, works on its own branch, asks before any action outside its limits, and comes back with a pull request, or a comment when there is no code. Nothing is merged without you.
 
-TaskForce has no account and no server: your data stays in a folder on your computer, and the app sends no usage data. The AI can run on a local model through Ollama, or on any OpenAI-compatible API key you choose. Without AI, the project management features keep working. The app is made for one person: there is no sync between computers.
+TaskForce needs a free account, used to sign in: our server keeps the account (name and email address), while your projects stay in a folder on your computer, and the app sends no usage data. The AI can run on a local model through Ollama, or on any OpenAI-compatible API key you choose. Without AI, the project management features keep working. The app is made for one person: there is no sync between computers.
 
 ## Pages
 - [Home](https://taskforce-project.fr/): What TaskForce does, in one page.
@@ -12,7 +12,7 @@ TaskForce has no account and no server: your data stays in a folder on your comp
 - [Agents](https://taskforce-project.fr/agents): How a run works with Claude Code or GitHub Copilot, what an agent can touch, and what each one needs.
 - [Security](https://taskforce-project.fr/security): Where the data lives, what can leave the computer and when, and how to report a vulnerability.
 - [Download](https://taskforce-project.fr/download): The current release, system requirements, AI options and release notes.
-- [Moving from the web app](https://taskforce-project.fr/migrate): How to export projects from the hosted web app, which is closing, and import them into the desktop app.
+- [Moving from the web app](https://taskforce-project.fr/migrate): The hosted web app is closing: sign in to the desktop app with the same account, and it offers to bring your web app projects to your computer.
 
 ## About
 - License: GNU AGPL-3.0

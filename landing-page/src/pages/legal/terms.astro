@@ -1,12 +1,12 @@
 ---
-/** Conditions : licence AGPL pour le logiciel, absence de garantie, responsabilités de l'utilisateur, nom et logo, droit français. */
+/** Conditions : licence AGPL pour le logiciel, absence de garantie, compte TaskForce, responsabilités de l'utilisateur, nom et logo, droit français. */
 import LegalDoc from "@/layouts/LegalDoc.astro";
 import { LINKS } from "@/lib/site";
 ---
 
 <LegalDoc
   title="Terms of use"
-  description="TaskForce is free software under the AGPL-3.0 license. These terms cover the app, this website, and the name and logo."
+  description="TaskForce is free software under the AGPL-3.0 license. These terms cover the app, your TaskForce account, this website, and the name and logo."
   updated="19 October 2026"
 >
   <h2>The software</h2>
@@ -21,6 +21,16 @@ import { LINKS } from "@/lib/site";
     The app is provided “as is”, without any warranty, as the license states. Nothing in these terms limits a
     liability that the law does not allow to limit.
   </p>
+
+  <h2>Your account</h2>
+  <ul>
+    <li>
+      The app needs a free TaskForce account. Use an email address you can read, and keep your password to yourself.
+    </li>
+    <li>
+      You can ask us to delete your account at any time by writing to <a href={`mailto:${LINKS.email}`}>{LINKS.email}</a>.
+    </li>
+  </ul>
 
   <h2>Your data and your agents</h2>
   <ul>

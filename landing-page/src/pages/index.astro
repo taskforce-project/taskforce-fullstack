@@ -59,11 +59,11 @@ const MEMORY: TabItem[] = [
 const FAQ: FaqItem[] = [
   {
     q: "Is TaskForce free?",
-    a: "Yes. TaskForce is open source under the AGPL-3.0 license: no account, no subscription and no usage limit set by us. If you use a hosted AI model or GitHub Copilot, those providers bill you directly.",
+    a: "Yes. TaskForce is open source under the AGPL-3.0 license and your account is free: no subscription and no usage limit set by us. If you use a hosted AI model or GitHub Copilot, those providers bill you directly.",
   },
   {
     q: "Do I need an account?",
-    a: "No. You install the app and open it. Your name and avatar stay on your computer.",
+    a: "Yes, a free TaskForce account. You create it the first time you open the app, or sign in with the one you already use on the web app. It is how we keep your web app projects within reach and tell you about updates. Your projects themselves stay on your computer.",
   },
   {
     q: "Which AI does it use?",
@@ -80,11 +80,11 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "Where is my data stored?",
-    a: "In the app's data folder on your computer. There is no TaskForce server holding a copy, and the app works offline, except for the services you connect.",
+    a: "Your projects, Brain OS pages and files stay in the app's data folder on your computer: they never go to our servers. We only keep your account, with your name and email address.",
   },
   {
     q: "I used the TaskForce web app. What happens to my projects?",
-    a: "You can export them from the web app and bring them into the desktop app. The guide walks through each step.",
+    a: "Sign in to the desktop app with the same account. TaskForce sees that you already have projects on the web app and offers to bring them to your computer.",
     link: { label: "Moving from the web app", href: "/migrate" },
   },
 ];
@@ -190,8 +190,8 @@ const FAQ: FaqItem[] = [
   <PaintBand bg="band" label="Local first">
     <Fragment slot="title">Your work stays <span class="t-word">on your computer.</span></Fragment>
     <p class="t-lead mt-6 max-w-2xl text-foreground/80" data-reveal style="--d: 140ms">
-      No account, no TaskForce server, no tracking. Your projects live in a folder on your disk, the AI can run on your
-      own machine, and nothing leaves unless you connect it.
+      Your projects live in a folder on your disk, not on our servers. The AI can run on your own machine, nothing
+      leaves unless you connect it, and the app sends no usage data.
     </p>
     <a href="/security" class="btn btn-secondary mt-9" data-reveal style="--d: 200ms">
       How TaskForce protects your work <ArrowRight aria-hidden="true" />
@@ -249,7 +249,7 @@ const FAQ: FaqItem[] = [
           {
             [
               { t: "AGPL-3.0", d: "Open source", dot: "bg-shape-blue" },
-              { t: "No account", d: "Nothing to sign up", dot: "bg-shape-green" },
+              { t: "Free", d: "No subscription", dot: "bg-shape-green" },
               { t: "No telemetry", d: "No usage data sent", dot: "bg-shape-pink" },
             ].map((s) => (
               <li class="flex size-32 flex-col items-center justify-center rounded-full bg-white text-center shadow-sm ring-1 ring-black/5">
