@@ -55,7 +55,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
       
       const sendRegistration = async () => {
         try {
-          await authService.register({
+          const result = await authService.register({
             email: registerData.email,
             password: registerData.password,
             firstName: registerData.firstName,
@@ -65,7 +65,15 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
             challengeToken: registerData.challengeToken,
             turnstileToken: registerData.turnstileToken,
           });
-          
+
+          // Instance sans vérification d'e-mail : le compte est déjà prêt, aucun code ne viendra.
+          if (result?.otpSent === false) {
+            clearRegisterData();
+            toast.success(t.auth.ui.accountReadyTitle, { description: t.auth.ui.accountReadyDesc });
+            router.push('/auth/login');
+            return;
+          }
+
           toast.success(t.auth.ui.verifyCodeSentTitle, {
             description: t.auth.ui.verifyCodeSentDesc,
           });
