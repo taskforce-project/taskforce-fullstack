@@ -105,7 +105,8 @@
         }
       ],
       "realmRoles": [
-        "user"
+        "user",
+        "offline_access"
       ]
     },
     {
@@ -124,7 +125,8 @@
         }
       ],
       "realmRoles": [
-        "user"
+        "user",
+        "offline_access"
       ]
     },
     {
@@ -143,7 +145,8 @@
         }
       ],
       "realmRoles": [
-        "user"
+        "user",
+        "offline_access"
       ]
     },
     {
@@ -162,7 +165,8 @@
         }
       ],
       "realmRoles": [
-        "user"
+        "user",
+        "offline_access"
       ]
     },
     {
@@ -181,7 +185,8 @@
         }
       ],
       "realmRoles": [
-        "user"
+        "user",
+        "offline_access"
       ]
     },
     {
@@ -200,7 +205,8 @@
         }
       ],
       "realmRoles": [
-        "user"
+        "user",
+        "offline_access"
       ]
     },
     {
@@ -219,7 +225,8 @@
         }
       ],
       "realmRoles": [
-        "user"
+        "user",
+        "offline_access"
       ]
     },
     {
@@ -238,7 +245,8 @@
         }
       ],
       "realmRoles": [
-        "user"
+        "user",
+        "offline_access"
       ]
     },
     {
@@ -257,7 +265,8 @@
         }
       ],
       "realmRoles": [
-        "user"
+        "user",
+        "offline_access"
       ]
     },
     {
@@ -276,7 +285,8 @@
         }
       ],
       "realmRoles": [
-        "user"
+        "user",
+        "offline_access"
       ]
     },
     {
@@ -295,7 +305,8 @@
         }
       ],
       "realmRoles": [
-        "user"
+        "user",
+        "offline_access"
       ]
     },
     {
@@ -314,7 +325,8 @@
         }
       ],
       "realmRoles": [
-        "user"
+        "user",
+        "offline_access"
       ]
     }
   ],
