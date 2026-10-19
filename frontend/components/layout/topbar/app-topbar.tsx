@@ -27,6 +27,8 @@ import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { AgentChat } from "@/components/agent/agent-chat"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useModKeyLabel } from "@/lib/hooks/use-mod-key"
+import { desktopBridge, IS_DESKTOP } from "@/lib/desktop"
+import { cn } from "@/lib/utils"
 
 /**
  * Map a URL segment (slug) to a display label.
@@ -113,8 +115,14 @@ function useBreadcrumbs() {
 
 export function AppTopbar() {
   const breadcrumbs = useBreadcrumbs()
-  const { t } = usePreferencesStore()
+  const { t, theme } = usePreferencesStore()
   const modKey = useModKeyLabel()
+
+  // App desktop : cette barre sert de barre de titre ; les boutons du système prennent les couleurs du thème, sur la
+  // hauteur de la marge du contenu arrondi (8 px) et de la barre (56 px).
+  React.useEffect(() => {
+    desktopBridge()?.setTitleBarTheme?.(theme === "dark", 64)
+  }, [theme])
   const [cmdOpen, setCmdOpen] = React.useState(false)
   const togglePanel = usePanelStore((s) => s.togglePanel)
   const openAssistant = React.useCallback(() => {
@@ -140,7 +148,12 @@ export function AppTopbar() {
   }, [])
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
+    <header
+      className={cn(
+        "sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-4",
+        IS_DESKTOP && "desktop-titlebar",
+      )}
+    >
       {/* Left: sidebar trigger + breadcrumb */}
       <div className="flex flex-1 items-center gap-2">
         <SidebarTrigger className="-ml-1" />

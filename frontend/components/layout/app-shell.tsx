@@ -15,6 +15,7 @@ import { CreateProjectModal } from "@/components/dialogs/create-project-modal"
 import { ProductTour } from "@/components/tour/product-tour"
 import { PendingInvitationsBanner } from "@/components/invitations/pending-invitations-banner"
 import { IS_DESKTOP } from "@/lib/desktop"
+import { cn } from "@/lib/utils"
 
 interface AppShellProps {
   readonly children: React.ReactNode
@@ -25,8 +26,10 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <SidebarProvider className="h-full">
+      {/* App desktop, façon Claude Desktop : le contenu est une carte arrondie dans le cadre de la barre latérale. */}
+      {IS_DESKTOP && <div className="desktop-top-drag" aria-hidden="true" />}
       <AppSidebar />
-      <SidebarInset className="overflow-hidden">
+      <SidebarInset className={cn("overflow-hidden", IS_DESKTOP && "desktop-content md:border md:border-border/70")}>
         <AppTopbar />
         {/* Invitations reçues en attente d'approbation - bannière montée hors du <main> keyé par
             la route : un seul fetch par session, persistante à la navigation. Nulle si rien. */}

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Check, Menu } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { desktopBridge, IS_DESKTOP } from "@/lib/desktop";
+import { usePreferencesStore } from "@/lib/store/preferences-store";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   Sheet,
@@ -97,12 +99,18 @@ export function OnboardingShell({
   footer,
 }: OnboardingShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const theme = usePreferencesStore((s) => s.theme);
+
+  // App desktop : la barre du haut (56 px) sert de barre de titre, les boutons du système s'y posent à droite.
+  useEffect(() => {
+    desktopBridge()?.setTitleBarTheme?.(theme === "dark", 56);
+  }, [theme]);
 
   return (
     <SidebarProvider className="h-svh">
       {/* ── Sidebar RÉELLE de l'app (desktop) : marque · étapes · compte ───────────── */}
       <Sidebar collapsible="none" className="max-md:hidden border-r border-sidebar-border">
-        <SidebarHeader className="h-14 justify-center border-b border-sidebar-border px-4 py-0">
+        <SidebarHeader className={cn("h-14 justify-center border-b border-sidebar-border px-4 py-0", IS_DESKTOP && "desktop-drag")}>
           <BrandLockup />
         </SidebarHeader>
 
@@ -207,7 +215,7 @@ export function OnboardingShell({
 
       {/* ── Canevas principal : topbar · contenu centré · footer ──────────────────── */}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
-        <header className="flex h-14 shrink-0 items-center border-b border-border px-4 md:px-6">
+        <header className={cn("flex h-14 shrink-0 items-center border-b border-border px-4 md:px-6", IS_DESKTOP && "desktop-titlebar")}>
           {/* Mobile : bouton MENU (libellé = étape courante) qui ouvre les étapes en overlay. */}
           <button
             type="button"
