@@ -1171,7 +1171,7 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
     setLoadingRepos(true)
     getGitHubRepos(slug)
       .then((r) => { if (active) setRepos(r) })
-      .catch(() => { if (active) toast.error("Couldn't load GitHub repositories") })
+      .catch((e) => { if (active) toast.error(getErrorMessage(e)) })
       .finally(() => { if (active) setLoadingRepos(false) })
     return () => { active = false }
   }, [slug])
@@ -1183,7 +1183,7 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
     setLoadingIssues(true)
     getGitHubRepoIssues(slug, full)
       .then(setIssues)
-      .catch(() => toast.error("Couldn't load the repository's issues"))
+      .catch((e) => toast.error(getErrorMessage(e)))
       .finally(() => setLoadingIssues(false))
   }
 
@@ -1193,8 +1193,8 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
     try {
       const r = await syncGitHub(slug, repo)
       toast.success(`Ingested into the Brain OS: ${r.created} created, ${r.updated} updated`)
-    } catch {
-      toast.error("Couldn't sync this repository")
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     } finally {
       setSyncing(false)
     }
