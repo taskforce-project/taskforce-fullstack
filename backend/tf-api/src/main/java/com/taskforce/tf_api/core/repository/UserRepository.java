@@ -26,6 +26,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
      */
     Optional<User> findByKeycloakId(String keycloakId);
 
+    /** Personne d'une passkey, par son identifiant WebAuthn (V101). */
+    Optional<User> findByPasskeyHandle(String passkeyHandle);
+
     /**
      * Vérifie si un email existe déjà
      */
