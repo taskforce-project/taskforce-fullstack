@@ -189,4 +189,25 @@ class RateLimitFilterTest {
         // Seule la requête réelle ci-dessus a consommé un jeton — les 20 préflights, aucun.
         assertThat(Integer.parseInt(after.getHeader("X-RateLimit-Remaining"))).isEqualTo(remainingBefore - 1);
     }
+
+    @org.junit.jupiter.params.ParameterizedTest(name = "{0} : {1} requêtes par minute")
+    @org.junit.jupiter.params.provider.CsvSource({
+        "/api/auth/passkey/options, 10",
+        "/api/auth/passkey/login, 10",
+        "/api/auth/desktop/token, 10",
+        "/api/auth/desktop/revoke, 10",
+        "/api/auth/desktop/session, 20",
+    })
+    @DisplayName("les routes de connexion par passkey et de l'app de bureau sont limitées comme la connexion")
+    void sign_in_routes_are_limited(String path, int limit) throws Exception {
+        FilterChain chain = mock(FilterChain.class);
+        for (int i = 0; i < limit; i++) {
+            filter.doFilter(req(path, null, null, "6.6.6.6"), new MockHttpServletResponse(), chain);
+        }
+        verify(chain, times(limit)).doFilter(any(), any());
+
+        var blocked = new MockHttpServletResponse();
+        filter.doFilter(req(path, null, null, "6.6.6.6"), blocked, mock(FilterChain.class));
+        assertThat(blocked.getStatus()).isEqualTo(429);
+    }
 }

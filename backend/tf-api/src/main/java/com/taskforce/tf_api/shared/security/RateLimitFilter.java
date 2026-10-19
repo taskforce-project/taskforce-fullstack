@@ -30,7 +30,10 @@ import java.util.concurrent.TimeUnit;
  *  - /api/auth/verify-otp         → 5  req / 60 s
  *  - /api/auth/resend-otp         → 5  req / 60 s
  *  - /api/auth/runner/**          → 10 req / 60 s  (jeton machine d'un runner local, ADR-013)
+ *  - /api/auth/passkey/**         → 10 req / 60 s  (connexion par passkey)
+ *  - /api/auth/desktop/token, /revoke → 10 req / 60 s  (code à usage unique de l'app de bureau)
  *  - /api/auth/refresh-token      → 20 req / 60 s  (clients silencieux fréquents)
+ *  - /api/auth/desktop/session    → 20 req / 60 s  (l'app de bureau vérifie sa session)
  *  - endpoints IA (smart-assign)  → 20 req / 60 s
  *  - autres endpoints             → 200 req / 60 s (protection DDoS léger)
  */
@@ -111,10 +114,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/auth/verify-otp")
                 || path.startsWith("/api/auth/resend-otp")
                 // Jeton machine d'un runner local (ADR-013) : échange d'un secret, même risque qu'un login.
-                || path.startsWith("/api/auth/runner/")) {
+                || path.startsWith("/api/auth/runner/")
+                || path.startsWith("/api/auth/passkey/")
+                || path.startsWith("/api/auth/desktop/token")
+                || path.startsWith("/api/auth/desktop/revoke")) {
             return RateProfile.AUTH_STRICT;
         }
-        if (path.startsWith("/api/auth/refresh-token")) {
+        if (path.startsWith("/api/auth/refresh-token") || path.startsWith("/api/auth/desktop/session")) {
             return RateProfile.AUTH_REFRESH;
         }
         if (path.contains("/smart-assign") || path.contains("/assistant")) {
