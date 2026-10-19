@@ -18,7 +18,8 @@ import lombok.extern.slf4j.Slf4j;
  * en lier un existant, à la création du projet OU plus tard. Le dépôt sert de défaut au coding agent.
  *
  * <p>Service <b>dédié</b> (plutôt que d'ajouter GitHub à {@link ProjectService}) pour isoler la nouvelle
- * dépendance GitHub et ne pas casser les tests slicés existants. Lier/délier un dépôt = <b>écriture</b>
+ * dépendance GitHub et ne pas casser les tests slicés existants. GitHub passe par {@link ProjectRepoHost} : l'intégration
+ * de l'espace dans la webapp, le GitHub CLI de la personne dans l'app desktop. Lier/délier un dépôt = <b>écriture</b>
  * sur le projet (LEAD / ADMIN / OWNER), garde via {@link ProjectVisibilityGuard}.</p>
  */
 @Service
@@ -29,7 +30,7 @@ public class ProjectRepoService {
     private static final String PROVIDER_GITHUB = "github";
 
     private final ProjectRepository        projectRepository;
-    private final GitHubIntegrationService gitHubService;
+    private final ProjectRepoHost          repoHost;
     private final ProjectVisibilityGuard   visibilityGuard;
 
     @Transactional
@@ -43,13 +44,13 @@ public class ProjectRepoService {
             if (isBlank(request.getRepoName())) {
                 throw new BusinessException("The name of the repository to create is required");
             }
-            fullName = gitHubService.createRepo(workspaceSlug, request.getRepoName().trim(), request.isPrivateRepo());
+            fullName = repoHost.createRepo(workspaceSlug, request.getRepoName().trim(), request.isPrivateRepo());
         } else if ("LINK".equals(mode)) {
             if (isBlank(request.getRepoFullName())) {
                 throw new BusinessException("The repository to link (owner/name) is required");
             }
             fullName = GitHubRepoNames.requireFullName(request.getRepoFullName());
-            gitHubService.assertRepoAccessible(workspaceSlug, fullName);
+            repoHost.assertRepoAccessible(workspaceSlug, fullName);
         } else {
             throw new BusinessException("Invalid mode: expected CREATE or LINK");
         }
