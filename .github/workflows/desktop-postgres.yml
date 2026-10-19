@@ -6,6 +6,8 @@ name: Desktop - PostgreSQL bundle
 
 on:
   workflow_dispatch:
+  # Called by the desktop release (desktop-release.yml), which packs the bundle into the installers.
+  workflow_call:
   push:
     branches: [feature/desktop]
     paths:

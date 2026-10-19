@@ -1,0 +1,167 @@
+name: Desktop - Release
+
+# Builds the desktop app for Windows (NSIS installer, per user) and Linux (.deb and AppImage) and publishes it twice:
+# - the versioned release `desktop-v<version>`, which the website's download page reads at build time
+#   (landing-page/src/lib/release.ts);
+# - the rolling release `desktop-latest`, which the installed apps check for updates (desktop/src/updater.ts). It
+#   always holds the latest installers and their update files (latest.yml, latest-linux.yml), whatever else the
+#   repository releases.
+#
+# Run it by hand once desktop/package.json carries the new version. The builds are not signed yet
+# (landing-page/src/lib/release.ts, SIGNED_BUILDS): Windows SmartScreen warns on the first launch.
+
+on:
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: 'Publish the versioned release as a preview'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+
+jobs:
+  postgres:
+    name: PostgreSQL bundle
+    uses: ./.github/workflows/desktop-postgres.yml
+
+  package:
+    name: Package (${{ matrix.name }})
+    needs: postgres
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-2022
+            builder: --win
+            postgres: postgres-windows-x64
+          - name: Linux
+            # The oldest supported runner, like the PostgreSQL bundle, for older glibc versions.
+            os: ubuntu-22.04
+            builder: --linux
+            postgres: postgres-linux-x64
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            taskforce-runner/package-lock.json
+            desktop/package-lock.json
+
+      - name: Backend
+        working-directory: backend/tf-api
+        run: ./mvnw -B -q -DskipTests package
+
+      - name: Interface (desktop build)
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_DESKTOP: 'true'
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: |
+          npm ci --no-audit --no-fund
+          npx next build
+
+      - name: Runner
+        working-directory: taskforce-runner
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.postgres }}
+          path: postgres-bundle
+
+      - name: Shell and resources
+        working-directory: desktop
+        run: |
+          npm ci --no-audit --no-fund
+          bundle="$(ls "$GITHUB_WORKSPACE"/postgres-bundle/*)"
+          TF_POSTGRES_BUNDLE="$bundle" node scripts/prepare-resources.mjs
+          npm test
+          npm run build
+          # The app icon is drawn from the brand mark (frontend/app/icon.svg), with sharp from the interface's packages.
+          npm run icon
+
+      - name: Installers
+        working-directory: desktop
+        env:
+          # Not signed yet: electron-builder must not look for a certificate in the runner.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder ${{ matrix.builder }} --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.name }}
+          path: |
+            desktop/release/*.exe
+            desktop/release/*.blockmap
+            desktop/release/*.deb
+            desktop/release/*.AppImage
+            desktop/release/latest*.yml
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: out
+          merge-multiple: true
+
+      - name: Versioned release
+        run: |
+          version="$(jq -r .version desktop/package.json)"
+          tag="desktop-v${version}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "::error::$tag already exists: bump desktop/package.json first"
+            exit 1
+          fi
+          flags=()
+          if [ "${{ inputs.prerelease }}" = "true" ]; then flags+=(--prerelease); fi
+          gh release create "$tag" out/* --target "$GITHUB_SHA" --title "TaskForce Desktop ${version}" \
+            --notes "TaskForce for Windows and Linux, version ${version}. Download it from https://taskforce-project.fr/download." \
+            "${flags[@]}"
+
+      - name: Rolling release for the updater
+        run: |
+          # Marked as a preview so that it never becomes the repository's "Latest" release.
+          if ! gh release view desktop-latest >/dev/null 2>&1; then
+            gh release create desktop-latest --prerelease --title "TaskForce Desktop (updates)" \
+              --notes "Update channel of the installed apps. Download TaskForce from https://taskforce-project.fr/download."
+          fi
+          # Only the files of this version stay: older installers would otherwise pile up.
+          gh release view desktop-latest --json assets --jq '.assets[].name' | while read -r name; do
+            gh release delete-asset desktop-latest "$name" --yes
+          done
+          gh release upload desktop-latest out/* --clobber
