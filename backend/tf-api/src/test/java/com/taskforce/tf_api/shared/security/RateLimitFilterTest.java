@@ -192,7 +192,7 @@ class RateLimitFilterTest {
 
     @org.junit.jupiter.params.ParameterizedTest(name = "{0} : {1} requêtes par minute")
     @org.junit.jupiter.params.provider.CsvSource({
-        "/api/auth/passkey/options, 10",
+        "/api/auth/passkey/options, 30",
         "/api/auth/passkey/login, 10",
         "/api/auth/desktop/token, 10",
         "/api/auth/desktop/revoke, 10",

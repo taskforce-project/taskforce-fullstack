@@ -30,7 +30,8 @@ import java.util.concurrent.TimeUnit;
  *  - /api/auth/verify-otp         → 5  req / 60 s
  *  - /api/auth/resend-otp         → 5  req / 60 s
  *  - /api/auth/runner/**          → 10 req / 60 s  (jeton machine d'un runner local, ADR-013)
- *  - /api/auth/passkey/**         → 10 req / 60 s  (connexion par passkey)
+ *  - /api/auth/passkey/login     → 10 req / 60 s  (connexion par passkey)
+ *  - /api/auth/passkey/options   → 30 req / 60 s  (défi demandé à chaque affichage de la page de connexion)
  *  - /api/auth/desktop/token, /revoke → 10 req / 60 s  (code à usage unique de l'app de bureau)
  *  - /api/auth/refresh-token      → 20 req / 60 s  (clients silencieux fréquents)
  *  - /api/auth/desktop/session    → 20 req / 60 s  (l'app de bureau vérifie sa session)
@@ -103,6 +104,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private enum RateProfile {
         AUTH_STRICT,   // login, register, forgot-password, otp
         AUTH_REFRESH,  // refresh-token
+        PASSKEY_CHALLENGE, // défi de connexion par passkey, à part : il ne réduit pas le quota de la connexion
         AI,            // smart-assign, assistant
         DEFAULT
     }
@@ -115,13 +117,16 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/auth/resend-otp")
                 // Jeton machine d'un runner local (ADR-013) : échange d'un secret, même risque qu'un login.
                 || path.startsWith("/api/auth/runner/")
-                || path.startsWith("/api/auth/passkey/")
+                || path.startsWith("/api/auth/passkey/login")
                 || path.startsWith("/api/auth/desktop/token")
                 || path.startsWith("/api/auth/desktop/revoke")) {
             return RateProfile.AUTH_STRICT;
         }
         if (path.startsWith("/api/auth/refresh-token") || path.startsWith("/api/auth/desktop/session")) {
             return RateProfile.AUTH_REFRESH;
+        }
+        if (path.startsWith("/api/auth/passkey/options")) {
+            return RateProfile.PASSKEY_CHALLENGE;
         }
         if (path.contains("/smart-assign") || path.contains("/assistant")) {
             return RateProfile.AI;
@@ -146,6 +151,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return switch (profile) {
             case AUTH_STRICT  -> Bandwidth.builder().capacity(10) .refillIntervally(10, Duration.ofMinutes(1)).build();
             case AUTH_REFRESH -> Bandwidth.builder().capacity(20) .refillIntervally(20, Duration.ofMinutes(1)).build();
+            case PASSKEY_CHALLENGE -> Bandwidth.builder().capacity(30).refillIntervally(30, Duration.ofMinutes(1)).build();
             case AI           -> Bandwidth.builder().capacity(20) .refillIntervally(20, Duration.ofMinutes(1)).build();
             case DEFAULT      -> Bandwidth.builder().capacity(200).refillIntervally(200, Duration.ofMinutes(1)).build();
         };
