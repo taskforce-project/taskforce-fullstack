@@ -9,6 +9,7 @@ import { randomToken } from "./net";
 import { accountDataDir } from "./paths";
 import { EmbeddedPostgres } from "./postgres";
 import { Proxy } from "./proxy";
+import { Runner } from "./runner";
 import { settings, type Account } from "./settings";
 
 /** Tout ce qui tourne pour le compte connecté : base, backend, interface et relais de la fenêtre. */
@@ -33,7 +34,7 @@ function accountSecret(subject: string, name: "databasePassword" | "encryptionKe
 
 /**
  * Démarre l'app du compte. La base d'abord ; puis le backend et l'interface en parallèle (le backend prend le plus
- * de temps) ; le relais enfin, qui ouvre l'origine de la fenêtre.
+ * de temps) ; le relais enfin, qui ouvre l'origine de la fenêtre, et le runner de Claude Code.
  */
 export async function startStack(account: Account, onStep: (step: string) => void): Promise<Stack> {
   const dataDir = accountDataDir(account.subject);
@@ -42,12 +43,16 @@ export async function startStack(account: Account, onStep: (step: string) => voi
   const backend = new Backend();
   const frontend = new Frontend();
   const proxy = new Proxy();
+  const runner = new Runner();
+  const runnerSecret = randomToken("tfs_");
   const ai = new AiRelay(() => ({
     settings: settings.aiSettings(account.subject),
     apiKey: settings.secret(account.subject, "aiApiKey"),
   }));
 
+  // Le runner d'abord : il rend au backend le résultat d'un run interrompu avant que celui-ci s'arrête.
   const stop = async () => {
+    await runner.stop().catch(() => undefined);
     await proxy.stop().catch(() => undefined);
     await frontend.stop().catch(() => undefined);
     await backend.stop().catch(() => undefined);
@@ -74,10 +79,12 @@ export async function startStack(account: Account, onStep: (step: string) => voi
         launchToken,
         uiOrigin: origin,
         ai: { url: ai.url(), token: ai.token },
+        runnerSecret,
       }),
       frontend.start(join(dataDir, "logs")),
     ]);
     await proxy.start(backend.port, frontend.port);
+    runner.start({ apiPort: backend.port, secret: runnerSecret, dataDir });
     log.info(`TaskForce ready at ${origin}`);
     return { account, dataDir, launchToken, origin, ai, stop };
   } catch (error) {
