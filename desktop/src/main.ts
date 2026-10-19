@@ -3,10 +3,12 @@ import { join } from "node:path";
 
 import { accountPageUrl, ISSUER, refresh, revoke, signIn, signInError } from "./account";
 import { parseAiInput } from "./ai";
+import { createRepo, DEVICE_PAGE, findRepo, GitHubSignIn, isNewRepoName, isRepoFullName, listRepos } from "./github";
 import { initLog, log } from "./log";
 import { appLogDir } from "./paths";
 import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
+import { toolsStatus } from "./tools";
 import { check, startUpdater } from "./updater";
 
 /**
@@ -17,6 +19,7 @@ import { check, startUpdater } from "./updater";
 let stack: Stack | null = null;
 let mainWindow: BrowserWindow | null = null;
 let quitting = false;
+const githubSignIn = new GitHubSignIn();
 
 const staticPage = (name: string): string => join(__dirname, "..", "static", name);
 
@@ -234,6 +237,21 @@ function registerIpc(): void {
     }
   });
   ipcMain.handle("desktop:check-updates", () => check());
+  // Outils de la personne pour les tâches de Claude Code : Claude Code, git et GitHub CLI, installés et connectés ?
+  ipcMain.handle("desktop:tools-status", () => toolsStatus());
+  // GitHub par le `gh` de la personne (dépôts, création, connexion) : son jeton reste dans le trousseau du système.
+  ipcMain.handle("desktop:github-repos", () => settle(listRepos()));
+  ipcMain.handle("desktop:github-repo", (_event, fullName: unknown) =>
+    settle(isRepoFullName(fullName) ? findRepo(fullName) : Promise.resolve(null)));
+  ipcMain.handle("desktop:github-create-repo", (_event, input: unknown) => {
+    const { name, private: isPrivate } = (input ?? {}) as { name?: unknown; private?: unknown };
+    if (!isNewRepoName(name)) return { ok: false, error: "Letters, digits, dots, dashes and underscores only" };
+    return settle(createRepo(name, isPrivate !== false));
+  });
+  ipcMain.handle("desktop:github-sign-in", () => settle(githubSignIn.start()));
+  ipcMain.handle("desktop:github-sign-in-page", () => shell.openExternal(DEVICE_PAGE));
+  ipcMain.handle("desktop:github-sign-in-wait", () => githubSignIn.wait());
+  ipcMain.handle("desktop:github-sign-in-cancel", () => githubSignIn.cancel());
   ipcMain.handle("desktop:sign-out", async () => {
     const account = stack?.account ?? settings.account();
     if (account) {
@@ -245,6 +263,15 @@ function registerIpc(): void {
     app.relaunch();
     app.quit();
   });
+}
+
+/** Réponse d'une action de la coque : la valeur, ou le message à montrer. */
+async function settle<T>(promise: Promise<T>): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+  try {
+    return { ok: true, value: await promise };
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
+  }
 }
 
 /** Réglages d'IA tels que l'écran les montre, avec l'état lu à l'instant chez le fournisseur. */
@@ -292,6 +319,7 @@ app.on("before-quit", (event) => {
   if (quitting || !stack) return;
   event.preventDefault();
   quitting = true;
+  githubSignIn.cancel();
   const current = stack;
   stack = null;
   log.info("Stopping");

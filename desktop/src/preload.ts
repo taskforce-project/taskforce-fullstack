@@ -26,4 +26,19 @@ contextBridge.exposeInMainWorld("taskforceDesktop", {
     get: (): Promise<unknown> => ipcRenderer.invoke("desktop:ai-get"),
     save: (input: unknown): Promise<unknown> => ipcRenderer.invoke("desktop:ai-save", input),
   },
+  // Outils de la personne pour les tâches de Claude Code (Claude Code, git, GitHub CLI).
+  tools: {
+    status: (): Promise<unknown> => ipcRenderer.invoke("desktop:tools-status"),
+  },
+  // GitHub par le `gh` de la personne : son jeton ne passe jamais par la page.
+  github: {
+    repos: (): Promise<unknown> => ipcRenderer.invoke("desktop:github-repos"),
+    repo: (fullName: string): Promise<unknown> => ipcRenderer.invoke("desktop:github-repo", fullName),
+    createRepo: (input: { name: string; private: boolean }): Promise<unknown> =>
+      ipcRenderer.invoke("desktop:github-create-repo", input),
+    signIn: (): Promise<unknown> => ipcRenderer.invoke("desktop:github-sign-in"),
+    openSignInPage: (): Promise<void> => ipcRenderer.invoke("desktop:github-sign-in-page"),
+    waitForSignIn: (): Promise<unknown> => ipcRenderer.invoke("desktop:github-sign-in-wait"),
+    cancelSignIn: (): Promise<void> => ipcRenderer.invoke("desktop:github-sign-in-cancel"),
+  },
 });
