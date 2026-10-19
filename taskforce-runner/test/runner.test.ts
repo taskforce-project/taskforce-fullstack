@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { agentArgs, agentEnv, agentSettings, allowedTools, DENIED_TOOLS, mcpConfig, parseAgentOutput, safeModel } from "../src/agent.js";
 import type { Claim } from "../src/api.js";
 import { parseEnvFile, parseRunnerConfigFile, type RunnerConfig } from "../src/config.js";
-import { branchName, isValidRepoFullName, managedCheckoutDir, pullRequestBody, resolveRepo } from "../src/git.js";
+import { branchName, ghCredentialArgs, isValidRepoFullName, managedCheckoutDir, pullRequestBody, resolveRepo } from "../src/git.js";
 import { quoteForCmd, run } from "../src/proc.js";
 import { buildPrompt, buildReplyPrompt } from "../src/prompt.js";
 
@@ -72,6 +75,31 @@ describe("dépôt du projet : nom validé, clone géré par le runner", () => {
 
   it("nom de dépôt invalide : refusé avant toute commande", async () => {
     await assert.rejects(resolveRepo({}, true, "/tmp/h", "acme/../../etc"), /not a valid GitHub/);
+  });
+
+  it("un clone déjà fait par le runner est réutilisé, marqué géré", async () => {
+    const home = mkdtempSync(join(tmpdir(), "tf-runner-"));
+    try {
+      mkdirSync(join(managedCheckoutDir(home, "acme/website"), ".git"), { recursive: true });
+      const repo = await resolveRepo({}, true, home, "acme/website");
+      assert.equal(repo.managed, true);
+      assert.equal(repo.path, managedCheckoutDir(home, "acme/website"));
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ghCredentialArgs", () => {
+  it("un clone géré pousse avec les identifiants de GitHub CLI, pour cette commande seulement", () => {
+    assert.deepEqual(ghCredentialArgs({ path: "/h/repos/acme/site", baseBranch: "main", setup: [], managed: true }), [
+      "-c", "credential.https://github.com.helper=",
+      "-c", "credential.https://github.com.helper=!gh auth git-credential",
+    ]);
+  });
+
+  it("un dépôt déclaré garde la configuration git de la personne", () => {
+    assert.deepEqual(ghCredentialArgs({ path: "/work/site", baseBranch: "main", setup: [] }), []);
   });
 });
 

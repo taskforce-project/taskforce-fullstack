@@ -14,6 +14,11 @@ export interface RepoConfig {
    * commande est un tableau d'arguments (`["npm", "ci"]`), jamais une chaîne passée à un shell.
    */
   setup: string[][];
+  /**
+   * Clone géré par le runner (cloné avec `gh`, jamais déclaré dans la configuration) : fetch et push passent alors
+   * par les identifiants de GitHub CLI (cf. `ghCredentialArgs`).
+   */
+  managed?: boolean;
 }
 
 export interface AgentConfig {

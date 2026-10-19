@@ -71,7 +71,20 @@ export async function resolveRepo(
     mkdirSync(join(path, ".."), { recursive: true });
     await runOrThrow("gh", ["repo", "clone", fullName, path], { timeoutMs: 10 * 60_000 });
   }
-  return { path, baseBranch: await defaultBranch(path), setup: [] };
+  return { path, baseBranch: await defaultBranch(path), setup: [], managed: true };
+}
+
+/**
+ * Clone géré par le runner : fetch et push passent par les identifiants de GitHub CLI, comme le clone et la pull
+ * request. Sinon git les demanderait à un autre gestionnaire, qui peut ouvrir une fenêtre en pleine tâche. La
+ * configuration git de la personne n'est pas modifiée : ces réglages ne valent que pour la commande. La valeur vide
+ * écarte d'abord les gestionnaires configurés pour github.com, comme `gh auth setup-git`. Le checkout d'un dépôt
+ * déclaré garde la configuration de la personne.
+ */
+export function ghCredentialArgs(repo: RepoConfig): string[] {
+  return repo.managed
+    ? ["-c", "credential.https://github.com.helper=", "-c", "credential.https://github.com.helper=!gh auth git-credential"]
+    : [];
 }
 
 /**
@@ -84,7 +97,7 @@ export async function prepareWorktree(repo: RepoConfig, claim: Claim, home: stri
   mkdirSync(join(home, "worktrees"), { recursive: true });
 
   await runOrThrow("git", ["-C", repo.path, "rev-parse", "--is-inside-work-tree"]);
-  await runOrThrow("git", ["-C", repo.path, "fetch", "origin", repo.baseBranch]);
+  await runOrThrow("git", [...ghCredentialArgs(repo), "-C", repo.path, "fetch", "origin", repo.baseBranch]);
   await runOrThrow("git", ["-C", repo.path, "worktree", "add", "-b", branch, dir, `origin/${repo.baseBranch}`]);
   return { path: dir, branch, base: `origin/${repo.baseBranch}` };
 }
@@ -114,9 +127,11 @@ export async function finalizeCommits(worktree: Worktree, claim: Claim): Promise
   return Number.parseInt(count, 10) || 0;
 }
 
-export async function pushBranch(worktree: Worktree): Promise<void> {
+export async function pushBranch(worktree: Worktree, repo: RepoConfig): Promise<void> {
   // Jamais de --force : la branche est neuve, un refus ici est un vrai problème à remonter.
-  await runOrThrow("git", ["-C", worktree.path, "push", "-u", "origin", worktree.branch], { timeoutMs: 5 * 60_000 });
+  await runOrThrow("git", [...ghCredentialArgs(repo), "-C", worktree.path, "push", "-u", "origin", worktree.branch], {
+    timeoutMs: 5 * 60_000,
+  });
 }
 
 /** Ouvre la pull request avec `gh` et rend son URL. Aucune fusion : la revue reste humaine. */

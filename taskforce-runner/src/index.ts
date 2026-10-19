@@ -93,7 +93,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
           summary: `${outcome.text}\n\n${commits} commit(s) on local branch ${worktree.branch} (push disabled on this runner).`.slice(0, 7900),
         };
       } else {
-        await pushBranch(worktree);
+        await pushBranch(worktree, repo);
         const url = config.openPullRequest ? await openPullRequest(worktree, repo, claim, outcome.text, config.home) : undefined;
         result = { status: "DONE", summary: outcome.text.slice(0, 7900), resultUrl: url };
         log.info(url ? `Pull request opened: ${url}` : `Branch pushed: ${worktree.branch}`);
