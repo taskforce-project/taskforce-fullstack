@@ -6,6 +6,7 @@ import { toast } from "sonner"
 
 import { useAuth } from "@/lib/contexts/auth-context"
 import { restoreMyAccount } from "@/lib/api/gdpr-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 import { Button } from "@/components/ui/button"
 
 /**
@@ -27,7 +28,7 @@ export function AccountDeletionBanner() {
   const purgeAt = user?.scheduledPurgeAt
   if (!purgeAt) return null
 
-  const purgeDate = new Date(purgeAt)
+  const purgeDate = parseServerDate(purgeAt)
   const label = Number.isNaN(purgeDate.getTime())
     ? null
     : purgeDate.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })

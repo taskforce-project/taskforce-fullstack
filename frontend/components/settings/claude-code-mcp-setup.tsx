@@ -13,6 +13,7 @@ import type { AccessToken, CreatedAccessToken } from "@/lib/api/access-token-ser
 import { DELIVERY_ROUTES } from "@/lib/config/api-routes"
 import { API_URL } from "@/lib/config/urls"
 import { useAccessTokenStore } from "@/lib/store/access-token-store"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 /**
  * Claude Code en mode interactif (lot 5) : la personne branche SON Claude Code sur le serveur MCP de l'instance avec
@@ -39,7 +40,7 @@ export function claudeMcpAddCommand(slug: string, token: string, apiUrl: string 
 
 function shortDate(value: string | null): string {
   if (!value) return ""
-  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  return parseServerDate(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
 export function ClaudeCodeMcpSetup({ slug }: Readonly<{ slug: string }>) {

@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils"
 import { PRIORITY_DOT } from "@/lib/palette"
 import { useIssueStore } from "@/lib/store/issue-store"
 import type { Issue, IssuePriority } from "@/lib/api/issue-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 // ---------------------------------------------------------------------------
 // Config
@@ -54,7 +55,7 @@ function toSheetIssue(issue: Issue): SheetIssue {
     archived:       issue.archived,
     dueDate:        formatDate(issue.dueDate) ?? null,
     storyPoints:    null,
-    createdAt:      formatDate(issue.createdAt) ?? issue.createdAt,
+    createdAt:      parseServerDate(issue.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
   }
 }
 

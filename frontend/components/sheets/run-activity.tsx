@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import type { DeliveryRunActivity, DeliveryRunApproval, DeliveryRunEvent } from "@/lib/api/delivery-service"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { cn } from "@/lib/utils"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 /**
  * Activité d'un run du runner local sur la fiche d'issue (lot 5) : la chronologie en direct de Claude Code et ses
@@ -25,7 +26,7 @@ const EVENT_ICON: Record<DeliveryRunEvent["kind"], React.ElementType> = {
 
 function minutesLeft(expiresAt: string | null): string {
   if (!expiresAt) return ""
-  const minutes = Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 60_000))
+  const minutes = Math.max(0, Math.ceil((parseServerDate(expiresAt).getTime() - Date.now()) / 60_000))
   return minutes <= 1 ? "less than a minute left" : `${minutes} min left`
 }
 

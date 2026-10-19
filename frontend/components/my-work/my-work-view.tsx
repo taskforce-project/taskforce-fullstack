@@ -25,6 +25,7 @@ import { acceptAssignment, declineAssignment } from "@/lib/api/assignment-servic
 import { listWorkspaceCycles, type WorkspaceCycle } from "@/lib/api/cycle-service"
 import type { IssueStatusCategory, IssuePriority as ApiPriority, Issue as ApiIssue } from "@/lib/api/issue-service"
 import type { CycleStatus as ApiCycleStatus } from "@/lib/api/cycle-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -297,7 +298,7 @@ function mapWorkspacePage({ page: p, projectId, projectName }: WorkspacePage, ba
     title:                p.title,
     project:              projectName,
     projectId:            String(projectId),
-    lastEditedAt:         new Date(p.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    lastEditedAt:         parseServerDate(p.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     lastEditedBy:         p.createdByName,
     lastEditedByInitials: p.createdByInitials,
     url:                  `${baseUrl}/projects/${projectId}/pages/${p.id}`,

@@ -5,6 +5,30 @@
 > Each issue: **Priority · Impact · Effort · Confidence**, with the fix locus (not applied here).
 > Effort scale: S ≤2h · M ½–1d · L 1–3d · XL >3d. Confidence = how sure the finding is true.
 
+## ✅ Recently fixed - 2026-10-19 (dates du serveur lues en heure locale)
+
+- **Symptôme** : une page enregistrée à l'instant affiche « about 2 hours ago » (2 h l'été en France, 1 h l'hiver),
+  une notification « 2h ago », et le compte à rebours d'une validation du runner « less than a minute left » pendant
+  ses 10 minutes.
+- **Cause** : la JVM du backend tourne en UTC (`-Duser.timezone=UTC` et `TZ=UTC` dans les compose de dev et de prod)
+  et les entités utilisent `LocalDateTime`, sérialisé sans fuseau (`2026-10-18T21:41:00`). Le navigateur lit
+  `new Date("2026-10-18T21:41:00")` en heure LOCALE.
+- **Fix** (branche `fix/server-dates-utc`) : `parseServerDate()` (`frontend/lib/utils/server-date.ts`, identique à la
+  copie du lot 6) lit une valeur sans fuseau comme de l'UTC et garde un fuseau explicite. Branché sur chaque écran qui
+  lit une date-heure du serveur (`1c875032`), sur le fil d'activité de l'issue, qui avait sa propre copie de la règle
+  (`2e38122d`, ISS-09), et sur les barres de projet de la roadmap, posées sur le jour local et non plus le jour UTC
+  (`4919acbe`). Vérifié sur le stack local : la même page affiche « about 2 hours ago » sur le front sans le
+  correctif et « less than a minute ago » avec.
+- **Règle** : une date-heure venue de l'API (`createdAt`, `updatedAt`, `*At`) passe par `parseServerDate()`, jamais
+  par `new Date()`. Les champs `LocalDate` (échéances, dates de cycle) restent des dates seules.
+- **Remise à niveau sur `dev` (19/10)** : `dev` a reçu les lots 6 et 7 pendant que la PR #346 attendait. Conflit
+  dans `quick-columns.tsx` : la colonne « Recent » lit désormais le store des notifications (`9ce2f58b`) ; gardé, avec
+  son tri et son heure relative par `parseServerDate()`. Le code front arrivé sur `dev` depuis la base de la branche
+  ne lit aucune autre date-heure du serveur en heure locale.
+- **Reste** : l'API publique envoie toujours ces valeurs sans fuseau alors que sa spec OpenAPI les déclare
+  `format: date-time` (RFC 3339, fuseau obligatoire). Pour les clients externes, à corriger côté backend (`Instant`
+  ou sérialisation avec `Z`) ; `parseServerDate()` restera compatible.
+
 ## ✅ Recently fixed - 2026-09-20 (image Docker de prod du site restée en Node 20)
 
 - **Symptôme** : le workflow « Release Services » échoue sur `dev` à chaque push qui touche `landing-page/` :

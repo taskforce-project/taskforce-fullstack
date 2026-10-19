@@ -21,6 +21,7 @@ import { useWorkflowStore } from "@/lib/store/workflow-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import type { AnalysisJob, JobStatus } from "@/lib/api/analysis-service"
 import type { DeliveryProvider, DeliveryRun, DeliveryRunStatus } from "@/lib/api/delivery-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 export const WORKFLOW_PANEL_ID = "workflows"
 
@@ -160,7 +161,7 @@ function RunCard({ slug, run, provider }: Readonly<{ slug: string; run: Delivery
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-foreground">{title}</p>
           <p className="truncate text-[11px] text-muted-foreground">
-            {[agentName, run.projectName, when ? formatDistanceToNow(new Date(when), { addSuffix: true }) : null]
+            {[agentName, run.projectName, when ? formatDistanceToNow(parseServerDate(when), { addSuffix: true }) : null]
               .filter(Boolean).join(" · ")}
           </p>
         </div>

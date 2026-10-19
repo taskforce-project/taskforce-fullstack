@@ -12,6 +12,7 @@ import {
   acknowledge as acknowledgeApi,
   acknowledgeAll as acknowledgeAllApi,
 } from "../api/notification-service";
+import { parseServerDate } from "../utils/server-date";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,7 +47,7 @@ export interface Signal {
 
 /** Conversion d'une date ISO en label relatif simple */
 function toRelativeTime(isoDate: string): string {
-  const diff = Date.now() - new Date(isoDate).getTime();
+  const diff = Date.now() - parseServerDate(isoDate).getTime();
   const seconds = Math.floor(diff / 1000);
   if (seconds < 60)       return "just now";
   if (seconds < 3600)     return `${Math.floor(seconds / 60)} min ago`;

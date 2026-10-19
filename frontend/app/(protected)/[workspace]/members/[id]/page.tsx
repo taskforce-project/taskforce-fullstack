@@ -31,6 +31,7 @@ import { useProjectStore } from "@/lib/store/project-store"
 import { useIssueStore } from "@/lib/store/issue-store"
 import type { WorkspaceRole } from "@/lib/api/workspace-service"
 import type { Issue } from "@/lib/api/issue-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 // ---------------------------------------------------------------------------
 // Config
@@ -133,10 +134,10 @@ export default function MemberProfilePage() {
   const inProgress = assignedIssues.filter((i) => i.status.category === "STARTED").length
 
   const recentIssues = [...assignedIssues]
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .sort((a, b) => parseServerDate(b.updatedAt).getTime() - parseServerDate(a.updatedAt).getTime())
     .slice(0, 5)
 
-  const joinedLabel = new Date(member.joinedAt).toLocaleDateString("en-US", {
+  const joinedLabel = parseServerDate(member.joinedAt).toLocaleDateString("en-US", {
     day: "numeric", month: "short", year: "numeric",
   })
 

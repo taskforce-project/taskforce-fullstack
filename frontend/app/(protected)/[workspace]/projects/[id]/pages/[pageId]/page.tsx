@@ -13,6 +13,7 @@ import { usePageStore } from "@/lib/store/page-store"
 import { toast } from "sonner"
 import { getErrorMessage } from "@/lib/api/client"
 import { cn } from "@/lib/utils"
+import { parseServerDate } from "@/lib/utils/server-date"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty"
 
@@ -113,7 +114,7 @@ export default function ProjectPageDetailPage() {
         <span>{currentPage.createdByName}</span>
         <span>·</span>
         <span>
-          {formatDistanceToNow(new Date(currentPage.updatedAt), { addSuffix: true })}
+          {formatDistanceToNow(parseServerDate(currentPage.updatedAt), { addSuffix: true })}
         </span>
       </div>
 

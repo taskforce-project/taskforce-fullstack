@@ -64,6 +64,7 @@ import {
   type Invitation,
 } from "@/lib/api/invitation-service"
 import { listSkillProfiles, type MemberSkillProfile } from "@/lib/api/skill-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 import { RedistributionDialog } from "@/components/dialogs/redistribution-dialog"
 
 const SENIORITY_LABEL: Record<string, string> = {
@@ -621,10 +622,10 @@ export default function MembersPage() {
       icon: <CalendarDays className="size-3.5" />,
       align: "right",
       className: "hidden lg:table-cell w-32",
-      sortValue: (m) => new Date(m.joinedAt).getTime(),
+      sortValue: (m) => parseServerDate(m.joinedAt).getTime(),
       render: (m) => (
         <span className="text-xs text-muted-foreground">
-          {new Date(m.joinedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+          {parseServerDate(m.joinedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
         </span>
       ),
     },
