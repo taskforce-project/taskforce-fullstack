@@ -1,0 +1,53 @@
+---
+/**
+ * Carte d'une paire (façon Cluely) : un titre, un texte, des points en option, et la scène animée posée en bas de la
+ * carte. `accent` : carte cobalt, texte blanc ; sinon carte claire. `brand` place le vrai logo devant le titre, `id`
+ * en fait une ancre de la page.
+ */
+import { Check } from "lucide-react";
+import Vignette from "@/components/visuals/Vignette";
+import { BrandMark } from "@/components/visuals/brand";
+import type { VignetteKey } from "@/components/visuals/vignettes";
+import type { BrandKey } from "@/lib/brands";
+
+interface Props {
+  title: string;
+  text: string;
+  art: VignetteKey;
+  accent?: boolean;
+  points?: string[];
+  brand?: BrandKey;
+  /** Petit libellé au-dessus du titre (où l'agent travaille, par exemple). */
+  kicker?: string;
+  /** Ancre de la page. */
+  id?: string;
+  delay?: number;
+}
+const { title, text, art, accent = false, points, brand, kicker, id, delay = 0 } = Astro.props;
+---
+
+<article id={id} class:list={["flex scroll-mt-24 flex-col overflow-hidden rounded-2xl", accent ? "duo-accent" : "duo-light"]} data-reveal style={`--d: ${delay}ms`}>
+  <div class="px-7 pt-8 sm:px-10 sm:pt-10">
+    {kicker && <p class:list={["text-[13.5px] font-medium", accent ? "text-white/75" : "text-subtle"]}>{kicker}</p>}
+    <h3 class:list={["t-h3 flex items-center gap-3", kicker && "mt-2"]}>
+      {brand && <BrandMark brand={brand} className="size-7" />}
+      {title}
+    </h3>
+    <p class="duo-text mt-3 max-w-md text-[16px] leading-relaxed">{text}</p>
+    {
+      points && (
+        <ul class="mt-6 flex flex-col gap-2.5">
+          {points.map((p) => (
+            <li class="flex items-start gap-2.5 text-[15px] leading-relaxed">
+              <Check className={`mt-1 size-4 shrink-0 ${accent ? "text-white" : "text-primary"}`} strokeWidth={2.5} aria-hidden="true" />
+              <span class="duo-text">{p}</span>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+  <div class="mt-auto px-3 pt-8 sm:px-8 sm:pt-10">
+    <Vignette client:visible art={art} bare className="-mb-6 sm:-mb-8" />
+  </div>
+</article>

@@ -1,85 +1,68 @@
 ---
+/** Conditions : licence AGPL pour le logiciel, absence de garantie, compte TaskForce, responsabilités de l'utilisateur, nom et logo, droit français. */
 import LegalDoc from "@/layouts/LegalDoc.astro";
+import { LINKS } from "@/lib/site";
 ---
 
 <LegalDoc
-  title="Terms of Service"
-  description="The terms for using TaskForce. A working draft, pending final legal review."
-  eyebrow="Legal & Trust"
-  updated="31 July 2026"
-  draft={true}
+  title="Terms of use"
+  description="TaskForce is free software under the AGPL-3.0 license. These terms cover the app, your TaskForce account, this website, and the name and logo."
+  updated="19 October 2026"
 >
+  <h2>The software</h2>
   <p>
-    These terms govern your use of TaskForce (the “Service”). By creating an account or using the
-    Service, you agree to them. Placeholders in <code>[brackets]</code> mark details we'll confirm
-    before launch.
+    TaskForce is free software. Using, copying, modifying and sharing it are governed by the{" "}
+    <a href={LINKS.license}>GNU Affero General Public License v3.0</a>. Where these terms and the license differ about
+    the software, the license applies.
   </p>
 
-  <h2>The service</h2>
+  <h2>No warranty</h2>
   <p>
-    TaskForce is a governed delivery platform. Parts of it are Live, others are Beta or Planned, and we
-    label which is which. Because the product is evolving, we provide it on an “as available” basis and
-    may change or discontinue features, with reasonable notice for material changes.
+    The app is provided “as is”, without any warranty, as the license states. Nothing in these terms limits a
+    liability that the law does not allow to limit.
   </p>
 
   <h2>Your account</h2>
-  <p>
-    You're responsible for your account, for keeping credentials secure, and for the activity of users
-    you invite. You must be able to form a binding contract and use the Service in compliance with
-    applicable law.
-  </p>
-
-  <h2>Acceptable use</h2>
   <ul>
-    <li>Don't use the Service for anything illegal, harmful, or infringing.</li>
-    <li>Don't attempt to breach security, disrupt the Service, or access data that isn't yours.</li>
-    <li>Don't reverse engineer or resell the Service except as the law expressly permits.</li>
+    <li>
+      The app needs a free TaskForce account. Use an email address you can read, and keep your password to yourself.
+    </li>
+    <li>
+      You can ask us to delete your account at any time by writing to <a href={`mailto:${LINKS.email}`}>{LINKS.email}</a>.
+    </li>
   </ul>
 
-  <h2>Your content</h2>
+  <h2>Your data and your agents</h2>
+  <ul>
+    <li>
+      Your data lives on your computer, so keeping copies of it is up to you. The app copies its database before each
+      update, but that copy is not a backup plan.
+    </li>
+    <li>
+      The agents you start run on your computer or under your own accounts. You decide what they may do, and you
+      review their work before you merge it.
+    </li>
+    <li>
+      Claude Code, GitHub Copilot, AI providers and the other services you connect are used under your own accounts
+      and their own terms.
+    </li>
+  </ul>
+
+  <h2>Name and logo</h2>
   <p>
-    You keep ownership of the content you bring to or create in TaskForce. You grant us the limited
-    licence needed to host and process it in order to provide the Service. We claim no ownership over
-    your work.
+    The TaskForce name and logo are not covered by the software license. You are welcome to adapt the code, but a
+    modified version must not be presented as the official TaskForce.
   </p>
 
-  <h2>AI outputs</h2>
+  <h2>This website</h2>
   <p>
-    TaskForce uses AI to draft specs, propose approaches and prepare actions. <strong>These are
-    proposals, not decisions.</strong> AI can be confidently wrong; a human reviews and approves before
-    anything moves forward. You are responsible for reviewing outputs and for what you choose to ship.
-    See <a href="/legal/ai-transparency">AI transparency</a>.
-  </p>
-
-  <h2>Plans & billing</h2>
-  <p>
-    Paid plans are billed through our payment provider. Prices, limits and AI-usage metering are
-    described on the <a href="/pricing">pricing page</a> <strong>(prices are indicative until launch)</strong>. Prices are shown in US dollars (USD).
-    Fees are non-refundable except where required by law.
-  </p>
-
-  <h2>Termination</h2>
-  <p>
-    You can stop using the Service and close your account at any time. We may suspend or terminate access
-    for a material breach of these terms. On termination you can export your data for a reasonable period.
-  </p>
-
-  <h2>Disclaimers & liability</h2>
-  <p>
-    The Service is provided “as is”, without warranties of any kind to the extent permitted by law. To
-    the maximum extent permitted, our liability is limited <strong>[limitation of liability - to be set
-    by counsel]</strong>. Nothing here excludes liability that cannot be excluded by law.
+    The content of this website is provided for information and may change at any time. The release notes and the
+    source code are the reference for what each version does.
   </p>
 
   <h2>Governing law</h2>
   <p>
-    These terms are governed by the laws of <strong>France</strong>, and disputes are subject to
-    the <strong>competent French courts</strong>, without prejudice to mandatory consumer protections.
-  </p>
-
-  <h2>Changes</h2>
-  <p>
-    We may update these terms; we'll change the date above and notify you of material changes. Continued
-    use after changes take effect means you accept them.
+    These terms are governed by French law. Disputes go to the competent French courts, without prejudice to the
+    protections that consumers keep under the law of their country.
   </p>
 </LegalDoc>
