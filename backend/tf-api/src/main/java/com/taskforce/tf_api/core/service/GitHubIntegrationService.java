@@ -242,11 +242,18 @@ public class GitHubIntegrationService {
     public GitHubLinkResponse addLink(String workspaceSlug, Long issueId, GitHubLinkRequest req, User linkedBy) {
         Issue issue = scopedIssue(workspaceSlug, issueId);
         visibilityGuard.assertCanWrite(issue.getProject(), linkedBy.getId()); // ajouter un lien = écriture
+        GitHubLinkType type = GitHubLinkType.valueOf(req.linkType());
+        if (type == GitHubLinkType.PR && req.prNumber() == null) {
+            throw new BusinessException("A pull request link needs the pull request number");
+        }
+        if (type == GitHubLinkType.COMMIT && (req.commitSha() == null || req.commitSha().isBlank())) {
+            throw new BusinessException("A commit link needs the commit hash");
+        }
 
         IssueGitHubLink link = IssueGitHubLink.builder()
             .issue(issue)
-            .linkType(GitHubLinkType.valueOf(req.linkType()))
-            .repoFullName(req.repoFullName())
+            .linkType(type)
+            .repoFullName(GitHubRepoNames.requireFullName(req.repoFullName()))
             .prNumber(req.prNumber())
             .prUrl(req.prUrl())
             .commitSha(req.commitSha())
@@ -303,9 +310,10 @@ public class GitHubIntegrationService {
     /** Liste les issues + PR d'un dépôt (l'API GitHub renvoie les deux ; PR = champ {@code pull_request}). */
     @SuppressWarnings("unchecked")
     public List<GitHubIssueResponse> listRepoIssues(String workspaceSlug, String repoFullName) {
+        String repo = GitHubRepoNames.requireFullName(repoFullName);
         String token = requireAccessToken(workspaceSlug);
         List<Map<String, Object>> issues = githubGetList(token,
-            "https://api.github.com/repos/" + repoFullName + "/issues?state=all&per_page=50&sort=updated");
+            "https://api.github.com/repos/" + repo + "/issues?state=all&per_page=50&sort=updated");
         return issues.stream().map(i -> {
             Map<String, Object> user = i.get("user") instanceof Map<?, ?> m ? (Map<String, Object>) m : null;
             return new GitHubIssueResponse(
@@ -325,7 +333,8 @@ public class GitHubIntegrationService {
      * connexion). {@code auto_init=true} pour que le dépôt ait un commit initial → clonable tout de suite
      * par un coding agent (TF-AGENT-DELIVERY). Renvoie le {@code "owner/name"} du dépôt créé.
      */
-    public String createRepo(String workspaceSlug, String name, boolean isPrivate) {
+    public String createRepo(String workspaceSlug, String repoName, boolean isPrivate) {
+        String name = GitHubRepoNames.requireName(repoName);
         String token = requireAccessToken(workspaceSlug);
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
@@ -353,15 +362,16 @@ public class GitHubIntegrationService {
 
     /** Vérifie qu'un dépôt {@code "owner/name"} existe et est accessible via le token du workspace. */
     public void assertRepoAccessible(String workspaceSlug, String repoFullName) {
+        String repo = GitHubRepoNames.requireFullName(repoFullName);
         String token = requireAccessToken(workspaceSlug);
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
         headers.set("Accept", "application/vnd.github+json");
         try {
-            restTemplate.exchange("https://api.github.com/repos/" + repoFullName, HttpMethod.GET,
+            restTemplate.exchange("https://api.github.com/repos/" + repo, HttpMethod.GET,
                 new HttpEntity<>(headers), new ParameterizedTypeReference<Map<String, Object>>() {});
         } catch (HttpClientErrorException e) {
-            throw new BusinessException("GitHub repository not found or not accessible: " + repoFullName);
+            throw new BusinessException("GitHub repository not found or not accessible: " + repo);
         }
     }
 
@@ -400,7 +410,8 @@ public class GitHubIntegrationService {
      * puis embedde. On ne reecrit jamais rien chez GitHub.
      */
     @Transactional
-    public GitHubSyncResponse sync(String workspaceSlug, Long userId, String repoFullName) {
+    public GitHubSyncResponse sync(String workspaceSlug, Long userId, String repoName) {
+        String repoFullName = GitHubRepoNames.requireFullName(repoName);
         Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
             .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + workspaceSlug));
         String token = integrationRepository

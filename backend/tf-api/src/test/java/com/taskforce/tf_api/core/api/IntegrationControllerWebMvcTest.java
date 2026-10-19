@@ -166,11 +166,12 @@ class IntegrationControllerWebMvcTest {
         when(userRepository.findByEmail(anyString()))
             .thenReturn(Optional.of(User.builder().id(3L).email("dev@it.dev").build()));
         when(gitHubService.addLink(anyString(), anyLong(), any(), any())).thenReturn(
-            new GitHubLinkResponse(1L, "PR", "octo/hello", 42, "https://pr", null, null, "T", "OPEN", null));
+            new GitHubLinkResponse(1L, "PR", "octo/hello", 42, "https://github.com/octo/hello/pull/42", null, null, "T", "OPEN", null));
 
         mockMvc.perform(post("/api/workspaces/acme/integrations/github/issues/5/links").with(auth())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"linkType\":\"PR\",\"repoFullName\":\"octo/hello\",\"prNumber\":42,\"prUrl\":\"https://pr\"}"))
+                .content("{\"linkType\":\"PR\",\"repoFullName\":\"octo/hello\",\"prNumber\":42,"
+                    + "\"prUrl\":\"https://github.com/octo/hello/pull/42\"}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.linkType").value("PR"));
     }
@@ -181,6 +182,22 @@ class IntegrationControllerWebMvcTest {
         mockMvc.perform(post("/api/workspaces/acme/integrations/github/issues/5/links").with(auth())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"linkType\":\"TAG\",\"repoFullName\":\"octo/hello\"}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest(name = "{0}")
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+        "{\"linkType\":\"PR\",\"repoFullName\":\"octo/hello?per_page=1\",\"prNumber\":1}",
+        "{\"linkType\":\"PR\",\"repoFullName\":\"octo/hello\",\"prNumber\":1,\"prUrl\":\"https://evil.example/x\"}",
+        "{\"linkType\":\"PR\",\"repoFullName\":\"octo/hello\",\"prNumber\":-1}",
+        "{\"linkType\":\"COMMIT\",\"repoFullName\":\"octo/hello\",\"commitSha\":\"not-a-hash\"}",
+        "{\"linkType\":\"COMMIT\",\"repoFullName\":\"octo/hello\",\"commitSha\":\"abc1234\",\"commitUrl\":\"javascript:alert(1)\"}",
+    })
+    @DisplayName("POST github issue links : dépôt, numéro, hash ou lien hors github.com refusés à l'entrée → 400")
+    void github_add_link_rejects_bad_input(String body) throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/integrations/github/issues/5/links").with(auth())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
             .andExpect(status().isBadRequest());
     }
 
