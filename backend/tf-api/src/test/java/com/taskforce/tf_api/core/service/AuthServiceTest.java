@@ -872,6 +872,19 @@ class AuthServiceTest {
         }
 
         @Test
+        @DisplayName("Keycloak qui refuse l'échange donne un message clair, pas une erreur du serveur")
+        void keycloak_refuses_the_exchange() {
+            User user = User.builder().id(7L).email(TEST_EMAIL).keycloakId(TEST_KEYCLOAK_ID).isActive(true).build();
+            when(userRepository.findById(7L)).thenReturn(java.util.Optional.of(user));
+            when(keycloakAuthService.impersonate(TEST_KEYCLOAK_ID))
+                .thenThrow(new RuntimeException("The account service did not open a session"));
+
+            assertThatThrownBy(() -> authService.completePasskeyLogin(7L)).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Use your password");
+            verify(auditService, never()).record(any(), anyLong(), anyString());
+        }
+
+        @Test
         @DisplayName("un compte désactivé ou inconnu n'ouvre rien")
         void refuses_inactive_or_unknown_accounts() {
             when(userRepository.findById(7L)).thenReturn(java.util.Optional.of(

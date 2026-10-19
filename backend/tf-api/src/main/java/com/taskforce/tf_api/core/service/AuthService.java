@@ -598,7 +598,14 @@ public class AuthService {
         if (!Boolean.TRUE.equals(user.getIsActive())) {
             throw new BusinessException("This account is disabled.");
         }
-        KeycloakTokenResponse kcToken = keycloakAuthService.impersonate(user.getKeycloakId());
+        KeycloakTokenResponse kcToken;
+        try {
+            kcToken = keycloakAuthService.impersonate(user.getKeycloakId());
+        } catch (RuntimeException e) {
+            // Keycloak sans l'échange de jetons (keycloak/scripts/passkey-sessions.sh) ou injoignable.
+            log.error("Session refusée après une passkey valide pour l'utilisateur {} : {}", user.getId(), e.getMessage());
+            throw new BusinessException("Signing in with a passkey isn't available right now. Use your password.");
+        }
 
         String firstName = null;
         String lastName = null;
