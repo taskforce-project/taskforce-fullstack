@@ -34,6 +34,17 @@ describe("PasskeysCard", () => {
     await waitFor(() => expect(fetchPasskeys).toHaveBeenCalled())
   })
 
+  it("says when a passkey was last used only once it served after being added", () => {
+    usePasskeyStore.setState({ passkeys: [
+      { ...PASSKEY, id: "pk-2", label: "Fresh", lastUsedAt: PASSKEY.createdAt },
+      { ...PASSKEY, id: "pk-3", label: "Old", createdAt: null },
+    ] })
+    render(<PasskeysCard />)
+
+    expect(screen.getByText("Fresh").nextSibling?.textContent).toBe("Added Oct 19, 2026")
+    expect(screen.getByText("Old").nextSibling?.textContent).toContain("last used Oct 20, 2026")
+  })
+
   it("adds a passkey and says how to use it", async () => {
     addPasskey.mockResolvedValue(PASSKEY)
     render(<PasskeysCard />)

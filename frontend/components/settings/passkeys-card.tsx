@@ -5,6 +5,7 @@ import { KeyRound, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import type { Passkey } from "@/lib/api/passkey-service"
 import { passkeysSupported } from "@/lib/auth/passkeys"
 import { usePasskeyStore } from "@/lib/store/passkey-store"
 import { parseServerDate } from "@/lib/utils/server-date"
@@ -15,6 +16,13 @@ function shortDate(value: string | null): string {
 }
 
 const noSubscription = () => () => {}
+
+/** Servie depuis son ajout : l'enregistrement compte déjà comme un usage, inutile de le répéter. */
+function usedSinceAdded(passkey: Passkey): boolean {
+  if (!passkey.lastUsedAt) return false
+  if (!passkey.createdAt) return true
+  return parseServerDate(passkey.lastUsedAt).getTime() - parseServerDate(passkey.createdAt).getTime() > 60_000
+}
 
 /**
  * Passkeys du compte : se connecter avec l'empreinte, le visage ou le code de l'appareil (Windows Hello, Touch ID, un
@@ -81,7 +89,7 @@ export function PasskeysCard() {
                   <p className="truncate text-sm text-foreground">{passkey.label}</p>
                   <p className="text-xs text-muted-foreground">
                     Added {shortDate(passkey.createdAt)}
-                    {passkey.lastUsedAt ? ` · last used ${shortDate(passkey.lastUsedAt)}` : ""}
+                    {usedSinceAdded(passkey) ? ` · last used ${shortDate(passkey.lastUsedAt)}` : ""}
                   </p>
                 </div>
               </div>
