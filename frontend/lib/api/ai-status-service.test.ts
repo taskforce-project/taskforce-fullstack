@@ -15,4 +15,12 @@ describe("ai-status-service", () => {
     await expect(getAiStatus()).resolves.toEqual(status)
     expect(apiClient.get).toHaveBeenCalledWith(AI_ROUTES.STATUS, { silentError: true })
   })
+
+  it("relit l'état sans attendre le cache du backend quand on le demande", async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { success: true, data: {} } })
+
+    await getAiStatus({ refresh: true })
+
+    expect(apiClient.get).toHaveBeenCalledWith(AI_ROUTES.STATUS, { silentError: true, params: { refresh: true } })
+  })
 })
