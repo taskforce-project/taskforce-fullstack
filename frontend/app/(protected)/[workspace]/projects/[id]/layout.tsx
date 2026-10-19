@@ -32,6 +32,7 @@ import {
 import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
 import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/lib/store/project-store"
+import { IS_DESKTOP } from "@/lib/desktop"
 import type { UpdateProjectPayload } from "@/lib/api/project-service"
 
 // ---------------------------------------------------------------------------
@@ -61,7 +62,8 @@ const PROJECT_TABS: ProjectTab[] = [
   { key: "detail.backlog", icon: AlignLeft, pathSuffix: "/backlog" },
   { key: "detail.cycles", icon: RefreshCw, pathSuffix: "/cycles" },
   { key: "detail.pages", icon: FileText, pathSuffix: "/pages" },
-  { key: "detail.teams", icon: Users, pathSuffix: "/teams" },
+  // App desktop : pas d'équipes, on y travaille seul avec ses agents.
+  ...(IS_DESKTOP ? [] : [{ key: "detail.teams", icon: Users, pathSuffix: "/teams" }]),
   { key: "detail.settings", icon: Settings, pathSuffix: "/settings" },
 ]
 

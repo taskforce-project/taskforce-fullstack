@@ -48,6 +48,7 @@ import { toast } from "sonner"
 import { getErrorMessage } from "@/lib/api/client"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useLabelStore } from "@/lib/store/label-store"
+import { IS_DESKTOP } from "@/lib/desktop"
 import type { ProjectStatus } from "@/lib/api/project-service"
 
 // ---------------------------------------------------------------------------
@@ -56,7 +57,8 @@ import type { ProjectStatus } from "@/lib/api/project-service"
 
 const SECTIONS = [
   { key: "general",      label: "General",      icon: Settings },
-  { key: "members",      label: "Members",      icon: Users },
+  // App desktop : pas de membres, on y travaille seul avec ses agents.
+  ...(IS_DESKTOP ? [] : [{ key: "members", label: "Members", icon: Users }] as const),
   { key: "labels",       label: "Labels",       icon: Tag },
   { key: "integrations", label: "Integrations", icon: GitBranch },
 ] as const

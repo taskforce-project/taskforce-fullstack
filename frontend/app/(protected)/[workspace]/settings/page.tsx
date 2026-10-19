@@ -50,6 +50,7 @@ import { getSystemStatus, type SystemStatus } from "@/lib/api/status-service"
 import { apiClient, getErrorMessage } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
 import { cn } from "@/lib/utils"
+import { desktopBridge, IS_DESKTOP } from "@/lib/desktop"
 import { parseServerDate } from "@/lib/utils/server-date"
 
 export type SettingsSection =
@@ -72,7 +73,7 @@ interface SectionConfig {
   group: string
 }
 
-export const SECTIONS: SectionConfig[] = [
+const ALL_SECTIONS: SectionConfig[] = [
   { key: "profile",       label: "Profile",        icon: <User className="h-4 w-4" />,       group: "Personal" },
   { key: "account",       label: "Account",        icon: <Globe className="h-4 w-4" />,      group: "Personal" },
   { key: "appearance",    label: "Appearance",     icon: <Palette className="h-4 w-4" />,    group: "Personal" },
@@ -85,6 +86,11 @@ export const SECTIONS: SectionConfig[] = [
   { key: "status",        label: "Status",         icon: <Activity className="h-4 w-4" />,    group: "Workspace" },
   { key: "privacy",       label: "Privacy & Data", icon: <Shield className="h-4 w-4" />,     group: "Personal" },
 ]
+
+/** App desktop : le mot de passe et la double authentification se règlent sur le compte en ligne (« Account »). */
+const DESKTOP_HIDDEN_SECTIONS: readonly SettingsSection[] = ["security"]
+
+export const SECTIONS: SectionConfig[] = ALL_SECTIONS.filter((s) => !IS_DESKTOP || !DESKTOP_HIDDEN_SECTIONS.includes(s.key))
 
 export const SECTION_GROUPS = [
   { label: "Personal",  keys: ["profile", "account", "appearance", "notifications", "security", "privacy"] as const },
@@ -338,6 +344,33 @@ function ProfilePanel() {
       {/* Aperçu « Mon profil » (ex-page /profile, supprimée) : stats + heatmap + activité - tout dans le modal. */}
       <Separator className="mt-2" />
       <ProfileOverview />
+    </div>
+  )
+}
+
+/**
+ * Compte dans l'app desktop : le compte TaskForce vit en ligne (adresse, mot de passe, double authentification,
+ * suppression), l'app ne garde que la session de cet ordinateur et les projets.
+ */
+function DesktopAccountPanel() {
+  const { user, logout } = useAuth()
+  return (
+    <div className="flex flex-col gap-4">
+      <SectionCard title="Account info" description="Your TaskForce account is online. Your projects stay on this computer.">
+        <div className="flex flex-col gap-5">
+          <FormField label="Email" hint="Change it, your password or two-step verification from your online account.">
+            <StyledInput type="email" value={user?.email ?? ""} readOnly />
+          </FormField>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => void desktopBridge()?.openAccountPage()}>
+              Manage account online
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => void logout()}>
+              Sign out of this computer
+            </Button>
+          </div>
+        </div>
+      </SectionCard>
     </div>
   )
 }
@@ -1702,7 +1735,7 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
   return (
     <>
       {active === "profile"       && <ProfilePanel />}
-      {active === "account"       && <AccountPanel />}
+      {active === "account"       && (IS_DESKTOP ? <DesktopAccountPanel /> : <AccountPanel />)}
       {active === "appearance"    && <AppearancePanel />}
       {active === "notifications" && <NotificationsPanel />}
       {active === "security"      && <SecurityPanel />}

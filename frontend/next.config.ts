@@ -179,8 +179,17 @@ const nextConfig: NextConfig = {
       "settings", "help", "roadmap", "cycles", "issues", "profile",
     ]
     // App desktop : la connexion, l'inscription et les invitations se passent hors de l'interface (coque, compte en
-    // ligne) ; un lien resté vers l'une de ces pages ramène à l'app.
-    const desktopAbsent = IS_DESKTOP ? ["/auth/:path*", "/invitations/:path*"] : []
+    // ligne), et les pages de membres et d'équipes n'y existent pas (on y travaille seul avec ses agents). Un lien
+    // resté vers l'une d'elles ramène à l'app.
+    const desktopAbsent = IS_DESKTOP
+      ? [
+          "/auth/:path*",
+          "/invitations/:path*",
+          "/:workspace/members/:path*",
+          "/:workspace/projects/:id/members",
+          "/:workspace/projects/:id/teams",
+        ]
+      : []
     return [
       ...legacyRoutes.map((path) => `/${path}`),
       ...desktopAbsent,
