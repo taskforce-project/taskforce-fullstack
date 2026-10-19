@@ -1,0 +1,59 @@
+---
+/**
+ * Colonnes séparées par des filets (façon Duna) : une pastille d'icône, un titre, un texte, un lien en option. Pas de
+ * cartes : de l'air et des filets. Trois ou quatre colonnes.
+ */
+import { ArrowRight, ArrowUpRight, type LucideIcon } from "lucide-react";
+
+export type RuleItem = {
+  icon: LucideIcon;
+  /** Classes de la pastille (fond teinté et couleur d'encre). */
+  tint: string;
+  title: string;
+  text: string;
+  link?: { href: string; label: string; external?: boolean };
+};
+
+interface Props {
+  items: RuleItem[];
+  cols?: 3 | 4;
+  class?: string;
+}
+const { items, cols = 3, class: cls } = Astro.props;
+const four = cols === 4;
+---
+
+<ul
+  class:list={[
+    "grid gap-y-10 border-t border-border pt-10 md:pt-12",
+    four ? "sm:grid-cols-2 sm:gap-x-10 lg:grid-cols-4 lg:gap-x-0 lg:divide-x lg:divide-border" : "md:grid-cols-3 md:divide-x md:divide-border",
+    cls,
+  ]}
+>
+  {
+    items.map((it, i) => (
+      <li
+        class:list={["flex flex-col gap-4", four ? "lg:px-7 lg:first:pl-0 lg:last:pr-0" : "md:px-8 md:first:pl-0 md:last:pr-0"]}
+        data-reveal
+        style={`--d: ${i * 80}ms`}
+      >
+        <span class={`flex size-10 items-center justify-center rounded-lg ${it.tint}`}>
+          <it.icon className="size-5" strokeWidth={1.8} aria-hidden="true" />
+        </span>
+        <p class="t-h4 mt-2">{it.title}</p>
+        <p class="t-body">{it.text}</p>
+        {it.link && (
+          <a
+            href={it.link.href}
+            target={it.link.external ? "_blank" : undefined}
+            rel={it.link.external ? "noopener" : undefined}
+            class="link-arrow mt-auto pt-2 text-[15px]"
+          >
+            {it.link.label}
+            {it.link.external ? <ArrowUpRight aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}
+          </a>
+        )}
+      </li>
+    ))
+  }
+</ul>

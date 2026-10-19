@@ -1,0 +1,288 @@
+---
+/**
+ * Téléchargement : fichiers de la dernière release desktop (GitHub Releases, lue au build), configuration
+ * requise, choix de l'IA, notes d'installation, nouveautés. Sans release publiée : état explicite, aucun lien mort.
+ */
+import { createMarkdownProcessor } from "@astrojs/markdown-remark";
+import { ArrowRight, ArrowUpRight, Bell, Bot, Cpu, Download, MemoryStick, UserRound } from "lucide-react";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import HeroDownload from "@/components/site/HeroDownload.astro";
+import SectionHead from "@/components/site/SectionHead.astro";
+import Pill from "@/components/site/Pill.astro";
+import RuleColumns, { type RuleItem } from "@/components/site/RuleColumns.astro";
+import { BrandMark } from "@/components/visuals/brand";
+import { formatDate, formatSize, getDesktopRelease, PLATFORMS, SIGNED_BUILDS, type OsFamily } from "@/lib/release";
+import { LINKS } from "@/lib/site";
+
+const release = await getDesktopRelease();
+const notesHtml = release?.notes ? (await (await createMarkdownProcessor()).render(release.notes)).code : "";
+
+const FAMILIES: { os: OsFamily; brand: "macos" | "windows" | "linux"; name: string; wash: string; files: string }[] = [
+  { os: "mac", brand: "macos", name: "macOS", wash: "wash-blue", files: "Disk image (.dmg)" },
+  { os: "windows", brand: "windows", name: "Windows", wash: "wash-sky", files: "Installer (.exe)" },
+  { os: "linux", brand: "linux", name: "Linux", wash: "wash-green", files: "AppImage or .deb" },
+];
+
+const NEEDS: RuleItem[] = [
+  { icon: Cpu, tint: "bg-tint-blue text-ink-blue", title: "A 64-bit computer", text: "macOS on Apple silicon or Intel, Windows 10 or 11, or Linux." },
+  { icon: MemoryStick, tint: "bg-tint-green text-ink-green", title: "8 GB of memory", text: "Enough for TaskForce itself. A local AI model needs more, see below." },
+  { icon: UserRound, tint: "bg-tint-yellow text-ink-yellow", title: "A free TaskForce account", text: "Created when you first open the app, or the one you already use on the web app." },
+  { icon: Bot, tint: "bg-tint-pink text-ink-pink", title: "An agent, if you delegate", text: "Claude Code installed and signed in with your own account, or GitHub Copilot's coding agent." },
+];
+
+const AI_TIERS = [
+  { pc: "No graphics card, 8 GB", model: "A small 3B to 4B model, or an API key", good: "Short summaries and rewording" },
+  { pc: "No graphics card, 16 GB", model: "A 7B to 8B model", good: "Chat, summaries, simple breakdowns" },
+  { pc: "8 GB graphics card, or Apple silicon with 16 GB", model: "An 8B model", good: "The assistant with tools, analyses" },
+  { pc: "12 GB graphics card or more, or Apple silicon with 32 GB", model: "A 14B model", good: "Finer reasoning and breakdowns" },
+];
+---
+
+<BaseLayout
+  title="Download TaskForce for macOS, Windows and Linux"
+  description="Download TaskForce, the free and open source desktop app for planning your work and handing tasks to AI agents. For macOS, Windows and Linux."
+  software
+  softwareVersion={release?.version}
+>
+  <PageHero
+    bg="download"
+    label="Download"
+    lead="Free and open source, for macOS, Windows and Linux. Install it, sign in or create your free account, and start with your first project."
+  >
+    <Fragment slot="title">Download <span class="t-word">TaskForce.</span></Fragment>
+    {
+      release ? (
+        <div class="anim-fade-up mt-10" style="--d: 200ms">
+          <HeroDownload align="center" />
+          <p class="t-label mt-4">
+            Version {release.version} · released {formatDate(release.date)}
+          </p>
+        </div>
+      ) : (
+        <div class="anim-fade-up mt-10 flex max-w-2xl flex-col items-center gap-4 rounded-xl bg-white/80 px-6 py-6 shadow-sm ring-1 ring-black/5 backdrop-blur sm:px-8" style="--d: 200ms">
+          <p class="flex items-center gap-2 font-medium text-ink-yellow">
+            <Bell className="size-4" aria-hidden="true" /> The first desktop release is not published yet
+          </p>
+          <p class="t-body">
+            The files will appear on this page the day it ships. To be told first, open the repository on GitHub, choose
+            Watch, then Custom, then Releases.
+          </p>
+          <a href={LINKS.github} target="_blank" rel="noopener" class="btn btn-secondary btn-sm">
+            Watch the repository <ArrowUpRight aria-hidden="true" />
+          </a>
+        </div>
+      )
+    }
+  </PageHero>
+
+  {/* ───────── Les fichiers, par système ───────── */}
+  <section class="pt-12 pb-6 sm:pt-16">
+    <div class="container-site">
+      <div class="grid gap-5 lg:grid-cols-3">
+        {
+          FAMILIES.map((f, i) => {
+            const files = PLATFORMS.filter((p) => p.os === f.os);
+            return (
+              <article class="card-white flex flex-col overflow-hidden" data-reveal style={`--d: ${i * 90}ms`}>
+                <div class={`wash ${f.wash} relative flex h-40 items-center justify-center rounded-none`}>
+                  <span class="absolute top-5 left-5"><Pill tone="glass">{f.files}</Pill></span>
+                  <BrandMark brand={f.brand} className="anim-float h-14 w-auto" />
+                </div>
+                <div class="flex flex-1 flex-col p-7">
+                  <p class="t-h3">{f.name}</p>
+                  <ul class="mt-5 flex flex-col divide-y divide-border border-y border-border">
+                    {files.map((p) => {
+                      const asset = release?.assets[p.platform];
+                      return (
+                        <li class="flex items-center gap-4 py-4">
+                          <div class="min-w-0 flex-1">
+                            <p class="text-[15px] font-medium">{p.detail}</p>
+                            <p class="mt-0.5 truncate text-[12.5px] text-subtle">
+                              {asset ? `${asset.name} · ${formatSize(asset.size)}` : "Not published yet"}
+                            </p>
+                          </div>
+                          {asset ? (
+                            <a href={asset.url} class="btn btn-primary btn-sm" aria-label={`Download for ${f.name}, ${p.detail}`}>
+                              <Download aria-hidden="true" />
+                            </a>
+                          ) : (
+                            <span class="btn btn-secondary btn-sm" aria-disabled="true" aria-label={`Not published yet for ${f.name}, ${p.detail}`}>
+                              <Download aria-hidden="true" />
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </article>
+            );
+          })
+        }
+      </div>
+      <p class="t-small mt-6" data-reveal>
+        Prefer to build it yourself? The source code is on{" "}
+        <a href={LINKS.github} target="_blank" class="link-inline" rel="noopener">GitHub</a>, under the AGPL-3.0 license.
+      </p>
+    </div>
+  </section>
+
+  {/* ───────── Ce qu'il faut ───────── */}
+  <section id="requirements" class="section scroll-mt-16">
+    <div class="container-site">
+      <SectionHead label="What you need">
+        <Fragment slot="title">A computer, a free account, <span class="t-word">and that's it.</span></Fragment>
+      </SectionHead>
+      <RuleColumns items={NEEDS} cols={4} class="mt-14 sm:mt-16" />
+    </div>
+  </section>
+
+  {/* ───────── Choisir son IA ───────── */}
+  <section class="section pt-0!">
+    <div class="container-site">
+      <SectionHead
+        label="Your AI"
+        tone="green"
+        lead="On first launch, TaskForce looks for Ollama on your computer and lists the models you have. You can also add an API key from OpenAI, Groq, Mistral, OpenRouter, LM Studio or any OpenAI-compatible service, or skip this step: everything except the AI features works without a model."
+      >
+        <Fragment slot="title">Pick the AI that fits <span class="t-word">your machine.</span></Fragment>
+      </SectionHead>
+      <div class="card-white mt-14 overflow-x-auto sm:mt-16" data-reveal>
+        <table class="w-full min-w-[640px] border-collapse text-left text-[15px]">
+          <caption class="sr-only">Suggested local models by computer</caption>
+          <thead>
+            <tr class="t-label">
+              <th scope="col" class="border-b border-border px-6 py-4 font-medium">Your computer</th>
+              <th scope="col" class="border-b border-border px-6 py-4 font-medium">Suggested local model</th>
+              <th scope="col" class="border-b border-border px-6 py-4 font-medium">Works well for</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              AI_TIERS.map((t, i) => (
+                <tr class="transition-colors hover:bg-paper">
+                  <td class:list={["px-6 py-4 font-medium", i < AI_TIERS.length - 1 && "border-b border-border"]}>{t.pc}</td>
+                  <td class:list={["px-6 py-4 text-muted-foreground", i < AI_TIERS.length - 1 && "border-b border-border"]}>{t.model}</td>
+                  <td class:list={["px-6 py-4 text-muted-foreground", i < AI_TIERS.length - 1 && "border-b border-border"]}>{t.good}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="t-small mt-6 max-w-3xl">
+        On a small machine, the assistant with tools can be slow. An API key is the easy way around it, and you can
+        switch at any time in the settings.
+      </p>
+    </div>
+  </section>
+
+  {/* ───────── Premier lancement ───────── */}
+  {
+    (!SIGNED_BUILDS.mac || !SIGNED_BUILDS.windows) && (
+      <section class="section pt-0!">
+        <div class="container-site">
+          <SectionHead
+            label="First launch"
+            tone="yellow"
+            lead="The first builds are not code-signed yet, so your system warns you before opening an app it does not know. The code is open on GitHub if you want to check what you install."
+          >
+            <Fragment slot="title">
+              If your system asks, <span class="t-word">here is what to do.</span>
+            </Fragment>
+          </SectionHead>
+          <div class="mt-14 grid gap-4 sm:mt-16 md:grid-cols-3">
+            {!SIGNED_BUILDS.mac && (
+              <div class="card p-7" data-reveal>
+                <p class="t-h4">macOS</p>
+                <p class="t-small mt-2">
+                  If macOS blocks the app, open System Settings, then Privacy and Security, and choose Open Anyway next to
+                  TaskForce.
+                </p>
+              </div>
+            )}
+            {!SIGNED_BUILDS.windows && (
+              <div class="card p-7" data-reveal style="--d: 80ms">
+                <p class="t-h4">Windows</p>
+                <p class="t-small mt-2">If SmartScreen shows “Windows protected your PC”, choose More info, then Run anyway.</p>
+              </div>
+            )}
+            <div class="card p-7" data-reveal style="--d: 160ms">
+              <p class="t-h4">Linux</p>
+              <p class="t-small mt-2">
+                Make the AppImage executable (chmod +x) and open it, or install the .deb with your package manager.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  {/* ───────── Nouveautés ───────── */}
+  <section id="whats-new" class="section scroll-mt-16 pt-0!">
+    <div class="container-site grid gap-12 lg:grid-cols-[0.8fr_1.2fr]">
+      <div data-reveal>
+        <Pill tone="lime">What's new</Pill>
+        <h2 class="t-h2 mt-6">{release ? `In version ${release.version}` : "Release notes"}</h2>
+        <a href={LINKS.releases} target="_blank" class="link-arrow mt-7 text-[15px]" rel="noopener">
+          All releases on GitHub <ArrowUpRight aria-hidden="true" />
+        </a>
+      </div>
+      {
+        notesHtml ? (
+          <div class="notes t-body" set:html={notesHtml} />
+        ) : (
+          <p class="t-body">The notes of each desktop release will be published here and on GitHub.</p>
+        )
+      }
+    </div>
+  </section>
+
+  {/* ───────── Depuis la webapp ───────── */}
+  <section class="pb-24 sm:pb-28">
+    <div class="container-site">
+      <div class="wash wash-yellow flex flex-col gap-6 p-8 sm:flex-row sm:items-center sm:justify-between sm:p-10" data-reveal>
+        <div>
+          <p class="t-h3">Coming from the TaskForce web app?</p>
+          <p class="t-body mt-2 max-w-xl">Export your projects from the web app and bring them into the desktop app.</p>
+        </div>
+        <a href="/migrate" class="btn btn-secondary shrink-0">
+          Moving from the web app <ArrowRight aria-hidden="true" />
+        </a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .notes :global(h2),
+  .notes :global(h3) {
+    margin-top: 1.5rem;
+    color: var(--foreground);
+    font-weight: 500;
+    font-size: 1.125rem;
+  }
+  .notes :global(ul) {
+    margin-top: 0.75rem;
+    padding-left: 1.1rem;
+    list-style: disc;
+  }
+  .notes :global(li) {
+    margin-top: 0.35rem;
+  }
+  .notes :global(a) {
+    color: var(--foreground);
+    text-decoration: underline;
+    text-decoration-color: var(--input);
+    text-underline-offset: 3px;
+  }
+  .notes :global(code) {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    background: var(--muted);
+    padding: 0.05em 0.35em;
+    border-radius: 6px;
+  }
+</style>

@@ -1,77 +1,285 @@
 ---
-import BaseLayout from "@/layouts/BaseLayout.astro";
-import { Hero } from "@/components/site/home/Hero";
-import HeroRuns from "@/components/site/home/HeroRuns";
-import { TeamGrid } from "@/components/site/home/TeamGrid";
-import { Trust, FinalCta } from "@/components/site/home/Proof";
-import BeforeAfter from "@/components/site/home/BeforeAfter.astro";
-import WhatShipsToday from "@/components/site/home/WhatShipsToday.astro";
-import Synergy from "@/components/site/home/Synergy.astro";
-import TheRun from "@/components/site/home/TheRun.astro";
-import FaqSection from "@/components/site/sections/FaqSection.astro";
-
 /**
- * FAQ de la home. Réponses HONNÊTES et alignées sur la maturité réelle (badges nav : Smart Assign /
- * Collaboration / Analytics = live ; Approvals / Memory / Integrations = beta ; Orchestration /
- * Agents = planned). Le même tableau nourrit le bloc visible ET le JSON-LD FAQPage (via FaqSection).
+ * Accueil. Structure variée, façon duna.com, cluely.com et dust.tt : héros sur une peinture avec l'app au travail,
+ * logos, manifeste en trois colonnes, deux cartes en paire (l'issue, puis l'agent), section mémoire à liste
+ * dépliante, bande peinte pleine largeur, trois cartes « contrôle », bandeau open source, FAQ, appel final. Tout ce
+ * qui est montré existe dans l'app.
  */
-const FAQ_ITEMS: { q: string; a: string }[] = [
+import { ArrowRight, Eye, FileSearch, ShieldCheck } from "lucide-react";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Backdrop from "@/components/site/Backdrop.astro";
+import BentoCard from "@/components/site/BentoCard.astro";
+import CtaBand from "@/components/site/CtaBand.astro";
+import DuoCard from "@/components/site/DuoCard.astro";
+import Faq, { type FaqItem } from "@/components/site/Faq.astro";
+import HeroDownload from "@/components/site/HeroDownload.astro";
+import PaintBand from "@/components/site/PaintBand.astro";
+import Pill from "@/components/site/Pill.astro";
+import ProductSection from "@/components/site/ProductSection.astro";
+import RuleColumns, { type RuleItem } from "@/components/site/RuleColumns.astro";
+import HeroApp from "@/components/visuals/HeroApp";
+import { BrandMark } from "@/components/visuals/brand";
+import type { TabItem } from "@/components/visuals/FeatureTabs";
+import { BRANDS, type BrandKey } from "@/lib/brands";
+import { getDesktopRelease } from "@/lib/release";
+import { LINKS } from "@/lib/site";
+
+const release = await getDesktopRelease();
+
+const WORKS_WITH: BrandKey[] = ["claude-code", "github-copilot", "github", "ollama", "openai", "mistral", "mcp", "plane"];
+
+const PROMISES: RuleItem[] = [
   {
-    q: "What is TaskForce?",
-    a: "TaskForce is an AI delivery operating system. You describe an outcome, scoped agents plan and draft each step, and a human approves every checkpoint before anything ships. It sits on top of the board and repository you already use.",
+    icon: FileSearch,
+    tint: "bg-tint-green text-ink-green",
+    title: "Context comes with the task",
+    text: "Agents look up your decisions and conventions in Brain OS before they start, so they don't begin from a blank page.",
   },
   {
-    q: "How is TaskForce different from Cursor, Copilot or Devin?",
-    a: "Those tools help write code inside the editor. TaskForce runs the delivery around the code: it turns an intent into reviewable checkpoints, keeps the context of every decision, and routes work to the right person or agent. It orchestrates the flow rather than autocompleting one file.",
+    icon: Eye,
+    tint: "bg-tint-blue text-ink-blue",
+    title: "Every step in plain sight",
+    text: "Follow what the agent reads, edits and runs, live, on the issue it is working on.",
   },
   {
-    q: "Does a human stay in control?",
-    a: "Yes. Every step waits for a human sign off at its checkpoint. Agents draft and propose, they do not ship on their own, and you keep an auditable trail of what was decided.",
+    icon: ShieldCheck,
+    tint: "bg-tint-pink text-ink-pink",
+    title: "Nothing ships without you",
+    text: "Risky actions wait for your answer, and the work comes back as a pull request for you to review.",
+  },
+];
+
+const MEMORY: TabItem[] = [
+  { title: "Pages in a tree", desc: "Write in Markdown, nest pages under each other and tag them.", art: "tree", icon: "tree" },
+  { title: "Linked notes", desc: "Link pages with [[wikilinks]] and #tags, and see how your notes connect.", art: "links", icon: "links" },
+  { title: "Search by meaning", desc: "Find a decision by what it says, not only by its words, when an embedding model is available.", art: "search", icon: "search" },
+  { title: "Read by your agents", desc: "Agents and the assistant search Brain OS for the decisions that relate to a task.", art: "agentReads", icon: "reads" },
+];
+
+const FAQ: FaqItem[] = [
+  {
+    q: "Is TaskForce free?",
+    a: "Yes. TaskForce is open source under the AGPL-3.0 license and your account is free: no subscription and no usage limit set by us. If you use a hosted AI model or GitHub Copilot, those providers bill you directly.",
   },
   {
-    q: "Can the AI models run on our own hardware?",
-    a: "Yes. TaskForce can use hosted providers or models running on your own infrastructure, so sensitive work does not have to leave your environment.",
+    q: "Do I need an account?",
+    a: "Yes, a free TaskForce account. You create it the first time you open the app, or sign in with the one you already use on the web app. It is how we keep your web app projects within reach and tell you about updates. Your projects themselves stay on your computer.",
   },
   {
-    q: "What can TaskForce do today, and what is planned?",
-    a: "Collaboration, Smart Assign and analytics are live. Approvals, TaskForce Memory and integrations are in beta. Handing an issue to Claude Code through a local runner on your own machine is in beta, and you set it up yourself. Deeper orchestration and agent roles are on the public roadmap. We label maturity honestly rather than promising everything at once.",
+    q: "Which AI does it use?",
+    a: "The one you choose: a local model through Ollama, free and private, or any OpenAI-compatible API with your own key, such as OpenAI, Groq, Mistral, OpenRouter or LM Studio. TaskForce also works without AI: the board, Brain OS and analytics don't need it.",
   },
   {
-    q: "Is there a free plan?",
-    a: "Yes. You can start for free, with paid tiers for teams that need more. Members are unlimited on every plan.",
+    q: "Do I need Claude Code or Copilot?",
+    a: "Only to hand tasks to them. Claude Code must be installed on your computer and signed in with your own account; TaskForce never sees your Claude credentials. Copilot needs a GitHub account with Copilot, connected through GitHub's own sign-in.",
+  },
+  {
+    q: "Can an agent break things on my computer?",
+    a: "Each run works on its own branch, with a fixed set of allowed actions. Anything outside that set, like running a command, waits for you to allow or deny it, and is denied if you don't answer. Agents never delete anything in TaskForce, and nothing is merged without you.",
+    link: { label: "How agents work", href: "/agents" },
+  },
+  {
+    q: "Where is my data stored?",
+    a: "Your projects, Brain OS pages and files stay in the app's data folder on your computer: they never go to our servers. We only keep your account, with your name and email address.",
+  },
+  {
+    q: "I used the TaskForce web app. What happens to my projects?",
+    a: "Sign in to the desktop app with the same account. TaskForce sees that you already have projects on the web app and offers to bring them to your computer.",
+    link: { label: "Moving from the web app", href: "/migrate" },
   },
 ];
 ---
 
 <BaseLayout
-  title="TaskForce - AI Delivery Operating System"
-  description="The governed layer above your coding agents: TaskForce turns an outcome into the spec, plan and prompt your agent runs, with a human approving every step."
+  title="TaskForce: plan your work and hand it to AI agents, from your desktop"
+  description="A free, open source desktop app to plan your work, keep your project's memory and hand tasks to Claude Code or GitHub Copilot. It runs on your computer and asks before anything risky."
   software
+  softwareVersion={release?.version}
 >
-  {/* 2e PASSE DE RÉDUCTION (24/09, validée CEO) : ~14 → ~10 écrans. Fusions, aucun message perdu :
-        · Problem + Before/After   → une section « The problem » (titre + diagrammes + chute)
-        · Smart Assign             → carte pleine largeur de « What ships today » (+ vraie capture)
-        · Memory (BrainTeaser)     → bloc mémoire de « Why it's different » (même lien)
-        · The direction            → bandeau bas de « Who it's for » (wedge, pas plafond + roadmap)
-      Doublons retirés : les 4 puces entreprise de The run, la 2e piste d'audit (cellule Verify).
-      (1re passe, review 13 : 16 → 10 sections, Manifesto / Pillars / Foundations / Phases absorbés.)
+  {/* ───────── Héros : la promesse sur une peinture, l'app au travail posée dessus ───────── */}
+  <section class="relative isolate -mt-16 overflow-hidden pt-16">
+    <Backdrop name="home" class="inset-x-0 top-0 h-[1040px] sm:h-[1240px]" fade veil="top" priority />
+    <div class="container-wide relative flex flex-col items-center pt-20 text-center sm:pt-24 lg:pt-28">
+      <span class="anim-fade-up"><Pill tone="glass">Free and open source · macOS, Windows, Linux</Pill></span>
+      <h1 class="t-display anim-fade-up mt-8" style="--d: 70ms">
+        <span class="block">Delegate to AI agents.</span>
+        <span class="block">Keep the <span class="t-word">final say.</span></span>
+      </h1>
+      <p class="t-lead anim-fade-up mt-8 max-w-[40rem] text-foreground/75" style="--d: 140ms">
+        TaskForce is a desktop app to plan your work and hand it to Claude Code or GitHub Copilot. Agents work on their
+        own branch, ask before anything risky, and never merge without you.
+      </p>
+      <HeroDownload class="anim-fade-up mt-10" align="center" secondary={{ label: "See how it works", href: "#how" }} />
+    </div>
+    <div class="container-wide anim-fade-up relative mt-14 sm:mt-16" style="--d: 260ms">
+      <HeroApp client:load />
+    </div>
+  </section>
 
-      Spine : PROMESSE + PREUVE VIVANTE (hero scindé, table de runs par rôle) → PROBLÈME (fuites de
-      contexte) → POURQUOI DIFFÉRENT (+ Memory) → CE QUI EST LIVE → LE RUN → ENTREPRISE → POUR QUI
-      (+ direction) → FAQ → ESSAI. Îlots : HeroRuns (`client:idle`) + démos `client:visible` + flux
-      React Flow `client:only`. */}
-  <Hero>
-    <HeroRuns client:idle />
-  </Hero>
+  {/* ───────── Les outils, avec leurs vrais logos ───────── */}
+  <section class="pt-20 sm:pt-24">
+    <div class="container-site">
+      <p class="text-center text-[15px] text-muted-foreground" data-reveal>Works with the agents and tools you already use</p>
+      <ul class="mt-9 flex flex-wrap items-center justify-center gap-x-10 gap-y-6" data-reveal style="--d: 80ms">
+        {
+          WORKS_WITH.map((key) => (
+            <li class="flex items-center gap-2.5 text-[16px] font-medium tracking-[-0.015em] text-foreground/85">
+              <BrandMark brand={key} className="size-6" />
+              {BRANDS[key].name}
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
 
-  <BeforeAfter />
-  <Synergy />
-  <WhatShipsToday />
+  {/* ───────── Manifeste : trois promesses, en colonnes séparées par des filets (façon Duna) ───────── */}
+  <section class="section">
+    <div class="container-site">
+      <h2 class="t-h2 max-w-4xl" data-reveal>
+        AI agents do the work. <span class="t-word">You make the calls.</span>
+      </h2>
+      <p class="t-lead mt-7 max-w-2xl" data-reveal style="--d: 80ms">
+        Agents are fast, but working with them is still messy: context gets lost, you can't see what they do, and
+        results land unchecked. TaskForce puts the plan, the memory and the agents in one app, with you in charge.
+      </p>
+      <RuleColumns items={PROMISES} class="mt-16" />
+    </div>
+  </section>
 
-  <TheRun />
-  <Trust />
-  <TeamGrid />
+  {/* ───────── De l'idée à la pull request : deux cartes en paire (façon Cluely) ───────── */}
+  <section id="how" class="scroll-mt-16 pb-24 sm:pb-32">
+    <div class="container-site">
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between" data-reveal>
+        <h2 class="t-h2 max-w-2xl">From your idea <span class="t-word">to a pull request.</span></h2>
+        <a href="/features" class="btn btn-secondary btn-sm self-start lg:self-end">
+          All features <ArrowRight aria-hidden="true" />
+        </a>
+      </div>
+      <div class="mt-12 grid gap-5 lg:grid-cols-2">
+        <DuoCard
+          accent
+          title="You write the issue"
+          text="Plan it on the board or in a cycle, the way you deliver. The decisions you keep in Brain OS travel with it."
+          art="board"
+        />
+        <DuoCard
+          title="An agent does the work"
+          text="Assign it to Claude Code or GitHub Copilot, then follow each file it reads and each command it runs, on the issue."
+          art="live"
+          delay={100}
+        />
+      </div>
+    </div>
+  </section>
 
-  <FaqSection eyebrow="FAQ" title="Frequently asked questions" items={FAQ_ITEMS} />
-  <FinalCta />
+  {/* ───────── La mémoire du projet : liste dépliante qui pilote l'illustration (façon Duna) ───────── */}
+  <ProductSection
+    id="memory"
+    label="Brain OS"
+    tone="green"
+    lead="Brain OS keeps your specs, decisions and notes in one place, so people and agents start from what you already decided."
+    items={MEMORY}
+    more={{ href: "/features#memory" }}
+    reverse
+  >
+    <Fragment slot="title">Git remembers what changed. <span class="t-word">TaskForce remembers why.</span></Fragment>
+  </ProductSection>
+
+  {/* ───────── Bande peinte : tout reste sur l'ordinateur ───────── */}
+  <PaintBand bg="band" label="Local first">
+    <Fragment slot="title">Your work stays <span class="t-word">on your computer.</span></Fragment>
+    <p class="t-lead mt-6 max-w-2xl text-foreground/80" data-reveal style="--d: 140ms">
+      Your projects live in a folder on your disk, not on our servers. The AI can run on your own machine, nothing
+      leaves unless you connect it, and the app sends no usage data.
+    </p>
+    <a href="/security" class="btn btn-secondary mt-9" data-reveal style="--d: 200ms">
+      How TaskForce protects your work <ArrowRight aria-hidden="true" />
+    </a>
+  </PaintBand>
+
+  {/* ───────── Le contrôle : trois cartes, la légende dessous (façon Cluely) ───────── */}
+  <section class="section">
+    <div class="container-site">
+      <div class="flex flex-col items-center text-center" data-reveal>
+        <h2 class="t-h2 max-w-3xl">Stay in control <span class="t-word">without watching every step.</span></h2>
+        <p class="t-lead mt-6 max-w-2xl">Agents ask before anything outside their limits, and their work comes back to you.</p>
+      </div>
+      <div class="mt-14 grid gap-x-6 gap-y-12 sm:mt-16 md:grid-cols-3">
+        <BentoCard
+          title="Approve or deny"
+          text="Commands outside the agent's allowed actions wait for your answer. No answer in 10 minutes means no."
+          art="approve"
+          tone="yellow"
+        />
+        <BentoCard
+          title="A pull request at the end"
+          text="Code tasks end with a pull request on GitHub, ready for your review. Other work comes back as a comment."
+          art="pr"
+          tone="pink"
+          delay={90}
+        />
+        <BentoCard
+          title="You merge"
+          text="TaskForce never merges anything. The final call is always yours."
+          art="merge"
+          tone="green"
+          delay={180}
+        />
+      </div>
+    </div>
+  </section>
+
+  {/* ───────── Confiance : le code est ouvert (bandeau gris, sceaux à droite, façon Duna) ───────── */}
+  <section class="pb-24 sm:pb-32">
+    <div class="container-site">
+      <div class="card grid items-center gap-10 p-8 sm:p-12 lg:grid-cols-[1fr_auto] lg:gap-16 lg:p-14">
+        <div data-reveal>
+          <h2 class="t-h2">Open source, <span class="t-word">from the first line.</span></h2>
+          <p class="t-lead mt-5 max-w-xl">
+            Every part of TaskForce is published under the AGPL-3.0 license. Read how it handles your data, build it
+            yourself, or adapt it for your company.
+          </p>
+          <a href={LINKS.github} target="_blank" rel="noopener" class="btn btn-secondary btn-lg mt-8">
+            <BrandMark brand="github" className="size-[18px]" />
+            Read the code on GitHub
+          </a>
+        </div>
+        <ul class="flex flex-wrap justify-start gap-4 lg:justify-end" data-reveal style="--d: 100ms">
+          {
+            [
+              { t: "AGPL-3.0", d: "Open source", dot: "bg-shape-blue" },
+              { t: "Free", d: "No subscription", dot: "bg-shape-green" },
+              { t: "No telemetry", d: "No usage data sent", dot: "bg-shape-pink" },
+            ].map((s) => (
+              <li class="flex size-32 flex-col items-center justify-center rounded-full bg-white text-center shadow-sm ring-1 ring-black/5">
+                <span class={`mb-2 size-2.5 rounded-full ${s.dot}`} />
+                <span class="text-[17px] font-medium tracking-[-0.02em]">{s.t}</span>
+                <span class="mt-1 text-[12.5px] text-muted-foreground">{s.d}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  {/* ───────── FAQ, pleine largeur (façon Cluely) ───────── */}
+  <section class="pb-24 sm:pb-32">
+    <div class="container-site">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between" data-reveal>
+        <h2 class="t-h2">Questions <span class="t-word">people ask first.</span></h2>
+        <p class="t-body max-w-sm">
+          Something else? Ask on{" "}
+          <a href={LINKS.issues} target="_blank" rel="noopener" class="link-inline">GitHub</a> or write to{" "}
+          <a href={`mailto:${LINKS.email}`} class="link-inline">{LINKS.email}</a>.
+        </p>
+      </div>
+      <div class="mt-10" data-reveal style="--d: 80ms">
+        <Faq items={FAQ} />
+      </div>
+    </div>
+  </section>
+
+  <CtaBand />
 </BaseLayout>

@@ -1,0 +1,9 @@
+---
+/**
+ * En-tête du site : îlot React (menus façon Duna, menu mobile), gardé d'une page à l'autre par la navigation sans
+ * rechargement (`transition:persist`) pour que l'ouverture d'un lien ne fasse pas clignoter la barre.
+ */
+import SiteNav from "@/components/nav/SiteNav";
+---
+
+<SiteNav client:load transition:persist="site-nav" />

@@ -1,38 +1,33 @@
-import { BUILT_ROUTES } from "@/components/site/nav";
-import { CONNECTORS } from "@/lib/connectors-data";
-
 /**
- * sitemap.xml - généré à partir de `BUILT_ROUTES` (source unique des pages construites) + les fiches
- * connecteur MCP-ready (route dynamique `[key].astro`, dérivée du catalogue). Aucune liste à tenir.
+ * sitemap.xml : les pages indexables du site. La 404 et les anciennes adresses (redirections) n'y figurent pas.
+ * Domaine lu dans PUBLIC_BASE_DOMAIN, comme `site` dans astro.config.mjs.
  */
-// Même dérivation que nav.ts : suffixe (domaine) en variable d'env, défaut = domaine de prod réel.
-// Ne pas coder en dur un domaine (l'ancien « taskforce.dev » sortait de mauvaises URL dans le sitemap).
 const BASE_DOMAIN = (import.meta.env.PUBLIC_BASE_DOMAIN ?? "taskforce-project.fr")
   .replace(/^https?:\/\//, "")
   .replace(/\/+$/, "");
 const SITE = `https://${BASE_DOMAIN}`;
 
-/** Routes construites mais NON indexables : les soumettre ferait lever « URL envoyée marquée
- *  noindex » dans Search Console. /docs = redirection vers docs.taskforce-project.fr (noindex). */
-const NOINDEX = new Set(["/docs"]);
+const PAGES: { path: string; priority: string }[] = [
+  { path: "/", priority: "1.0" },
+  { path: "/download", priority: "0.9" },
+  { path: "/features", priority: "0.8" },
+  { path: "/agents", priority: "0.8" },
+  { path: "/security", priority: "0.7" },
+  { path: "/migrate", priority: "0.6" },
+  { path: "/legal/notice", priority: "0.3" },
+  { path: "/legal/privacy", priority: "0.3" },
+  { path: "/legal/terms", priority: "0.3" },
+];
 
 export function GET() {
-  const lastmod = new Date().toISOString().slice(0, 10); // date du build (YYYY-MM-DD)
-  const mcpFiches = CONNECTORS.filter((c) => c.mcp).map((c) => `/product/integrations/${c.key}`);
-  const paths = [...new Set([...BUILT_ROUTES, ...mcpFiches])].filter((p) => !NOINDEX.has(p)).sort();
-  const urls = paths
-    .map((p) => {
-      // La home porte la priorite max ; les pages produit/solutions au-dessus des pages legales.
-      const priority = p === "/" ? "1.0" : p.startsWith("/legal") ? "0.4" : "0.7";
-      return `  <url><loc>${SITE}${p}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>${priority}</priority></url>`;
-    })
-    .join("\n");
+  const lastmod = new Date().toISOString().slice(0, 10);
+  const urls = PAGES.map(
+    (p) => `  <url><loc>${SITE}${p.path}</loc><lastmod>${lastmod}</lastmod><priority>${p.priority}</priority></url>`,
+  ).join("\n");
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls}
 </urlset>
 `;
-  return new Response(xml, {
-    headers: { "Content-Type": "application/xml; charset=utf-8" },
-  });
+  return new Response(xml, { headers: { "Content-Type": "application/xml; charset=utf-8" } });
 }

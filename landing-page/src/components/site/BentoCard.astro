@@ -1,0 +1,39 @@
+---
+/**
+ * Carte de rangée (façon Cluely) : la scène animée sur son panneau pastel, puis le titre, le texte et des points en
+ * option dessous, hors du panneau. `id` en fait une ancre de la page.
+ */
+import { Check } from "lucide-react";
+import Vignette from "@/components/visuals/Vignette";
+import type { VignetteKey } from "@/components/visuals/vignettes";
+import type { Tone } from "@/components/visuals/shapes";
+
+interface Props {
+  title: string;
+  text: string;
+  art: VignetteKey;
+  tone: Tone;
+  points?: string[];
+  id?: string;
+  delay?: number;
+}
+const { title, text, art, tone, points, id, delay = 0 } = Astro.props;
+---
+
+<article id={id} class="flex scroll-mt-24 flex-col" data-reveal style={`--d: ${delay}ms`}>
+  <Vignette client:visible art={art} tone={tone} className="px-3 py-6 sm:px-5 sm:py-8" />
+  <h3 class="t-h4 mt-6">{title}</h3>
+  <p class="t-small mt-2 max-w-md">{text}</p>
+  {
+    points && (
+      <ul class="mt-5 flex flex-col gap-2.5">
+        {points.map((p) => (
+          <li class="flex items-start gap-2.5 text-[15px] leading-relaxed">
+            <Check className="mt-1 size-4 shrink-0 text-primary" strokeWidth={2.5} aria-hidden="true" />
+            {p}
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</article>

@@ -1,0 +1,35 @@
+---
+/**
+ * Fond peint d'une zone (héros, bande, appel final) : l'image couvre la zone, cadrée sur ce qui compte. `fade` fond le
+ * bas de l'image dans la page ; `veil` pose un voile clair très doux là où passe le texte, pour qu'il se lise sur la
+ * peinture. Décorative : sans texte alternatif, ignorée des lecteurs d'écran.
+ */
+import { BACKGROUNDS, type BackgroundName } from "@/lib/backgrounds";
+
+interface Props {
+  name: BackgroundName;
+  class?: string;
+  /** Le bas de l'image s'efface dans la page. */
+  fade?: boolean;
+  /** Voile clair derrière le texte : « top » quand le texte est en haut de la zone, « center » au milieu. */
+  veil?: "top" | "center";
+  /** Image du haut de page : chargée tout de suite, en priorité. */
+  priority?: boolean;
+}
+const { name, class: cls, fade = false, veil, priority = false } = Astro.props;
+const bg = BACKGROUNDS[name];
+---
+
+<div class:list={["backdrop", fade && "backdrop-fade", cls]} aria-hidden="true">
+  <img
+    src={bg.src}
+    srcset={bg.srcset}
+    sizes="100vw"
+    alt=""
+    style={`object-position: ${bg.position}`}
+    loading={priority ? "eager" : "lazy"}
+    fetchpriority={priority ? "high" : "auto"}
+    decoding="async"
+  />
+  {veil && <div class:list={["backdrop-veil", `backdrop-veil-${veil}`]} />}
+</div>

@@ -1,11 +1,11 @@
 {
-  "name": "TaskForce - AI Delivery Operating System",
+  "name": "TaskForce",
   "short_name": "TaskForce",
-  "description": "Describe the outcome and TaskForce runs the delivery: scoped agents plan and draft every step, a human approves each checkpoint.",
+  "description": "A free, open source desktop app to plan your projects and hand tasks to AI agents, while you keep the final say.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#2563eb",
+  "theme_color": "#2f6bf6",
   "icons": [
     {
       "src": "/favicon.svg",

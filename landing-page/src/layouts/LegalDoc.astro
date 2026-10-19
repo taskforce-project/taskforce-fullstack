@@ -1,65 +1,126 @@
 ---
-import BaseLayout from "@/layouts/BaseLayout.astro";
-import Prose from "@/components/site/Prose.astro";
-import { Info } from "lucide-react";
-
 /**
- * LegalDoc - gabarit partagé des pages légales : en-tête (fil d'Ariane léger + titre + date),
- * bandeau de brouillon optionnel (HONNÊTETÉ : ne jamais présenter un texte non relu comme des
- * conditions définitives), corps en `Prose`, pied « une question ? ». Le contenu passe en `<slot />`.
+ * Gabarit des pages légales : sommaire des trois documents, titre, date de mise à jour, corps (slot) mis en forme
+ * par `.legal`, et une ligne de contact. Les textes décrivent le site et l'app desktop tels qu'ils sont.
  */
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { LINKS } from "@/lib/site";
+
 interface Props {
   title: string;
   description: string;
   updated: string;
-  eyebrow?: string;
-  /** Affiche un bandeau « brouillon, en attente de relecture juridique ». */
-  draft?: boolean;
 }
-const { title, description, updated, eyebrow = "Legal", draft = false } = Astro.props;
-const CONTACT = "contact@taskforce-project.fr";
+const { title, description, updated } = Astro.props;
+
+const DOCS = [
+  { href: "/legal/notice", label: "Legal notice" },
+  { href: "/legal/privacy", label: "Privacy policy" },
+  { href: "/legal/terms", label: "Terms of use" },
+];
+const here = Astro.url.pathname.replace(/\/$/, "");
 ---
 
-<BaseLayout title={`${title} - TaskForce`} description={description}>
-  <section class="bg-card border-b">
-    <div class="container-rail py-16 lg:py-20">
-      <div class="mx-auto max-w-2xl">
-        <p class="t-eyebrow mb-3">{eyebrow}</p>
-        <h1 class="t-h1">{title}</h1>
-        <p class="text-muted-foreground mt-4 text-[13.5px]">Last updated: {updated}</p>
-
+<BaseLayout title={`${title} | TaskForce`} description={description}>
+  <div class="container-site grid gap-12 pt-14 pb-24 lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-20 lg:pt-20 lg:pb-28">
+    <nav aria-label="Legal documents" class="lg:sticky lg:top-28 lg:self-start">
+      <p class="t-label">Legal</p>
+      <ul class="mt-4 flex flex-wrap gap-2 lg:flex-col lg:gap-0.5">
         {
-          draft && (
-            <div class="border-primary/25 mt-6 flex items-start gap-2.5 rounded-xl border bg-primary/[0.05] px-4 py-3.5">
-              <Info className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
-              <p class="text-[13px] leading-6 text-foreground">
-                <span class="font-medium">Working draft.</span> TaskForce is pre-launch. This document
-                is provided for transparency and is pending final legal review - it is not yet a binding
-                agreement. Questions?{" "}
-                <a href={`mailto:${CONTACT}`} class="link-underline text-foreground font-medium">
-                  {CONTACT}
-                </a>
-              </p>
-            </div>
-          )
+          DOCS.map((d) => (
+            <li>
+              <a
+                href={d.href}
+                aria-current={here === d.href ? "page" : undefined}
+                class:list={[
+                  "block border px-3 py-1.5 text-[14.5px] transition-colors lg:border-0 lg:border-l-2 lg:py-1.5",
+                  here === d.href
+                    ? "border-primary text-foreground"
+                    : "border-border text-muted-foreground hover:text-foreground lg:border-transparent",
+                ]}
+              >
+                {d.label}
+              </a>
+            </li>
+          ))
         }
-      </div>
-    </div>
-  </section>
+      </ul>
+    </nav>
 
-  <section class="bg-card">
-    <div class="container-rail pb-20 lg:pb-28">
-      <div class="mx-auto max-w-2xl">
-        <Prose>
-          <slot />
-        </Prose>
-
-        <hr class="border-border my-12" />
-        <p class="text-muted-foreground text-[13.5px] leading-6">
-          Questions about this document? Write to{" "}
-          <a href={`mailto:${CONTACT}`} class="link-underline text-foreground font-medium">{CONTACT}</a>.
-        </p>
+    <article class="max-w-[44rem]">
+      <h1 class="t-h1">{title}</h1>
+      <p class="t-label mt-5">Last updated {updated}</p>
+      <div class="legal mt-12">
+        <slot />
       </div>
-    </div>
-  </section>
+      <p class="t-small mt-14 border-t border-border pt-6">
+        Questions about this document? Write to <a href={`mailto:${LINKS.email}`} class="link-inline">{LINKS.email}</a>.
+      </p>
+    </article>
+  </div>
 </BaseLayout>
+
+<style>
+  .legal {
+    font-size: 1rem;
+    line-height: 1.7;
+    color: var(--muted-foreground);
+  }
+  .legal :global(h2) {
+    margin-top: 3rem;
+    font-size: 1.375rem;
+    font-weight: 550;
+    letter-spacing: -0.022em;
+    line-height: 1.25;
+    color: var(--foreground);
+  }
+  .legal :global(h2:first-child) {
+    margin-top: 0;
+  }
+  .legal :global(p),
+  .legal :global(ul),
+  .legal :global(dl) {
+    margin-top: 1rem;
+  }
+  .legal :global(ul) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-left: 1.25rem;
+    list-style: square;
+  }
+  .legal :global(li::marker) {
+    color: var(--rule);
+  }
+  .legal :global(strong) {
+    font-weight: 600;
+    color: var(--foreground);
+  }
+  .legal :global(a) {
+    color: var(--foreground);
+    text-decoration: underline;
+    text-decoration-color: var(--rule);
+    text-underline-offset: 3px;
+  }
+  .legal :global(a:hover) {
+    text-decoration-color: var(--primary);
+  }
+  .legal :global(dl) {
+    border-top: 1px solid var(--border);
+  }
+  .legal :global(dl > div) {
+    display: grid;
+    gap: 0.25rem 1.5rem;
+    padding: 0.875rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  @media (min-width: 640px) {
+    .legal :global(dl > div) {
+      grid-template-columns: 11rem 1fr;
+    }
+  }
+  .legal :global(dt) {
+    font-weight: 500;
+    color: var(--foreground);
+  }
+</style>

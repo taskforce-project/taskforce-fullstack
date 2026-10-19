@@ -1,0 +1,26 @@
+---
+/**
+ * Bande peinte pleine largeur (façon Duna) : une peinture d'un bord à l'autre, et au centre une étiquette, un titre
+ * (slot `title`) et ce que la section met dessous (slot par défaut : texte, bouton). Le voile clair garde le texte
+ * lisible sur la peinture.
+ */
+import type { BackgroundName } from "@/lib/backgrounds";
+import Backdrop from "./Backdrop.astro";
+import Pill from "./Pill.astro";
+
+interface Props {
+  bg: BackgroundName;
+  label: string;
+  id?: string;
+}
+const { bg, label, id } = Astro.props;
+---
+
+<section id={id} class="relative isolate overflow-hidden scroll-mt-16">
+  <Backdrop name={bg} class="inset-0" veil="center" />
+  <div class="container-site relative flex min-h-[540px] flex-col items-center justify-center py-24 text-center sm:min-h-[600px]">
+    <span data-reveal><Pill tone="glass">{label}</Pill></span>
+    <h2 class="t-h2 mt-7 max-w-3xl" data-reveal style="--d: 70ms"><slot name="title" /></h2>
+    <slot />
+  </div>
+</section>

@@ -1,0 +1,44 @@
+---
+/**
+ * En-tête de section façon Duna : étiquette, grand titre (slot `title`), chapô, et à droite un bouton « Explore » en
+ * option. `align="center"` pour les sections de manifeste.
+ */
+import { ChevronRight } from "lucide-react";
+import Pill from "./Pill.astro";
+
+interface Props {
+  label: string;
+  tone?: "blue" | "red" | "green" | "lime" | "yellow" | "pink" | "sky" | "neutral" | "glass";
+  lead?: string;
+  align?: "left" | "center";
+  /** Bouton « Explore » à droite du titre. */
+  more?: { href: string; label?: string };
+  class?: string;
+}
+const { label, tone = "blue", lead, align = "left", more, class: className } = Astro.props;
+const center = align === "center";
+---
+
+<div
+  class:list={[
+    "flex flex-col gap-8",
+    !center && more && "lg:flex-row lg:items-end lg:justify-between lg:gap-16",
+    center && "items-center text-center",
+    className,
+  ]}
+  data-reveal
+>
+  <div class:list={["flex flex-col gap-6", center ? "items-center" : "items-start"]}>
+    <Pill tone={tone}>{label}</Pill>
+    <h2 class:list={["t-h2", center ? "max-w-4xl" : "max-w-3xl"]}><slot name="title" /></h2>
+    {lead && <p class:list={["t-lead max-w-2xl", center && "mx-auto"]}>{lead}</p>}
+  </div>
+  {
+    more && (
+      <a href={more.href} class="btn btn-secondary btn-sm shrink-0 self-start lg:self-end">
+        {more.label ?? "Explore"}
+        <ChevronRight aria-hidden="true" />
+      </a>
+    )
+  }
+</div>
