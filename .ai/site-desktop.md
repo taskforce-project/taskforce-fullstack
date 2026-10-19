@@ -31,6 +31,15 @@ connexion, « Download » à la place.
 - **Ton** : utilisateur, pas technique ; chaque phrase vérifiée dans le code (palette de commandes, thèmes, accessibilité
   revérifiés dans `frontend/` le 19/10).
 
+## Compte TaskForce (décision du CEO du 19/10)
+
+Compte gratuit obligatoire dans l'app desktop : créé au premier lancement, ou celui de la webapp (Keycloak et sa base
+restent hébergés). À la première connexion, l'app propose de rapatrier les projets web. Les comptes existants reçoivent
+un e-mail avant la fermeture de la webapp. Les téléchargements sont comptés par GitHub. Le site le dit partout (FAQ,
+sécurité, téléchargement, `/migrate` et son animation, confidentialité, conditions, `llms.txt`) ; plus aucune mention
+« No account » ni « pas de serveur ». Reste : nommer l'hébergeur du serveur de comptes dans `legal/privacy.astro` dès
+qu'il est choisi. Spec : `Specification_App_Desktop.md` §10.
+
 ## Où sont les choses
 
 | Quoi | Où |
