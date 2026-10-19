@@ -1,0 +1,12 @@
+---
+/** Étiquette de section façon Duna : pilule douce, teinte de la palette, petite pastille ronde. */
+interface Props {
+  tone?: "blue" | "red" | "green" | "lime" | "yellow" | "pink" | "sky" | "neutral" | "glass";
+  class?: string;
+}
+const { tone = "blue", class: className } = Astro.props;
+---
+
+<span class:list={["pill", className]} data-tone={tone === "blue" ? undefined : tone}>
+  <slot />
+</span>
