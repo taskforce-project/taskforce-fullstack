@@ -15,7 +15,7 @@ const READY: DesktopToolsStatus = {
   github: { installed: true, signedIn: true, login: "ada" },
 };
 
-/** Pont de la coque, tel que `desktop/src/preload.ts` l'expose : seuls les outils et GitHub servent ici. */
+/** Pont de la coque, tel que `desktop/src/preload.ts` l'expose : seuls les outils, GitHub et Claude Code servent ici. */
 function installBridge() {
   const bridge = {
     tools: { status: vi.fn() },
@@ -28,6 +28,7 @@ function installBridge() {
       waitForSignIn: vi.fn(),
       cancelSignIn: vi.fn(),
     },
+    claude: { mcpStatus: vi.fn(), connectMcp: vi.fn(), disconnectMcp: vi.fn() },
   };
   (window as Window & { taskforceDesktop?: unknown }).taskforceDesktop = bridge;
   return bridge;
@@ -49,7 +50,11 @@ describe("useDesktopToolsStore", () => {
       expect(await store.getState().startGitHubSignIn()).toBe(false);
       expect(await store.getState().resolveRepo("link", "acme/site", true)).toBeNull();
       expect(store.getState().error).toBe("Only available in the TaskForce desktop app");
+      expect(await store.getState().fetchMcp("acme")).toBeNull();
+      expect(await store.getState().connectClaudeCode("acme", "tfp_x")).toBe(false);
+      expect(await store.getState().disconnectClaudeCode("acme")).toBe(false);
       expect(bridge.tools.status).not.toHaveBeenCalled();
+      expect(bridge.claude.connectMcp).not.toHaveBeenCalled();
     });
   });
 
@@ -220,6 +225,75 @@ describe("useDesktopToolsStore", () => {
       store.getState().openGitHubSignInPage();
 
       expect(bridge.github.openSignInPage).toHaveBeenCalled();
+    });
+  });
+
+  describe("Claude Code connected to a workspace", () => {
+    it("reads the connection of each workspace", async () => {
+      const bridge = installBridge();
+      bridge.claude.mcpStatus.mockResolvedValue({ ok: true, value: { connected: true, current: false } });
+      const store = await loadStore();
+
+      expect(await store.getState().fetchMcp("acme")).toEqual({ connected: true, current: false });
+      expect(store.getState().mcp).toEqual({ acme: { connected: true, current: false } });
+      expect(bridge.claude.mcpStatus).toHaveBeenCalledWith("acme");
+    });
+
+    it.each([
+      ["the shell refuses", () => Promise.resolve({ ok: false, error: "Unknown workspace" }), "Unknown workspace"],
+      ["the shell doesn't answer", () => Promise.reject(new Error("gone")), null],
+    ])("returns null when %s", async (_case, answer, error) => {
+      const bridge = installBridge();
+      bridge.claude.mcpStatus.mockImplementation(answer);
+      const store = await loadStore();
+
+      expect(await store.getState().fetchMcp("acme")).toBeNull();
+      expect(store.getState()).toMatchObject({ mcp: {}, error });
+    });
+
+    it("connects Claude Code with the token it is given", async () => {
+      const bridge = installBridge();
+      bridge.claude.connectMcp.mockResolvedValue({ ok: true, value: undefined });
+      const store = await loadStore();
+
+      expect(await store.getState().connectClaudeCode("acme", "tfp_value")).toBe(true);
+      expect(bridge.claude.connectMcp).toHaveBeenCalledWith({ slug: "acme", token: "tfp_value" });
+      expect(store.getState().mcp.acme).toEqual({ connected: true, current: true });
+    });
+
+    it.each([
+      ["Claude Code refuses", () => Promise.resolve({ ok: false, error: "Invalid header" }), "Invalid header"],
+      ["Claude Code doesn't answer", () => Promise.reject(new Error("gone")), "Claude Code didn't answer. Please try again."],
+    ])("says why the connection failed when %s", async (_case, answer, error) => {
+      const bridge = installBridge();
+      bridge.claude.connectMcp.mockImplementation(answer);
+      const store = await loadStore();
+
+      expect(await store.getState().connectClaudeCode("acme", "tfp_value")).toBe(false);
+      expect(store.getState()).toMatchObject({ mcp: {}, error });
+    });
+
+    it("disconnects Claude Code", async () => {
+      const bridge = installBridge();
+      bridge.claude.disconnectMcp.mockResolvedValue({ ok: true, value: undefined });
+      const store = await loadStore();
+      store.setState({ mcp: { acme: { connected: true, current: true } } });
+
+      expect(await store.getState().disconnectClaudeCode("acme")).toBe(true);
+      expect(store.getState().mcp.acme).toEqual({ connected: false, current: false });
+    });
+
+    it.each([
+      ["the shell refuses", () => Promise.resolve({ ok: false, error: "Claude Code is not installed on this computer" }), "Claude Code is not installed on this computer"],
+      ["the shell doesn't answer", () => Promise.reject(new Error("gone")), null],
+    ])("keeps the connection when %s", async (_case, answer, error) => {
+      const bridge = installBridge();
+      bridge.claude.disconnectMcp.mockImplementation(answer);
+      const store = await loadStore();
+      store.setState({ mcp: { acme: { connected: true, current: true } } });
+
+      expect(await store.getState().disconnectClaudeCode("acme")).toBe(false);
+      expect(store.getState()).toMatchObject({ mcp: { acme: { connected: true, current: true } }, error });
     });
   });
 });

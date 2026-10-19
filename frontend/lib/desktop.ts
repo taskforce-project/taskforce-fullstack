@@ -48,6 +48,13 @@ export interface DesktopToolsStatus {
   github: { installed: boolean; signedIn: boolean; login: string | null };
 }
 
+/** Claude Code de la personne branché sur le serveur MCP d'un espace (mode interactif). */
+export interface DesktopMcpConnection {
+  connected: boolean;
+  /** Il vise l'adresse actuelle de l'app ; sinon l'app a changé de port et il faut le rebrancher. */
+  current: boolean;
+}
+
 /** Dépôt GitHub tel que le `gh` de la personne le voit. */
 export interface DesktopGitHubRepo {
   fullName: string;
@@ -88,6 +95,12 @@ export interface DesktopBridge {
     openSignInPage(): Promise<void>;
     waitForSignIn(): Promise<{ ok: true } | { ok: false; error: string }>;
     cancelSignIn(): Promise<void>;
+  };
+  /** Claude Code de la personne et le serveur MCP d'un espace : le jeton personnel va de la page à `claude`. */
+  claude: {
+    mcpStatus(slug: string): Promise<DesktopResult<DesktopMcpConnection>>;
+    connectMcp(input: { slug: string; token: string }): Promise<DesktopResult<void>>;
+    disconnectMcp(slug: string): Promise<DesktopResult<void>>;
   };
 }
 

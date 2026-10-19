@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { desktopBridge, type DesktopGitHubRepo, type DesktopToolsStatus } from "../desktop";
+import { desktopBridge, type DesktopGitHubRepo, type DesktopMcpConnection, type DesktopToolsStatus } from "../desktop";
 
 // ---------------------------------------------------------------------------
 // Store des outils de la personne dans l'app desktop : Claude Code, git et GitHub CLI (cf. desktop/src/tools.ts et
@@ -19,6 +19,8 @@ interface DesktopToolsState {
   repos: DesktopGitHubRepo[] | null;
   /** Code à usage unique de la connexion GitHub en cours, à saisir sur github.com. */
   signInCode: string | null;
+  /** Claude Code de la personne branché sur le serveur MCP de chaque espace (mode interactif), par slug. */
+  mcp: Record<string, DesktopMcpConnection>;
   error: string | null;
 
   refresh: () => Promise<DesktopToolsStatus | null>;
@@ -32,6 +34,10 @@ interface DesktopToolsState {
   startGitHubSignIn: () => Promise<boolean>;
   openGitHubSignInPage: () => void;
   cancelGitHubSignIn: () => void;
+  fetchMcp: (slug: string) => Promise<DesktopMcpConnection | null>;
+  /** Branche Claude Code sur le serveur MCP de l'espace avec ce jeton personnel (que le store ne garde pas). */
+  connectClaudeCode: (slug: string, token: string) => Promise<boolean>;
+  disconnectClaudeCode: (slug: string) => Promise<boolean>;
 }
 
 export const useDesktopToolsStore = create<DesktopToolsState>((set, get) => ({
@@ -39,6 +45,7 @@ export const useDesktopToolsStore = create<DesktopToolsState>((set, get) => ({
   checking: false,
   repos: null,
   signInCode: null,
+  mcp: {},
   error: null,
 
   refresh: async () => {
@@ -139,5 +146,54 @@ export const useDesktopToolsStore = create<DesktopToolsState>((set, get) => ({
   cancelGitHubSignIn: () => {
     set({ signInCode: null });
     void desktopBridge()?.github.cancelSignIn();
+  },
+
+  fetchMcp: async (slug) => {
+    const bridge = desktopBridge();
+    if (!bridge) return null;
+    try {
+      const result = await bridge.claude.mcpStatus(slug);
+      if (!result.ok) {
+        set({ error: result.error });
+        return null;
+      }
+      set((state) => ({ mcp: { ...state.mcp, [slug]: result.value } }));
+      return result.value;
+    } catch {
+      return null;
+    }
+  },
+
+  connectClaudeCode: async (slug, token) => {
+    const bridge = desktopBridge();
+    if (!bridge) return false;
+    try {
+      const result = await bridge.claude.connectMcp({ slug, token });
+      if (!result.ok) {
+        set({ error: result.error });
+        return false;
+      }
+      set((state) => ({ mcp: { ...state.mcp, [slug]: { connected: true, current: true } }, error: null }));
+      return true;
+    } catch {
+      set({ error: "Claude Code didn't answer. Please try again." });
+      return false;
+    }
+  },
+
+  disconnectClaudeCode: async (slug) => {
+    const bridge = desktopBridge();
+    if (!bridge) return false;
+    try {
+      const result = await bridge.claude.disconnectMcp(slug);
+      if (!result.ok) {
+        set({ error: result.error });
+        return false;
+      }
+      set((state) => ({ mcp: { ...state.mcp, [slug]: { connected: false, current: false } } }));
+      return true;
+    } catch {
+      return false;
+    }
   },
 }));

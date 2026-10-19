@@ -57,9 +57,9 @@ export function AgentsPanel() {
 
               {/* Runner local : identité machine en libre-service (ADR-013). L'app desktop le lance elle-même. */}
               {p.key === "claude-code" && p.available && !IS_DESKTOP && <LocalRunnerSetup />}
-              {p.key === "claude-code" && IS_DESKTOP && <DesktopClaudeCodeSetup />}
-              {/* Mode interactif : le Claude Code de la personne sur le serveur MCP de l'instance (lot 5). Pas dans
-                  l'app desktop, dont l'API change de port à chaque lancement. */}
+              {p.key === "claude-code" && IS_DESKTOP && <DesktopClaudeCodeSetup slug={slug} />}
+              {/* Mode interactif : le Claude Code de la personne sur le serveur MCP de l'instance (lot 5). L'app
+                  desktop le branche elle-même (DesktopClaudeCodeSetup). */}
               {p.key === "claude-code" && slug && !IS_DESKTOP && <ClaudeCodeMcpSetup slug={slug} />}
             </div>
           ))}
