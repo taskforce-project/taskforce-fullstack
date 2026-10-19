@@ -1,0 +1,78 @@
+---
+/**
+ * Politique de signature du code, exigée par la SignPath Foundation (certificat gratuit des projets open source) :
+ * ce qui est signé et comment, l'équipe et ses rôles, la confidentialité, la mention de SignPath. Liée depuis le pied
+ * de page (donc l'accueil) et la page de téléchargement. `SIGNED_BUILDS.windows` passe à vrai quand la signature est
+ * en place : le statut de la page suit.
+ */
+import LegalDoc from "@/layouts/LegalDoc.astro";
+import { LINKS } from "@/lib/site";
+import { SIGNED_BUILDS } from "@/lib/release";
+
+const WORKFLOW = `${LINKS.github}/blob/main/.github/workflows/desktop-release.yml`;
+---
+
+<LegalDoc
+  title="Code signing policy"
+  description="How TaskForce Desktop for Windows is built and signed: from the public source code, by GitHub Actions, with a certificate by the SignPath Foundation."
+  updated="20 October 2026"
+>
+  <h2>Signing</h2>
+  {
+    SIGNED_BUILDS.windows ? (
+      <p>
+        Free code signing provided by <a href="https://signpath.io">SignPath.io</a>, certificate by{" "}
+        <a href="https://signpath.org">SignPath Foundation</a>.
+      </p>
+    ) : (
+      <p>
+        TaskForce Desktop for Windows will be signed with free code signing provided by{" "}
+        <a href="https://signpath.io">SignPath.io</a>, certificate by <a href="https://signpath.org">SignPath Foundation</a>.
+        Our application is under review: until it is accepted, the Windows installer is not signed, and Windows or your
+        antivirus may warn you before running it.
+      </p>
+    )
+  }
+
+  <h2>What we sign</h2>
+  <ul>
+    <li>
+      The TaskForce Desktop installer for Windows (<code>TaskForce-Setup-&lt;version&gt;.exe</code>), published on the{" "}
+      <a href="/download">download page</a> and in the project's GitHub releases.
+    </li>
+    <li>
+      It is built from the public source code of the <code>main</code> branch by the{" "}
+      <a href={WORKFLOW}>Desktop - Release</a> workflow on GitHub Actions. We sign nothing built anywhere else, and only
+      binaries built from this repository.
+    </li>
+    <li>
+      The app bundles open source components from other projects (Electron, a Java runtime, PostgreSQL). They keep
+      their own publishers' signatures, or none: we do not sign them in their name.
+    </li>
+  </ul>
+
+  <h2>Team and roles</h2>
+  <ul>
+    <li>
+      <strong>Committers and reviewers:</strong> Pierre Michel (<a href="https://github.com/Miche1-Pierre">Miche1-Pierre</a>).
+      Changes from anyone outside the team come as pull requests, reviewed by a committer before they are merged.
+    </li>
+    <li>
+      <strong>Approvers:</strong> Pierre Michel. Every signing request is approved by hand, release by release.
+    </li>
+    <li>Team members must use two-factor authentication on GitHub and on SignPath.</li>
+  </ul>
+
+  <h2>Privacy</h2>
+  <p>
+    What TaskForce Desktop sends, and to whom, is described in our <a href="/legal/privacy">privacy policy</a>: it signs
+    you in to your TaskForce account, asks GitHub whether a new version exists, and sends data to the AI providers and
+    services you choose to connect. It sends us no usage data.
+  </p>
+
+  <h2>Check a download</h2>
+  <p>
+    Each file of a release shows its SHA-256 digest on its <a href={`${LINKS.github}/releases`}>GitHub release page</a>.
+    On Windows, compare it with <code>Get-FileHash TaskForce-Setup-&lt;version&gt;.exe</code> in PowerShell.
+  </p>
+</LegalDoc>

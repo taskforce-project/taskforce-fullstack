@@ -17,6 +17,7 @@ const PAGES: { path: string; priority: string }[] = [
   { path: "/legal/notice", priority: "0.3" },
   { path: "/legal/privacy", priority: "0.3" },
   { path: "/legal/terms", priority: "0.3" },
+  { path: "/code-signing-policy", priority: "0.3" },
 ];
 
 export function GET() {
