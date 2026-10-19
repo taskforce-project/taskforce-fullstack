@@ -37,8 +37,9 @@ Compte gratuit obligatoire dans l'app desktop : créé au premier lancement, ou 
 restent hébergés). À la première connexion, l'app propose de rapatrier les projets web. Les comptes existants reçoivent
 un e-mail avant la fermeture de la webapp. Les téléchargements sont comptés par GitHub. Le site le dit partout (FAQ,
 sécurité, téléchargement, `/migrate` et son animation, confidentialité, conditions, `llms.txt`) ; plus aucune mention
-« No account » ni « pas de serveur ». Reste : nommer l'hébergeur du serveur de comptes dans `legal/privacy.astro` dès
-qu'il est choisi. Spec : `Specification_App_Desktop.md` §10.
+« No account » ni « pas de serveur ». Serveur de comptes hébergé chez OVH, en France (compte du CEO) : confidentialité
+et mentions légales. Après la première connexion, l'app marche aussi hors ligne. L'e-mail aux comptes est dans la todo
+marketing (OSS-MKT.1 du plan de release). Spec : `Specification_App_Desktop.md` §10.
 
 ## Où sont les choses
 
@@ -79,6 +80,11 @@ qu'il est choisi. Spec : `Specification_App_Desktop.md` §10.
 - Signature des builds (`SIGNED_BUILDS` dans `src/lib/release.ts`), nommage `desktop-v*` des releases, reconstruction du
   site après chaque release (hook de déploiement Vercel depuis la CI desktop).
 - Brain OS n'a pas d'export : à ajouter côté webapp avant la fermeture, ou garder la consigne « copiez vos pages ».
-- Le site est pensé desktop alors qu'aucune release desktop n'existe encore : à trancher avant la mise en prod (la
-  session webapp du lot 8 le remonte aussi ; le guide SELF_HOSTING.md n'est pas lié par le site).
-- Dépendances du site devenues inutiles (three, radix, recharts, gsap…) : nettoyage possible dans un commit à part.
+- Mise en prod : la webapp part sur main avec l'ancien site ; ce site desktop reste sur dev jusqu'à la sortie du desktop.
+
+## Dépendances (19/10)
+
+Une cinquantaine de paquets de l'ancien site retirés (three, Radix, Recharts, GSAP, PostHog, Zod…) : 905 paquets
+installés à 613. Gardés : Astro et son intégration React, Tailwind, motion, lucide-react, clsx, tailwind-merge, et
+`@astrojs/markdown-remark`, désormais déclaré : la page Téléchargement l'importe pour les notes de release, et il ne
+venait jusque-là que de l'intégration MDX retirée. `npm audit` inchangé (5 alertes sur l'outillage de lint).
