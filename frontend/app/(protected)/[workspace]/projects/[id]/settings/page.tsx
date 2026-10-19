@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { ProjectMembersManager } from "@/components/projects/project-members-manager"
+import { ProjectRepositoryCard } from "@/components/projects/project-repository-card"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import {
   Select,
@@ -459,10 +460,12 @@ export default function ProjectSettingsPage() {
       </section>
       )}
 
-      {/* ── Integrations → gérées au niveau workspace ── */}
+      {/* ── Integrations : le dépôt de code du projet, puis les intégrations (gérées au niveau workspace) ── */}
       {section === "integrations" && (
       <section>
-        <SectionTitle icon={GitBranch} title="Integrations" description="Managed once for the whole workspace" />
+        <SectionTitle icon={GitBranch} title="Integrations" description="This project's code repository, and the tools connected to the workspace" />
+        <div className="flex flex-col gap-4">
+        <ProjectRepositoryCard workspace={workspace} projectId={projectId} />
         <div className="flex flex-col items-start gap-4 rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             {["github", "slack", "linear", "notion", "figma"].map((k) => (
@@ -478,6 +481,7 @@ export default function ProjectSettingsPage() {
           <Button className="gap-2" onClick={() => openSettings("integrations")}>
             <Plug className="size-4" /> Manage integrations
           </Button>
+        </div>
         </div>
       </section>
       )}
