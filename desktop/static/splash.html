@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
+  <title>TaskForce</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #fbfbfc; --ink: #1c1b19; --muted: #6b6862; --line: #e6e6e9; --accent: #2f6bf6; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #0e1116; --ink: #ecebe8; --muted: #9a978f; --line: #262b33; } }
+    html, body { height: 100%; margin: 0; }
+    body { background: var(--bg); color: var(--ink); font: 14px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
+      display: grid; place-items: center; -webkit-app-region: drag; user-select: none; }
+    main { display: grid; gap: 18px; justify-items: center; text-align: center; padding: 24px; }
+    .name { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+    .step { color: var(--muted); min-height: 21px; }
+    .bar { width: 180px; height: 3px; border-radius: 3px; background: var(--line); overflow: hidden; }
+    .bar::after { content: ""; display: block; width: 40%; height: 100%; background: var(--accent); border-radius: 3px;
+      animation: slide 1.4s ease-in-out infinite; }
+    @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+    @media (prefers-reduced-motion: reduce) { .bar::after { animation: none; width: 100%; opacity: 0.5; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="name">TaskForce</div>
+    <div class="bar" role="progressbar" aria-label="Starting"></div>
+    <div class="step" id="step">Starting</div>
+  </main>
+  <script>
+    // L'étape en cours arrive par l'adresse (#step=...), mise à jour par la coque.
+    function render() {
+      const step = new URLSearchParams(location.hash.slice(1)).get("step");
+      if (step) document.getElementById("step").textContent = step;
+    }
+    window.addEventListener("hashchange", render);
+    render();
+  </script>
+</body>
+</html>
