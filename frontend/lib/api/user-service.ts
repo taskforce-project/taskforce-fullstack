@@ -55,32 +55,16 @@ export async function searchUsers(q: string): Promise<UserSearchResult[]> {
   return response.data.data;
 }
 
-// ---- Sécurité : 2FA TOTP gérée par l'app ----------------------------------------------------------
+// ---- Sécurité : la double authentification se règle sur le compte en ligne ------------------------
 
-/** Ce que renvoie le démarrage de l'activation 2FA : de quoi afficher un QR (ou saisir à la main). */
-export interface TwoFactorSetup {
-  secret: string;
-  otpauthUri: string;
-}
-
-/** Indique si le 2FA (TOTP) est actif pour l'utilisateur courant. */
+/** Vrai si la connexion demande un code : application d'authentification du compte en ligne (ou ancien TOTP de l'app). */
 export async function getTwoFactorStatus(): Promise<boolean> {
   const response = await apiClient.get<{ data: boolean }>(USER_ROUTES.TWO_FACTOR, { silentError: true });
   return response.data.data;
 }
 
-/** Démarre l'activation 2FA : renvoie le secret + l'URI otpauth (à encoder en QR). N'active pas encore. */
-export async function setupTwoFactor(): Promise<TwoFactorSetup> {
-  const response = await apiClient.post<{ data: TwoFactorSetup }>(USER_ROUTES.TWO_FACTOR_SETUP, undefined, { silentError: true });
+/** Adresse du compte en ligne, où l'on enregistre son application d'authentification. */
+export async function getAccountPageUrl(): Promise<string> {
+  const response = await apiClient.get<{ data: string }>(USER_ROUTES.ACCOUNT_PAGE, { silentError: true });
   return response.data.data;
-}
-
-/** Confirme l'activation avec un premier code à 6 chiffres. */
-export async function confirmTwoFactor(code: string): Promise<void> {
-  await apiClient.post(USER_ROUTES.TWO_FACTOR_CONFIRM, { code }, { silentError: true });
-}
-
-/** Désactive le 2FA (supprime le secret). */
-export async function disableTwoFactor(): Promise<void> {
-  await apiClient.delete(USER_ROUTES.TWO_FACTOR, { silentError: true });
 }
