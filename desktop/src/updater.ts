@@ -19,7 +19,8 @@ export function startUpdater(): void {
   started = true;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.logger = { info: log.info, warn: log.warn, error: log.error, debug: () => undefined };
+  // Les erreurs passent par l'événement « error », une seule ligne par échec.
+  autoUpdater.logger = { info: log.info, warn: log.warn, error: () => undefined, debug: () => undefined };
 
   autoUpdater.on("update-downloaded", async (info) => {
     log.info(`Update ${info.version} downloaded`);
@@ -50,7 +51,7 @@ export async function check(): Promise<void> {
   if (!app.isPackaged) return;
   try {
     await autoUpdater.checkForUpdates();
-  } catch (error) {
-    log.warn(`Update check failed: ${(error as Error).message}`);
+  } catch {
+    // Déjà dit par l'événement « error » (hors ligne, release introuvable) : l'app continue, on réessaie plus tard.
   }
 }
