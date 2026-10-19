@@ -24,6 +24,10 @@ import { log } from "./log.js";
 import { resolveCommand, run } from "./proc.js";
 import { MIN_CLAUDE_CODE, supportsApprovals } from "./version.js";
 
+// Lancé par l'app desktop avec le Node d'Electron (ELECTRON_RUN_AS_NODE) : ni git, ni gh, ni Claude Code ne doivent
+// en hériter.
+delete process.env.ELECTRON_RUN_AS_NODE;
+
 const HEARTBEAT_MS = 30_000;
 /** Marge gardée sur la durée de vie du jeton de session : l'agent doit finir avant son expiration. */
 const TOKEN_SAFETY_MS = 3 * 60_000;
@@ -57,7 +61,7 @@ function logOutcome(outcome: AgentOutcome): void {
 }
 
 /** Traite un run réclamé, jusqu'au résultat posté. Ne lève jamais : tout échec devient un résultat FAILED. */
-async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim): Promise<void> {
+async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim, signal?: AbortSignal): Promise<void> {
   log.info(`Run #${claim.runId} claimed: ${claim.issueKey} - ${claim.title}`);
   const heartbeat = setInterval(() => {
     api.heartbeat(claim.runId).catch((e: unknown) => log.warn(`Heartbeat refused: ${(e as Error).message}`));
@@ -76,7 +80,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim)
 
       const { agentConfig, token } = await startAgentSession(config, api);
       log.info("Claude Code at work (follow it live in TaskForce)...");
-      const outcome = await runAgent(agentConfig, claim, worktree.path, token, { mode: "repo", branch: worktree.branch }, api);
+      const outcome = await runAgent(agentConfig, claim, worktree.path, token, { mode: "repo", branch: worktree.branch, signal }, api);
       logOutcome(outcome);
       if (!outcome.ok) throw new Error(outcome.text);
 
@@ -105,7 +109,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim)
 
       const { agentConfig, token } = await startAgentSession(config, api);
       log.info("Claude Code at work on a repo-less task (follow it live in TaskForce)...");
-      const outcome = await runAgent(agentConfig, claim, scratch, token, { mode: "repoless" }, api);
+      const outcome = await runAgent(agentConfig, claim, scratch, token, { mode: "repoless", signal }, api);
       logOutcome(outcome);
       if (!outcome.ok) throw new Error(outcome.text);
       result = { status: "DONE", summary: outcome.text.slice(0, 7900) };
@@ -196,6 +200,22 @@ async function main(): Promise<void> {
     log.info("Stop requested: the runner exits after the current run (Ctrl+C again to force).");
   });
 
+  // Lancé par l'app desktop (canal IPC) : à sa fermeture, elle envoie « stop » ; si elle disparaît, le canal se
+  // coupe. Le run en cours s'arrête tout de suite et finit en échec, dit à TaskForce, au lieu de tourner sans elle.
+  const shutdown = new AbortController();
+  const stopNow = () => {
+    if (shutdown.signal.aborted) return;
+    stopping = true;
+    log.info("Stop requested by TaskForce: the current run stops now.");
+    shutdown.abort();
+  };
+  if (process.send) {
+    process.on("message", (message) => {
+      if (message === "stop") stopNow();
+    });
+    process.on("disconnect", stopNow);
+  }
+
   log.info(`Runner ${config.clientId} listening to ${config.apiUrl} (every ${config.pollSeconds} s)`);
   let lastError = "";
   while (!stopping) {
@@ -203,7 +223,7 @@ async function main(): Promise<void> {
       const claim = await api.claim();
       lastError = "";
       if (claim) {
-        await processRun(config, api, claim);
+        await processRun(config, api, claim, shutdown.signal);
         if (args.has("--once")) break;
         continue;
       }
@@ -218,8 +238,10 @@ async function main(): Promise<void> {
       lastError = message;
       if (args.has("--once")) process.exit(1);
     }
-    await sleep(config.pollSeconds * 1000);
+    await sleep(config.pollSeconds * 1000, undefined, { signal: shutdown.signal }).catch(() => undefined);
   }
+  // Le canal IPC garderait le processus en vie.
+  if (process.connected) process.disconnect();
 }
 
 main().catch((e: unknown) => {

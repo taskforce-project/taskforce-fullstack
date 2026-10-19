@@ -5,7 +5,7 @@ import { agentArgs, agentEnv, agentSettings, allowedTools, DENIED_TOOLS, mcpConf
 import type { Claim } from "../src/api.js";
 import { parseEnvFile, parseRunnerConfigFile, type RunnerConfig } from "../src/config.js";
 import { branchName, isValidRepoFullName, managedCheckoutDir, pullRequestBody, resolveRepo } from "../src/git.js";
-import { quoteForCmd } from "../src/proc.js";
+import { quoteForCmd, run } from "../src/proc.js";
 import { buildPrompt, buildReplyPrompt } from "../src/prompt.js";
 
 const claim: Claim = {
@@ -352,4 +352,28 @@ describe("mode sans dépôt (repoless)", () => {
 describe("acceptRepoless (tâches non-code)", () => {
   it("accepté par défaut", () => assert.equal(parseRunnerConfigFile({}).acceptRepoless, true));
   it("désactivable pour un runner code-only", () => assert.equal(parseRunnerConfigFile({ acceptRepoless: false }).acceptRepoless, false));
+});
+
+describe("run : arrêt du runner pendant une commande", () => {
+  it("le signal arrête le processus tout de suite, et le résultat le dit", async () => {
+    const stop = new AbortController();
+    const started = Date.now();
+    setTimeout(() => stop.abort(), 200);
+    const result = await run(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { signal: stop.signal });
+    assert.equal(result.aborted, true);
+    assert.equal(result.timedOut, false);
+    assert.ok(Date.now() - started < 10_000, "arrêté sans attendre");
+  });
+
+  it("un signal déjà levé n'attend pas la fin de la commande", async () => {
+    const stop = new AbortController();
+    stop.abort();
+    const result = await run(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { signal: stop.signal });
+    assert.equal(result.aborted, true);
+  });
+
+  it("sans signal, la commande va à son terme", async () => {
+    const result = await run(process.execPath, ["-e", "process.stdout.write('ok')"]);
+    assert.deepEqual([result.code, result.stdout, result.aborted], [0, "ok", false]);
+  });
 });
