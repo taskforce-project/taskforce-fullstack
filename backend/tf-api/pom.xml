@@ -109,6 +109,12 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
 		</dependency>
+		<!-- Passkeys (WebAuthn) : enregistrement et connexion vérifiés par Spring Security, au-dessus de webauthn4j
+		     (version gérée par la nomenclature de Spring Security). -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-webauthn</artifactId>
+		</dependency>
 
 		<!-- Keycloak Admin Client -->
 		<dependency>

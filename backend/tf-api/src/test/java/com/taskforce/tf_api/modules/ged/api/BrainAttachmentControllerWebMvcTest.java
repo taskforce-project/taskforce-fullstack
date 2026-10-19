@@ -17,7 +17,7 @@ import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
-import com.taskforce.tf_api.modules.ged.service.MinioService;
+import com.taskforce.tf_api.modules.ged.service.ObjectStorage;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Tests de tranche web du {@link BrainAttachmentController} (upload Brain OS → MinIO) via
  * {@code @WebMvcTest}. Couvre l'upload multipart (contrat HTTP + enveloppe ApiResponse) et le
- * rejet non authentifié. MinioService, BrainAccessGuard et repositories mockés.
+ * rejet non authentifié. ObjectStorage, BrainAccessGuard et repositories mockés.
  */
 @WebMvcTest(BrainAttachmentController.class)
 @Import(SecurityConfig.class)
@@ -42,7 +42,7 @@ class BrainAttachmentControllerWebMvcTest {
 
     @Autowired private MockMvc mockMvc;
 
-    @MockitoBean private MinioService minioService;
+    @MockitoBean private ObjectStorage objectStorage;
     @MockitoBean private BrainAccessGuard access;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;

@@ -39,7 +39,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
 
     @MockitoBean private KeycloakService keycloakService;
-    @MockitoBean private com.taskforce.tf_api.modules.ged.service.MinioService minioService;
+    @MockitoBean private com.taskforce.tf_api.modules.ged.service.ObjectStorage objectStorage;
     @MockitoBean private EmailService emailService;
 
     private User user;
@@ -123,7 +123,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
         String expectedUrl = "/api/files/avatars/" + user.getId();
         assertThat(res.getAvatarUrl()).isEqualTo(expectedUrl);
         assertThat(userRepository.findById(user.getId()).orElseThrow().getAvatarUrl()).isEqualTo(expectedUrl);
-        org.mockito.Mockito.verify(minioService).upload(
+        org.mockito.Mockito.verify(objectStorage).upload(
             org.mockito.ArgumentMatchers.eq("avatars/" + user.getId() + "/avatar"),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.eq((long) 4),
@@ -166,7 +166,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("uploadAvatar propage un échec Minio en RuntimeException")
     void should_wrap_minio_failure() {
         org.mockito.Mockito.doThrow(new RuntimeException("minio down"))
-            .when(minioService).upload(anyString(), org.mockito.ArgumentMatchers.any(),
+            .when(objectStorage).upload(anyString(), org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyLong(), anyString());
         var file = new org.springframework.mock.web.MockMultipartFile(
             "file", "photo.png", "image/png", new byte[] {9, 9, 9});

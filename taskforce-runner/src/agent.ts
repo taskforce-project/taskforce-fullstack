@@ -161,6 +161,8 @@ export interface AgentRunOptions {
   mode: AgentMode;
   /** Nom de la branche git (mode `repo`) ; absent en mode `repoless`. */
   branch?: string;
+  /** Arrêt du runner : Claude Code est arrêté tout de suite, le run finit en échec. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -192,6 +194,7 @@ export async function runAgent(
       env: agentEnv(config, process.env, approvals.token),
       input: opts.mode === "repoless" ? buildReplyPrompt(claim) : buildPrompt(claim, opts.branch ?? ""),
       timeoutMs: config.agent.timeoutMinutes * 60_000,
+      signal: opts.signal,
       onStdoutLine: (line) => {
         try {
           relay.push(toEvents(JSON.parse(line), workDir));
@@ -200,6 +203,9 @@ export async function runAgent(
         }
       },
     });
+    if (result.aborted) {
+      return { ok: false, text: "The runner stopped while Claude Code was working (TaskForce was closed). Delegate the task again.", costUsd: null, turns: null };
+    }
     if (result.timedOut) {
       return { ok: false, text: `The agent was stopped after ${config.agent.timeoutMinutes} min (timeout).`, costUsd: null, turns: null };
     }

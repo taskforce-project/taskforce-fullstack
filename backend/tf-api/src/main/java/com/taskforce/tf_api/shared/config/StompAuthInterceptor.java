@@ -2,6 +2,7 @@ package com.taskforce.tf_api.shared.config;
 
 import java.util.List;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageDeliveryException;
@@ -10,12 +11,15 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.RealtimeAuthorizationService;
+import com.taskforce.tf_api.shared.security.BearerTokenAuthenticator;
 import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
 
 import lombok.RequiredArgsConstructor;
@@ -55,6 +59,8 @@ public class StompAuthInterceptor implements ChannelInterceptor {
     private final UserRepository               userRepository;
     private final JwtIdentityResolver          identityResolver;
     private final RealtimeAuthorizationService realtimeAuth;
+    /** Bearers qui ne sont pas des JWT de Keycloak ; seuls ceux qui ouvrent le temps réel sont essayés ici. */
+    private final ObjectProvider<BearerTokenAuthenticator> bearerTokenAuthenticators;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -80,7 +86,7 @@ public class StompAuthInterceptor implements ChannelInterceptor {
 
         Jwt jwt;
         try {
-            jwt = jwtDecoder.decode(authorization.substring(7));
+            jwt = decode(authorization.substring(7));
         } catch (Exception ex) {
             log.warn("STOMP CONNECT refusé : token invalide — {}", ex.getMessage());
             throw new MessageDeliveryException("Invalid token");
@@ -105,6 +111,23 @@ public class StompAuthInterceptor implements ChannelInterceptor {
                 log.warn("STOMP CONNECT refusé : utilisateur {} introuvable", email);
                 return new MessageDeliveryException("Unknown user");
             });
+    }
+
+    /**
+     * Jeton de l'app desktop d'abord, s'il ouvre le temps réel ; sinon JWT de Keycloak. Un jeton personnel
+     * ({@code tfp_}) n'ouvre pas le temps réel : il tombe sur le décodeur JWT, qui le refuse.
+     */
+    private Jwt decode(String token) {
+        for (BearerTokenAuthenticator authenticator : bearerTokenAuthenticators.orderedStream().toList()) {
+            if (authenticator.allowsRealtime() && authenticator.supports(token)) {
+                Authentication authentication = authenticator.authenticate(token);
+                if (authentication instanceof JwtAuthenticationToken jwtAuthentication) {
+                    return jwtAuthentication.getToken();
+                }
+                throw new MessageDeliveryException("Unsupported token");
+            }
+        }
+        return jwtDecoder.decode(token);
     }
 
     /**

@@ -1,0 +1,51 @@
+# Paquets de l'app desktop (electron-builder). Les ressources (Java, base, backend, interface, runner) sont assemblées
+# dans resources/ par `npm run resources` (en local) ou par la CI (.github/workflows/desktop-release.yml).
+appId: fr.taskforce-project.desktop
+productName: TaskForce
+copyright: Copyright 2026 TaskForce contributors
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**
+  - static/**
+  - package.json
+extraResources:
+  # jre, backend, postgres, frontend et runner, copiés en une fois depuis leur dossier parent : electron-builder écarte
+  # toujours le node_modules qui est à la racine de « from », et le serveur Next autonome ne trouverait plus le module
+  # « next ». Son dossier .next commence par un point : il faut le nommer.
+  - from: resources
+    to: .
+    filter:
+      - "**/*"
+      - "frontend/.next/**/*"
+asar: true
+
+win:
+  target: nsis
+  icon: build/icon.png
+  artifactName: TaskForce-Setup-${version}.exe
+
+# Installation par personne, sans droits d'administrateur, comme Claude Desktop : %LOCALAPPDATA%\Programs\TaskForce.
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+  shortcutName: TaskForce
+
+linux:
+  target:
+    - deb
+    - AppImage
+  icon: build/icon.png
+  category: Office
+  synopsis: Projects, Brain OS and coding agents on your computer
+  maintainer: TaskForce contributors <contact@taskforce-project.fr>
+  # Dépendances du .deb : celles d'electron-builder par défaut (GTK, NSS, libsecret pour le trousseau, libuuid pour
+  # la base embarquée) ; zlib, que la base lit aussi, est présente sur toute distribution.
+  artifactName: TaskForce-${version}-${arch}.${ext}
+
+# Mises à jour : release `desktop-latest` du dépôt, qui porte toujours la dernière version desktop (cf. updater.ts).
+publish:
+  provider: generic
+  url: https://github.com/taskforce-project/taskforce-fullstack/releases/download/desktop-latest

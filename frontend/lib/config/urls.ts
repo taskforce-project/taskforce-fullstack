@@ -14,6 +14,8 @@
  * (qui ré-inline la même dérivation, ne pouvant pas importer ce module au chargement de la config).
  */
 
+import { IS_DESKTOP } from "@/lib/desktop";
+
 /** Retire les slashs de fin d'une URL/domaine brut (chaîne vide si absent). */
 const trimTrailingSlash = (value: string | undefined): string => (value ?? "").replace(/\/+$/, "");
 
@@ -24,9 +26,13 @@ const BASE_DOMAIN = trimTrailingSlash(process.env.NEXT_PUBLIC_BASE_DOMAIN).repla
 const fromBase = (subdomainPrefix: string): string =>
   BASE_DOMAIN ? `https://${subdomainPrefix}${BASE_DOMAIN}` : "";
 
-/** API telle que le NAVIGATEUR la joint (CSR). */
-export const API_URL =
-  trimTrailingSlash(process.env.NEXT_PUBLIC_API_URL) || fromBase("api.") || "http://localhost:8080";
+/**
+ * API telle que le NAVIGATEUR la joint (CSR). Dans l'app desktop, l'API a la même origine que l'interface (proxy
+ * local de la coque, sur un port choisi au lancement) : les chemins restent relatifs.
+ */
+export const API_URL = IS_DESKTOP
+  ? ""
+  : trimTrailingSlash(process.env.NEXT_PUBLIC_API_URL) || fromBase("api.") || "http://localhost:8080";
 
 /**
  * API telle que le SERVEUR Next la joint (SSR). En mono-hôte (dev) c'est le nom de service Docker ;

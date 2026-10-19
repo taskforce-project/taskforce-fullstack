@@ -539,6 +539,38 @@ describe('authService - couverture OAuth / challenge / fallbacks / garde-fous', 
     expect(localStorageMock.setItem).not.toHaveBeenCalled();
   });
 
+  it('passkeySignInOptions renvoie le défi, sans toast global quand il est demandé en fond', async () => {
+    const challenge = { requestId: 'req-1', options: { challenge: 'c' } };
+    vi.mocked(client.apiClient.post).mockResolvedValue({ data: { data: challenge } } as any);
+
+    await expect(authService.passkeySignInOptions()).resolves.toEqual(challenge);
+    expect(client.apiClient.post).toHaveBeenLastCalledWith(AUTH_ROUTES.PASSKEY_OPTIONS, undefined, { silentError: false });
+
+    await authService.passkeySignInOptions(true);
+    expect(client.apiClient.post).toHaveBeenLastCalledWith(AUTH_ROUTES.PASSKEY_OPTIONS, undefined, { silentError: true });
+  });
+
+  it('passkeySignInOptions propage une erreur', async () => {
+    vi.mocked(client.apiClient.post).mockRejectedValue(new Error('too-many'));
+    await expect(authService.passkeySignInOptions()).rejects.toThrow('too-many');
+  });
+
+  it('passkeySignIn échange la réponse du navigateur contre la session et la persiste', async () => {
+    const data = { user: { id: '1', email: 'a@b.co', firstName: 'A', lastName: 'B', role: 'USER' }, accessToken: 'at', expiresIn: 3600 };
+    vi.mocked(client.apiClient.post).mockResolvedValue({ data: { data } } as any);
+    const payload = { requestId: 'req-1', credential: { id: 'abc' } };
+
+    await expect(authService.passkeySignIn(payload)).resolves.toEqual(data);
+    expect(client.apiClient.post).toHaveBeenCalledWith(AUTH_ROUTES.PASSKEY_LOGIN, payload);
+    expect(localStorageMock.setItem).toHaveBeenCalledWith('accessToken', 'at');
+  });
+
+  it('passkeySignIn propage une erreur sans rien persister', async () => {
+    vi.mocked(client.apiClient.post).mockRejectedValue(new Error('refused'));
+    await expect(authService.passkeySignIn({ requestId: 'req-1', credential: {} })).rejects.toThrow('refused');
+    expect(localStorageMock.setItem).not.toHaveBeenCalled();
+  });
+
   it('forgotPassword retombe sur un message par défaut si le serveur ne renvoie rien', async () => {
     vi.mocked(client.apiClient.post).mockResolvedValue({ data: { message: '' } } as any);
     await expect(authService.forgotPassword('a@b.co')).resolves.toEqual({ message: 'Email sent' });

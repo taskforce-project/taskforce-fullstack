@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.api;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,6 +31,8 @@ import lombok.RequiredArgsConstructor;
  * machine et le filtre de session déléguée. Gaté par le même flag que le reste du runner.</p>
  */
 @RestController
+// Identité du runner créée dans Keycloak : dans l'app desktop, la coque lance le runner elle-même.
+@Profile("!desktop")
 @RequestMapping("/api/delivery/runners")
 @ConditionalOnProperty(name = LocalRunnerSettings.ENABLED_PROPERTY, havingValue = "true")
 @RequiredArgsConstructor

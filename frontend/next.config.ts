@@ -92,9 +92,31 @@ const cspHeader = [
   "upgrade-insecure-requests",
 ].join("; ");
 
+// App desktop (`NEXT_PUBLIC_DESKTOP=true`) : l'interface et l'API partagent l'origine de la fenêtre, le proxy local
+// de la coque sur 127.0.0.1, en HTTP, sur un port choisi au lancement. Ni Turnstile, ni Cloudflare, ni stockage objet :
+// la politique se réduit à cette origine. `upgrade-insecure-requests` et HSTS n'ont pas de sens sur la boucle locale.
+const IS_DESKTOP = process.env.NEXT_PUBLIC_DESKTOP === "true";
+
+const desktopCspHeader = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${IS_PROD ? "" : " 'unsafe-eval'"}`,
+  "frame-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  // Temps réel : `'self'` couvre aussi le WebSocket de la même origine en CSP 3 ; la boucle locale est écrite en plus,
+  // son port n'étant connu qu'au lancement.
+  "connect-src 'self' ws://127.0.0.1:*",
+  `img-src 'self' data: blob: ${OAUTH_AVATAR_ORIGINS}`,
+  "font-src 'self' data:",
+  "media-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
+
 const securityHeaders = [
   { key: "X-DNS-Prefetch-Control",      value: "on" },
-  { key: "Strict-Transport-Security",   value: "max-age=31536000; includeSubDomains; preload" },
+  ...(IS_DESKTOP ? [] : [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" }]),
   { key: "X-Content-Type-Options",      value: "nosniff" },
   { key: "X-Frame-Options",             value: "DENY" },
   { key: "X-XSS-Protection",            value: "0" }, // désactivé - la CSP prend le relais
@@ -105,7 +127,7 @@ const securityHeaders = [
   // qui ne renvoie pas d'en-tête Cross-Origin-Resource-Policy.
   { key: "Cross-Origin-Opener-Policy",  value: "same-origin" },
   { key: "Permissions-Policy",          value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
-  { key: "Content-Security-Policy",     value: cspHeader },
+  { key: "Content-Security-Policy",     value: IS_DESKTOP ? desktopCspHeader : cspHeader },
 ];
 
 const nextConfig: NextConfig = {
@@ -156,8 +178,23 @@ const nextConfig: NextConfig = {
       "teams", "messages", "discussions", "analytics",
       "settings", "help", "roadmap", "cycles", "issues", "profile",
     ]
-    return legacyRoutes.map((path) => ({
-      source: `/${path}`,
+    // App desktop : la connexion, l'inscription et les invitations se passent hors de l'interface (coque, compte en
+    // ligne), et les pages de membres et d'équipes n'y existent pas (on y travaille seul avec ses agents). Un lien
+    // resté vers l'une d'elles ramène à l'app.
+    const desktopAbsent = IS_DESKTOP
+      ? [
+          "/auth/:path*",
+          "/invitations/:path*",
+          "/:workspace/members/:path*",
+          "/:workspace/projects/:id/members",
+          "/:workspace/projects/:id/teams",
+        ]
+      : []
+    return [
+      ...legacyRoutes.map((path) => `/${path}`),
+      ...desktopAbsent,
+    ].map((source) => ({
+      source,
       destination: "/",
       permanent: false,
     }))

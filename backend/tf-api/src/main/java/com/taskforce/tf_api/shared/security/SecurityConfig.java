@@ -12,6 +12,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -45,6 +46,14 @@ public class SecurityConfig {
     @Value("${keycloak.realm:taskforce}")
     private String keycloakRealm;
 
+    /** Client confidentiel du backend : les jetons des personnes sont obtenus par lui (cf. {@link AuthorizedPartyValidator}). */
+    @Value("${keycloak.client-id:}")
+    private String keycloakClientId;
+
+    /** Préfixe des clients des runners de Claude Code ({@code tf-runner-<nom>}), seuls autres clients admis. */
+    @Value("${delivery.local-runner.client-prefix:tf-runner-}")
+    private String runnerClientPrefix;
+
     /**
      * Filtres à exécuter juste après l'authentification du bearer (cf. {@link PostAuthenticationFilter}).
      * Vide tant qu'aucune fonctionnalité n'en déclare : la chaîne protégée est alors inchangée.
@@ -65,7 +74,9 @@ public class SecurityConfig {
      * auto-émis (clé symétrique — dette PC-019 / TF-SEC-009, supprimée).
      *
      * <p>La signature est vérifiée via les clés publiques exposées sur {@code /protocol/openid-connect/certs},
-     * et l'{@code issuer} est validé (défense contre un token signé par un autre realm/IdP).</p>
+     * et l'{@code issuer} est validé (défense contre un token signé par un autre realm/IdP). Le client qui a obtenu le
+     * jeton aussi : le backend ou un runner, jamais un jeton du même realm obtenu ailleurs, qui contournerait la double
+     * authentification de l'app ({@link AuthorizedPartyValidator}).</p>
      *
      * <p><b>Issuer public, clés internes — le piège interne/public, encore.</b> Depuis que le realm
      * porte un {@code frontendUrl} fixe (URL publique), <b>tous</b> les jetons — connexion classique
@@ -84,7 +95,8 @@ public class SecurityConfig {
 
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
         OAuth2TokenValidator<Jwt> withIssuer = JwtValidators.createDefaultWithIssuer(issuer);
-        decoder.setJwtValidator(withIssuer);
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+            withIssuer, new AuthorizedPartyValidator(keycloakClientId, runnerClientPrefix)));
         return decoder;
     }
 

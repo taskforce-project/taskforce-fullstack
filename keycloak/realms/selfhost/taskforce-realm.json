@@ -2,6 +2,7 @@
   "realm": "taskforce",
   "enabled": true,
   "displayName": "TaskForce",
+  "loginTheme": "taskforce",
   "accessTokenLifespan": 1800,
   "ssoSessionIdleTimeout": 28800,
   "ssoSessionMaxLifespan": 86400,

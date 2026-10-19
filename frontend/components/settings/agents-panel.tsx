@@ -4,8 +4,10 @@ import { useEffect } from "react"
 
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { ClaudeCodeMcpSetup } from "@/components/settings/claude-code-mcp-setup"
+import { DesktopClaudeCodeSetup } from "@/components/settings/desktop-claude-code-setup"
 import { LocalRunnerSetup } from "@/components/settings/local-runner-setup"
 import { Badge } from "@/components/ui/badge"
+import { IS_DESKTOP } from "@/lib/desktop"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 
@@ -16,7 +18,9 @@ import { useWorkspaceStore } from "@/lib/store/workspace-store"
  */
 export function AgentsPanel() {
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug) ?? ""
-  const providers = useDeliveryStore((s) => s.providers)
+  const allProviders = useDeliveryStore((s) => s.providers)
+  // App desktop : les agents dans le cloud (GitHub Copilot) passent par l'intégration GitHub de l'espace, absente ici.
+  const providers = IS_DESKTOP ? allProviders.filter((p) => p.key === "claude-code") : allProviders
   const fetchProviders = useDeliveryStore((s) => s.fetchProviders)
 
   useEffect(() => { if (slug) fetchProviders(slug) }, [slug, fetchProviders])
@@ -51,10 +55,12 @@ export function AgentsPanel() {
                 </div>
               </div>
 
-              {/* Runner local : identité machine en libre-service (ADR-013) */}
-              {p.key === "claude-code" && p.available && <LocalRunnerSetup />}
-              {/* Mode interactif : le Claude Code de la personne sur le serveur MCP de l'instance (lot 5) */}
-              {p.key === "claude-code" && slug && <ClaudeCodeMcpSetup slug={slug} />}
+              {/* Runner local : identité machine en libre-service (ADR-013). L'app desktop le lance elle-même. */}
+              {p.key === "claude-code" && p.available && !IS_DESKTOP && <LocalRunnerSetup />}
+              {p.key === "claude-code" && IS_DESKTOP && <DesktopClaudeCodeSetup slug={slug} />}
+              {/* Mode interactif : le Claude Code de la personne sur le serveur MCP de l'instance (lot 5). L'app
+                  desktop le branche elle-même (DesktopClaudeCodeSetup). */}
+              {p.key === "claude-code" && slug && !IS_DESKTOP && <ClaudeCodeMcpSetup slug={slug} />}
             </div>
           ))}
           {providers.length === 0 && (

@@ -25,6 +25,23 @@ export const AUTH_ROUTES = {
   RESET_PASSWORD: "/api/auth/reset-password",
   REFRESH_TOKEN: "/api/auth/refresh-token",
   LOGOUT: "/api/auth/logout",
+  /** Connexion par passkey : un défi (POST), que le navigateur signe avec une passkey de ce site. */
+  PASSKEY_OPTIONS: "/api/auth/passkey/options",
+  /** Connexion par passkey : la réponse du navigateur contre une session TaskForce. */
+  PASSKEY_LOGIN: "/api/auth/passkey/login",
+} as const;
+
+/**
+ * Passkeys de la personne connectée (réglages de sécurité).
+ * Backend: @RequestMapping("/api/users/me/passkeys")
+ */
+export const PASSKEY_ROUTES = {
+  /** POST = options de création d'une passkey, à passer au navigateur. */
+  OPTIONS: "/api/users/me/passkeys/options",
+  /** GET = passkeys du compte ; POST = enregistre la passkey créée par le navigateur. */
+  PASSKEYS: "/api/users/me/passkeys",
+  /** DELETE = retire cette passkey. */
+  PASSKEY: (passkeyId: string) => `/api/users/me/passkeys/${encodeURIComponent(passkeyId)}`,
 } as const;
 
 /**
@@ -54,6 +71,20 @@ export const DELIVERY_ROUTES = {
    * régénérer le secret. Sans slug : l'identité d'un runner est liée à la personne, pas au workspace.
    */
   RUNNER: "/api/delivery/runners",
+} as const;
+
+/**
+ * Sessions de l'app desktop de la personne connectée : l'accord donné sur /auth/desktop, puis la liste des ordinateurs
+ * connectés, que les réglages de sécurité déconnectent.
+ * Backend: @RequestMapping("/api/users/me/desktop-sessions")
+ */
+export const DESKTOP_SESSION_ROUTES = {
+  /** POST = accord à l'app desktop : rend son adresse de retour, avec un code à usage unique. */
+  AUTHORIZE: "/api/users/me/desktop-sessions/authorize",
+  /** GET = ordinateurs connectés (jamais de jeton). */
+  SESSIONS: "/api/users/me/desktop-sessions",
+  /** DELETE = déconnecte cet ordinateur. */
+  SESSION: (sessionId: number) => `/api/users/me/desktop-sessions/${sessionId}`,
 } as const;
 
 /**

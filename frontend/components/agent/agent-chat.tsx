@@ -17,6 +17,8 @@ import {
 } from "@/lib/api/ai-conversation-service"
 import { executeMcpAction, getMcpServers } from "@/lib/api/integration-service"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
+import { useSettingsStore } from "@/lib/store/settings-store"
+import { IS_DESKTOP } from "@/lib/desktop"
 import { CortexUsage } from "./cortex-usage"
 
 interface Turn {
@@ -77,15 +79,22 @@ function QuotaNotice() {
  * Carte d'information, pas d'erreur : l'état vient de GET /api/ai/status.
  */
 function AiUnavailableNotice() {
+  const openSettings = useSettingsStore((s) => s.openSettings)
   return (
     <div className="flex w-full flex-col gap-1.5 border border-border bg-muted/40 p-3 text-left">
       <p className="flex items-center gap-1.5 text-xs font-medium text-foreground">
         <CircleAlert className="size-3.5 shrink-0 text-ink-yellow" /> AI is not configured
       </p>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Cortex still searches the Brain OS and cites the notes it finds. To get written answers, an
-        administrator connects a model to the AI service: Ollama on this machine, or any OpenAI-compatible API.
+        {IS_DESKTOP
+          ? "Cortex still searches the Brain OS and cites the notes it finds. To get written answers, choose a model: Ollama on this computer, or any OpenAI-compatible API."
+          : "Cortex still searches the Brain OS and cites the notes it finds. To get written answers, an administrator connects a model to the AI service: Ollama on this machine, or any OpenAI-compatible API."}
       </p>
+      {IS_DESKTOP && (
+        <button type="button" onClick={() => openSettings("ai")} className="self-start text-xs font-medium text-primary hover:underline">
+          Set up AI
+        </button>
+      )}
     </div>
   )
 }

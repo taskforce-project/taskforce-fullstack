@@ -14,6 +14,7 @@ import { useSettingsStore } from "@/lib/store/settings-store"
 import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useModKeyLabel } from "@/lib/hooks/use-mod-key"
+import { IS_DESKTOP } from "@/lib/desktop"
 
 /** Connecteurs mis en avant dans la pilule (clés du catalogue - cf. ConnectorCatalog.java). */
 const PILL_TOOLS = [
@@ -31,7 +32,8 @@ const NAV_ITEMS = [
   { label: "Operations", path: "/projects", icon: FolderKanban },
   { label: "Issues", path: "/my-work/issues", icon: CircleDot },
   { label: "Cycles", path: "/cycles", icon: Repeat },
-  { label: "Members", path: "/members", icon: Users },
+  // App desktop : pas de membres, on y travaille seul avec ses agents.
+  ...(IS_DESKTOP ? [] : [{ label: "Members", path: "/members", icon: Users }] as const),
   { label: "Intelligence", path: "/analytics", icon: Activity },
   { label: "Brain OS", path: "/brain", icon: Brain },
 ] as const
