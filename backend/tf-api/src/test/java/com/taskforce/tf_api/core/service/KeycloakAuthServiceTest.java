@@ -79,31 +79,6 @@ class KeycloakAuthServiceTest {
             verify(restTemplate).postForEntity(anyString(), any(HttpEntity.class), eq(Map.class));
         }
 
-        @org.junit.jupiter.params.ParameterizedTest(name = "code « {0} » → envoyé : {1}")
-        @org.junit.jupiter.params.provider.CsvSource(nullValues = "NULL", value = {
-            "123456, true",
-            "' 123456 ', true",
-            "'', false",
-            "NULL, false",
-        })
-        @DisplayName("le code de l'application d'authentification part vers Keycloak avec le mot de passe")
-        @SuppressWarnings("unchecked")
-        void authenticate_withOneTimeCode_sendsItToKeycloak(String totp, boolean sent) {
-            Map<String, Object> keycloakResponse = new HashMap<>();
-            keycloakResponse.put("access_token", "a");
-            keycloakResponse.put("expires_in", 300);
-            keycloakResponse.put("refresh_expires_in", 1800);
-            org.mockito.ArgumentCaptor<HttpEntity> request = org.mockito.ArgumentCaptor.forClass(HttpEntity.class);
-            when(restTemplate.postForEntity(anyString(), request.capture(), eq(Map.class)))
-                    .thenReturn(new ResponseEntity<>(keycloakResponse, HttpStatus.OK));
-
-            keycloakAuthService.authenticate("test@example.com", "Password123!", totp);
-
-            org.springframework.util.MultiValueMap<String, String> form =
-                (org.springframework.util.MultiValueMap<String, String>) request.getValue().getBody();
-            assertThat(form.getFirst("totp")).isEqualTo(sent ? "123456" : null);
-        }
-
         @Test
         @DisplayName("devrait envoyer les bonnes données au token endpoint")
         void authenticate_shouldSendCorrectDataToKeycloak() {

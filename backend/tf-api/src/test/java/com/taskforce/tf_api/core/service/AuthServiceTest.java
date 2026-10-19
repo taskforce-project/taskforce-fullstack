@@ -561,35 +561,6 @@ class AuthServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Invalid authentication code");
         }
-
-        @Test
-        @DisplayName("application d'authentification du compte en ligne + sans code → code demandé, aucun appel à Keycloak")
-        void login_shouldAskForTheAccountCode_beforeAnyGrant() {
-            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-            when(keycloakService.hasOneTimeCode(TEST_KEYCLOAK_ID)).thenReturn(true);
-
-            AuthResponse response = authService.login(loginRequest);
-
-            assertThat(response.getTwoFactorRequired()).isTrue();
-            assertThat(response.getAccessToken()).isNull();
-            verifyNoInteractions(keycloakAuthService);
-        }
-
-        @Test
-        @DisplayName("application d'authentification du compte en ligne + code → Keycloak le vérifie, sans le 2FA de l'app")
-        void login_shouldLetKeycloakCheckTheAccountCode() {
-            loginRequest.setTotp("654321");
-            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-            when(keycloakService.hasOneTimeCode(TEST_KEYCLOAK_ID)).thenReturn(true);
-            when(keycloakAuthService.authenticate(TEST_EMAIL, "Password123!", "654321")).thenReturn(keycloakToken);
-            when(userRepository.findByKeycloakId(TEST_KEYCLOAK_ID)).thenReturn(Optional.of(user));
-
-            AuthResponse response = authService.login(loginRequest);
-
-            assertThat(response.getAccessToken()).isEqualTo("keycloak_access_token");
-            verify(twoFactorService, never()).isEnabled(anyLong());
-            verify(twoFactorService, never()).verifyOrThrow(anyLong(), anyString());
-        }
     }
 
     @Nested

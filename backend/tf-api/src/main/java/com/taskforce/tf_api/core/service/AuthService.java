@@ -213,42 +213,23 @@ public class AuthService {
             .build();
     }
 
-    /** Vrai si le compte de cette adresse a une application d'authentification ; faux pour une adresse inconnue. */
-    private boolean hasKeycloakOneTimeCode(String email) {
-        try {
-            UserRepresentation account = keycloakService.getUserByEmail(email);
-            return account != null && keycloakService.hasOneTimeCode(account.getId());
-        } catch (RuntimeException e) {
-            // Compte inconnu : le mot de passe échouera de toute façon, avec le message habituel.
-            return false;
-        }
-    }
-
     /**
      * Connexion d'un utilisateur
-     * 1. Authentifie via Keycloak (vérification email/password, et code de l'application d'authentification si le
-     *    compte en a enregistré une sur le compte en ligne)
+     * 1. Authentifie via Keycloak (vérification email/password)
      * 2. Récupère l'utilisateur de notre DB
      * 3. Génère les tokens JWT
      */
     public AuthResponse login(LoginRequest request) {
         log.info("Tentative de connexion pour : {}", request.getEmail());
 
-        // 2FA du compte en ligne : un compte qui a une application d'authentification dans Keycloak donne son code à
-        // Keycloak lui-même, avec le mot de passe. On le demande donc avant tout appel, comme pour le 2FA de l'app.
-        boolean keycloakOneTimeCode = hasKeycloakOneTimeCode(request.getEmail());
-        if (keycloakOneTimeCode && (request.getTotp() == null || request.getTotp().isBlank())) {
-            log.info("Connexion : code de l'application d'authentification requis");
-            return AuthResponse.builder().twoFactorRequired(true).build();
-        }
-
         // Authentifier l'utilisateur via Keycloak (vérifie email + password) et récupérer les
         // tokens OIDC RS256 émis par Keycloak (plus de token custom HS512).
         KeycloakTokenResponse kcToken;
         try {
-            kcToken = keycloakOneTimeCode
-                ? keycloakAuthService.authenticate(request.getEmail(), request.getPassword(), request.getTotp())
-                : keycloakAuthService.authenticate(request.getEmail(), request.getPassword());
+            kcToken = keycloakAuthService.authenticate(
+                request.getEmail(),
+                request.getPassword()
+            );
 
             log.info("Authentification Keycloak réussie pour : {}", request.getEmail());
         } catch (RuntimeException e) {
@@ -285,9 +266,10 @@ public class AuthService {
             throw new RuntimeException("This account is disabled");
         }
 
-        // 2FA géré par l'app (avant le 2FA du compte en ligne) : le mot de passe est bon. Si le 2FA est actif, on exige
-        // un code TOTP AVANT d'émettre le moindre token. Inutile quand Keycloak vient de vérifier un code.
-        if (!keycloakOneTimeCode && twoFactorService.isEnabled(user.getId())) {
+        // 2FA géré par l'app : le mot de passe est bon. Si le 2FA est actif, on exige un code TOTP
+        // AVANT d'émettre le moindre token. Le backend (client confidentiel) étant le seul chemin
+        // d'authentification, l'imposer ici suffit.
+        if (twoFactorService.isEnabled(user.getId())) {
             String totp = request.getTotp();
             if (totp == null || totp.isBlank()) {
                 log.info("2FA requis pour : {}", request.getEmail());

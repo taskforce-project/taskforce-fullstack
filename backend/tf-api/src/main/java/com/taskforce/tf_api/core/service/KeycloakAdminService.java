@@ -141,15 +141,6 @@ public class KeycloakAdminService implements KeycloakService {
         return users.get(0);
     }
 
-    /** Type d'identifiant d'une application d'authentification dans Keycloak. */
-    private static final String OTP_CREDENTIAL = "otp";
-
-    @Override
-    public boolean hasOneTimeCode(String keycloakId) {
-        return realmResource.users().get(keycloakId).credentials().stream()
-            .anyMatch(credential -> OTP_CREDENTIAL.equals(credential.getType()));
-    }
-
     /**
      * Vérifie si un email existe déjà dans Keycloak
      */
