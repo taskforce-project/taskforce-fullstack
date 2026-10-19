@@ -98,7 +98,7 @@ taskforce-fullstack/
 ├─ rabbitmq/         Relais STOMP temps réel
 ├─ security-reports/ OWASP ZAP / Trivy / Semgrep
 ├─ scripts/          Outils & automatisation
-└─ docker-compose.{dev,prod,tools}.yml
+└─ docker-compose.yml + docker-compose.{dev,prod,tools}.yml
 ```
 
 📖 Diagramme complet, C4 et ADR dans le **[Brain OS](https://github.com/taskforce-project/taskforce-docs)**.
@@ -151,6 +151,9 @@ Comptes de test (realm `taskforce-dev`) : `admin / admin123`, `user / user123`.
 ---
 
 ## 🚢 Déploiement
+
+**Auto-hébergement sur une machine** : `./scripts/selfhost-init.sh` puis `docker compose up -d --build`, détail dans
+[SELF_HOSTING.md](./SELF_HOSTING.md). Contribuer : [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 Images publiées sur **GHCR** à chaque release. La production tourne en `docker compose` (profil prod) derrière Nginx/TLS ; un merge sur `main` déclenche le déploiement automatique.
 

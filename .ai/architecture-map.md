@@ -188,7 +188,10 @@ Functional domains and their code locations are detailed in [`module-map.md`](./
 - `docker-compose.prod.yml` — postgres:16-alpine, keycloak 23, backend(temurin jre), frontend, nginx.
 - `docker-compose.tools.yml` — optional profiles: `observability` (SigNoz: zookeeper, clickhouse,
   otel-collector, UI :3301) and one-shot security scanners (`trivy`, `semgrep`).
-- `docker-compose.yml` — base/shared definition. `tf.ps1` (launcher) + `scripts/*.ps1` + `Makefile` — orchestration.
+- `docker-compose.yml` : self-hosting on one machine (OSS-7.1) : postgres, keycloak 26 (realm `keycloak/realms/selfhost`),
+  redis, minio, ai-service, backend, frontend, Ollama optional (profile `ollama`) ; `.env` written by
+  `scripts/selfhost-init.{sh,ps1}` from `.env.selfhost.example` ; guide `SELF_HOSTING.md`.
+  `tf.ps1` (launcher) + `scripts/*.ps1` + `Makefile` : dev orchestration.
 
 **CI/CD (`.github/workflows/`):** `backend-tests.yml`, `frontend-tests.yml`, `landing-tests.yml`
 (per-app test/lint/build on PR & push), `release.yml` (build+push images to GHCR),

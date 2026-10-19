@@ -1,7 +1,7 @@
 # TaskForce, self-hosted on one machine.
 #
 #   ./scripts/selfhost-init.sh        (Windows: .\scripts\selfhost-init.ps1) writes .env with fresh secrets
-#   docker compose up -d --build      first start: images are built from this repository (10 to 15 minutes)
+#   docker compose up -d --build      first start: images are built from this repository (10 to 20 minutes)
 #
 # Then open the app (TF_APP_URL, http://localhost:3000 by default) and create your account. SELF_HOSTING.md covers
 # AI (Ollama), email, another machine on the network, updates and backups.
