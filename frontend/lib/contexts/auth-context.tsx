@@ -12,6 +12,7 @@ import { useUserStore } from "../store/user-store";
 import { desktopBridge, IS_DESKTOP } from "../desktop";
 import type { AuthUser, LoginCredentials } from "../auth";
 import { afterSignInPath } from "../auth/desktop-handoff";
+import { getPasskey } from "../auth/passkeys";
 
 /**
  * Type du contexte d'authentification
@@ -22,6 +23,11 @@ interface AuthContextType {
   isLoading: boolean;
   /** Renvoie la réponse d'auth : `twoFactorRequired` si un code 2FA manque, sinon `user` (l'appelant route selon `onboardingCompleted`). */
   login: (credentials: LoginCredentials) => Promise<AuthResponse>;
+  /**
+   * Connexion par passkey. `conditional` : attend que la personne choisisse une passkey dans le champ e-mail. Null si
+   * elle renonce ou si la demande est annulée ; une erreur si la passkey est refusée.
+   */
+  loginWithPasskey: (options?: { conditional?: boolean; signal?: AbortSignal }) => Promise<AuthResponse | null>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -114,22 +120,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (response.twoFactorRequired) {
         return response;
       }
-      // Setter immédiat depuis la réponse login → redirection rapide, pas de blocage réseau
-      setUser(response.user);
-      setStoreUser(response.user);
-      // Enrichir avec le profil complet en arrière-plan (non bloquant)
-      void fetchMe().then((remoteUser) => {
-        if (remoteUser) {
-          setUser(remoteUser);
-          setStoreUser(remoteUser);
-        }
-      });
+      establishSession(response);
       // La redirection est gérée par le composant appelant, qui décide d'après `onboardingCompleted`.
       return response;
     } catch (error) {
       setUser(null);
       throw error;
     }
+  };
+
+  /**
+   * Connexion par passkey : un défi du serveur, la passkey choisie dans le navigateur, puis la session.
+   */
+  const loginWithPasskey = async (options: { conditional?: boolean; signal?: AbortSignal } = {}) => {
+    let challenge: { requestId: string; options: Record<string, unknown> };
+    try {
+      challenge = await authService.passkeySignInOptions(options.conditional === true);
+    } catch (error) {
+      // Suggestion de fond : sans défi, le champ e-mail ne propose simplement pas de passkey.
+      if (options.conditional) return null;
+      throw error;
+    }
+    const credential = await getPasskey(challenge.options, options);
+    if (!credential) return null;
+    const response = await authService.passkeySignIn({ requestId: challenge.requestId, credential });
+    establishSession(response);
+    return response;
+  };
+
+  /** Session ouverte : l'utilisateur de la réponse tout de suite, son profil complet en arrière-plan. */
+  const establishSession = (response: AuthResponse) => {
+    // Setter immédiat depuis la réponse login → redirection rapide, pas de blocage réseau
+    setUser(response.user);
+    setStoreUser(response.user);
+    // Enrichir avec le profil complet en arrière-plan (non bloquant)
+    void fetchMe().then((remoteUser) => {
+      if (remoteUser) {
+        setUser(remoteUser);
+        setStoreUser(remoteUser);
+      }
+    });
   };
 
   /**
@@ -177,6 +207,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAuthenticated: !!user,
     isLoading,
     login,
+    loginWithPasskey,
     logout,
     refreshUser,
   };

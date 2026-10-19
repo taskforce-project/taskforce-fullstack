@@ -25,6 +25,23 @@ export const AUTH_ROUTES = {
   RESET_PASSWORD: "/api/auth/reset-password",
   REFRESH_TOKEN: "/api/auth/refresh-token",
   LOGOUT: "/api/auth/logout",
+  /** Connexion par passkey : un défi (POST), que le navigateur signe avec une passkey de ce site. */
+  PASSKEY_OPTIONS: "/api/auth/passkey/options",
+  /** Connexion par passkey : la réponse du navigateur contre une session TaskForce. */
+  PASSKEY_LOGIN: "/api/auth/passkey/login",
+} as const;
+
+/**
+ * Passkeys de la personne connectée (réglages de sécurité).
+ * Backend: @RequestMapping("/api/users/me/passkeys")
+ */
+export const PASSKEY_ROUTES = {
+  /** POST = options de création d'une passkey, à passer au navigateur. */
+  OPTIONS: "/api/users/me/passkeys/options",
+  /** GET = passkeys du compte ; POST = enregistre la passkey créée par le navigateur. */
+  PASSKEYS: "/api/users/me/passkeys",
+  /** DELETE = retire cette passkey. */
+  PASSKEY: (passkeyId: string) => `/api/users/me/passkeys/${encodeURIComponent(passkeyId)}`,
 } as const;
 
 /**

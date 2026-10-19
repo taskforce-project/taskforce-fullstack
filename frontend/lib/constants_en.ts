@@ -205,6 +205,10 @@ export const CONSTANTS_EN = {
       twoFactorCodeInvalid: "Invalid code - try again.",
       twoFactorEnabled: "Two-factor authentication enabled.",
       twoFactorCopySecret: "Copy the secret (manual entry)",
+      // Passkeys
+      passkeySignIn: "Sign in with a passkey",
+      passkeyWaiting: "Waiting for your passkey…",
+      passkeyFailed: "Couldn't sign in with this passkey. Use your password, or try again.",
       // Desktop app sign-in (/auth/desktop)
       desktopTitle: "Sign in to TaskForce Desktop",
       desktopSubtitle: "Continue as {email} in the TaskForce app on this computer.",
