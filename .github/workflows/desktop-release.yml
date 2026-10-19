@@ -77,7 +77,8 @@ jobs:
 
       - name: Backend
         working-directory: backend/tf-api
-        run: ./mvnw -B -q -DskipTests package
+        # The wrapper is not executable in git (mode 644): called through bash, on Linux and Windows alike.
+        run: bash ./mvnw -B -q -DskipTests package
 
       - name: Interface (desktop build)
         working-directory: frontend
