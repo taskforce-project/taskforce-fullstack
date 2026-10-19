@@ -40,6 +40,12 @@ public class DesktopAccountDirectory implements KeycloakService {
         return representation();
     }
 
+    /** L'app desktop ne connecte personne : la connexion, code compris, se fait sur le compte en ligne. */
+    @Override
+    public boolean hasOneTimeCode(String keycloakId) {
+        return false;
+    }
+
     @Override
     public boolean emailExists(String email) {
         return email != null && account().email().equalsIgnoreCase(email.trim());

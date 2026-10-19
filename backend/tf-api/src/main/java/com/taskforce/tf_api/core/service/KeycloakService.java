@@ -45,4 +45,10 @@ public interface KeycloakService {
 
     /** Ferme toutes les sessions du compte. */
     void logoutUser(String keycloakId);
+
+    /**
+     * Vrai si le compte a enregistré une application d'authentification sur le compte en ligne : la connexion
+     * demande alors son code, sur toutes les voies (webapp, app desktop, GitHub et Google).
+     */
+    boolean hasOneTimeCode(String keycloakId);
 }

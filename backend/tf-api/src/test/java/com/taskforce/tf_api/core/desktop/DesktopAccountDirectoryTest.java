@@ -81,4 +81,10 @@ class DesktopAccountDirectoryTest {
     void logout_is_a_no_op() {
         assertThatCode(() -> DIRECTORY.logoutUser("kc-sub-1")).doesNotThrowAnyException();
     }
+
+    @Test
+    @DisplayName("le code de l'application d'authentification se demande sur le compte en ligne, jamais dans l'app")
+    void one_time_code_is_never_asked_locally() {
+        assertThat(DIRECTORY.hasOneTimeCode("kc-sub-1")).isFalse();
+    }
 }

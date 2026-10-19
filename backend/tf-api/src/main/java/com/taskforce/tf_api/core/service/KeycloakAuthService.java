@@ -57,6 +57,14 @@ public class KeycloakAuthService {
      * @throws RuntimeException si l'authentification échoue
      */
     public KeycloakTokenResponse authenticate(String email, String password) {
+        return authenticate(email, password, null);
+    }
+
+    /**
+     * Comme {@link #authenticate(String, String)}, avec le code de l'application d'authentification du compte : Keycloak
+     * le vérifie lui-même quand le compte en a enregistré une (champ {@code totp} du flux « direct grant »).
+     */
+    public KeycloakTokenResponse authenticate(String email, String password, String totp) {
         log.info("Authentification de l'utilisateur via Keycloak : {}", email);
 
         String tokenUrl = keycloakUrl + "/realms/" + realm + "/protocol/openid-connect/token";
@@ -68,6 +76,9 @@ public class KeycloakAuthService {
         params.add("password", password);
         params.add("client_id", clientId);
         params.add("client_secret", clientSecret);
+        if (totp != null && !totp.isBlank()) {
+            params.add("totp", totp.trim());
+        }
 
         // Préparer les headers
         HttpHeaders headers = new HttpHeaders();

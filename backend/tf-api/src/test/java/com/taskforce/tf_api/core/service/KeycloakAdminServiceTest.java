@@ -5,6 +5,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.UserResource;
@@ -325,6 +327,33 @@ class KeycloakAdminServiceTest {
 
             // Then
             verify(userResource).update(argThat(u -> !u.isEnabled()));
+        }
+    }
+
+    @Nested
+    @DisplayName("Application d'authentification du compte")
+    class OneTimeCodeTests {
+
+        @ParameterizedTest(name = "identifiants {0} → {1}")
+        @CsvSource({
+            "password, false",
+            "password|otp, true",
+            "webauthn, false",
+            "'', false",
+        })
+        @DisplayName("vrai seulement si le compte a enregistré une application d'authentification")
+        void hasOneTimeCode_readsTheAccountCredentials(String types, boolean expected) {
+            List<CredentialRepresentation> credentials = types.isEmpty() ? List.of()
+                : java.util.Arrays.stream(types.split("[|]")).map(type -> {
+                    CredentialRepresentation credential = new CredentialRepresentation();
+                    credential.setType(type);
+                    return credential;
+                }).toList();
+            when(realmResource.users()).thenReturn(usersResource);
+            when(usersResource.get("user-123")).thenReturn(userResource);
+            when(userResource.credentials()).thenReturn(credentials);
+
+            assertThat(keycloakService.hasOneTimeCode("user-123")).isEqualTo(expected);
         }
     }
 
