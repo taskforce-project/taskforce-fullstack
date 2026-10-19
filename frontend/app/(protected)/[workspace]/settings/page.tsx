@@ -1736,12 +1736,13 @@ export default function SettingsPage() {
     const github = searchParams.get("github")
     const slack = searchParams.get("slack")
     const mcp = searchParams.get("mcp")
-    if (github === "connected") toast.success("GitHub connected successfully!")
-    if (github === "error") toast.error("GitHub wasn't connected. Try again, and accept the access on GitHub.")
-    if (slack === "connected") toast.success("Slack connected successfully!")
-    if (slack === "error") toast.error("Slack wasn't connected. Try again, and allow the access on Slack.")
-    if (mcp === "connected") toast.success("MCP server connected")
-    if (mcp === "error") toast.error("The MCP server connection failed. Try again, or connect it with a token.")
+    // Un id par service : l'effet peut repasser avant que router.replace n'ait retiré les paramètres, un seul toast.
+    if (github === "connected") toast.success("GitHub connected successfully!", { id: "oauth-github" })
+    if (github === "error") toast.error("GitHub wasn't connected. Try again, and accept the access on GitHub.", { id: "oauth-github" })
+    if (slack === "connected") toast.success("Slack connected successfully!", { id: "oauth-slack" })
+    if (slack === "error") toast.error("Slack wasn't connected. Try again, and allow the access on Slack.", { id: "oauth-slack" })
+    if (mcp === "connected") toast.success("MCP server connected", { id: "oauth-mcp" })
+    if (mcp === "error") toast.error("The MCP server connection failed. Try again, or connect it with a token.", { id: "oauth-mcp" })
     const target = github || slack || mcp
       ? "integrations"
       : section && SECTIONS.some((s) => s.key === section)
