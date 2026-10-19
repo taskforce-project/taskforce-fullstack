@@ -2,14 +2,14 @@
   "openapi": "3.1.0",
   "info": {
     "title": "TaskForce API",
-    "description": "API REST modulaire pour l'ERP Taskforce",
+    "description": "REST API of TaskForce, the open-source project management and AI delivery platform",
     "contact": {
       "name": "Taskforce Team",
       "email": "support@taskforce.com"
     },
     "license": {
-      "name": "Propriétaire",
-      "url": "https://taskforce.com/license"
+      "name": "AGPL-3.0",
+      "url": "https://www.gnu.org/licenses/agpl-3.0.html"
     },
     "version": "1.0.0"
   },
@@ -41,6 +41,9 @@
       "description": "Opérations : projets, visibilité, statuts et types de tâches."
     },
     {
+      "name": "Project export"
+    },
+    {
       "name": "Issues",
       "description": "Tâches : CRUD, statut, priorité, relations, sous-tâches, commentaires."
     },
@@ -70,6 +73,10 @@
     },
     {
       "name": "Profile"
+    },
+    {
+      "name": "Personal access tokens",
+      "description": "Jetons personnels, valables seulement sur le serveur MCP."
     },
     {
       "name": "Invitations"
@@ -104,13 +111,28 @@
     },
     {
       "name": "Brain OS",
-      "description": "Base de connaissance de l'espace (graphe)."
+      "description": "Base de connaissance de l'espace : pages Markdown, liens, tags, recherche et ingestion."
     },
     {
       "name": "Brain OS attachments"
     },
     {
       "name": "AI usage"
+    },
+    {
+      "name": "AI status"
+    },
+    {
+      "name": "Coding agents",
+      "description": "Délégation d'une issue à un agent de code (Claude Code, GitHub Copilot) et suivi du run."
+    },
+    {
+      "name": "Coding agent runners",
+      "description": "Identité du runner local de chaque personne (créée une fois, secret montré une fois)."
+    },
+    {
+      "name": "MCP server",
+      "description": "Serveur MCP de l'instance (JSON-RPC sur HTTP), pour Claude Code avec un jeton personnel."
     },
     {
       "name": "Dashboard"
@@ -124,7 +146,8 @@
       "description": "Connexion des outils externes (GitHub, Slack…)."
     },
     {
-      "name": "Webhooks"
+      "name": "Webhooks",
+      "description": "Webhooks sortants signés (HMAC-SHA256) : événements, test, historique des envois."
     },
     {
       "name": "MCP actions"
@@ -137,15 +160,6 @@
     },
     {
       "name": "Status"
-    },
-    {
-      "name": "Delivery"
-    },
-    {
-      "name": "Mcp O Auth Callback"
-    },
-    {
-      "name": "Project Export"
     }
   ],
   "paths": {
@@ -756,7 +770,85 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseWebhookResponse"
+                  "$ref": "#/components/schemas/ApiResponseCreatedWebhookResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/webhooks/{webhookId}/test": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "operationId": "sendTest",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseWebhookDeliveryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/webhooks/{webhookId}/secret": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "operationId": "regenerateSecret",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseWebhookSecretResponse"
                 }
               }
             }
@@ -3007,6 +3099,67 @@
         }
       }
     },
+    "/api/workspaces/{slug}/mcp": {
+      "get": {
+        "tags": [
+          "MCP server"
+        ],
+        "operationId": "stream",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "MCP server"
+        ],
+        "operationId": "message",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "MCP server"
+        ],
+        "operationId": "close",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/mcp/servers": {
       "get": {
         "tags": [
@@ -3579,12 +3732,12 @@
         }
       }
     },
-    "/api/workspaces/{slug}/integrations/connectors/{key}": {
+    "/api/workspaces/{slug}/delivery/runs/{runId}/approvals/{approvalId}": {
       "post": {
         "tags": [
-          "Integrations"
+          "Coding agents"
         ],
-        "operationId": "connectConnector",
+        "operationId": "decide",
         "parameters": [
           {
             "name": "slug",
@@ -3595,11 +3748,21 @@
             }
           },
           {
-            "name": "key",
+            "name": "runId",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "approvalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
             }
           }
         ],
@@ -3607,47 +3770,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ConnectConnectorRequest"
+                "$ref": "#/components/schemas/ApprovalDecisionRequest"
               }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Integrations"
-        ],
-        "operationId": "disconnectConnector",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
             }
           },
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -3665,7 +3793,7 @@
     "/api/workspaces/{slug}/delivery/issues/{issueId}/delegate": {
       "post": {
         "tags": [
-          "Delivery"
+          "Coding agents"
         ],
         "operationId": "delegate",
         "parameters": [
@@ -3704,198 +3832,6 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseDeliveryRunResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/workspaces/{slug}/delivery/cursor": {
-      "get": {
-        "tags": [
-          "Delivery"
-        ],
-        "operationId": "cursorStatus",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseDeliveryKeyStatus"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Delivery"
-        ],
-        "operationId": "connectCursor",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ConnectKeyRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseDeliveryKeyStatus"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Delivery"
-        ],
-        "operationId": "disconnectCursor",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/workspaces/{slug}/delivery/anthropic": {
-      "get": {
-        "tags": [
-          "Delivery"
-        ],
-        "operationId": "anthropicStatus",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseDeliveryKeyStatus"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Delivery"
-        ],
-        "operationId": "connectAnthropic",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ConnectKeyRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseDeliveryKeyStatus"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Delivery"
-        ],
-        "operationId": "disconnectAnthropic",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
                 }
               }
             }
@@ -4011,83 +3947,7 @@
         }
       }
     },
-    "/api/workspaces/{slug}/brain/reseed": {
-      "post": {
-        "tags": [
-          "Brain OS"
-        ],
-        "operationId": "reseed",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReseedRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/workspaces/{slug}/brain/nodes": {
-      "get": {
-        "tags": [
-          "Brain OS"
-        ],
-        "operationId": "listNodes",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "domain",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseListKnowledgeNodeResponse"
-                }
-              }
-            }
-          }
-        }
-      },
       "post": {
         "tags": [
           "Brain OS"
@@ -4175,52 +4035,12 @@
         }
       }
     },
-    "/api/workspaces/{slug}/brain/edges": {
-      "post": {
-        "tags": [
-          "Brain OS"
-        ],
-        "operationId": "createEdge",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateKnowledgeEdgeRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseKnowledgeEdgeResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/workspaces/{slug}/assistant": {
       "post": {
         "tags": [
           "AI assistant"
         ],
-        "operationId": "chatStream",
+        "operationId": "chat",
         "parameters": [
           {
             "name": "slug",
@@ -4245,11 +4065,6 @@
           "200": {
             "description": "OK",
             "content": {
-              "text/event-stream": {
-                "schema": {
-                  "$ref": "#/components/schemas/SseEmitter"
-                }
-              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseChatTurnResponse"
@@ -4525,29 +4340,19 @@
         }
       }
     },
-    "/api/workspaces/{slug}/ai/conversations": {
+    "/api/users/me/tokens": {
       "get": {
         "tags": [
-          "AI assistant"
+          "Personal access tokens"
         ],
         "operationId": "list_3",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseListConversationSummary"
+                  "$ref": "#/components/schemas/ApiResponseListPersonalAccessTokenResponse"
                 }
               }
             }
@@ -4556,46 +4361,26 @@
       },
       "post": {
         "tags": [
-          "AI assistant"
+          "Personal access tokens"
         ],
         "operationId": "create_2",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseConversationSummary"
-                }
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePersonalAccessTokenRequest"
               }
             }
-          }
-        }
-      }
-    },
-    "/api/users/me/password/reset": {
-      "post": {
-        "tags": [
-          "Users"
-        ],
-        "operationId": "requestPasswordReset",
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
+                  "$ref": "#/components/schemas/ApiResponseCreatedPersonalAccessTokenResponse"
                 }
               }
             }
@@ -4626,36 +4411,6 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseUserResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/users/me/data-request": {
-      "post": {
-        "tags": [
-          "Users"
-        ],
-        "operationId": "dataRequest",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DataRequestRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
                 }
               }
             }
@@ -4874,6 +4629,44 @@
         }
       }
     },
+    "/api/delivery/runners": {
+      "get": {
+        "tags": [
+          "Coding agent runners"
+        ],
+        "operationId": "status",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRunnerStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Coding agent runners"
+        ],
+        "operationId": "provision",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRunnerProvisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/verify-otp": {
       "post": {
         "tags": [
@@ -4897,36 +4690,6 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseVerifyOtpResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/select-plan": {
-      "post": {
-        "tags": [
-          "Authentication"
-        ],
-        "operationId": "selectPlan",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SelectPlanRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSelectPlanResponse"
                 }
               }
             }
@@ -5074,6 +4837,36 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CallbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAuthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/oauth/2fa": {
+      "post": {
+        "tags": [
+          "OAuth login"
+        ],
+        "operationId": "twoFactor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TwoFactorRequest"
               }
             }
           },
@@ -6751,43 +6544,6 @@
       }
     },
     "/api/workspaces/{slug}/brain/nodes/{nodeId}": {
-      "get": {
-        "tags": [
-          "Brain OS"
-        ],
-        "operationId": "getNode",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "nodeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseKnowledgeNodeResponse"
-                }
-              }
-            }
-          }
-        }
-      },
       "delete": {
         "tags": [
           "Brain OS"
@@ -6970,12 +6726,12 @@
         }
       }
     },
-    "/api/workspaces/{slug}/usage": {
+    "/api/workspaces/{slug}/webhooks/{webhookId}/deliveries": {
       "get": {
         "tags": [
-          "Workspaces"
+          "Webhooks"
         ],
-        "operationId": "getUsage",
+        "operationId": "deliveries",
         "parameters": [
           {
             "name": "slug",
@@ -6983,6 +6739,15 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
             }
           }
         ],
@@ -6992,7 +6757,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseWorkspaceUsageResponse"
+                  "$ref": "#/components/schemas/ApiResponseListWebhookDeliveryResponse"
                 }
               }
             }
@@ -7305,7 +7070,7 @@
     "/api/workspaces/{slug}/projects/{projectId}/export": {
       "get": {
         "tags": [
-          "Project Export"
+          "Project export"
         ],
         "operationId": "export",
         "parameters": [
@@ -7382,55 +7147,6 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseStoredBriefResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/workspaces/{slug}/projects/{id}/activity": {
-      "get": {
-        "tags": [
-          "Projects"
-        ],
-        "operationId": "getProjectActivity",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "days",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 14
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseListProjectActivityPointResponse"
                 }
               }
             }
@@ -7571,36 +7287,6 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseListNotificationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/workspaces/{slug}/notifications/unread-count": {
-      "get": {
-        "tags": [
-          "Notifications"
-        ],
-        "operationId": "countUnread",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseLong"
                 }
               }
             }
@@ -7998,6 +7684,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "returnTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -8047,7 +7741,7 @@
     "/api/workspaces/{slug}/delivery/runs": {
       "get": {
         "tags": [
-          "Delivery"
+          "Coding agents"
         ],
         "operationId": "listRuns",
         "parameters": [
@@ -8074,10 +7768,59 @@
         }
       }
     },
+    "/api/workspaces/{slug}/delivery/runs/{runId}/activity": {
+      "get": {
+        "tags": [
+          "Coding agents"
+        ],
+        "operationId": "activity",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDeliveryRunActivityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/delivery/providers": {
       "get": {
         "tags": [
-          "Delivery"
+          "Coding agents"
         ],
         "operationId": "listProviders",
         "parameters": [
@@ -8087,6 +7830,15 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
             }
           }
         ],
@@ -8107,7 +7859,7 @@
     "/api/workspaces/{slug}/delivery/issues/{issueId}/run": {
       "get": {
         "tags": [
-          "Delivery"
+          "Coding agents"
         ],
         "operationId": "latestRun",
         "parameters": [
@@ -8436,82 +8188,6 @@
         }
       }
     },
-    "/api/workspaces/{slug}/analysis/{jobId}": {
-      "get": {
-        "tags": [
-          "AI analysis (workflows)"
-        ],
-        "operationId": "get_1",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "jobId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseAnalysisJobResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "AI analysis (workflows)"
-        ],
-        "operationId": "dismiss",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "jobId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/workspaces/{slug}/ai/usage": {
       "get": {
         "tags": [
@@ -8535,6 +8211,36 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseAiUsageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/ai/conversations": {
+      "get": {
+        "tags": [
+          "AI assistant"
+        ],
+        "operationId": "list_4",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListConversationSummary"
                 }
               }
             }
@@ -8618,26 +8324,6 @@
         }
       }
     },
-    "/api/workspaces/current": {
-      "get": {
-        "tags": [
-          "Workspaces"
-        ],
-        "operationId": "getCurrent",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseWorkspaceResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/users/search": {
       "get": {
         "tags": [
@@ -8711,7 +8397,7 @@
         "tags": [
           "Status"
         ],
-        "operationId": "status",
+        "operationId": "status_1",
         "responses": {
           "200": {
             "description": "OK",
@@ -8722,45 +8408,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/mcp/oauth/callback": {
-      "get": {
-        "tags": [
-          "Mcp O Auth Callback"
-        ],
-        "operationId": "callback_1",
-        "parameters": [
-          {
-            "name": "code",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "state",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "error",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
           }
         }
       }
@@ -8825,7 +8472,7 @@
           {
             "name": "code",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -8833,7 +8480,15 @@
           {
             "name": "state",
             "in": "query",
-            "required": true,
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -8856,7 +8511,7 @@
           {
             "name": "code",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -8864,7 +8519,15 @@
           {
             "name": "state",
             "in": "query",
-            "required": true,
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -9000,6 +8663,26 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/status": {
+      "get": {
+        "tags": [
+          "AI status"
+        ],
+        "operationId": "status_2",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAiStatus"
                 }
               }
             }
@@ -9711,45 +9394,6 @@
         }
       }
     },
-    "/api/workspaces/{slug}/brain/edges/{edgeId}": {
-      "delete": {
-        "tags": [
-          "Brain OS"
-        ],
-        "operationId": "deleteEdge",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "edgeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/workspaces/{slug}/analytics/charts/{chartId}": {
       "delete": {
         "tags": [
@@ -9788,6 +9432,76 @@
           }
         }
       }
+    },
+    "/api/workspaces/{slug}/analysis/{jobId}": {
+      "delete": {
+        "tags": [
+          "AI analysis (workflows)"
+        ],
+        "operationId": "dismiss",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me/tokens/{tokenId}": {
+      "delete": {
+        "tags": [
+          "Personal access tokens"
+        ],
+        "operationId": "revoke_1",
+        "parameters": [
+          {
+            "name": "tokenId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -9801,16 +9515,14 @@
             "minLength": 0,
             "pattern": "https?://.*"
           },
-          "secret": {
-            "type": "string",
-            "maxLength": 128,
-            "minLength": 0
-          },
           "eventTypes": {
             "type": "array",
             "items": {
               "type": "string"
             }
+          },
+          "active": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -10291,9 +10003,6 @@
             "type": "string",
             "maxLength": 500,
             "minLength": 0
-          },
-          "brainTemplate": {
-            "type": "string"
           }
         },
         "required": [
@@ -10364,6 +10073,116 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseCreatedWebhookResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CreatedWebhookResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreatedWebhookResponse": {
+        "type": "object",
+        "properties": {
+          "webhook": {
+            "$ref": "#/components/schemas/WebhookResponse"
+          },
+          "secret": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseWebhookDeliveryResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/WebhookDeliveryResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WebhookDeliveryResponse": {
+        "type": "object",
+        "properties": {
+          "deliveryId": {
+            "type": "string"
+          },
+          "eventType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastStatus": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastError": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deliveredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nextAttemptAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseWebhookSecretResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/WebhookSecretResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WebhookSecretResponse": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string"
           }
         }
       },
@@ -12458,12 +12277,25 @@
             "type": "string",
             "minLength": 1
           },
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 0
+          },
           "mcpUrl": {
             "type": "string",
-            "minLength": 1
+            "maxLength": 2000,
+            "minLength": 0
           },
           "mcpToken": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 0
+          },
+          "headerName": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
           },
           "mcpAllow": {
             "type": "string"
@@ -12501,6 +12333,9 @@
           "connectorKey": {
             "type": "string"
           },
+          "name": {
+            "type": "string"
+          },
           "url": {
             "type": "string"
           },
@@ -12524,6 +12359,11 @@
           "mcpUrl": {
             "type": "string",
             "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 0
           },
           "returnTo": {
             "type": "string"
@@ -12985,20 +12825,28 @@
           "repoFullName": {
             "type": "string",
             "maxLength": 255,
-            "minLength": 0
+            "minLength": 0,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100}"
           },
           "prNumber": {
             "type": "integer",
             "format": "int32"
           },
           "prUrl": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 0,
+            "pattern": "https://github\\.com/.+"
           },
           "commitSha": {
-            "type": "string"
+            "type": "string",
+            "pattern": "[0-9a-fA-F]{7,40}"
           },
           "commitUrl": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 0,
+            "pattern": "https://github\\.com/.+"
           },
           "title": {
             "type": "string",
@@ -13067,16 +12915,18 @@
           }
         }
       },
-      "ConnectConnectorRequest": {
+      "ApprovalDecisionRequest": {
         "type": "object",
         "properties": {
-          "config": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
+          "decision": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "ALLOW|DENY"
           }
-        }
+        },
+        "required": [
+          "decision"
+        ]
       },
       "DelegateRequest": {
         "type": "object",
@@ -13122,6 +12972,19 @@
             "type": "integer",
             "format": "int64"
           },
+          "issueKey": {
+            "type": "string"
+          },
+          "issueTitle": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectName": {
+            "type": "string"
+          },
           "providerKey": {
             "type": "string"
           },
@@ -13151,47 +13014,6 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
-          }
-        }
-      },
-      "ConnectKeyRequest": {
-        "type": "object",
-        "properties": {
-          "apiKey": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "apiKey"
-        ]
-      },
-      "ApiResponseDeliveryKeyStatus": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/DeliveryKeyStatus"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "DeliveryKeyStatus": {
-        "type": "object",
-        "properties": {
-          "connected": {
-            "type": "boolean"
-          },
-          "keyHint": {
-            "type": "string"
           }
         }
       },
@@ -13293,14 +13115,6 @@
           }
         }
       },
-      "ReseedRequest": {
-        "type": "object",
-        "properties": {
-          "template": {
-            "type": "string"
-          }
-        }
-      },
       "CreateKnowledgeNodeRequest": {
         "type": "object",
         "properties": {
@@ -13333,13 +13147,6 @@
             "type": "array",
             "items": {
               "type": "string"
-            }
-          },
-          "projects": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "int64"
             }
           },
           "metadata": {
@@ -13392,76 +13199,6 @@
           }
         }
       },
-      "CreateKnowledgeEdgeRequest": {
-        "type": "object",
-        "properties": {
-          "fromNodeId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "toNodeId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "relationType": {
-            "type": "string"
-          },
-          "weight": {
-            "type": "number",
-            "format": "double"
-          }
-        },
-        "required": [
-          "fromNodeId",
-          "relationType",
-          "toNodeId"
-        ]
-      },
-      "ApiResponseKnowledgeEdgeResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/KnowledgeEdgeResponse"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "KnowledgeEdgeResponse": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "fromNodeId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "toNodeId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "relationType": {
-            "type": "string"
-          },
-          "weight": {
-            "type": "number",
-            "format": "double"
-          },
-          "auto": {
-            "type": "boolean"
-          }
-        }
-      },
       "AssistantRequest": {
         "type": "object",
         "properties": {
@@ -13478,15 +13215,6 @@
         "required": [
           "message"
         ]
-      },
-      "SseEmitter": {
-        "type": "object",
-        "properties": {
-          "timeout": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
       },
       "ApiResponseChatTurnResponse": {
         "type": "object",
@@ -13902,7 +13630,26 @@
           "answer"
         ]
       },
-      "ApiResponseConversationSummary": {
+      "CreatePersonalAccessTokenRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "expiresInDays": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 365,
+            "minimum": 1
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "ApiResponseCreatedPersonalAccessTokenResponse": {
         "type": "object",
         "properties": {
           "success": {
@@ -13912,7 +13659,7 @@
             "type": "string"
           },
           "data": {
-            "$ref": "#/components/schemas/ConversationSummary"
+            "$ref": "#/components/schemas/CreatedPersonalAccessTokenResponse"
           },
           "timestamp": {
             "type": "string",
@@ -13920,26 +13667,44 @@
           }
         }
       },
-      "ConversationSummary": {
+      "CreatedPersonalAccessTokenResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "$ref": "#/components/schemas/PersonalAccessTokenResponse"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "PersonalAccessTokenResponse": {
         "type": "object",
         "properties": {
           "id": {
             "type": "integer",
             "format": "int64"
           },
-          "title": {
+          "name": {
             "type": "string"
           },
-          "updatedAt": {
+          "hint": {
             "type": "string"
           },
-          "messageCount": {
-            "type": "integer",
-            "format": "int32"
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           },
-          "totalTokens": {
-            "type": "integer",
-            "format": "int64"
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expired": {
+            "type": "boolean"
           }
         }
       },
@@ -14002,39 +13767,6 @@
           "onboardingCompleted": {
             "type": "boolean"
           },
-          "planType": {
-            "type": "string",
-            "enum": [
-              "FREE",
-              "BASIC",
-              "BUSINESS",
-              "ENTERPRISE"
-            ]
-          },
-          "planStatus": {
-            "type": "string",
-            "enum": [
-              "ACTIVE",
-              "CANCELED",
-              "PAST_DUE",
-              "TRIALING",
-              "INCOMPLETE",
-              "INCOMPLETE_EXPIRED",
-              "UNPAID"
-            ]
-          },
-          "subscriptionStartDate": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "subscriptionEndDate": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "trialEndDate": {
-            "type": "string",
-            "format": "date-time"
-          },
           "isActive": {
             "type": "boolean"
           },
@@ -14047,19 +13779,6 @@
             "format": "date-time"
           }
         }
-      },
-      "DataRequestRequest": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "ACCESS|DELETION"
-          }
-        },
-        "required": [
-          "type"
-        ]
       },
       "ApiResponseTwoFactorSetupResponse": {
         "type": "object",
@@ -14103,83 +13822,6 @@
           "code"
         ]
       },
-      "EnterpriseInquiryRequest": {
-        "type": "object",
-        "properties": {
-          "fullName": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 0
-          },
-          "email": {
-            "type": "string",
-            "format": "email",
-            "maxLength": 255,
-            "minLength": 0
-          },
-          "teamSize": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "^(1-10|11-50|51-200|200\\+)$"
-          },
-          "message": {
-            "type": "string",
-            "maxLength": 2000,
-            "minLength": 0
-          }
-        },
-        "required": [
-          "email",
-          "fullName",
-          "teamSize"
-        ]
-      },
-      "ApiResponseEnterpriseInquiryResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/EnterpriseInquiryResponse"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "EnterpriseInquiryResponse": {
-        "type": "object",
-        "properties": {
-          "inquiryId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "fullName": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "teamSize": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "message": {
-            "type": "string"
-          }
-        }
-      },
       "ClientLogRequest": {
         "type": "object",
         "properties": {
@@ -14213,37 +13855,7 @@
           "message"
         ]
       },
-      "SubmitFeedbackRequest": {
-        "type": "object",
-        "properties": {
-          "category": {
-            "type": "string",
-            "pattern": "BUG|IDEA|OTHER"
-          },
-          "message": {
-            "type": "string",
-            "maxLength": 5000,
-            "minLength": 0
-          },
-          "context": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 0
-          }
-        },
-        "required": [
-          "message"
-        ]
-      },
-      "PortalSessionRequest": {
-        "type": "object",
-        "properties": {
-          "returnUrl": {
-            "type": "string"
-          }
-        }
-      },
-      "ApiResponsePortalSessionResponse": {
+      "ApiResponseRunnerProvisionResponse": {
         "type": "object",
         "properties": {
           "success": {
@@ -14253,7 +13865,7 @@
             "type": "string"
           },
           "data": {
-            "$ref": "#/components/schemas/PortalSessionResponse"
+            "$ref": "#/components/schemas/RunnerProvisionResponse"
           },
           "timestamp": {
             "type": "string",
@@ -14261,68 +13873,109 @@
           }
         }
       },
-      "PortalSessionResponse": {
+      "RunnerProvisionResponse": {
         "type": "object",
         "properties": {
-          "url": {
+          "clientId": {
+            "type": "string"
+          },
+          "clientSecret": {
+            "type": "string"
+          },
+          "ownerEmail": {
             "type": "string"
           }
         }
       },
-      "CreateCheckoutSessionRequest": {
+      "RunnerResultRequest": {
         "type": "object",
         "properties": {
-          "planType": {
-            "type": "string",
-            "minLength": 1
-          },
-          "successUrl": {
-            "type": "string"
-          },
-          "cancelUrl": {
-            "type": "string"
-          },
-          "billingInterval": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "planType"
-        ]
-      },
-      "ApiResponseCheckoutSessionResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/CheckoutSessionResponse"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "CheckoutSessionResponse": {
-        "type": "object",
-        "properties": {
-          "sessionId": {
-            "type": "string"
-          },
-          "sessionUrl": {
-            "type": "string"
-          },
           "status": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "pattern": "DONE|FAILED"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 0
+          },
+          "resultUrl": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 0,
+            "pattern": "^https?://\\S+$"
+          },
+          "error": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 0
           }
-        }
+        },
+        "required": [
+          "status"
+        ]
       },
-      "ApiResponseSubscriptionInfoResponse": {
+      "Event": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "start|text|tool|error|denied"
+          },
+          "tool": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "kind",
+          "text"
+        ]
+      },
+      "RunnerEventsRequest": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "maxItems": 50,
+            "minItems": 0
+          }
+        },
+        "required": [
+          "events"
+        ]
+      },
+      "RunnerApprovalRequest": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "summary",
+          "tool"
+        ]
+      },
+      "ApiResponseRunnerApprovalResponse": {
         "type": "object",
         "properties": {
           "success": {
@@ -14332,7 +13985,7 @@
             "type": "string"
           },
           "data": {
-            "$ref": "#/components/schemas/SubscriptionInfoResponse"
+            "$ref": "#/components/schemas/RunnerApprovalResponse"
           },
           "timestamp": {
             "type": "string",
@@ -14340,24 +13993,79 @@
           }
         }
       },
-      "SubscriptionInfoResponse": {
+      "RunnerApprovalResponse": {
         "type": "object",
         "properties": {
-          "userId": {
+          "approvalId": {
             "type": "integer",
             "format": "int64"
           },
-          "planType": {
-            "type": "string"
-          },
           "status": {
             "type": "string"
           },
-          "currentPeriodEnd": {
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseRunnerClaimResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
             "type": "string"
           },
-          "cancelAtPeriodEnd": {
-            "type": "boolean"
+          "data": {
+            "$ref": "#/components/schemas/RunnerClaimResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RunnerClaimResponse": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "issueId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "issueKey": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectName": {
+            "type": "string"
+          },
+          "workspaceSlug": {
+            "type": "string"
+          },
+          "repoFullName": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "sessionExpiresAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -14420,6 +14128,9 @@
           },
           "twoFactorRequired": {
             "type": "boolean"
+          },
+          "twoFactorChallenge": {
+            "type": "string"
           }
         }
       },
@@ -14434,32 +14145,29 @@
           },
           "authData": {
             "$ref": "#/components/schemas/AuthResponse"
-          },
-          "checkoutSessionUrl": {
-            "type": "string"
           }
         }
       },
-      "SelectPlanRequest": {
+      "RunnerTokenRequest": {
         "type": "object",
         "properties": {
-          "email": {
+          "clientId": {
             "type": "string",
-            "format": "email",
-            "minLength": 1
+            "maxLength": 100,
+            "minLength": 0
           },
-          "planType": {
+          "clientSecret": {
             "type": "string",
-            "minLength": 1,
-            "pattern": "^(FREE|PRO|ENTERPRISE)$"
+            "maxLength": 200,
+            "minLength": 0
           }
         },
         "required": [
-          "email",
-          "planType"
+          "clientId",
+          "clientSecret"
         ]
       },
-      "ApiResponseSelectPlanResponse": {
+      "ApiResponseRunnerTokenResponse": {
         "type": "object",
         "properties": {
           "success": {
@@ -14469,7 +14177,7 @@
             "type": "string"
           },
           "data": {
-            "$ref": "#/components/schemas/SelectPlanResponse"
+            "$ref": "#/components/schemas/RunnerTokenResponse"
           },
           "timestamp": {
             "type": "string",
@@ -14477,24 +14185,15 @@
           }
         }
       },
-      "SelectPlanResponse": {
+      "RunnerTokenResponse": {
         "type": "object",
         "properties": {
-          "message": {
+          "accessToken": {
             "type": "string"
           },
-          "email": {
-            "type": "string"
-          },
-          "planType": {
-            "type": "string"
-          },
-          "otpSent": {
-            "type": "boolean"
-          },
-          "otpExpiresInMinutes": {
+          "expiresIn": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           }
         }
       },
@@ -14596,15 +14295,6 @@
             "maxLength": 50,
             "minLength": 2
           },
-          "planType": {
-            "type": "string",
-            "enum": [
-              "FREE",
-              "BASIC",
-              "BUSINESS",
-              "ENTERPRISE"
-            ]
-          },
           "challengeToken": {
             "type": "string"
           },
@@ -14616,8 +14306,7 @@
           "email",
           "firstName",
           "lastName",
-          "password",
-          "planType"
+          "password"
         ]
       },
       "RefreshTokenRequest": {
@@ -14656,6 +14345,17 @@
             "type": "string"
           },
           "redirectUri": {
+            "type": "string"
+          }
+        }
+      },
+      "TwoFactorRequest": {
+        "type": "object",
+        "properties": {
+          "challenge": {
+            "type": "string"
+          },
+          "totp": {
             "type": "string"
           }
         }
@@ -15087,13 +14787,6 @@
             "type": "integer",
             "format": "int64"
           },
-          "projects": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
           "metadata": {
             "type": "object",
             "additionalProperties": {}
@@ -15179,7 +14872,7 @@
           }
         }
       },
-      "ApiResponseWorkspaceUsageResponse": {
+      "ApiResponseListWebhookDeliveryResponse": {
         "type": "object",
         "properties": {
           "success": {
@@ -15189,35 +14882,14 @@
             "type": "string"
           },
           "data": {
-            "$ref": "#/components/schemas/WorkspaceUsageResponse"
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WebhookDeliveryResponse"
+            }
           },
           "timestamp": {
             "type": "string",
             "format": "date-time"
-          }
-        }
-      },
-      "WorkspaceUsageResponse": {
-        "type": "object",
-        "properties": {
-          "plan": {
-            "type": "string"
-          },
-          "membersUsed": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "membersLimit": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "workspacesUsed": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "workspacesLimit": {
-            "type": "integer",
-            "format": "int64"
           }
         }
       },
@@ -15760,39 +15432,6 @@
           }
         }
       },
-      "ApiResponseListProjectActivityPointResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProjectActivityPointResponse"
-            }
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "ProjectActivityPointResponse": {
-        "type": "object",
-        "properties": {
-          "date": {
-            "type": "string"
-          },
-          "count": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
       "ApiResponseListProjectHealthPointResponse": {
         "type": "object",
         "properties": {
@@ -15848,6 +15487,18 @@
           "timestamp": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ProjectActivityPointResponse": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -15979,25 +15630,6 @@
             "items": {
               "$ref": "#/components/schemas/NotificationResponse"
             }
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "ApiResponseLong": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "integer",
-            "format": "int64"
           },
           "timestamp": {
             "type": "string",
@@ -16479,9 +16111,6 @@
           "authType": {
             "type": "string"
           },
-          "status": {
-            "type": "string"
-          },
           "connected": {
             "type": "boolean"
           },
@@ -16521,10 +16150,6 @@
             "type": "integer",
             "format": "int32"
           },
-          "available": {
-            "type": "integer",
-            "format": "int32"
-          },
           "connected": {
             "type": "integer",
             "format": "int32"
@@ -16555,6 +16180,77 @@
           "timestamp": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseDeliveryRunActivityResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DeliveryRunActivityResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Approval": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decidedBy": {
+            "type": "string"
+          },
+          "canDecide": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DeliveryRunActivityResponse": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
+          },
+          "approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Approval"
+            }
           }
         }
       },
@@ -16599,6 +16295,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
           }
         }
       },
@@ -16631,9 +16333,6 @@
             "type": "integer",
             "format": "int64"
           },
-          "templateType": {
-            "type": "string"
-          },
           "versionLabel": {
             "type": "string"
           },
@@ -16662,24 +16361,30 @@
           }
         }
       },
-      "ApiResponseListKnowledgeNodeResponse": {
+      "KnowledgeEdgeResponse": {
         "type": "object",
         "properties": {
-          "success": {
-            "type": "boolean"
+          "id": {
+            "type": "integer",
+            "format": "int64"
           },
-          "message": {
+          "fromNodeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "toNodeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "relationType": {
             "type": "string"
           },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/KnowledgeNodeResponse"
-            }
+          "weight": {
+            "type": "number",
+            "format": "double"
           },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
+          "auto": {
+            "type": "boolean"
           }
         }
       },
@@ -16903,9 +16608,6 @@
           "agent": {
             "type": "string"
           },
-          "agentColor": {
-            "type": "string"
-          },
           "category": {
             "type": "string"
           },
@@ -17070,9 +16772,6 @@
       "AiUsageResponse": {
         "type": "object",
         "properties": {
-          "plan": {
-            "type": "string"
-          },
           "usedTokens": {
             "type": "integer",
             "format": "int64"
@@ -17137,6 +16836,29 @@
           "timestamp": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ConversationSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "messageCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalTokens": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -17244,6 +16966,27 @@
           }
         }
       },
+      "ApiResponseListPersonalAccessTokenResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PersonalAccessTokenResponse"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "ApiResponseBoolean": {
         "type": "object",
         "properties": {
@@ -17259,50 +17002,6 @@
           "timestamp": {
             "type": "string",
             "format": "date-time"
-          }
-        }
-      },
-      "ApiResponseVerifySessionResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/VerifySessionResponse"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "VerifySessionResponse": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string"
-          },
-          "planType": {
-            "type": "string"
-          },
-          "paymentStatus": {
-            "type": "string"
-          },
-          "subscriptionId": {
-            "type": "string"
-          },
-          "customerId": {
-            "type": "string"
-          },
-          "userCreated": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
           }
         }
       },
@@ -17455,6 +17154,79 @@
           "data": {
             "type": "object",
             "additionalProperties": {}
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseRunnerStatusResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunnerStatusResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RunnerStatusResponse": {
+        "type": "object",
+        "properties": {
+          "exists": {
+            "type": "boolean"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "ownerEmail": {
+            "type": "string"
+          }
+        }
+      },
+      "AiStatus": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "chatAvailable": {
+            "type": "boolean"
+          },
+          "chatModel": {
+            "type": "string"
+          },
+          "fastModel": {
+            "type": "string"
+          },
+          "embeddingsAvailable": {
+            "type": "boolean"
+          },
+          "embeddingModel": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseAiStatus": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AiStatus"
           },
           "timestamp": {
             "type": "string",

@@ -53,22 +53,28 @@ const TAG_MAP = {
   "gdpr-controller": "GDPR",
   "attachment-controller": "Attachments",
   "file-controller": "Files",
-  "feedback-controller": "Feedback",
   "client-log-controller": "Client logs",
   "status-controller": "Status",
+  "ai-status-controller": "AI status",
+  "delivery-controller": "Coding agents",
+  "runner-provisioning-controller": "Coding agent runners",
+  "mcp-server-controller": "MCP server",
+  "personal-access-token-controller": "Personal access tokens",
+  "project-export-controller": "Project export",
 };
 
 // Ordre d'affichage des sections dans la référence (les tags absents d'ici sont ajoutés à la fin).
 const TAG_ORDER = [
   "Authentication", "OAuth login",
-  "Workspaces", "Projects", "Issues", "Cycles", "Pages", "Roadmap",
-  "Teams", "Users", "Member skills", "Membership", "Profile", "Invitations",
+  "Workspaces", "Projects", "Project export", "Issues", "Cycles", "Pages", "Roadmap",
+  "Teams", "Users", "Member skills", "Membership", "Profile", "Personal access tokens", "Invitations",
   "Assignments", "Assignment redistribution", "My work", "Notifications", "Notification preferences",
   "AI assistant", "AI analysis (workflows)", "Skill suggestions", "Brain OS", "Brain OS attachments", "AI usage",
+  "AI status", "Coding agents", "Coding agent runners", "MCP server",
   "Dashboard", "Analytics",
   "Integrations", "Webhooks", "MCP actions",
   "GDPR",
-  "Files", "Attachments", "Feedback", "Client logs", "Status",
+  "Files", "Attachments", "Client logs", "Status",
 ];
 
 // Descriptions courtes des sections principales (facultatif, améliore la référence).
@@ -84,7 +90,12 @@ const TAG_DESC = {
   "Notifications": "Signaux in-app et leur état.",
   "AI assistant": "Cortex : conversations et assistance IA.",
   "AI analysis (workflows)": "Traitements agentiques : plan, exécution, reprise.",
-  "Brain OS": "Base de connaissance de l'espace (graphe).",
+  "Brain OS": "Base de connaissance de l'espace : pages Markdown, liens, tags, recherche et ingestion.",
+  "Coding agents": "Délégation d'une issue à un agent de code (Claude Code, GitHub Copilot) et suivi du run.",
+  "Coding agent runners": "Identité du runner local de chaque personne (créée une fois, secret montré une fois).",
+  "MCP server": "Serveur MCP de l'instance (JSON-RPC sur HTTP), pour Claude Code avec un jeton personnel.",
+  "Personal access tokens": "Jetons personnels, valables seulement sur le serveur MCP.",
+  "Webhooks": "Webhooks sortants signés (HMAC-SHA256) : événements, test, historique des envois.",
   "Analytics": "Indicateurs : débit, vélocité, charge, burndown.",
   "Integrations": "Connexion des outils externes (GitHub, Slack…).",
 };
@@ -109,8 +120,9 @@ for (const p of Object.keys(spec.paths ?? {})) {
 // Filtrage sur les tags BRUTS springdoc (« xxx-controller »), donc AVANT le renommage.
 const HIDE = new Set([
   "client-log-controller",
-  "feedback-controller",
   "gdpr-controller",
+  // Retour du navigateur après le consentement OAuth d'un serveur MCP : une redirection, pas une API à appeler.
+  "mcp-o-auth-callback-controller",
   // Endpoints MACHINE du runner local de délégation (ADR-013) : réservés à un compte de service
   // Keycloak, sans intérêt pour un consommateur de l'API. La spec vient du backend DEV, où ils existent.
   "delivery-runner-controller",
