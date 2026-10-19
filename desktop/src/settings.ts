@@ -30,6 +30,8 @@ interface StoredSettings {
   account?: Account;
   /** Fournisseur d'IA choisi, par identifiant de compte (sans la clé, gardée avec les secrets). */
   ai?: Record<string, AiSettings>;
+  /** Port de la fenêtre, par identifiant de compte : une origine stable garde le stockage du navigateur. */
+  windowPorts?: Record<string, number>;
   /** Secrets chiffrés, par identifiant de compte (base64 du texte chiffré). */
   secrets?: Record<string, Record<keyof AccountSecrets, string | undefined>>;
 }
@@ -96,6 +98,16 @@ export const settings = {
   setAiSettings(subject: string, ai: AiSettings): void {
     const current = read();
     write({ ...current, ai: { ...(current.ai ?? {}), [subject]: ai } });
+  },
+
+  windowPort(subject: string): number | undefined {
+    return read().windowPorts?.[subject];
+  },
+
+  setWindowPort(subject: string, port: number): void {
+    const current = read();
+    if (current.windowPorts?.[subject] === port) return;
+    write({ ...current, windowPorts: { ...(current.windowPorts ?? {}), [subject]: port } });
   },
 
   secret(subject: string, name: keyof AccountSecrets): string | undefined {

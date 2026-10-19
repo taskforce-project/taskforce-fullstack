@@ -66,7 +66,8 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     onStep("Starting the database");
     await database.start();
 
-    const origin = await proxy.reserve();
+    const origin = await proxy.reserve(settings.windowPort(account.subject));
+    settings.setWindowPort(account.subject, proxy.port);
     await ai.start();
     onStep("Starting TaskForce");
     await Promise.all([
