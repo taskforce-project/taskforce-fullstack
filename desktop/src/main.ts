@@ -170,7 +170,17 @@ async function openApp(account: Account, previous: BrowserWindow | null): Promis
   });
   lockNavigation(mainWindow, stack.origin);
   mainWindow.once("ready-to-show", () => {
-    mainWindow?.show();
+    if (!mainWindow) return;
+    if (previous) {
+      // Après la connexion, la personne est dans son navigateur : Windows ne laisse une app revenir au premier plan que
+      // si elle passe un instant au-dessus des autres fenêtres.
+      mainWindow.setAlwaysOnTop(true);
+      mainWindow.show();
+      mainWindow.setAlwaysOnTop(false);
+      mainWindow.focus();
+    } else {
+      mainWindow.show();
+    }
     if (!splash.isDestroyed()) splash.close();
   });
   mainWindow.on("closed", () => (mainWindow = null));
