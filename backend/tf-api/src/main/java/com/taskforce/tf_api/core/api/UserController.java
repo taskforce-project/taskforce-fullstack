@@ -1,7 +1,9 @@
 package com.taskforce.tf_api.core.api;
 
 import com.taskforce.tf_api.core.dto.request.CompleteOnboardingRequest;
+import com.taskforce.tf_api.core.dto.request.TwoFactorConfirmRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateUserRequest;
+import com.taskforce.tf_api.core.dto.response.TwoFactorSetupResponse;
 import com.taskforce.tf_api.core.dto.response.UserResponse;
 import com.taskforce.tf_api.core.dto.response.UserSearchResult;
 import com.taskforce.tf_api.core.service.TwoFactorService;
@@ -13,7 +15,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -41,12 +42,6 @@ public class UserController {
 
     private final UserService userService;
     private final TwoFactorService twoFactorService;
-
-    @Value("${keycloak.public-url:${keycloak.url:http://localhost:8080}}")
-    private String accountPublicUrl;
-
-    @Value("${keycloak.realm}")
-    private String accountRealm;
     private final JwtIdentityResolver identityResolver;
 
     /**
@@ -108,23 +103,37 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("Avatar updated", response));
     }
 
-    // ---- Sécurité : la double authentification se règle sur le compte en ligne (le mot de passe se réinitialise via
-    // /auth/forgot-password) ----
+    // ---- Sécurité : 2FA (TOTP géré par l'app ; le mot de passe se réinitialise via /auth/forgot-password) ----
 
-    /** La connexion demande-t-elle un code ? GET /api/users/me/2fa → { data: true|false } */
+    /** Statut du 2FA (TOTP, géré par l'app). GET /api/users/me/2fa → { data: true|false } */
     @GetMapping("/me/2fa")
     public ResponseEntity<ApiResponse<Boolean>> getTwoFactor(@AuthenticationPrincipal Jwt jwt) {
-        boolean enabled = twoFactorService.isOnForAccount(identityResolver.resolveEmail(jwt));
+        boolean enabled = twoFactorService.isEnabled(identityResolver.resolveEmail(jwt));
         return ResponseEntity.ok(ApiResponse.success("Two-factor authentication status", enabled));
     }
 
-    /**
-     * Page du compte en ligne, où l'on enregistre son application d'authentification (onglet « Account security »).
-     * GET /api/users/me/account-page → { data: url }
-     */
-    @GetMapping("/me/account-page")
-    public ResponseEntity<ApiResponse<String>> getAccountPage() {
-        return ResponseEntity.ok(ApiResponse.success("Account page", accountPublicUrl.replaceAll("/+$", "") + "/realms/" + accountRealm + "/account"));
+    /** Démarre l'activation : renvoie le secret + l'URI otpauth (à encoder en QR). POST /api/users/me/2fa/setup */
+    @PostMapping("/me/2fa/setup")
+    public ResponseEntity<ApiResponse<TwoFactorSetupResponse>> setupTwoFactor(@AuthenticationPrincipal Jwt jwt) {
+        TwoFactorSetupResponse res = twoFactorService.setup(identityResolver.resolveEmail(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Two-factor setup generated", res));
+    }
+
+    /** Confirme l'activation avec un premier code TOTP. POST /api/users/me/2fa/confirm */
+    @PostMapping("/me/2fa/confirm")
+    public ResponseEntity<ApiResponse<Void>> confirmTwoFactor(
+        @AuthenticationPrincipal Jwt jwt,
+        @Valid @RequestBody TwoFactorConfirmRequest request
+    ) {
+        twoFactorService.confirm(identityResolver.resolveEmail(jwt), request.getCode());
+        return ResponseEntity.ok(ApiResponse.success("Two-factor authentication enabled", null));
+    }
+
+    /** Désactive le 2FA (supprime le secret). DELETE /api/users/me/2fa */
+    @DeleteMapping("/me/2fa")
+    public ResponseEntity<ApiResponse<Void>> disableTwoFactor(@AuthenticationPrincipal Jwt jwt) {
+        twoFactorService.disable(identityResolver.resolveEmail(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Two-factor authentication disabled", null));
     }
 
     /**

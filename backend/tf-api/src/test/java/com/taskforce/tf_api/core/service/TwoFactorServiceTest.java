@@ -12,19 +12,19 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.taskforce.tf_api.core.dto.response.TwoFactorSetupResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.UserTwoFactor;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.UserTwoFactorRepository;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import com.taskforce.tf_api.shared.security.TotpService;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,7 +33,6 @@ class TwoFactorServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private UserTwoFactorRepository repository;
     @Mock private TotpService totp;
-    @Mock private KeycloakService keycloakService;
     @InjectMocks private TwoFactorService service;
 
     private static final String EMAIL = "pierre@example.com";
@@ -46,35 +45,74 @@ class TwoFactorServiceTest {
         ReflectionTestUtils.setField(user, "id", UID);
     }
 
-    @ParameterizedTest(name = "TOTP de l'app {0}, application du compte en ligne {1} → {2}")
-    @CsvSource({
-        "false, false, false",
-        "true, false, true",
-        "false, true, true",
-    })
-    void isOnForAccount_combinesTheAppTotpAndTheAccountAuthenticator(boolean appTotp, boolean accountApp, boolean expected) {
-        user.setKeycloakId("kc-7");
+    @Test
+    void setup_generatesSecret_createsPendingRow_returnsUri() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
-        when(repository.existsByUserIdAndEnabledTrue(UID)).thenReturn(appTotp);
-        if (!appTotp) {
-            when(keycloakService.hasOneTimeCode("kc-7")).thenReturn(accountApp);
-        }
+        when(repository.findByUserId(UID)).thenReturn(Optional.empty());
+        when(totp.generateSecret()).thenReturn("SECRETBASE32");
+        when(totp.buildUri("SECRETBASE32", EMAIL, "TaskForce")).thenReturn("otpauth://totp/TaskForce:pierre");
 
-        assertThat(service.isOnForAccount(EMAIL)).isEqualTo(expected);
+        TwoFactorSetupResponse res = service.setup(EMAIL);
+
+        assertThat(res.getSecret()).isEqualTo("SECRETBASE32");
+        assertThat(res.getOtpauthUri()).isEqualTo("otpauth://totp/TaskForce:pierre");
+        ArgumentCaptor<UserTwoFactor> saved = ArgumentCaptor.forClass(UserTwoFactor.class);
+        verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getUserId()).isEqualTo(UID);
+        assertThat(saved.getValue().getSecret()).isEqualTo("SECRETBASE32");
+        assertThat(saved.getValue().isEnabled()).isFalse(); // pas encore actif
     }
 
     @Test
-    void isOnForAccount_unknownUser_isFalse() {
+    void setup_unknownUser_throws() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
-        assertThat(service.isOnForAccount(EMAIL)).isFalse();
+        assertThatThrownBy(() -> service.setup(EMAIL)).isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
-    void isOnForAccount_accountServiceDown_reportsOnlyTheAppTotp() {
-        user.setKeycloakId("kc-7");
+    void confirm_validCode_enables() {
+        UserTwoFactor row = UserTwoFactor.builder().userId(UID).secret("S").enabled(false).build();
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
-        when(keycloakService.hasOneTimeCode("kc-7")).thenThrow(new RuntimeException("connection refused"));
-        assertThat(service.isOnForAccount(EMAIL)).isFalse();
+        when(repository.findByUserId(UID)).thenReturn(Optional.of(row));
+        when(totp.verify("S", "123456")).thenReturn(true);
+
+        service.confirm(EMAIL, "123456");
+
+        assertThat(row.isEnabled()).isTrue();
+        assertThat(row.getConfirmedAt()).isNotNull();
+        verify(repository).save(row);
+    }
+
+    @Test
+    void confirm_invalidCode_throws_andDoesNotEnable() {
+        UserTwoFactor row = UserTwoFactor.builder().userId(UID).secret("S").enabled(false).build();
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+        when(repository.findByUserId(UID)).thenReturn(Optional.of(row));
+        when(totp.verify("S", "000000")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.confirm(EMAIL, "000000")).isInstanceOf(BusinessException.class);
+        assertThat(row.isEnabled()).isFalse();
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void confirm_noPendingSetup_throws() {
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+        when(repository.findByUserId(UID)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.confirm(EMAIL, "123456")).isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void isEnabled_byEmail_delegatesToRepo() {
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+        when(repository.existsByUserIdAndEnabledTrue(UID)).thenReturn(true);
+        assertThat(service.isEnabled(EMAIL)).isTrue();
+    }
+
+    @Test
+    void isEnabled_unknownUser_isFalse() {
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+        assertThat(service.isEnabled(EMAIL)).isFalse();
     }
 
     @Test
@@ -113,5 +151,12 @@ class TwoFactorServiceTest {
         assertThatThrownBy(() -> service.verifyOrThrow(UID, "000000"))
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining("Wait a minute");
+    }
+
+    @Test
+    void disable_deletesRow() {
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+        service.disable(EMAIL);
+        verify(repository).deleteByUserId(UID);
     }
 }

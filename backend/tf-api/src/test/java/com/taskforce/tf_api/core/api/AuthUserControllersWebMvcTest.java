@@ -108,24 +108,6 @@ class AuthUserControllersWebMvcTest {
     }
 
     @Test
-    @DisplayName("GET /users/me/2fa → la connexion demande-t-elle un code (app ou compte en ligne)")
-    void user_two_factor_status_200() throws Exception {
-        when(identityResolver.resolveEmail(any())).thenReturn(EMAIL);
-        when(twoFactorService.isOnForAccount(EMAIL)).thenReturn(true);
-        mockMvc.perform(get("/api/users/me/2fa").with(jwt().jwt(b -> b.claim("email", EMAIL))))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data").value(true));
-    }
-
-    @Test
-    @DisplayName("GET /users/me/account-page → page du compte en ligne du realm")
-    void user_account_page_200() throws Exception {
-        mockMvc.perform(get("/api/users/me/account-page").with(jwt().jwt(b -> b.claim("email", EMAIL))))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data").value("http://localhost:8080/realms/taskforce-test/account"));
-    }
-
-    @Test
     @DisplayName("GET /users/me sans JWT → 401")
     void user_me_unauthenticated_401() throws Exception {
         mockMvc.perform(get("/api/users/me")).andExpect(status().isUnauthorized());
