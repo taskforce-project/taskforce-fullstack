@@ -13,6 +13,7 @@ vi.mock('../api/integration-service', () => ({
   getGitHubStatus: vi.fn(),
   connectGitHub: vi.fn(),
   disconnectGitHub: vi.fn(),
+  getGitHubRepos: vi.fn(),
   getGitHubLinks: vi.fn(),
   addGitHubLink: vi.fn(),
   deleteGitHubLink: vi.fn(),
@@ -70,6 +71,8 @@ describe('integration-store', () => {
         webhookDeliveries: {},
         slackChannels: [],
         githubLinks: {},
+        githubRepos: [],
+        changes: 0,
       });
     });
   });
@@ -88,9 +91,49 @@ describe('integration-store', () => {
     expect(useIntegrationStore.getState().githubStatus).toEqual(status);
   });
 
-  it('connectGitHub delegates to the service', async () => {
+  it('connectGitHub delegates to the service, with the path to come back to', async () => {
     await act(async () => { await useIntegrationStore.getState().connectGitHub('acme'); });
-    expect(svc.connectGitHub).toHaveBeenCalledWith('acme');
+    expect(svc.connectGitHub).toHaveBeenCalledWith('acme', undefined);
+
+    await act(async () => { await useIntegrationStore.getState().connectGitHub('acme', '/acme?newProject=repo'); });
+    expect(svc.connectGitHub).toHaveBeenLastCalledWith('acme', '/acme?newProject=repo');
+  });
+
+  it('fetchGitHubRepos stores the repositories the connection can see', async () => {
+    const repos = [{ fullName: 'octo/hello', name: 'hello', isPrivate: false, htmlUrl: 'https://github.com/octo/hello', openIssues: 2 }];
+    vi.mocked(svc.getGitHubRepos).mockResolvedValue(repos);
+
+    await act(async () => { await useIntegrationStore.getState().fetchGitHubRepos('acme'); });
+
+    expect(svc.getGitHubRepos).toHaveBeenCalledWith('acme');
+    expect(useIntegrationStore.getState().githubRepos).toEqual(repos);
+  });
+
+  it('disconnectGitHub drops the links and repositories, and tells the catalog to reload', async () => {
+    act(() => useIntegrationStore.setState({
+      githubStatus: makeStatus(),
+      githubLinks: { 55: [makeLink()] },
+      githubRepos: [{ fullName: 'octo/hello', name: 'hello', isPrivate: false, htmlUrl: 'https://github.com/octo/hello', openIssues: 0 }],
+    }));
+    vi.mocked(svc.disconnectGitHub).mockResolvedValue(undefined);
+
+    await act(async () => { await useIntegrationStore.getState().disconnectGitHub('acme'); });
+
+    const state = useIntegrationStore.getState();
+    expect(state.githubLinks).toEqual({});
+    expect(state.githubRepos).toEqual([]);
+    expect(state.changes).toBe(1);
+  });
+
+  it('disconnectGitHub keeps everything when the call fails', async () => {
+    act(() => useIntegrationStore.setState({ githubStatus: makeStatus(), githubLinks: { 55: [makeLink()] } }));
+    vi.mocked(svc.disconnectGitHub).mockRejectedValue(new Error('boom'));
+
+    await expect(useIntegrationStore.getState().disconnectGitHub('acme')).rejects.toThrow('boom');
+
+    expect(useIntegrationStore.getState().githubStatus?.connected).toBe(true);
+    expect(useIntegrationStore.getState().githubLinks[55]).toHaveLength(1);
+    expect(useIntegrationStore.getState().changes).toBe(0);
   });
 
   it('disconnectGitHub resets the status to disconnected', async () => {
@@ -184,6 +227,16 @@ describe('integration-store', () => {
   it('connectSlack delegates to the service', async () => {
     await act(async () => { await useIntegrationStore.getState().connectSlack('acme'); });
     expect(svc.connectSlack).toHaveBeenCalledWith('acme');
+  });
+
+  it('disconnectSlack drops the channels (they belong to the Slack team) and tells the catalog to reload', async () => {
+    act(() => useIntegrationStore.setState({ slackStatus: makeStatus({ provider: 'SLACK' }), slackChannels: [makeChannel()] }));
+    vi.mocked(svc.disconnectSlack).mockResolvedValue(undefined);
+
+    await act(async () => { await useIntegrationStore.getState().disconnectSlack('acme'); });
+
+    expect(useIntegrationStore.getState().slackChannels).toEqual([]);
+    expect(useIntegrationStore.getState().changes).toBe(1);
   });
 
   it('disconnectSlack resets the status to disconnected', async () => {

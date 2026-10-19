@@ -3,6 +3,7 @@ import {
   getGitHubStatus,
   connectGitHub,
   disconnectGitHub,
+  getGitHubRepos,
   getGitHubLinks,
   addGitHubLink,
   deleteGitHubLink,
@@ -20,6 +21,7 @@ import {
   testWebhook,
   getWebhookDeliveries,
   type IntegrationStatus,
+  type GitHubRepo,
   type GitHubLink,
   type GitHubLinkPayload,
   type SlackChannel,
@@ -39,10 +41,16 @@ interface IntegrationState {
   slackChannels: SlackChannel[];
   /** Liens GitHub indexés par issueId */
   githubLinks:   Record<number, GitHubLink[]>;
+  /** Dépôts visibles par la connexion GitHub du workspace (liaison d'un projet). */
+  githubRepos:   GitHubRepo[];
+  /** Incrémenté à chaque déconnexion : le catalogue, qui garde son propre état, se relit. */
+  changes:       number;
 
   // GitHub
   fetchGitHubStatus:  (slug: string) => Promise<void>;
-  connectGitHub:      (slug: string) => Promise<void>;
+  /** `returnTo` : chemin de l'app où revenir après le consentement (sinon Settings). */
+  connectGitHub:      (slug: string, returnTo?: string) => Promise<void>;
+  fetchGitHubRepos:   (slug: string) => Promise<void>;
   disconnectGitHub:   (slug: string) => Promise<void>;
   fetchGitHubLinks:   (slug: string, issueId: number) => Promise<void>;
   addGitHubLink:      (slug: string, issueId: number, payload: GitHubLinkPayload) => Promise<GitHubLink>;
@@ -76,6 +84,8 @@ export const useIntegrationStore = create<IntegrationState>((set) => ({
   webhookDeliveries: {},
   slackChannels: [],
   githubLinks:   {},
+  githubRepos:   [],
+  changes:       0,
 
   // ---------------------------------------------------------------------------
   // GitHub
@@ -86,13 +96,23 @@ export const useIntegrationStore = create<IntegrationState>((set) => ({
     set({ githubStatus: status });
   },
 
-  connectGitHub: async (slug) => {
-    await connectGitHub(slug);
+  connectGitHub: async (slug, returnTo) => {
+    await connectGitHub(slug, returnTo);
   },
 
   disconnectGitHub: async (slug) => {
     await disconnectGitHub(slug);
-    set({ githubStatus: { id: null, provider: "GITHUB", connected: false, meta: null, connectedAt: null } });
+    set((s) => ({
+      githubStatus: { id: null, provider: "GITHUB", connected: false, meta: null, connectedAt: null },
+      githubLinks: {},
+      githubRepos: [],
+      changes: s.changes + 1,
+    }));
+  },
+
+  fetchGitHubRepos: async (slug) => {
+    const repos = await getGitHubRepos(slug);
+    set({ githubRepos: repos });
   },
 
   fetchGitHubLinks: async (slug, issueId) => {
@@ -136,7 +156,12 @@ export const useIntegrationStore = create<IntegrationState>((set) => ({
 
   disconnectSlack: async (slug) => {
     await disconnectSlack(slug);
-    set({ slackStatus: { id: null, provider: "SLACK", connected: false, meta: null, connectedAt: null } });
+    // Les canaux partent avec la connexion (ils appartiennent à l'équipe Slack connectée).
+    set((s) => ({
+      slackStatus: { id: null, provider: "SLACK", connected: false, meta: null, connectedAt: null },
+      slackChannels: [],
+      changes: s.changes + 1,
+    }));
   },
 
   fetchSlackChannels: async (slug) => {

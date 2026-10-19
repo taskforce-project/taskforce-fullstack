@@ -27,6 +27,7 @@ import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { getGitHubRepos, getGitHubRepoIssues, syncGitHub, syncSlack, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { IntegrationsCatalog } from "@/components/integrations/integrations-catalog"
+import { DisconnectConfirmDialog, DISCONNECT_CONSEQUENCES } from "@/components/integrations/disconnect-confirm-dialog"
 import { WebhooksPanel } from "@/components/settings/webhooks-panel"
 import { EventPicker } from "@/components/settings/event-picker"
 import { AgentsPanel } from "@/components/settings/agents-panel"
@@ -46,7 +47,7 @@ import {
   type NotificationEventKey,
 } from "@/lib/api/notification-service"
 import { getSystemStatus, type SystemStatus } from "@/lib/api/status-service"
-import { apiClient } from "@/lib/api/client"
+import { apiClient, getErrorMessage } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
 import { cn } from "@/lib/utils"
 
@@ -1268,6 +1269,8 @@ function IntegrationsPanel() {
   const [channelEvents, setChannelEvents] = useState<string[]>(["issue.created"])
   const [addingChannel, setAddingChannel] = useState(false)
   const [syncingChannel, setSyncingChannel] = useState<string | null>(null)
+  // Déconnexion en attente de confirmation (elle révoque l'accès chez le service).
+  const [confirmDisconnect, setConfirmDisconnect] = useState<"github" | "slack" | null>(null)
 
   useEffect(() => {
     if (!slug) return
@@ -1281,21 +1284,14 @@ function IntegrationsPanel() {
     }
   }, [slug, slackStatus?.connected, fetchSlackChannels])
 
-  async function handleDisconnectGitHub() {
+  async function handleDisconnect(provider: "github" | "slack") {
+    const name = provider === "github" ? "GitHub" : "Slack"
     try {
-      await disconnectGitHub(slug)
-      toast.success("GitHub disconnected")
-    } catch {
-      toast.error("Couldn't disconnect GitHub")
-    }
-  }
-
-  async function handleDisconnectSlack() {
-    try {
-      await disconnectSlack(slug)
-      toast.success("Slack disconnected")
-    } catch {
-      toast.error("Couldn't disconnect Slack")
+      if (provider === "github") await disconnectGitHub(slug)
+      else await disconnectSlack(slug)
+      toast.success(`${name} disconnected`)
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     }
   }
 
@@ -1307,8 +1303,8 @@ function IntegrationsPanel() {
       setChannelId("")
       setChannelName("")
       toast.success("Slack channel added")
-    } catch {
-      toast.error("Couldn't add the channel")
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     } finally {
       setAddingChannel(false)
     }
@@ -1319,8 +1315,8 @@ function IntegrationsPanel() {
     try {
       const r = await syncSlack(slug, chId)
       toast.success(`Ingested into the Brain OS: ${r.created} created, ${r.updated} updated`)
-    } catch {
-      toast.error("Couldn't sync this channel")
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     } finally {
       setSyncingChannel(null)
     }
@@ -1350,7 +1346,7 @@ function IntegrationsPanel() {
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-xs text-ink-green border-shape-green/20 bg-shape-green/10">Connected</Badge>
-              <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDisconnectGitHub}>
+              <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setConfirmDisconnect("github")}>
                 Disconnect
               </Button>
             </div>
@@ -1375,7 +1371,7 @@ function IntegrationsPanel() {
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs text-ink-green border-shape-green/20 bg-shape-green/10">Connected</Badge>
-                <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDisconnectSlack}>
+                <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setConfirmDisconnect("slack")}>
                   Disconnect
                 </Button>
               </div>
@@ -1446,6 +1442,18 @@ function IntegrationsPanel() {
       <SectionCard title="Webhooks" description="Send workspace events to n8n, Zapier, Make or your own endpoint.">
         {slug && <WebhooksPanel slug={slug} />}
       </SectionCard>
+
+      <DisconnectConfirmDialog
+        open={confirmDisconnect !== null}
+        onOpenChange={(open) => { if (!open) setConfirmDisconnect(null) }}
+        name={confirmDisconnect === "slack" ? "Slack" : "GitHub"}
+        consequence={DISCONNECT_CONSEQUENCES[confirmDisconnect ?? "github"]}
+        onConfirm={() => {
+          const provider = confirmDisconnect
+          setConfirmDisconnect(null)
+          if (provider) handleDisconnect(provider)
+        }}
+      />
     </div>
   )
 }
@@ -1729,7 +1737,9 @@ export default function SettingsPage() {
     const slack = searchParams.get("slack")
     const mcp = searchParams.get("mcp")
     if (github === "connected") toast.success("GitHub connected successfully!")
+    if (github === "error") toast.error("GitHub wasn't connected. Try again, and accept the access on GitHub.")
     if (slack === "connected") toast.success("Slack connected successfully!")
+    if (slack === "error") toast.error("Slack wasn't connected. Try again, and allow the access on Slack.")
     if (mcp === "connected") toast.success("MCP server connected")
     if (mcp === "error") toast.error("The MCP server connection failed. Try again, or connect it with a token.")
     const target = github || slack || mcp

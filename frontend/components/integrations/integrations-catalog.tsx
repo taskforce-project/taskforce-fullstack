@@ -23,6 +23,7 @@ import {
   type IntegrationCatalog, type ConnectorView, type PlaneProject, type PlaneStatus, type McpServerStatus,
 } from "@/lib/api/integration-service"
 import { McpActionConsole } from "@/components/integrations/mcp-action-console"
+import { DisconnectConfirmDialog, DISCONNECT_CONSEQUENCES } from "@/components/integrations/disconnect-confirm-dialog"
 
 const CAP_LABEL: Record<string, string> = { observe: "Observe", act: "Act", mcp: "MCP" }
 const CAP_DESC: Record<string, string> = {
@@ -78,6 +79,8 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   // Filtre « ce que j'ai connecté ou pas » (en plus du filtre par catégorie).
   const [statusFilter, setStatusFilter] = useState<"all" | "connected" | "disconnected">("all")
   const { connectGitHub, connectSlack } = useIntegrationStore()
+  // Une déconnexion GitHub ou Slack faite ailleurs (sections de Settings) incrémente ce compteur.
+  const changes = useIntegrationStore((s) => s.changes)
 
   const refresh = useCallback(() => {
     setLoading(true)
@@ -96,7 +99,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
       .finally(() => setLoading(false))
   }, [slug])
 
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => { refresh() }, [refresh, changes])
 
   async function handleAction(tool: ConnectorView) {
     // GitHub / Slack non connectés : OAuth 1-clic dédié (redirection). Le reste ouvre le dialogue.
@@ -104,8 +107,8 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
       try {
         if (tool.key === "github") await connectGitHub(slug)
         else await connectSlack(slug)
-      } catch {
-        toast.error(`Could not start the ${tool.name} connection`)
+      } catch (e) {
+        toast.error(getErrorMessage(e))
       }
       return
     }
@@ -408,10 +411,14 @@ function ConnectorDialog({
 
 type PanelProps = Readonly<{ slug: string; tool: ConnectorView; onClose: () => void; onChanged: () => void }>
 
-/** GitHub ou Slack connecté : état et déconnexion par leur propre route (pas une connexion MCP). */
-function NativeOAuthPanel({ slug, tool, onClose, onChanged }: PanelProps) {
+/**
+ * GitHub ou Slack connecté : état et déconnexion par leur propre route (pas une connexion MCP). La déconnexion
+ * passe par le store, qui fait relire le catalogue.
+ */
+function NativeOAuthPanel({ slug, tool, onClose }: PanelProps) {
   const { disconnectGitHub, disconnectSlack } = useIntegrationStore()
   const [busy, setBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
 
   async function handleDisconnect() {
     setBusy(true)
@@ -419,7 +426,6 @@ function NativeOAuthPanel({ slug, tool, onClose, onChanged }: PanelProps) {
       if (tool.key === "github") await disconnectGitHub(slug)
       else await disconnectSlack(slug)
       toast.success(`${tool.name} disconnected`)
-      onChanged()
       onClose()
     } catch (e) {
       toast.error(getErrorMessage(e))
@@ -435,15 +441,22 @@ function NativeOAuthPanel({ slug, tool, onClose, onChanged }: PanelProps) {
         <span><span className="font-medium">{tool.name}</span> is connected for this workspace.</span>
       </div>
       {tool.key === "github" && (
-        <p className="text-xs text-muted-foreground">Each project links its repository in its own settings (Code repository).</p>
+        <p className="text-xs text-muted-foreground">Each project links its repository in its own settings (Integrations, Code repository).</p>
       )}
       <DialogFooter>
         <Button variant="outline" size="sm"
                 className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
-                onClick={handleDisconnect} disabled={busy}>
+                onClick={() => setConfirming(true)} disabled={busy}>
           {busy && <Loader2 className="size-3.5 animate-spin" />} Disconnect
         </Button>
       </DialogFooter>
+      <DisconnectConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        name={tool.name}
+        consequence={DISCONNECT_CONSEQUENCES[tool.key === "github" ? "github" : "slack"]}
+        onConfirm={() => { setConfirming(false); handleDisconnect() }}
+      />
     </div>
   )
 }
