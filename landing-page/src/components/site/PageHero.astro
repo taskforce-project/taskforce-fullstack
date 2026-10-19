@@ -1,78 +1,29 @@
 ---
 /**
- * PageHero - en-tête standard des pages internes (hors home).
- * Même grammaire que le hero de la home : kicker bleu optionnel, eyebrow, h1 display,
- * chapô, jusqu'à deux CTA en pill. `<slot/>` pour un visuel sous le texte.
- * Les boutons réutilisent `buttonVariants` (styles identiques au reste du site, zéro JS).
+ * Héros des pages intérieures : une peinture derrière le haut de page (elle s'efface doucement dans la page),
+ * l'étiquette, le titre (slot `title`), le chapô, et ce que la page met dessous (slot par défaut : boutons, avis…).
+ * La section n'isole pas son empilement : la peinture (z-index -1) reste ainsi sous le contenu de la section suivante
+ * qu'elle déborde, au lieu de le recouvrir.
  */
-import { buttonVariants } from "@/components/ui/button";
-import { LevelBadge } from "@/components/site/Section";
-import { cn } from "@/lib/utils";
-import type { Maturity } from "@/components/site/nav";
-
-interface Cta {
-  label: string;
-  href: string;
-}
+import type { BackgroundName } from "@/lib/backgrounds";
+import Backdrop from "./Backdrop.astro";
+import Pill from "./Pill.astro";
 
 interface Props {
-  /** Petite ligne bleue de catégorie, au-dessus du titre. */
-  kicker?: string;
-  eyebrow?: string;
-  title: string;
-  lead?: string;
-  level?: Maturity;
-  align?: "left" | "center";
-  primary?: Cta;
-  secondary?: Cta;
-  band?: boolean;
+  label: string;
+  lead: string;
+  /** La peinture de la page (lib/backgrounds.ts). */
+  bg: BackgroundName;
 }
-
-const {
-  kicker,
-  eyebrow,
-  title,
-  lead,
-  level,
-  // Défaut CENTRÉ (review user : « si rien de démonstratif → contenu centré », + mobile).
-  // Les héros internes n'ont pas de visuel latéral ; une page qui glisse un visuel via <slot/>
-  // peut repasser à align="left" (cf. brain-os qui reste center avec son visuel centré).
-  align = "center",
-  primary,
-  secondary,
-  band = false,
-} = Astro.props;
-
-const center = align === "center";
+const { label, lead, bg } = Astro.props;
 ---
 
-<section class:list={[band ? "bg-secondary" : "bg-card", "border-b"]}>
-  <div class="container-rail py-20 lg:py-24">
-    <div class:list={[center ? "mx-auto max-w-3xl text-center" : "max-w-3xl"]}>
-      {kicker && (
-        <p class="text-primary mb-4 text-[14px] font-medium tracking-[-0.01em]">{kicker}</p>
-      )}
-      {(eyebrow || level) && (
-        <div class:list={["mb-3 flex items-center gap-2.5", center && "justify-center"]}>
-          {eyebrow && <span class="t-eyebrow">{eyebrow}</span>}
-          {level && <LevelBadge level={level} />}
-        </div>
-      )}
-      <h1 class="t-h1">{title}</h1>
-      {lead && <p class:list={["t-lead mt-5", center ? "mx-auto max-w-2xl" : "max-w-2xl"]}>{lead}</p>}
-      {(primary || secondary) && (
-        <div class:list={["mt-8 flex flex-wrap gap-3", center && "justify-center"]}>
-          {primary && (
-            <a href={primary.href} class={cn(buttonVariants({ size: "pill" }))}>{primary.label}</a>
-          )}
-          {secondary && (
-            <a href={secondary.href} class={cn(buttonVariants({ variant: "outline", size: "pill" }))}>
-              {secondary.label}
-            </a>
-          )}
-        </div>
-      )}
-    </div>
+<section class="relative -mt-16 pt-16">
+  <Backdrop name={bg} class="inset-x-0 top-0 h-[760px] sm:h-[820px]" fade veil="top" priority />
+  <div class="container-wide relative flex flex-col items-center pt-20 pb-6 text-center sm:pt-24 lg:pt-28">
+    <span class="anim-fade-up"><Pill tone="glass">{label}</Pill></span>
+    <h1 class="t-h1 anim-fade-up mt-8 max-w-4xl" style="--d: 70ms"><slot name="title" /></h1>
+    <p class="t-lead anim-fade-up mt-7 max-w-2xl text-foreground/75" style="--d: 140ms">{lead}</p>
     <slot />
   </div>
 </section>

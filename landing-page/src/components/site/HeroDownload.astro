@@ -1,0 +1,45 @@
+---
+/**
+ * Bouton de téléchargement principal + ligne de plateformes. Lit la release desktop au build : avec des fichiers
+ * publiés, le bouton télécharge directement celui du système du visiteur ; sinon il mène à /download.
+ */
+import { ArrowRight } from "lucide-react";
+import DownloadButton from "./DownloadButton";
+import { downloadTargets, getDesktopRelease } from "@/lib/release";
+
+interface Props {
+  class?: string;
+  /** Lien secondaire à droite du bouton. */
+  secondary?: { label: string; href: string };
+  align?: "start" | "center";
+}
+const { class: cls = "", secondary, align = "start" } = Astro.props;
+
+const release = await getDesktopRelease();
+const targets = downloadTargets(release);
+const urls = {
+  macArm: release?.assets["mac-arm64"]?.url ?? null,
+  macIntel: release?.assets["mac-x64"]?.url ?? null,
+  windows: targets.windows,
+  linux: targets.linux,
+};
+const center = align === "center";
+---
+
+<div class:list={["flex flex-col gap-5", center && "items-center text-center", cls]}>
+  <div class:list={["flex flex-wrap items-center gap-x-6 gap-y-3", center && "justify-center"]}>
+    <DownloadButton client:idle urls={urls} />
+    {
+      secondary && (
+        <a href={secondary.href} class="btn btn-ghost btn-lg">
+          {secondary.label}
+          <ArrowRight aria-hidden="true" />
+        </a>
+      )
+    }
+  </div>
+  <p class="t-label text-foreground/70">
+    {release ? `Version ${release.version} · ` : ""}macOS · Windows · Linux ·{" "}
+    <a href="/download" class="underline decoration-rule underline-offset-2 hover:text-foreground">all downloads</a>
+  </p>
+</div>

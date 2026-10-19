@@ -1,0 +1,230 @@
+---
+/**
+ * Features : ce que fait l'app aujourd'hui, en sections variées (liste dépliante, rangée avec vignette, cartes en
+ * paire, cartes en rangée, mur de logos, colonnes à filets) plutôt qu'une suite de rangées identiques. Rien
+ * d'annoncé qui n'existe pas (libellés et commandes vérifiés dans frontend/).
+ */
+import { Accessibility, Command, Moon, Webhook } from "lucide-react";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import BentoCard from "@/components/site/BentoCard.astro";
+import CtaBand from "@/components/site/CtaBand.astro";
+import DuoCard from "@/components/site/DuoCard.astro";
+import FeatureRow from "@/components/site/FeatureRow.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import ProductSection from "@/components/site/ProductSection.astro";
+import RuleColumns, { type RuleItem } from "@/components/site/RuleColumns.astro";
+import SectionHead from "@/components/site/SectionHead.astro";
+import { BrandMark } from "@/components/visuals/brand";
+import type { TabItem } from "@/components/visuals/FeatureTabs";
+import { BRANDS, type BrandKey } from "@/lib/brands";
+
+const NAV = [
+  ["#plan", "Plan"],
+  ["#memory", "Memory"],
+  ["#agents", "Agents"],
+  ["#approvals", "Approvals"],
+  ["#assistant", "Assistant"],
+  ["#measure", "Analytics"],
+  ["#connect", "Connections"],
+  ["#everyday", "Every day"],
+] as const;
+
+const PLAN: TabItem[] = [
+  { title: "Board, list and backlog", desc: "One set of issues, three ways to see them. Drag a card to change its status.", art: "board", icon: "board" },
+  { title: "Cycles and roadmap", desc: "Plan a week or a sprint, then see the bigger picture on the roadmap.", art: "cycles", icon: "cycles" },
+  { title: "Subtasks and relations", desc: "Break the work down, mark what blocks what, add checklists, due dates and the time spent.", art: "subtasks", icon: "subtasks" },
+  { title: "My Queue and inbox", desc: "What needs you next, across every project: approvals, reviews and replies.", art: "queue", icon: "queue" },
+];
+
+const TOOLS: { brand?: BrandKey; name: string; role: string }[] = [
+  { brand: "github", name: "GitHub", role: "Repositories, issues and pull requests" },
+  { brand: "mcp", name: "MCP servers", role: "Ready-made presets, or any server you point it to" },
+  { brand: "plane", name: "Plane", role: "Read your Plane projects" },
+  { name: "Webhooks", role: "Signed events, sent to your own tools" },
+];
+
+const AI: BrandKey[] = ["ollama", "openai", "mistral", "groq"];
+
+const EVERYDAY: RuleItem[] = [
+  { icon: Command, tint: "bg-tint-blue text-ink-blue", title: "A command palette", text: "Open it with Ctrl K or Cmd K to create an issue, go anywhere in the app or ask the AI." },
+  { icon: Moon, tint: "bg-tint-sky text-ink-sky", title: "Light and dark", text: "Both themes, or the one your system uses." },
+  { icon: Accessibility, tint: "bg-tint-green text-ink-green", title: "Easier to read", text: "A dyslexia-friendly font and color-blind palettes, in the settings." },
+];
+---
+
+<BaseLayout
+  title="Features: plan, remember, delegate and measure | TaskForce"
+  description="Boards and cycles, a project memory, AI agents that ask before acting, an assistant that knows your work, and analytics. Everything TaskForce does today, on your desktop."
+>
+  <PageHero
+    bg="features"
+    label="Features"
+    lead="TaskForce keeps your projects, your notes and your AI agents together on your desktop. Here is what it does today."
+  >
+    <Fragment slot="title">One app for the plan, <span class="t-word">the memory and the agents.</span></Fragment>
+    <nav aria-label="On this page" class="anim-fade-up mt-10 flex max-w-3xl flex-wrap justify-center gap-2" style="--d: 200ms">
+      {
+        NAV.map(([href, label]) => (
+          <a href={href} class="btn btn-secondary btn-sm">
+            {label}
+          </a>
+        ))
+      }
+    </nav>
+  </PageHero>
+
+  {/* ───────── Planifier : liste dépliante ───────── */}
+  <ProductSection
+    id="plan"
+    label="Plan"
+    tone="blue"
+    lead="Write the work down the way you think about it, then organize it the way you deliver it. Comments and time tracking come with every issue."
+    items={PLAN}
+  >
+    <Fragment slot="title">Plan the work <span class="t-word">your way.</span></Fragment>
+  </ProductSection>
+
+  {/* ───────── La mémoire : rangée avec vignette ───────── */}
+  <FeatureRow
+    id="memory"
+    label="Memory"
+    tone="green"
+    art="tree"
+    reverse
+    lead="Brain OS holds what you know about a project: specs, decisions, notes and documents."
+    points={[
+      "Pages in a tree, written in Markdown, with #tags and [[wikilinks]]",
+      "Search by meaning when an embedding model is available, by keywords otherwise",
+      "Attach images and documents to your pages",
+      "Agents and the assistant search it before they start",
+    ]}
+  >
+    <Fragment slot="title">A memory that <span class="t-word">stays with the project.</span></Fragment>
+  </FeatureRow>
+
+  {/* ───────── Agents et validations : deux cartes en paire ───────── */}
+  <section class="section pt-0!">
+    <div class="container-site">
+      <SectionHead label="Agents" tone="pink" lead="Assign an issue like you would to a person. The agent asks before anything outside its limits.">
+        <Fragment slot="title">Hand off tasks, <span class="t-word">not control.</span></Fragment>
+      </SectionHead>
+      <div class="mt-12 grid gap-5 sm:mt-14 lg:grid-cols-2">
+        <DuoCard
+          id="agents"
+          accent
+          title="Delegate to an agent"
+          text="Assign an issue to Claude Code or GitHub Copilot, then follow the run on the issue."
+          points={[
+            "Only the agents ready for the project are offered",
+            "Each run works on its own branch, followed live",
+            "Claude Code on your computer, Copilot in GitHub's cloud",
+            "A pull request at the end, or a comment when there is no code",
+          ]}
+          art="assign"
+        />
+        <DuoCard
+          id="approvals"
+          title="Answer when it asks"
+          text="Agents ask before anything outside their limits. You answer on the issue, and the run goes on or stops there."
+          points={[
+            "Commands outside the allowed actions wait for your Allow or Deny",
+            "No answer in 10 minutes means no",
+            "Pushing is always refused: TaskForce opens the pull request itself",
+            "TaskForce never merges: the final call is yours",
+          ]}
+          art="approve"
+          delay={100}
+        />
+      </div>
+    </div>
+  </section>
+
+  {/* ───────── Assistant et analytics : deux cartes en rangée, la légende dessous ───────── */}
+  <section class="section pt-0!">
+    <div class="container-site">
+      <SectionHead label="Assistant and analytics" tone="sky">
+        <Fragment slot="title">Ask your projects, <span class="t-word">see where you stand.</span></Fragment>
+      </SectionHead>
+      <div class="mt-12 grid gap-x-6 gap-y-14 sm:mt-14 md:grid-cols-2">
+        <BentoCard
+          id="assistant"
+          title="An assistant that knows your work"
+          text="Ask about your projects in plain words. It reads your board and Brain OS, and can use the tools you connect."
+          points={[
+            "Answers grounded in your board and your Brain OS pages",
+            "Drafts issues from a rough idea",
+            "Uses the tools of the MCP servers you connect",
+            "Runs on your local model or on the API key you choose",
+          ]}
+          art="ask"
+          tone="sky"
+        />
+        <BentoCard
+          id="measure"
+          title="Analytics from your own board"
+          text="See how the work moves without building a spreadsheet. Everything is computed from your board."
+          points={[
+            "Throughput: what got done each week, against what came in",
+            "Burndown for each cycle",
+            "Workload and capacity, for you and your agents",
+          ]}
+          art="chart"
+          tone="lime"
+          delay={100}
+        />
+      </div>
+    </div>
+  </section>
+
+  {/* ───────── Connexions : un mur de logos (façon Cluely) ───────── */}
+  <section id="connect" class="section scroll-mt-16 pt-0!">
+    <div class="container-site">
+      <SectionHead
+        label="Connections"
+        tone="blue"
+        lead="Plug TaskForce into the tools you already use. Each connection is one you set up, and you can remove it at any time."
+      >
+        <Fragment slot="title">Works with <span class="t-word">what you already use.</span></Fragment>
+      </SectionHead>
+      <div class="mt-12 grid gap-px overflow-hidden rounded-2xl bg-border ring-1 ring-border sm:mt-14 sm:grid-cols-2 lg:grid-cols-4" data-reveal>
+        {
+          TOOLS.map((t) => (
+            <div class="flex flex-col gap-4 bg-white p-7">
+              {t.brand ? <BrandMark brand={t.brand} className="size-8" /> : <Webhook className="size-8 text-foreground" strokeWidth={1.6} aria-hidden="true" />}
+              <div>
+                <p class="t-h4">{t.name}</p>
+                <p class="t-small mt-1">{t.role}</p>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+      <div class="mt-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-10" data-reveal style="--d: 80ms">
+        <p class="t-label shrink-0">Your AI, your choice</p>
+        <ul class="flex flex-wrap items-center gap-x-9 gap-y-4">
+          {
+            AI.map((key) => (
+              <li class="flex items-center gap-2.5 text-[16px] font-medium tracking-[-0.015em] text-foreground/85">
+                <BrandMark brand={key} className="size-6" />
+                {BRANDS[key].name}
+              </li>
+            ))
+          }
+          <li class="text-[15px] text-muted-foreground">and any OpenAI-compatible API</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  {/* ───────── Au quotidien : colonnes à filets ───────── */}
+  <section id="everyday" class="section scroll-mt-16 pt-0!">
+    <div class="container-site">
+      <SectionHead label="Every day" tone="red" lead="The small things that make an app pleasant to live in, every day.">
+        <Fragment slot="title">Small things, <span class="t-word">done well.</span></Fragment>
+      </SectionHead>
+      <RuleColumns items={EVERYDAY} class="mt-12 sm:mt-14" />
+    </div>
+  </section>
+
+  <CtaBand />
+</BaseLayout>

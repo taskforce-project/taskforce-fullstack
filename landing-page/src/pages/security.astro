@@ -1,0 +1,259 @@
+---
+/**
+ * Security : où vivent les données, ce qui peut sortir du poste, comment les agents sont bornés, comment signaler une
+ * faille. Repris de la spec desktop (§5.3, §5.7) et du runner ; rien d'affirmé au-delà. Sections variées : fiche en
+ * un panneau à filets, rangée en deux colonnes, bandeau gris, colonnes à filets.
+ */
+import { ArrowRight, Check, CircleAlert, Code2, Hammer } from "lucide-react";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import SectionHead from "@/components/site/SectionHead.astro";
+import Pill from "@/components/site/Pill.astro";
+import Faq, { type FaqItem } from "@/components/site/Faq.astro";
+import CtaBand from "@/components/site/CtaBand.astro";
+import RuleColumns, { type RuleItem } from "@/components/site/RuleColumns.astro";
+import { LINKS } from "@/lib/site";
+
+const FACTS = [
+  { k: "Account", v: "None to create" },
+  { k: "Your data", v: "In one folder on your computer" },
+  { k: "Your keys", v: "In your system's keychain" },
+  { k: "Telemetry", v: "None" },
+  { k: "AI", v: "A local model, or the API key you choose" },
+  { k: "Source code", v: "Open, under AGPL-3.0" },
+];
+
+const FOLDERS = [
+  { os: "Windows", path: "%APPDATA%\\TaskForce" },
+  { os: "macOS", path: "~/Library/Application Support/TaskForce" },
+  { os: "Linux", path: "~/.local/share/TaskForce" },
+];
+
+const OUTBOUND = [
+  {
+    what: "Your AI provider",
+    when: "Only if you add an API key. Your question and the context it needs go to that provider. With a local model, nothing leaves.",
+  },
+  {
+    what: "Claude Code",
+    when: "It talks to Anthropic with your own account, exactly as when you use it yourself.",
+  },
+  {
+    what: "GitHub",
+    when: "Only if you connect it: the repositories, issues and pull requests you work with, and the tasks you give to Copilot.",
+  },
+  {
+    what: "MCP servers and Plane",
+    when: "Only the ones you connect, when the assistant or a sync uses them.",
+  },
+  { what: "Webhooks", when: "Only to the addresses you add, while the app is open." },
+  { what: "Updates", when: "The app checks the project's GitHub releases for a new version." },
+];
+
+const AGENT_LIMITS = [
+  "Each run works in a separate copy of your repository, on its own branch",
+  "Commands outside reading, editing and committing wait for your Allow or Deny",
+  "Pushing is always refused: TaskForce opens the pull request itself",
+  "A cloned repository can't change how the agent runs: its own agent settings are ignored",
+  "Issue text is passed as task data, never as instructions",
+  "In TaskForce, the agent can read your workspace and write issues of its project, never delete",
+];
+
+const OPEN: RuleItem[] = [
+  {
+    icon: Code2,
+    tint: "bg-tint-blue text-ink-blue",
+    title: "Every line is public",
+    text: "The whole app is published under the AGPL-3.0 license: the interface, the service behind it, and the way agents are started.",
+    link: { href: LINKS.github, label: "Source code", external: true },
+  },
+  {
+    icon: Hammer,
+    tint: "bg-tint-yellow text-ink-yellow",
+    title: "Build it yourself",
+    text: "Prefer not to run a file you downloaded? The source code is public, so you can build the app yourself.",
+    link: { href: "/download", label: "All downloads" },
+  },
+  {
+    icon: CircleAlert,
+    tint: "bg-tint-red text-ink-red",
+    title: "Report a problem",
+    text: "Found a security issue? Tell us privately: with “Report a vulnerability” in the repository's Security tab, or by email with “Security” in the subject. We answer within a few days.",
+    link: { href: `mailto:${LINKS.email}?subject=Security`, label: LINKS.email },
+  },
+];
+
+const FAQ: FaqItem[] = [
+  {
+    q: "Can I use TaskForce for confidential projects?",
+    a: "Yes. With a local model, nothing about your projects leaves your computer. If you add an API key or connect an agent, that provider receives what it needs to answer, so check that it is allowed by your company first.",
+  },
+  {
+    q: "Is my data encrypted?",
+    a: "Your API keys and tokens are kept in your system's keychain, never in plain text. The database itself is not encrypted by the app: turn on your system's disk encryption (FileVault, BitLocker or LUKS) to protect it.",
+  },
+  {
+    q: "Does TaskForce see my code?",
+    a: "There is no TaskForce server to see it. Your code stays in your repository. The agents you start read it, and send what they need to their own provider: Anthropic for Claude Code, GitHub for Copilot.",
+  },
+  {
+    q: "Can other apps on my computer talk to TaskForce?",
+    a: "The app's internal service only accepts connections from your own computer, on a port picked at each launch, and only from requests that carry a key the app creates at every start.",
+  },
+  {
+    q: "What happens to my data before an update?",
+    a: "The app copies your database before applying an update, so a failed update never costs you your work.",
+  },
+];
+---
+
+<BaseLayout
+  title="Security and privacy: your data stays on your computer | TaskForce"
+  description="TaskForce runs on your computer, keeps your data there and sends nothing without your say. See what is stored, what can leave, how agents are kept in check, and how to report a problem."
+>
+  <PageHero
+    bg="security"
+    label="Security and privacy"
+    lead="TaskForce runs on your computer and keeps your work there. Here is what it stores, what can leave and when, and how agents are kept in check. The code is open, so you can verify every line."
+  >
+    <Fragment slot="title">Private by default. <span class="t-word">Open to check.</span></Fragment>
+  </PageHero>
+
+  {/* la fiche « en un coup d'œil » */}
+  <section class="pt-10">
+    <div class="container-site">
+      <dl class="grid gap-px overflow-hidden rounded-2xl bg-border shadow-sm ring-1 ring-border sm:grid-cols-2 lg:grid-cols-3" data-reveal>
+        {
+          FACTS.map((f) => (
+            <div class="flex flex-col gap-2 bg-white p-6 sm:p-7">
+              <dt class="t-label">{f.k}</dt>
+              <dd class="text-[19px] font-medium tracking-[-0.02em]">{f.v}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </div>
+  </section>
+
+  {/* ───────── Où vivent les données ───────── */}
+  <section class="section">
+    <div class="container-site grid gap-12 lg:grid-cols-2 lg:gap-20">
+      <SectionHead
+        label="Your data"
+        tone="green"
+        lead="Your projects, Brain OS pages, attachments and settings live in the app's data folder. Nothing is stored anywhere else."
+      >
+        <Fragment slot="title">One folder, <span class="t-word">on your computer.</span></Fragment>
+      </SectionHead>
+      <div class="flex flex-col gap-8" data-reveal style="--d: 100ms">
+        <dl class="card-white divide-y divide-border px-6">
+          {
+            FOLDERS.map((f) => (
+              <div class="grid gap-1 py-4 sm:grid-cols-[7rem_1fr] sm:gap-6">
+                <dt class="text-[15px] font-medium">{f.os}</dt>
+                <dd class="font-mono text-[13px] break-all text-muted-foreground">{f.path}</dd>
+              </div>
+            ))
+          }
+        </dl>
+        <ul class="flex flex-col gap-3.5">
+          {
+            [
+              "API keys and GitHub tokens go to your system's keychain, never in plain text",
+              "Your database is copied before every update",
+              "Turn on disk encryption to protect the rest: the app doesn't encrypt its database",
+            ].map((t) => (
+              <li class="flex items-start gap-3 text-[16px] leading-relaxed">
+                <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-tint-green text-ink-green">
+                  <Check className="size-3.5" strokeWidth={2.6} aria-hidden="true" />
+                </span>
+                {t}
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  {/* ───────── Ce qui peut sortir : bandeau gris, la liste à droite ───────── */}
+  <section class="pb-6">
+    <div class="container-wide">
+      <div class="rounded-2xl bg-card py-16 sm:py-20">
+        <div class="relative grid gap-12 px-6 sm:px-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-16 lg:px-14">
+          <SectionHead
+            label="What can leave"
+            tone="glass"
+            lead="TaskForce has no server of its own and collects no usage data. These are the only connections it makes, and each one is something you set up."
+          >
+            <Fragment slot="title">Nothing leaves <span class="t-word">without your say.</span></Fragment>
+          </SectionHead>
+          <dl class="divide-y divide-black/[0.06] rounded-xl bg-white px-6 shadow-sm" data-reveal style="--d: 100ms">
+            {
+              OUTBOUND.map((r) => (
+                <div class="grid gap-1 py-4 sm:grid-cols-[11rem_1fr] sm:gap-6">
+                  <dt class="text-[15px] font-medium">{r.what}</dt>
+                  <dd class="text-[15px] leading-relaxed text-muted-foreground">{r.when}</dd>
+                </div>
+              ))
+            }
+          </dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* ───────── Les agents ───────── */}
+  <section class="section">
+    <div class="container-site grid gap-12 lg:grid-cols-2 lg:gap-20">
+      <SectionHead
+        label="Agents"
+        tone="pink"
+        lead="Coding agents are powerful, so TaskForce sets the limits of every run itself. They hold whatever the agent is asked to do."
+      >
+        <Fragment slot="title">Agents work <span class="t-word">inside your limits.</span></Fragment>
+      </SectionHead>
+      <div data-reveal style="--d: 100ms">
+        <ul class="card-white divide-y divide-border px-6">
+          {
+            AGENT_LIMITS.map((t) => (
+              <li class="flex items-start gap-3 py-4 text-[16px] leading-relaxed">
+                <Check className="mt-1 size-4 shrink-0 text-primary" strokeWidth={2.5} aria-hidden="true" />
+                {t}
+              </li>
+            ))
+          }
+        </ul>
+        <a href="/agents#limits" class="link-arrow mt-8 text-[15px]">
+          How a run works <ArrowRight aria-hidden="true" />
+        </a>
+      </div>
+    </div>
+  </section>
+
+  {/* ───────── Code ouvert et signalement ───────── */}
+  <section class="section pt-0!">
+    <div class="container-site">
+      <SectionHead label="Open source" tone="blue">
+        <Fragment slot="title">Don't take our word for it. <span class="t-word">Read the code.</span></Fragment>
+      </SectionHead>
+      <RuleColumns items={OPEN} class="mt-14 sm:mt-16" />
+    </div>
+  </section>
+
+  {/* ───────── FAQ ───────── */}
+  <section class="section pt-0!">
+    <div class="container-site grid gap-12 lg:grid-cols-[0.8fr_1.2fr]">
+      <div data-reveal>
+        <Pill tone="neutral">Questions</Pill>
+        <h2 class="t-h2 mt-6">About <span class="t-word">security.</span></h2>
+        <p class="t-body mt-5 max-w-sm">
+          Something we didn't cover? Write to <a href={`mailto:${LINKS.email}`} class="link-inline">{LINKS.email}</a>.
+        </p>
+      </div>
+      <Faq items={FAQ} />
+    </div>
+  </section>
+
+  <CtaBand title="Your work, on your computer." />
+</BaseLayout>

@@ -1,0 +1,31 @@
+---
+/**
+ * Section produit (architecture de Duna) : étiquette, grand titre, chapô, bouton « Explore » à droite, puis la liste
+ * dépliante qui pilote l'illustration (îlot FeatureTabs). `reverse` met l'illustration à droite, pour alterner.
+ */
+import SectionHead from "./SectionHead.astro";
+import FeatureTabs, { type TabItem } from "@/components/visuals/FeatureTabs";
+import type { Tone } from "@/components/visuals/shapes";
+
+interface Props {
+  id?: string;
+  label: string;
+  tone: Tone;
+  lead: string;
+  items: TabItem[];
+  more?: { href: string; label?: string };
+  reverse?: boolean;
+}
+const { id, label, tone, lead, items, more, reverse = false } = Astro.props;
+---
+
+<section id={id} class="section scroll-mt-16">
+  <div class="container-site">
+    <SectionHead label={label} tone={tone} lead={lead} more={more}>
+      <Fragment slot="title"><slot name="title" /></Fragment>
+    </SectionHead>
+    <div class="mt-14 sm:mt-16" data-reveal>
+      <FeatureTabs client:visible items={items} tone={tone} reverse={reverse} />
+    </div>
+  </div>
+</section>

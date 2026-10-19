@@ -1,0 +1,160 @@
+---
+/**
+ * Agents : comment une tâche part vers Claude Code ou Copilot et en revient (déroulé qui s'allume au défilement), ce
+ * que l'agent peut toucher (colonnes à filets), les deux agents (cartes en paire, vrais logos), FAQ. Tout est repris
+ * du code (runner, ADR-013, GitHubCopilotProvider).
+ */
+import { ArrowRight, FolderGit2, Github, Laptop, ListChecks } from "lucide-react";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import CtaBand from "@/components/site/CtaBand.astro";
+import DuoCard from "@/components/site/DuoCard.astro";
+import Faq, { type FaqItem } from "@/components/site/Faq.astro";
+import HeroDownload from "@/components/site/HeroDownload.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import Pill from "@/components/site/Pill.astro";
+import RuleColumns, { type RuleItem } from "@/components/site/RuleColumns.astro";
+import SectionHead from "@/components/site/SectionHead.astro";
+import RunPipeline from "@/components/visuals/RunPipeline";
+
+const LIMITS: RuleItem[] = [
+  {
+    icon: FolderGit2,
+    tint: "bg-tint-blue text-ink-blue",
+    title: "Your repository",
+    text: "A separate copy on a new branch. Your checkout and your current branch are never touched.",
+  },
+  {
+    icon: Laptop,
+    tint: "bg-tint-green text-ink-green",
+    title: "Your computer",
+    text: "Reading, editing and committing are allowed. Anything else, like running the tests, waits for your approval. Pushing is always refused.",
+  },
+  {
+    icon: ListChecks,
+    tint: "bg-tint-pink text-ink-pink",
+    title: "TaskForce",
+    text: "Your rights, narrowed to reading the workspace and writing the issues of that project. It never deletes anything.",
+  },
+  {
+    icon: Github,
+    tint: "bg-tint-yellow text-ink-yellow",
+    title: "GitHub",
+    text: "Nothing directly. TaskForce pushes the branch and opens the pull request once the agent is done.",
+  },
+];
+
+const FAQ: FaqItem[] = [
+  {
+    q: "Does TaskForce use my Claude subscription?",
+    a: "Your own Claude Code does, exactly as when you run it yourself. TaskForce starts Claude Code on your computer and never handles your Anthropic login or tokens. The usage counts against your own plan or API key.",
+  },
+  {
+    q: "What happens if I don't answer an approval?",
+    a: "After 10 minutes the request is denied, and the agent goes on without that action.",
+  },
+  {
+    q: "Which model does the agent use?",
+    a: "Claude Code uses your own default model, the one set in your Claude Code settings. Copilot uses the model GitHub picks for the task.",
+  },
+  {
+    q: "Can I use an agent for work that isn't code?",
+    a: "Yes. When a project has no repository, Claude Code works in a temporary folder and answers with a comment on the issue: research, a draft, a summary. The same limits apply.",
+  },
+  {
+    q: "Could someone hijack the agent through an issue?",
+    a: "The text of an issue is handed to the agent as task data, never as instructions. And whatever a planted sentence asks for, the limits above still hold: commands wait for your approval, nothing is deleted in TaskForce, and nothing is merged without you.",
+  },
+];
+---
+
+<BaseLayout
+  title="Agents: hand tasks to Claude Code or GitHub Copilot | TaskForce"
+  description="Assign an issue to Claude Code or GitHub Copilot. TaskForce gives the agent the context, shows every step and waits for your answer before anything risky."
+>
+  <PageHero
+    bg="agents"
+    label="Agents"
+    lead="Give an issue to Claude Code or GitHub Copilot. TaskForce hands the agent the context it needs, shows you every step, and waits for you before anything risky."
+  >
+    <Fragment slot="title">Hand off the work. <span class="t-word">Keep the control.</span></Fragment>
+    <HeroDownload class="anim-fade-up mt-10" align="center" secondary={{ label: "What an agent can touch", href: "#limits" }} />
+  </PageHero>
+
+  {/* ───────── Le déroulé, qui s'allume au défilement ───────── */}
+  <section id="run" class="section scroll-mt-16">
+    <div class="container-site">
+      <SectionHead
+        label="A run, from start to finish"
+        lead="Everything happens on the issue: you assign it, you watch it, you answer when it asks, and you review what comes back."
+      >
+        <Fragment slot="title">Five steps, <span class="t-word">all on the issue.</span></Fragment>
+      </SectionHead>
+      <div class="mt-14 sm:mt-16" data-reveal>
+        <RunPipeline client:visible />
+      </div>
+    </div>
+  </section>
+
+  {/* ───────── Le périmètre : colonnes à filets ───────── */}
+  <section id="limits" class="section scroll-mt-16 pt-0!">
+    <div class="container-site">
+      <SectionHead
+        label="Limits"
+        tone="green"
+        lead="Every run gets the same limits, whatever the agent is asked to do. TaskForce sets them, not the agent."
+      >
+        <Fragment slot="title">What the agent <span class="t-word">can touch.</span></Fragment>
+      </SectionHead>
+      <RuleColumns items={LIMITS} cols={4} class="mt-14 sm:mt-16" />
+      <p class="t-small mt-10 max-w-3xl" data-reveal>
+        The text of an issue is written by people, so it is handed to the agent as task data, never as instructions. A
+        cloned repository can't change how the agent runs either: its own agent settings are ignored.
+      </p>
+    </div>
+  </section>
+
+  {/* ───────── Les deux agents : cartes en paire, vrais logos ───────── */}
+  <section id="agents" class="section scroll-mt-16 pt-0!">
+    <div class="container-site">
+      <SectionHead label="Your agents" tone="yellow">
+        <Fragment slot="title">Use the agent <span class="t-word">you already have.</span></Fragment>
+      </SectionHead>
+      <div class="mt-12 grid gap-5 sm:mt-14 lg:grid-cols-2">
+        <DuoCard
+          accent
+          brand="claude-code"
+          kicker="On your computer"
+          title="Claude Code"
+          text="Your own Claude Code, installed on your computer and signed in with your own subscription or API key. TaskForce starts it for each run and never sees your Claude credentials."
+          points={["Claude Code installed and signed in", "A git repository for code tasks, or none for everything else"]}
+          art="live"
+        />
+        <DuoCard
+          brand="github-copilot"
+          kicker="In GitHub's cloud"
+          title="GitHub Copilot"
+          text="GitHub's coding agent works in GitHub's cloud, from your issue and under your GitHub account. TaskForce follows the task and shows you the pull request on the same issue."
+          points={["A Copilot plan with the coding agent turned on for the repository", "The project linked to a GitHub repository"]}
+          art="prCopilot"
+          delay={100}
+        />
+      </div>
+      <a href="/download#requirements" class="link-arrow mt-10 text-[15px]" data-reveal>
+        Everything you need to get started <ArrowRight aria-hidden="true" />
+      </a>
+    </div>
+  </section>
+
+  {/* ───────── FAQ ───────── */}
+  <section class="section pt-0!">
+    <div class="container-site grid gap-12 lg:grid-cols-[0.8fr_1.2fr]">
+      <div data-reveal>
+        <Pill tone="neutral">Questions</Pill>
+        <h2 class="t-h2 mt-6">About <span class="t-word">agents.</span></h2>
+      </div>
+      <Faq items={FAQ} />
+    </div>
+  </section>
+
+  <CtaBand title="Give your next issue to an agent." />
+</BaseLayout>
