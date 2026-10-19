@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell } from "electron";
 import { join } from "node:path";
 
 import { ACCOUNT_SERVER, accountPageUrl, refresh, revoke, SessionEndedError, signIn, signInError } from "./account";
@@ -11,6 +11,14 @@ import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
 import { toolsStatus } from "./tools";
 import { check, startUpdater } from "./updater";
+import {
+  integratedTitleBar,
+  MAIN_TITLE_BAR_HEIGHT,
+  SIGNIN_TITLE_BAR_HEIGHT,
+  titleBarHeight,
+  titleBarOptions,
+  titleBarOverlay,
+} from "./window-chrome";
 
 /**
  * Coque de l'app desktop : connexion au compte TaskForce, puis base, backend et interface sur la machine, dans une
@@ -96,14 +104,20 @@ async function sessionEnded(): Promise<void> {
 /** Écran de connexion : se résout une fois le compte connecté, la fenêtre encore ouverte (cf. `openApp`). */
 function signInWindow(): Promise<{ account: Account; window: BrowserWindow }> {
   return new Promise((resolve) => {
+    // Comme la page de connexion de la webapp : la peinture et l'app à gauche, la connexion à droite.
+    const dark = nativeTheme.shouldUseDarkColors;
     const window = new BrowserWindow({
-      width: 460,
-      height: 520,
+      width: 1000,
+      height: 640,
       resizable: false,
+      maximizable: false,
+      fullscreenable: false,
       title: "Sign in to TaskForce",
-      backgroundColor: "#fbfbfc",
+      backgroundColor: dark ? "#0b0e19" : "#ffffff",
+      ...titleBarOptions(process.platform, dark, SIGNIN_TITLE_BAR_HEIGHT),
       webPreferences: { preload: join(__dirname, "signin-preload.js"), contextIsolation: true, sandbox: true },
     });
+    window.setMenuBarVisibility(false);
     lockNavigation(window, null);
     void window.loadFile(staticPage("signin.html"));
 
@@ -143,8 +157,11 @@ function splashWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 420,
     height: 280,
-    frame: false,
+    // Sans barre de titre ni boutons, mais avec le cadre du système : Windows 11 en arrondit les coins.
+    ...(integratedTitleBar(process.platform) ? { titleBarStyle: "hidden" as const } : { frame: false }),
     resizable: false,
+    maximizable: false,
+    minimizable: false,
     show: false,
     backgroundColor: "#fbfbfc",
     webPreferences: { contextIsolation: true, sandbox: true },
@@ -190,9 +207,13 @@ async function openApp(account: Account, previous: BrowserWindow | null): Promis
     minHeight: 600,
     show: false,
     title: "TaskForce",
-    backgroundColor: "#fbfbfc",
+    backgroundColor: "#fbfaf9",
+    // Le thème de l'interface est connu une fois la page chargée : elle l'envoie (desktop:title-bar-theme).
+    ...titleBarOptions(process.platform, false, MAIN_TITLE_BAR_HEIGHT),
     webPreferences: { preload: join(__dirname, "preload.js"), contextIsolation: true, sandbox: true },
   });
+  // Le menu reste pour ses raccourcis (copier, zoom, recharger) ; sa barre n'apparaît pas.
+  mainWindow.setMenuBarVisibility(false);
   lockNavigation(mainWindow, stack.origin);
   mainWindow.once("ready-to-show", () => {
     if (!mainWindow) return;
@@ -259,6 +280,15 @@ function registerIpc(): void {
     }
   });
   ipcMain.handle("desktop:check-updates", () => check());
+  ipcMain.handle("desktop:open-logs", () => shell.openPath(appLogDir()));
+  // Boutons du système aux couleurs du thème de l'interface (clair ou sombre), à la hauteur de la barre qu'elle dessine.
+  ipcMain.on("desktop:title-bar-theme", (event, input: unknown) => {
+    const { dark, height } = (input ?? {}) as { dark?: unknown; height?: unknown };
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window && typeof dark === "boolean" && integratedTitleBar(process.platform)) {
+      window.setTitleBarOverlay(titleBarOverlay(dark, titleBarHeight(height)));
+    }
+  });
   // Outils de la personne pour les tâches de Claude Code : Claude Code, git et GitHub CLI, installés et connectés ?
   ipcMain.handle("desktop:tools-status", () => toolsStatus());
   // GitHub par le `gh` de la personne (dépôts, création, connexion) : son jeton reste dans le trousseau du système.
