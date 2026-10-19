@@ -1,46 +1,72 @@
 ---
+/**
+ * Mentions légales : éditeur, hébergeurs (site, téléchargements, comptes, domaine), propriété intellectuelle, crédits
+ * des peintures (lib/backgrounds.ts).
+ * Repris de l'ancienne page, sans l'hébergement de la webapp.
+ */
 import LegalDoc from "@/layouts/LegalDoc.astro";
+import { BACKGROUNDS, type BackgroundName } from "@/lib/backgrounds";
+import { LINKS } from "@/lib/site";
+
+const WHERE: Record<BackgroundName, string> = {
+  home: "Home page",
+  features: "Features",
+  agents: "Agents",
+  security: "Security",
+  download: "Download",
+  migrate: "Moving from the web app",
+  band: "Home page, local first",
+  end: "Closing panel",
+};
+const CREDITS = (Object.keys(BACKGROUNDS) as BackgroundName[]).map((k) => ({ where: WHERE[k], ...BACKGROUNDS[k].credit }));
 ---
 
 <LegalDoc
-  title="Legal Notice"
-  description="Publication and hosting information for the TaskForce website. Publication details are placeholders pending company registration."
-  eyebrow="Legal & Trust"
-  updated="31 July 2026"
-  draft={true}
+  title="Legal notice"
+  description="Who publishes the TaskForce website, who hosts it, and who owns what is shown on it."
+  updated="19 October 2026"
 >
-  <p>
-    This notice identifies the publisher and host of this website, as required by applicable law.
-    TaskForce is currently published by an individual; business registration details will be added
-    once the registration is finalized.
-  </p>
-
   <h2>Publisher</h2>
-  <ul>
-    <li><strong>Publisher</strong> - Pierre Michel (individual)</li>
-    <li><strong>Status</strong> - Sole proprietor, business registration in progress</li>
-    <li><strong>Director of publication</strong> - Pierre Michel</li>
-    <li><strong>Contact</strong> - <a href="mailto:contact@taskforce-project.fr">contact@taskforce-project.fr</a></li>
-  </ul>
+  <dl>
+    <div><dt>Publisher</dt><dd>Pierre Michel, individual</dd></div>
+    <div><dt>Director of publication</dt><dd>Pierre Michel</dd></div>
+    <div><dt>Contact</dt><dd><a href={`mailto:${LINKS.email}`}>{LINKS.email}</a></dd></div>
+  </dl>
 
   <h2>Hosting</h2>
-  <ul>
-    <li><strong>Website (landing)</strong> - Vercel Inc., 340 S Lemon Ave #4133, Walnut, CA 91789, USA</li>
-    <li><strong>Domain and DNS</strong> - OVH SAS (registrar), Cloudflare, Inc. (DNS and CDN)</li>
-    <li><strong>Application</strong> - hosted on infrastructure located in the European Union (France), via OVH SAS. See our <a href="/legal/privacy">privacy policy</a> for details.</li>
-  </ul>
+  <dl>
+    <div><dt>Website</dt><dd>Vercel Inc., 340 S Lemon Ave #4133, Walnut, CA 91789, USA</dd></div>
+    <div>
+      <dt>Downloads</dt>
+      <dd>GitHub, Inc., 88 Colin P. Kelly Jr. Street, San Francisco, CA 94107, USA, through the project's releases</dd>
+    </div>
+    <div><dt>Accounts</dt><dd>OVH SAS, 2 rue Kellermann, 59100 Roubaix, France</dd></div>
+    <div><dt>Domain and DNS</dt><dd>OVH SAS (registrar), Cloudflare, Inc. (DNS)</dd></div>
+  </dl>
 
   <h2>Intellectual property</h2>
   <p>
-    The TaskForce name, logo and the content of this site are protected. Third-party names and logos
-    shown on the site (for example, the tools in our integrations catalogue) belong to their respective
-    owners and are used for identification only.
+    The source code of TaskForce is published under the <a href={LINKS.license}>GNU Affero General Public License
+    v3.0</a>. The TaskForce name and logo identify the official project and are not covered by that license.
+  </p>
+  <p>
+    Other names and logos shown on this site, such as Claude, Claude Code, GitHub Copilot, GitHub, Ollama and Plane,
+    belong to their owners. They are used only to say which tools TaskForce works with. TaskForce is not affiliated
+    with or endorsed by them.
   </p>
 
-  <h2>Contact</h2>
+  <h2>Images</h2>
   <p>
-    For any question about this site, write to
-    <a href="mailto:contact@taskforce-project.fr">contact@taskforce-project.fr</a>. See also our
-    <a href="/legal/privacy">privacy policy</a> and <a href="/legal/terms">terms of service</a>.
+    The paintings behind the pages come from museum collections that publish them on Unsplash, in the public domain or
+    under the Unsplash License.
   </p>
+  <ul>
+    {
+      CREDITS.map((c) => (
+        <li>
+          {c.where}: <a href={c.source}>{c.collection}</a>
+        </li>
+      ))
+    }
+  </ul>
 </LegalDoc>

@@ -1,0 +1,27 @@
+---
+/** Dernier appel : un grand panneau sur une peinture, le titre en haut sur le ciel (voile clair), le téléchargement. */
+import Backdrop from "./Backdrop.astro";
+import HeroDownload from "./HeroDownload.astro";
+
+interface Props {
+  title?: string;
+  text?: string;
+}
+const {
+  title = "Your projects, your agents, your computer.",
+  text = "Install TaskForce, create your free account, and start with your first project.",
+} = Astro.props;
+---
+
+<section class="pb-20 sm:pb-24">
+  <div class="container-wide">
+    <div class="relative isolate overflow-hidden rounded-2xl px-6 pt-16 pb-36 sm:pt-20 sm:pb-44" data-reveal>
+      <Backdrop name="end" class="inset-0" veil="top" />
+      <div class="relative flex flex-col items-center text-center">
+        <h2 class="t-h1 max-w-[18ch]">{title}</h2>
+        <p class="t-lead mt-6 max-w-xl text-foreground/80">{text}</p>
+        <HeroDownload class="mt-10" align="center" />
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,43 @@
+---
+/**
+ * FAQ en accordéon natif (<details>), sans JavaScript. Émet le FAQPage correspondant : le balisage reprend
+ * exactement les questions et réponses affichées. `link` ajoute un lien sous la réponse.
+ */
+import { faqPageLd } from "@/lib/structured-data";
+
+export type FaqItem = { q: string; a: string; link?: { label: string; href: string } };
+
+interface Props {
+  items: FaqItem[];
+}
+const { items } = Astro.props;
+const ld = faqPageLd(items);
+---
+
+<div class="faq border-t border-rule">
+  {
+    items.map((it) => (
+      <details class="group border-b border-rule">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-6 py-6 text-[17px] font-medium tracking-[-0.015em] transition-colors hover:text-ink-blue [&::-webkit-details-marker]:hidden">
+          {it.q}
+          <span class="relative size-4 shrink-0 text-subtle" aria-hidden="true">
+            <span class="absolute top-1/2 left-0 h-px w-4 bg-current" />
+            <span class="absolute top-0 left-1/2 h-4 w-px bg-current transition-transform duration-200 group-open:scale-y-0" />
+          </span>
+        </summary>
+        <div class="max-w-3xl pb-6">
+          <p class="t-body">{it.a}</p>
+          {it.link && (
+            <a href={it.link.href} class="link-arrow mt-3 text-[15px]">
+              {it.link.label}
+              <svg viewBox="0 0 16 16" class="size-4" aria-hidden="true">
+                <path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" />
+              </svg>
+            </a>
+          )}
+        </div>
+      </details>
+    ))
+  }
+</div>
+<script type="application/ld+json" is:inline set:html={JSON.stringify(ld)} />
