@@ -2,37 +2,67 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' file:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
   <title>Sign in to TaskForce</title>
   <style>
-    :root { color-scheme: light dark; --bg: #fbfbfc; --panel: #ffffff; --ink: #1c1b19; --muted: #6b6862; --line: #e6e6e9;
-      --accent: #2f6bf6; --accent-ink: #ffffff; --error: #b42318; }
-    @media (prefers-color-scheme: dark) { :root { --bg: #0e1116; --panel: #151a21; --ink: #ecebe8; --muted: #9a978f;
-      --line: #262b33; --error: #f97066; } }
+    /* Comme la page de connexion de la webapp : à gauche la peinture (celle de l'accueil du site), le titre et l'app ;
+       à droite la connexion, au thème du système. Le panneau peint reste clair dans les deux thèmes. */
+    :root { color-scheme: light dark; --bg: #ffffff; --ink: #191715; --muted: #6b6762; --line: #e6e4e0;
+      --button: #ffffff; --accent: #2f6bf6; --accent-ink: #ffffff; --error: #b42318; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #0b0e19; --ink: #f3f2f0; --muted: #9a978f; --line: #242a40;
+      --button: #12172a; --error: #f97066; } }
     html, body { height: 100%; margin: 0; }
-    body { background: var(--bg); color: var(--ink); font: 14px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
-      display: grid; place-items: center; }
-    main { width: min(360px, calc(100% - 32px)); display: grid; gap: 20px; }
-    .logo { display: block; margin-bottom: 18px; }
-    h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
-    p { margin: 0; color: var(--muted); }
+    body { display: grid; grid-template-columns: 520px 1fr; overflow: hidden; background: var(--bg); color: var(--ink);
+      font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+      -webkit-app-region: drag; user-select: none; }
+    button { -webkit-app-region: no-drag; }
+
+    .paint { position: relative; overflow: hidden; color: #191715; border-right: 1px solid #e6e4e0; }
+    .paint > .bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 72%; }
+    /* Voile clair et doux sous le texte : la peinture reste visible autour, le texte se lit. */
+    .paint > .veil { position: absolute; inset: 0;
+      background: radial-gradient(85% 52% at 26% 20%, rgb(255 255 255 / 0.7) 0%, rgb(255 255 255 / 0.32) 55%, rgb(255 255 255 / 0) 85%); }
+    .paint-content { position: relative; display: flex; flex-direction: column; height: 100%; box-sizing: border-box;
+      padding: 40px 40px 0; gap: 22px; }
+    .paint h2 { margin: 18px 0 0; font-size: 29px; font-weight: 600; line-height: 1.14; letter-spacing: -0.03em;
+      text-wrap: balance; max-width: 400px; }
+    .paint p { margin: 10px 0 0; max-width: 400px; color: rgb(25 23 21 / 0.72); font-size: 14.5px; }
+    .shot { margin-top: auto; }
+    .shot img { display: block; width: 100%; border: 1px solid rgb(25 23 21 / 0.08); border-bottom: none;
+      border-radius: 10px 10px 0 0; box-shadow: 0 1px 0 #1917150a, 0 18px 40px -16px #19171538; transform: translateY(6px); }
+
+    main { align-self: center; justify-self: center; width: min(340px, calc(100% - 48px)); display: grid; gap: 20px; }
+    h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+    main p { margin: 0; color: var(--muted); }
+    .lead { margin-top: 6px !important; }
     .actions { display: grid; gap: 10px; }
-    button { font: inherit; font-weight: 500; height: 40px; border-radius: 999px; cursor: pointer; border: 1px solid var(--line);
-      background: var(--panel); color: var(--ink); }
-    button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    button:disabled { opacity: 0.6; cursor: default; }
+    .actions button { font: inherit; font-weight: 500; height: 40px; border-radius: 8px; cursor: pointer;
+      border: 1px solid var(--line); background: var(--button); color: var(--ink); }
+    .actions button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+    .actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .actions button:disabled { opacity: 0.6; cursor: default; }
     .status { min-height: 21px; }
     .status.error { color: var(--error); }
     .note { font-size: 12.5px; }
   </style>
 </head>
 <body>
+  <aside class="paint" aria-hidden="true">
+    <img class="bg" src="painting.webp" alt="">
+    <div class="veil"></div>
+    <div class="paint-content">
+      <div>
+        <svg width="40" height="40" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="#2f6bf6"/><svg x="19" y="19" width="62" height="62" viewBox="180 79 250 250"><path fill-rule="evenodd" fill="#fff" d="M 295.302 130.180 C 288.367 131.232, 281.321 133.995, 275.687 137.871 C 270.921 141.151, 235.210 178.670, 233.593 182.096 C 231.969 185.539, 233.936 185.455, 240.778 181.788 C 244.475 179.807, 250.650 177.160, 254.500 175.906 C 261.252 173.706, 263.165 173.603, 308.500 173.007 C 358.807 172.345, 357.172 172.511, 368.097 166.959 C 373.525 164.200, 404 134.371, 404 131.817 C 404 130.817, 403.663 129.927, 403.250 129.837 C 400.447 129.230, 299.451 129.550, 295.302 130.180 M 268.500 185.116 C 260.296 186.308, 251.710 189.336, 245.826 193.111 C 240.552 196.496, 208 229.691, 208 231.685 C 208 234.229, 210.489 233.990, 224.753 230.080 C 232.864 227.857, 242.650 225.589, 246.500 225.039 C 250.350 224.489, 272.077 224.031, 294.782 224.020 C 348.983 223.994, 345.904 224.948, 368.630 201.140 C 375.433 194.012, 381 187.513, 381 186.697 C 381 185.881, 380.288 184.941, 379.418 184.607 C 376.966 183.666, 275.264 184.133, 268.500 185.116 M 245.798 237.923 C 242.661 238.930, 238.088 240.930, 235.635 242.368 C 231.238 244.945, 209.192 267.489, 205.744 272.935 C 202.511 278.042, 203.673 278.223, 236.710 277.771 C 269.622 277.321, 270.882 277.112, 280.500 270.516 C 286.603 266.331, 310.500 240.602, 310.500 238.216 C 310.500 236.638, 308.128 236.484, 281 236.296 C 254.795 236.115, 250.863 236.297, 245.798 237.923"/></svg></svg>
+        <h2>Where teams and AI agents ship together.</h2>
+        <p>Plan the work, delegate to the right person or agent, and watch it move, all in one workspace.</p>
+      </div>
+      <div class="shot"><img src="app.webp" alt=""></div>
+    </div>
+  </aside>
   <main>
     <div>
-      <svg class="logo" width="48" height="48" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#2f6bf6"/><svg x="19" y="19" width="62" height="62" viewBox="180 79 250 250"><path fill-rule="evenodd" fill="#fff" d="M 295.302 130.180 C 288.367 131.232, 281.321 133.995, 275.687 137.871 C 270.921 141.151, 235.210 178.670, 233.593 182.096 C 231.969 185.539, 233.936 185.455, 240.778 181.788 C 244.475 179.807, 250.650 177.160, 254.500 175.906 C 261.252 173.706, 263.165 173.603, 308.500 173.007 C 358.807 172.345, 357.172 172.511, 368.097 166.959 C 373.525 164.200, 404 134.371, 404 131.817 C 404 130.817, 403.663 129.927, 403.250 129.837 C 400.447 129.230, 299.451 129.550, 295.302 130.180 M 268.500 185.116 C 260.296 186.308, 251.710 189.336, 245.826 193.111 C 240.552 196.496, 208 229.691, 208 231.685 C 208 234.229, 210.489 233.990, 224.753 230.080 C 232.864 227.857, 242.650 225.589, 246.500 225.039 C 250.350 224.489, 272.077 224.031, 294.782 224.020 C 348.983 223.994, 345.904 224.948, 368.630 201.140 C 375.433 194.012, 381 187.513, 381 186.697 C 381 185.881, 380.288 184.941, 379.418 184.607 C 376.966 183.666, 275.264 184.133, 268.500 185.116 M 245.798 237.923 C 242.661 238.930, 238.088 240.930, 235.635 242.368 C 231.238 244.945, 209.192 267.489, 205.744 272.935 C 202.511 278.042, 203.673 278.223, 236.710 277.771 C 269.622 277.321, 270.882 277.112, 280.500 270.516 C 286.603 266.331, 310.500 240.602, 310.500 238.216 C 310.500 236.638, 308.128 236.484, 281 236.296 C 254.795 236.115, 250.863 236.297, 245.798 237.923"/></svg></svg>
       <h1>Sign in to TaskForce</h1>
-      <p>Use your free TaskForce account. Your browser opens to sign in, then you come back here.</p>
+      <p class="lead">Use your free TaskForce account. Your browser opens to sign in, then you come back here.</p>
     </div>
     <div class="actions">
       <button class="primary" id="signin" type="button">Sign in</button>

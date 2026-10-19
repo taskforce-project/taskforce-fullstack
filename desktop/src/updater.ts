@@ -46,12 +46,23 @@ export function startUpdater(): void {
   setInterval(() => void check(), CHECK_EVERY_MS).unref();
 }
 
+/**
+ * Résultat d'une vérification, pour les réglages : à jour, nouvelle version en cours de téléchargement (installée à la
+ * fermeture), vérification impossible (hors ligne), ou app lancée depuis les sources (pas de mises à jour).
+ */
+export type UpdateCheck =
+  | { status: "up-to-date" | "downloading"; version: string }
+  | { status: "unavailable" | "development" };
+
 /** Vérifie maintenant (au lancement, toutes les six heures, ou à la demande depuis les réglages). */
-export async function check(): Promise<void> {
-  if (!app.isPackaged) return;
+export async function check(): Promise<UpdateCheck> {
+  if (!app.isPackaged) return { status: "development" };
   try {
-    await autoUpdater.checkForUpdates();
+    const result = await autoUpdater.checkForUpdates();
+    if (result?.isUpdateAvailable) return { status: "downloading", version: result.updateInfo.version };
+    return { status: "up-to-date", version: app.getVersion() };
   } catch {
     // Déjà dit par l'événement « error » (hors ligne, release introuvable) : l'app continue, on réessaie plus tard.
+    return { status: "unavailable" };
   }
 }

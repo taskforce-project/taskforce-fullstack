@@ -12,13 +12,13 @@ import { SITE_URL } from "@/lib/config/urls";
 /**
  * Coquille des pages d'authentification - **ecran scinde**.
  *
- * A GAUCHE (>= 1024px) un panneau de marque : papier doux et filet (direction artistique), titre produit
- * et une **capture reelle de l'app**. A DROITE le formulaire, sur fond de
+ * A GAUCHE (>= 1024px) un panneau de marque : la peinture de l'accueil du site (domaine public, credit dans les
+ * mentions legales), titre produit et une **capture reelle de l'app**. Le panneau reste clair dans les deux themes. A DROITE le formulaire, sur fond de
  * theme, en trois bandes (barre · contenu centre · mention legale). Sous 1024px le panneau cede la place
  * et le formulaire prend toute la largeur (la marque revient alors dans la barre). Hauteur 100svh, sans
  * defilement : ces pages restent un passage.
  *
- * Les deux colonnes suivent le theme clair/sombre.
+ * La colonne du formulaire suit le theme clair/sombre.
  */
 export default function AuthLayout({
   children,
@@ -49,6 +49,15 @@ export default function AuthLayout({
     <div className="auth-shell">
       {/* ── Panneau de marque (gauche, desktop) : titre + capture reelle de l'app ── */}
       <aside className="auth-aside">
+        <Image
+          src="/images/sign-in-painting.webp"
+          alt=""
+          fill
+          sizes="(min-width: 1024px) 53vw, 1px"
+          priority
+          className="auth-aside-paint"
+        />
+        <div className="auth-aside-veil" aria-hidden="true" />
         <div className="auth-aside-content">
           <a href={siteUrl} className="auth-aside-brand" aria-label="TaskForce, back to the website">
             <Image
@@ -57,7 +66,7 @@ export default function AuthLayout({
               width={150}
               height={100}
               priority
-              className="h-16 w-auto dark:invert"
+              className="h-16 w-auto"
             />
           </a>
 
