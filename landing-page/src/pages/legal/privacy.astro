@@ -1,7 +1,9 @@
 ---
 /**
- * Confidentialité : le site (aucun cookie, aucune mesure d'audience, journaux de l'hébergeur), l'app desktop (pas de
- * compte, données locales, aucune télémétrie, connexions choisies), les droits RGPD.
+ * Confidentialité : le site (aucun cookie, aucune mesure d'audience, journaux de l'hébergeur, téléchargements comptés
+ * par GitHub), le compte TaskForce (obligatoire pour l'app desktop : nom, e-mail, mot de passe haché ; connexion,
+ * rapatriement des projets web, e-mails sur le service), l'app desktop (données locales, aucune télémétrie, connexions
+ * choisies), les droits RGPD. L'hébergeur du serveur de comptes est à nommer ici dès qu'il est choisi.
  */
 import LegalDoc from "@/layouts/LegalDoc.astro";
 import { LINKS } from "@/lib/site";
@@ -9,13 +11,16 @@ import { LINKS } from "@/lib/site";
 
 <LegalDoc
   title="Privacy policy"
-  description="The TaskForce website uses no cookies and no analytics. The desktop app has no account, keeps your data on your computer and sends us nothing."
+  description="The TaskForce website uses no cookies and no analytics. The desktop app keeps your projects on your computer: your free TaskForce account is the only thing we hold."
   updated="19 October 2026"
 >
   <h2>In short</h2>
   <ul>
     <li>This website sets <strong>no cookies</strong> and runs <strong>no analytics</strong> or advertising trackers.</li>
-    <li>The desktop app has <strong>no account</strong>. Your data stays on your computer, and the app sends us nothing.</li>
+    <li>
+      The desktop app needs a <strong>free TaskForce account</strong>. We keep your account; your projects stay on your
+      computer, and the app sends us no usage data.
+    </li>
     <li>The services you connect to the app receive data directly from your computer, under their own terms.</li>
   </ul>
 
@@ -37,12 +42,34 @@ import { LINKS } from "@/lib/site";
       read.
     </li>
     <li>
-      <strong>Downloads</strong> are served by GitHub from the project's releases. When you download a file, GitHub
-      receives the request, under GitHub's privacy statement.
+      <strong>Downloads</strong> are served by GitHub from the project's releases, under GitHub's privacy statement.
+      GitHub counts how many times each file is downloaded: we only see those totals, never who downloaded.
     </li>
     <li>
       <strong>Email.</strong> If you write to us, we use your address and your message only to answer you, and we
       delete them once they are no longer needed.
+    </li>
+  </ul>
+
+  <h2>Your TaskForce account</h2>
+  <ul>
+    <li>
+      <strong>What we keep.</strong> Your email address, your name, and your password, which our sign-in service only
+      stores as a secure hash. The account you used on the web app is the same account.
+    </li>
+    <li>
+      <strong>Why.</strong> To sign you in to the app; to offer to bring your web app projects to your computer, if you
+      have some; and to email you about TaskForce itself, such as updates, changes to these terms or the closing of the
+      web app. We send no advertising.
+    </li>
+    <li>
+      <strong>Legal basis.</strong> Providing the account you asked for, and our legitimate interest in telling you
+      about changes to the service.
+    </li>
+    <li><strong>Emails</strong> are sent through Brevo, our email provider.</li>
+    <li>
+      <strong>How long.</strong> As long as your account exists. Ask us to delete it at any time, and we delete it with
+      everything attached to it.
     </li>
   </ul>
 
@@ -51,6 +78,10 @@ import { LINKS } from "@/lib/site";
     <li>
       <strong>Your data stays on your computer.</strong> Projects, Brain OS pages, attachments and settings are kept
       in the app's data folder. We have no access to them.
+    </li>
+    <li>
+      <strong>Signing in.</strong> The app talks to our account server to sign you in and, if you accept, to bring your
+      web app projects to your computer. It sends nothing else.
     </li>
     <li><strong>No telemetry.</strong> The app sends no usage data, to us or to anyone else.</li>
     <li>
@@ -64,16 +95,17 @@ import { LINKS } from "@/lib/site";
   <h2>The web app</h2>
   <p>
     Until it closes, the hosted web app at app.taskforce-project.fr is covered by its own privacy policy, shown in the
-    app. To take your projects with you, see <a href="/migrate">moving from the web app</a>.
+    app. Its projects are deleted when it closes; your account stays. To take your projects with you, see{" "}
+    <a href="/migrate">moving from the web app</a>.
   </p>
 
   <h2>Your rights</h2>
   <p>
-    Under the GDPR you can access, correct, delete or export the personal data we hold about you, and object to or
-    restrict its processing. Write to <a href={`mailto:${LINKS.email}`}>{LINKS.email}</a>. You can also lodge a
-    complaint with your data protection authority: in France, the CNIL (cnil.fr).
+    Under the GDPR you can access, correct, delete or export the personal data we hold about you, including your
+    account, and object to or restrict its processing. Write to <a href={`mailto:${LINKS.email}`}>{LINKS.email}</a>.
+    You can also lodge a complaint with your data protection authority: in France, the CNIL (cnil.fr).
   </p>
 
   <h2>Changes</h2>
-  <p>If this policy changes, we update it on this page and change the date above.</p>
+  <p>If this policy changes, we update it on this page, change the date above, and tell account holders by email.</p>
 </LegalDoc>

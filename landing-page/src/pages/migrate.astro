@@ -20,24 +20,24 @@ const WEB_APP_CLOSES: string | null = null;
 const WEB_APP_HOST = "app.taskforce-project.fr";
 
 const STEPS = [
-  {
-    n: "01",
-    t: "Export each project",
-    d: "In the web app, open a project, click Export in the toolbar, then JSON (full). You get one file per project.",
-    dot: "bg-tint-blue text-ink-blue",
-  },
+  { n: "01", t: "Install the desktop app", d: "Download TaskForce for macOS, Windows or Linux.", dot: "bg-tint-blue text-ink-blue" },
   {
     n: "02",
-    t: "Save what the export doesn't hold",
-    d: "Copy the Brain OS pages and download the attachments you want to keep. The list is below.",
-    dot: "bg-tint-yellow text-ink-yellow",
+    t: "Sign in with your account",
+    d: "Use the email address and password you use on the web app. Your account stays the same.",
+    dot: "bg-tint-green text-ink-green",
   },
-  { n: "03", t: "Install the desktop app", d: "Download TaskForce for macOS, Windows or Linux. No account to create.", dot: "bg-tint-green text-ink-green" },
+  {
+    n: "03",
+    t: "Bring your projects",
+    d: "TaskForce sees your web app projects and asks whether to bring them to this computer. Say yes, and they arrive with their comments and history.",
+    dot: "bg-tint-pink text-ink-pink",
+  },
   {
     n: "04",
-    t: "Import your files",
-    d: "Open TaskForce and import each project file. Your issues come back with their comments and history.",
-    dot: "bg-tint-pink text-ink-pink",
+    t: "Save what doesn't move",
+    d: "Before the web app closes, copy the Brain OS pages and download the attachments you want to keep. The list is below.",
+    dot: "bg-tint-yellow text-ink-yellow",
   },
 ];
 
@@ -57,11 +57,15 @@ const MISSING = [
 const FAQ: FaqItem[] = [
   {
     q: "Why is the web app closing?",
-    a: "TaskForce is becoming a desktop app: your data on your own computer, no account, and no server to keep running. It is free and open source.",
+    a: "TaskForce is becoming a desktop app: your projects on your own computer, instead of on our servers. It is free and open source.",
   },
   {
     q: "What happens to the data left on the web app?",
-    a: "It goes away with the web app. Export everything you want to keep before it closes.",
+    a: "Your projects on the web app are deleted when it closes. Your account stays, so you keep signing in to the desktop app with it.",
+  },
+  {
+    q: "Will you tell me before it closes?",
+    a: "Yes. Every web app account receives an email before the web app closes, with the date and the steps on this page.",
   },
   {
     q: "Can my team keep working together?",
@@ -73,7 +77,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "I prefer a spreadsheet. Is there another format?",
-    a: "The same Export menu offers CSV (issues and details): one row per issue, ready for any spreadsheet. Keep the JSON file too: it is the one you import into the desktop app.",
+    a: "Yes. In the web app, a project's Export menu offers CSV (issues and details): one row per issue, ready for any spreadsheet.",
   },
 ];
 ---
@@ -85,7 +89,7 @@ const FAQ: FaqItem[] = [
   <PageHero
     bg="migrate"
     label="Moving from the web app"
-    lead={`The TaskForce web app at ${WEB_APP_HOST} is closing. TaskForce goes on as a free desktop app, with your data on your own computer. Here is how to take your work with you.`}
+    lead={`The TaskForce web app at ${WEB_APP_HOST} is closing. TaskForce goes on as a free desktop app, with your projects on your own computer. Your account stays: sign in with it, and bring your work along.`}
   >
     <Fragment slot="title">Bring your projects <span class="t-word">to your desktop.</span></Fragment>
     <p class="anim-fade-up mt-8 inline-flex items-center gap-2.5 rounded-full bg-white/80 px-4 py-2.5 text-[14.5px] shadow-sm ring-1 ring-black/5 backdrop-blur" style="--d: 200ms">
@@ -125,7 +129,7 @@ const FAQ: FaqItem[] = [
               <span class:list={["flex size-9 items-center justify-center rounded-full text-[14px] font-medium", s.dot]}>{i + 1}</span>
               <p class="t-h4 mt-5">{s.t}</p>
               <p class="t-small mt-2">{s.d}</p>
-              {s.n === "03" && (
+              {s.n === "01" && (
                 <a href="/download" class="link-arrow mt-5 text-[15px]">
                   Download <ArrowRight aria-hidden="true" />
                 </a>
@@ -145,7 +149,7 @@ const FAQ: FaqItem[] = [
       </SectionHead>
       <div class="mt-14 grid gap-5 sm:mt-16 lg:grid-cols-2">
         <article class="wash wash-green p-8 sm:p-10" data-reveal>
-          <p class="t-label text-ink-green">In the project file</p>
+          <p class="t-label text-ink-green">Brought to your computer</p>
           <ul class="mt-6 flex flex-col gap-3.5">
             {
               INCLUDED.map((t) => (
@@ -192,5 +196,5 @@ const FAQ: FaqItem[] = [
     </div>
   </section>
 
-  <CtaBand title="Ready when you are." text="Install TaskForce, import your first project and pick up where you left off." />
+  <CtaBand title="Ready when you are." text="Install TaskForce, sign in with your account and pick up where you left off." />
 </BaseLayout>

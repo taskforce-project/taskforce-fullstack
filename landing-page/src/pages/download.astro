@@ -4,7 +4,7 @@
  * requise, choix de l'IA, notes d'installation, nouveautés. Sans release publiée : état explicite, aucun lien mort.
  */
 import { createMarkdownProcessor } from "@astrojs/markdown-remark";
-import { ArrowRight, ArrowUpRight, Bell, Bot, Cpu, Download, Github, MemoryStick } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Bell, Bot, Cpu, Download, MemoryStick, UserRound } from "lucide-react";
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import HeroDownload from "@/components/site/HeroDownload.astro";
@@ -27,8 +27,8 @@ const FAMILIES: { os: OsFamily; brand: "macos" | "windows" | "linux"; name: stri
 const NEEDS: RuleItem[] = [
   { icon: Cpu, tint: "bg-tint-blue text-ink-blue", title: "A 64-bit computer", text: "macOS on Apple silicon or Intel, Windows 10 or 11, or Linux." },
   { icon: MemoryStick, tint: "bg-tint-green text-ink-green", title: "8 GB of memory", text: "Enough for TaskForce itself. A local AI model needs more, see below." },
-  { icon: Bot, tint: "bg-tint-yellow text-ink-yellow", title: "Claude Code, if you delegate to it", text: "Installed on your computer and signed in with your own account." },
-  { icon: Github, tint: "bg-tint-pink text-ink-pink", title: "A GitHub account, for Copilot", text: "With Copilot's coding agent, connected through GitHub's own sign-in." },
+  { icon: UserRound, tint: "bg-tint-yellow text-ink-yellow", title: "A free TaskForce account", text: "Created when you first open the app, or the one you already use on the web app." },
+  { icon: Bot, tint: "bg-tint-pink text-ink-pink", title: "An agent, if you delegate", text: "Claude Code installed and signed in with your own account, or GitHub Copilot's coding agent." },
 ];
 
 const AI_TIERS = [
@@ -48,7 +48,7 @@ const AI_TIERS = [
   <PageHero
     bg="download"
     label="Download"
-    lead="Free and open source, for macOS, Windows and Linux. Install it, open it, and start with your first project. No account to create."
+    lead="Free and open source, for macOS, Windows and Linux. Install it, sign in or create your free account, and start with your first project."
   >
     <Fragment slot="title">Download <span class="t-word">TaskForce.</span></Fragment>
     {
@@ -132,7 +132,7 @@ const AI_TIERS = [
   <section id="requirements" class="section scroll-mt-16">
     <div class="container-site">
       <SectionHead label="What you need">
-        <Fragment slot="title">A computer, and <span class="t-word">nothing else to set up.</span></Fragment>
+        <Fragment slot="title">A computer, a free account, <span class="t-word">and that's it.</span></Fragment>
       </SectionHead>
       <RuleColumns items={NEEDS} cols={4} class="mt-14 sm:mt-16" />
     </div>
