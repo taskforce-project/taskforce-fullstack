@@ -28,9 +28,9 @@ describe("ai-status-store", () => {
   })
 
   it.each([
-    ["force", true, 0],
-    ["état périmé", false, Date.now() - 61_000],
-  ])("relit l'état (%s)", async (_label, force, fetchedAt) => {
+    ["force", true, 0, { refresh: true }],
+    ["état périmé", false, Date.now() - 61_000, {}],
+  ])("relit l'état (%s)", async (_label, force, fetchedAt, options) => {
     useAiStatusStore.setState({ status: ready, fetchedAt })
     vi.mocked(getAiStatus).mockResolvedValue({ ...ready, chatAvailable: false })
 
@@ -38,6 +38,7 @@ describe("ai-status-store", () => {
 
     expect(next?.chatAvailable).toBe(false)
     expect(getAiStatus).toHaveBeenCalledTimes(1)
+    expect(getAiStatus).toHaveBeenCalledWith(options)
   })
 
   it("échec de lecture → null, état conservé, pas d'exception", async () => {

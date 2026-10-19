@@ -205,6 +205,21 @@ export const CONSTANTS_EN = {
       twoFactorCodeInvalid: "Invalid code - try again.",
       twoFactorEnabled: "Two-factor authentication enabled.",
       twoFactorCopySecret: "Copy the secret (manual entry)",
+      // Passkeys
+      passkeySignIn: "Sign in with a passkey",
+      passkeyWaiting: "Waiting for your passkey…",
+      passkeyFailed: "Couldn't sign in with this passkey. Use your password, or try again.",
+      // Desktop app sign-in (/auth/desktop)
+      desktopTitle: "Sign in to TaskForce Desktop",
+      desktopSubtitle: "Continue as {email} in the TaskForce app on this computer.",
+      desktopContinue: "Continue to the app",
+      desktopOpening: "Opening the app…",
+      desktopDoneTitle: "You're signed in",
+      desktopDoneSubtitle: "Go back to the TaskForce app. You can close this tab.",
+      desktopUseAnother: "Use another account",
+      desktopMissingTitle: "Start from the app",
+      desktopMissingSubtitle: "Click Sign in in the TaskForce desktop app: it opens this page for you.",
+      desktopError: "Couldn't sign in to the app. Start again from the app.",
       // Register (step 1)
       registerTitle: "Create your account",
       firstName: "First name",

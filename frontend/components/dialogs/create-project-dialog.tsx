@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { BrandLogo } from "@/components/ui/brand-logo"
+import { DesktopGitHubConnect } from "@/components/desktop/desktop-github-connect"
 import { ProjectIconPicker } from "@/components/ui/project-icon-picker"
 import { ColorPalettePicker, PROJECT_COLORS } from "@/components/ui/color-palette-picker"
 import { ProjectVisibilityPicker } from "@/components/ui/project-visibility-picker"
@@ -32,6 +33,8 @@ import {
   type ConnectorView,
   type GitHubRepo,
 } from "@/lib/api/integration-service"
+import { IS_DESKTOP } from "@/lib/desktop"
+import { useDesktopToolsStore } from "@/lib/store/desktop-tools-store"
 import { cn } from "@/lib/utils"
 
 // ---------------------------------------------------------------------------
@@ -87,6 +90,12 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const linkRepo = useProjectStore((s) => s.linkRepo)
   const preselectImportSource = useCreateProjectStore((s) => s.importSource)
   const repoSetup = useCreateProjectStore((s) => s.repoSetup)
+  // App desktop : GitHub passe par le GitHub CLI de la personne, pas par l'intégration de l'espace.
+  const desktopGitHub = useDesktopToolsStore((s) => s.status?.github ?? null)
+  const desktopRepos = useDesktopToolsStore((s) => s.repos)
+  const refreshTools = useDesktopToolsStore((s) => s.refresh)
+  const fetchDesktopRepos = useDesktopToolsStore((s) => s.fetchRepos)
+  const resolveDesktopRepo = useDesktopToolsStore((s) => s.resolveRepo)
 
   const [mode, setMode] = useState<Mode>("blank")
   const [isLoading, setIsLoading] = useState(false)
@@ -159,22 +168,38 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   // Statut GitHub (connecté ?) à l'ouverture du mode vierge : conditionne la section « dépôt de code ».
   useEffect(() => {
     if (!open || mode !== "blank" || !slug) return
+    if (IS_DESKTOP) {
+      if (useDesktopToolsStore.getState().status === null) void refreshTools()
+      return
+    }
     let alive = true
     getGitHubStatus(slug)
       .then((s) => { if (alive) setGithubConnected(s.connected) })
       .catch(() => { if (alive) setGithubConnected(false) })
     return () => { alive = false }
-  }, [open, mode, slug])
+  }, [open, mode, slug, refreshTools])
 
   // Charge les dépôts accessibles quand on choisit « lier un dépôt existant ».
   useEffect(() => {
-    if (repoMode !== "link" || !githubConnected || !slug || githubRepos.length > 0) return
+    if (repoMode !== "link") return
+    if (IS_DESKTOP) {
+      if (!desktopGitHub?.signedIn || desktopRepos !== null) return
+      setReposLoading(true)
+      void fetchDesktopRepos().finally(() => setReposLoading(false))
+      return
+    }
+    if (!githubConnected || !slug || githubRepos.length > 0) return
     setReposLoading(true)
     getGitHubRepos(slug)
       .then(setGithubRepos)
       .catch(() => setGithubRepos([]))
       .finally(() => setReposLoading(false))
-  }, [repoMode, githubConnected, slug, githubRepos.length])
+  }, [repoMode, githubConnected, slug, githubRepos.length, desktopGitHub, desktopRepos, fetchDesktopRepos])
+
+  // Desktop : seuls les dépôts où la personne peut pousser sont proposés (Claude Code y ouvre ses pull requests).
+  const repoChoices = IS_DESKTOP
+    ? (desktopRepos ?? []).filter((r) => r.canPush).map((r) => ({ fullName: r.fullName, isPrivate: r.private }))
+    : githubRepos
 
   function handleNameChange(value: string) {
     setName(value)
@@ -225,8 +250,12 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
       if (project) {
         // Dépôt de code optionnel : on lie APRÈS création. Un échec de lien n'annule pas le projet.
         if (repoMode === "create" && repoName.trim()) {
-          const linked = await linkRepo(slug, project.id, { mode: "CREATE", repoName: repoName.trim(), privateRepo: repoPrivate })
-          if (!linked) toast.warning("Project created, but the repository couldn't be created. You can link one later.")
+          const linked = IS_DESKTOP
+            ? await createDesktopRepo(slug, project.id, repoName.trim())
+            : await linkRepo(slug, project.id, { mode: "CREATE", repoName: repoName.trim(), privateRepo: repoPrivate })
+          if (!linked) toast.warning("Project created, but the repository couldn't be created. You can link one later.", {
+            description: IS_DESKTOP ? useDesktopToolsStore.getState().error ?? undefined : undefined,
+          })
         } else if (repoMode === "link" && linkRepoFullName) {
           const linked = await linkRepo(slug, project.id, { mode: "LINK", repoFullName: linkRepoFullName })
           if (!linked) toast.warning("Project created, but the repository couldn't be linked. You can link one later.")
@@ -242,6 +271,12 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     } finally {
       setIsLoading(false)
     }
+  }
+
+  /** Desktop : le dépôt se crée avec le GitHub CLI de la personne, puis se lie par son nom. */
+  async function createDesktopRepo(projectSlug: string, projectId: number, repo: string) {
+    const fullName = await resolveDesktopRepo("create", repo, repoPrivate)
+    return fullName ? linkRepo(projectSlug, projectId, { mode: "LINK", repoFullName: fullName }) : null
   }
 
   /**
@@ -397,7 +432,9 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                 <span className="font-normal text-muted-foreground">(optional)</span>
               </label>
 
-              {githubConnected === false ? (
+              {IS_DESKTOP && !desktopGitHub?.signedIn ? (
+                <DesktopGitHubConnect purpose="Create or link a repository so that Claude Code can work on this project and open pull requests." />
+              ) : !IS_DESKTOP && githubConnected === false ? (
                 <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2.5">
                   <p className="text-xs text-muted-foreground">
                     Connect GitHub to create or link a repository for this project. You will come right back here.
@@ -455,7 +492,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                         className="h-control w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary/50"
                       >
                         <option value="">Select a repository…</option>
-                        {githubRepos.map((r) => (
+                        {repoChoices.map((r) => (
                           <option key={r.fullName} value={r.fullName}>
                             {r.fullName}{r.isPrivate ? " (private)" : ""}
                           </option>

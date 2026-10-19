@@ -586,6 +586,42 @@ public class AuthService {
         return buildAuthResponse(user, kcToken, pending.firstName(), pending.lastName());
     }
 
+    /**
+     * Connexion par passkey, vérifiée par {@code PasskeyService} : la passkey vaut deux facteurs (l'appareil et le geste
+     * de la personne, empreinte ou code de l'appareil), aucun code n'est demandé en plus. Keycloak ouvre la session par
+     * l'échange de jetons du backend ({@link KeycloakAuthService#impersonate}).
+     */
+    @Transactional
+    public AuthResponse completePasskeyLogin(Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new BusinessException("This passkey couldn't sign you in"));
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new BusinessException("This account is disabled.");
+        }
+        KeycloakTokenResponse kcToken;
+        try {
+            kcToken = keycloakAuthService.impersonate(user.getKeycloakId());
+        } catch (RuntimeException e) {
+            // Keycloak sans l'échange de jetons (keycloak/scripts/passkey-sessions.sh) ou injoignable.
+            log.error("Session refusée après une passkey valide pour l'utilisateur {} : {}", user.getId(), e.getMessage());
+            throw new BusinessException("Signing in with a passkey isn't available right now. Use your password.");
+        }
+
+        String firstName = null;
+        String lastName = null;
+        try {
+            UserRepresentation kcUser = keycloakService.getUserById(user.getKeycloakId());
+            firstName = kcUser.getFirstName();
+            lastName = kcUser.getLastName();
+        } catch (RuntimeException e) {
+            log.warn("Nom du compte {} illisible après une passkey : {}", user.getId(), e.getMessage());
+        }
+
+        auditService.record(null, user.getId(), AuditService.USER_LOGIN);
+        log.info("Connexion par passkey réussie pour l'utilisateur {}", user.getId());
+        return buildAuthResponse(user, kcToken, firstName, lastName);
+    }
+
     private static String str(Object value) {
         return value == null ? null : String.valueOf(value);
     }

@@ -1,0 +1,5 @@
+node_modules/
+dist/
+release/
+# Ressources assemblées par `npm run resources` (Java, base, backend, interface) : jamais commitées.
+resources/

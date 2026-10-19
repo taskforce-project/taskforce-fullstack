@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.repository.UserRepository;
-import com.taskforce.tf_api.modules.ged.service.MinioService;
+import com.taskforce.tf_api.modules.ged.service.ObjectStorage;
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,7 +25,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class FileController {
 
-    private final MinioService minioService;
+    private final ObjectStorage objectStorage;
     private final UserRepository userRepository;
 
     /**
@@ -42,7 +42,7 @@ public class FileController {
         }
         String objectKey = "avatars/" + userId + "/avatar";
         try {
-            InputStream stream = minioService.getObjectStream(objectKey);
+            InputStream stream = objectStorage.getObjectStream(objectKey);
             return ResponseEntity.ok()
                 .header(HttpHeaders.CACHE_CONTROL, "max-age=86400, public")
                 .contentType(MediaType.IMAGE_JPEG)
@@ -66,8 +66,8 @@ public class FileController {
     ) {
         String objectKey = "brain/" + workspaceId + "/" + name;
         try {
-            String ct = minioService.contentType(objectKey);
-            InputStream stream = minioService.getObjectStream(objectKey);
+            String ct = objectStorage.contentType(objectKey);
+            InputStream stream = objectStorage.getObjectStream(objectKey);
             return ResponseEntity.ok()
                 .header(HttpHeaders.CACHE_CONTROL, "max-age=86400, public")
                 .contentType(MediaType.parseMediaType(ct != null && !ct.isBlank() ? ct : "application/octet-stream"))

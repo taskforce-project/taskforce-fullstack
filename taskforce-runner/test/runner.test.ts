@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { agentArgs, agentEnv, agentSettings, allowedTools, DENIED_TOOLS, mcpConfig, parseAgentOutput, safeModel } from "../src/agent.js";
 import type { Claim } from "../src/api.js";
 import { parseEnvFile, parseRunnerConfigFile, type RunnerConfig } from "../src/config.js";
-import { branchName, isValidRepoFullName, managedCheckoutDir, pullRequestBody, resolveRepo } from "../src/git.js";
-import { quoteForCmd } from "../src/proc.js";
+import { branchName, ghCredentialArgs, isValidRepoFullName, managedCheckoutDir, pullRequestBody, resolveRepo } from "../src/git.js";
+import { quoteForCmd, run } from "../src/proc.js";
 import { buildPrompt, buildReplyPrompt } from "../src/prompt.js";
 
 const claim: Claim = {
@@ -72,6 +75,31 @@ describe("dépôt du projet : nom validé, clone géré par le runner", () => {
 
   it("nom de dépôt invalide : refusé avant toute commande", async () => {
     await assert.rejects(resolveRepo({}, true, "/tmp/h", "acme/../../etc"), /not a valid GitHub/);
+  });
+
+  it("un clone déjà fait par le runner est réutilisé, marqué géré", async () => {
+    const home = mkdtempSync(join(tmpdir(), "tf-runner-"));
+    try {
+      mkdirSync(join(managedCheckoutDir(home, "acme/website"), ".git"), { recursive: true });
+      const repo = await resolveRepo({}, true, home, "acme/website");
+      assert.equal(repo.managed, true);
+      assert.equal(repo.path, managedCheckoutDir(home, "acme/website"));
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ghCredentialArgs", () => {
+  it("un clone géré pousse avec les identifiants de GitHub CLI, pour cette commande seulement", () => {
+    assert.deepEqual(ghCredentialArgs({ path: "/h/repos/acme/site", baseBranch: "main", setup: [], managed: true }), [
+      "-c", "credential.https://github.com.helper=",
+      "-c", "credential.https://github.com.helper=!gh auth git-credential",
+    ]);
+  });
+
+  it("un dépôt déclaré garde la configuration git de la personne", () => {
+    assert.deepEqual(ghCredentialArgs({ path: "/work/site", baseBranch: "main", setup: [] }), []);
   });
 });
 
@@ -352,4 +380,28 @@ describe("mode sans dépôt (repoless)", () => {
 describe("acceptRepoless (tâches non-code)", () => {
   it("accepté par défaut", () => assert.equal(parseRunnerConfigFile({}).acceptRepoless, true));
   it("désactivable pour un runner code-only", () => assert.equal(parseRunnerConfigFile({ acceptRepoless: false }).acceptRepoless, false));
+});
+
+describe("run : arrêt du runner pendant une commande", () => {
+  it("le signal arrête le processus tout de suite, et le résultat le dit", async () => {
+    const stop = new AbortController();
+    const started = Date.now();
+    setTimeout(() => stop.abort(), 200);
+    const result = await run(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { signal: stop.signal });
+    assert.equal(result.aborted, true);
+    assert.equal(result.timedOut, false);
+    assert.ok(Date.now() - started < 10_000, "arrêté sans attendre");
+  });
+
+  it("un signal déjà levé n'attend pas la fin de la commande", async () => {
+    const stop = new AbortController();
+    stop.abort();
+    const result = await run(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { signal: stop.signal });
+    assert.equal(result.aborted, true);
+  });
+
+  it("sans signal, la commande va à son terme", async () => {
+    const result = await run(process.execPath, ["-e", "process.stdout.write('ok')"]);
+    assert.deepEqual([result.code, result.stdout, result.aborted], [0, "ok", false]);
+  });
 });

@@ -5,19 +5,44 @@ import { LoginForm } from './login-form';
 
 // Mock next/navigation
 const mockPush = vi.fn();
+const mockReplace = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
+    replace: mockReplace,
   }),
 }));
 
 // Mock auth context
 const mockLogin = vi.fn();
+const mockLoginWithPasskey = vi.fn();
 vi.mock('@/lib/contexts/auth-context', () => ({
   useAuth: () => ({
     login: mockLogin,
+    loginWithPasskey: mockLoginWithPasskey,
   }),
 }));
+
+// Passkeys : absentes par défaut (navigateur de test), activées par les tests qui en ont besoin.
+const { mockSupported, mockAutofill } = vi.hoisted(() => ({
+  mockSupported: vi.fn(() => false),
+  mockAutofill: vi.fn(async () => false),
+}));
+vi.mock('@/lib/auth/passkeys', () => ({
+  passkeysSupported: mockSupported,
+  passkeyAutofillAvailable: mockAutofill,
+}));
+
+// Invitation en attente : aucune par défaut.
+const { mockTakeInvitation, mockAcceptInvitation } = vi.hoisted(() => ({
+  mockTakeInvitation: vi.fn((): string | null => null),
+  mockAcceptInvitation: vi.fn(),
+}));
+vi.mock('@/lib/utils/pending-invitation', () => ({
+  stashInvitationToken: vi.fn(),
+  takeInvitationToken: mockTakeInvitation,
+}));
+vi.mock('@/lib/api/invitation-service', () => ({ acceptInvitation: mockAcceptInvitation }));
 
 // Mock sonner toast
 vi.mock('sonner', () => ({
@@ -62,6 +87,9 @@ describe('LoginForm Component', () => {
     mockIsAllowed.mockReturnValue(true);
     mockGetTimeUntilReset.mockReturnValue(30);
     mockReset.mockClear();
+    mockSupported.mockReturnValue(false);
+    mockAutofill.mockResolvedValue(false);
+    mockTakeInvitation.mockReturnValue(null);
   });
 
   it('should render login form with all fields', () => {
@@ -379,6 +407,159 @@ describe('LoginForm Component', () => {
       await waitFor(() => {
         expect(mockLogin).toHaveBeenCalledTimes(1);
       });
+    });
+  });
+
+  describe('Passkeys', () => {
+    beforeEach(() => {
+      mockSupported.mockReturnValue(true);
+    });
+
+    it('hides the passkey button when the browser has no passkeys', () => {
+      mockSupported.mockReturnValue(false);
+      render(<LoginForm />);
+
+      expect(screen.queryByRole('button', { name: /sign in with a passkey/i })).not.toBeInTheDocument();
+    });
+
+    it('lets the email field suggest passkeys', () => {
+      render(<LoginForm />);
+
+      expect(screen.getByLabelText(/email/i)).toHaveAttribute('autocomplete', 'username webauthn');
+    });
+
+    it('signs in with a passkey and opens the next page', async () => {
+      const { toast } = await import('sonner');
+      mockLoginWithPasskey.mockResolvedValue({ user: { onboardingCompleted: true } });
+      const user = userEvent.setup();
+      render(<LoginForm />);
+
+      await user.click(screen.getByRole('button', { name: /sign in with a passkey/i }));
+
+      await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/'));
+      expect(mockLoginWithPasskey).toHaveBeenCalledWith();
+      expect(mockReset).toHaveBeenCalledWith('login');
+      expect(toast.success).toHaveBeenCalled();
+    });
+
+    it('sends a new account to onboarding and applies a pending invitation', async () => {
+      const { toast } = await import('sonner');
+      mockTakeInvitation.mockReturnValue('invite-token');
+      mockAcceptInvitation.mockResolvedValue(undefined);
+      mockLoginWithPasskey.mockResolvedValue({ user: { onboardingCompleted: false } });
+      const user = userEvent.setup();
+      render(<LoginForm />);
+
+      await user.click(screen.getByRole('button', { name: /sign in with a passkey/i }));
+
+      await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/onboarding'));
+      expect(mockAcceptInvitation).toHaveBeenCalledWith('invite-token');
+      expect(toast.success).toHaveBeenCalledWith('Invitation accepted');
+    });
+
+    it('still signs in when the pending invitation fails', async () => {
+      const { toast } = await import('sonner');
+      mockTakeInvitation.mockReturnValue('invite-token');
+      mockAcceptInvitation.mockRejectedValue(new Error('expired'));
+      mockLoginWithPasskey.mockResolvedValue({ user: { onboardingCompleted: true } });
+      const user = userEvent.setup();
+      render(<LoginForm />);
+
+      await user.click(screen.getByRole('button', { name: /sign in with a passkey/i }));
+
+      await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/'));
+      expect(toast.success).toHaveBeenCalledWith('Successfully signed in!');
+    });
+
+    it('does nothing when the person closes the passkey window', async () => {
+      const { toast } = await import('sonner');
+      mockLoginWithPasskey.mockResolvedValue(null);
+      const user = userEvent.setup();
+      render(<LoginForm />);
+
+      await user.click(screen.getByRole('button', { name: /sign in with a passkey/i }));
+
+      await waitFor(() => expect(mockLoginWithPasskey).toHaveBeenCalled());
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it('shows the server reason when the passkey is refused', async () => {
+      const { toast } = await import('sonner');
+      mockLoginWithPasskey.mockRejectedValue(new Error('This passkey couldn\'t sign you in.'));
+      const user = userEvent.setup();
+      render(<LoginForm />);
+
+      await user.click(screen.getByRole('button', { name: /sign in with a passkey/i }));
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Error', { description: 'This passkey couldn\'t sign you in.' }));
+    });
+
+    it('explains a browser failure in plain words', async () => {
+      const { toast } = await import('sonner');
+      const failure = new Error('The browser couldn\'t use a passkey.');
+      failure.name = 'PasskeyError';
+      mockLoginWithPasskey.mockRejectedValue(failure);
+      const user = userEvent.setup();
+      render(<LoginForm />);
+
+      await user.click(screen.getByRole('button', { name: /sign in with a passkey/i }));
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Error', {
+        description: 'Couldn\'t sign in with this passkey. Use your password, or try again.',
+      }));
+    });
+
+    it('signs in when a passkey is picked in the email field', async () => {
+      mockAutofill.mockResolvedValue(true);
+      mockLoginWithPasskey.mockResolvedValue({ user: { onboardingCompleted: true } });
+      render(<LoginForm />);
+
+      await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/'));
+      expect(mockLoginWithPasskey).toHaveBeenCalledWith({ conditional: true, signal: expect.any(AbortSignal) });
+    });
+
+    it('reports a refused passkey picked in the email field', async () => {
+      const { toast } = await import('sonner');
+      mockAutofill.mockResolvedValue(true);
+      mockLoginWithPasskey.mockRejectedValue(new Error('This passkey couldn\'t sign you in.'));
+      render(<LoginForm />);
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Error', { description: 'This passkey couldn\'t sign you in.' }));
+    });
+
+    it('stops suggesting passkeys when the passkey button is used', async () => {
+      mockAutofill.mockResolvedValue(true);
+      let suggestion: AbortSignal | undefined;
+      mockLoginWithPasskey.mockImplementation((options?: { signal?: AbortSignal }) => {
+        if (options?.signal) {
+          suggestion = options.signal;
+          return new Promise(() => {});
+        }
+        return Promise.resolve(null);
+      });
+      const user = userEvent.setup();
+      render(<LoginForm />);
+      await waitFor(() => expect(suggestion).toBeDefined());
+
+      await user.click(screen.getByRole('button', { name: /sign in with a passkey/i }));
+
+      expect(suggestion?.aborted).toBe(true);
+    });
+
+    it('stops suggesting passkeys when the page closes', async () => {
+      mockAutofill.mockResolvedValue(true);
+      let suggestion: AbortSignal | undefined;
+      mockLoginWithPasskey.mockImplementation((options?: { signal?: AbortSignal }) => {
+        suggestion = options?.signal;
+        return new Promise(() => {});
+      });
+      const { unmount } = render(<LoginForm />);
+      await waitFor(() => expect(suggestion).toBeDefined());
+
+      unmount();
+
+      expect(suggestion?.aborted).toBe(true);
     });
   });
 });

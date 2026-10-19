@@ -312,4 +312,56 @@ class KeycloakAuthServiceTest {
             verify(restTemplate).postForEntity(anyString(), any(HttpEntity.class), eq(Void.class));
         }
     }
+
+    @Nested
+    @DisplayName("impersonate : session d'une personne connectée par passkey")
+    class ImpersonateTests {
+
+        @Test
+        @DisplayName("demande à Keycloak des jetons à son nom, par l'échange de jetons du client du backend")
+        void asks_for_a_token_exchange() {
+            Map<String, Object> keycloakResponse = new HashMap<>();
+            keycloakResponse.put("access_token", "at");
+            keycloakResponse.put("refresh_token", "rt");
+            keycloakResponse.put("token_type", "Bearer");
+            keycloakResponse.put("expires_in", 300);
+            keycloakResponse.put("refresh_expires_in", 1800);
+            when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(new ResponseEntity<>(keycloakResponse, HttpStatus.OK));
+
+            KeycloakTokenResponse response = keycloakAuthService.impersonate("kc-ada");
+
+            assertThat(response.getAccessToken()).isEqualTo("at");
+            assertThat(response.getRefreshExpiresIn()).isEqualTo(1800);
+            @SuppressWarnings("unchecked")
+            org.mockito.ArgumentCaptor<HttpEntity<org.springframework.util.MultiValueMap<String, String>>> sent =
+                org.mockito.ArgumentCaptor.forClass(HttpEntity.class);
+            verify(restTemplate).postForEntity(eq("http://localhost:8180/realms/taskforce/protocol/openid-connect/token"),
+                sent.capture(), eq(Map.class));
+            org.springframework.util.MultiValueMap<String, String> form = sent.getValue().getBody();
+            assertThat(form.getFirst("grant_type")).isEqualTo("urn:ietf:params:oauth:grant-type:token-exchange");
+            assertThat(form.getFirst("requested_subject")).isEqualTo("kc-ada");
+            assertThat(form.getFirst("requested_token_type")).isEqualTo("urn:ietf:params:oauth:token-type:refresh_token");
+            assertThat(form.getFirst("client_id")).isEqualTo("taskforce-backend");
+        }
+
+        @Test
+        @DisplayName("un refus de Keycloak n'ouvre pas de session")
+        void refused_exchange() {
+            when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
+                .thenThrow(new org.springframework.web.client.HttpClientErrorException(HttpStatus.FORBIDDEN));
+
+            assertThatThrownBy(() -> keycloakAuthService.impersonate("kc-ada")).isInstanceOf(RuntimeException.class)
+                .hasMessage("The account service did not open a session");
+        }
+
+        @Test
+        @DisplayName("une réponse vide n'ouvre pas de session")
+        void empty_answer() {
+            when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(ResponseEntity.status(HttpStatus.OK).body(null));
+
+            assertThatThrownBy(() -> keycloakAuthService.impersonate("kc-ada")).isInstanceOf(RuntimeException.class);
+        }
+    }
 }

@@ -4,8 +4,10 @@
  */
 
 import { apiClient, getErrorMessage } from "./client";
+import { getSessionToken } from "./session-token";
 import type { LoginCredentials, RegisterCredentials, AuthUser } from "../auth";
 import { AUTH_ROUTES } from "../config/api-routes";
+import { IS_DESKTOP } from "../desktop";
 
 /**
  * État des vérifications anti-robot, tel que le serveur le déclare.
@@ -205,6 +207,47 @@ export const authService = {
   },
 
   /**
+   * Connexion par passkey, étape 1 : un défi du serveur, que le navigateur signe avec une passkey de ce site.
+   * `silent` : demande de fond (suggestion dans le champ e-mail), sans toast global en cas d'échec.
+   */
+  async passkeySignInOptions(silent = false): Promise<{ requestId: string; options: Record<string, unknown> }> {
+    try {
+      const response = await apiClient.post<{
+        success: boolean;
+        message: string;
+        data: { requestId: string; options: Record<string, unknown> };
+      }>(AUTH_ROUTES.PASSKEY_OPTIONS, undefined, { silentError: silent });
+      return response.data.data;
+    } catch (error) {
+      throw new Error(getErrorMessage(error));
+    }
+  },
+
+  /**
+   * Connexion par passkey, étape 2 : la réponse du navigateur contre la session. Une passkey vaut les deux facteurs,
+   * le serveur ne demande pas de code. Persiste les jetons comme {@link login}.
+   */
+  async passkeySignIn(payload: { requestId: string; credential: Record<string, unknown> }): Promise<AuthResponse> {
+    try {
+      const response = await apiClient.post<{
+        success: boolean;
+        message: string;
+        data: AuthResponse;
+      }>(AUTH_ROUTES.PASSKEY_LOGIN, payload);
+
+      const authData = response.data.data;
+      if (typeof window !== "undefined") {
+        // Le refresh token n'est plus stocké côté JS : il vit dans un cookie HttpOnly posé par le backend.
+        localStorage.setItem("accessToken", authData.accessToken);
+        localStorage.setItem("user", JSON.stringify(authData.user));
+      }
+      return authData;
+    } catch (error) {
+      throw new Error(getErrorMessage(error));
+    }
+  },
+
+  /**
    * Inscription utilisateur (Étape 1)
    * @param data - Données d'inscription
    * @returns ID utilisateur et email
@@ -363,7 +406,9 @@ export const authService = {
    */
   isAuthenticated(): boolean {
     if (typeof window === "undefined") return false;
-    
+    // App desktop : la coque n'ouvre la fenêtre qu'une fois le compte connecté, le profil se lit ensuite sur l'API.
+    if (IS_DESKTOP) return getSessionToken() !== null;
+
     const token = localStorage.getItem("accessToken");
     const user = localStorage.getItem("user");
     

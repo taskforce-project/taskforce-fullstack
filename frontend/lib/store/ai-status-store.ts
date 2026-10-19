@@ -8,7 +8,10 @@ const TTL_MS = 60_000
 interface AiStatusState {
   status: AiStatus | null
   fetchedAt: number
-  /** Relit l'état au plus une fois par minute (sauf `force`). Renvoie null en cas d'échec, sans lever. */
+  /**
+   * Relit l'état au plus une fois par minute. `force` relit tout de suite, cache du backend compris (fournisseur
+   * changé dans les réglages). Renvoie null en cas d'échec, sans lever.
+   */
   fetchStatus: (force?: boolean) => Promise<AiStatus | null>
 }
 
@@ -20,7 +23,7 @@ export const useAiStatusStore = create<AiStatusState>((set, get) => ({
     const { status, fetchedAt } = get()
     if (!force && status && Date.now() - fetchedAt < TTL_MS) return status
     try {
-      const next = await getAiStatus()
+      const next = await getAiStatus(force ? { refresh: true } : {})
       set({ status: next, fetchedAt: Date.now() })
       return next
     } catch {

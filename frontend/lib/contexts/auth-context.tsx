@@ -9,7 +9,10 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useRouter, usePathname } from "next/navigation";
 import { authService, type AuthResponse } from "../api/auth-service";
 import { useUserStore } from "../store/user-store";
+import { desktopBridge, IS_DESKTOP } from "../desktop";
 import type { AuthUser, LoginCredentials } from "../auth";
+import { afterSignInPath } from "../auth/desktop-handoff";
+import { getPasskey } from "../auth/passkeys";
 
 /**
  * Type du contexte d'authentification
@@ -20,6 +23,11 @@ interface AuthContextType {
   isLoading: boolean;
   /** Renvoie la réponse d'auth : `twoFactorRequired` si un code 2FA manque, sinon `user` (l'appelant route selon `onboardingCompleted`). */
   login: (credentials: LoginCredentials) => Promise<AuthResponse>;
+  /**
+   * Connexion par passkey. `conditional` : attend que la personne choisisse une passkey dans le champ e-mail. Null si
+   * elle renonce ou si la demande est annulée ; une erreur si la passkey est refusée.
+   */
+  loginWithPasskey: (options?: { conditional?: boolean; signal?: AbortSignal }) => Promise<AuthResponse | null>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -88,14 +96,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (isLoading || !user || globalThis.window === undefined) return;
     const path = pathname ?? globalThis.location.pathname;
 
-    if (user.onboardingCompleted === false && !path.startsWith("/onboarding") && !path.startsWith("/auth")) {
+    // `/account` : la page du compte, que l'app desktop ouvre pour un compte qui n'a pas d'espace de travail en ligne.
+    if (user.onboardingCompleted === false && !path.startsWith("/onboarding") && !path.startsWith("/auth")
+      && !path.startsWith("/account")) {
       router.replace("/onboarding");
       return;
     }
     // Sortie de la page login : on route direct vers l'onboarding si non fait - pas de passage par
     // l'app avant (sinon elle « flashe » le temps que la garde ci-dessus se déclenche).
     if (path === "/auth/login") {
-      router.replace(user.onboardingCompleted === false ? "/onboarding" : "/");
+      router.replace(afterSignInPath(user.onboardingCompleted === false ? "/onboarding" : "/"));
     }
   }, [user, isLoading, router, pathname]);
 
@@ -110,16 +120,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (response.twoFactorRequired) {
         return response;
       }
-      // Setter immédiat depuis la réponse login → redirection rapide, pas de blocage réseau
-      setUser(response.user);
-      setStoreUser(response.user);
-      // Enrichir avec le profil complet en arrière-plan (non bloquant)
-      void fetchMe().then((remoteUser) => {
-        if (remoteUser) {
-          setUser(remoteUser);
-          setStoreUser(remoteUser);
-        }
-      });
+      establishSession(response);
       // La redirection est gérée par le composant appelant, qui décide d'après `onboardingCompleted`.
       return response;
     } catch (error) {
@@ -129,9 +130,48 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   /**
+   * Connexion par passkey : un défi du serveur, la passkey choisie dans le navigateur, puis la session.
+   */
+  const loginWithPasskey = async (options: { conditional?: boolean; signal?: AbortSignal } = {}) => {
+    let challenge: { requestId: string; options: Record<string, unknown> };
+    try {
+      challenge = await authService.passkeySignInOptions(options.conditional === true);
+    } catch (error) {
+      // Suggestion de fond : sans défi, le champ e-mail ne propose simplement pas de passkey.
+      if (options.conditional) return null;
+      throw error;
+    }
+    const credential = await getPasskey(challenge.options, options);
+    if (!credential) return null;
+    const response = await authService.passkeySignIn({ requestId: challenge.requestId, credential });
+    establishSession(response);
+    return response;
+  };
+
+  /** Session ouverte : l'utilisateur de la réponse tout de suite, son profil complet en arrière-plan. */
+  const establishSession = (response: AuthResponse) => {
+    // Setter immédiat depuis la réponse login → redirection rapide, pas de blocage réseau
+    setUser(response.user);
+    setStoreUser(response.user);
+    // Enrichir avec le profil complet en arrière-plan (non bloquant)
+    void fetchMe().then((remoteUser) => {
+      if (remoteUser) {
+        setUser(remoteUser);
+        setStoreUser(remoteUser);
+      }
+    });
+  };
+
+  /**
    * Déconnexion
    */
   const logout = async () => {
+    const desktop = desktopBridge();
+    if (desktop) {
+      // App desktop : la coque révoque la session, oublie le compte et relance l'app sur son écran de connexion.
+      await desktop.signOut();
+      return;
+    }
     try {
       await authService.logout();
       setUser(null);
@@ -167,6 +207,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAuthenticated: !!user,
     isLoading,
     login,
+    loginWithPasskey,
     logout,
     refreshUser,
   };
@@ -198,7 +239,8 @@ export function useRequireAuth(redirectTo: string = "/auth/login") {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    // App desktop : pas de page de connexion dans l'interface, la coque connecte le compte avant d'ouvrir la fenêtre.
+    if (!isLoading && !isAuthenticated && !IS_DESKTOP) {
       router.push(redirectTo);
     }
   }, [isAuthenticated, isLoading, redirectTo, router]);

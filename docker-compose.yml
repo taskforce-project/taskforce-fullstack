@@ -50,12 +50,16 @@ services:
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
       KC_CACHE: local
+      # Passkeys: the API opens the session through token exchange (run keycloak/scripts/passkey-sessions.sh once).
+      KC_FEATURES: token-exchange,admin-fine-grained-authz:v1
       # Values substituted in the imported realm.
       TF_APP_URL: ${TF_APP_URL:-http://localhost:3000}
       TF_API_URL: ${TF_API_URL:-http://localhost:8080}
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?missing value, run scripts/selfhost-init first}
     volumes:
       - ./keycloak/realms/selfhost:/opt/keycloak/data/import:ro
+      # Sign-in pages in TaskForce colours (loginTheme of the realm).
+      - ./keycloak/themes/taskforce:/opt/keycloak/themes/taskforce:ro
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${KEYCLOAK_PORT:-8180}:8080"
     depends_on:

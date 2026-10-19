@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { delimiter, extname, join } from "node:path";
 
@@ -7,6 +7,8 @@ export interface ProcResult {
   stdout: string;
   stderr: string;
   timedOut: boolean;
+  /** Arrêté par `signal` (le runner s'arrête) avant d'avoir fini. */
+  aborted: boolean;
 }
 
 export interface ProcOptions {
@@ -17,6 +19,25 @@ export interface ProcOptions {
   timeoutMs?: number;
   /** Appelé pour chaque ligne complète de stdout, au fil de l'eau (suivi en direct de l'agent). */
   onStdoutLine?: (line: string) => void;
+  /** Arrête le processus et ses descendants quand le signal est levé. */
+  signal?: AbortSignal;
+}
+
+/**
+ * Arrête un processus et ses descendants. Sous Windows, arrêter `cmd.exe` (lanceur `.cmd`) laisserait tourner le Node
+ * de Claude Code : `taskkill /T` arrête tout l'arbre. Ailleurs, SIGTERM, puis SIGKILL après 10 s.
+ */
+export function killTree(child: ChildProcess): void {
+  if (child.exitCode !== null || child.signalCode !== null || child.pid === undefined) return;
+  if (process.platform === "win32") {
+    spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" })
+      .on("error", () => child.kill());
+    return;
+  }
+  child.kill("SIGTERM");
+  setTimeout(() => {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+  }, 10_000).unref();
 }
 
 /**
@@ -91,13 +112,19 @@ export function run(command: string, args: string[], options: ProcOptions = {}):
     let stderr = "";
     let pending = "";
     let timedOut = false;
+    let aborted = false;
     const timer = options.timeoutMs
       ? setTimeout(() => {
           timedOut = true;
-          child.kill("SIGTERM");
-          setTimeout(() => child.kill("SIGKILL"), 10_000).unref();
+          killTree(child);
         }, options.timeoutMs)
       : null;
+    const abort = () => {
+      aborted = true;
+      killTree(child);
+    };
+    if (options.signal?.aborted) abort();
+    else options.signal?.addEventListener("abort", abort, { once: true });
 
     child.stdout.on("data", (chunk: Buffer) => {
       const text = chunk.toString("utf8");
@@ -111,12 +138,14 @@ export function run(command: string, args: string[], options: ProcOptions = {}):
     child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString("utf8")));
     child.on("error", (err) => {
       if (timer) clearTimeout(timer);
+      options.signal?.removeEventListener("abort", abort);
       reject(err);
     });
     child.on("close", (code) => {
       if (timer) clearTimeout(timer);
+      options.signal?.removeEventListener("abort", abort);
       if (options.onStdoutLine && pending.trim()) options.onStdoutLine(pending);
-      resolvePromise({ code, stdout, stderr, timedOut });
+      resolvePromise({ code, stdout, stderr, timedOut, aborted });
     });
 
     if (options.input !== undefined) child.stdin.write(options.input);

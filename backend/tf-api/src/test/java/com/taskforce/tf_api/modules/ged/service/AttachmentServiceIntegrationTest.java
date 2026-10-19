@@ -40,7 +40,7 @@ import static org.mockito.Mockito.verify;
 
 /**
  * Tests d'intégration — {@link AttachmentService} (pièces jointes MinIO). Repos réels,
- * {@code MinioService} mocké.
+ * {@code ObjectStorage} mocké.
  *
  * <p>Couvre le nominal, et surtout la <b>non-régression de l'IDOR</b> : le service ne vérifiait
  * que le rattachement de l'issue au projet/workspace de l'URL, jamais <b>qui</b> demandait. Tout
@@ -61,7 +61,7 @@ class AttachmentServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private IssueStatusRepository issueStatusRepository;
     @Autowired private IssueRepository issueRepository;
 
-    @MockitoBean private MinioService minioService;
+    @MockitoBean private ObjectStorage objectStorage;
 
     private static final String SLUG = "ws-att-it";
     private User owner;
@@ -109,7 +109,7 @@ class AttachmentServiceIntegrationTest extends AbstractIntegrationTest {
         attachmentService.upload(SLUG, project.getId(), issueId, file(), owner.getId());
 
         assertThat(attachmentService.listByIssue(SLUG, project.getId(), issueId, owner.getId())).hasSize(1);
-        verify(minioService).upload(anyString(), any(), anyLong(), anyString());
+        verify(objectStorage).upload(anyString(), any(), anyLong(), anyString());
     }
 
     @Test

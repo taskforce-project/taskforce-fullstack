@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getAvatarUrl } from "@/lib/utils/avatar";
+import { IS_DESKTOP } from "@/lib/desktop";
 
 /**
  * Wizard d'onboarding - universel (tous les comptes, au 1ᵉʳ login), sautable.
@@ -38,8 +39,13 @@ const SENIORITIES: { value: Seniority; label: string }[] = [
   { value: "LEAD", label: "Lead" },
 ];
 
-const STEPS = ["You", "Skills", "Team", "First project"];
-const TOTAL = STEPS.length;
+/**
+ * Étapes du parcours, numérotées 1 « Vous », 2 « Compétences », 3 « Équipe », 4 « Premier projet ». L'app desktop,
+ * où l'on travaille seul avec ses agents, saute les compétences (elles servent à départager des collègues) et ne
+ * garde de l'équipe que l'espace de travail, sans invitations.
+ */
+const FLOW: readonly number[] = IS_DESKTOP ? [1, 3, 4] : [1, 2, 3, 4];
+const STEPS = IS_DESKTOP ? ["You", "Workspace", "First project"] : ["You", "Skills", "Team", "First project"];
 
 /** Phases défilées pendant la génération des suggestions (loader « vivant », sans label). */
 const SUGGESTION_PHASES = [
@@ -282,8 +288,14 @@ export default function OnboardingPage() {
 
   // Saut latéral depuis la checklist : borné aux étapes déjà atteintes (cf. maxStep).
   const goToStep = (n: number) => {
-    if (n <= maxStep) setStep(n);
+    const target = FLOW[n - 1];
+    if (target !== undefined && target <= maxStep) setStep(target);
   };
+
+  // Position de l'étape dans le parcours affiché (1 à FLOW.length), et étapes voisines.
+  const position = FLOW.indexOf(step) + 1;
+  const previousStep = FLOW[Math.max(0, position - 2)] ?? 1;
+  const nextStep = FLOW[Math.min(FLOW.length - 1, position)] ?? step;
 
   const account = {
     name: user?.displayName || [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "You",
@@ -295,22 +307,22 @@ export default function OnboardingPage() {
     <>
     <OnboardingShell
       steps={STEPS}
-      current={step}
-      maxReached={maxStep}
+      current={position}
+      maxReached={FLOW.indexOf(maxStep) + 1}
       onSelectStep={goToStep}
       account={account}
       footer={
         <>
           <Button
             variant="ghost"
-            onClick={() => setStep((s) => Math.max(1, s - 1))}
-            disabled={step === 1 || submitting}
+            onClick={() => setStep(previousStep)}
+            disabled={position === 1 || submitting}
           >
             <ArrowLeft /> Back
           </Button>
 
-          {step < TOTAL ? (
-            <Button onClick={() => setStep((s) => Math.min(TOTAL, s + 1))} disabled={!canNext || submitting}>
+          {position < FLOW.length ? (
+            <Button onClick={() => setStep(nextStep)} disabled={!canNext || submitting}>
               Next <ArrowRight />
             </Button>
           ) : (
@@ -331,7 +343,9 @@ export default function OnboardingPage() {
                 Welcome{user?.firstName ? `, ${user.firstName}` : ""} 👋
               </h1>
               <p className="mt-1 text-sm" style={{ color: "var(--label-tertiary)" }}>
-                Two minutes to personalize TaskForce and power smart assignment.
+                {IS_DESKTOP
+                  ? "A minute to set up TaskForce on this computer."
+                  : "Two minutes to personalize TaskForce and power smart assignment."}
               </p>
             </div>
             <label className="block">
@@ -503,7 +517,9 @@ export default function OnboardingPage() {
                 Your workspace
               </h1>
               <p className="mt-1 text-sm" style={{ color: "var(--label-tertiary)" }}>
-                Name your workspace and invite your team (you can do this later).
+                {IS_DESKTOP
+                  ? "Name your workspace. You can change it later."
+                  : "Name your workspace and invite your team (you can do this later)."}
               </p>
             </div>
             <label className="block">
@@ -531,48 +547,50 @@ export default function OnboardingPage() {
                 One sentence. It feeds your Brain OS so the AI understands your context.
               </span>
             </label>
-            <div>
-              <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
-                Invite teammates <span style={{ color: "var(--label-quaternary)" }}>(optional)</span>
-              </span>
-              <div className="flex gap-2">
-                <Input
-                  value={inviteInput}
-                  onChange={(e) => setInviteInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addInvite();
-                    }
-                  }}
-                  placeholder="colleague@company.com"
-                  type="email"
-                />
-                <Button type="button" variant="outline" onClick={addInvite} className="shrink-0">
-                  Add
-                </Button>
-              </div>
-              {invites.length > 0 && (
-                <ul className="mt-3 space-y-1.5">
-                  {invites.map((email) => (
-                    <li
-                      key={email}
-                      className="flex items-center justify-between rounded-lg border px-3 py-1.5 text-sm"
-                      style={{ borderColor: "var(--border)", color: "var(--label-secondary)" }}
-                    >
-                      {email}
-                      <button
-                        type="button"
-                        onClick={() => setInvites((prev) => prev.filter((e) => e !== email))}
-                        aria-label={`Remove ${email}`}
+            {!IS_DESKTOP && (
+              <div>
+                <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
+                  Invite teammates <span style={{ color: "var(--label-quaternary)" }}>(optional)</span>
+                </span>
+                <div className="flex gap-2">
+                  <Input
+                    value={inviteInput}
+                    onChange={(e) => setInviteInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addInvite();
+                      }
+                    }}
+                    placeholder="colleague@company.com"
+                    type="email"
+                  />
+                  <Button type="button" variant="outline" onClick={addInvite} className="shrink-0">
+                    Add
+                  </Button>
+                </div>
+                {invites.length > 0 && (
+                  <ul className="mt-3 space-y-1.5">
+                    {invites.map((email) => (
+                      <li
+                        key={email}
+                        className="flex items-center justify-between rounded-lg border px-3 py-1.5 text-sm"
+                        style={{ borderColor: "var(--border)", color: "var(--label-secondary)" }}
                       >
-                        <X className="h-3.5 w-3.5 opacity-60 hover:opacity-100" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+                        {email}
+                        <button
+                          type="button"
+                          onClick={() => setInvites((prev) => prev.filter((e) => e !== email))}
+                          aria-label={`Remove ${email}`}
+                        >
+                          <X className="h-3.5 w-3.5 opacity-60 hover:opacity-100" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
         )}
 

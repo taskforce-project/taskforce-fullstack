@@ -11,8 +11,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.taskforce.tf_api.core.dto.request.RunnerTokenRequest;
 import com.taskforce.tf_api.core.dto.response.RunnerTokenResponse;
 import com.taskforce.tf_api.core.service.delivery.LocalRunnerSettings;
-import com.taskforce.tf_api.core.service.delivery.RunnerTokenService;
-import com.taskforce.tf_api.core.service.delivery.RunnerTokenService.InvalidRunnerCredentialsException;
+import com.taskforce.tf_api.core.service.delivery.RunnerTokenIssuer;
+import com.taskforce.tf_api.core.service.delivery.RunnerTokenIssuer.InvalidRunnerCredentialsException;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 
 import jakarta.validation.Valid;
@@ -20,7 +20,8 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * Jeton machine d'un runner local (ADR-013). Public comme le reste de {@code /api/auth/**} (on y échange
- * un secret contre un jeton), limité en débit comme un login.
+ * un secret contre un jeton), limité en débit comme un login. Émis par Keycloak sur le serveur, par la coque dans
+ * l'app desktop (cf. {@link RunnerTokenIssuer}).
  */
 @RestController
 @RequestMapping("/api/auth/runner")
@@ -28,13 +29,13 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RunnerAuthController {
 
-    private final RunnerTokenService tokenService;
+    private final RunnerTokenIssuer tokenIssuer;
 
-    /** POST /api/auth/runner/token : {@code client_credentials} relayé vers Keycloak. */
+    /** POST /api/auth/runner/token : identifiants du runner contre son jeton. */
     @PostMapping("/token")
     public ResponseEntity<ApiResponse<RunnerTokenResponse>> token(@Valid @RequestBody RunnerTokenRequest request) {
         try {
-            RunnerTokenResponse token = tokenService.issue(request.clientId(), request.clientSecret());
+            RunnerTokenResponse token = tokenIssuer.issue(request.clientId(), request.clientSecret());
             return ResponseEntity.ok(ApiResponse.success("Runner token issued", token));
         } catch (InvalidRunnerCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(e.getMessage()));

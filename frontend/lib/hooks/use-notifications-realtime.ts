@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react"
 import { Client, type IMessage } from "@stomp/stompjs"
 import { toast } from "sonner"
 
+import { getSessionToken } from "@/lib/api/session-token"
+import { API_URL } from "@/lib/config/urls"
 import { buildRealtimeUrls } from "@/lib/hooks/use-stomp"
 import { useNotificationStore } from "@/lib/store/notification-store"
 import { useUserStore } from "@/lib/store/user-store"
@@ -28,9 +30,8 @@ export function useNotificationsRealtime(slug: string | undefined) {
     let disposed = false
     let fallbackTriggered = false
     let connectedOnce = false
-    const token = localStorage.getItem("accessToken")
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api"
-    const { wsUrl, sockJsUrl } = buildRealtimeUrls(apiUrl)
+    const token = getSessionToken()
+    const { wsUrl, sockJsUrl } = buildRealtimeUrls(API_URL)
     const connectHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
 
     function handle(msg: IMessage) {

@@ -8,6 +8,8 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { AppShell } from "@/components/layout/app-shell"
 import { LoginIntro } from "@/components/layout/login-intro"
 import { TwoFactorNudge } from "@/components/security/two-factor-nudge"
+import { getSessionToken } from "@/lib/api/session-token"
+import { IS_DESKTOP } from "@/lib/desktop"
 
 export default function ProtectedLayout({
   children,
@@ -48,14 +50,15 @@ export default function ProtectedLayout({
     if (!mounted || isLoading) return
     // Ne rediriger que si : pas authentifié ET pas de token en localStorage
     // Évite les faux positifs dus au timing React (état contexte pas encore propagé)
-    const hasLocalToken = !!localStorage.getItem("accessToken")
-    if (!isAuthenticated && !hasLocalToken) {
+    // App desktop : pas de page de connexion dans l'interface, la coque connecte le compte avant d'ouvrir la fenêtre.
+    const hasLocalToken = !!getSessionToken()
+    if (!isAuthenticated && !hasLocalToken && !IS_DESKTOP) {
       router.replace("/auth/login")
     }
   }, [mounted, isAuthenticated, isLoading, router])
 
   const authLoading = !mounted || isLoading
-  const hasLocalToken = typeof window !== "undefined" && !!localStorage.getItem("accessToken")
+  const hasLocalToken = typeof window !== "undefined" && !!getSessionToken()
   const blocked = !authLoading && !isAuthenticated && !hasLocalToken
 
   return (
@@ -74,8 +77,9 @@ export default function ProtectedLayout({
           <div className="h-svh">
             <AppShell>{children}</AppShell>
           </div>
-          {/* Nudge sécurité 2FA (best-effort, une fois par session) - ne rend rien, déclenche un toast. */}
-          <TwoFactorNudge />
+          {/* Nudge sécurité 2FA (best-effort, une fois par session) - ne rend rien, déclenche un toast. Pas dans
+              l'app desktop : la double authentification se règle sur le compte en ligne. */}
+          {!IS_DESKTOP && <TwoFactorNudge />}
         </>
       )}
 

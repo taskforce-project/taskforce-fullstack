@@ -833,4 +833,67 @@ class AuthServiceTest {
             verify(twoFactorService, never()).verifyOrThrow(anyLong(), anyString());
         }
     }
+
+    @Nested
+    @DisplayName("completePasskeyLogin : session ouverte par une passkey")
+    class PasskeyLoginTests {
+
+        @Test
+        @DisplayName("Keycloak ouvre la session par l'échange de jetons du backend, sans code en plus")
+        void opens_the_session_without_a_code() {
+            User user = User.builder().id(7L).email(TEST_EMAIL).keycloakId(TEST_KEYCLOAK_ID).isActive(true).build();
+            when(userRepository.findById(7L)).thenReturn(java.util.Optional.of(user));
+            when(keycloakAuthService.impersonate(TEST_KEYCLOAK_ID)).thenReturn(KeycloakTokenResponse.builder()
+                .accessToken("at").refreshToken("rt").tokenType("Bearer").expiresIn(300).refreshExpiresIn(1800).build());
+            org.keycloak.representations.idm.UserRepresentation kc = new org.keycloak.representations.idm.UserRepresentation();
+            kc.setFirstName("Ada");
+            kc.setLastName("Lovelace");
+            when(keycloakService.getUserById(TEST_KEYCLOAK_ID)).thenReturn(kc);
+
+            AuthResponse response = authService.completePasskeyLogin(7L);
+
+            assertThat(response.getAccessToken()).isEqualTo("at");
+            assertThat(response.getRefreshToken()).isEqualTo("rt");
+            assertThat(response.getUser().getFirstName()).isEqualTo("Ada");
+            verify(auditService).record(null, 7L, AuditService.USER_LOGIN);
+            verify(twoFactorService, never()).verifyOrThrow(anyLong(), anyString());
+        }
+
+        @Test
+        @DisplayName("sans nom lisible chez Keycloak, la session s'ouvre quand même")
+        void opens_without_a_name() {
+            User user = User.builder().id(7L).email(TEST_EMAIL).keycloakId(TEST_KEYCLOAK_ID).isActive(true).build();
+            when(userRepository.findById(7L)).thenReturn(java.util.Optional.of(user));
+            when(keycloakAuthService.impersonate(TEST_KEYCLOAK_ID)).thenReturn(KeycloakTokenResponse.builder()
+                .accessToken("at").refreshToken("rt").expiresIn(300).refreshExpiresIn(1800).build());
+            when(keycloakService.getUserById(TEST_KEYCLOAK_ID)).thenThrow(new RuntimeException("down"));
+
+            assertThat(authService.completePasskeyLogin(7L).getUser().getFirstName()).isNull();
+        }
+
+        @Test
+        @DisplayName("Keycloak qui refuse l'échange donne un message clair, pas une erreur du serveur")
+        void keycloak_refuses_the_exchange() {
+            User user = User.builder().id(7L).email(TEST_EMAIL).keycloakId(TEST_KEYCLOAK_ID).isActive(true).build();
+            when(userRepository.findById(7L)).thenReturn(java.util.Optional.of(user));
+            when(keycloakAuthService.impersonate(TEST_KEYCLOAK_ID))
+                .thenThrow(new RuntimeException("The account service did not open a session"));
+
+            assertThatThrownBy(() -> authService.completePasskeyLogin(7L)).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Use your password");
+            verify(auditService, never()).record(any(), anyLong(), anyString());
+        }
+
+        @Test
+        @DisplayName("un compte désactivé ou inconnu n'ouvre rien")
+        void refuses_inactive_or_unknown_accounts() {
+            when(userRepository.findById(7L)).thenReturn(java.util.Optional.of(
+                User.builder().id(7L).email(TEST_EMAIL).keycloakId(TEST_KEYCLOAK_ID).isActive(false).build()));
+            when(userRepository.findById(8L)).thenReturn(java.util.Optional.empty());
+
+            assertThatThrownBy(() -> authService.completePasskeyLogin(7L)).isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> authService.completePasskeyLogin(8L)).isInstanceOf(BusinessException.class);
+            verify(keycloakAuthService, never()).impersonate(anyString());
+        }
+    }
 }

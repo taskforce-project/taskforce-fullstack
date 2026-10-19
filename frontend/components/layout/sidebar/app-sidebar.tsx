@@ -24,6 +24,7 @@ import { NavUser } from "@/components/layout/sidebar/nav-user"
 import { WorkspaceSwitcher } from "@/components/layout/sidebar/team-switcher"
 import { getAvatarUrl } from "@/lib/utils/avatar"
 import { useAuth } from "@/lib/contexts/auth-context"
+import { IS_DESKTOP } from "@/lib/desktop"
 import { useTranslation } from "@/lib/i18n"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
@@ -305,13 +306,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenu>
         </SidebarGroup>
 
-        {/* People */}
-        <SidebarGroup>
-          <SidebarGroupLabel>People</SidebarGroupLabel>
-          <SidebarMenu>
-            {NAV_PEOPLE.map(renderItem)}
-          </SidebarMenu>
-        </SidebarGroup>
+        {/* People : pas dans l'app desktop, où l'on travaille seul avec ses agents. */}
+        {!IS_DESKTOP && (
+          <SidebarGroup>
+            <SidebarGroupLabel>People</SidebarGroupLabel>
+            <SidebarMenu>
+              {NAV_PEOPLE.map(renderItem)}
+            </SidebarMenu>
+          </SidebarGroup>
+        )}
 
         {/* Quick create */}
         <SidebarGroup className="group-data-[collapsible=icon]:hidden mt-auto">

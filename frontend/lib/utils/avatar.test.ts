@@ -1,23 +1,29 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getAvatarUrl, getInitials } from './avatar';
 
+/** L'origine de l'API est figée au chargement (comme au build) : chaque cas recharge le module avec son environnement. */
+async function avatarWith(env: Record<string, string>) {
+  for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
+  vi.resetModules();
+  return (await import('./avatar')).getAvatarUrl;
+}
+
 describe('avatar helper', () => {
-  const previousApiUrl = process.env.NEXT_PUBLIC_API_URL;
-
   afterEach(() => {
-    if (previousApiUrl === undefined) {
-      delete process.env.NEXT_PUBLIC_API_URL;
-      return;
-    }
-
-    process.env.NEXT_PUBLIC_API_URL = previousApiUrl;
+    vi.unstubAllEnvs();
   });
 
-  it('resolves relative avatar paths against the public API origin', () => {
-    process.env.NEXT_PUBLIC_API_URL = 'https://api.taskforce.test/api';
+  it('resolves relative avatar paths against the public API origin', async () => {
+    const resolve = await avatarWith({ NEXT_PUBLIC_API_URL: 'https://api.taskforce.test' });
 
-    expect(getAvatarUrl({ email: 'alice@example.com', avatarUrl: '/uploads/avatar.png' }))
-      .toBe('https://api.taskforce.test/api/uploads/avatar.png');
+    expect(resolve({ email: 'alice@example.com', avatarUrl: '/uploads/avatar.png' }))
+      .toBe('https://api.taskforce.test/uploads/avatar.png');
+  });
+
+  it('keeps relative avatar paths relative in the desktop app, where the API shares the window origin', async () => {
+    const resolve = await avatarWith({ NEXT_PUBLIC_DESKTOP: 'true' });
+
+    expect(resolve({ email: 'alice@example.com', avatarUrl: '/uploads/avatar.png' })).toBe('/uploads/avatar.png');
   });
 
   it('keeps absolute avatar URLs unchanged', () => {
@@ -47,10 +53,10 @@ describe('avatar helper', () => {
     expect(a).toBe(b);
   });
 
-  it('prefixes a relative path without leading slash and falls back to the default API origin', () => {
-    delete process.env.NEXT_PUBLIC_API_URL;
+  it('prefixes a relative path without leading slash and falls back to the default API origin', async () => {
+    const resolve = await avatarWith({ NEXT_PUBLIC_API_URL: '' });
 
-    expect(getAvatarUrl({ email: 'x@example.com', avatarUrl: 'uploads/a.png' }))
+    expect(resolve({ email: 'x@example.com', avatarUrl: 'uploads/a.png' }))
       .toBe('http://localhost:8080/uploads/a.png');
   });
 });

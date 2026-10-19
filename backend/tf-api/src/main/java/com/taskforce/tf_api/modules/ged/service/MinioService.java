@@ -4,6 +4,7 @@ import java.io.InputStream;
 import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import io.minio.BucketExistsArgs;
@@ -19,10 +20,12 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/** Stockage des fichiers dans MinIO (webapp et auto-hébergement) ; l'app desktop utilise {@link LocalObjectStorage}. */
 @Service
+@Profile("!desktop")
 @RequiredArgsConstructor
 @Slf4j
-public class MinioService {
+public class MinioService implements ObjectStorage {
 
     private final MinioClient minioClient;
     /** Client signant les URLs présignées avec l'endpoint PUBLIC (joignable par le navigateur). */
@@ -44,6 +47,7 @@ public class MinioService {
         }
     }
 
+    @Override
     public void upload(String objectKey, InputStream stream, long size, String contentType) {
         try {
             minioClient.putObject(
@@ -59,6 +63,7 @@ public class MinioService {
         }
     }
 
+    @Override
     public String presignedGetUrl(String objectKey) {
         try {
             return minioPublicClient.getPresignedObjectUrl(
@@ -74,6 +79,7 @@ public class MinioService {
         }
     }
 
+    @Override
     public void delete(String objectKey) {
         try {
             minioClient.removeObject(
@@ -88,6 +94,7 @@ public class MinioService {
     }
 
     /** Type MIME stocké de l'objet (pour servir avec le bon Content-Type). */
+    @Override
     public String contentType(String objectKey) {
         try {
             return minioClient.statObject(
@@ -98,6 +105,7 @@ public class MinioService {
         }
     }
 
+    @Override
     public InputStream getObjectStream(String objectKey) {
         try {
             return minioClient.getObject(

@@ -13,6 +13,7 @@ import { usePreferencesStore } from "@/lib/store/preferences-store";
 import { LoginIntro } from "@/components/layout/login-intro";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { afterSignInPath } from "@/lib/auth/desktop-handoff";
 
 /**
  * Page de rappel de la connexion externe (GitHub / Google).
@@ -50,8 +51,9 @@ async function enterApp(auth: AuthResponse, startedAt: number) {
     }
   }
 
-  // Modèle Linear : un NOUVEAU venu (onboarding non fait) va au wizard ; un habitué à l'app.
-  const target = auth?.user?.onboardingCompleted === false ? "/onboarding" : "/";
+  // Modèle Linear : un NOUVEAU venu (onboarding non fait) va au wizard ; un habitué à l'app. Une connexion demandée
+  // par l'app desktop revient sur son accord.
+  const target = afterSignInPath(auth?.user?.onboardingCompleted === false ? "/onboarding" : "/");
 
   // Drapeau consommé une fois par l'AppShell → joue la révélation en overlay. sessionStorage
   // survit au rechargement dans le même onglet.

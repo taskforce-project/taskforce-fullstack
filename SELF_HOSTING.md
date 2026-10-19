@@ -59,6 +59,18 @@ TaskForce sends sign-up codes, invitations and password resets by email. Without
 With an SMTP server, fill the `MAIL_*` values in `.env`, set `SIGNUP_EMAIL_VERIFICATION=true` and run
 `docker compose up -d`.
 
+## Passkeys
+
+People can add a passkey (Windows Hello, Touch ID, a phone or a security key) in Settings > Security, then sign in
+with it instead of their password. Keycloak opens their session for the API once you allow it, one time:
+
+```bash
+docker compose exec -T keycloak sh -s taskforce < keycloak/scripts/passkey-sessions.sh
+```
+
+Browsers only offer passkeys on `https://` addresses and on `localhost`. A passkey belongs to the app's address
+(`TF_APP_URL`): after changing it, people add their passkeys again.
+
 ## Using it from other machines
 
 By default every port listens on this machine only (`BIND_ADDRESS=127.0.0.1`). To open it to your network:

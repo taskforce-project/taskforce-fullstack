@@ -6,6 +6,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -35,15 +36,10 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Service
 @ConditionalOnProperty(name = LocalRunnerSettings.ENABLED_PROPERTY, havingValue = "true")
+// Dans l'app desktop, aucun Keycloak : la coque lance le runner avec son propre secret (DesktopRunnerTokens).
+@Profile("!desktop")
 @Slf4j
-public class RunnerTokenService {
-
-    /** Échec d'émission : un seul type, un seul message, quelle que soit la cause (pas d'oracle). */
-    public static class InvalidRunnerCredentialsException extends RuntimeException {
-        public InvalidRunnerCredentialsException() {
-            super("Invalid runner credentials");
-        }
-    }
+public class RunnerTokenService implements RunnerTokenIssuer {
 
     private final RestTemplate restTemplate;
     private final ObjectProvider<JwtDecoder> jwtDecoder;
@@ -66,6 +62,7 @@ public class RunnerTokenService {
         this.tokenUrl = keycloakUrl + "/realms/" + realm + "/protocol/openid-connect/token";
     }
 
+    @Override
     @SuppressWarnings({"rawtypes", "unchecked"})
     public RunnerTokenResponse issue(String clientId, String clientSecret) {
         if (clientId == null || !clientId.startsWith(settings.clientPrefix())) {

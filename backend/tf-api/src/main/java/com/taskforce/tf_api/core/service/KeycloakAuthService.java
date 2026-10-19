@@ -111,6 +111,46 @@ public class KeycloakAuthService {
     }
 
     /**
+     * Session d'une personne qui s'est connectée sans mot de passe (passkey vérifiée par le backend) : le client du backend
+     * demande à Keycloak des jetons à son nom, par l'échange de jetons (« impersonation » directe). Keycloak ne l'admet que
+     * pour ce client, qui a la permission d'agir pour les comptes du realm (keycloak/scripts/passkey-sessions.sh).
+     */
+    public KeycloakTokenResponse impersonate(String keycloakUserId) {
+        String tokenUrl = keycloakUrl + "/realms/" + realm + "/protocol/openid-connect/token";
+
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange");
+        params.add("client_id", clientId);
+        params.add("client_secret", clientSecret);
+        params.add("requested_subject", keycloakUserId);
+        params.add("requested_token_type", "urn:ietf:params:oauth:token-type:refresh_token");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        try {
+            @SuppressWarnings("rawtypes")
+            ResponseEntity<Map> response = restTemplate.postForEntity(tokenUrl, new HttpEntity<>(params, headers), Map.class);
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> body = response.getBody();
+                Object refreshExpires = body.get("refresh_expires_in");
+                return KeycloakTokenResponse.builder()
+                    .accessToken((String) body.get("access_token"))
+                    .refreshToken((String) body.get("refresh_token"))
+                    .tokenType((String) body.get("token_type"))
+                    .expiresIn(((Number) body.get("expires_in")).intValue())
+                    .refreshExpiresIn(refreshExpires instanceof Number n ? n.intValue() : 0)
+                    .build();
+            }
+            throw new RuntimeException("The account service did not open a session");
+        } catch (HttpClientErrorException e) {
+            log.error("Échange de jetons refusé par Keycloak : {}", e.getStatusCode());
+            throw new RuntimeException("The account service did not open a session");
+        }
+    }
+
+    /**
      * Rafraîchit un token d'accès
      *
      * @param refreshToken Token de rafraîchissement

@@ -3,6 +3,7 @@ package com.taskforce.tf_api.core.service;
 import java.text.Normalizer;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -385,6 +386,14 @@ public class WorkspaceService {
         return email.contains("@") ? email.substring(0, email.indexOf('@')) : email;
     }
 
+    /**
+     * Premiers segments d'adresse de la webapp, hors espaces de travail (`frontend/app`) : un espace qui porterait l'un de
+     * ces noms serait masqué par la page du même nom (`/account`, `/auth/...`). Il reçoit un suffixe, comme en cas de
+     * collision.
+     */
+    static final Set<String> RESERVED_SLUGS = Set.of(
+        "account", "auth", "invitations", "legal-notices", "onboarding", "privacy-policy");
+
     private String generateUniqueSlug(String base) {
         String normalized = Normalizer.normalize(base, Normalizer.Form.NFD)
             .replaceAll("\\p{M}", "")
@@ -395,7 +404,7 @@ public class WorkspaceService {
         String candidate = normalized;
         int attempt = 0;
 
-        while (workspaceRepository.existsBySlug(candidate)) {
+        while (RESERVED_SLUGS.contains(candidate) || workspaceRepository.existsBySlug(candidate)) {
             attempt++;
             if (attempt == 1) {
                 candidate = normalized + "-" + UUID.randomUUID().toString().substring(0, 6);

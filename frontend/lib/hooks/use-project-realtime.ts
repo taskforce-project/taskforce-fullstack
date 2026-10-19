@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react"
 import { Client, type IMessage } from "@stomp/stompjs"
 
+import { getSessionToken } from "@/lib/api/session-token"
+import { API_URL } from "@/lib/config/urls"
 import { buildRealtimeUrls } from "@/lib/hooks/use-stomp"
 import { useIssueStore } from "@/lib/store/issue-store"
 import type { Issue } from "@/lib/api/issue-service"
@@ -30,9 +32,8 @@ export function useProjectRealtime(projectId: number | null) {
     let disposed = false
     let fallbackTriggered = false
     let connectedOnce = false
-    const token = localStorage.getItem("accessToken")
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api"
-    const { wsUrl, sockJsUrl } = buildRealtimeUrls(apiUrl)
+    const token = getSessionToken()
+    const { wsUrl, sockJsUrl } = buildRealtimeUrls(API_URL)
     const connectHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
 
     function handle(msg: IMessage) {

@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, useParams } from "next/navigation"
 import {
   User, Bell, Mail, Zap, Globe, Key, Palette, Webhook,
   Upload, Camera, Trash2, Shield, Loader2, RotateCcw,
-  Activity, CheckCircle2, AlertTriangle, Gauge, Search, Bot,
+  Activity, CheckCircle2, AlertTriangle, Gauge, Search, Bot, Sparkles,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTheme } from "next-themes"
@@ -31,6 +31,9 @@ import { DisconnectConfirmDialog, DISCONNECT_CONSEQUENCES } from "@/components/i
 import { WebhooksPanel } from "@/components/settings/webhooks-panel"
 import { EventPicker } from "@/components/settings/event-picker"
 import { AgentsPanel } from "@/components/settings/agents-panel"
+import { DesktopAiPanel } from "@/components/settings/desktop-ai-panel"
+import { DesktopSessionsCard } from "@/components/settings/desktop-sessions-card"
+import { PasskeysCard } from "@/components/settings/passkeys-card"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { ProfileOverview } from "@/components/profile/profile-overview"
 import { MemberSkillsCard } from "@/components/members/member-skills-card"
@@ -50,6 +53,7 @@ import { getSystemStatus, type SystemStatus } from "@/lib/api/status-service"
 import { apiClient, getErrorMessage } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
 import { cn } from "@/lib/utils"
+import { desktopBridge, IS_DESKTOP } from "@/lib/desktop"
 import { parseServerDate } from "@/lib/utils/server-date"
 
 export type SettingsSection =
@@ -60,6 +64,7 @@ export type SettingsSection =
   | "security"
   | "workspace"
   | "usage"
+  | "ai"
   | "status"
   | "integrations"
   | "agents"
@@ -72,7 +77,7 @@ interface SectionConfig {
   group: string
 }
 
-export const SECTIONS: SectionConfig[] = [
+const ALL_SECTIONS: SectionConfig[] = [
   { key: "profile",       label: "Profile",        icon: <User className="h-4 w-4" />,       group: "Personal" },
   { key: "account",       label: "Account",        icon: <Globe className="h-4 w-4" />,      group: "Personal" },
   { key: "appearance",    label: "Appearance",     icon: <Palette className="h-4 w-4" />,    group: "Personal" },
@@ -80,15 +85,26 @@ export const SECTIONS: SectionConfig[] = [
   { key: "security",      label: "Security",       icon: <Key className="h-4 w-4" />,        group: "Personal" },
   { key: "workspace",     label: "General",        icon: <Globe className="h-4 w-4" />,      group: "Workspace" },
   { key: "usage",         label: "Cortex usage",   icon: <Gauge className="h-4 w-4" />,       group: "Workspace" },
+  { key: "ai",            label: "AI",             icon: <Sparkles className="h-4 w-4" />,    group: "Workspace" },
   { key: "integrations",  label: "Integrations",   icon: <Webhook className="h-4 w-4" />,    group: "Workspace" },
   { key: "agents",        label: "Agents",         icon: <Bot className="h-4 w-4" />,        group: "Workspace" },
   { key: "status",        label: "Status",         icon: <Activity className="h-4 w-4" />,    group: "Workspace" },
   { key: "privacy",       label: "Privacy & Data", icon: <Shield className="h-4 w-4" />,     group: "Personal" },
 ]
 
+/**
+ * App desktop : le mot de passe et la double authentification se règlent sur le compte en ligne (« Account ») ; l'IA
+ * se choisit sur l'ordinateur (« AI »), section sans objet dans la webapp, où l'instance règle son fournisseur.
+ */
+const DESKTOP_HIDDEN_SECTIONS: readonly SettingsSection[] = ["security"]
+const DESKTOP_ONLY_SECTIONS: readonly SettingsSection[] = ["ai"]
+
+export const SECTIONS: SectionConfig[] = ALL_SECTIONS.filter((s) =>
+  IS_DESKTOP ? !DESKTOP_HIDDEN_SECTIONS.includes(s.key) : !DESKTOP_ONLY_SECTIONS.includes(s.key))
+
 export const SECTION_GROUPS = [
   { label: "Personal",  keys: ["profile", "account", "appearance", "notifications", "security", "privacy"] as const },
-  { label: "Workspace", keys: ["workspace", "usage", "integrations", "agents", "status"] as const },
+  { label: "Workspace", keys: ["workspace", "ai", "usage", "integrations", "agents", "status"] as const },
 ]
 
 // SKILL_OPTIONS + SkillsTagInput retirés avec le faux champ « Skills » du Profil (TF-SETTINGS-FAKE) :
@@ -338,6 +354,33 @@ function ProfilePanel() {
       {/* Aperçu « Mon profil » (ex-page /profile, supprimée) : stats + heatmap + activité - tout dans le modal. */}
       <Separator className="mt-2" />
       <ProfileOverview />
+    </div>
+  )
+}
+
+/**
+ * Compte dans l'app desktop : le compte TaskForce vit en ligne (adresse, mot de passe, double authentification,
+ * suppression), l'app ne garde que la session de cet ordinateur et les projets.
+ */
+function DesktopAccountPanel() {
+  const { user, logout } = useAuth()
+  return (
+    <div className="flex flex-col gap-4">
+      <SectionCard title="Account info" description="Your TaskForce account is online. Your projects stay on this computer.">
+        <div className="flex flex-col gap-5">
+          <FormField label="Email" hint="Change it, your password or two-step verification from your online account.">
+            <StyledInput type="email" value={user?.email ?? ""} readOnly />
+          </FormField>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => void desktopBridge()?.openAccountPage()}>
+              Manage account online
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => void logout()}>
+              Sign out of this computer
+            </Button>
+          </div>
+        </div>
+      </SectionCard>
     </div>
   )
 }
@@ -895,6 +938,8 @@ function SecurityPanel() {
           </div>
         </div>
       </SectionCard>
+      <PasskeysCard />
+      <DesktopSessionsCard />
     </div>
   )
 }
@@ -1702,12 +1747,13 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
   return (
     <>
       {active === "profile"       && <ProfilePanel />}
-      {active === "account"       && <AccountPanel />}
+      {active === "account"       && (IS_DESKTOP ? <DesktopAccountPanel /> : <AccountPanel />)}
       {active === "appearance"    && <AppearancePanel />}
       {active === "notifications" && <NotificationsPanel />}
       {active === "security"      && <SecurityPanel />}
       {active === "workspace"     && <WorkspacePanel />}
       {active === "usage"         && <UsagePanel />}
+      {active === "ai"            && <DesktopAiPanel />}
       {active === "integrations"  && <IntegrationsPanel />}
       {active === "agents"        && <AgentsPanel />}
       {active === "status"        && <StatusPanel />}
