@@ -79,25 +79,25 @@ const TAG_ORDER = [
 
 // Descriptions courtes des sections principales (facultatif, améliore la référence).
 const TAG_DESC = {
-  "Authentication": "Inscription, connexion, vérification et gestion de session.",
-  "Workspaces": "Espaces de travail : création, membres, réglages.",
-  "Projects": "Opérations : projets, visibilité, statuts et types de tâches.",
-  "Issues": "Tâches : CRUD, statut, priorité, relations, sous-tâches, commentaires.",
-  "Cycles": "Sprints : périodes bornées et leur avancement.",
-  "Pages": "Documents rattachés à une opération.",
-  "Roadmap": "Feuille de route : éléments planifiés dans le temps.",
-  "Assignments": "Acceptation et refus des assignations de tâches.",
-  "Notifications": "Signaux in-app et leur état.",
-  "AI assistant": "Cortex : conversations et assistance IA.",
-  "AI analysis (workflows)": "Traitements agentiques : plan, exécution, reprise.",
-  "Brain OS": "Base de connaissance de l'espace : pages Markdown, liens, tags, recherche et ingestion.",
-  "Coding agents": "Délégation d'une issue à un agent de code (Claude Code, GitHub Copilot) et suivi du run.",
-  "Coding agent runners": "Identité du runner local de chaque personne (créée une fois, secret montré une fois).",
-  "MCP server": "Serveur MCP de l'instance (JSON-RPC sur HTTP), pour Claude Code avec un jeton personnel.",
-  "Personal access tokens": "Jetons personnels, valables seulement sur le serveur MCP.",
-  "Webhooks": "Webhooks sortants signés (HMAC-SHA256) : événements, test, historique des envois.",
-  "Analytics": "Indicateurs : débit, vélocité, charge, burndown.",
-  "Integrations": "Connexion des outils externes (GitHub, Slack…).",
+  "Authentication": "Sign-up, sign-in, verification codes and sessions.",
+  "Workspaces": "Workspaces: creation, members and settings.",
+  "Projects": "Projects, their visibility, statuses and issue types.",
+  "Issues": "Issues: status, priority, relations, subtasks and comments.",
+  "Cycles": "Cycles: time-boxed iterations and their progress.",
+  "Pages": "Documents attached to a project.",
+  "Roadmap": "Work planned over time.",
+  "Assignments": "Accepting and declining issue assignments.",
+  "Notifications": "In-app notifications (Signals) and their state.",
+  "AI assistant": "Cortex: conversations and AI help.",
+  "AI analysis (workflows)": "AI analysis jobs: plan, run and resume.",
+  "Brain OS": "The workspace's knowledge base: Markdown pages, links, tags, search and ingestion.",
+  "Coding agents": "Delegating an issue to a coding agent (Claude Code, GitHub Copilot) and following the run.",
+  "Coding agent runners": "Each person's local runner identity, created once, its secret shown once.",
+  "MCP server": "The workspace's MCP server (JSON-RPC over HTTP), for Claude Code with a personal access token.",
+  "Personal access tokens": "Personal access tokens, valid on the MCP server only.",
+  "Webhooks": "Signed outgoing webhooks (HMAC-SHA256): events, test and delivery history.",
+  "Analytics": "Indicators: throughput, velocity, workload and burndown.",
+  "Integrations": "Connecting external tools: GitHub, Slack, Plane and MCP servers.",
 };
 
 const prettify = (kebab) =>
@@ -161,9 +161,8 @@ spec.tags = ordered.map((name) => (TAG_DESC[name] ? { name, description: TAG_DES
 spec.info ??= {};
 spec.info.title = "TaskForce API";
 spec.info.description ??=
-  "API REST de TaskForce. Toutes les routes sont préfixées par `/api` et renvoient une enveloppe " +
-  "`ApiResponse<T>` (le corps utile est dans `data`). Authentification par jeton Bearer (JWT). " +
-  "Voir les guides Authentification et Conventions.";
+  "REST API of TaskForce. Every path starts with `/api`; a successful response wraps its payload in `data`. " +
+  "Authentication with a Bearer access token: see the Authentication and Conventions guides.";
 
 writeFileSync(SPEC, JSON.stringify(spec, null, 2) + "\n", { encoding: "utf8" });
 

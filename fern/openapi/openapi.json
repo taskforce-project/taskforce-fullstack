@@ -4,8 +4,8 @@
     "title": "TaskForce API",
     "description": "REST API of TaskForce, the open-source project management and AI delivery platform",
     "contact": {
-      "name": "Taskforce Team",
-      "email": "support@taskforce.com"
+      "name": "TaskForce",
+      "url": "https://github.com/taskforce-project/taskforce-fullstack"
     },
     "license": {
       "name": "AGPL-3.0",
@@ -27,37 +27,37 @@
   "tags": [
     {
       "name": "Authentication",
-      "description": "Inscription, connexion, vérification et gestion de session."
+      "description": "Sign-up, sign-in, verification codes and sessions."
     },
     {
       "name": "OAuth login"
     },
     {
       "name": "Workspaces",
-      "description": "Espaces de travail : création, membres, réglages."
+      "description": "Workspaces: creation, members and settings."
     },
     {
       "name": "Projects",
-      "description": "Opérations : projets, visibilité, statuts et types de tâches."
+      "description": "Projects, their visibility, statuses and issue types."
     },
     {
       "name": "Project export"
     },
     {
       "name": "Issues",
-      "description": "Tâches : CRUD, statut, priorité, relations, sous-tâches, commentaires."
+      "description": "Issues: status, priority, relations, subtasks and comments."
     },
     {
       "name": "Cycles",
-      "description": "Sprints : périodes bornées et leur avancement."
+      "description": "Cycles: time-boxed iterations and their progress."
     },
     {
       "name": "Pages",
-      "description": "Documents rattachés à une opération."
+      "description": "Documents attached to a project."
     },
     {
       "name": "Roadmap",
-      "description": "Feuille de route : éléments planifiés dans le temps."
+      "description": "Work planned over time."
     },
     {
       "name": "Teams"
@@ -76,14 +76,14 @@
     },
     {
       "name": "Personal access tokens",
-      "description": "Jetons personnels, valables seulement sur le serveur MCP."
+      "description": "Personal access tokens, valid on the MCP server only."
     },
     {
       "name": "Invitations"
     },
     {
       "name": "Assignments",
-      "description": "Acceptation et refus des assignations de tâches."
+      "description": "Accepting and declining issue assignments."
     },
     {
       "name": "Assignment redistribution"
@@ -93,25 +93,25 @@
     },
     {
       "name": "Notifications",
-      "description": "Signaux in-app et leur état."
+      "description": "In-app notifications (Signals) and their state."
     },
     {
       "name": "Notification preferences"
     },
     {
       "name": "AI assistant",
-      "description": "Cortex : conversations et assistance IA."
+      "description": "Cortex: conversations and AI help."
     },
     {
       "name": "AI analysis (workflows)",
-      "description": "Traitements agentiques : plan, exécution, reprise."
+      "description": "AI analysis jobs: plan, run and resume."
     },
     {
       "name": "Skill suggestions"
     },
     {
       "name": "Brain OS",
-      "description": "Base de connaissance de l'espace : pages Markdown, liens, tags, recherche et ingestion."
+      "description": "The workspace's knowledge base: Markdown pages, links, tags, search and ingestion."
     },
     {
       "name": "Brain OS attachments"
@@ -124,30 +124,30 @@
     },
     {
       "name": "Coding agents",
-      "description": "Délégation d'une issue à un agent de code (Claude Code, GitHub Copilot) et suivi du run."
+      "description": "Delegating an issue to a coding agent (Claude Code, GitHub Copilot) and following the run."
     },
     {
       "name": "Coding agent runners",
-      "description": "Identité du runner local de chaque personne (créée une fois, secret montré une fois)."
+      "description": "Each person's local runner identity, created once, its secret shown once."
     },
     {
       "name": "MCP server",
-      "description": "Serveur MCP de l'instance (JSON-RPC sur HTTP), pour Claude Code avec un jeton personnel."
+      "description": "The workspace's MCP server (JSON-RPC over HTTP), for Claude Code with a personal access token."
     },
     {
       "name": "Dashboard"
     },
     {
       "name": "Analytics",
-      "description": "Indicateurs : débit, vélocité, charge, burndown."
+      "description": "Indicators: throughput, velocity, workload and burndown."
     },
     {
       "name": "Integrations",
-      "description": "Connexion des outils externes (GitHub, Slack…)."
+      "description": "Connecting external tools: GitHub, Slack, Plane and MCP servers."
     },
     {
       "name": "Webhooks",
-      "description": "Webhooks sortants signés (HMAC-SHA256) : événements, test, historique des envois."
+      "description": "Signed outgoing webhooks (HMAC-SHA256): events, test and delivery history."
     },
     {
       "name": "MCP actions"
@@ -17249,7 +17249,7 @@
     "securitySchemes": {
       "bearer-jwt": {
         "type": "http",
-        "description": "JWT token obtenu via Keycloak",
+        "description": "Access token returned by POST /api/auth/login",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       }
