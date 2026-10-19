@@ -37,6 +37,8 @@ export class Proxy {
   port = 0;
   private server: Server | null = null;
   private targets: { backend: number; frontend: number } | null = null;
+  /** Connexions WebSocket relayées : le serveur HTTP ne les suit plus une fois ouvertes. */
+  private readonly sockets = new Set<Duplex>();
 
   /**
    * Ouvre le relais, sur `preferred` s'il est libre, sinon sur un port libre : le backend doit connaître l'origine de la
@@ -96,6 +98,8 @@ export class Proxy {
         socket.destroy();
         return;
       }
+      this.sockets.add(socket);
+      socket.on("close", () => this.sockets.delete(socket));
       const upstream = connect(port, "127.0.0.1", () => {
         const lines = [`${req.method} ${req.url} HTTP/${req.httpVersion}`];
         for (const [name, value] of Object.entries(forwardHeaders(req, port))) {
@@ -120,10 +124,21 @@ export class Proxy {
     return `http://127.0.0.1:${this.port}`;
   }
 
+  /**
+   * Ferme le relais et les connexions encore ouvertes : la fenêtre peut l'être aussi (déconnexion), et `close` attendrait
+   * sans fin la fin de son temps réel.
+   */
   async stop(): Promise<void> {
-    await new Promise<void>((resolve) => (this.server ? this.server.close(() => resolve()) : resolve()));
+    const server = this.server;
     this.server = null;
     this.targets = null;
+    for (const socket of this.sockets) socket.destroy();
+    this.sockets.clear();
+    if (!server) return;
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+      server.closeAllConnections();
+    });
   }
 }
 

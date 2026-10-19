@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
 import { createServer, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
+import { connect, type AddressInfo } from "node:net";
+import type { Duplex } from "node:stream";
 import { describe, it } from "node:test";
 
 import { freePort } from "../src/net";
@@ -77,6 +78,38 @@ describe("Proxy", () => {
       await proxy.stop();
       backend.server.close();
       frontend.server.close();
+    }
+  });
+});
+
+describe("Proxy stop", () => {
+  it("stops even while the window keeps a realtime connection open", async () => {
+    // Service qui accepte la mise à niveau WebSocket et garde la connexion, comme le temps réel du backend.
+    const backend = createServer();
+    const held: Duplex[] = [];
+    backend.on("upgrade", (_req, socket) => {
+      held.push(socket);
+      socket.write("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n");
+    });
+    await new Promise<void>((resolve) => backend.listen(0, "127.0.0.1", () => resolve()));
+    const backendPort = (backend.address() as AddressInfo).port;
+    const proxy = new Proxy();
+    try {
+      await proxy.reserve();
+      await proxy.start(backendPort, backendPort);
+      const client = connect(proxy.port, "127.0.0.1");
+      await new Promise<void>((resolve) => {
+        client.write("GET /ws HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n");
+        client.once("data", () => resolve());
+      });
+
+      const started = Date.now();
+      await proxy.stop();
+      assert.ok(Date.now() - started < 3_000, "the open connection does not hold the stop");
+      client.destroy();
+    } finally {
+      for (const socket of held) socket.destroy();
+      backend.close();
     }
   });
 });

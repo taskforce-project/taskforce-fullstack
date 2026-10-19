@@ -23,6 +23,14 @@ export interface Stack {
   stop: () => Promise<void>;
 }
 
+/** Attend une étape d'arrêt au plus `ms` millisecondes, sans jamais échouer. */
+function within(step: Promise<void>, ms: number): Promise<void> {
+  return Promise.race([
+    step.catch(() => undefined),
+    new Promise<void>((resolve) => setTimeout(resolve, ms).unref()),
+  ]);
+}
+
 /** Secret d'un compte sur ce poste, créé au premier lancement puis gardé chiffré par le système. */
 function accountSecret(subject: string, name: "databasePassword" | "encryptionKey"): string {
   const existing = settings.secret(subject, name);
@@ -50,14 +58,15 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     apiKey: settings.secret(account.subject, "aiApiKey"),
   }));
 
-  // Le runner d'abord : il rend au backend le résultat d'un run interrompu avant que celui-ci s'arrête.
+  // Le runner d'abord : il rend au backend le résultat d'un run interrompu avant que celui-ci s'arrête. Chaque étape a un
+  // délai : une étape bloquée ne doit jamais empêcher l'arrêt propre de la base.
   const stop = async () => {
-    await runner.stop().catch(() => undefined);
-    await proxy.stop().catch(() => undefined);
-    await frontend.stop().catch(() => undefined);
-    await backend.stop().catch(() => undefined);
-    await ai.stop().catch(() => undefined);
-    await database.stop().catch(() => undefined);
+    await within(runner.stop(), 20_000);
+    await within(proxy.stop(), 5_000);
+    await within(frontend.stop(), 10_000);
+    await within(backend.stop(), 15_000);
+    await within(ai.stop(), 5_000);
+    await within(database.stop(), 45_000);
   };
 
   try {
