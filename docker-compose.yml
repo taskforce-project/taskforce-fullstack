@@ -43,8 +43,8 @@ services:
       KC_DB_PASSWORD: ${DB_PASSWORD:?missing value, run scripts/selfhost-init first}
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?missing value, run scripts/selfhost-init first}
-      # Public address: the issuer of every token, whoever asks for it (browser, local runner or the backend through
-      # the internal network).
+      # Public address (admin console) and the issuer of every token, including the ones the API asks for through
+      # the internal network.
       KC_HOSTNAME: ${TF_KEYCLOAK_URL:-http://localhost:8180}
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       KC_HTTP_ENABLED: "true"

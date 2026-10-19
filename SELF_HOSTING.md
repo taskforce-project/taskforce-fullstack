@@ -76,8 +76,8 @@ Note that Keycloak keeps the addresses it was first started with for its realm: 
 ## Coding agents
 
 Each person can delegate issues to Claude Code running on their own computer: Settings > Agents > "Set up local
-runner", then follow the steps shown (see [`taskforce-runner`](./taskforce-runner/README.md)). The runner reaches
-the API and Keycloak at `TF_API_URL` and `TF_KEYCLOAK_URL`.
+runner", then follow the steps shown (see [`taskforce-runner`](./taskforce-runner/README.md)). The runner only
+talks to the API, at `TF_API_URL`.
 
 ## Integrations
 
