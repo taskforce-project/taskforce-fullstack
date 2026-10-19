@@ -882,3 +882,36 @@ textarea:not([disabled]) { cursor: text; }
   .auth-step-seg[data-state="done"]    { background: color-mix(in srgb, var(--primary) 45%, transparent); }
   .auth-step-seg[data-state="current"] { background: var(--primary); }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   APP DESKTOP - haut de la fenêtre dessiné par l'interface
+   ─────────────────────────────────────────────────────────────────────────
+   La coque n'a ni barre de titre ni menu du système (desktop/src/window-chrome.ts) : la barre du haut et
+   l'en-tête de la barre latérale déplacent la fenêtre, leurs contrôles restent cliquables, et la barre du
+   haut laisse à droite la place des boutons du système (Window Controls Overlay : titlebar-area-*).
+   ══════════════════════════════════════════════════════════════════════════ */
+.desktop-titlebar,
+.desktop-drag {
+  -webkit-app-region: drag;
+}
+.desktop-titlebar :is(button, a, input, select, textarea, [role="button"], [role="combobox"], [contenteditable="true"]),
+.desktop-drag :is(button, a, input, [role="button"]) {
+  -webkit-app-region: no-drag;
+}
+.desktop-titlebar {
+  padding-right: max(1rem, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)));
+}
+/* Le contenu, carte arrondie dans le cadre de la barre latérale (les composants gardent leurs angles droits). */
+@media (min-width: 768px) {
+  .desktop-content {
+    border-radius: 0.75rem;
+  }
+}
+/* Bande au-dessus du contenu arrondi : elle déplace aussi la fenêtre. */
+.desktop-top-drag {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 0.5rem;
+  z-index: 60;
+  -webkit-app-region: drag;
+}

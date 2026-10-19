@@ -63,6 +63,14 @@ export interface DesktopGitHubRepo {
   canPush: boolean;
 }
 
+/**
+ * Vérification des mises à jour : à jour, nouvelle version en cours de téléchargement (installée à la fermeture),
+ * impossible pour l'instant (hors ligne), ou app lancée depuis les sources.
+ */
+export type DesktopUpdateCheck =
+  | { status: "up-to-date" | "downloading"; version: string }
+  | { status: "unavailable" | "development" };
+
 /** Ce que la coque expose à la fenêtre de l'app. */
 export interface DesktopBridge {
   /** Jeton de la session de l'app, valable tant qu'elle reste ouverte. */
@@ -74,7 +82,14 @@ export interface DesktopBridge {
   signOut(): Promise<void>;
   /** Ouvre le compte TaskForce en ligne (mot de passe, double authentification, suppression) dans le navigateur. */
   openAccountPage(): Promise<void>;
-  checkForUpdates(): Promise<void>;
+  checkForUpdates(): Promise<DesktopUpdateCheck>;
+  /** Ouvre le dossier des journaux de l'app (à joindre à un signalement). */
+  openLogs(): Promise<void>;
+  /**
+   * Boutons du système (réduire, agrandir, fermer), posés sur la barre du haut de l'interface : couleurs du thème, et
+   * hauteur de cette barre depuis le haut de la fenêtre.
+   */
+  setTitleBarTheme(dark: boolean, height?: number): void;
   /** IA de l'app : `apiKey` absente garde la clé enregistrée, `null` l'efface. */
   ai: {
     get(): Promise<DesktopAiView>;
