@@ -9,6 +9,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useRouter, usePathname } from "next/navigation";
 import { authService, type AuthResponse } from "../api/auth-service";
 import { useUserStore } from "../store/user-store";
+import { desktopBridge, IS_DESKTOP } from "../desktop";
 import type { AuthUser, LoginCredentials } from "../auth";
 
 /**
@@ -132,6 +133,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * Déconnexion
    */
   const logout = async () => {
+    const desktop = desktopBridge();
+    if (desktop) {
+      // App desktop : la coque révoque la session, oublie le compte et relance l'app sur son écran de connexion.
+      await desktop.signOut();
+      return;
+    }
     try {
       await authService.logout();
       setUser(null);
@@ -198,7 +205,8 @@ export function useRequireAuth(redirectTo: string = "/auth/login") {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    // App desktop : pas de page de connexion dans l'interface, la coque connecte le compte avant d'ouvrir la fenêtre.
+    if (!isLoading && !isAuthenticated && !IS_DESKTOP) {
       router.push(redirectTo);
     }
   }, [isAuthenticated, isLoading, redirectTo, router]);

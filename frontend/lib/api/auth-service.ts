@@ -4,8 +4,10 @@
  */
 
 import { apiClient, getErrorMessage } from "./client";
+import { getSessionToken } from "./session-token";
 import type { LoginCredentials, RegisterCredentials, AuthUser } from "../auth";
 import { AUTH_ROUTES } from "../config/api-routes";
+import { IS_DESKTOP } from "../desktop";
 
 /**
  * État des vérifications anti-robot, tel que le serveur le déclare.
@@ -363,7 +365,9 @@ export const authService = {
    */
   isAuthenticated(): boolean {
     if (typeof window === "undefined") return false;
-    
+    // App desktop : la coque n'ouvre la fenêtre qu'une fois le compte connecté, le profil se lit ensuite sur l'API.
+    if (IS_DESKTOP) return getSessionToken() !== null;
+
     const token = localStorage.getItem("accessToken");
     const user = localStorage.getItem("user");
     

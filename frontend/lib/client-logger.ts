@@ -1,4 +1,6 @@
+import { getSessionToken } from "@/lib/api/session-token";
 import { WORKSPACE_ROUTES } from "@/lib/config/api-routes";
+import { API_URL } from "@/lib/config/urls";
 
 /**
  * Journalisation « classique » des erreurs client (E25) - best-effort, non bloquant.
@@ -12,10 +14,6 @@ import { WORKSPACE_ROUTES } from "@/lib/config/api-routes";
 const THROTTLE_MS = 10_000;
 const lastSent = new Map<string, number>();
 
-function apiBase(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-}
-
 type ClientLevel = "error" | "warn";
 
 export function reportClientError(
@@ -25,7 +23,7 @@ export function reportClientError(
   stack?: string,
 ): void {
   if (typeof window === "undefined") return;
-  const token = localStorage.getItem("accessToken");
+  const token = getSessionToken();
   if (!token) return; // endpoint authentifié → on ignore hors session
 
   // Dédup / throttle par (niveau + début du message).
@@ -35,7 +33,7 @@ export function reportClientError(
   lastSent.set(key, now);
 
   try {
-    void fetch(`${apiBase()}${WORKSPACE_ROUTES.CLIENT_LOG}`, {
+    void fetch(`${API_URL}${WORKSPACE_ROUTES.CLIENT_LOG}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({

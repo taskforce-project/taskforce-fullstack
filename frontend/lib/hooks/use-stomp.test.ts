@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildRealtimeUrls } from './use-stomp';
 
 describe('use-stomp helpers', () => {
@@ -14,5 +14,17 @@ describe('use-stomp helpers', () => {
       wsUrl: 'wss://api.taskforce.test/ws',
       sockJsUrl: 'https://api.taskforce.test/ws-sockjs',
     });
+  });
+
+  it('uses the page origin when the API shares it (desktop app)', () => {
+    vi.stubGlobal('location', { origin: 'http://127.0.0.1:47900' });
+    try {
+      expect(buildRealtimeUrls('')).toEqual({
+        wsUrl: 'ws://127.0.0.1:47900/ws',
+        sockJsUrl: 'http://127.0.0.1:47900/ws-sockjs',
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

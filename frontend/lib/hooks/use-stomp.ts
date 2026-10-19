@@ -9,7 +9,8 @@ export type RealtimeConnectionState = "idle" | "connecting" | "connected" | "dis
 export type RealtimeTransport = "none" | "websocket" | "sockjs"
 
 export function buildRealtimeUrls(apiUrl: string): { wsUrl: string; sockJsUrl: string } {
-  const normalizedApiUrl = apiUrl.replace(/\/$/, "")
+  // API sur la même origine que l'interface (app desktop, `API_URL` vide) : on part de l'adresse de la page.
+  const normalizedApiUrl = (apiUrl || globalThis.location?.origin || "").replace(/\/$/, "")
   const baseUrl = normalizedApiUrl.replace(/\/api\/?$/, "")
 
   return {
