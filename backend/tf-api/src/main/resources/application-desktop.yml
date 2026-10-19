@@ -6,6 +6,16 @@
 # (spec Specification_App_Desktop §5.2 et §5.7).
 # ===============================
 spring:
+  autoconfigure:
+    # Pas de Redis sur un poste : le cache est en mémoire (spring.cache.type) et le garde-débit de l'IA laisse passer
+    # sans lui (AiRateGuard). Sans ces exclusions, le client Lettuce démarrerait ses threads pour un serveur absent.
+    exclude:
+      - org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration
+      - org.springframework.boot.data.redis.autoconfigure.DataRedisReactiveAutoConfiguration
+      - org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration
+      - org.springframework.boot.data.redis.autoconfigure.health.DataRedisHealthContributorAutoConfiguration
+      - org.springframework.boot.data.redis.autoconfigure.health.DataRedisReactiveHealthContributorAutoConfiguration
+      - org.springframework.boot.data.redis.autoconfigure.observation.LettuceObservationAutoConfiguration
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME:taskforce}
@@ -37,6 +47,10 @@ server:
   # Jamais joignable depuis le réseau : seule la coque, sur la même machine, parle à l'API.
   address: 127.0.0.1
   port: ${TF_DESKTOP_API_PORT}
+  tomcat:
+    threads:
+      # Une personne, quelques requêtes à la fois : 2 threads au repos au lieu de 10.
+      min-spare: 2
 
 desktop:
   # Jeton tiré par la coque à chaque lancement, exigé sur chaque requête (DesktopLaunchTokenAuthenticator).

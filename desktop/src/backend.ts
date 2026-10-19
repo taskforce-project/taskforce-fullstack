@@ -52,10 +52,13 @@ export class Backend {
       TF_DESKTOP_RUNNER_SECRET: options.runnerSecret,
     });
     const args = [
-      // Une personne, un poste : peu de mémoire, démarrage rapide plutôt que débit maximal.
-      "-Xms128m",
+      // Une personne, un poste : peu de mémoire, démarrage rapide plutôt que débit maximal. Le tas part petit et rend
+      // au système ce qu'il n'utilise plus après une collecte complète (DesktopMemoryTrim en fait une au démarrage).
+      "-Xms32m",
       "-Xmx768m",
       "-XX:+UseSerialGC",
+      "-XX:MinHeapFreeRatio=15",
+      "-XX:MaxHeapFreeRatio=40",
       "-XX:TieredStopAtLevel=1",
       "-Xss512k",
       // Comme sur le serveur : l'API rend des dates UTC sans fuseau, que l'interface lit comme telles.
