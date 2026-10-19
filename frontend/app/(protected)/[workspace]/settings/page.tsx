@@ -381,7 +381,62 @@ function DesktopAccountPanel() {
           </div>
         </div>
       </SectionCard>
+      <DesktopAppSection />
     </div>
+  )
+}
+
+/**
+ * L'app elle-même : ce que donnait le menu Aide avant que la fenêtre perde sa barre de menus (version, mises à jour,
+ * journaux, documentation, signalement d'un problème).
+ */
+function DesktopAppSection() {
+  const bridge = desktopBridge()
+  const [checking, setChecking] = useState(false)
+
+  async function checkUpdates() {
+    if (!bridge) return
+    setChecking(true)
+    const result = await bridge.checkForUpdates().catch(() => ({ status: "unavailable" as const }))
+    setChecking(false)
+    switch (result.status) {
+      case "up-to-date":
+        toast.success(`TaskForce ${result.version} is up to date`)
+        break
+      case "downloading":
+        toast.success(`TaskForce ${result.version} is downloading`, { description: "It installs when you quit TaskForce." })
+        break
+      case "development":
+        toast.info("Updates are checked in the installed app.")
+        break
+      default:
+        toast.error("Couldn't check for updates. Check your connection and try again.")
+    }
+  }
+
+  return (
+    <SectionCard
+      title="TaskForce Desktop"
+      description={`Version ${bridge?.version ?? ""}. Updates download by themselves and install when you quit TaskForce.`}
+    >
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={() => void checkUpdates()} disabled={checking}>
+          {checking && <Loader2 className="size-3.5 animate-spin" />}
+          Check for updates
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => void bridge?.openLogs?.()}>
+          Open logs folder
+        </Button>
+        <Button size="sm" variant="ghost" asChild>
+          <a href="https://docs.taskforce-project.fr" target="_blank" rel="noreferrer">Documentation</a>
+        </Button>
+        <Button size="sm" variant="ghost" asChild>
+          <a href="https://github.com/taskforce-project/taskforce-fullstack/issues" target="_blank" rel="noreferrer">
+            Report an issue
+          </a>
+        </Button>
+      </div>
+    </SectionCard>
   )
 }
 
