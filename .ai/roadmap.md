@@ -10,6 +10,13 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 19/10/2026 (fin de nuit) - Release 1.1.0 EN PROD (PR #360, `9732c836`, tag `taskforce-v1.1.0`) : l'app desktop, les passkeys, aucune page Keycloak.** `[backend + frontend + keycloak prod + desktop]`
+> - PR #359 fusionnée dans `dev` (`14991a61`, CI verte, suite backend locale 1728 tests sans échec) ; release = arbre exact de `dev` sur `main` par `commit-tree`, version produit 1.1.0 posée par la CI sur la PR (`b32b354c`), `--admin --squash`.
+> - **Déployé et vérifié** : V100 et V101 appliquées en 49 ms, backend sain sans erreur ; webapp 1.1.0 avec « Sign in with a passkey » ; `/api/auth/passkey/options` 200 (rpId `app.taskforce-project.fr`, vérification de l'utilisateur exigée), session desktop inconnue 401.
+> - **Keycloak de prod** : recréé par le déploiement (dépendance du backend) avec `token-exchange` et `admin-fine-grained-authz` (noms validés avant par un `kc.sh build` jetable sur la VM) et le thème monté ; `passkey-sessions.sh taskforce-prod` (politique créée, `impersonate` accordée à `taskforce-api`) ; realm remis : `browserFlow=browser`, plus de flux après GitHub et Google, `registrationAllowed=false`, `loginTheme=taskforce`, client `taskforce-desktop` désactivé.
+> - **Release desktop publiée** depuis `main` (workflow `Desktop - Release`, run 39330562930) : `desktop-v1.0.0` en préversion, non signée (installeur Windows 271 Mo, `.deb` 252 Mo, AppImage 288 Mo) et `desktop-latest` pour les mises à jour.
+> - `dev` réaligné en 1.1.0 (cette trace) ; une seconde release `dev` → `main` reconstruit le site pour la page de téléchargement.
+
 > **▶ MAJ 19/10/2026 (fin de nuit) - Aucun écran Keycloak et passkeys : faits, vérifiés de bout en bout (branche `feature/desktop`, pas encore poussé).** `[backend + frontend + desktop + keycloak + docs]`
 > - **Faille fermée** : l'API acceptait tout jeton du realm, donc une connexion sur les pages de Keycloak (client `taskforce-web` ou `taskforce-desktop`) contournait la 2FA de l'app. `AuthorizedPartyValidator` (`76fd28b4`) n'accepte que `azp` = `keycloak.client-id` ou `tf-runner-*`. ⚠️ Prod : vérifier `KEYCLOAK_CLIENT_ID=taskforce-api` avant de déployer.
 > - **2FA de l'app rétablie** (revert des 3 commits du TOTP Keycloak, `eb7ad698`, `4606eb3c`, `1317caa0`) ; `two-step-flows.sh` retiré (`26bc9489`).
