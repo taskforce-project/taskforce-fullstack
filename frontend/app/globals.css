@@ -606,15 +606,21 @@ textarea:not([disabled]) { cursor: text; }
     overflow: hidden;
   }
 
-  /* ── Panneau de marque (gauche) : masqué sous 1024px. Papier doux et filet à droite, comme les
-     surfaces secondaires de la direction artistique ; suit le thème. ── */
+  /* ── Panneau de marque (gauche) : masqué sous 1024px. La peinture de l'accueil du site, un voile clair sous
+     le texte, un filet à droite ; il reste clair dans les deux thèmes (texte sombre sur la peinture). ── */
   .auth-aside {
     position: relative;
     display: none;
     overflow: hidden;
-    color: var(--foreground);
-    background: var(--paper-soft);
+    color: #191715;
+    background: #dfe6ec;
     border-right: 1px solid var(--border);
+  }
+  .auth-aside-paint { object-fit: cover; object-position: 50% 72%; }
+  .auth-aside-veil {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(80% 48% at 28% 22%, rgb(255 255 255 / 0.68) 0%, rgb(255 255 255 / 0.3) 55%, rgb(255 255 255 / 0) 85%);
   }
   @media (min-width: 1024px) { .auth-aside { display: flex; } }
 
@@ -640,7 +646,7 @@ textarea:not([disabled]) { cursor: text; }
     margin-top: 0.9rem;
     font-size: 1rem;
     line-height: 1.55;
-    color: var(--muted-foreground);
+    color: rgb(25 23 21 / 0.72);
   }
   /* La capture flotte en bas et deborde le bord bas (clippee par le panneau) : fenetre d'app posee. */
   .auth-aside-shot { margin-top: auto; display: flex; justify-content: center; }
@@ -648,9 +654,10 @@ textarea:not([disabled]) { cursor: text; }
     width: 100%;
     max-width: 46rem;
     height: auto;
-    border: 1px solid var(--border);
+    border: 1px solid rgb(25 23 21 / 0.08);
     border-bottom: none;
-    box-shadow: var(--shadow-window);
+    border-radius: 10px 10px 0 0;
+    box-shadow: 0 1px 0 #1917150a, 0 18px 40px -16px #19171538;
     transform: translateY(6px);
   }
 
