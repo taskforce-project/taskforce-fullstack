@@ -105,6 +105,8 @@ services:
       # Monter le SOUS-dossier prod : Keycloak n'importe QUE les .json directement dans le dossier
       # (pas de récursion) — monter `./keycloak/realms` (qui contient prod/ et dev/) n'importe rien.
       - ./keycloak/realms/prod:/opt/keycloak/data/import:ro
+      # Pages de connexion aux couleurs de TaskForce (loginTheme du realm, à poser avec kcadm sur un realm déjà importé).
+      - ./keycloak/themes/taskforce:/opt/keycloak/themes/taskforce:ro
     healthcheck:
       # L'image Keycloak (ubi-micro) n'embarque PAS curl → test TCP via bash /dev/tcp.
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]

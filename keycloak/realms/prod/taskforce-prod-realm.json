@@ -2,6 +2,7 @@
   "realm": "taskforce-prod",
   "enabled": true,
   "displayName": "Taskforce Production",
+  "loginTheme": "taskforce",
   "displayNameHtml": "<div class=\"kc-logo-text\"><span>Taskforce</span></div>",
   "accessTokenLifespan": 1800,
   "accessTokenLifespanForImplicitFlow": 600,

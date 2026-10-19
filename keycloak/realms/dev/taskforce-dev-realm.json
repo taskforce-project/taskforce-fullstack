@@ -2,6 +2,7 @@
   "realm": "taskforce-dev",
   "enabled": true,
   "displayName": "Taskforce Development",
+  "loginTheme": "taskforce",
   "registrationAllowed": true,
   "resetPasswordAllowed": true,
   "rememberMe": true,

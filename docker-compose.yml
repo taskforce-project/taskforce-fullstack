@@ -56,6 +56,8 @@ services:
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?missing value, run scripts/selfhost-init first}
     volumes:
       - ./keycloak/realms/selfhost:/opt/keycloak/data/import:ro
+      # Sign-in pages in TaskForce colours (loginTheme of the realm).
+      - ./keycloak/themes/taskforce:/opt/keycloak/themes/taskforce:ro
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${KEYCLOAK_PORT:-8180}:8080"
     depends_on:
