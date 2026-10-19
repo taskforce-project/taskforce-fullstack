@@ -138,6 +138,11 @@ delivery:
   local-runner:
     enabled: true
 
+# Une personne sur sa machine : la fenêtre, le runner et Claude Code partagent 127.0.0.1, un quota par adresse les
+# bloquerait ensemble. L'API n'admet de toute façon que les jetons de la coque.
+ratelimit:
+  enabled: false
+
 springdoc:
   api-docs:
     enabled: false
