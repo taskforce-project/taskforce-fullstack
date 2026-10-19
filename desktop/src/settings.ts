@@ -2,6 +2,8 @@ import { app, safeStorage } from "electron";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import { DEFAULT_AI_SETTINGS, type AiSettings } from "./ai";
+
 /** Compte TaskForce connecté, lu dans le jeton d'identité du compte hébergé. */
 export interface Account {
   /** Service de comptes qui l'a connecté : un compte d'un autre service (développement, nouvelle adresse) ne s'ouvre pas. */
@@ -20,10 +22,14 @@ interface AccountSecrets {
   databasePassword?: string;
   /** Clé de chiffrement des jetons et clés en base (`TF_ENCRYPTION_KEY`). */
   encryptionKey?: string;
+  /** Clé de l'API d'IA choisie par la personne (fournisseur compatible OpenAI). */
+  aiApiKey?: string;
 }
 
 interface StoredSettings {
   account?: Account;
+  /** Fournisseur d'IA choisi, par identifiant de compte (sans la clé, gardée avec les secrets). */
+  ai?: Record<string, AiSettings>;
   /** Secrets chiffrés, par identifiant de compte (base64 du texte chiffré). */
   secrets?: Record<string, Record<keyof AccountSecrets, string | undefined>>;
 }
@@ -81,6 +87,15 @@ export const settings = {
       if (entry) secrets[current.account.subject] = { ...entry, refreshToken: undefined };
       write({ ...current, account: undefined, secrets });
     }
+  },
+
+  aiSettings(subject: string): AiSettings {
+    return { ...DEFAULT_AI_SETTINGS, ...(read().ai?.[subject] ?? {}) };
+  },
+
+  setAiSettings(subject: string, ai: AiSettings): void {
+    const current = read();
+    write({ ...current, ai: { ...(current.ai ?? {}), [subject]: ai } });
   },
 
   secret(subject: string, name: keyof AccountSecrets): string | undefined {

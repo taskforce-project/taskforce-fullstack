@@ -21,4 +21,9 @@ contextBridge.exposeInMainWorld("taskforceDesktop", {
   signOut: (): Promise<void> => ipcRenderer.invoke("desktop:sign-out"),
   openAccountPage: (): Promise<void> => ipcRenderer.invoke("desktop:account-page"),
   checkForUpdates: (): Promise<void> => ipcRenderer.invoke("desktop:check-updates"),
+  // IA : fournisseur choisi et état ; la clé d'API part vers le trousseau et ne revient jamais à la page.
+  ai: {
+    get: (): Promise<unknown> => ipcRenderer.invoke("desktop:ai-get"),
+    save: (input: unknown): Promise<unknown> => ipcRenderer.invoke("desktop:ai-save", input),
+  },
 });

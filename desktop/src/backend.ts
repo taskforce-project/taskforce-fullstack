@@ -16,6 +16,8 @@ export interface BackendOptions {
   launchToken: string;
   /** Origine de la fenêtre (relais local), seule origine admise par l'API. */
   uiOrigin: string;
+  /** Relais d'IA de la coque, joint comme l'ai-service de la webapp (cf. ai.ts). */
+  ai: { url: string; token: string };
 }
 
 /**
@@ -43,6 +45,8 @@ export class Backend {
       TF_DESKTOP_ACCOUNT_FAMILY_NAME: options.account.familyName,
       TF_ENCRYPTION_KEY: options.encryptionKey,
       CORS_ALLOWED_ORIGINS: options.uiOrigin,
+      AI_SERVICE_URL: options.ai.url,
+      AI_SERVICE_TOKEN: options.ai.token,
     });
     const args = [
       // Une personne, un poste : peu de mémoire, démarrage rapide plutôt que débit maximal.

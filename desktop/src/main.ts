@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import { join } from "node:path";
 
 import { accountPageUrl, ISSUER, refresh, revoke, signIn, signInError } from "./account";
+import { parseAiInput } from "./ai";
 import { initLog, log } from "./log";
 import { appLogDir } from "./paths";
 import { settings, type Account } from "./settings";
@@ -208,6 +209,20 @@ function registerIpc(): void {
     };
   });
   ipcMain.handle("desktop:account-page", () => shell.openExternal(accountPageUrl()));
+  // Réglages d'IA du compte : fournisseur et modèles dans les réglages, clé dans le trousseau, jamais renvoyée à la page.
+  ipcMain.handle("desktop:ai-get", () => aiView());
+  ipcMain.handle("desktop:ai-save", async (_event, input: unknown) => {
+    if (!stack) return { ok: false, error: "TaskForce is still starting" };
+    try {
+      const { settings: next, apiKey } = parseAiInput(input);
+      settings.setAiSettings(stack.account.subject, next);
+      if (apiKey !== undefined) settings.setSecret(stack.account.subject, "aiApiKey", apiKey || undefined);
+      stack.ai.invalidate();
+      return { ok: true, view: await aiView() };
+    } catch (error) {
+      return { ok: false, error: (error as Error).message };
+    }
+  });
   ipcMain.handle("desktop:check-updates", () => check());
   ipcMain.handle("desktop:sign-out", async () => {
     const account = stack?.account ?? settings.account();
@@ -220,6 +235,17 @@ function registerIpc(): void {
     app.relaunch();
     app.quit();
   });
+}
+
+/** Réglages d'IA tels que l'écran les montre, avec l'état lu à l'instant chez le fournisseur. */
+async function aiView() {
+  if (!stack) throw new Error("TaskForce is still starting");
+  const subject = stack.account.subject;
+  return {
+    settings: settings.aiSettings(subject),
+    hasApiKey: Boolean(settings.secret(subject, "aiApiKey")),
+    state: await stack.ai.state(true),
+  };
 }
 
 function buildMenu(): Menu {

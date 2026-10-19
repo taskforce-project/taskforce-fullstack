@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 
+import { AiRelay } from "./ai";
 import { Backend } from "./backend";
 import { Frontend } from "./frontend";
 import { log } from "./log";
@@ -16,6 +17,8 @@ export interface Stack {
   dataDir: string;
   launchToken: string;
   origin: string;
+  /** Relais vers le fournisseur d'IA choisi (réglages « AI » de l'app). */
+  ai: AiRelay;
   stop: () => Promise<void>;
 }
 
@@ -39,11 +42,16 @@ export async function startStack(account: Account, onStep: (step: string) => voi
   const backend = new Backend();
   const frontend = new Frontend();
   const proxy = new Proxy();
+  const ai = new AiRelay(() => ({
+    settings: settings.aiSettings(account.subject),
+    apiKey: settings.secret(account.subject, "aiApiKey"),
+  }));
 
   const stop = async () => {
     await proxy.stop().catch(() => undefined);
     await frontend.stop().catch(() => undefined);
     await backend.stop().catch(() => undefined);
+    await ai.stop().catch(() => undefined);
     await database.stop().catch(() => undefined);
   };
 
@@ -54,6 +62,7 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     await database.start();
 
     const origin = await proxy.reserve();
+    await ai.start();
     onStep("Starting TaskForce");
     await Promise.all([
       backend.start({
@@ -64,12 +73,13 @@ export async function startStack(account: Account, onStep: (step: string) => voi
         encryptionKey: accountSecret(account.subject, "encryptionKey"),
         launchToken,
         uiOrigin: origin,
+        ai: { url: ai.url(), token: ai.token },
       }),
       frontend.start(join(dataDir, "logs")),
     ]);
     await proxy.start(backend.port, frontend.port);
     log.info(`TaskForce ready at ${origin}`);
-    return { account, dataDir, launchToken, origin, stop };
+    return { account, dataDir, launchToken, origin, ai, stop };
   } catch (error) {
     await stop();
     throw error;
