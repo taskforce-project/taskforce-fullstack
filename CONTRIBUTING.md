@@ -39,6 +39,9 @@ docker compose -f docker-compose.dev.yml --env-file backend/tf-api/.env.dev up -
 The app is then on <http://localhost:3000>, the API on <http://localhost:8080/api> and Keycloak on
 <http://localhost:8180>. The test accounts are listed in [`backend/tf-api/seed/README.md`](./backend/tf-api/seed/README.md).
 
+GitHub and Slack need OAuth apps of your own: `.env.example` lists their variables and callback URLs, to set in
+`.env.dev`.
+
 The frontend container does not reload on every change on Windows: restart it (`docker restart
 taskforce-frontend-dev`). Backend changes need a rebuild of its image (`.\scripts\docker.ps1 rebuild backend`).
 
