@@ -233,3 +233,9 @@ Temporary Items
 security-reports/**/*.html
 security-reports/**/*.json
 security-reports/**/*.png
+
+# Fichiers locaux des assistants de code : réglages de Claude Code (.claude/) et les AGENTS.md / CLAUDE.md
+# que `next dev` réécrit dans frontend/ à chaque démarrage. Les consignes communes sont dans AGENTS.md à la racine.
+.claude/
+/frontend/AGENTS.md
+/frontend/CLAUDE.md
