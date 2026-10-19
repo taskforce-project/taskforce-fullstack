@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { accountPageUrl, ISSUER, refresh, revoke, signIn, signInError } from "./account";
 import { parseAiInput } from "./ai";
+import { connectMcp, disconnectMcp, isPersonalToken, isWorkspaceSlug, mcpConnection } from "./claude";
 import { createRepo, DEVICE_PAGE, findRepo, GitHubSignIn, isNewRepoName, isRepoFullName, listRepos } from "./github";
 import { initLog, log } from "./log";
 import { appLogDir } from "./paths";
@@ -252,6 +253,20 @@ function registerIpc(): void {
   ipcMain.handle("desktop:github-sign-in-page", () => shell.openExternal(DEVICE_PAGE));
   ipcMain.handle("desktop:github-sign-in-wait", () => githubSignIn.wait());
   ipcMain.handle("desktop:github-sign-in-cancel", () => githubSignIn.cancel());
+  // Claude Code de la personne branché sur le serveur MCP d'un espace (mode interactif), à l'adresse de la fenêtre.
+  ipcMain.handle("desktop:claude-mcp-status", (_event, slug: unknown) => {
+    if (!stack || !isWorkspaceSlug(slug)) return { ok: false, error: "Unknown workspace" };
+    return settle(mcpConnection(stack.origin, slug));
+  });
+  ipcMain.handle("desktop:claude-mcp-connect", (_event, input: unknown) => {
+    const { slug, token } = (input ?? {}) as { slug?: unknown; token?: unknown };
+    if (!stack || !isWorkspaceSlug(slug) || !isPersonalToken(token)) return { ok: false, error: "Invalid workspace or token" };
+    return settle(connectMcp(stack.origin, slug, token));
+  });
+  ipcMain.handle("desktop:claude-mcp-disconnect", (_event, slug: unknown) => {
+    if (!isWorkspaceSlug(slug)) return { ok: false, error: "Unknown workspace" };
+    return settle(disconnectMcp(slug));
+  });
   ipcMain.handle("desktop:sign-out", async () => {
     const account = stack?.account ?? settings.account();
     if (account) {
