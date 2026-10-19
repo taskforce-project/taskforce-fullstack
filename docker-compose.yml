@@ -151,6 +151,8 @@ services:
       FRONTEND_URL: ${TF_APP_URL:-http://localhost:3000}
       APP_API_URL: ${TF_API_URL:-http://localhost:8080}
       CORS_ALLOWED_ORIGINS: ${TF_APP_URL:-http://localhost:3000}
+      # Session cookie. Browsers drop secure cookies over plain http (localhost aside): false for http on a network.
+      AUTH_REFRESH_COOKIE_SECURE: ${AUTH_REFRESH_COOKIE_SECURE:-true}
       AI_SERVICE_URL: http://ai-service:8000
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?missing value, run scripts/selfhost-init first}
       MINIO_ENDPOINT: http://minio:9000

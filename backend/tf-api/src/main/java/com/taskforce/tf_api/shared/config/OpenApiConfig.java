@@ -20,12 +20,13 @@ public class OpenApiConfig {
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("Taskforce API")
+                        .title("TaskForce API")
                         .version("1.0.0")
                         .description("REST API of TaskForce, the open-source project management and AI delivery platform")
+                        // Le projet n'a pas d'adresse de support : on renvoie au dépôt, où se posent les questions.
                         .contact(new Contact()
-                                .name("Taskforce Team")
-                                .email("support@taskforce.com"))
+                                .name("TaskForce")
+                                .url("https://github.com/taskforce-project/taskforce-fullstack"))
                         .license(new License()
                                 .name("AGPL-3.0")
                                 .url("https://www.gnu.org/licenses/agpl-3.0.html")))
@@ -34,7 +35,7 @@ public class OpenApiConfig {
                                 .type(SecurityScheme.Type.HTTP)
                                 .scheme("bearer")
                                 .bearerFormat("JWT")
-                                .description("JWT token obtenu via Keycloak")))
+                                .description("Access token returned by POST /api/auth/login")))
                 .addSecurityItem(new SecurityRequirement().addList("bearer-jwt"));
     }
 }

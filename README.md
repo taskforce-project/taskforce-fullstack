@@ -1,188 +1,132 @@
-# ⚡ TaskForce - la couche d'exécution IA pour les équipes qui livrent
+# TaskForce
 
 <div align="center">
 
 <!-- BADGES:START -->
-![Version](https://img.shields.io/badge/Version-0.2.0--rc1-blue.svg)
+![Version](https://img.shields.io/badge/Version-1.0.0-blue.svg)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)
 ![Java](https://img.shields.io/badge/Java-21-orange.svg)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.6-brightgreen.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-16.3.8-black.svg)
-![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-38bdf8.svg)
-![Keycloak](https://img.shields.io/badge/Keycloak-26.0.6-blue.svg)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)
-![Backend App](https://img.shields.io/badge/Backend_App-0.0.15--SNAPSHOT-6f42c1.svg)
-![Frontend App](https://img.shields.io/badge/Frontend_App-0.3.8-0ea5e9.svg)
-![Landing App](https://img.shields.io/badge/Landing_App-0.0.1-f59e0b.svg)
-![Runtime](https://img.shields.io/badge/Runtime-ci-blueviolet.svg)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-blue.svg)
+![Keycloak](https://img.shields.io/badge/Keycloak-26.5.2-blue.svg)
+![Self-hosted](https://img.shields.io/badge/Self--hosted-Docker-blue.svg)
 <!-- BADGES:END -->
 
-**TaskForce se pose au-dessus des outils qu'une équipe utilise déjà et transforme une intention en résultat livré.**
+**Open-source project management where people and coding agents work on the same issues.**
 
-[🌐 Site](https://taskforce-project.fr) • [🚀 Application](https://app.taskforce-project.fr) • [📖 Référence API](https://docs.taskforce-project.fr) • [🧠 Brain OS (doc)](https://github.com/taskforce-project/taskforce-docs)
+[Website](https://taskforce-project.fr) · [Self-hosting](./SELF_HOSTING.md) · [API reference](https://docs.taskforce-project.fr) · [Contributing](./CONTRIBUTING.md)
 
 </div>
 
----
+![TaskForce dashboard](.github/assets/dashboard.webp)
 
-## 📋 Sommaire
+## What it is
 
-- [À propos](#-à-propos)
-- [Ce qui tourne aujourd'hui](#-ce-qui-tourne-aujourdhui)
-- [Stack technique](#-stack-technique)
-- [Architecture](#-architecture)
-- [Démarrage rapide](#-démarrage-rapide)
-- [Services & accès](#-services--accès-dev-local)
-- [Développement](#-développement)
-- [Déploiement](#-déploiement)
-- [Documentation](#-documentation)
-- [Licence](#-licence)
+TaskForce plans a team's work and hands parts of it to coding agents. Projects, cycles and roadmaps live next to the
+team's knowledge, the Brain OS, and an AI assistant, Cortex, works with both. You run it yourself, on one machine or
+a server: AI comes from Ollama on that machine by default, or from any OpenAI-compatible API you choose, and
+everything else keeps working without it.
 
----
+## Features
 
-## 🎯 À propos
+### Plan the work
 
-**TaskForce** se pose au-dessus des outils qu'une équipe utilise déjà (Linear, Notion, GitHub, Claude) et transforme une intention en résultat livré. Les outils de gestion de projet *suivent* le travail ; TaskForce le *comprend* : il orchestre le flux entre les outils d'une équipe et l'IA qui agit dessus, concentre le contexte de chaque projet dans un modèle unique, et éclaire les décisions - jusqu'à en anticiper les conséquences avant qu'elles ne soient prises.
+- Projects with board, list, backlog, cycles, roadmap and pages. Issues carry priorities, labels, due dates, story
+  points, subtasks, checklists, relations, attachments and time tracking.
+- My Queue gathers your issues, cycles and pages across projects; Signals lists what needs you.
+- Smart Assign suggests the best person for an issue from skills, workload and history, always as an explicit
+  suggestion. It can also propose assignees for a whole board and rebalance the team's workload.
+- Members and roles (owner, admin, member, viewer), private projects, invitations, two-factor sign-in.
 
-Ce coeur d'intelligence, c'est le **Brain OS** : un modèle persistant et navigable d'un projet (sa connaissance, son histoire, les conséquences des actions passées) qu'un humain et un agent parcourent de la même façon.
+![Project board](.github/assets/board.webp)
 
-> **Statut : beta, en évolution.** Ce qui tourne de bout en bout aujourd'hui est un workspace dockerisé, déployé et joignable - les écrans sont réels. La couche d'orchestration et de décision complète est la direction vers laquelle pousse le Brain OS, pas une feature livrée. On montre la capacité, jamais de la traction inventée.
+### Delegate to coding agents
 
----
+- **Claude Code**, run by each person on their own computer through the local runner: delegate an issue the way you
+  assign a teammate, follow the run live on the issue, allow or deny each action that needs it, and get the pull
+  request.
+- **GitHub Copilot coding agent** (preview) works in the project's repository and opens a pull request.
+- From your terminal, Claude Code can also use TaskForce as an MCP server, with a personal access token.
 
-## 🌟 Ce qui tourne aujourd'hui
+![Delegating an issue to Claude Code](.github/assets/issue-agents.webp)
 
-| | Capacité | Ce que ça fait |
-| --- | --- | --- |
-| 🧭 | **Un workspace** | Projets, cycles, issues, backlog, roadmap, pages et analytics au même endroit - vues board, liste et roadmap. |
-| 🤖 | **Smart Assign** | Recommande le bon responsable pour chaque issue par compétence, charge et historique - un score décomposé et transparent, pas une réunion de planif. |
-| 📊 | **AI Insights** | Une lecture exécutive du débit, de la capacité et de ce qui est à risque, générée sans que personne ne construise un rapport. |
-| 💬 | **Ask AI** | Un assistant contextuel qui répond depuis le vrai workspace de l'équipe, pas un chat générique. |
-| 🧠 | **Brain OS** | La connaissance du workspace sous forme de graphe navigable, lisible par un humain comme par un agent. |
+### Keep the team's knowledge
 
----
+- The Brain OS: a tree of Markdown pages with `[[links]]` and `#tags`, plain-text and semantic search, and notes
+  ingested from GitHub, Slack and Plane.
+- Cortex answers from the workspace and the Brain OS, drafts issue specs, and can use the tools of connected MCP
+  servers: reads run directly, a change waits for the approval of an owner or admin.
 
-## 🛠️ Stack technique
+![Brain OS](.github/assets/brain-os.webp)
 
-| Couche | Technologies |
-| --- | --- |
-| **Backend** | Java 21, Spring Boot 4, Clean Architecture, multi-tenant, REST + WebSocket/STOMP |
-| **Frontend** | Next.js 16, React 19, TypeScript, TailwindCSS, shadcn/ui |
-| **Landing** | Astro 5 |
-| **IA** | Inférence auto-hébergée - Ollama (Qwen3 14B / 8B), embeddings BGE-M3 (1024d) dans pgvector, derrière une passerelle FastAPI ; serveur MCP |
-| **Identité** | Keycloak - OIDC, JWT, RBAC |
-| **Données** | PostgreSQL 18 + pgvector, Redis, MinIO (S3), RabbitMQ (relais STOMP) |
-| **Observabilité** | OpenTelemetry vers SigNoz |
-| **CI/CD** | GitHub Actions, GHCR, Docker Compose (dev / prod / tools), Nginx |
+### Connect your tools
 
-> L'inférence est **auto-hébergée** : aucun LLM tiers, aucune donnée du workspace ne sort de la machine.
+- **GitHub**: pull requests and commits linked to issues, with their status kept up to date; one repository per
+  project for the agents; issues imported into the Brain OS.
+- **Slack**: notifications per channel and event; channel history imported into the Brain OS.
+- **Plane**: projects and work items synced into the Brain OS.
+- **Any MCP server**, with one-click OAuth or a token. 25 official servers are listed (Linear, Jira, Notion,
+  Sentry...).
+- **Outgoing webhooks** for n8n, Zapier, Make or your own endpoint, signed with HMAC-SHA256 and retried.
 
----
+![Integrations catalog](.github/assets/integrations.webp)
 
-## 🏗️ Architecture
-
-Monorepo multi-tenant. L'identité est déléguée à Keycloak ; le frontend parle à l'API en REST (JWT bearer) et en WebSocket/STOMP pour le temps réel (RabbitMQ comme relais). L'API délègue l'inférence à une passerelle IA qui route vers un runtime Ollama local.
-
-```
-taskforce-fullstack/
-├─ backend/          API Spring Boot (Java 21, Clean Architecture)
-├─ frontend/         App Next.js 16 (React 19, TypeScript)
-├─ landing-page/     Site marketing Astro
-├─ ai-service/       Passerelle IA (FastAPI) -> runtime Ollama local
-├─ taskforce-runner/ Runner local de délégation (Claude Code sur ton poste)
-├─ taskforce-plugin/ Plugin Claude Code (mode interactif, serveur MCP de l'instance)
-├─ keycloak/         Identité & accès
-├─ nginx/            Reverse proxy / TLS
-├─ observability/    OpenTelemetry + SigNoz
-├─ rabbitmq/         Relais STOMP temps réel
-├─ security-reports/ OWASP ZAP / Trivy / Semgrep
-├─ scripts/          Outils & automatisation
-└─ docker-compose.yml + docker-compose.{dev,prod,tools}.yml
-```
-
-📖 Diagramme complet, C4 et ADR dans le **[Brain OS](https://github.com/taskforce-project/taskforce-docs)**.
-
----
-
-## 📦 Démarrage rapide
-
-**Prérequis :** Docker Desktop 4.x+ (Compose V2), Git, et `make` (Windows : `choco install make`). Pour le dev natif : JDK 21+, Node 20+, Maven 3.9+.
+## Self-host
 
 ```bash
-# 1. Cloner
 git clone https://github.com/taskforce-project/taskforce-fullstack.git
 cd taskforce-fullstack
-
-# 2. Initialiser l'environnement (.env + vérif Docker)
-make init-dev
-
-# 3. Démarrer toute la stack
-make dev-up            # menu interactif : make menu
+./scripts/selfhost-init.sh        # Windows PowerShell: .\scripts\selfhost-init.ps1
+docker compose up -d --build
 ```
 
-Sur Windows, le centre de commande est `.\tf.ps1` (`.\tf.ps1 up` / `down` / `logs` / `help`). Les scripts Docker vivent dans [`scripts/`](./scripts/README.md).
+Then open <http://localhost:3000> and create your account. [SELF_HOSTING.md](./SELF_HOSTING.md) covers AI, email,
+access from other machines, coding agents, updates and backups.
 
----
+## Stack
 
-## 🚀 Services & accès (dev local)
-
-| Service | URL |
+| Part | Technology |
 | --- | --- |
-| 🌐 Frontend | http://localhost:3000 |
-| 🌍 Landing | http://localhost:4321 |
-| 🔌 API | http://localhost:8080/api |
-| 📚 Swagger UI | http://localhost:8080/api/swagger-ui.html |
-| 🔐 Keycloak | http://localhost:8180 |
-| 🗄️ pgAdmin | http://localhost:5050 |
+| API | Java 21, Spring Boot 4, PostgreSQL 18 with pgvector, Flyway |
+| App | Next.js 16, React 19, TypeScript, Tailwind CSS, Zustand |
+| AI gateway | Python, FastAPI; Ollama or any OpenAI-compatible API |
+| Sign-in | Keycloak |
+| Files | MinIO (S3-compatible) |
+| Coding agents | Local runner (Node.js) for Claude Code; GitHub Copilot coding agent |
 
-Comptes de test (realm `taskforce-dev`) : `admin / admin123`, `user / user123`.
+| Folder | What it is |
+| --- | --- |
+| [`backend/tf-api`](./backend/tf-api) | The API |
+| [`frontend`](./frontend) | The app |
+| [`ai-service`](./ai-service) | The AI gateway |
+| [`taskforce-runner`](./taskforce-runner) | The local runner for Claude Code |
+| [`taskforce-plugin`](./taskforce-plugin) | The Claude Code plugin (`/taskforce`) |
+| [`keycloak`](./keycloak) | Sign-in realms |
+| [`landing-page`](./landing-page) | The website |
 
----
+## Documentation
 
-## 💻 Développement
+- [SELF_HOSTING.md](./SELF_HOSTING.md) to run it, [CONTRIBUTING.md](./CONTRIBUTING.md) to work on it.
+- [API reference](https://docs.taskforce-project.fr).
+- [Design and architecture notes](https://github.com/taskforce-project/taskforce-docs) (in French): decisions,
+  architecture, API, known issues.
 
-- **Branches** depuis l'intégration (`feature/*`, `fix/*`) ; **Conventional Commits** (`type(scope): description`).
-- Chaque PR porte **un label de release** par service modifié (`release:{major|minor|patch}`).
-- **Tests** : backend JUnit 5 (`./mvnw test`), frontend Jest + E2E Playwright sur la stack Docker réelle (pas de mock).
-- **Qualité** : ESLint / Checkstyle avant commit.
-- Les règles d'architecture (couches, préfixe `/api`, stores Zustand, migrations Flyway) sont dans **[CLAUDE.md](./CLAUDE.md)** et le Brain OS.
+## Security
 
----
+Report vulnerabilities privately, as described in [SECURITY.md](./SECURITY.md).
 
-## 🚢 Déploiement
+## License
 
-**Auto-hébergement sur une machine** : `./scripts/selfhost-init.sh` puis `docker compose up -d --build`, détail dans
-[SELF_HOSTING.md](./SELF_HOSTING.md). Contribuer : [CONTRIBUTING.md](./CONTRIBUTING.md).
+TaskForce is free software under the [GNU Affero General Public License v3.0](./LICENSE). You can use it, change it
+and host it, in a company too. If you offer a modified version to users over a network, you must give them the
+source code of your changes, under the same license.
 
-Images publiées sur **GHCR** à chaque release. La production tourne en `docker compose` (profil prod) derrière Nginx/TLS ; un merge sur `main` déclenche le déploiement automatique.
-
-```bash
-docker compose -f docker-compose.prod.yml up -d
-```
-
----
-
-## 📚 Documentation
-
-- 🧠 **[Brain OS - vault de doc](https://github.com/taskforce-project/taskforce-docs)** : architecture, ADR, API, runbooks, sécurité, R&D.
-- 📖 **[Référence API publique](https://docs.taskforce-project.fr)** (Fern).
-- 🔧 Par service : [backend](./backend/tf-api/README.md) · [frontend](./frontend/README.md) · [landing](./landing-page/README.md).
-
----
-
-## 📄 Licence
-
-TaskForce est un logiciel libre, distribué sous licence **GNU Affero General Public License v3.0** ([AGPL-3.0](./LICENSE)).
-Vous pouvez l'utiliser, le modifier et l'héberger, y compris en entreprise. Si vous proposez une version modifiée à
-des utilisateurs à travers un réseau, vous devez leur donner accès au code source de vos modifications, sous la même
-licence.
-
-Le nom et le logo « TaskForce » ne sont pas couverts par cette licence : si vous distribuez une version modifiée,
-donnez-lui un autre nom.
+The TaskForce name and logo are not covered by this license: if you distribute a modified version, give it another
+name.
 
 ---
 
 <div align="center">
-<sub>Construit par <a href="https://github.com/Miche1-Pierre">Pierre Michel</a> · fil-rouge du titre RNCP niveau 6, Metz Numeric School · 2025-2026</sub>
+<sub>Built by <a href="https://github.com/Miche1-Pierre">Pierre Michel</a> · final project of a level 6 RNCP degree, Metz Numeric School · 2025-2026</sub>
 </div>

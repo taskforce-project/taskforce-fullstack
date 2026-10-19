@@ -10,6 +10,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import io.github.bucket4j.distributed.proxy.ProxyManager;
+import io.swagger.v3.oas.models.OpenAPI;
 
 /**
  * Smoke tests des classes {@code @Configuration} du package shared.
@@ -42,10 +43,13 @@ class SharedConfigBeanTest {
     }
 
     @Test
-    @DisplayName("OpenApiConfig — customOpenAPI() se construit")
+    @DisplayName("OpenApiConfig — customOpenAPI() nomme le projet et renvoie à son dépôt")
     void openApiConfig_customOpenAPI() {
-        OpenApiConfig cfg = new OpenApiConfig();
-        assertThat(cfg.customOpenAPI()).isNotNull();
+        OpenAPI api = new OpenApiConfig().customOpenAPI();
+        assertThat(api.getInfo().getTitle()).isEqualTo("TaskForce API");
+        // Pas d'adresse e-mail sur un domaine que le projet ne possède pas : la spec publiée renvoie au dépôt.
+        assertThat(api.getInfo().getContact().getEmail()).isNull();
+        assertThat(api.getInfo().getContact().getUrl()).isEqualTo("https://github.com/taskforce-project/taskforce-fullstack");
     }
 
     @Test

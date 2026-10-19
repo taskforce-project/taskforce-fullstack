@@ -65,6 +65,8 @@ By default every port listens on this machine only (`BIND_ADDRESS=127.0.0.1`). T
 
 1. In `.env`, set `BIND_ADDRESS=0.0.0.0` and replace `localhost` with this machine's address in `TF_APP_URL`,
    `TF_API_URL`, `TF_KEYCLOAK_URL` and `TF_STORAGE_URL`.
+   If you stay on plain http, also set `AUTH_REFRESH_COOKIE_SECURE=false`: browsers drop secure cookies over http
+   (localhost aside), and sessions would end after 30 minutes.
 2. Rebuild the app, which keeps the addresses it was built with: `docker compose up -d --build`.
 
 Sign-in sends passwords to the API: beyond a trusted network, serve the four addresses over HTTPS with a reverse
