@@ -58,6 +58,8 @@ export class Backend {
       "-XX:+UseSerialGC",
       "-XX:TieredStopAtLevel=1",
       "-Xss512k",
+      // Comme sur le serveur : l'API rend des dates UTC sans fuseau, que l'interface lit comme telles.
+      "-Duser.timezone=UTC",
       "-Dfile.encoding=UTF-8",
       "-Djava.awt.headless=true",
       "-jar",
