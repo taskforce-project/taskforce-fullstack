@@ -179,6 +179,29 @@
       "directAccessGrantsEnabled": false,
       "protocol": "openid-connect",
       "fullScopeAllowed": true
+    },
+    {
+      "clientId": "taskforce-desktop",
+      "name": "TaskForce Desktop",
+      "description": "Desktop app: sign-in in the browser with PKCE and a return on 127.0.0.1 (RFC 8252); the app keeps an offline session",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://127.0.0.1:47812/callback",
+        "http://127.0.0.1:47813/callback",
+        "http://127.0.0.1:47814/callback",
+        "http://127.0.0.1:47815/callback"
+      ],
+      "webOrigins": [],
+      "fullScopeAllowed": true,
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
     }
   ],
   "internationalizationEnabled": true,
