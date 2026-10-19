@@ -71,9 +71,7 @@ public class AttachmentService {
 
         String rawOriginalName = file.getOriginalFilename();
         String originalName = rawOriginalName != null && !rawOriginalName.isBlank() ? rawOriginalName : "unknown";
-        String ext = rawOriginalName != null && rawOriginalName.contains(".")
-            ? rawOriginalName.substring(rawOriginalName.lastIndexOf('.'))
-            : "";
+        String ext = extensionOf(rawOriginalName);
         String storedKey = "issues/" + issueId + "/" + UUID.randomUUID() + ext;
         String contentType = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
 
@@ -191,5 +189,21 @@ public class AttachmentService {
                 .uploadedByName(a.getUploadedBy() != null ? a.getUploadedBy().getDisplayName() : "Unknown")
                 .downloadUrl(downloadUrl)
                 .build();
+    }
+
+    /**
+     * Extension du nom d'origine, réduite à des lettres et des chiffres (10 au plus) : elle entre dans la clé de
+     * stockage, qui devient un chemin de fichier dans l'app desktop. Un nom fabriqué ({@code a.x/../../y}) ne peut
+     * donc pas faire sortir la clé de son dossier.
+     */
+    static String extensionOf(String originalName) {
+        if (originalName == null || originalName.lastIndexOf('.') < 0) {
+            return "";
+        }
+        String ext = originalName.substring(originalName.lastIndexOf('.') + 1).replaceAll("[^A-Za-z0-9]", "");
+        if (ext.isEmpty()) {
+            return "";
+        }
+        return "." + (ext.length() > 10 ? ext.substring(0, 10) : ext).toLowerCase(java.util.Locale.ROOT);
     }
 }
