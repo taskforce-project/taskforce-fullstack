@@ -17,6 +17,12 @@ on:
         description: 'Publish the versioned release as a preview'
         type: boolean
         default: true
+  # On the desktop branch, the installers are built (and kept as artifacts) without being published.
+  push:
+    branches: [feature/desktop]
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop-release.yml'
 
 permissions:
   contents: write
@@ -126,6 +132,7 @@ jobs:
   publish:
     name: Publish
     needs: package
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
