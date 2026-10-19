@@ -99,21 +99,61 @@ navigation:
       - api: API reference
         slug: api-reference
 
-# Addresses of the former French guides (until October 2026).
+# Addresses of the former French docs (until October 2026): every page lands on the closest English one.
 redirects:
   - source: /guides/bienvenue
     destination: /guides/welcome
   - source: /guides/premiers-pas
     destination: /guides/self-hosting
+  - source: /guides/onboarding-et-profil
+    destination: /guides/welcome
+  - source: /guides/tour-interface
+    destination: /guides/concepts
   - source: /guides/concepts-cles
+    destination: /guides/concepts
+  - source: /guides/espaces-et-projets
+    destination: /guides/concepts
+  - source: /guides/issues-et-tableaux
+    destination: /guides/concepts
+  - source: /guides/cycles
+    destination: /guides/concepts
+  - source: /guides/roadmap
+    destination: /guides/concepts
+  - source: /guides/pages
+    destination: /guides/concepts
+  - source: /guides/tableau-de-bord
+    destination: /guides/concepts
+  - source: /guides/inbox
+    destination: /guides/concepts
+  - source: /guides/mon-travail
+    destination: /guides/concepts
+  - source: /guides/assignations
+    destination: /guides/concepts
+  - source: /guides/membres-et-roles
+    destination: /guides/concepts
+  - source: /guides/inviter-son-equipe
+    destination: /guides/concepts
+  - source: /guides/equipes
+    destination: /guides/concepts
+  - source: /guides/notifications
+    destination: /guides/concepts
+  - source: /guides/smart-assign
     destination: /guides/concepts
   - source: /guides/memoire
     destination: /guides/concepts
-  - source: /guides/smart-assign
+  - source: /guides/analytics
+    destination: /guides/concepts
+  - source: /guides/profil-et-securite
     destination: /guides/concepts
   - source: /guides/ia-vue-ensemble
     destination: /guides/ai
   - source: /guides/ia-assistant
+    destination: /guides/ai
+  - source: /guides/ia-workflows
+    destination: /guides/ai
+  - source: /guides/ia-generation-spec
+    destination: /guides/ai
+  - source: /guides/ia-et-consommation
     destination: /guides/ai
   - source: /reference-api/api-introduction
     destination: /api/api-introduction
@@ -121,5 +161,11 @@ redirects:
     destination: /api/api-authentication
   - source: /reference-api/api-conventions
     destination: /api/api-conventions
+  - source: /reference-api/api-bonnes-pratiques
+    destination: /api/api-conventions
   - source: /reference-api/api-mcp
     destination: /api/api-mcp
+  - source: /reference-api/reference-api/:path*
+    destination: /api/api-reference/:path*
+  - source: /reference-api
+    destination: /api/api-introduction
