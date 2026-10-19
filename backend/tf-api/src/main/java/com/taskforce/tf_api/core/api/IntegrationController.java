@@ -133,12 +133,14 @@ public class IntegrationController {
     }
 
     /** Callback appelé par GitHub — endpoint PUBLIC (pas de JWT requis). {@code state} = token aléatoire. */
+    /** Retour de GitHub : toujours une redirection vers l'app ({@code github=connected} ou {@code github=error}). */
     @GetMapping("/api/integrations/github/callback")
     public ResponseEntity<Void> githubCallback(
-        @RequestParam String code,
-        @RequestParam String state
+        @RequestParam(required = false) String code,
+        @RequestParam(required = false) String state,
+        @RequestParam(required = false) String error
     ) {
-        String redirectUrl = gitHubService.handleCallback(code, state);
+        String redirectUrl = gitHubService.handleCallback(code, state, error);
         return ResponseEntity.status(HttpStatus.FOUND)
             .location(URI.create(redirectUrl))
             .build();

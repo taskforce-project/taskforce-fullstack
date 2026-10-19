@@ -291,11 +291,24 @@ class IntegrationControllerWebMvcTest {
     @Test
     @DisplayName("GET github/callback public → 302")
     void github_callback_302() throws Exception {
-        when(gitHubService.handleCallback(anyString(), anyString()))
+        when(gitHubService.handleCallback(anyString(), anyString(), org.mockito.ArgumentMatchers.isNull()))
             .thenReturn("http://localhost:3000/acme/settings?github=connected");
 
         mockMvc.perform(get("/api/integrations/github/callback").param("code", "c").param("state", "acme"))
             .andExpect(status().isFound());
+    }
+
+    @Test
+    @DisplayName("GET github/callback sans code (accès refusé chez GitHub) → 302 vers l'app, plus de 500")
+    void github_callback_access_denied_302() throws Exception {
+        when(gitHubService.handleCallback(org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq("s"),
+                org.mockito.ArgumentMatchers.eq("access_denied")))
+            .thenReturn("http://localhost:3000/acme/settings?section=integrations&github=error");
+
+        mockMvc.perform(get("/api/integrations/github/callback").param("error", "access_denied").param("state", "s"))
+            .andExpect(status().isFound())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string("Location", "http://localhost:3000/acme/settings?section=integrations&github=error"));
     }
 
     @Test
