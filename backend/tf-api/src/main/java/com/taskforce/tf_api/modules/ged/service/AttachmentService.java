@@ -51,7 +51,7 @@ public class AttachmentService {
     private final AttachmentRepository attachmentRepository;
     private final IssueRepository issueRepository;
     private final UserRepository userRepository;
-    private final MinioService minioService;
+    private final ObjectStorage objectStorage;
     private final ProjectVisibilityGuard visibilityGuard;
 
     @Transactional
@@ -78,7 +78,7 @@ public class AttachmentService {
         String contentType = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
 
         try {
-            minioService.upload(storedKey, file.getInputStream(), file.getSize(), contentType);
+            objectStorage.upload(storedKey, file.getInputStream(), file.getSize(), contentType);
         } catch (Exception e) {
             throw new RuntimeException("Upload to storage failed", e);
         }
@@ -121,7 +121,7 @@ public class AttachmentService {
             throw new ForbiddenException("You are not the owner of this attachment");
         }
 
-        minioService.delete(attachment.getStoredKey());
+        objectStorage.delete(attachment.getStoredKey());
         attachmentRepository.delete(attachment);
     }
 
@@ -175,9 +175,9 @@ public class AttachmentService {
     private AttachmentResponse toResponse(Attachment a) {
         String downloadUrl;
         try {
-            downloadUrl = minioService.presignedGetUrl(a.getStoredKey());
+            downloadUrl = objectStorage.presignedGetUrl(a.getStoredKey());
         } catch (Exception e) {
-            log.warn("Présignature MinIO échouée pour {} : {}", a.getStoredKey(), e.getMessage());
+            log.warn("Lien de téléchargement impossible pour {} : {}", a.getStoredKey(), e.getMessage());
             downloadUrl = null;
         }
 

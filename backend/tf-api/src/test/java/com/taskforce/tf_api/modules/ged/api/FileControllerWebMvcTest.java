@@ -17,7 +17,7 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
-import com.taskforce.tf_api.modules.ged.service.MinioService;
+import com.taskforce.tf_api.modules.ged.service.ObjectStorage;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
 import static org.mockito.ArgumentMatchers.anyString;
@@ -34,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>Rappel sécurité (cf. SecurityConfig PUBLIC_MATCHERS) : {@code /api/files/brain/**} ET
  * {@code /api/files/avatars/*} sont PUBLICS — servis en {@code <img>}, impossible d'y joindre un
  * Bearer. Les endpoints renvoient un {@code InputStreamResource} (pas d'enveloppe ApiResponse).
- * MinioService et repositories mockés.
+ * ObjectStorage et repositories mockés.
  */
 @WebMvcTest(FileController.class)
 @Import(SecurityConfig.class)
@@ -44,7 +44,7 @@ class FileControllerWebMvcTest {
 
     @Autowired private MockMvc mockMvc;
 
-    @MockitoBean private MinioService minioService;
+    @MockitoBean private ObjectStorage objectStorage;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository;
@@ -66,7 +66,7 @@ class FileControllerWebMvcTest {
     @DisplayName("GET avatars/{id} (auth) → 200 + image/jpeg quand MinIO renvoie le flux")
     void getAvatar_200() throws Exception {
         stubUserFound();
-        when(minioService.getObjectStream(anyString()))
+        when(objectStorage.getObjectStream(anyString()))
             .thenReturn(new ByteArrayInputStream("img".getBytes()));
 
         mockMvc.perform(get("/api/files/avatars/7").with(auth()))
@@ -78,7 +78,7 @@ class FileControllerWebMvcTest {
     @DisplayName("GET avatars/{id} (auth) → 404 quand MinIO échoue (le front génère l'identicon localement)")
     void getAvatar_fallback_404() throws Exception {
         stubUserFound();
-        when(minioService.getObjectStream(anyString()))
+        when(objectStorage.getObjectStream(anyString()))
             .thenThrow(new RuntimeException("Minio object not found"));
 
         mockMvc.perform(get("/api/files/avatars/7").with(auth()))
@@ -89,7 +89,7 @@ class FileControllerWebMvcTest {
     @DisplayName("GET avatars/{id} SANS JWT → 200 (endpoint public : servi en <img> sans Bearer)")
     void getAvatar_unauthenticated_isPublic() throws Exception {
         stubUserFound();
-        when(minioService.getObjectStream(anyString()))
+        when(objectStorage.getObjectStream(anyString()))
             .thenReturn(new ByteArrayInputStream("img".getBytes()));
 
         mockMvc.perform(get("/api/files/avatars/7"))
@@ -111,8 +111,8 @@ class FileControllerWebMvcTest {
     @Test
     @DisplayName("GET brain/{wsId}/{name} (public, sans JWT) → 200 + Content-Type MinIO")
     void getBrainFile_200_public() throws Exception {
-        when(minioService.contentType(anyString())).thenReturn("image/png");
-        when(minioService.getObjectStream(anyString()))
+        when(objectStorage.contentType(anyString())).thenReturn("image/png");
+        when(objectStorage.getObjectStream(anyString()))
             .thenReturn(new ByteArrayInputStream("img".getBytes()));
 
         mockMvc.perform(get("/api/files/brain/42/abc-diagram.png"))
@@ -123,8 +123,8 @@ class FileControllerWebMvcTest {
     @Test
     @DisplayName("GET brain/{wsId}/{name} → 404 quand l'objet MinIO est introuvable")
     void getBrainFile_notFound_404() throws Exception {
-        when(minioService.contentType(anyString())).thenReturn("image/png");
-        when(minioService.getObjectStream(anyString()))
+        when(objectStorage.contentType(anyString())).thenReturn("image/png");
+        when(objectStorage.getObjectStream(anyString()))
             .thenThrow(new RuntimeException("Minio object not found"));
 
         mockMvc.perform(get("/api/files/brain/42/missing.png"))
