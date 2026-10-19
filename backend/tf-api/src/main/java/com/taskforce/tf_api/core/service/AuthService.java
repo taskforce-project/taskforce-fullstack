@@ -58,6 +58,21 @@ public class AuthService {
     @Value("${taskforce.account.deletion-grace-days:30}")
     private int graceDays;
 
+    // Vérification de l'adresse à l'inscription, par un code envoyé par e-mail. Une instance sans SMTP
+    // (auto-hébergement) la coupe : le compte est prêt tout de suite, sans preuve que l'adresse appartient à la
+    // personne. Vrai par défaut, la prod et le dev gardent la vérification.
+    @Value("${taskforce.signup.email-verification:true}")
+    private boolean signupEmailVerification = true;
+
+    @jakarta.annotation.PostConstruct
+    void warnWhenSignupIsNotVerified() {
+        if (!signupEmailVerification) {
+            log.warn("Inscription sans vérification d'e-mail (SIGNUP_EMAIL_VERIFICATION=false) : quiconque joint "
+                + "l'instance peut créer un compte avec n'importe quelle adresse, y compris une adresse invitée. "
+                + "À réserver à un réseau privé, ou configurer un SMTP.");
+        }
+    }
+
     /**
      * Inscription d'un nouvel utilisateur
      * 1. Crée le compte dans Keycloak (ou renvoie OTP si déjà créé mais non vérifié)
@@ -134,6 +149,22 @@ public class AuthService {
             }
         }
 
+        // Instance sans vérification d'e-mail (pas de SMTP) : aucun code à envoyer, le compte est prêt.
+        if (!signupEmailVerification) {
+            if (userAlreadyExists) {
+                // Compte resté non vérifié d'une tentative précédente : il prend ce qui vient d'être saisi.
+                keycloakService.updatePassword(keycloakId, request.getPassword());
+                keycloakService.updateUserNames(keycloakId, request.getFirstName(), request.getLastName());
+            }
+            completeRegistration(request.getEmail());
+            log.info("Inscription sans vérification d'e-mail pour : {}", request.getEmail());
+            return RegisterResponse.builder()
+                .message("Account created. You can now sign in.")
+                .email(request.getEmail())
+                .otpSent(false)
+                .build();
+        }
+
         // Générer et envoyer le code OTP
         otpService.generateAndSendOtp(
             request.getEmail(),
@@ -171,32 +202,7 @@ public class AuthService {
             throw new RuntimeException("Invalid or expired verification code");
         }
 
-        // Récupérer l'utilisateur depuis Keycloak
-        UserRepresentation keycloakUser = keycloakService.getUserByEmail(request.getEmail());
-        String keycloakId = keycloakUser.getId();
-
-        // Marquer l'email comme vérifié dans Keycloak
-        keycloakService.verifyEmail(keycloakId);
-
-        // Créer l'utilisateur dans notre DB
-        String firstName = keycloakUser.getFirstName();
-        String lastName = keycloakUser.getLastName();
-        String displayName = buildDisplayName(firstName, lastName);
-        User user = User.builder()
-            .keycloakId(keycloakId)
-            .email(request.getEmail())
-            .isActive(true)
-            .displayName(displayName)
-            .build();
-
-        user = userRepository.save(user);
-        log.info("Utilisateur créé dans la DB avec ID : {}", user.getId());
-
-        // Créer automatiquement un workspace pour le nouvel utilisateur
-        workspaceService.createWorkspace(user, keycloakUser.getFirstName());
-
-        // Envoyer l'email de bienvenue
-        emailService.sendWelcomeEmail(request.getEmail(), keycloakUser.getFirstName());
+        completeRegistration(request.getEmail());
 
         // Depuis la migration OIDC : plus d'auto-login (Keycloak ne peut émettre un token sans
         // mot de passe, absent à ce stade). Le compte est prêt ; le front redirige vers /login.
@@ -313,6 +319,30 @@ public class AuthService {
     }
 
     /**
+     * Compte prêt : adresse marquée vérifiée dans Keycloak, utilisateur et premier workspace créés, e-mail de
+     * bienvenue si un SMTP est configuré. La personne se connecte ensuite.
+     */
+    private void completeRegistration(String email) {
+        UserRepresentation keycloakUser = keycloakService.getUserByEmail(email);
+        String keycloakId = keycloakUser.getId();
+        keycloakService.verifyEmail(keycloakId);
+
+        User user = User.builder()
+            .keycloakId(keycloakId)
+            .email(email)
+            .isActive(true)
+            .displayName(buildDisplayName(keycloakUser.getFirstName(), keycloakUser.getLastName()))
+            .build();
+        user = userRepository.save(user);
+        log.info("Utilisateur créé dans la DB avec ID : {}", user.getId());
+
+        workspaceService.createWorkspace(user, keycloakUser.getFirstName());
+        if (emailService.isEnabled()) {
+            emailService.sendWelcomeEmail(email, keycloakUser.getFirstName());
+        }
+    }
+
+    /**
      * Demande de réinitialisation de mot de passe
      * 1. Vérifie que l'utilisateur existe
      * 2. Génère un code OTP
@@ -320,6 +350,12 @@ public class AuthService {
      */
     public void forgotPassword(String email) {
         log.info("Demande de réinitialisation de mot de passe pour : {}", email);
+
+        // Sans SMTP, le code ne peut pas partir : le dire, plutôt qu'une erreur d'envoi.
+        if (!emailService.isEnabled()) {
+            throw new BusinessException(
+                "Password reset by email is not available on this instance: ask an administrator to reset your password");
+        }
 
         // Vérifier que l'utilisateur existe dans Keycloak
         if (!keycloakService.emailExists(email)) {

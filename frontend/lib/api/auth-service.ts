@@ -50,11 +50,14 @@ export interface OtpResponse {
 }
 
 /**
- * Réponse d'inscription (étape 1)
+ * Réponse d'inscription (étape 1). `otpSent` faux : l'instance ne vérifie pas les adresses (pas de SMTP), le
+ * compte est déjà prêt.
  */
 export interface RegisterResponse {
-  userId: string;
+  message: string;
   email: string;
+  otpSent: boolean;
+  otpExpiresInMinutes?: number | null;
 }
 
 /**

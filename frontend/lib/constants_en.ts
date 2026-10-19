@@ -288,6 +288,8 @@ export const CONSTANTS_EN = {
       verifySuccessTitle: "Account verified successfully!",
       verifySuccessDesc: "Sign in to access your workspace.",
       verifyInvalidCode: "Invalid verification code",
+      accountReadyTitle: "Account created",
+      accountReadyDesc: "Sign in to access your workspace.",
     },
   },
 

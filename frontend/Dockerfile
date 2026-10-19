@@ -57,6 +57,9 @@ ARG NEXT_PUBLIC_APP_VERSION=dev
 # Analytics produit (PostHog UE, derrière le consentement). Vide par défaut : une instance auto-hébergée
 # n'envoie rien tant qu'elle ne fournit pas sa propre clé de projet.
 ARG NEXT_PUBLIC_POSTHOG_KEY=
+# Instance auto-hébergée (docker-compose.yml de la racine) : pages légales neutres, l'administrateur de l'instance
+# en répond. Vide = pages du service hébergé.
+ARG NEXT_PUBLIC_SELF_HOSTED=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL_SSR=$NEXT_PUBLIC_API_URL_SSR
 ENV NEXT_PUBLIC_STORAGE_URL=$NEXT_PUBLIC_STORAGE_URL
@@ -66,6 +69,7 @@ ENV NEXT_PUBLIC_AUTH_SOCIAL_PROVIDERS=$NEXT_PUBLIC_AUTH_SOCIAL_PROVIDERS
 ENV NEXT_PUBLIC_AUTH_SOCIAL_READY=$NEXT_PUBLIC_AUTH_SOCIAL_READY
 ENV NEXT_PUBLIC_APP_VERSION=$NEXT_PUBLIC_APP_VERSION
 ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
+ENV NEXT_PUBLIC_SELF_HOSTED=$NEXT_PUBLIC_SELF_HOSTED
 
 # Build de l'application Next.js
 RUN npm run build

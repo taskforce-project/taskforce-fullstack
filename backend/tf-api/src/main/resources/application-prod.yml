@@ -174,6 +174,10 @@ integrations:
 
 # Webhooks sortants (OSS-6.2) : envois signés HMAC-SHA256, tentés jusqu'à 6 fois sur 9 h environ.
 taskforce:
+  # Inscription : adresse vérifiée par un code envoyé par e-mail. false = compte prêt tout de suite, pour une instance
+  # sans SMTP (auto-hébergement, SELF_HOSTING.md) ; personne ne prouve alors que l'adresse est la sienne.
+  signup:
+    email-verification: ${SIGNUP_EMAIL_VERIFICATION:true}
   webhooks:
     dispatch-interval-ms: ${WEBHOOKS_DISPATCH_INTERVAL_MS:5000}       # fréquence de la file d'envoi
     timeout-ms: ${WEBHOOKS_TIMEOUT_MS:10000}                          # attente de la réponse du destinataire
