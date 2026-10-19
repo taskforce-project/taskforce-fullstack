@@ -1,82 +1,54 @@
 package com.taskforce.tf_api.core.service;
 
-import java.time.LocalDateTime;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.taskforce.tf_api.core.dto.response.TwoFactorSetupResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.UserTwoFactor;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.UserTwoFactorRepository;
 import com.taskforce.tf_api.shared.exception.BusinessException;
-import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import com.taskforce.tf_api.shared.security.TotpService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 2FA (TOTP) <b>géré par l'application</b> — le secret vit dans notre DB, jamais dans Keycloak, et
- * l'utilisateur ne voit jamais de page hébergée par Keycloak.
+ * Double authentification. Elle se règle sur le compte en ligne (Keycloak : application d'authentification), qui demande
+ * le code sur toutes les voies : webapp, app desktop, GitHub et Google (flux `tf-browser` et `tf-post-broker`, cf.
+ * keycloak/scripts/two-step-flows.sh).
  *
- * <p>Parcours : {@link #setup} génère un secret (inactif) + le QR → l'utilisateur scanne →
- * {@link #confirm} valide un 1er code et active. Au login, {@link #verifyOrThrow} exige un code
- * si {@link #isEnabled} — imposé côté backend, seul chemin d'authentification (client confidentiel).</p>
+ * <p>Le TOTP géré par l'application (V79), dont le secret vit dans notre base, n'est plus proposé : il reste vérifié à la
+ * connexion pour un compte qui l'avait activé ({@link #verifyOrThrow}).</p>
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class TwoFactorService {
 
-    private static final String ISSUER = "TaskForce";
-
     private final UserRepository userRepository;
     private final UserTwoFactorRepository repository;
     private final TotpService totp;
+    private final KeycloakService keycloakService;
 
-    /** Démarre l'activation : (ré)génère un secret EN ATTENTE et renvoie le QR/URI à scanner. */
-    @Transactional
-    public TwoFactorSetupResponse setup(String email) {
-        User user = requireUser(email);
-        String secret = totp.generateSecret();
-        UserTwoFactor row = repository.findByUserId(user.getId()).orElseGet(UserTwoFactor::new);
-        row.setUserId(user.getId());
-        row.setSecret(secret);
-        row.setEnabled(false);
-        row.setConfirmedAt(null);
-        if (row.getCreatedAt() == null) {
-            row.setCreatedAt(LocalDateTime.now());
-        }
-        repository.save(row);
-        return TwoFactorSetupResponse.builder()
-            .secret(secret)
-            .otpauthUri(totp.buildUri(secret, email, ISSUER))
-            .build();
-    }
-
-    /** Confirme l'activation : le 1er code valide passe le 2FA en actif. */
-    @Transactional
-    public void confirm(String email, String code) {
-        User user = requireUser(email);
-        UserTwoFactor row = repository.findByUserId(user.getId())
-            .orElseThrow(() -> new BusinessException("No two-factor setup is in progress: start the setup again"));
-        if (!totp.verify(row.getSecret(), code)) {
-            throw new BusinessException("Invalid code: check your phone's clock and try again");
-        }
-        row.setEnabled(true);
-        row.setConfirmedAt(LocalDateTime.now());
-        repository.save(row);
-        log.info("2FA activé pour userId={}", user.getId());
-    }
-
-    /** Le 2FA est-il actif pour cet email ? */
+    /**
+     * Vrai si la connexion de ce compte demande un code : application d'authentification du compte en ligne, ou TOTP
+     * de l'app pour un compte qui l'avait activé.
+     */
     @Transactional(readOnly = true)
-    public boolean isEnabled(String email) {
+    public boolean isOnForAccount(String email) {
         return userRepository.findByEmail(email)
-            .map(u -> repository.existsByUserIdAndEnabledTrue(u.getId()))
+            .map(user -> repository.existsByUserIdAndEnabledTrue(user.getId()) || hasAccountOneTimeCode(user))
             .orElse(false);
+    }
+
+    private boolean hasAccountOneTimeCode(User user) {
+        try {
+            return user.getKeycloakId() != null && keycloakService.hasOneTimeCode(user.getKeycloakId());
+        } catch (RuntimeException e) {
+            log.warn("Application d'authentification du compte {} illisible : {}", user.getId(), e.getMessage());
+            return false;
+        }
     }
 
     /** Le 2FA est-il actif pour cet utilisateur (par id) ? */
@@ -111,18 +83,5 @@ public class TwoFactorService {
             throw new BusinessException("Invalid authentication code");
         }
         totpFails.remove(userId); // succès → on oublie les échecs
-    }
-
-    /** Désactive le 2FA (supprime le secret). */
-    @Transactional
-    public void disable(String email) {
-        User user = requireUser(email);
-        repository.deleteByUserId(user.getId());
-        log.info("2FA désactivé pour userId={}", user.getId());
-    }
-
-    private User requireUser(String email) {
-        return userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 }
