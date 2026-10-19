@@ -90,6 +90,8 @@ services:
 
       # Expose /health/* (sinon le healthcheck ne répond pas). Requis par KC 23.
       KC_HEALTH_ENABLED: "true"
+      # Passkeys : l'API ouvre la session par échange de jetons (keycloak/scripts/passkey-sessions.sh, une fois).
+      KC_FEATURES: token-exchange,admin-fine-grained-authz
       # Substitution des placeholders du realm importé : redirectUris/webOrigins (${FRONTEND_URL}/${API_URL})
       # et le secret du client taskforce-api (${KEYCLOAK_CLIENT_SECRET}). Sans eux → "Invalid redirect URI".
       FRONTEND_URL: ${FRONTEND_URL}

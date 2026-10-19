@@ -54,6 +54,9 @@ services:
       # HTTP Configuration
       KC_HTTP_ENABLED: "true"
       KC_HOSTNAME_STRICT: "false"
+
+      # Passkeys : l'API ouvre la session par échange de jetons (keycloak/scripts/passkey-sessions.sh, une fois)
+      KC_FEATURES: token-exchange,admin-fine-grained-authz:v1
     ports:
       - "8180:8080"
     networks:

@@ -50,6 +50,8 @@ services:
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
       KC_CACHE: local
+      # Passkeys: the API opens the session through token exchange (run keycloak/scripts/passkey-sessions.sh once).
+      KC_FEATURES: token-exchange,admin-fine-grained-authz:v1
       # Values substituted in the imported realm.
       TF_APP_URL: ${TF_APP_URL:-http://localhost:3000}
       TF_API_URL: ${TF_API_URL:-http://localhost:8080}
