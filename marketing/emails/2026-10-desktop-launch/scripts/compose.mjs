@@ -1,35 +1,19 @@
 // Visuels de l'e-mail, composés à partir des vraies captures de l'interface desktop (captures/*.webp) et des peintures du
 // site (landing-page/public/images) : une page HTML par visuel, rendue par Edge sans interface, puis figée en image,
 // parce que les clients de messagerie ne savent ni flouter ni superposer. Le GIF est monté par ffmpeg.
+// L'en-tête et le générique de fin sont animés à part (scripts/motion.mjs).
 //
 // Sortie : landing-page/public/email/2026-10-desktop-launch/ (servi par le site sur taskforce-project.fr/email/...).
-//   logo.png          logo officiel et nom, pour l'en-tête
-//   hero.jpg          tableau de bord dans une fenêtre de verre, sur la peinture de la page de téléchargement
+//   logo.png          logo officiel et nom, pour l'en-tête et le pied
 //   demo.gif          board, délégation à Claude Code, note du Brain OS, en fondu (la 1re image suffit sans animation)
 //   demo-static.jpg   la scène de délégation, pour la version sans animation
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { chromium } from "playwright-core";
 
-const ROOT = resolve(import.meta.dirname, "..");
-const REPO = resolve(ROOT, "../../..");
-const CAPTURES = join(ROOT, "captures");
-const PAINTINGS = join(REPO, "landing-page/public/images");
-const OUT = join(REPO, "landing-page/public/email/2026-10-desktop-launch");
-const WORK = join(ROOT, ".work");
-
-const url = (file) => pathToFileURL(file).href;
-const capture = (name) => url(join(CAPTURES, `${name}.webp`));
-const painting = (name) => url(join(PAINTINGS, `bg-${name}-1920.webp`));
-/** Geist, la police du site (paquet @fontsource-variable/geist, licence SIL OFL), chargée en local : rendu stable. */
-const GEIST = url(join(ROOT, "node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2"));
-
-/** Tracé du logo, le même que landing-page/src/components/site/Logo.astro. */
-const LOGO_PATH =
-  "M 295.302 130.180 C 288.367 131.232, 281.321 133.995, 275.687 137.871 C 270.921 141.151, 235.210 178.670, 233.593 182.096 C 231.969 185.539, 233.936 185.455, 240.778 181.788 C 244.475 179.807, 250.650 177.160, 254.500 175.906 C 261.252 173.706, 263.165 173.603, 308.500 173.007 C 358.807 172.345, 357.172 172.511, 368.097 166.959 C 373.525 164.200, 404 134.371, 404 131.817 C 404 130.817, 403.663 129.927, 403.250 129.837 C 400.447 129.230, 299.451 129.550, 295.302 130.180 M 268.500 185.116 C 260.296 186.308, 251.710 189.336, 245.826 193.111 C 240.552 196.496, 208 229.691, 208 231.685 C 208 234.229, 210.489 233.990, 224.753 230.080 C 232.864 227.857, 242.650 225.589, 246.500 225.039 C 250.350 224.489, 272.077 224.031, 294.782 224.020 C 348.983 223.994, 345.904 224.948, 368.630 201.140 C 375.433 194.012, 381 187.513, 381 186.697 C 381 185.881, 380.288 184.941, 379.418 184.607 C 376.966 183.666, 275.264 184.133, 268.500 185.116 M 245.798 237.923 C 242.661 238.930, 238.088 240.930, 235.635 242.368 C 231.238 244.945, 209.192 267.489, 205.744 272.935 C 202.511 278.042, 203.673 278.223, 236.710 277.771 C 269.622 277.321, 270.882 277.112, 280.500 270.516 C 286.603 266.331, 310.500 240.602, 310.500 238.216 C 310.500 236.638, 308.128 236.484, 281 236.296 C 254.795 236.115, 250.863 236.297, 245.798 237.923";
+import { GEIST, LOGO_PATH, LOGO_VIEWBOX, OUT, WORK, capture, clean, painting, url } from "./shared.mjs";
 
 const HEAD = `<!doctype html><html><head><meta charset="utf-8">
 <style>
@@ -93,24 +77,15 @@ function crop(name, { x, y, w, h, zoom = 1 }) {
   </div>`;
 }
 
-rmSync(WORK, { recursive: true, force: true });
-mkdirSync(WORK, { recursive: true });
+clean(WORK);
 mkdirSync(OUT, { recursive: true });
 
 // Logo : pictogramme et nom, comme l'en-tête du site (nom en Geist semi-gras, approche -0,03 em).
 await render("logo", `<div class="stage" style="display:inline-flex;align-items:center;gap:10px;padding:2px 1px;color:#191715">
-    <svg viewBox="200 124 210 160" style="height:17px;width:auto" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="${LOGO_PATH}"/></svg>
+    <svg viewBox="${LOGO_VIEWBOX}" style="height:17px;width:auto" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="${LOGO_PATH}"/></svg>
     <span style="font-size:17px;font-weight:600;letter-spacing:-0.03em;line-height:1">TaskForce</span>
   </div>`, { width: 200, height: 40, scale: 3, transparent: true });
 execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", join(WORK, "logo.png"), join(OUT, "logo.png")]);
-
-// Visuel principal : le tableau de bord, fenêtre entière, qui sort par le bas du cadre.
-await render("hero", scene({
-  width: 640, height: 400, paint: "download", position: "50% 62%",
-  halo: { top: 18, width: 640, height: 300 },
-  glass: { left: 34, top: 58, padding: 9 },
-  inner: `<img class="shot" src="${capture("dashboard")}" style="width:554px">`,
-}), { width: 640, height: 400, scale: 2, type: "jpeg", quality: 84 });
 
 // Démo : trois scènes à la taille réelle de l'interface, pour qu'elle reste lisible.
 const SCENES = [
