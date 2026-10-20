@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { app } from "electron";
 
 import { AiRelay } from "./ai";
-import { backupBeforeMigration } from "./backup";
+import { backupBeforeMigration, lastVersion, updateNotice } from "./backup";
 import { downloadAccountAvatar } from "./avatar";
 import { Backend } from "./backend";
 import { Frontend } from "./frontend";
@@ -26,6 +26,8 @@ export interface Stack {
   ai: AiRelay;
   /** Jeton GitHub de la personne (son `gh`), rendu au backend seul (Copilot, pull requests liées). */
   github: GitHubRelay;
+  /** Notification à montrer une fois la fenêtre ouverte, au premier lancement d'une nouvelle version (cf. backup.ts). */
+  updateNotice: { title: string; body: string } | null;
   stop: () => Promise<void>;
 }
 
@@ -87,6 +89,7 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     onStep("Starting the database");
     await database.start();
     // Une nouvelle version de l'app peut faire évoluer la base au démarrage du backend : la coque la copie d'abord.
+    const previous = lastVersion(dataDir);
     await backupBeforeMigration({
       dump: (file) => {
         onStep("Saving a copy of your data before the update");
@@ -118,7 +121,7 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     await proxy.start(backend.port, frontend.port);
     runner.start({ apiPort: backend.port, secret: runnerSecret, dataDir });
     log.info(`TaskForce ready at ${origin}`);
-    return { account, dataDir, launchToken, origin, ai, github, stop };
+    return { account, dataDir, launchToken, origin, ai, github, updateNotice: updateNotice(previous, app.getVersion(), fresh), stop };
   } catch (error) {
     await stop();
     throw error;
