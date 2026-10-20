@@ -10,6 +10,13 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 20/10/2026 - SignPath refusé ; le site explique l'installation (Windows, Linux) et la vérification d'un fichier ; envoi automatique à VirusTotal.** `[landing + ci]`
+> - **SignPath Foundation : refus du 20/10** : le programme exige des signes publics que le projet n'a pas encore (étoiles, forks, contributeurs, articles, discussions, soutien institutionnel) ; nouvelle demande possible plus tard, ou abonnement SignPath payant. Les étapes SignPath de `Desktop - Release` restent, inactives sans leurs variables.
+> - **Site** (`64eb96ff`, `6b0a9117`) : section « Install » de la page de téléchargement. Windows : SmartScreen (More info, puis Run anyway) et antivirus, avec le rapport VirusTotal du fichier. Linux : `sudo apt install ./<fichier>.deb`, ou l'AppImage avec `chmod +x` et `libfuse2` sur Ubuntu 22.04 et suivantes (l'AppImage d'electron-builder 26 utilise par défaut le runtime FUSE 2). Sous chaque fichier : son SHA-256 (digest calculé par GitHub) et son rapport VirusTotal quand les notes de la release le listent. Plus aucune mention de SignPath ; la page « Code signing policy » dit que les installeurs ne sont pas encore signés.
+> - **VirusTotal** (`b01a7435`) : workflow `Desktop - VirusTotal`, appelé par `Desktop - Release` après la publication ou lancé à la main pour une release publiée : envoie l'installeur, le `.deb` et l'AppImage (API publique, un appel toutes les 16 s, fichier déjà connu non renvoyé) et liste leurs rapports dans les notes sous « ### VirusTotal ». Sans effet tant que le secret `VIRUSTOTAL_API_KEY` (clé d'API du compte VirusTotal du CEO) n'existe pas.
+> - **Vérifié** : site construit en conteneur (lint, types, build) et pages regardées ; lecture d'une release par le site testée sur un exemple (empreinte, rapport, lien d'un autre domaine ignoré, notes sans la section) ; workflows : YAML lu, scripts vérifiés par `bash -n`, découpage des notes essayé. Non lancé : un envoi réel à VirusTotal (pas encore de clé).
+> - **Pas encore essayé** : l'app sur une vraie machine Linux (les paquets sont construits par la CI).
+
 > **▶ MAJ 20/10/2026 - Release 1.1.4 EN PROD (PR #373, `077b3ccb`) et TaskForce Desktop 1.0.3 publiée.** `[release]`
 > - PR #372 fusionnée dans `dev` (CI verte, dont l'installeur Windows construit par GitHub Actions avec `installer.nsh`) ; release = arbre exact de `dev` sur `main`, version produit 1.1.4 posée par la CI (`c945d8a1`), `--admin --squash`.
 > - **En prod** : `taskforce-project.fr/goodbye` répond 200 (hors index, peinture de l'accueil).
