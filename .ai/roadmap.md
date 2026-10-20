@@ -10,7 +10,8 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
-> **▶ MAJ 20/10/2026 (soir) - Mise à jour dans l'app vérifiée (1.1.0 vers 1.2.0) ; desktop 1.2.1 pour la revoir (branche `feature/desktop`).** `[desktop]`
+> **▶ MAJ 20/10/2026 (soir) - Mise à jour dans l'app vérifiée (1.1.0 vers 1.2.0) ; TaskForce Desktop 1.2.1 publiée (PR #384, release #385, `5c783bce`).** `[desktop + release]`
+> - Publiée depuis `main` (run 39460498859) : `desktop-v1.2.1` avec ses trois rapports VirusTotal, `desktop-latest` en 1.2.1 ; site reconstruit par la release suivante (sans étiquette). Produit inchangé (1.3.0), `main` = `dev`. Release vers `main` fusionnée sur l'arbre déjà vérifié par #384 (CodeQL JS/TS, Semgrep, Trivy, tests front et site verts ; aucun fichier Java changé).
 > - **Vérifiée sur le poste du CEO** (journal de l'app) : « Check for updates » à 18:34, téléchargement complet de l'installeur 1.2.0 (285 Mo, ~5 min), « Restart now » à 18:39, installeur lancé avec `--updated --force-run`, base copiée avant (`before-1.2.0.dump`), TaskForce 1.2.0 relancée à 18:40. Piège pour le diagnostic : sous Windows, la taille d'un fichier en cours d'écriture reste à 0 dans la liste du dossier (`pending\temp-...exe`) ; ouvrir le fichier donne la vraie taille.
 > - **Desktop 1.2.1** : téléchargement complet direct (`d68d0740` : la mise à jour différentielle échouait toujours, la carte de blocs de la version précédente n'étant plus dans `desktop-latest` et GitHub refusant les requêtes à plusieurs plages), avancement noté par quart dans le journal ; notification « TaskForce X is installed, updated from version Y » au premier lancement d'une nouvelle version (`07941f4f`). Coque : 214 tests.
 
