@@ -15,6 +15,7 @@
     "resources": "node scripts/prepare-resources.mjs",
     "icon": "node scripts/make-icon.mjs",
     "dist:win": "npm run build && npm run icon && electron-builder --win nsis --publish never",
+    "dist:store": "npm run build && npm run icon && electron-builder --win appx --publish never",
     "dist:linux": "npm run build && npm run icon && electron-builder --linux deb AppImage --publish never"
   },
   "dependencies": {
