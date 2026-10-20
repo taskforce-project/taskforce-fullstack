@@ -9,13 +9,19 @@ const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 let started = false;
 
 /**
+ * Version du Microsoft Store (paquet MSIX) : le Store installe ses mises à jour, l'app ne les cherche pas elle-même (ses
+ * règles l'interdisent, et l'installeur de `desktop-latest` ne remplacerait pas un paquet).
+ */
+export const fromStore = (): boolean => process.windowsStore === true;
+
+/**
  * Mises à jour, comme Claude Desktop : vérifiées au lancement puis toutes les six heures, téléchargées en arrière-plan,
  * installées à la fermeture de l'app ; la personne peut aussi redémarrer tout de suite. La source est la release
  * `desktop-latest` du dépôt (cf. electron-builder.yml), qui porte toujours la dernière version desktop : les autres
  * releases du dépôt (backend, site...) ne s'y mélangent pas. Les migrations de la base s'appliquent au redémarrage.
  */
 export function startUpdater(): void {
-  if (started || !app.isPackaged) return;
+  if (started || !app.isPackaged || fromStore()) return;
   started = true;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
@@ -64,14 +70,16 @@ export function startUpdater(): void {
 
 /**
  * Résultat d'une vérification, pour les réglages : à jour, nouvelle version en cours de téléchargement (installée à la
- * fermeture), vérification impossible (hors ligne), ou app lancée depuis les sources (pas de mises à jour).
+ * fermeture), vérification impossible (hors ligne), app lancée depuis les sources (pas de mises à jour), ou version du
+ * Microsoft Store (mises à jour par le Store).
  */
 export type UpdateCheck =
   | { status: "up-to-date" | "downloading"; version: string }
-  | { status: "unavailable" | "development" };
+  | { status: "unavailable" | "development" | "store" };
 
 /** Vérifie maintenant (au lancement, toutes les six heures, ou à la demande depuis les réglages). */
 export async function check(): Promise<UpdateCheck> {
+  if (fromStore()) return { status: "store" };
   if (!app.isPackaged) return { status: "development" };
   try {
     const result = await autoUpdater.checkForUpdates();
