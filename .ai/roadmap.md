@@ -10,6 +10,11 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 20/10/2026 - Release 1.1.5 EN PROD (PR #376, `72ac837b`) : guide d'installation et vérification des fichiers sur le site.** `[release]`
+> - PR #375 fusionnée dans `dev` (CI verte, dont les paquets Windows et Linux construits avec le workflow de release modifié) ; release = arbre exact de `dev` sur `main`, version produit 1.1.5 posée par la CI (`91fc070d`), `--admin --squash`.
+> - **En prod** : la page de téléchargement montre la section « Install » avec les vrais noms des fichiers 1.0.3 et le SHA-256 de chacun ; plus aucune mention de SignPath ; la « Code signing policy » dit « not code-signed yet ». Rapports VirusTotal : pas encore, en attente du secret `VIRUSTOTAL_API_KEY` (puis lancer `Desktop - VirusTotal` pour `desktop-v1.0.3` et reconstruire le site).
+> - `dev` réaligné en 1.1.5 (cette trace).
+
 > **▶ MAJ 20/10/2026 - SignPath refusé ; le site explique l'installation (Windows, Linux) et la vérification d'un fichier ; envoi automatique à VirusTotal.** `[landing + ci]`
 > - **SignPath Foundation : refus du 20/10** : le programme exige des signes publics que le projet n'a pas encore (étoiles, forks, contributeurs, articles, discussions, soutien institutionnel) ; nouvelle demande possible plus tard, ou abonnement SignPath payant. Les étapes SignPath de `Desktop - Release` restent, inactives sans leurs variables.
 > - **Site** (`64eb96ff`, `6b0a9117`) : section « Install » de la page de téléchargement. Windows : SmartScreen (More info, puis Run anyway) et antivirus, avec le rapport VirusTotal du fichier. Linux : `sudo apt install ./<fichier>.deb`, ou l'AppImage avec `chmod +x` et `libfuse2` sur Ubuntu 22.04 et suivantes (l'AppImage d'electron-builder 26 utilise par défaut le runtime FUSE 2). Sous chaque fichier : son SHA-256 (digest calculé par GitHub) et son rapport VirusTotal quand les notes de la release le listent. Plus aucune mention de SignPath ; la page « Code signing policy » dit que les installeurs ne sont pas encore signés.
