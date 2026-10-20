@@ -19,6 +19,9 @@ import {
   listProjectLabels,
   createProjectLabel,
   deleteProjectLabel,
+  downloadProjectBundle,
+  importProjectBundle,
+  fileNameFromDisposition,
 } from './project-service';
 import { apiClient } from './client';
 import { PROJECT_ROUTES } from '../config/api-routes';
@@ -272,6 +275,74 @@ describe('project-service', () => {
 
       expect(apiClient.post).toHaveBeenCalledWith(PROJECT_ROUTES.LABELS(SLUG, PROJECT_ID), payload);
       expect(result).toEqual(label);
+    });
+  });
+
+  describe('fileNameFromDisposition', () => {
+    it.each([
+      ['attachment; filename="APO-2026-10-20.taskforce.zip"', 'APO-2026-10-20.taskforce.zip'],
+      ["attachment; filename*=UTF-8''APO%20file.zip", 'APO file.zip'],
+      ['attachment', null],
+      [undefined, null],
+    ])('lit %s', (header, expected) => {
+      expect(fileNameFromDisposition(header)).toBe(expected);
+    });
+  });
+
+  describe('downloadProjectBundle', () => {
+    it('télécharge le zip sous le nom donné par le serveur, sans délai maximal, avec la progression', async () => {
+      const blob = new Blob(['PK']);
+      vi.mocked(apiClient.get).mockImplementation(async (_url, config) => {
+        config?.onDownloadProgress?.({ loaded: 5, total: 10 } as any);
+        return { data: blob, headers: { 'content-disposition': 'attachment; filename="APO-2026-10-20.taskforce.zip"' } } as any;
+      });
+      const createObjectURL = vi.fn(() => 'blob:project');
+      const revokeObjectURL = vi.fn();
+      Object.assign(URL, { createObjectURL, revokeObjectURL });
+      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      const progress = vi.fn();
+
+      await downloadProjectBundle(SLUG, PROJECT_ID, progress);
+
+      expect(apiClient.get).toHaveBeenCalledWith(PROJECT_ROUTES.BUNDLE(SLUG, PROJECT_ID),
+        expect.objectContaining({ responseType: 'blob', timeout: 0 }));
+      expect(progress).toHaveBeenCalledWith(50);
+      expect(createObjectURL).toHaveBeenCalledWith(blob);
+      expect((click.mock.contexts[0] as HTMLAnchorElement).download).toBe('APO-2026-10-20.taskforce.zip');
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:project');
+      click.mockRestore();
+    });
+
+    it("prend un nom par défaut quand le serveur n'en donne pas", async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: new Blob(['PK']), headers: {} } as any);
+      Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:x'), revokeObjectURL: vi.fn() });
+      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+      await downloadProjectBundle(SLUG, PROJECT_ID);
+
+      expect((click.mock.contexts[0] as HTMLAnchorElement).download).toBe(`project-${PROJECT_ID}.taskforce.zip`);
+      click.mockRestore();
+    });
+  });
+
+  describe('importProjectBundle', () => {
+    it('POST le fichier tel quel en application/zip et rend le projet créé', async () => {
+      const file = new Blob(['PK'], { type: 'application/zip' });
+      const project = { id: 9, name: 'Apollo' } as any;
+      vi.mocked(apiClient.post).mockImplementation(async (_url, _body, config) => {
+        config?.onUploadProgress?.({ loaded: 1, total: 4 } as any);
+        return envelope(project) as any;
+      });
+      const progress = vi.fn();
+
+      const result = await importProjectBundle(SLUG, file, progress);
+
+      expect(apiClient.post).toHaveBeenCalledWith(PROJECT_ROUTES.IMPORT(SLUG), file, expect.objectContaining({
+        headers: { 'Content-Type': 'application/zip' },
+        timeout: 0,
+      }));
+      expect(progress).toHaveBeenCalledWith(25);
+      expect(result).toEqual(project);
     });
   });
 

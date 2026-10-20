@@ -31,7 +31,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * URL OAuth, statut (déconnecté), disconnect, liens issue↔GitHub (CRUD).
  */
 @DisplayName("GitHubIntegrationService (intégration Postgres)")
-@Import({GitHubIntegrationService.class, ProjectVisibilityGuard.class, TransactionTemplateTestConfig.class})
+@Import({GitHubIntegrationService.class, ProjectVisibilityGuard.class, TransactionTemplateTestConfig.class,
+    WorkspaceGitHubTokenSource.class})
 class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private GitHubIntegrationService service;
@@ -49,6 +50,8 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
     // Collaborateurs Brain OS de sync() : non exerces ici, juste requis pour cabler le contexte.
     @MockitoBean private KnowledgeService knowledgeService;
     @MockitoBean private BrainSearchService brainSearch;
+    // Fin du ticket d'une PR fusionnée : passe par IssueService, vérifiée à part (MergedPullRequestsTest).
+    @MockitoBean private MergedPullRequests mergedPullRequests;
 
     private static final String SLUG = "ws-gh-it";
     private User owner;
@@ -271,6 +274,37 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
             assertThat(l.getTitle()).isEqualTo("Fix login");
             assertThat(l.getStatusCheckedAt()).isNotNull();
         });
+        // La PR vient d'être fusionnée : son ticket est terminé, au nom de la personne qui l'a liée.
+        org.mockito.Mockito.verify(mergedPullRequests).completeIssue(issueId, owner.getId());
+    }
+
+    @Test
+    @DisplayName("getLinks : une PR encore ouverte ou déjà connue fusionnée ne termine pas le ticket")
+    void get_links_completes_only_on_a_new_merge() {
+        connectGitHub();
+        service.addLink(SLUG, issueId,
+            new GitHubLinkRequest("PR", "o/r", 2, "https://github.com/o/r/pull/2", null, null, "Open"), owner);
+        org.mockito.Mockito.doReturn(org.springframework.http.ResponseEntity.ok(java.util.Map.of("state", "open")))
+            .when(restTemplate).exchange(org.mockito.ArgumentMatchers.eq("https://api.github.com/repos/o/r/pulls/2"),
+                org.mockito.ArgumentMatchers.eq(org.springframework.http.HttpMethod.GET),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class));
+
+        assertThat(service.getLinks(SLUG, issueId, owner)).singleElement()
+            .satisfies(l -> assertThat(l.status()).isEqualTo("OPEN"));
+        org.mockito.Mockito.verify(mergedPullRequests, org.mockito.Mockito.never())
+            .completeIssue(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("refreshOpenPullRequests : sur le serveur, sans jeton hors d'un espace, rien n'est relu")
+    void the_server_never_sweeps() {
+        connectGitHub();
+        service.addLink(SLUG, issueId,
+            new GitHubLinkRequest("PR", "o/r", 3, "https://github.com/o/r/pull/3", null, null, "Open"), owner);
+
+        assertThat(service.refreshOpenPullRequests(10)).isZero();
+        org.mockito.Mockito.verifyNoInteractions(restTemplate);
     }
 
     @Test

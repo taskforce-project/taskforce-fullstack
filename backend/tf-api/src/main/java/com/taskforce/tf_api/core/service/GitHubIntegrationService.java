@@ -18,6 +18,7 @@ import java.util.function.Supplier;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -95,6 +96,8 @@ public class GitHubIntegrationService implements ProjectRepoHost {
     private final OAuthStateRepository     oauthStateRepository;
     private final RestTemplate             restTemplate;
     private final ProjectVisibilityGuard   visibilityGuard;
+    private final GitHubTokenSource        tokens;
+    private final MergedPullRequests       mergedPullRequests;
 
     // Ingestion Brain OS (meme patron que PlaneIntegrationService).
     private final KnowledgeService         knowledgeService;
@@ -324,39 +327,71 @@ public class GitHubIntegrationService implements ProjectRepoHost {
     /**
      * Liens d'une issue, avec le statut des PR relu chez GitHub quand il date de plus de 5 minutes (OSS-6.3 :
      * il n'était écrit qu'à la création du lien). Lecture et écriture en transactions courtes, appels à GitHub
-     * entre les deux (PC-022) ; sans GitHub connecté, les statuts enregistrés sont rendus tels quels.
+     * entre les deux (PC-022) ; sans GitHub connecté, les statuts enregistrés sont rendus tels quels. Le jeton vient de
+     * {@link GitHubTokenSource} : la connexion de l'espace sur le serveur, le GitHub CLI de la personne dans l'app.
      */
     public List<GitHubLinkResponse> getLinks(String workspaceSlug, Long issueId, User requester) {
         IssueLinks view = tx.execute(status -> {
             Issue issue = scopedIssue(workspaceSlug, issueId);
             visibilityGuard.assertCanView(issue.getProject(), requester.getId());
-            String token = integrationRepository
-                .findByWorkspaceIdAndProvider(issue.getProject().getWorkspace().getId(), IntegrationProvider.GITHUB)
-                .map(Integration::getAccessToken)
-                .orElse(null);
-            return new IssueLinks(issueGitHubLinkRepository.findByIssueIdOrderByLinkedAtDesc(issue.getId()), token);
+            return new IssueLinks(issueGitHubLinkRepository.findByIssueIdOrderByLinkedAtDesc(issue.getId()),
+                issue.getProject().getWorkspace().getId());
         });
-        List<IssueGitHubLink> refreshed = view.token() == null ? List.of() : refreshPullRequests(view.links(), view.token());
-        if (!refreshed.isEmpty()) tx.executeWithoutResult(status -> issueGitHubLinkRepository.saveAll(refreshed));
+        String token = tokens.token(view.workspaceId()).orElse(null);
+        if (token != null) applyRefresh(refreshPullRequests(view.links(), token, PR_REFRESH_BUDGET));
         return view.links().stream().map(this::toResponse).toList();
     }
 
-    private record IssueLinks(List<IssueGitHubLink> links, String token) {}
+    private record IssueLinks(List<IssueGitHubLink> links, Long workspaceId) {}
+
+    /** PR relues, à enregistrer, et celles d'entre elles qui viennent d'être fusionnées. */
+    private record Refresh(List<IssueGitHubLink> refreshed, List<IssueGitHubLink> merged) {}
+
+    /** Enregistre les PR relues, puis termine les tickets de celles qui viennent d'être fusionnées (hors transaction). */
+    private int applyRefresh(Refresh refresh) {
+        if (!refresh.refreshed().isEmpty()) {
+            tx.executeWithoutResult(status -> issueGitHubLinkRepository.saveAll(refresh.refreshed()));
+        }
+        int completed = 0;
+        for (IssueGitHubLink link : refresh.merged()) {
+            if (link.getIssue() == null) continue;
+            Long linkedBy = link.getLinkedBy() == null ? null : link.getLinkedBy().getId();
+            if (mergedPullRequests.completeIssue(link.getIssue().getId(), linkedBy)) completed++;
+        }
+        return completed;
+    }
+
+    /**
+     * Relit les pull requests ouvertes liées aux tickets, les moins récemment relues d'abord ({@code budget} au plus), et
+     * termine les tickets de celles qui viennent d'être fusionnées. Pour l'app desktop, que GitHub ne peut pas prévenir
+     * (pas de webhook entrant) : son jeton est celui de la personne, le même pour tous ses espaces. Sur le serveur, sans
+     * jeton hors d'un espace, rien ne se passe.
+     *
+     * @return le nombre de tickets terminés
+     */
+    public int refreshOpenPullRequests(int budget) {
+        String token = tokens.token(null).orElse(null);
+        if (token == null) return 0;
+        List<IssueGitHubLink> links = tx.execute(status ->
+            issueGitHubLinkRepository.findOpenPullRequests(PageRequest.of(0, budget)));
+        return links == null || links.isEmpty() ? 0 : applyRefresh(refreshPullRequests(links, token, budget));
+    }
 
     /**
      * Relit chez GitHub le statut des PR liées dont la dernière lecture date de plus de {@link #PR_STATUS_TTL}
-     * ({@link #PR_REFRESH_BUDGET} au plus). Une PR fusionnée l'est pour de bon, elle n'est plus relue. Une erreur
+     * ({@code budget} au plus). Une PR fusionnée l'est pour de bon, elle n'est plus relue. Une erreur
      * sur une PR garde son statut jusqu'à la prochaine relecture ; GitHub injoignable arrête les relectures.
-     * Renvoie les liens relus, à enregistrer.
+     * Renvoie les liens relus, à enregistrer, et ceux qui viennent de passer à « fusionnée ».
      */
-    private List<IssueGitHubLink> refreshPullRequests(List<IssueGitHubLink> links, String token) {
+    private Refresh refreshPullRequests(List<IssueGitHubLink> links, String token, int budget) {
         LocalDateTime staleBefore = LocalDateTime.now().minus(PR_STATUS_TTL);
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
         headers.set("Accept", "application/vnd.github+json");
         List<IssueGitHubLink> refreshed = new ArrayList<>();
+        List<IssueGitHubLink> merged = new ArrayList<>();
         for (IssueGitHubLink link : links) {
-            if (refreshed.size() >= PR_REFRESH_BUDGET) break;
+            if (refreshed.size() >= budget) break;
             if (link.getLinkType() != GitHubLinkType.PR || link.getPrNumber() == null) continue;
             if (link.getStatus() == GitHubLinkStatus.MERGED) continue;
             if (link.getStatusCheckedAt() != null && link.getStatusCheckedAt().isAfter(staleBefore)) continue;
@@ -367,7 +402,9 @@ public class GitHubIntegrationService implements ProjectRepoHost {
                     HttpMethod.GET, new HttpEntity<>(headers),
                     new ParameterizedTypeReference<Map<String, Object>>() {}).getBody();
                 if (pr != null) {
-                    link.setStatus(pullRequestStatus(pr));
+                    GitHubLinkStatus status = pullRequestStatus(pr);
+                    if (status == GitHubLinkStatus.MERGED) merged.add(link);
+                    link.setStatus(status);
                     String title = str(pr.get("title"));
                     if (title != null && !title.isBlank()) link.setTitle(truncate(title, 500));
                 }
@@ -381,7 +418,7 @@ public class GitHubIntegrationService implements ProjectRepoHost {
             link.setStatusCheckedAt(LocalDateTime.now());
             refreshed.add(link);
         }
-        return refreshed;
+        return new Refresh(refreshed, merged);
     }
 
     /** Statut d'une PR d'après l'API GitHub : fusionnée prime sur fermée (une PR fusionnée est aussi fermée). */

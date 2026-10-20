@@ -55,7 +55,10 @@ import {
 import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { useProjectRealtime } from "@/lib/hooks/use-project-realtime"
-import { downloadProjectExport } from "@/lib/api/project-service"
+import { downloadProjectBundle, downloadProjectExport } from "@/lib/api/project-service"
+import { SendToWebDialog } from "@/components/desktop/project-transfer"
+import { IS_DESKTOP } from "@/lib/desktop"
+import { useProjectStore } from "@/lib/store/project-store"
 import { notifyProgress } from "@/lib/notify"
 import { toast } from "sonner"
 import type { Issue, IssueStatus, IssueStatusCategory, IssuePriority } from "@/lib/api/issue-service"
@@ -610,6 +613,8 @@ export default function ProjectBoardPage() {
   const [overColumnId, setOverColumnId] = useState<number | null>(null)
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null)
   const [filters, setFilters] = useState<IssueFilterState>(EMPTY_ISSUE_FILTERS)
+  const [sendOpen, setSendOpen] = useState(false)
+  const projectName = useProjectStore((s) => s.projects.find((p) => p.id === projectId)?.name) ?? "this project"
 
   const sensors = useSensors(
     // Distance d'activation : un simple clic ouvre l'issue, un glissé > 6px déclenche le drag
@@ -737,6 +742,20 @@ export default function ProjectBoardPage() {
     }
   }
 
+  // Fichier de projet TaskForce : le projet entier, à importer dans la webapp ou l'app desktop, ou à garder.
+  async function exportProjectFile() {
+    if (!workspace) return
+    const progress = notifyProgress("Exporting the project file", {
+      description: "Packing issues, history and attachments…",
+    })
+    try {
+      await downloadProjectBundle(workspace, projectId, (pct) => progress.setProgress(pct))
+      progress.success("Project file ready")
+    } catch {
+      progress.error("Export failed. Please try again.")
+    }
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-0">
       {/* Toolbar */}
@@ -745,19 +764,40 @@ export default function ProjectBoardPage() {
         <div className="ml-auto flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" disabled={issues.length === 0}>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
                 <Download className="size-3.5" />
                 Export
                 <ChevronDown className="size-3.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Full project export</DropdownMenuLabel>
-              <DropdownMenuItem onSelect={() => void exportProject("csv")}>CSV (issues and details)</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void exportProject("json")}>JSON (full)</DropdownMenuItem>
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Move or back up</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => void exportProjectFile()}>
+                TaskForce project file (.zip)
+              </DropdownMenuItem>
+              {IS_DESKTOP && (
+                <DropdownMenuItem onSelect={() => setSendOpen(true)}>Copy to the web app…</DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">For other tools</DropdownMenuLabel>
+              <DropdownMenuItem disabled={issues.length === 0} onSelect={() => void exportProject("csv")}>
+                CSV (issues and details)
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={issues.length === 0} onSelect={() => void exportProject("json")}>
+                JSON (issues, comments and activity)
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <BulkAssignDialog slug={workspace} projectId={projectId} issues={issues} />
+          {IS_DESKTOP && workspace && (
+            <SendToWebDialog
+              open={sendOpen}
+              onOpenChange={setSendOpen}
+              workspace={workspace}
+              projectId={projectId}
+              projectName={projectName}
+            />
+          )}
         </div>
       </div>
 

@@ -24,6 +24,18 @@ contextBridge.exposeInMainWorld("taskforceDesktop", {
   openAccountPage: (): Promise<void> => ipcRenderer.invoke("desktop:account-page"),
   checkForUpdates: (): Promise<unknown> => ipcRenderer.invoke("desktop:check-updates"),
   openLogs: (): Promise<void> => ipcRenderer.invoke("desktop:open-logs"),
+  openBackups: (): Promise<void> => ipcRenderer.invoke("desktop:open-backups"),
+  // Événement reçu pendant que la fenêtre n'est pas au premier plan : notification du système, qui ramène sur sa page.
+  notify: (input: { title: string; body?: string; path?: string }): void => ipcRenderer.send("desktop:notify", input),
+  onNavigate: (callback: (path: string) => void): (() => void) => {
+    const listener = (_event: unknown, path: unknown) => {
+      if (typeof path === "string") callback(path);
+    };
+    ipcRenderer.on("desktop:navigate", listener);
+    return () => {
+      ipcRenderer.removeListener("desktop:navigate", listener);
+    };
+  },
   // Le haut de la fenêtre est dessiné par l'interface : les boutons du système prennent les couleurs de son thème.
   setTitleBarTheme: (dark: boolean, height?: number): void => ipcRenderer.send("desktop:title-bar-theme", { dark, height }),
   // IA : fournisseur choisi et état ; la clé d'API part vers le trousseau et ne revient jamais à la page.
@@ -45,6 +57,15 @@ contextBridge.exposeInMainWorld("taskforceDesktop", {
     openSignInPage: (): Promise<void> => ipcRenderer.invoke("desktop:github-sign-in-page"),
     waitForSignIn: (): Promise<unknown> => ipcRenderer.invoke("desktop:github-sign-in-wait"),
     cancelSignIn: (): Promise<void> => ipcRenderer.invoke("desktop:github-sign-in-cancel"),
+  },
+  // Projets entre la webapp et cet ordinateur : la session de l'app reste dans la coque.
+  projects: {
+    web: (): Promise<unknown> => ipcRenderer.invoke("desktop:web-projects"),
+    bring: (input: { workspace: string; projectId: number; target: string }): Promise<unknown> =>
+      ipcRenderer.invoke("desktop:bring-project", input),
+    send: (input: { workspace: string; projectId: number; target: string }): Promise<unknown> =>
+      ipcRenderer.invoke("desktop:send-project", input),
+    openWeb: (url: string): Promise<void> => ipcRenderer.invoke("desktop:open-web", url),
   },
   // Claude Code de la personne branché sur TaskForce (serveur MCP de l'espace) : le jeton va de la page à `claude`.
   claude: {

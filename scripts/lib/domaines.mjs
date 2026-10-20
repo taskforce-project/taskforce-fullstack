@@ -31,15 +31,18 @@ export const DOMAINES = [
     id: "4.3", titre: "IA, affectation intelligente et graphe de connaissances",
     intro: "Le moteur d'affectation et sa mémoire. `knowledge_nodes` porte les vecteurs d'embedding utilisés par la recherche sémantique.",
     tables: [
-      "ai_conversation", "ai_message", "ai_documents", "ai_runs", "ai_token_usage",
+      "ai_conversation", "ai_message", "ai_documents", "ai_runs", "ai_generations", "ai_token_usage",
       "ai_insight_snapshots", "brain_workspaces", "knowledge_nodes", "knowledge_edges",
       "analysis_job", "decision_brief", "decision_priority", "saved_chart",
     ],
   },
   {
     id: "4.4", titre: "Authentification et sécurité",
-    intro: "L'identité est déléguée à Keycloak. Ne subsistent ici que les données propres à l'application : codes à usage unique, jetons anti-CSRF, journal d'audit.",
-    tables: ["otp_verification", "oauth_states", "audit_logs"],
+    intro: "Les comptes et les mots de passe sont délégués à Keycloak. L'application garde ce qu'elle gère elle-même : double authentification (TOTP), clés d'accès (passkeys), jetons d'accès personnels, sessions de l'app desktop, codes à usage unique, jetons anti-CSRF et journal d'audit.",
+    tables: [
+      "otp_verification", "oauth_states", "audit_logs", "user_two_factor", "user_credentials",
+      "personal_access_tokens", "desktop_sessions",
+    ],
   },
   {
     id: "4.5", titre: "Facturation",
@@ -48,13 +51,21 @@ export const DOMAINES = [
   },
   {
     id: "4.6", titre: "Intégrations et communications",
-    intro: "Connecteurs externes et notifications. Les identifiants de connecteurs sont chiffrés en base (AES-256-GCM).",
-    tables: ["integrations", "connector_connection", "webhooks", "slack_channels", "issue_github_links", "notifications"],
+    intro: "Connecteurs externes, webhooks et leurs envois, notifications et leurs préférences. Les identifiants de connecteurs sont chiffrés en base (AES-256-GCM).",
+    tables: [
+      "integrations", "connector_connection", "mcp_oauth_states", "webhooks", "webhook_deliveries",
+      "slack_channels", "issue_github_links", "notifications", "notification_preferences",
+    ],
   },
   {
-    id: "4.7", titre: "Documentation, tableaux de bord et prospects",
-    intro: "Pages de documentation collaborative, composition du tableau de bord par utilisateur, et demandes commerciales.",
-    tables: ["pages", "dashboard_cards", "enterprise_inquiries"],
+    id: "4.7", titre: "Documentation, tableaux de bord, prospects et retours",
+    intro: "Pages de documentation collaborative, composition du tableau de bord par utilisateur, demandes commerciales, et retours envoyés depuis l'app.",
+    tables: ["pages", "dashboard_cards", "enterprise_inquiries", "feedback"],
+  },
+  {
+    id: "4.8", titre: "Délégation aux agents de code",
+    intro: "Les tickets confiés à un agent de code (Claude Code par le runner local, ou GitHub Copilot) : chaque exécution, sa chronologie, et les actions de l'agent qui attendent la décision de la personne qui a délégué.",
+    tables: ["delivery_runs", "delivery_run_events", "delivery_run_approvals"],
   },
 ];
 

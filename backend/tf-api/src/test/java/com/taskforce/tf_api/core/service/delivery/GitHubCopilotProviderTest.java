@@ -27,6 +27,8 @@ import com.taskforce.tf_api.core.model.Integration;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.IntegrationRepository;
+import com.taskforce.tf_api.core.service.GitHubTokenSource;
+import com.taskforce.tf_api.core.service.WorkspaceGitHubTokenSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -54,7 +56,7 @@ class GitHubCopilotProviderTest {
 
     @BeforeEach
     void setUp() {
-        provider = new GitHubCopilotProvider(integrations, rest, "oauth-client-id");
+        provider = new GitHubCopilotProvider(new WorkspaceGitHubTokenSource(integrations), rest, "oauth-client-id");
         workspace = Workspace.builder().id(3L).slug("acme").build();
         when(integrations.findByWorkspaceIdAndProvider(3L, IntegrationProvider.GITHUB))
             .thenReturn(Optional.of(Integration.builder().accessToken("gho_token").build()));
@@ -89,11 +91,58 @@ class GitHubCopilotProviderTest {
 
     @Test
     void unavailable_when_the_instance_cannot_connect_github() {
-        GitHubCopilotProvider off = new GitHubCopilotProvider(integrations, rest, " ");
+        GitHubCopilotProvider off = new GitHubCopilotProvider(new WorkspaceGitHubTokenSource(integrations), rest, " ");
 
         assertThat(off.available()).isFalse();
         assertThat(off.unavailableReason(new DeliveryContext(7L, workspace, project("acme/website"))))
             .contains("GitHub isn't set up on this instance");
+    }
+
+    /** App desktop : le jeton est celui du GitHub CLI de la personne, sans application OAuth sur l'instance. */
+    private GitHubCopilotProvider desktop(String token) {
+        GitHubTokenSource personal = mock(GitHubTokenSource.class);
+        when(personal.personal()).thenReturn(true);
+        when(personal.token(any())).thenReturn(Optional.ofNullable(token));
+        when(personal.missingHint()).thenReturn("Sign in to GitHub first (Settings > Agents).");
+        when(personal.refusedHint()).thenReturn("sign in to GitHub again in Settings > Agents");
+        when(personal.accountLabel()).thenReturn("your GitHub account");
+        return new GitHubCopilotProvider(personal, rest, "");
+    }
+
+    @Test
+    void desktop_uses_the_persons_github_account() {
+        GitHubCopilotProvider app = desktop("gho_person");
+        when(rest.exchange(eq(TASKS), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)))
+            .thenReturn(ResponseEntity.status(201).body(Map.of("id", "task-7", "state", "queued")));
+
+        assertThat(app.available()).isTrue();
+        assertThat(app.unavailableReason(new DeliveryContext(7L, workspace, project("acme/website")))).isNull();
+        app.dispatch(brief("acme/website"));
+
+        ArgumentCaptor<HttpEntity<Map<String, Object>>> request = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(rest).exchange(eq(TASKS), eq(HttpMethod.POST), request.capture(), any(ParameterizedTypeReference.class));
+        assertThat(request.getValue().getHeaders().getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer gho_person");
+    }
+
+    @Test
+    void desktop_says_to_sign_in_to_github() {
+        GitHubCopilotProvider app = desktop(null);
+
+        assertThat(app.unavailableReason(new DeliveryContext(7L, workspace, project("acme/website"))))
+            .isEqualTo("Sign in to GitHub first (Settings > Agents).");
+        assertThatThrownBy(() -> app.dispatch(brief("acme/website")))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Settings > Agents");
+    }
+
+    @Test
+    void desktop_explains_a_refusal_with_the_persons_account() {
+        GitHubCopilotProvider app = desktop("gho_person");
+        when(rest.exchange(eq(TASKS), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)))
+            .thenThrow(HttpClientErrorException.create(HttpStatus.FORBIDDEN, "Forbidden", HttpHeaders.EMPTY, new byte[0], StandardCharsets.UTF_8));
+
+        assertThatThrownBy(() -> app.dispatch(brief("acme/website")))
+            .hasMessageContaining("Check that your GitHub account has a Copilot plan");
     }
 
     // --------------------------------------------------------------------- démarrage

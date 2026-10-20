@@ -4,19 +4,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -34,6 +41,7 @@ import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.MemberSkillProfileService;
 import com.taskforce.tf_api.core.service.NotificationPreferenceService;
+import com.taskforce.tf_api.core.service.UserService;
 import com.taskforce.tf_api.core.service.WorkspaceService;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,6 +51,7 @@ class DesktopAccountBootstrapTest {
     @TempDir private Path dataDir;
 
     @Mock private UserRepository userRepository;
+    @Mock private UserService userService;
     @Mock private WorkspaceService workspaceService;
     @Mock private WorkspaceRepository workspaceRepository;
     @Mock private MemberSkillProfileService skillProfiles;
@@ -58,7 +67,7 @@ class DesktopAccountBootstrapTest {
     private DesktopAccountBootstrap bootstrap(String profileJson) {
         DesktopProperties properties = new DesktopProperties("tfd_" + "a".repeat(40), dataDir.toString(),
             new DesktopProperties.Account("kc-sub-1", "ada@example.com", "Ada", "Trial", profileJson));
-        return new DesktopAccountBootstrap(properties, userRepository, workspaceService, workspaceRepository, skillProfiles,
+        return new DesktopAccountBootstrap(properties, userRepository, userService, workspaceService, workspaceRepository, skillProfiles,
             notificationPreferences, notificationPreferenceRepository, new ObjectMapper(), transactionManager);
     }
 
@@ -238,5 +247,78 @@ class DesktopAccountBootstrapTest {
 
         assertThatCode(() -> bootstrap(ONBOARDED_PROFILE).run(null)).doesNotThrowAnyException();
         assertThat(settingsTaken()).isFalse();
+    }
+
+    /** Utilisateur local déjà créé, avec ou sans photo. */
+    private User localUser(String avatarUrl) {
+        User user = User.builder().id(1L).keycloakId("kc-sub-1").email("ada@example.com").displayName("Ada")
+            .avatarUrl(avatarUrl).build();
+        when(userRepository.findByKeycloakId("kc-sub-1")).thenReturn(Optional.of(user));
+        return user;
+    }
+
+    /** Photo du compte en ligne déposée par la coque dans le dossier du compte. */
+    private Path depositedPhoto(byte[] bytes) throws IOException {
+        return Files.write(dataDir.resolve(DesktopAccountBootstrap.AVATAR_FILE), bytes);
+    }
+
+    private boolean photoMarked() {
+        return Files.exists(dataDir.resolve(DesktopAccountBootstrap.AVATAR_TAKEN_MARKER));
+    }
+
+    @Test
+    @DisplayName("photo du compte en ligne : reprise quand l'app n'en a pas, une seule fois, et le fichier déposé est effacé")
+    void takes_the_account_photo_once() throws IOException {
+        User user = localUser(null);
+        byte[] photo = {1, 2, 3};
+        Path deposited = depositedPhoto(photo);
+
+        bootstrap().run(null);
+
+        verify(userService).storeAvatar(user, photo, "image/jpeg");
+        assertThat(deposited).doesNotExist();
+        assertThat(photoMarked()).isTrue();
+
+        depositedPhoto(photo);
+        bootstrap().run(null);
+
+        verify(userService, times(1)).storeAvatar(any(), any(), any());
+        assertThat(deposited).doesNotExist();
+    }
+
+    static Stream<Arguments> photoNotTaken() {
+        return Stream.of(
+            Arguments.of("une photo choisie dans l'app l'emporte", "/api/files/avatars/1", new byte[] {1, 2, 3}, true),
+            Arguments.of("une photo vide n'est pas reprise", null, new byte[0], true),
+            Arguments.of("sans photo déposée, rien ne change", null, null, false));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("photoNotTaken")
+    @DisplayName("photo du compte en ligne non reprise")
+    void photo_not_taken(String scenario, String avatarUrl, byte[] deposited, boolean marked) throws IOException {
+        localUser(avatarUrl);
+        if (deposited != null) {
+            depositedPhoto(deposited);
+        }
+
+        bootstrap().run(null);
+
+        verify(userService, never()).storeAvatar(any(), any(), any());
+        assertThat(dataDir.resolve(DesktopAccountBootstrap.AVATAR_FILE)).doesNotExist();
+        assertThat(photoMarked()).isEqualTo(marked);
+    }
+
+    @Test
+    @DisplayName("photo du compte en ligne : un échec ne bloque pas le démarrage, et la reprise sera retentée")
+    void a_failed_photo_never_blocks_the_start() throws IOException {
+        localUser(null);
+        depositedPhoto(new byte[] {1});
+        doThrow(new IllegalStateException("disk full")).when(userService).storeAvatar(any(), any(), any());
+
+        assertThatCode(() -> bootstrap().run(null)).doesNotThrowAnyException();
+
+        assertThat(dataDir.resolve(DesktopAccountBootstrap.AVATAR_FILE)).doesNotExist();
+        assertThat(photoMarked()).isFalse();
     }
 }

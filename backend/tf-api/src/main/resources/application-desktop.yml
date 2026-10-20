@@ -59,6 +59,11 @@ desktop:
   runner-secret: ${TF_DESKTOP_RUNNER_SECRET:}
   # Dossier de données de l'app (fichiers, pièces jointes, Brain OS), propre au compte connecté.
   data-dir: ${TF_DESKTOP_DATA_DIR}
+  # Jeton GitHub de la personne (son GitHub CLI), servi par la coque sur 127.0.0.1 (DesktopGitHubTokenSource) :
+  # Copilot et relecture des pull requests liées aux tickets.
+  github:
+    url: ${TF_DESKTOP_GITHUB_URL:}
+    token: ${TF_DESKTOP_GITHUB_TOKEN:}
   # Compte TaskForce connecté, lu par la coque dans le jeton du compte hébergé.
   account:
     subject: ${TF_DESKTOP_ACCOUNT_SUBJECT}

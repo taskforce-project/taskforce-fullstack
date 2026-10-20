@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.mockito.ArgumentCaptor;
@@ -238,6 +239,18 @@ class DesktopSessionServiceTest {
             assertThat(response.account().profile()).isEqualTo(profile);
         }
 
+        @ParameterizedTest(name = "« {0} »")
+        @NullSource
+        @ValueSource(strings = {"/api/files/avatars/7", "https://avatars.githubusercontent.com/u/1?v=4"})
+        @DisplayName("le compte rendu porte sa photo de profil telle qu'enregistrée, que l'app reprendra")
+        void the_account_carries_its_photo(String avatarUrl) {
+            ada.setAvatarUrl(avatarUrl);
+
+            DesktopSessionResponse response = service.exchange(tokenRequest(authorize()));
+
+            assertThat(response.account().avatarUrl()).isEqualTo(avatarUrl);
+        }
+
         @Test
         @DisplayName("des réglages illisibles n'empêchent pas la connexion : l'app fera son onboarding")
         void opens_without_settings() {
@@ -301,6 +314,20 @@ class DesktopSessionServiceTest {
             assertThat(response.get().account().subject()).isEqualTo("kc-ada");
             assertThat(session.getExpiresAt()).isEqualTo(LocalDateTime.of(2027, 1, 17, 20, 0));
             assertThat(session.getLastUsedAt()).isEqualTo(LocalDateTime.of(2026, 10, 19, 20, 0));
+        }
+
+        @Test
+        @DisplayName("l'utilisateur d'une session valable sert au déplacement de projets, sans prolonger la session")
+        void the_user_of_a_session() {
+            String token = DesktopSessionService.PREFIX + "d".repeat(43);
+            DesktopSession session = session(token);
+            when(sessionRepository.findByTokenHashWithUser(DesktopSessionService.sha256(token))).thenReturn(Optional.of(session));
+
+            assertThat(service.userOf(token)).contains(7L);
+            assertThat(service.userOf("tfa_unknown")).isEmpty();
+            session.setRevokedAt(LocalDateTime.of(2026, 10, 18, 0, 0));
+            assertThat(service.userOf(token)).isEmpty();
+            verify(sessionRepository, never()).save(any());
         }
 
         @Test

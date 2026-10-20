@@ -12,9 +12,13 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -324,6 +328,59 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).headers(ex.getHeaders()).body(error);
+    }
+
+    /**
+     * Paramètre de requête, en-tête ou fichier obligatoire absent (un {@code ?q} oublié, un envoi sans son fichier)
+     * → 400 qui nomme ce qui manque. Tombait dans le fourre-tout {@code Exception} ci-dessous : 500 « Unexpected
+     * error » et une trace d'erreur au journal pour une requête simplement incomplète. Les noms viennent des
+     * contrôleurs, jamais de la requête.
+     */
+    @ExceptionHandler({MissingServletRequestParameterException.class, MissingRequestHeaderException.class,
+            MissingServletRequestPartException.class})
+    public ResponseEntity<ErrorResponse> handleMissingRequestValue(
+            Exception ex,
+            HttpServletRequest request) {
+
+        String message;
+        if (ex instanceof MissingServletRequestParameterException missing) {
+            message = "The request parameter '" + missing.getParameterName() + "' is required.";
+        } else if (ex instanceof MissingRequestHeaderException missing) {
+            message = "The request header '" + missing.getHeaderName() + "' is required.";
+        } else if (ex instanceof MissingServletRequestPartException missing) {
+            message = "The request part '" + missing.getRequestPartName() + "' is required.";
+        } else {
+            message = "The request is missing a required value.";
+        }
+
+        ErrorResponse error = ErrorResponse.of(
+                HttpStatus.BAD_REQUEST.value(),
+                "Bad Request",
+                message,
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Paramètre de requête ou de chemin d'un autre type que celui attendu (du texte là où la route attend un nombre,
+     * une date ou une valeur d'une liste) → 400 qui nomme le paramètre. Tombait aussi dans le fourre-tout 500. La
+     * valeur reçue n'est pas renvoyée.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleArgumentTypeMismatch(
+            MethodArgumentTypeMismatchException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse error = ErrorResponse.of(
+                HttpStatus.BAD_REQUEST.value(),
+                "Bad Request",
+                "The parameter '" + ex.getName() + "' has an invalid value.",
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
     /**
