@@ -12,17 +12,23 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
+import com.taskforce.tf_api.core.enums.GitHubLinkStatus;
+import com.taskforce.tf_api.core.enums.GitHubLinkType;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.IssueGitHubLink;
 import com.taskforce.tf_api.core.model.IssueStatus;
 import com.taskforce.tf_api.core.model.Project;
+import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
+import com.taskforce.tf_api.core.repository.IssueGitHubLinkRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.IssueStatusRepository;
 import com.taskforce.tf_api.core.service.NotificationService;
@@ -53,6 +59,7 @@ class DeliveryRunnerTest {
     @Mock private IssueStatusRepository issueStatusRepository;
     @Mock private IssueRepository issueRepository;
     @Mock private NotificationService notificationService;
+    @Mock private IssueGitHubLinkRepository linkRepository;
 
     @InjectMocks private DeliveryRunner runner;
 
@@ -185,6 +192,63 @@ class DeliveryRunnerTest {
         assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.DONE);
         assertThat(run.getError()).isNull();
         verifyNoMoreInteractions(notificationService);
+    }
+
+    /** Run de Claude Code terminé, sur un ticket du projet 400, délégué par la personne 9. */
+    private DeliveryRun finishedRun(User delegator) {
+        Project project = mock(Project.class);
+        when(project.getId()).thenReturn(400L);
+        Issue issue = mock(Issue.class);
+        lenient().when(issue.getId()).thenReturn(4L);
+        when(issue.getProject()).thenReturn(project);
+        DeliveryRun run = DeliveryRun.builder()
+            .id(41L).issue(issue).startedBy(delegator).providerKey("claude-code").status(DeliveryRunStatus.RUNNING).build();
+        when(runRepository.findById(41L)).thenReturn(Optional.of(run));
+        when(issueStatusRepository.findByProjectIdAndName(400L, "In review by AI"))
+            .thenReturn(Optional.of(IssueStatus.builder().id(1L).build()));
+        return run;
+    }
+
+    static Stream<Arguments> resultUrls() {
+        return Stream.of(
+            Arguments.of("https://github.com/acme/web/pull/12", "acme/web", 12),
+            Arguments.of("https://github.com/acme/web.site/pull/7/files", "acme/web.site", 7),
+            Arguments.of("https://example.com/pull/10", null, null),
+            Arguments.of("https://github.com/acme/web/issues/3", null, null));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("resultUrls")
+    @DisplayName("la pull request d'un run terminé est liée à son ticket, au nom de la personne qui a délégué")
+    void links_the_pull_request_to_its_issue(String url, String repo, Integer number) {
+        User delegator = User.builder().id(9L).build();
+        finishedRun(delegator);
+
+        runner.complete(41L, new DeliveryPoll(DeliveryRunStatus.DONE, "PR opened", url, null));
+
+        if (repo == null) {
+            verify(linkRepository, never()).save(any());
+            return;
+        }
+        ArgumentCaptor<IssueGitHubLink> link = ArgumentCaptor.forClass(IssueGitHubLink.class);
+        verify(linkRepository).save(link.capture());
+        assertThat(link.getValue().getLinkType()).isEqualTo(GitHubLinkType.PR);
+        assertThat(link.getValue().getRepoFullName()).isEqualTo(repo);
+        assertThat(link.getValue().getPrNumber()).isEqualTo(number);
+        assertThat(link.getValue().getPrUrl()).isEqualTo("https://github.com/" + repo + "/pull/" + number);
+        assertThat(link.getValue().getStatus()).isEqualTo(GitHubLinkStatus.OPEN);
+        assertThat(link.getValue().getLinkedBy()).isEqualTo(delegator);
+    }
+
+    @Test
+    @DisplayName("une pull request déjà liée au ticket ne l'est pas deux fois")
+    void never_links_a_pull_request_twice() {
+        finishedRun(User.builder().id(9L).build());
+        when(linkRepository.existsByIssueIdAndRepoFullNameAndPrNumber(4L, "acme/web", 12)).thenReturn(true);
+
+        runner.complete(41L, new DeliveryPoll(DeliveryRunStatus.DONE, "PR opened", "https://github.com/acme/web/pull/12", null));
+
+        verify(linkRepository, never()).save(any());
     }
 
     /** (libellé, provider « pull » ?, délai de réclamation en min, âge du run en min, lignes closes par l'UPDATE, clos ?) */

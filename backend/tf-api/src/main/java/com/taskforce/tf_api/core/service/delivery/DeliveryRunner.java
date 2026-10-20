@@ -6,18 +6,24 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
+import com.taskforce.tf_api.core.enums.GitHubLinkStatus;
+import com.taskforce.tf_api.core.enums.GitHubLinkType;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.IssueGitHubLink;
 import com.taskforce.tf_api.core.model.IssueStatus;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
+import com.taskforce.tf_api.core.repository.IssueGitHubLinkRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.IssueStatusRepository;
 import com.taskforce.tf_api.core.service.NotificationService;
@@ -52,6 +58,11 @@ public class DeliveryRunner {
     private final IssueStatusRepository issueStatusRepository;
     private final IssueRepository issueRepository;
     private final NotificationService notificationService;
+    private final IssueGitHubLinkRepository linkRepository;
+
+    /** Adresse d'une pull request sur GitHub : le dépôt et le numéro. */
+    private static final Pattern PULL_REQUEST =
+        Pattern.compile("^https://github\\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(\\d{1,9})(?:[/?#].*)?$");
 
     /** Intervalle minimal entre deux lectures d'un provider « push » pour un même run (API externe, quotas). */
     static final Duration POLL_EVERY = Duration.ofSeconds(20);
@@ -212,6 +223,7 @@ public class DeliveryRunner {
                 run.setStatus(DeliveryRunStatus.DONE);
                 run.setSummary(poll.summary());
                 run.setResultUrl(poll.resultUrl());
+                linkPullRequest(run);
                 moveIssueTo(run, STATUS_IN_REVIEW, IssueStatusCategory.STARTED, COLOR_IN_REVIEW);
                 notifyFinished(run);
             }
@@ -222,6 +234,36 @@ public class DeliveryRunner {
                 notifyFinished(run);
             }
             default -> run.setStatus(DeliveryRunStatus.RUNNING); // encore en cours (poll ultérieur)
+        }
+    }
+
+    /**
+     * La pull request ouverte par l'agent est liée à son ticket : elle apparaît dans l'onglet GitHub avec son statut, et
+     * sa fusion terminera le ticket. Une adresse qui n'est pas celle d'une PR de GitHub ne lie rien. Best-effort.
+     */
+    private void linkPullRequest(DeliveryRun run) {
+        try {
+            Matcher matcher = PULL_REQUEST.matcher(run.getResultUrl() == null ? "" : run.getResultUrl());
+            if (!matcher.matches()) {
+                return;
+            }
+            String repo = matcher.group(1);
+            int number = Integer.parseInt(matcher.group(2));
+            Issue issue = run.getIssue();
+            if (linkRepository.existsByIssueIdAndRepoFullNameAndPrNumber(issue.getId(), repo, number)) {
+                return;
+            }
+            linkRepository.save(IssueGitHubLink.builder()
+                .issue(issue)
+                .linkType(GitHubLinkType.PR)
+                .repoFullName(repo)
+                .prNumber(number)
+                .prUrl("https://github.com/" + repo + "/pull/" + number)
+                .status(GitHubLinkStatus.OPEN)
+                .linkedBy(run.getStartedBy())
+                .build());
+        } catch (Exception e) {
+            log.warn("Delivery run {} : pull request non liée à son ticket : {}", run.getId(), e.getMessage());
         }
     }
 
