@@ -55,6 +55,36 @@ export interface DesktopMcpConnection {
   current: boolean;
 }
 
+/** Projet de la webapp, que l'app peut apporter sur l'ordinateur. */
+export interface DesktopWebProject {
+  id: number;
+  name: string;
+  identifier: string;
+  issueCount: number;
+}
+
+/** Espace de la personne dans la webapp, avec les projets qu'elle y voit. */
+export interface DesktopWebWorkspace {
+  slug: string;
+  name: string;
+  projects: DesktopWebProject[];
+}
+
+/** Projet créé de l'autre côté ; `url` : son adresse dans la webapp, pour un projet envoyé en ligne. */
+export interface DesktopMovedProject {
+  id: number;
+  name: string;
+  workspace: string;
+  url?: string;
+}
+
+/** Déplacement d'un projet : l'espace et le projet d'origine, l'espace qui le reçoit de l'autre côté. */
+export interface DesktopProjectMove {
+  workspace: string;
+  projectId: number;
+  target: string;
+}
+
 /** Dépôt GitHub tel que le `gh` de la personne le voit. */
 export interface DesktopGitHubRepo {
   fullName: string;
@@ -112,6 +142,19 @@ export interface DesktopBridge {
     openSignInPage(): Promise<void>;
     waitForSignIn(): Promise<{ ok: true } | { ok: false; error: string }>;
     cancelSignIn(): Promise<void>;
+  };
+  /**
+   * Projets entre la webapp et cet ordinateur : la coque joint la webapp avec la session de l'app, qui ne passe jamais
+   * par la page. Le projet est copié ; l'original reste où il était.
+   */
+  projects: {
+    web(): Promise<DesktopResult<DesktopWebWorkspace[]>>;
+    /** Copie un projet de la webapp (`workspace`, `projectId`) dans un espace de cet ordinateur (`target`). */
+    bring(move: DesktopProjectMove): Promise<DesktopResult<DesktopMovedProject>>;
+    /** Copie un projet de cet ordinateur dans un espace de la webapp (`target`). */
+    send(move: DesktopProjectMove): Promise<DesktopResult<DesktopMovedProject>>;
+    /** Ouvre une adresse de la webapp dans le navigateur. */
+    openWeb(url: string): Promise<void>;
   };
   /** Claude Code de la personne et le serveur MCP d'un espace : le jeton personnel va de la page à `claude`. */
   claude: {

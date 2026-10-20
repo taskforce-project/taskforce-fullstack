@@ -56,6 +56,9 @@ import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { useProjectRealtime } from "@/lib/hooks/use-project-realtime"
 import { downloadProjectBundle, downloadProjectExport } from "@/lib/api/project-service"
+import { SendToWebDialog } from "@/components/desktop/project-transfer"
+import { IS_DESKTOP } from "@/lib/desktop"
+import { useProjectStore } from "@/lib/store/project-store"
 import { notifyProgress } from "@/lib/notify"
 import { toast } from "sonner"
 import type { Issue, IssueStatus, IssueStatusCategory, IssuePriority } from "@/lib/api/issue-service"
@@ -610,6 +613,8 @@ export default function ProjectBoardPage() {
   const [overColumnId, setOverColumnId] = useState<number | null>(null)
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null)
   const [filters, setFilters] = useState<IssueFilterState>(EMPTY_ISSUE_FILTERS)
+  const [sendOpen, setSendOpen] = useState(false)
+  const projectName = useProjectStore((s) => s.projects.find((p) => p.id === projectId)?.name) ?? "this project"
 
   const sensors = useSensors(
     // Distance d'activation : un simple clic ouvre l'issue, un glissé > 6px déclenche le drag
@@ -770,6 +775,9 @@ export default function ProjectBoardPage() {
               <DropdownMenuItem onSelect={() => void exportProjectFile()}>
                 TaskForce project file (.zip)
               </DropdownMenuItem>
+              {IS_DESKTOP && (
+                <DropdownMenuItem onSelect={() => setSendOpen(true)}>Copy to the web app…</DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">For other tools</DropdownMenuLabel>
               <DropdownMenuItem disabled={issues.length === 0} onSelect={() => void exportProject("csv")}>
@@ -781,6 +789,15 @@ export default function ProjectBoardPage() {
             </DropdownMenuContent>
           </DropdownMenu>
           <BulkAssignDialog slug={workspace} projectId={projectId} issues={issues} />
+          {IS_DESKTOP && workspace && (
+            <SendToWebDialog
+              open={sendOpen}
+              onOpenChange={setSendOpen}
+              workspace={workspace}
+              projectId={projectId}
+              projectName={projectName}
+            />
+          )}
         </div>
       </div>
 

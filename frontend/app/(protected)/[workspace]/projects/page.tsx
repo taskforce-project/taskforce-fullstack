@@ -20,9 +20,13 @@ import {
   ArrowUpDown,
   Lock,
   Globe,
+  CloudDownload,
 } from "lucide-react"
 
 import { EditProjectDialog } from "@/components/dialogs/edit-project-dialog"
+import { BringFromWebDialog } from "@/components/desktop/project-transfer"
+import { IS_DESKTOP } from "@/lib/desktop"
+import { useDesktopTransferStore } from "@/lib/store/desktop-transfer-store"
 import { ProjectIcon } from "@/components/ui/project-icon"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -482,8 +486,42 @@ function ProjectsSkeleton({ cards }: { readonly cards: boolean }) {
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
-function EmptyState({ isSearch }: { readonly isSearch: boolean }) {
+function EmptyState({
+  isSearch,
+  onBring,
+  webCount = 0,
+}: {
+  readonly isSearch: boolean
+  readonly onBring?: () => void
+  /** Projets du compte dans la webapp (app desktop) : l'état vide propose de les copier ici. */
+  readonly webCount?: number
+}) {
   const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
+  if (!isSearch && onBring && webCount > 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+        <div className="flex size-12 items-center justify-center rounded-xl bg-muted">
+          <CloudDownload className="size-5 text-muted-foreground" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-foreground">
+            You have {webCount} project{webCount === 1 ? "" : "s"} in the web app
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Copy them to this computer, with their issues, history and attachments.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button size="sm" className="gap-1.5" onClick={onBring}>
+            <CloudDownload className="size-3.5" /> Choose projects
+          </Button>
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openCreateProject()}>
+            <Plus className="size-3.5" /> New Operation
+          </Button>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
       {isSearch ? (
@@ -500,9 +538,16 @@ function EmptyState({ isSearch }: { readonly isSearch: boolean }) {
             <p className="text-sm font-semibold text-foreground">No active operations</p>
             <p className="text-xs text-muted-foreground">Create your first operation to start tracking work</p>
           </div>
-          <Button size="sm" className="gap-1.5" onClick={() => openCreateProject()}>
-            <Plus className="size-3.5" /> New Operation
-          </Button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Button size="sm" className="gap-1.5" onClick={() => openCreateProject()}>
+              <Plus className="size-3.5" /> New Operation
+            </Button>
+            {onBring && (
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={onBring}>
+                <CloudDownload className="size-3.5" /> Copy from the web app
+              </Button>
+            )}
+          </div>
         </>
       )}
     </div>
@@ -520,6 +565,11 @@ export default function ProjectsPage() {
 
   const { projects, isLoading, fetchProjects } = useProjectStore()
   const [filter, setFilter] = useState<FilterTab>("active")
+  const [bringOpen, setBringOpen] = useState(false)
+  // App desktop : un espace local encore vide propose les projets du compte dans la webapp.
+  const webWorkspaces = useDesktopTransferStore((s) => s.webWorkspaces)
+  const fetchWebProjects = useDesktopTransferStore((s) => s.fetchWebProjects)
+  const webCount = webWorkspaces?.reduce((sum, w) => sum + w.projects.length, 0) ?? 0
   const [search, setSearch] = useState("")
   // Liste par défaut (façon Linear : dense, typographique) - les cartes restent dispo via le sélecteur.
   const [view, setView] = useState<"list" | "cards">("list")
@@ -533,6 +583,12 @@ export default function ProjectsPage() {
   useEffect(() => {
     if (slug) fetchProjects(slug)
   }, [slug, fetchProjects])
+
+  useEffect(() => {
+    if (IS_DESKTOP && !isLoading && projects.length === 0 && useDesktopTransferStore.getState().webWorkspaces === null) {
+      void fetchWebProjects()
+    }
+  }, [isLoading, projects.length, fetchWebProjects])
 
   useEffect(() => {
     if (!slug) return
@@ -589,11 +645,19 @@ export default function ProjectsPage() {
         title="Active Operations"
         description="Real-time health and velocity across all workstreams"
         actions={
-          <Button size="sm" className="gap-1.5" onClick={() => openCreateProject()}>
-            <Plus className="size-4" /> New Operation
-          </Button>
+          <div className="flex items-center gap-2">
+            {IS_DESKTOP && (
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setBringOpen(true)}>
+                <CloudDownload className="size-4" /> From the web app
+              </Button>
+            )}
+            <Button size="sm" className="gap-1.5" onClick={() => openCreateProject()}>
+              <Plus className="size-4" /> New Operation
+            </Button>
+          </div>
         }
       />
+      {IS_DESKTOP && <BringFromWebDialog open={bringOpen} onOpenChange={setBringOpen} target={slug} />}
 
       {/* Stats */}
       {!isLoading && activeProjects.length > 0 && <StatsStrip projects={activeProjects} history={history} />}
@@ -664,7 +728,11 @@ export default function ProjectsPage() {
         <ProjectsSkeleton cards={view === "cards"} />
       ) : sorted.length === 0 ? (
         <Card className="gap-0 overflow-hidden py-0">
-          <EmptyState isSearch={search.trim().length > 0} />
+          <EmptyState
+            isSearch={search.trim().length > 0}
+            onBring={IS_DESKTOP ? () => setBringOpen(true) : undefined}
+            webCount={projects.length === 0 ? webCount : 0}
+          />
         </Card>
       ) : view === "cards" ? (
         <>
