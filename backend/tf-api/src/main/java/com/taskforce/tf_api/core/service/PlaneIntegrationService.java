@@ -25,6 +25,7 @@ import com.taskforce.tf_api.core.service.PlaneClient.PlaneWorkItem;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -140,7 +141,7 @@ public class PlaneIntegrationService {
             }
         }
         log.info("Sync Plane workspace {} projet {} : {} créés, {} MAJ ({} work-items)",
-            ws.getId(), projectId, created, updated, items.size());
+            ws.getId(), LogSafe.of(projectId), created, updated, items.size());
         return new PlaneSyncResponse(created, updated, items.size());
     }
 

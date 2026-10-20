@@ -24,6 +24,7 @@ import com.taskforce.tf_api.core.service.WorkspaceService;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.security.HumanChallengeService;
 import com.taskforce.tf_api.shared.security.OAuthTwoFactorChallenge;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import com.nimbusds.jwt.JWTParser;
 
@@ -84,7 +85,7 @@ public class AuthService {
      * renvoie simplement un OTP au lieu de lever une erreur.
      */
     public RegisterResponse register(RegisterRequest request) {
-        log.info("Tentative d'inscription pour : {}", request.getEmail());
+        log.info("Tentative d'inscription pour : {}", LogSafe.of(request.getEmail()));
 
         // Vérification humaine AVANT tout travail : le but est d'éviter qu'un automate ne déclenche
         // en volume la création Keycloak et l'envoi de courriels. La contrôler après aurait laissé
@@ -117,7 +118,7 @@ public class AuthService {
             keycloakId = keycloakUser.getId();
             firstName = keycloakUser.getFirstName(); // Utiliser le prénom de Keycloak
             userAlreadyExists = true;
-            log.info("Utilisateur déjà créé dans Keycloak mais non vérifié : {}. Renvoi d'OTP.", request.getEmail());
+            log.info("Utilisateur déjà créé dans Keycloak mais non vérifié : {}. Renvoi d'OTP.", LogSafe.of(request.getEmail()));
         } else {
             // Créer l'utilisateur dans Keycloak avec gestion de race condition
             try {
@@ -127,11 +128,11 @@ public class AuthService {
                     request.getFirstName(),
                     request.getLastName()
                 );
-                log.info("Nouvel utilisateur créé dans Keycloak : {}", request.getEmail());
+                log.info("Nouvel utilisateur créé dans Keycloak : {}", LogSafe.of(request.getEmail()));
             } catch (RuntimeException e) {
                 // Si l'utilisateur a été créé entre-temps (race condition), le récupérer
                 if (e.getMessage() != null && e.getMessage().contains("User exists")) {
-                    log.warn("Race condition détectée : utilisateur créé entre-temps pour {}", request.getEmail());
+                    log.warn("Race condition détectée : utilisateur créé entre-temps pour {}", LogSafe.of(request.getEmail()));
                     UserRepresentation keycloakUser = keycloakService.getUserByEmail(request.getEmail());
                     
                     // Vérifier si l'email est vérifié
@@ -157,7 +158,7 @@ public class AuthService {
                 keycloakService.updateUserNames(keycloakId, request.getFirstName(), request.getLastName());
             }
             completeRegistration(request.getEmail());
-            log.info("Inscription sans vérification d'e-mail pour : {}", request.getEmail());
+            log.info("Inscription sans vérification d'e-mail pour : {}", LogSafe.of(request.getEmail()));
             return RegisterResponse.builder()
                 .message("Account created. You can now sign in.")
                 .email(request.getEmail())
@@ -176,7 +177,7 @@ public class AuthService {
 
         log.info("Inscription {} pour : {}. OTP envoyé.",
             userAlreadyExists ? "réessayée" : "réussie",
-            request.getEmail());
+            LogSafe.of(request.getEmail()));
 
         return RegisterResponse.builder()
             .message("A verification code has been sent to your email address")
@@ -193,7 +194,7 @@ public class AuthService {
      * 3. Crée l'utilisateur dans notre DB et son workspace initial ; la personne se connecte ensuite
      */
     public VerifyOtpResponse verifyOtpAndCompleteRegistration(VerifyOtpRequest request) {
-        log.info("Vérification OTP pour : {}", request.getEmail());
+        log.info("Vérification OTP pour : {}", LogSafe.of(request.getEmail()));
 
         // Vérifier le code OTP (les tentatives sont incrémentées automatiquement en cas d'échec)
         OtpVerification otpVerification = otpService.verifyOtpAndGetDetails(request.getEmail(), request.getOtpCode());
@@ -220,7 +221,7 @@ public class AuthService {
      * 3. Génère les tokens JWT
      */
     public AuthResponse login(LoginRequest request) {
-        log.info("Tentative de connexion pour : {}", request.getEmail());
+        log.info("Tentative de connexion pour : {}", LogSafe.of(request.getEmail()));
 
         // Authentifier l'utilisateur via Keycloak (vérifie email + password) et récupérer les
         // tokens OIDC RS256 émis par Keycloak (plus de token custom HS512).
@@ -231,9 +232,9 @@ public class AuthService {
                 request.getPassword()
             );
 
-            log.info("Authentification Keycloak réussie pour : {}", request.getEmail());
+            log.info("Authentification Keycloak réussie pour : {}", LogSafe.of(request.getEmail()));
         } catch (RuntimeException e) {
-            log.error("Échec d'authentification Keycloak pour {} : {}", request.getEmail(), e.getMessage());
+            log.error("Échec d'authentification Keycloak pour {} : {}", LogSafe.of(request.getEmail()), LogSafe.of(e.getMessage()));
             throw new RuntimeException("Invalid email or password");
         }
 
@@ -272,7 +273,7 @@ public class AuthService {
         if (twoFactorService.isEnabled(user.getId())) {
             String totp = request.getTotp();
             if (totp == null || totp.isBlank()) {
-                log.info("2FA requis pour : {}", request.getEmail());
+                log.info("2FA requis pour : {}", LogSafe.of(request.getEmail()));
                 return AuthResponse.builder().twoFactorRequired(true).build();
             }
             twoFactorService.verifyOrThrow(user.getId(), totp);
@@ -284,7 +285,7 @@ public class AuthService {
 
         auditService.record(null, user.getId(), AuditService.USER_LOGIN);
 
-        log.info("Connexion réussie pour : {}", request.getEmail());
+        log.info("Connexion réussie pour : {}", LogSafe.of(request.getEmail()));
         return authResponse;
     }
 
@@ -292,7 +293,7 @@ public class AuthService {
      * Renvoie un code OTP
      */
     public RegisterResponse resendOtp(String email) {
-        log.info("Renvoi du code OTP pour : {}", email);
+        log.info("Renvoi du code OTP pour : {}", LogSafe.of(email));
 
         // Récupérer l'utilisateur depuis Keycloak
         UserRepresentation keycloakUser = keycloakService.getUserByEmail(email);
@@ -349,7 +350,7 @@ public class AuthService {
      * 3. Envoie l'email avec le code
      */
     public void forgotPassword(String email) {
-        log.info("Demande de réinitialisation de mot de passe pour : {}", email);
+        log.info("Demande de réinitialisation de mot de passe pour : {}", LogSafe.of(email));
 
         // Sans SMTP, le code ne peut pas partir : le dire, plutôt qu'une erreur d'envoi.
         if (!emailService.isEnabled()) {
@@ -374,7 +375,7 @@ public class AuthService {
             keycloakUser.getId()
         );
 
-        log.info("Email de réinitialisation envoyé à : {}", email);
+        log.info("Email de réinitialisation envoyé à : {}", LogSafe.of(email));
     }
 
     /**
@@ -384,7 +385,7 @@ public class AuthService {
      * 3. Invalide tous les OTP en attente
      */
     public void resetPassword(String email, String otpCode, String newPassword) {
-        log.info("Tentative de réinitialisation de mot de passe pour : {}", email);
+        log.info("Tentative de réinitialisation de mot de passe pour : {}", LogSafe.of(email));
 
         // Vérifier le code OTP avec le type PASSWORD_RESET
         boolean isValid = otpService.verifyOtpWithType(email, otpCode, OtpType.PASSWORD_RESET);
@@ -402,7 +403,7 @@ public class AuthService {
         // Invalider tous les OTP en attente pour cet email
         otpService.invalidateAllPendingOtps(email);
 
-        log.info("Mot de passe réinitialisé avec succès pour : {}", email);
+        log.info("Mot de passe réinitialisé avec succès pour : {}", LogSafe.of(email));
     }
 
     /**

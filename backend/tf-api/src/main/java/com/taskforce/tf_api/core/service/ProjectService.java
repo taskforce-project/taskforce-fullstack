@@ -47,6 +47,7 @@ import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -234,7 +235,7 @@ public class ProjectService {
 
         project = projectRepository.save(project);
         log.info("Projet '{}' ({}) créé dans le workspace '{}'",
-            project.getName(), project.getIdentifier(), workspaceSlug);
+            LogSafe.of(project.getName()), LogSafe.of(project.getIdentifier()), LogSafe.of(workspaceSlug));
 
         // Le créateur devient LEAD automatiquement
         ProjectMember lead = ProjectMember.builder()

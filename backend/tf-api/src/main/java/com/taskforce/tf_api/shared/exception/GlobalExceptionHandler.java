@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.shared.exception;
 
 import com.taskforce.tf_api.shared.dto.ErrorResponse;
+import com.taskforce.tf_api.shared.util.LogSafe;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.WebApplicationException;
 import lombok.extern.slf4j.Slf4j;
@@ -224,8 +225,8 @@ public class GlobalExceptionHandler {
 
         // Le message JPA/SQL peut exposer des détails de schéma : on le journalise en INTERNE
         // seulement, et on ne renvoie qu'un message générique et sûr au client.
-        log.warn("Violation de contrainte d'intégrité sur {} : {}", request.getRequestURI(),
-                ex.getMostSpecificCause().getMessage());
+        log.warn("Violation de contrainte d'intégrité sur {} : {}", LogSafe.of(request.getRequestURI()),
+                LogSafe.of(ex.getMostSpecificCause().getMessage()));
 
         ErrorResponse error = ErrorResponse.of(
                 HttpStatus.CONFLICT.value(),
@@ -293,7 +294,8 @@ public class GlobalExceptionHandler {
             HttpMessageNotReadableException ex,
             HttpServletRequest request) {
 
-        log.debug("Corps de requête illisible sur {} : {}", request.getRequestURI(), ex.getMostSpecificCause().getMessage());
+        log.debug("Corps de requête illisible sur {} : {}", LogSafe.of(request.getRequestURI()),
+                LogSafe.of(ex.getMostSpecificCause().getMessage()));
 
         ErrorResponse error = ErrorResponse.of(
                 HttpStatus.BAD_REQUEST.value(),
@@ -355,7 +357,7 @@ public class GlobalExceptionHandler {
             HttpServletRequest request) {
 
         log.error("Échec d'un appel au fournisseur d'identité (Keycloak) sur {} : {}",
-                request.getRequestURI(), ex.getMessage());
+                LogSafe.of(request.getRequestURI()), LogSafe.of(ex.getMessage()));
 
         ErrorResponse error = ErrorResponse.of(
                 HttpStatus.BAD_GATEWAY.value(),

@@ -21,6 +21,7 @@ import com.taskforce.tf_api.core.service.delivery.RunnerIdentity;
 import com.taskforce.tf_api.core.service.delivery.RunnerIdentityResolver;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.security.PostAuthenticationFilter;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -108,7 +109,7 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
         delegated.setAuthentication(delegatedAuthentication(token.getToken(), session));
         SecurityContextHolder.setContext(delegated);
         log.info("Session déléguée : run {} (runner {}) {} {}",
-            session.runId(), session.runnerClientId(), request.getMethod(), forLog(path));
+            session.runId(), session.runnerClientId(), LogSafe.of(request.getMethod()), LogSafe.of(path));
         chain.doFilter(request, response);
     }
 
@@ -149,16 +150,9 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
         }
     }
 
-    /** Neutralise les sauts de ligne d'une valeur issue de la requête avant de la journaliser (anti log-injection). */
-    private static String forLog(String value) {
-        if (value == null) return "null";
-        String v = value.replaceAll("[\r\n\t]", "_");
-        return v.length() > 200 ? v.substring(0, 200) + "…" : v;
-    }
-
     /** Refus écrit à la main : une exception levée dans un filtre échappe au {@code @ControllerAdvice}. */
     private void deny(HttpServletResponse response, String path, String reason) throws IOException {
-        log.warn("Jeton de runner refusé sur {} : {}", forLog(path), reason);
+        log.warn("Jeton de runner refusé sur {} : {}", LogSafe.of(path), reason);
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
