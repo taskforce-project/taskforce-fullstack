@@ -48,7 +48,7 @@ import com.taskforce.tf_api.shared.security.SecurityConfig;
 class DesktopSessionControllersWebMvcTest {
 
     private static final String TOKEN = "tfa_" + "s".repeat(43);
-    private static final DesktopAccountResponse ADA = new DesktopAccountResponse("kc-ada", "ada@taskforce.dev", "Ada", "Lovelace");
+    private static final DesktopAccountResponse ADA = new DesktopAccountResponse("kc-ada", "ada@taskforce.dev", "Ada", "Lovelace", null);
 
     @Autowired private MockMvc mockMvc;
 

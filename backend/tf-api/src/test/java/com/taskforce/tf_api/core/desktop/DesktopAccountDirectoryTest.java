@@ -22,7 +22,7 @@ class DesktopAccountDirectoryTest {
 
     private static final DesktopAccountDirectory DIRECTORY = new DesktopAccountDirectory(
         new DesktopProperties("tfd_" + "a".repeat(40), "C:/data",
-            new DesktopProperties.Account("kc-sub-1", "Ada@Example.com", "Ada", "Trial")));
+            new DesktopProperties.Account("kc-sub-1", "Ada@Example.com", "Ada", "Trial", null)));
 
     @Test
     @DisplayName("le compte connecté se lit par identifiant, comme chez Keycloak")

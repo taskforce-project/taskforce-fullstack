@@ -53,12 +53,16 @@ export function readAccount(value: unknown, server: string = ACCOUNT_SERVER): Ac
   const account = (value ?? {}) as Record<string, unknown>;
   const text = (name: string): string => (typeof account[name] === "string" ? (account[name] as string) : "");
   if (!text("subject") || !text("email")) throw new Error("The account has no address: sign in again");
+  const profile = account.profile;
   return {
     issuer: server,
     subject: text("subject"),
     email: text("email"),
     givenName: text("givenName"),
     familyName: text("familyName"),
+    ...(profile !== null && typeof profile === "object" && !Array.isArray(profile)
+      ? { profile: profile as Record<string, unknown> }
+      : {}),
   };
 }
 

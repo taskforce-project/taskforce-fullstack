@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -87,6 +88,24 @@ public class MemberSkillProfileService {
             targetUserId
         );
         return rows.isEmpty() ? empty(targetUserId) : rows.getFirst();
+    }
+
+    /** Profil le plus récent d'une personne, tous espaces confondus : ce que l'app desktop reprend du compte. */
+    @Transactional(readOnly = true)
+    public Optional<MemberSkillProfileResponse> latestForUser(Long userId) {
+        return jdbcTemplate.query(
+            """
+            SELECT user_id, skills_json::text AS skills_json, profile_text,
+                   capacity_hours_per_week, seniority,
+                   growth_enabled, growth_target_skills::text AS growth_target_skills, updated_at
+            FROM member_skill_profiles
+            WHERE user_id = ?
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """,
+            (rs, rowNum) -> mapRow(rs),
+            userId
+        ).stream().findFirst();
     }
 
     // =========================================================================

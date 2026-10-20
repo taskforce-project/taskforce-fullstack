@@ -65,6 +65,7 @@ export class EmbeddedPostgres {
   }
 
   async start(): Promise<void> {
+    await this.stopLeftover();
     this.port = await freePort();
     mkdirSync(dirname(this.logFile), { recursive: true });
     // Réglages d'un poste : peu de connexions, peu de mémoire, pas de socket Unix (TCP local seulement).
@@ -81,6 +82,22 @@ export class EmbeddedPostgres {
     if (result.code !== 0) throw new Error(`The database did not start: ${result.output.trim().slice(-500)}`);
     await this.ensureDatabase();
     log.info(`Embedded database started on 127.0.0.1:${this.port}`);
+  }
+
+  /**
+   * Base restée ouverte par une session arrêtée de force (plantage, fin de tâche) : pg_ctl la lance hors du groupe de
+   * processus de l'app, elle survit donc à l'app et garde le cluster verrouillé, et le démarrage échouerait. Personne
+   * d'autre ne se sert de ce cluster : on l'arrête avant de démarrer.
+   */
+  private async stopLeftover(): Promise<void> {
+    if (!existsSync(join(this.cluster, "postmaster.pid"))) return;
+    const status = await runCommand(postgresTool("pg_ctl"), ["-D", this.cluster, "status"], { env: this.env(), timeoutMs: 15_000 })
+      .catch((error: Error) => ({ code: -1, output: error.message }));
+    // pg_ctl status : 0 quand le serveur tourne, 3 quand il ne tourne pas (fichier de verrou périmé, que PostgreSQL
+    // remplace lui-même).
+    if (status.code !== 0) return;
+    log.warn("The database was still running from a previous session: stopping it");
+    await this.stop();
   }
 
   /** Crée la base de l'app si elle manque (premier lancement). */

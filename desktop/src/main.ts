@@ -60,6 +60,15 @@ async function main(): Promise<void> {
   let refreshed: Promise<"valid" | "ended" | "offline"> = Promise.resolve("valid");
   if (!account) {
     ({ account, window: signInWin } = await signInWindow());
+  } else if (!account.profile) {
+    // Compte connecté par une version qui ne gardait pas les réglages du compte en ligne : on les relit avant de
+    // démarrer, pour que l'app les reprenne dès ce lancement (hors ligne, elle démarre sans).
+    const state = await refreshAccount(account);
+    if (state === "ended") {
+      await sessionEnded();
+      return;
+    }
+    account = settings.account() ?? account;
   } else {
     refreshed = refreshAccount(account);
   }
@@ -262,6 +271,8 @@ function registerIpc(): void {
       version: app.getVersion(),
       platform: process.platform,
       email: stack?.account.email ?? "",
+      // Compte déjà configuré sur la webapp : l'interface ne remontre pas l'accueil des nouveaux comptes.
+      onboardedOnline: stack?.account.profile?.onboardingCompleted === true,
     };
   });
   ipcMain.handle("desktop:account-page", () => shell.openExternal(accountPageUrl()));

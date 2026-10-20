@@ -83,6 +83,14 @@ describe("readAccount", () => {
     });
   }
 
+  it("keeps the account's settings from the web, and ignores anything else in their place", () => {
+    const profile = { jobTitle: "Engineering lead", onboardingCompleted: true };
+    assert.deepEqual(account.readAccount({ ...ADA, profile }).profile, profile);
+    assert.equal(account.readAccount({ ...ADA, profile: "lead" }).profile, undefined);
+    assert.equal(account.readAccount({ ...ADA, profile: [1] }).profile, undefined);
+    assert.equal("profile" in account.readAccount(ADA), false);
+  });
+
   it("keeps an account without a name", () => {
     assert.equal(account.readAccount({ subject: "kc-1", email: "x@example.com" }).givenName, "");
   });
