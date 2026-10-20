@@ -1,12 +1,14 @@
 package com.taskforce.tf_api.shared.exception;
 
 import com.taskforce.tf_api.shared.dto.ErrorResponse;
+import com.taskforce.tf_api.shared.util.LogSafe;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.WebApplicationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 import java.util.ArrayList;
@@ -222,8 +225,8 @@ public class GlobalExceptionHandler {
 
         // Le message JPA/SQL peut exposer des détails de schéma : on le journalise en INTERNE
         // seulement, et on ne renvoie qu'un message générique et sûr au client.
-        log.warn("Violation de contrainte d'intégrité sur {} : {}", request.getRequestURI(),
-                ex.getMostSpecificCause().getMessage());
+        log.warn("Violation de contrainte d'intégrité sur {} : {}", LogSafe.of(request.getRequestURI()),
+                LogSafe.of(ex.getMostSpecificCause().getMessage()));
 
         ErrorResponse error = ErrorResponse.of(
                 HttpStatus.CONFLICT.value(),
@@ -281,6 +284,49 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Corps de requête absent ou illisible (JSON mal formé, ou d'une autre forme que celle attendue) → 400. Sans ce
+     * handler, l'exception tombait dans le fourre-tout {@code Exception} ci-dessous : 500 « Unexpected error » et une
+     * trace d'erreur au journal pour une simple requête mal formée (vu en prod le 20/10 : un POST sans corps sur
+     * {@code /api/auth/desktop/session}). Le détail de l'analyseur reste au journal, jamais dans la réponse.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadableBody(
+            HttpMessageNotReadableException ex,
+            HttpServletRequest request) {
+
+        log.debug("Corps de requête illisible sur {} : {}", LogSafe.of(request.getRequestURI()),
+                LogSafe.of(ex.getMostSpecificCause().getMessage()));
+
+        ErrorResponse error = ErrorResponse.of(
+                HttpStatus.BAD_REQUEST.value(),
+                "Bad Request",
+                "The request body is missing or malformed.",
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Corps d'un type que la route ne lit pas (un formulaire là où elle attend du JSON, par exemple) → 415, avec
+     * l'en-tête {@code Accept} des types qu'elle lit. Tombait aussi dans le fourre-tout 500.
+     */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleUnsupportedMediaType(
+            HttpMediaTypeNotSupportedException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse error = ErrorResponse.of(
+                HttpStatus.UNSUPPORTED_MEDIA_TYPE.value(),
+                "Unsupported Media Type",
+                "This content type is not supported on this resource.",
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).headers(ex.getHeaders()).body(error);
+    }
+
+    /**
      * Fichier trop volumineux (upload multipart) → 413 propre au lieu du 500 fourre-tout.
      * Déclenché par la limite {@code spring.servlet.multipart.max-file-size} avant même le contrôleur
      * (c'était la cause du 500 « Couldn't upload the avatar » pour toute image > 1 Mo).
@@ -311,7 +357,7 @@ public class GlobalExceptionHandler {
             HttpServletRequest request) {
 
         log.error("Échec d'un appel au fournisseur d'identité (Keycloak) sur {} : {}",
-                request.getRequestURI(), ex.getMessage());
+                LogSafe.of(request.getRequestURI()), LogSafe.of(ex.getMessage()));
 
         ErrorResponse error = ErrorResponse.of(
                 HttpStatus.BAD_GATEWAY.value(),

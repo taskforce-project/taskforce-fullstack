@@ -21,6 +21,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import org.springframework.data.domain.PageRequest;
 import com.taskforce.tf_api.core.service.BrainTemplateService;
 import com.taskforce.tf_api.core.service.BrainTemplateService.ProjectRef;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -115,6 +116,6 @@ public class BrainSeedingService {
             links.syncFromContent(node, null);
         }
 
-        log.info("Brain OS amorcé pour workspace '{}' ({} nodes)", workspace.getSlug(), nodes.size());
+        log.info("Brain OS amorcé pour workspace '{}' ({} nodes)", LogSafe.of(workspace.getSlug()), nodes.size());
     }
 }

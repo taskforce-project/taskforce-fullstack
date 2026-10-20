@@ -12,6 +12,7 @@ import com.taskforce.tf_api.core.enums.OtpStatus;
 import com.taskforce.tf_api.core.enums.OtpType;
 import com.taskforce.tf_api.core.model.OtpVerification;
 import com.taskforce.tf_api.core.repository.OtpVerificationRepository;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,7 +49,7 @@ public class OtpService {
         Long userId,
         String keycloakId
     ) {
-        log.info("Génération d'un OTP pour : {}", email);
+        log.info("Génération d'un OTP pour : {}", LogSafe.of(email));
 
         // Vérifier le nombre de tentatives récentes (protection spam)
         long recentAttempts = otpRepository.countRecentOtpAttempts(
@@ -80,7 +81,7 @@ public class OtpService {
             .build();
 
         otp = otpRepository.save(otp);
-        log.info("OTP créé avec succès pour : {}", email);
+        log.info("OTP créé avec succès pour : {}", LogSafe.of(email));
 
         // Envoyer l'email selon le type d'OTP.
         // En dev (devFallbackLog), si le SMTP n'est pas configuré, l'envoi lève une exception :
@@ -98,7 +99,7 @@ public class OtpService {
             }
             log.warn("[OTP dev-fallback] Envoi e-mail impossible (SMTP non configuré ?). "
                 + "Code OTP pour {} = {} (valable {} min). Cause : {}",
-                email, otpCode, OTP_EXPIRY_MINUTES, e.getMessage());
+                LogSafe.of(email), otpCode, OTP_EXPIRY_MINUTES, LogSafe.of(e.getMessage()));
         }
 
         return otp;
@@ -144,7 +145,7 @@ public class OtpService {
      */
     @Transactional
     public boolean verifyOtpWithType(String email, String otpCode, OtpType otpType) {
-        log.info("Vérification du code OTP de type {} pour : {}", otpType, email);
+        log.info("Vérification du code OTP de type {} pour : {}", otpType, LogSafe.of(email));
 
         Optional<OtpVerification> otpOpt = otpRepository.findValidOtpByEmailAndCode(
             email,
@@ -153,7 +154,7 @@ public class OtpService {
         );
 
         if (otpOpt.isEmpty()) {
-            log.warn("Code OTP invalide ou expiré pour : {}", email);
+            log.warn("Code OTP invalide ou expiré pour : {}", LogSafe.of(email));
             return false;
         }
 
@@ -167,7 +168,7 @@ public class OtpService {
 
         // Vérifier si le code peut être validé
         if (!otp.canBeValidated()) {
-            log.warn("Le code OTP ne peut pas être validé (expiré ou max tentatives atteint) : {}", email);
+            log.warn("Le code OTP ne peut pas être validé (expiré ou max tentatives atteint) : {}", LogSafe.of(email));
             otpRepository.save(otp);
             return false;
         }
@@ -176,7 +177,7 @@ public class OtpService {
         otp.markAsVerified();
         otpRepository.save(otp);
 
-        log.info("Code OTP de type {} vérifié avec succès pour : {}", otpType, email);
+        log.info("Code OTP de type {} vérifié avec succès pour : {}", otpType, LogSafe.of(email));
         return true;
     }
 
@@ -185,7 +186,7 @@ public class OtpService {
      */
     @Transactional
     public void invalidateAllPendingOtps(String email) {
-        log.info("Invalidation de tous les OTP en attente pour : {}", email);
+        log.info("Invalidation de tous les OTP en attente pour : {}", LogSafe.of(email));
         otpRepository.expireAllPendingOtpsByEmail(email);
     }
 
@@ -194,13 +195,13 @@ public class OtpService {
      */
     @Transactional
     public OtpVerification verifyOtpAndGetDetails(String email, String otpCode) {
-        log.info("Vérification du code OTP avec détails pour : {}", email);
+        log.info("Vérification du code OTP avec détails pour : {}", LogSafe.of(email));
 
         // Chercher l'OTP PENDING pour cet email (peu importe le code)
         Optional<OtpVerification> pendingOtpOpt = otpRepository.findPendingOtpByEmail(email);
         
         if (pendingOtpOpt.isEmpty()) {
-            log.warn("Aucun OTP en attente trouvé pour : {}", email);
+            log.warn("Aucun OTP en attente trouvé pour : {}", LogSafe.of(email));
             return null;
         }
 
@@ -208,13 +209,13 @@ public class OtpService {
         
         // Vérifier si l'OTP n'est pas expiré
         if (otp.isExpired()) {
-            log.warn("OTP expiré pour : {}", email);
+            log.warn("OTP expiré pour : {}", LogSafe.of(email));
             return null;
         }
         
         // Vérifier si le nombre max de tentatives est atteint
         if (otp.hasReachedMaxAttempts()) {
-            log.warn("Nombre maximum de tentatives atteint pour : {}", email);
+            log.warn("Nombre maximum de tentatives atteint pour : {}", LogSafe.of(email));
             return null;
         }
         
@@ -222,7 +223,7 @@ public class OtpService {
         if (!otp.getOtpCode().equals(otpCode)) {
             // Code incorrect : incrémenter les tentatives
             log.warn("Code OTP incorrect pour : {} (tentative {}/{})", 
-                email, otp.getAttempts() + 1, otp.getMaxAttempts());
+                LogSafe.of(email), otp.getAttempts() + 1, otp.getMaxAttempts());
             otp.incrementAttempts();
             otpRepository.save(otp);
             return null;
@@ -232,7 +233,7 @@ public class OtpService {
         otp.markAsVerified();
         otpRepository.save(otp);
 
-        log.info("Code OTP vérifié avec succès pour : {}", email);
+        log.info("Code OTP vérifié avec succès pour : {}", LogSafe.of(email));
         return otp;
     }
 

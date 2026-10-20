@@ -25,7 +25,7 @@ const envelope = <T,>(data: T) => ({ data: { success: true, message: 'ok', data 
 describe('invitation-service', () => {
   const slug = 'acme';
   const invitationId = 3;
-  const token = 'tok-123';
+  const token = '9f2c4e7a1b3d5f6e8a0c2e4f6a8b0d1c';
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -76,6 +76,20 @@ describe('invitation-service', () => {
     await acceptInvitation(token);
 
     expect(apiClient.post).toHaveBeenCalledWith(INVITATION_ROUTES.ACCEPT(token), {});
+  });
+
+  it.each([
+    ['a path change', '../../users/me'],
+    ['a query string', '9f2c4e7a1b3d5f6e?role=OWNER'],
+    ['a fragment', '9f2c4e7a1b3d5f6e#x'],
+    ['an encoded slash', '9f2c4e7a1b3d5f6e%2F..'],
+    ['a too short token', 'tok-123'],
+    ['an empty token', ''],
+  ])('refuses a token with %s before any request', async (_label, bad) => {
+    await expect(previewInvitation(bad)).rejects.toThrow('This invitation link is not valid');
+    await expect(acceptInvitation(bad)).rejects.toThrow('This invitation link is not valid');
+    expect(apiClient.get).not.toHaveBeenCalled();
+    expect(apiClient.post).not.toHaveBeenCalled();
   });
 
   it('listPendingInvitations: propagates errors', async () => {

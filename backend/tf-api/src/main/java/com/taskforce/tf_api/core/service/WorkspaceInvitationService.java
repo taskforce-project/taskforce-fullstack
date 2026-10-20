@@ -30,6 +30,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -125,7 +126,7 @@ public class WorkspaceInvitationService {
         String acceptUrl = appUrl + "/invitations/" + invitation.getToken();
         emailService.sendWorkspaceInvitationEmail(email, inviterName, workspace.getName(), acceptUrl);
 
-        log.info("Invitation créée pour {} sur le workspace {}", email, slug);
+        log.info("Invitation créée pour {} sur le workspace {}", LogSafe.of(email), LogSafe.of(slug));
         return InvitationResponse.from(invitation);
     }
 

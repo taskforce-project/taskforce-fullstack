@@ -12,6 +12,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 /**
  * Service pour l'authentification via Keycloak OAuth2/OpenID Connect
@@ -57,7 +58,7 @@ public class KeycloakAuthService {
      * @throws RuntimeException si l'authentification échoue
      */
     public KeycloakTokenResponse authenticate(String email, String password) {
-        log.info("Authentification de l'utilisateur via Keycloak : {}", email);
+        log.info("Authentification de l'utilisateur via Keycloak : {}", LogSafe.of(email));
 
         String tokenUrl = keycloakUrl + "/realms/" + realm + "/protocol/openid-connect/token";
 
@@ -90,14 +91,14 @@ public class KeycloakAuthService {
                     .refreshExpiresIn(((Number) body.get("refresh_expires_in")).intValue())
                     .build();
 
-                log.info("Authentification réussie pour : {}", email);
+                log.info("Authentification réussie pour : {}", LogSafe.of(email));
                 return tokenResponse;
             } else {
                 throw new RuntimeException("Authentication with the identity provider failed");
             }
 
         } catch (HttpClientErrorException.Unauthorized e) {
-            log.error("Échec d'authentification pour {} : credentials invalides", email);
+            log.error("Échec d'authentification pour {} : credentials invalides", LogSafe.of(email));
             throw new RuntimeException("Invalid email or password");
 
         } catch (HttpClientErrorException e) {

@@ -36,6 +36,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import org.springframework.cache.annotation.Cacheable;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -421,7 +422,7 @@ public class AnalyticsService {
         throw e; // 404 légitime (workspace introuvable)
       } catch (Exception e) {
         // Toute autre erreur (DB, lazy…) → repli gracieux, jamais de 500 — mais tracée.
-        log.warn("Insights IA : échec de la collecte des métriques (slug={}) → repli : {}", slug, e.getMessage());
+        log.warn("Insights IA : échec de la collecte des métriques (slug={}) → repli : {}", LogSafe.of(slug), LogSafe.of(e.getMessage()));
         return fallbackInsights();
       }
     }

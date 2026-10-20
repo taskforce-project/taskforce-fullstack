@@ -30,6 +30,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.brain.BrainSeedingService;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -75,7 +76,7 @@ public class WorkspaceService {
             .build();
 
         workspace = workspaceRepository.save(workspace);
-        log.info("Workspace '{}' créé pour l'utilisateur {}", workspace.getSlug(), owner.getId());
+        log.info("Workspace '{}' créé pour l'utilisateur {}", LogSafe.of(workspace.getSlug()), owner.getId());
 
         // Ajouter le propriétaire comme membre OWNER
         WorkspaceMember ownerMember = WorkspaceMember.builder()
@@ -142,7 +143,7 @@ public class WorkspaceService {
             .build();
 
         workspace = workspaceRepository.save(workspace);
-        log.info("Workspace '{}' créé par l'utilisateur {}", workspace.getSlug(), userId);
+        log.info("Workspace '{}' créé par l'utilisateur {}", LogSafe.of(workspace.getSlug()), userId);
 
         WorkspaceMember ownerMember = WorkspaceMember.builder()
             .workspace(workspace)

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.taskforce.tf_api.shared.security.PostAuthenticationFilter;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -49,8 +50,8 @@ public class PersonalTokenScopeFilter extends OncePerRequestFilter implements Po
         boolean personalToken = auth instanceof JwtAuthenticationToken token
             && token.getToken().hasClaim(PersonalTokenAuthenticator.TOKEN_CLAIM);
         if (personalToken && !allows(request.getMethod(), request.getRequestURI())) {
-            log.warn("Personal access token refused outside the MCP server: {} {}", request.getMethod(),
-                forLog(request.getRequestURI()));
+            log.warn("Personal access token refused outside the MCP server: {} {}", LogSafe.of(request.getMethod()),
+                LogSafe.of(request.getRequestURI()));
             response.setStatus(HttpStatus.FORBIDDEN.value());
             response.setContentType("application/json");
             response.setCharacterEncoding("UTF-8");
@@ -61,10 +62,4 @@ public class PersonalTokenScopeFilter extends OncePerRequestFilter implements Po
         chain.doFilter(request, response);
     }
 
-    /** Neutralise les sauts de ligne d'une valeur issue de la requête avant de la journaliser. */
-    private static String forLog(String value) {
-        if (value == null) return "null";
-        String v = value.replaceAll("[\r\n\t]", "_");
-        return v.length() > 200 ? v.substring(0, 200) + "..." : v;
-    }
 }
