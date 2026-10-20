@@ -224,6 +224,13 @@ const AI_TIERS = [
             )}
             {!SIGNED_BUILDS.windows && (
               <li>
+                If Windows says Smart App Control blocked it, there is no Run anyway: Smart App Control, on by default on
+                some new Windows 11 PCs, only runs signed apps. To use TaskForce, open Windows Security, then App &amp;
+                browser control, then Smart App Control settings, and choose Off. TaskForce can't open while it is on.
+              </li>
+            )}
+            {!SIGNED_BUILDS.windows && (
+              <li>
                 If your antivirus stops it, it is reacting to a new file it has never seen. The VirusTotal report next
                 to the file shows what dozens of antivirus engines make of it.
               </li>
