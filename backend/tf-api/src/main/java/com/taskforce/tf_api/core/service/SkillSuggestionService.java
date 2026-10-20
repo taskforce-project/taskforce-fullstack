@@ -178,28 +178,38 @@ public class SkillSuggestionService {
     }
 
     /** Repli déterministe par mots-clés du rôle, quand le LLM n'est pas disponible. */
-    private List<String> fallback(String role, List<String> already) {
+    List<String> fallback(String role, List<String> already) {
         String r = role == null ? "" : role.toLowerCase();
         List<String> base;
-        if (r.matches(".*(front|react|ui|web).*")) {
+        if (containsAny(r, "front", "react", "ui", "web")) {
             base = List.of("React", "TypeScript", "CSS", "Next.js", "Accessibility", "E2E tests", "Design system");
-        } else if (r.matches(".*(back|api|java|spring).*")) {
+        } else if (containsAny(r, "back", "api", "java", "spring")) {
             base = List.of("Java", "Spring Boot", "REST", "SQL", "Unit tests", "Security", "Docker");
-        } else if (r.matches(".*(full ?stack|dev|ingénieur|engineer|développe).*")) {
+        } else if (containsAny(r, "fullstack", "full stack", "dev", "ingénieur", "engineer", "développe")) {
             base = List.of("TypeScript", "Java", "React", "SQL", "Git", "Tests", "CI/CD", "Docker");
-        } else if (r.matches(".*(devops|sre|infra|cloud).*")) {
+        } else if (containsAny(r, "devops", "sre", "infra", "cloud")) {
             base = List.of("Docker", "Kubernetes", "CI/CD", "Terraform", "Observability", "Linux", "Cloud");
-        } else if (r.matches(".*(design|ux|produit|product).*")) {
+        } else if (containsAny(r, "design", "ux", "produit", "product")) {
             base = List.of("Figma", "UX research", "Prototyping", "Design system", "Accessibility", "Wireframing");
-        } else if (r.matches(".*(qa|test|quality).*")) {
+        } else if (containsAny(r, "qa", "test", "quality")) {
             base = List.of("Playwright", "Cypress", "Unit tests", "E2E tests", "Automation", "CI/CD");
-        } else if (r.matches(".*(data|ml|ia|ai|analyst).*")) {
+        } else if (containsAny(r, "data", "ml", "ia", "ai", "analyst")) {
             base = List.of("SQL", "Python", "Data viz", "ETL", "Analysis", "Machine learning");
-        } else if (r.matches(".*(pm|chef|manager|lead|scrum|owner|projet).*")) {
+        } else if (containsAny(r, "pm", "chef", "manager", "lead", "scrum", "owner", "projet")) {
             base = List.of("Agile", "Roadmap", "Prioritization", "Communication", "Risk management", "Stakeholders");
         } else {
             base = List.of("Communication", "Organization", "Collaboration", "Documentation", "Problem solving");
         }
         return dedupeCap(base, already);
+    }
+
+    /** Le rôle contient-il l'un des mots-clés ? Sans expression régulière : le rôle est un texte saisi, de taille libre. */
+    private static boolean containsAny(String role, String... keywords) {
+        for (String keyword : keywords) {
+            if (role.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

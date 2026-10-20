@@ -34,6 +34,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -204,7 +205,7 @@ public class RedistributionService {
             Map.of("applied", applied, "skipped", skipped));
 
         log.info("Redistribution appliquée sur workspace {} : {} déplacement(s), {} ignoré(s)",
-            slug, applied, skipped);
+            LogSafe.of(slug), applied, skipped);
         return ApplyRedistributionResponse.builder().applied(applied).skipped(skipped).build();
     }
 

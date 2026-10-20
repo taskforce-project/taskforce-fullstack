@@ -16,9 +16,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -26,6 +30,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.taskforce.tf_api.core.dto.request.DesktopAuthorizeRequest;
@@ -121,6 +126,30 @@ class DesktopSessionControllersWebMvcTest {
         when(sessions.refresh(TOKEN)).thenReturn(Optional.empty());
         mockMvc.perform(post("/api/auth/desktop/session").contentType(MediaType.APPLICATION_JSON).content("{\"token\":\"" + TOKEN + "\"}"))
             .andExpect(status().isUnauthorized());
+    }
+
+    static Stream<Arguments> unreadable_bodies() {
+        return Stream.of(
+            Arguments.of("sans corps ni type de contenu (vu en prod le 20/10)", null, null, 400),
+            Arguments.of("JSON vide", MediaType.APPLICATION_JSON_VALUE, "", 400),
+            Arguments.of("JSON mal formé", MediaType.APPLICATION_JSON_VALUE, "{\"token\":", 400),
+            Arguments.of("JSON d'une autre forme", MediaType.APPLICATION_JSON_VALUE, "[\"" + TOKEN + "\"]", 400),
+            Arguments.of("formulaire au lieu de JSON", MediaType.APPLICATION_FORM_URLENCODED_VALUE, "token=" + TOKEN, 415));
+    }
+
+    @ParameterizedTest(name = "{0} : {3}")
+    @MethodSource("unreadable_bodies")
+    @DisplayName("un corps absent ou illisible est une erreur du client, jamais un 500")
+    void unreadable_body_is_a_client_error(String label, String contentType, String body, int expected) throws Exception {
+        MockHttpServletRequestBuilder request = post("/api/auth/desktop/session");
+        if (contentType != null) request.contentType(contentType);
+        if (body != null) request.content(body);
+
+        mockMvc.perform(request)
+            .andExpect(status().is(expected))
+            .andExpect(jsonPath("$.status").value(expected))
+            .andExpect(jsonPath("$.path").value("/api/auth/desktop/session"));
+        verify(sessions, never()).refresh(any());
     }
 
     @Test

@@ -17,6 +17,7 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.NotificationPreferenceRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -76,7 +77,7 @@ public class NotificationPreferenceService {
         for (UpdateNotificationPreferencesRequest.Item item : request.getPreferences()) {
             Optional<NotificationEvent> resolved = NotificationEvent.fromKey(item.getEventKey());
             if (resolved.isEmpty()) {
-                log.warn("Préférence de notification ignorée (event_key inconnu : {})", item.getEventKey());
+                log.warn("Préférence de notification ignorée (event_key inconnu : {})", LogSafe.of(item.getEventKey()));
                 continue;
             }
             NotificationEvent event = resolved.get();

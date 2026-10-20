@@ -11,6 +11,7 @@ import org.thymeleaf.context.Context;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 /**
  * Service d'envoi d'emails avec templates HTML via Mailtrap (développement) ou SMTP
@@ -52,9 +53,9 @@ public class EmailService {
                 htmlContent
             );
             
-            log.info("OTP email envoyé avec succès à : {}", toEmail);
+            log.info("OTP email envoyé avec succès à : {}", LogSafe.of(toEmail));
         } catch (Exception e) {
-            log.error("Erreur lors de l'envoi de l'email OTP à {}: {}", toEmail, e.getMessage());
+            log.error("Erreur lors de l'envoi de l'email OTP à {}: {}", LogSafe.of(toEmail), LogSafe.of(e.getMessage()));
             throw new RuntimeException("Error sending the email", e);
         }
     }
@@ -76,9 +77,9 @@ public class EmailService {
                 htmlContent
             );
             
-            log.info("Email de bienvenue envoyé à : {}", toEmail);
+            log.info("Email de bienvenue envoyé à : {}", LogSafe.of(toEmail));
         } catch (Exception e) {
-            log.error("Erreur lors de l'envoi de l'email de bienvenue à {}: {}", toEmail, e.getMessage());
+            log.error("Erreur lors de l'envoi de l'email de bienvenue à {}: {}", LogSafe.of(toEmail), LogSafe.of(e.getMessage()));
         }
     }
 
@@ -99,9 +100,9 @@ public class EmailService {
                 htmlContent
             );
             
-            log.info("Email de réinitialisation envoyé à : {}", toEmail);
+            log.info("Email de réinitialisation envoyé à : {}", LogSafe.of(toEmail));
         } catch (Exception e) {
-            log.error("Erreur lors de l'envoi de l'email de réinitialisation à {}: {}", toEmail, e.getMessage());
+            log.error("Erreur lors de l'envoi de l'email de réinitialisation à {}: {}", LogSafe.of(toEmail), LogSafe.of(e.getMessage()));
             throw new RuntimeException("Error sending the email", e);
         }
     }
@@ -125,9 +126,9 @@ public class EmailService {
                 String.format("[%s] You're invited to join %s", fromName, workspaceName),
                 htmlContent
             );
-            log.info("Email d'invitation workspace envoyé à : {}", toEmail);
+            log.info("Email d'invitation workspace envoyé à : {}", LogSafe.of(toEmail));
         } catch (Exception e) {
-            log.error("Échec de l'envoi de l'email d'invitation à {} : {}", toEmail, e.getMessage());
+            log.error("Échec de l'envoi de l'email d'invitation à {} : {}", LogSafe.of(toEmail), LogSafe.of(e.getMessage()));
         }
     }
 

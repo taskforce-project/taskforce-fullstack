@@ -21,6 +21,7 @@ import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -155,7 +156,7 @@ public class McpServerService {
             }
             Long userId = resolveUserId(principal);
             Object value = tool.handler().call(slug, userId, args);
-            log.info("MCP tool {} called in {} by user {}{}", name, slug, userId, via(principal));
+            log.info("MCP tool {} called in {} by user {}{}", LogSafe.of(name), LogSafe.of(slug), userId, via(principal));
             return result(id, toolResult(value));
         } catch (McpArgs.InvalidArgumentException e) {
             return result(id, toolError(e.getMessage()));
@@ -166,7 +167,7 @@ public class McpServerService {
         } catch (BusinessException e) {
             return result(id, toolError(e.getMessage()));
         } catch (RuntimeException e) {
-            log.warn("MCP tool {} failed in {}: {}", name, slug, e.toString());
+            log.warn("MCP tool {} failed in {}: {}", LogSafe.of(name), LogSafe.of(slug), LogSafe.of(e.toString()));
             return result(id, toolError("The tool failed on the server. Try again later."));
         }
     }

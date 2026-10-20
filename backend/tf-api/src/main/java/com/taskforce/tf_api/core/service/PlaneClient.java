@@ -15,6 +15,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -123,7 +124,7 @@ public class PlaneClient {
                 new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {});
             return resp.getBody() != null ? resp.getBody() : Map.of();
         } catch (Exception ex) {
-            log.warn("Appel Plane échoué ({}): {}", url, ex.getMessage());
+            log.warn("Appel Plane échoué ({}): {}", LogSafe.of(url), LogSafe.of(ex.getMessage()));
             throw new BusinessException("The call to Plane failed (invalid API key or workspace?)");
         }
     }

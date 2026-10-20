@@ -31,6 +31,7 @@ import com.taskforce.tf_api.shared.security.HumanChallengeService;
 import com.taskforce.tf_api.shared.security.RefreshTokenCookie;
 import com.taskforce.tf_api.shared.security.TurnstileService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
@@ -89,7 +90,7 @@ public class AuthController {
         @Valid @RequestBody RegisterRequest request,
         HttpServletRequest httpRequest
     ) {
-        log.info("Requête d'inscription reçue pour : {}", request.getEmail());
+        log.info("Requête d'inscription reçue pour : {}", LogSafe.of(request.getEmail()));
 
         // Turnstile est vérifié ICI, et non dans AuthService, pour deux raisons. D'abord l'adresse de
         // l'appelant n'existe qu'au niveau de la requête HTTP, et elle améliore le jugement rendu par
@@ -125,7 +126,7 @@ public class AuthController {
     public ResponseEntity<ApiResponse<VerifyOtpResponse>> verifyOtp(
         @Valid @RequestBody VerifyOtpRequest request
     ) {
-        log.info("Requête de vérification OTP reçue pour : {}", request.getEmail());
+        log.info("Requête de vérification OTP reçue pour : {}", LogSafe.of(request.getEmail()));
 
         try {
             VerifyOtpResponse response = authService.verifyOtpAndCompleteRegistration(request);
@@ -149,7 +150,7 @@ public class AuthController {
     public ResponseEntity<ApiResponse<RegisterResponse>> resendOtp(
         @Valid @RequestBody ResendOtpRequest request
     ) {
-        log.info("Requête de renvoi OTP pour : {}", request.getEmail());
+        log.info("Requête de renvoi OTP pour : {}", LogSafe.of(request.getEmail()));
 
         try {
             RegisterResponse response = authService.resendOtp(request.getEmail());
@@ -173,7 +174,7 @@ public class AuthController {
     public ResponseEntity<ApiResponse<AuthResponse>> login(
         @Valid @RequestBody LoginRequest request
     ) {
-        log.info("Requête de connexion reçue pour : {}", request.getEmail());
+        log.info("Requête de connexion reçue pour : {}", LogSafe.of(request.getEmail()));
 
         try {
             AuthResponse response = authService.login(request);
@@ -210,7 +211,7 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> forgotPassword(
         @Valid @RequestBody ForgotPasswordRequest request
     ) {
-        log.info("Requête de réinitialisation de mot de passe pour : {}", request.getEmail());
+        log.info("Requête de réinitialisation de mot de passe pour : {}", LogSafe.of(request.getEmail()));
 
         try {
             authService.forgotPassword(request.getEmail());
@@ -234,7 +235,7 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> resetPassword(
         @Valid @RequestBody ResetPasswordRequest request
     ) {
-        log.info("Requête de réinitialisation de mot de passe pour : {}", request.getEmail());
+        log.info("Requête de réinitialisation de mot de passe pour : {}", LogSafe.of(request.getEmail()));
 
         try {
             authService.resetPassword(request.getEmail(), request.getOtpCode(), request.getNewPassword());

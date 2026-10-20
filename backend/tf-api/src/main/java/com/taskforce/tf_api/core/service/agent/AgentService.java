@@ -28,6 +28,7 @@ import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.core.service.mcp.ExternalMcpTool;
 import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -125,7 +126,7 @@ public class AgentService {
             return new AssistantAnswer(answer, null, toolCalls.isEmpty() ? "fast" : "deep",
                 sources, steps, toolCalls, toUsage(usage));
         } catch (Exception ex) {
-            log.warn("Agent LLM indisponible (slug={}): {}", slug, ex.getMessage());
+            log.warn("Agent LLM indisponible (slug={}): {}", LogSafe.of(slug), LogSafe.of(ex.getMessage()));
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
                 "The model did not answer: here are the Brain OS notes"));
             LlmUsage usage = llm.currentUsage(); // usage partiel réel (appels déjà faits avant l'échec)

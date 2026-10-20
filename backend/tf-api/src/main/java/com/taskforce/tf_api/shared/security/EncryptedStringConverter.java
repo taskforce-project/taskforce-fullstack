@@ -65,7 +65,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
             Cipher cipher = Cipher.getInstance(TRANSFORMATION);
             cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(TAG_BITS, iv));
             byte[] ciphertext = cipher.doFinal(attribute.getBytes(StandardCharsets.UTF_8));
-            byte[] combined = ByteBuffer.allocate(iv.length + ciphertext.length).put(iv).put(ciphertext).array();
+            byte[] combined = ByteBuffer.allocate(Math.addExact(iv.length, ciphertext.length)).put(iv).put(ciphertext).array();
             return PREFIX + Base64.getEncoder().encodeToString(combined);
         } catch (Exception ex) {
             throw new IllegalStateException("Encryption at rest failed", ex);
