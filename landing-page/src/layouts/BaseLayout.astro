@@ -8,6 +8,7 @@ import { Font } from "astro:assets";
 import { ClientRouter } from "astro:transitions";
 import Header from "@/components/site/Header.astro";
 import Footer from "@/components/site/Footer.astro";
+import DownloadNotice from "@/components/site/DownloadNotice.astro";
 import { breadcrumbLd, organizationLd, softwareApplicationLd, websiteLd } from "@/lib/structured-data";
 
 interface Props {
@@ -99,6 +100,7 @@ const pageTransition = { forwards: pageAnimation, backwards: pageAnimation };
       <slot />
     </main>
     <Footer />
+    <DownloadNotice />
 
     <script>
       // Apparition au défilement des blocs [data-reveal], relancée à chaque page (navigation sans rechargement) ;

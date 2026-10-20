@@ -22,9 +22,11 @@ const WORKFLOW = `${LINKS.github}/blob/main/.github/workflows/desktop-release.ym
       <p>The TaskForce Desktop installer for Windows is code-signed.</p>
     ) : (
       <p>
-        The installers of TaskForce Desktop are not code-signed yet. Windows, and some antivirus programs that do not
-        know a new file yet, may warn you before running it: the <a href="/download#install">download page</a> says what
-        to do. Until the installers are signed, the sections below say how each file is built and how to check it.
+        TaskForce Desktop is free, and its installers are not code-signed for now: a code signing certificate is a paid
+        yearly subscription that this free project does not take. Windows, and antivirus programs that do not know a new
+        file yet, may warn you before running it: the <a href="/download#install">download page</a> says what to do.
+        Instead, every release is built in public and scanned on VirusTotal. The sections below say how, and how to
+        check a file.
       </p>
     )
   }
@@ -69,7 +71,7 @@ const WORKFLOW = `${LINKS.github}/blob/main/.github/workflows/desktop-release.ym
     Each file of a release shows its SHA-256 digest on the <a href="/download">download page</a> and on its{" "}
     <a href={`${LINKS.github}/releases`}>GitHub release page</a>. On Windows, compare it with{" "}
     <code>Get-FileHash TaskForce-Setup-&lt;version&gt;.exe</code> in PowerShell; on Linux, with{" "}
-    <code>sha256sum</code>. When a file has been sent to VirusTotal, its report is linked next to it on the download
-    page.
+    <code>sha256sum</code>. Every file of a release is sent to VirusTotal when it is published: its report is linked
+    next to it on the download page, and in the release notes on GitHub.
   </p>
 </LegalDoc>
