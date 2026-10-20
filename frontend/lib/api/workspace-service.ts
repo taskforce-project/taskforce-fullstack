@@ -3,6 +3,7 @@
  */
 
 import { apiClient } from "./client";
+import { fileNameFromDisposition, saveBlob } from "./project-service";
 import { WORKSPACE_ROUTES } from "../config/api-routes";
 
 // ---------------------------------------------------------------------------
@@ -140,6 +141,38 @@ export async function removeMember(slug: string, memberId: number): Promise<void
 }
 
 /** Supprime le workspace (OWNER uniquement) - cascade côté DB. */
+/** Progression d'un envoi ou d'un téléchargement, en pourcentage, quand le serveur donne la taille. */
+function progress(onProgress?: (pct: number) => void) {
+  return onProgress
+    ? (e: { loaded: number; total?: number }) => {
+        if (e.total) onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    : undefined;
+}
+
+/**
+ * Télécharge le fichier d'espace TaskForce (zip) : l'espace, son Brain OS et tous les projets que la personne y voit.
+ * Il s'importe dans la webapp comme dans l'app desktop, comme un nouvel espace.
+ */
+export async function downloadWorkspaceBundle(slug: string, onProgress?: (pct: number) => void): Promise<void> {
+  const res = await apiClient.get(WORKSPACE_ROUTES.BUNDLE(slug), {
+    responseType: "blob",
+    timeout: 0,
+    onDownloadProgress: progress(onProgress),
+  });
+  saveBlob(res.data as Blob, fileNameFromDisposition(res.headers?.["content-disposition"]) ?? `${slug}.taskforce-workspace.zip`);
+}
+
+/** Crée un nouvel espace, dont la personne est propriétaire, à partir d'un fichier d'espace TaskForce. */
+export async function importWorkspaceBundle(file: Blob, onProgress?: (pct: number) => void): Promise<Workspace> {
+  const response = await apiClient.post<{ data: Workspace }>(WORKSPACE_ROUTES.IMPORT, file, {
+    headers: { "Content-Type": "application/zip" },
+    timeout: 0,
+    onUploadProgress: progress(onProgress),
+  });
+  return response.data.data;
+}
+
 export async function deleteWorkspace(slug: string): Promise<void> {
   await apiClient.delete(WORKSPACE_ROUTES.BY_SLUG(slug));
 }

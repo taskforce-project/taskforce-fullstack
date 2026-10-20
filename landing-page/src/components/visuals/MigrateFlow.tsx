@@ -172,7 +172,7 @@ export default function MigrateFlow({ host }: Readonly<{ host?: string }>) {
                         </motion.div>
                       ))}
                     </div>
-                    <p className="mt-3 text-[10.5px] text-muted-foreground">With their history and attachments</p>
+                    <p className="mt-3 text-[10.5px] text-muted-foreground">With their Brain OS, history and attachments</p>
                   </motion.div>
                 ) : asking ? (
                   <motion.div
@@ -185,7 +185,7 @@ export default function MigrateFlow({ host }: Readonly<{ host?: string }>) {
                   >
                     <p className="text-[13px] font-medium">Welcome back</p>
                     <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
-                      You have 3 projects in the web app. Copy them to this computer?
+                      2 workspaces, 3 projects and their Brain OS are in the web app. Copy them to this computer?
                     </p>
                     <div className="mt-3 flex items-center gap-2">
                       <motion.span
@@ -193,9 +193,9 @@ export default function MigrateFlow({ host }: Readonly<{ host?: string }>) {
                         animate={{ scale: bringing ? 0.96 : 1 }}
                         transition={{ duration: 0.15 }}
                       >
-                        Choose projects
+                        Copy everything
                       </motion.span>
-                      <span className="inline-flex h-[30px] items-center rounded-md px-3 text-[11px] shadow-[inset_0_0_0_1px_var(--input)]">New project</span>
+                      <span className="inline-flex h-[30px] items-center rounded-md px-3 text-[11px] shadow-[inset_0_0_0_1px_var(--input)]">Choose</span>
                     </div>
                     <div className="mt-3 h-[3px] overflow-hidden rounded-full bg-muted">
                       <motion.span

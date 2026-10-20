@@ -13,7 +13,7 @@ import { appLogDir } from "./paths";
 import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
 import { toolsStatus } from "./tools";
-import { readMove, Transfer, type LocalApi } from "./transfer";
+import { readMove, readWorkspaceMove, Transfer, type LocalApi } from "./transfer";
 import { check, startUpdater } from "./updater";
 import {
   integratedTitleBar,
@@ -378,6 +378,16 @@ function registerIpc(): void {
     if (!move) return { ok: false, error: "Unknown project or workspace" };
     return withSession((token, local) =>
       transfer.send(token, { workspace: move.workspace, projectId: move.projectId }, move.target, local));
+  });
+  ipcMain.handle("desktop:bring-workspace", (_event, input: unknown) => {
+    const move = readWorkspaceMove(input);
+    if (!move) return { ok: false, error: "Unknown workspace" };
+    return withSession((token, local) => transfer.bringWorkspace(token, move.workspace, local));
+  });
+  ipcMain.handle("desktop:send-workspace", (_event, input: unknown) => {
+    const move = readWorkspaceMove(input);
+    if (!move) return { ok: false, error: "Unknown workspace" };
+    return withSession((token, local) => transfer.sendWorkspace(token, move.workspace, local));
   });
   ipcMain.handle("desktop:open-web", (_event, url: unknown) =>
     transfer.isWebAddress(url) ? shell.openExternal(url) : undefined);

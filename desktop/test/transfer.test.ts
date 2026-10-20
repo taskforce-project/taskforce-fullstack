@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type Server } from "node:http";
 import { after, before, beforeEach, describe, it } from "node:test";
 
 import { SessionEndedError } from "../src/account";
-import { readMove, Transfer } from "../src/transfer";
+import { readMove, readWorkspaceMove, Transfer } from "../src/transfer";
 
 /** Faux serveur : la webapp (`/api/auth/desktop/transfer/...`) et l'API locale (`/api/workspaces/...`). */
 interface Call {
@@ -139,6 +139,70 @@ describe("send", () => {
       new Response(ZIP, { headers: { "content-length": String(1024 * 1024 * 1024) } })) as typeof fetch);
 
     await assert.rejects(huge.send(TOKEN, { workspace: "ada", projectId: 9 }, "acme", local()), /too large/);
+  });
+});
+
+describe("whole workspaces", () => {
+  it("reads a workspace asked by the page", () => {
+    assert.deepEqual(readWorkspaceMove({ workspace: "acme" }), { workspace: "acme" });
+    assert.equal(readWorkspaceMove({ workspace: "acme/../x" }), null);
+    assert.equal(readWorkspaceMove(null), null);
+  });
+
+  it("brings a whole workspace from the web app as a new workspace on this computer", async () => {
+    respond = (call) => call.path === "/api/auth/desktop/transfer/workspace"
+      ? { status: 200, type: "application/zip", body: ZIP }
+      : { status: 201, body: { data: { slug: "acme-2", name: "Acme" } } };
+
+    const moved = await transfer().bringWorkspace(TOKEN, "acme", local());
+
+    assert.deepEqual(moved, { slug: "acme-2", name: "Acme" });
+    assert.deepEqual(JSON.parse(calls[0]?.body.toString() ?? "{}"), { token: TOKEN, workspace: "acme" });
+    assert.equal(calls[1]?.path, "/api/workspaces/import");
+    assert.equal(calls[1]?.headers.authorization, "Bearer tfd_launch");
+    assert.deepEqual(calls[1]?.body, ZIP);
+  });
+
+  it("sends a whole workspace from this computer to the web app", async () => {
+    respond = (call) => call.method === "GET"
+      ? { status: 200, type: "application/zip", body: ZIP }
+      : { status: 201, body: { data: { slug: "acme", name: "Acme" } } };
+
+    const moved = await transfer().sendWorkspace(TOKEN, "acme-local", local());
+
+    assert.deepEqual(moved, { slug: "acme", name: "Acme", url: "https://app.example.test/acme" });
+    assert.equal(calls[0]?.path, "/api/workspaces/acme-local/bundle");
+    assert.equal(calls[1]?.path, "/api/auth/desktop/transfer/workspace-import");
+    assert.equal(calls[1]?.headers["x-taskforce-session"], TOKEN);
+  });
+
+  it("passes on what the web app says when it refuses the workspace", async () => {
+    respond = (call) => call.method === "GET"
+      ? { status: 200, type: "application/zip", body: ZIP }
+      : { status: 400, body: { message: "This workspace file isn't a TaskForce workspace file." } };
+
+    await assert.rejects(transfer().sendWorkspace(TOKEN, "acme-local", local()), /workspace file/);
+  });
+
+  for (const [status, message] of [
+    [413, /too large for the web app to receive in one go/],
+    [524, /may still be finishing/],
+    [502, /may still be finishing/],
+  ] as const) {
+    it(`explains a ${status} from the relay in front of the web app, which has no message`, async () => {
+      respond = (call) => call.method === "GET"
+        ? { status: 200, type: "application/zip", body: ZIP }
+        : { status, type: "text/html", body: Buffer.from(`<html><body>${status}</body></html>`) };
+
+      await assert.rejects(transfer().sendWorkspace(TOKEN, "acme-local", local()), message);
+    });
+  }
+
+  it("names the workspace when it is too large to move", async () => {
+    const huge = new Transfer(base, "https://app.example.test", (async () =>
+      new Response(ZIP, { headers: { "content-length": String(1024 * 1024 * 1024) } })) as typeof fetch);
+
+    await assert.rejects(huge.bringWorkspace(TOKEN, "acme", local()), /This workspace is too large to move/);
   });
 });
 

@@ -141,6 +141,10 @@ export const WORKSPACE_ROUTES = {
   CREATE: "/api/workspaces",
   // Par slug
   BY_SLUG: (slug: string) => `/api/workspaces/${slug}`,
+  /** Fichier d'espace TaskForce (zip) : l'espace, son Brain OS et les projets que la personne y voit. */
+  BUNDLE: (slug: string) => `/api/workspaces/${slug}/bundle`,
+  /** Crée un nouvel espace depuis un fichier d'espace TaskForce (corps `application/zip`). */
+  IMPORT: "/api/workspaces/import",
   MEMBERS: (slug: string) => `/api/workspaces/${slug}/members`,
   AUDIT: (slug: string) => `/api/workspaces/${slug}/audit`,
   INVITE: (slug: string) => `/api/workspaces/${slug}/members/invite`,

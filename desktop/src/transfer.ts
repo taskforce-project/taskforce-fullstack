@@ -31,6 +31,14 @@ export interface MovedProject {
   url?: string;
 }
 
+/** Espace créé de l'autre côté, avec tout son travail. */
+export interface MovedWorkspace {
+  slug: string;
+  name: string;
+  /** Adresse de l'espace dans la webapp, pour un espace envoyé en ligne. */
+  url?: string;
+}
+
 /** API locale, jointe par le relais de la fenêtre avec le jeton de lancement. */
 export interface LocalApi {
   origin: string;
@@ -51,19 +59,30 @@ export function readMove(input: unknown): { workspace: string; projectId: number
   return { workspace, projectId, target };
 }
 
+/**
+ * Réponses du relais devant la webapp (Cloudflare), sans message de l'API : corps trop gros pour lui (413), ou délai
+ * de réponse dépassé (502, 504, 524) alors que la webapp peut encore finir l'import.
+ */
+const TOO_LARGE_FOR_WEB = "This is too large for the web app to receive in one go. Send the projects one at a time instead.";
+const WEB_APP_TOO_SLOW = "The web app took too long to answer and may still be finishing. Check the web app before trying again.";
+const GATEWAY_TIMEOUTS = new Set([502, 504, 524]);
+
 async function failure(response: Response, fallback: string, online: boolean): Promise<Error> {
   const payload = (await response.json().catch(() => ({}))) as { message?: string };
   if (online && response.status === 401) return new SessionEndedError(payload.message || "The session ended: sign in again");
-  return new Error(payload.message || `${fallback} (${response.status})`);
+  if (payload.message) return new Error(payload.message);
+  if (online && response.status === 413) return new Error(TOO_LARGE_FOR_WEB);
+  if (online && GATEWAY_TIMEOUTS.has(response.status)) return new Error(WEB_APP_TOO_SLOW);
+  return new Error(`${fallback} (${response.status})`);
 }
 
-/** Corps d'un fichier de projet, borné. */
-async function bundleOf(response: Response): Promise<ArrayBuffer> {
+/** Corps d'un fichier de projet ou d'espace, borné. */
+async function bundleOf(response: Response, what: "project" | "workspace" = "project"): Promise<ArrayBuffer> {
   if (Number(response.headers.get("content-length") ?? "0") > MAX_BUNDLE_BYTES) {
-    throw new Error("This project is too large to move");
+    throw new Error(`This ${what} is too large to move`);
   }
   const bundle = await response.arrayBuffer();
-  if (bundle.byteLength > MAX_BUNDLE_BYTES) throw new Error("This project is too large to move");
+  if (bundle.byteLength > MAX_BUNDLE_BYTES) throw new Error(`This ${what} is too large to move`);
   return bundle;
 }
 
@@ -88,6 +107,18 @@ function readWorkspaces(value: unknown): WebWorkspace[] {
       }),
     }];
   });
+}
+
+/** Espace demandé par la page, vérifié avant que la coque n'appelle quoi que ce soit. */
+export function readWorkspaceMove(input: unknown): { workspace: string } | null {
+  const { workspace } = (input ?? {}) as Record<string, unknown>;
+  return isWorkspaceSlug(workspace) ? { workspace } : null;
+}
+
+function createdWorkspace(payload: unknown): MovedWorkspace {
+  const workspace = ((payload ?? {}) as { data?: { slug?: unknown; name?: unknown } }).data ?? {};
+  if (typeof workspace.slug !== "string") throw new Error("The workspace was not created");
+  return { slug: workspace.slug, name: typeof workspace.name === "string" ? workspace.name : workspace.slug };
 }
 
 function createdProject(payload: unknown, workspace: string): MovedProject {
@@ -163,6 +194,45 @@ export class Transfer {
     if (!created.ok) throw await failure(created, "The web app didn't create the project", true);
     const project = createdProject(await created.json(), to);
     return { ...project, url: `${this.webUrl}/${to}/projects/${project.id}` };
+  }
+
+  /** Copie un espace entier de la webapp (Brain OS et projets) sur cet ordinateur, comme un nouvel espace. */
+  async bringWorkspace(sessionToken: string, workspace: string, local: LocalApi): Promise<MovedWorkspace> {
+    const download = await this.fetchImpl(`${this.apiUrl}/api/auth/desktop/transfer/workspace`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: sessionToken, workspace }),
+      signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
+    });
+    if (!download.ok) throw await failure(download, "The web app didn't send the workspace", true);
+    const bundle = await bundleOf(download, "workspace");
+    const created = await this.fetchImpl(`${local.origin}/api/workspaces/import`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${local.launchToken}`, "Content-Type": "application/zip" },
+      body: bundle,
+      signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
+    });
+    if (!created.ok) throw await failure(created, "TaskForce couldn't create the workspace", false);
+    return createdWorkspace(await created.json());
+  }
+
+  /** Copie un espace entier de cet ordinateur (Brain OS et projets) dans la webapp, comme un nouvel espace. */
+  async sendWorkspace(sessionToken: string, workspace: string, local: LocalApi): Promise<MovedWorkspace> {
+    const download = await this.fetchImpl(`${local.origin}/api/workspaces/${workspace}/bundle`, {
+      headers: { Authorization: `Bearer ${local.launchToken}` },
+      signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
+    });
+    if (!download.ok) throw await failure(download, "TaskForce couldn't pack the workspace", false);
+    const bundle = await bundleOf(download, "workspace");
+    const created = await this.fetchImpl(`${this.apiUrl}/api/auth/desktop/transfer/workspace-import`, {
+      method: "POST",
+      headers: { "X-TaskForce-Session": sessionToken, "Content-Type": "application/zip" },
+      body: bundle,
+      signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
+    });
+    if (!created.ok) throw await failure(created, "The web app didn't create the workspace", true);
+    const moved = createdWorkspace(await created.json());
+    return { ...moved, url: `${this.webUrl}/${moved.slug}` };
   }
 
   /** Message d'un déplacement qui échoue, dit pour la personne ; le message du serveur est gardé quand il y en a un. */

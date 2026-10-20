@@ -78,6 +78,13 @@ export interface DesktopMovedProject {
   url?: string;
 }
 
+/** Espace créé de l'autre côté, avec son Brain OS et ses projets ; `url` : son adresse dans la webapp. */
+export interface DesktopMovedWorkspace {
+  slug: string;
+  name: string;
+  url?: string;
+}
+
 /** Déplacement d'un projet : l'espace et le projet d'origine, l'espace qui le reçoit de l'autre côté. */
 export interface DesktopProjectMove {
   workspace: string;
@@ -162,6 +169,10 @@ export interface DesktopBridge {
     bring(move: DesktopProjectMove): Promise<DesktopResult<DesktopMovedProject>>;
     /** Copie un projet de cet ordinateur dans un espace de la webapp (`target`). */
     send(move: DesktopProjectMove): Promise<DesktopResult<DesktopMovedProject>>;
+    /** Copie un espace entier de la webapp (Brain OS et projets) sur cet ordinateur, comme un nouvel espace. */
+    bringWorkspace(input: { workspace: string }): Promise<DesktopResult<DesktopMovedWorkspace>>;
+    /** Copie un espace entier de cet ordinateur dans la webapp, comme un nouvel espace. */
+    sendWorkspace(input: { workspace: string }): Promise<DesktopResult<DesktopMovedWorkspace>>;
     /** Ouvre une adresse de la webapp dans le navigateur. */
     openWeb(url: string): Promise<void>;
   };

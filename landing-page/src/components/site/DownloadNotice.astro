@@ -2,8 +2,8 @@
 /**
  * Fenêtre ouverte par un clic sur un fichier de la release desktop, partout sur le site : le téléchargement part après
  * quelques secondes, et la fenêtre explique ce qui peut arriver ensuite. Windows : tant que l'installeur n'est pas
- * signé, l'avertissement de Windows ou du navigateur et la quarantaine d'un antivirus, avec le rapport VirusTotal du
- * fichier et comment le sortir de quarantaine. Linux : la commande d'installation. Sans release publiée : rien.
+ * signé, l'avertissement de Windows ou du navigateur, Smart App Control (aucune exception possible : le couper) et la
+ * quarantaine d'un antivirus, avec le rapport VirusTotal du fichier et comment le sortir de quarantaine. Linux : la commande d'installation. Sans release publiée : rien.
  */
 import { getDesktopRelease, SIGNED_BUILDS } from "@/lib/release";
 
@@ -51,6 +51,10 @@ const files = Object.values(release?.assets ?? {}).map((a) => ({
             </li>
             <li>
               <strong>“Windows protected your PC”:</strong> choose More info, then Run anyway.
+            </li>
+            <li>
+              <strong>Blocked by Smart App Control:</strong> it only runs signed apps, with no Run anyway. Open Windows
+              Security, then App &amp; browser control, then Smart App Control settings, and choose Off.
             </li>
             <li>
               <strong>Quarantined by Microsoft Defender:</strong> open Windows Security, then Virus &amp; threat
