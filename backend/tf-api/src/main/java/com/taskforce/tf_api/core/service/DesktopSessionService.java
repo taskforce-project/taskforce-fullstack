@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.taskforce.tf_api.core.dto.request.DesktopAuthorizeRequest;
 import com.taskforce.tf_api.core.dto.request.DesktopTokenRequest;
 import com.taskforce.tf_api.core.dto.response.DesktopAccountResponse;
+import com.taskforce.tf_api.core.dto.response.DesktopProfileResponse;
 import com.taskforce.tf_api.core.dto.response.DesktopSessionInfoResponse;
 import com.taskforce.tf_api.core.dto.response.DesktopSessionResponse;
 import com.taskforce.tf_api.core.model.DesktopSession;
@@ -80,6 +81,7 @@ public class DesktopSessionService {
     private final DesktopSessionRepository sessionRepository;
     private final UserRepository userRepository;
     private final KeycloakService keycloakService;
+    private final DesktopProfileReader profileReader;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
     private final Map<String, PendingCode> pendingCodes = new ConcurrentHashMap<>();
@@ -88,15 +90,16 @@ public class DesktopSessionService {
 
     @Autowired
     public DesktopSessionService(DesktopSessionRepository sessionRepository, UserRepository userRepository,
-                                 KeycloakService keycloakService) {
-        this(sessionRepository, userRepository, keycloakService, Clock.systemDefaultZone());
+                                 KeycloakService keycloakService, DesktopProfileReader profileReader) {
+        this(sessionRepository, userRepository, keycloakService, profileReader, Clock.systemDefaultZone());
     }
 
     DesktopSessionService(DesktopSessionRepository sessionRepository, UserRepository userRepository,
-                          KeycloakService keycloakService, Clock clock) {
+                          KeycloakService keycloakService, DesktopProfileReader profileReader, Clock clock) {
         this.sessionRepository = sessionRepository;
         this.userRepository = userRepository;
         this.keycloakService = keycloakService;
+        this.profileReader = profileReader;
         this.clock = clock;
     }
 
@@ -249,7 +252,17 @@ public class DesktopSessionService {
         } catch (RuntimeException e) {
             log.warn("Nom du compte {} illisible pour l'app desktop : {}", user.getId(), e.getMessage());
         }
-        return new DesktopAccountResponse(user.getKeycloakId(), user.getEmail(), given, family);
+        return new DesktopAccountResponse(user.getKeycloakId(), user.getEmail(), given, family, profile(user));
+    }
+
+    /** Réglages du compte repris par l'app ; illisibles, l'app se connecte quand même et fait son onboarding. */
+    private DesktopProfileResponse profile(User user) {
+        try {
+            return profileReader.read(user);
+        } catch (RuntimeException e) {
+            log.warn("Réglages du compte {} illisibles pour l'app desktop : {}", user.getId(), e.getMessage());
+            return null;
+        }
     }
 
     static String requireRedirectUri(String redirectUri) {

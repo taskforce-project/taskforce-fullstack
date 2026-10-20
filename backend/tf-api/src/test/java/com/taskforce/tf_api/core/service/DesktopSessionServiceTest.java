@@ -56,6 +56,7 @@ class DesktopSessionServiceTest {
     @Mock private DesktopSessionRepository sessionRepository;
     @Mock private UserRepository userRepository;
     @Mock private KeycloakService keycloakService;
+    @Mock private DesktopProfileReader profileReader;
 
     private MutableClock clock;
     private DesktopSessionService service;
@@ -77,7 +78,7 @@ class DesktopSessionServiceTest {
     @BeforeEach
     void setUp() {
         clock = new MutableClock();
-        service = new DesktopSessionService(sessionRepository, userRepository, keycloakService, clock);
+        service = new DesktopSessionService(sessionRepository, userRepository, keycloakService, profileReader, clock);
         ada = User.builder().id(7L).email("ada@example.com").keycloakId("kc-ada").isActive(true).build();
         lenient().when(userRepository.findById(7L)).thenReturn(Optional.of(ada));
         UserRepresentation kc = new UserRepresentation();
@@ -223,6 +224,29 @@ class DesktopSessionServiceTest {
         @DisplayName("un code inconnu ou mal formé est refusé")
         void unknown_codes_are_refused(String code) {
             assertThatThrownBy(() -> service.exchange(tokenRequest(code))).isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("le compte rendu porte ses réglages (récupération du compte)")
+        void the_account_carries_its_settings() {
+            com.taskforce.tf_api.core.dto.response.DesktopProfileResponse profile =
+                new com.taskforce.tf_api.core.dto.response.DesktopProfileResponse("Engineering lead", true, null, java.util.List.of());
+            when(profileReader.read(ada)).thenReturn(profile);
+
+            DesktopSessionResponse response = service.exchange(new DesktopTokenRequest(authorize(), VERIFIER, REDIRECT, "PC"));
+
+            assertThat(response.account().profile()).isEqualTo(profile);
+        }
+
+        @Test
+        @DisplayName("des réglages illisibles n'empêchent pas la connexion : l'app fera son onboarding")
+        void opens_without_settings() {
+            when(profileReader.read(ada)).thenThrow(new RuntimeException("db down"));
+
+            DesktopSessionResponse response = service.exchange(new DesktopTokenRequest(authorize(), VERIFIER, REDIRECT, "PC"));
+
+            assertThat(response.account().profile()).isNull();
+            assertThat(response.account().email()).isEqualTo("ada@example.com");
         }
 
         @Test
