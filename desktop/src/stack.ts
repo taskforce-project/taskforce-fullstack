@@ -7,6 +7,7 @@ import { backupBeforeMigration } from "./backup";
 import { downloadAccountAvatar } from "./avatar";
 import { Backend } from "./backend";
 import { Frontend } from "./frontend";
+import { GitHubRelay } from "./github-relay";
 import { log } from "./log";
 import { randomToken } from "./net";
 import { accountDataDir } from "./paths";
@@ -23,6 +24,8 @@ export interface Stack {
   origin: string;
   /** Relais vers le fournisseur d'IA choisi (réglages « AI » de l'app). */
   ai: AiRelay;
+  /** Jeton GitHub de la personne (son `gh`), rendu au backend seul (Copilot, pull requests liées). */
+  github: GitHubRelay;
   stop: () => Promise<void>;
 }
 
@@ -60,6 +63,7 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     settings: settings.aiSettings(account.subject),
     apiKey: settings.secret(account.subject, "aiApiKey"),
   }));
+  const github = new GitHubRelay();
 
   // Le runner d'abord : il rend au backend le résultat d'un run interrompu avant que celui-ci s'arrête. Chaque étape a un
   // délai : une étape bloquée ne doit jamais empêcher l'arrêt propre de la base.
@@ -69,6 +73,7 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     await within(frontend.stop(), 10_000);
     await within(backend.stop(), 15_000);
     await within(ai.stop(), 5_000);
+    await within(github.stop(), 5_000);
     await within(database.stop(), 45_000);
   };
 
@@ -92,6 +97,7 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     const origin = await proxy.reserve(settings.windowPort(account.subject));
     settings.setWindowPort(account.subject, proxy.port);
     await ai.start();
+    await github.start();
     await avatar;
     onStep("Starting TaskForce");
     await Promise.all([
@@ -104,6 +110,7 @@ export async function startStack(account: Account, onStep: (step: string) => voi
         launchToken,
         uiOrigin: origin,
         ai: { url: ai.url(), token: ai.token },
+        github: { url: github.url(), token: github.token },
         runnerSecret,
       }),
       frontend.start(join(dataDir, "logs")),
@@ -111,7 +118,7 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     await proxy.start(backend.port, frontend.port);
     runner.start({ apiPort: backend.port, secret: runnerSecret, dataDir });
     log.info(`TaskForce ready at ${origin}`);
-    return { account, dataDir, launchToken, origin, ai, stop };
+    return { account, dataDir, launchToken, origin, ai, github, stop };
   } catch (error) {
     await stop();
     throw error;

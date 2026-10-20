@@ -344,7 +344,12 @@ function registerIpc(): void {
   });
   ipcMain.handle("desktop:github-sign-in", () => settle(githubSignIn.start()));
   ipcMain.handle("desktop:github-sign-in-page", () => shell.openExternal(DEVICE_PAGE));
-  ipcMain.handle("desktop:github-sign-in-wait", () => githubSignIn.wait());
+  ipcMain.handle("desktop:github-sign-in-wait", async () => {
+    const outcome = await githubSignIn.wait();
+    // Connecté à GitHub : le backend relit le jeton tout de suite (Copilot, pull requests liées).
+    if (outcome.ok) stack?.github.invalidate();
+    return outcome;
+  });
   ipcMain.handle("desktop:github-sign-in-cancel", () => githubSignIn.cancel());
   // Claude Code de la personne branché sur le serveur MCP d'un espace (mode interactif), à l'adresse de la fenêtre.
   ipcMain.handle("desktop:claude-mcp-status", (_event, slug: unknown) => {
