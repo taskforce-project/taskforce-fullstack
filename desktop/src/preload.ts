@@ -46,6 +46,15 @@ contextBridge.exposeInMainWorld("taskforceDesktop", {
     waitForSignIn: (): Promise<unknown> => ipcRenderer.invoke("desktop:github-sign-in-wait"),
     cancelSignIn: (): Promise<void> => ipcRenderer.invoke("desktop:github-sign-in-cancel"),
   },
+  // Projets entre la webapp et cet ordinateur : la session de l'app reste dans la coque.
+  projects: {
+    web: (): Promise<unknown> => ipcRenderer.invoke("desktop:web-projects"),
+    bring: (input: { workspace: string; projectId: number; target: string }): Promise<unknown> =>
+      ipcRenderer.invoke("desktop:bring-project", input),
+    send: (input: { workspace: string; projectId: number; target: string }): Promise<unknown> =>
+      ipcRenderer.invoke("desktop:send-project", input),
+    openWeb: (url: string): Promise<void> => ipcRenderer.invoke("desktop:open-web", url),
+  },
   // Claude Code de la personne branché sur TaskForce (serveur MCP de l'espace) : le jeton va de la page à `claude`.
   claude: {
     mcpStatus: (slug: string): Promise<unknown> => ipcRenderer.invoke("desktop:claude-mcp-status", slug),

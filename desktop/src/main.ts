@@ -10,6 +10,7 @@ import { appLogDir } from "./paths";
 import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
 import { toolsStatus } from "./tools";
+import { readMove, Transfer, type LocalApi } from "./transfer";
 import { check, startUpdater } from "./updater";
 import {
   integratedTitleBar,
@@ -329,6 +330,22 @@ function registerIpc(): void {
     if (!isWorkspaceSlug(slug)) return { ok: false, error: "Unknown workspace" };
     return settle(disconnectMcp(slug));
   });
+  // Projets entre la webapp et cet ordinateur : la session de l'app reste dans la coque, la page ne voit que le résultat.
+  ipcMain.handle("desktop:web-projects", () => withSession((token) => transfer.webProjects(token)));
+  ipcMain.handle("desktop:bring-project", (_event, input: unknown) => {
+    const move = readMove(input);
+    if (!move) return { ok: false, error: "Unknown project or workspace" };
+    return withSession((token, local) =>
+      transfer.bring(token, { workspace: move.workspace, projectId: move.projectId }, move.target, local));
+  });
+  ipcMain.handle("desktop:send-project", (_event, input: unknown) => {
+    const move = readMove(input);
+    if (!move) return { ok: false, error: "Unknown project or workspace" };
+    return withSession((token, local) =>
+      transfer.send(token, { workspace: move.workspace, projectId: move.projectId }, move.target, local));
+  });
+  ipcMain.handle("desktop:open-web", (_event, url: unknown) =>
+    transfer.isWebAddress(url) ? shell.openExternal(url) : undefined);
   ipcMain.handle("desktop:sign-out", async () => {
     const account = stack?.account ?? settings.account();
     if (account) {
@@ -340,6 +357,23 @@ function registerIpc(): void {
     app.relaunch();
     app.quit();
   });
+}
+
+const transfer = new Transfer();
+
+/** Action qui joint la webapp avec la session de l'app, et l'API locale avec le jeton de lancement. */
+async function withSession<T>(
+  action: (token: string, local: LocalApi) => Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+  if (!stack) return { ok: false, error: "TaskForce is still starting" };
+  const token = settings.secret(stack.account.subject, "sessionToken");
+  if (!token) return { ok: false, error: "Sign out, then sign in again to reach the web app" };
+  const result = await settle(action(token, { origin: stack.origin, launchToken: stack.launchToken }));
+  if (!result.ok) {
+    log.warn(`Project move failed: ${result.error}`);
+    return { ok: false, error: Transfer.errorMessage(result.error) };
+  }
+  return result;
 }
 
 /** Réponse d'une action de la coque : la valeur, ou le message à montrer. */
