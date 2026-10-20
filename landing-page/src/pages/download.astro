@@ -209,7 +209,7 @@ const AI_TIERS = [
         <Fragment slot="title">Installed <span class="t-word">in a minute.</span></Fragment>
       </SectionHead>
       <div class:list={["mt-14 grid gap-4 sm:mt-16", hasMac ? "lg:grid-cols-3" : "md:grid-cols-2"]}>
-        <div class="card p-7" data-reveal>
+        <div class="card min-w-0 p-7" data-reveal>
           <p class="t-h4">Windows</p>
           <ol class="install-steps t-small mt-3">
             <li>
@@ -230,7 +230,7 @@ const AI_TIERS = [
             )}
           </ol>
         </div>
-        <div class="card p-7" data-reveal style="--d: 80ms">
+        <div class="card min-w-0 p-7" data-reveal style="--d: 80ms">
           <p class="t-h4">Linux</p>
           <p class="t-small mt-3 font-medium text-foreground">Debian, Ubuntu and derivatives</p>
           <ol class="install-steps t-small mt-2">
@@ -256,7 +256,7 @@ const AI_TIERS = [
           </ol>
         </div>
         {hasMac && (
-          <div class="card p-7" data-reveal style="--d: 160ms">
+          <div class="card min-w-0 p-7" data-reveal style="--d: 160ms">
             <p class="t-h4">macOS</p>
             <p class="t-small mt-3">
               {SIGNED_BUILDS.mac
@@ -339,6 +339,13 @@ const AI_TIERS = [
     gap: 0.6rem;
     padding-left: 1.15rem;
     list-style: decimal;
+  }
+  /* Une commande sur une ligne défile dans son cadre au lieu d'élargir la carte sur un téléphone. */
+  .install-steps > li {
+    min-width: 0;
+  }
+  .install-steps code:not(.install-cmd) {
+    overflow-wrap: anywhere;
   }
   .install-steps code,
   .install-steps + p code {
