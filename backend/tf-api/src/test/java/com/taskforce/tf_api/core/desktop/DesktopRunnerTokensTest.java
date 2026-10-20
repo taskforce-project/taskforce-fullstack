@@ -26,7 +26,7 @@ class DesktopRunnerTokensTest {
     private final LocalRunnerSettings settings =
         new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15);
     private final DesktopProperties properties = new DesktopProperties("tfd_" + "b".repeat(40), "C:/data",
-        new DesktopProperties.Account("kc-sub-1", "ada@example.com", "Ada", "Trial"));
+        new DesktopProperties.Account("kc-sub-1", "ada@example.com", "Ada", "Trial", null));
     private final DesktopRunnerTokens tokens = new DesktopRunnerTokens(properties, settings, SECRET);
 
     @Test

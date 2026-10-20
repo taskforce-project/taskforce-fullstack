@@ -21,7 +21,7 @@ class DesktopConfigTest {
 
     private static final String TOKEN = "tfd_" + "a".repeat(40);
     private static final DesktopProperties.Account ACCOUNT =
-        new DesktopProperties.Account("sub-1", "ada@example.com", "Ada", "Trial");
+        new DesktopProperties.Account("sub-1", "ada@example.com", "Ada", "Trial", null);
 
     @Test
     @DisplayName("des réglages complets laissent démarrer")
@@ -37,9 +37,9 @@ class DesktopConfigTest {
             Arguments.of("jeton trop court", new DesktopProperties("tfd_short", "C:/data", ACCOUNT)),
             Arguments.of("sans compte", new DesktopProperties(TOKEN, "C:/data", null)),
             Arguments.of("compte sans identifiant", new DesktopProperties(TOKEN, "C:/data",
-                new DesktopProperties.Account(" ", "ada@example.com", null, null))),
+                new DesktopProperties.Account(" ", "ada@example.com", null, null, null))),
             Arguments.of("compte sans adresse", new DesktopProperties(TOKEN, "C:/data",
-                new DesktopProperties.Account("sub-1", "", null, null))),
+                new DesktopProperties.Account("sub-1", "", null, null, null))),
             Arguments.of("sans dossier de données", new DesktopProperties(TOKEN, " ", ACCOUNT)));
     }
 
@@ -75,7 +75,7 @@ class DesktopConfigTest {
     @DisplayName("nom affiché : prénom et nom, sinon la partie locale de l'adresse")
     void display_name() {
         assertThat(ACCOUNT.displayName()).isEqualTo("Ada Trial");
-        assertThat(new DesktopProperties.Account("s", "ada.lovelace@example.com", null, " ").displayName())
+        assertThat(new DesktopProperties.Account("s", "ada.lovelace@example.com", null, " ", null).displayName())
             .isEqualTo("ada.lovelace");
     }
 }

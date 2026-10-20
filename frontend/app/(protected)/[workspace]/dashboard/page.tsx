@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useDashboardCardsStore } from "@/lib/store/dashboard-cards-store"
 import { useTourStore } from "@/lib/store/tour-store"
+import { onboardedOnline } from "@/lib/desktop"
 import { PageContainer } from "@/components/layout/page-shell"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -94,7 +95,8 @@ export default function DashboardPage() {
     const forceTour = new URLSearchParams(window.location.search).get("tour") === "1"
     // `hasSeen` (persisté) = terminé/opt-out définitif ; `dismissed` (session) = fermé sans cocher →
     // pas de re-déclenchement tant qu'on n'a pas rechargé l'app, mais la visite reviendra au prochain accès.
-    if ((tourHasSeen || tourDismissed) && !forceTour) return
+    // App desktop d'un compte déjà configuré en ligne : pas de visite d'accueil, la personne connaît TaskForce.
+    if ((tourHasSeen || tourDismissed || onboardedOnline()) && !forceTour) return
     const t = setTimeout(() => {
       startTour()
       if (forceTour) window.history.replaceState(null, "", `/${slug}/dashboard`)

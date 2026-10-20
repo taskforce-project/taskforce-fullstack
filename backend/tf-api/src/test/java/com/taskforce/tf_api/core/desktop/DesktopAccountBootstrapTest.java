@@ -1,36 +1,80 @@
 package com.taskforce.tf_api.core.desktop;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.taskforce.tf_api.core.dto.request.UpdateNotificationPreferencesRequest;
+import com.taskforce.tf_api.core.dto.request.UpsertMemberSkillsRequest;
+import com.taskforce.tf_api.core.dto.response.MemberSkillProfileResponse;
+import com.taskforce.tf_api.core.model.NotificationPreference;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.repository.NotificationPreferenceRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.MemberSkillProfileService;
+import com.taskforce.tf_api.core.service.NotificationPreferenceService;
 import com.taskforce.tf_api.core.service.WorkspaceService;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DesktopAccountBootstrap — utilisateur local du compte connecté")
 class DesktopAccountBootstrapTest {
 
-    private static final DesktopProperties PROPERTIES = new DesktopProperties("tfd_" + "a".repeat(40), "C:/data",
-        new DesktopProperties.Account("kc-sub-1", "ada@example.com", "Ada", "Trial"));
+    @TempDir private Path dataDir;
 
     @Mock private UserRepository userRepository;
     @Mock private WorkspaceService workspaceService;
+    @Mock private WorkspaceRepository workspaceRepository;
+    @Mock private MemberSkillProfileService skillProfiles;
+    @Mock private NotificationPreferenceService notificationPreferences;
+    @Mock private NotificationPreferenceRepository notificationPreferenceRepository;
+    @Mock private PlatformTransactionManager transactionManager;
 
     private DesktopAccountBootstrap bootstrap() {
-        return new DesktopAccountBootstrap(PROPERTIES, userRepository, workspaceService);
+        return bootstrap(null);
+    }
+
+    /** Lancement avec les réglages du compte en ligne, tels que la coque les passe (JSON de DesktopProfileResponse). */
+    private DesktopAccountBootstrap bootstrap(String profileJson) {
+        DesktopProperties properties = new DesktopProperties("tfd_" + "a".repeat(40), dataDir.toString(),
+            new DesktopProperties.Account("kc-sub-1", "ada@example.com", "Ada", "Trial", profileJson));
+        return new DesktopAccountBootstrap(properties, userRepository, workspaceService, workspaceRepository, skillProfiles,
+            notificationPreferences, notificationPreferenceRepository, new ObjectMapper(), transactionManager);
+    }
+
+    private static final String ONBOARDED_PROFILE = """
+        {"jobTitle":"Engineering lead","onboardingCompleted":true,
+         "skills":{"skills":["Java","React"],"seniority":"SENIOR","capacityHoursPerWeek":32,"growthEnabled":true,
+                   "growthTargetSkills":["Rust"],"profileText":"Backend first"},
+         "notifications":[{"eventKey":"assigned","inApp":true,"email":false}]}
+        """;
+
+    private void localWorkspace() {
+        when(workspaceRepository.findAllByMemberId(1L)).thenReturn(List.of(Workspace.builder().id(5L).slug("ada").build()));
+    }
+
+    private boolean settingsTaken() {
+        return Files.exists(dataDir.resolve(DesktopAccountBootstrap.SETTINGS_TAKEN_MARKER));
     }
 
     @Test
@@ -89,5 +133,110 @@ class DesktopAccountBootstrapTest {
         assertThat(user.getKeycloakId()).isEqualTo("kc-sub-1");
         assertThat(user.getDisplayName()).isEqualTo("Ada Trial");
         verify(userRepository).save(user);
+    }
+
+    @Test
+    @DisplayName("récupération du compte : rôle, compétences et notifications repris, onboarding sauté, une seule fois")
+    void first_launch_takes_the_account_settings() {
+        User[] created = new User[1];
+        when(userRepository.findByKeycloakId("kc-sub-1")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("ada@example.com")).thenReturn(Optional.empty());
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User user = invocation.getArgument(0);
+            if (user.getId() == null) user.setId(1L);
+            created[0] = user;
+            return user;
+        });
+        localWorkspace();
+
+        bootstrap(ONBOARDED_PROFILE).run(null);
+
+        assertThat(created[0].getJobTitle()).isEqualTo("Engineering lead");
+        assertThat(created[0].getOnboardingCompleted()).isTrue();
+        ArgumentCaptor<UpsertMemberSkillsRequest> skills = ArgumentCaptor.forClass(UpsertMemberSkillsRequest.class);
+        verify(skillProfiles).upsert(eq("ada"), eq(1L), skills.capture(), eq(1L));
+        assertThat(skills.getValue().getSkills()).containsExactly("Java", "React");
+        assertThat(skills.getValue().getSeniority()).isEqualTo("SENIOR");
+        ArgumentCaptor<UpdateNotificationPreferencesRequest> notifications = ArgumentCaptor.forClass(UpdateNotificationPreferencesRequest.class);
+        verify(notificationPreferences).updatePreferences(eq(1L), notifications.capture());
+        assertThat(notifications.getValue().getPreferences()).singleElement()
+            .satisfies(item -> assertThat(item.getEventKey()).isEqualTo("assigned"));
+        assertThat(settingsTaken()).isTrue();
+    }
+
+    @Test
+    @DisplayName("compte connecté par une version précédente, onboarding fait dans l'app : seuls les manques sont comblés")
+    void earlier_version_account_gets_what_it_lacks() {
+        User user = User.builder().id(1L).keycloakId("kc-sub-1").email("ada@example.com").displayName("Ada")
+            .onboardingCompleted(true).jobTitle("Local title").build();
+        when(userRepository.findByKeycloakId("kc-sub-1")).thenReturn(Optional.of(user));
+        localWorkspace();
+
+        bootstrap(ONBOARDED_PROFILE).run(null);
+
+        assertThat(user.getJobTitle()).isEqualTo("Local title");
+        verify(userRepository, never()).save(any());
+        verify(skillProfiles).upsert(eq("ada"), eq(1L), any(UpsertMemberSkillsRequest.class), eq(1L));
+        verify(notificationPreferences).updatePreferences(eq(1L), any(UpdateNotificationPreferencesRequest.class));
+        verify(workspaceService, never()).createWorkspace(any(), any());
+    }
+
+    @Test
+    @DisplayName("ce qui est réglé dans l'app reste : compétences et notifications déjà là")
+    void settings_made_in_the_app_stay() {
+        User user = User.builder().id(1L).keycloakId("kc-sub-1").email("ada@example.com").displayName("Ada")
+            .onboardingCompleted(true).jobTitle("Local title").build();
+        when(userRepository.findByKeycloakId("kc-sub-1")).thenReturn(Optional.of(user));
+        localWorkspace();
+        when(skillProfiles.latestForUser(1L)).thenReturn(Optional.of(MemberSkillProfileResponse.builder().build()));
+        when(notificationPreferenceRepository.findByUserId(1L)).thenReturn(List.of(NotificationPreference.builder().build()));
+
+        bootstrap(ONBOARDED_PROFILE).run(null);
+
+        verify(skillProfiles, never()).upsert(any(), any(), any(), any());
+        verify(notificationPreferences, never()).updatePreferences(any(), any());
+        assertThat(settingsTaken()).isTrue();
+    }
+
+    @Test
+    @DisplayName("une fois la reprise faite sur ce poste, plus rien n'est repris")
+    void settings_are_taken_once() throws Exception {
+        Files.writeString(dataDir.resolve(DesktopAccountBootstrap.SETTINGS_TAKEN_MARKER), "rôle");
+        User user = User.builder().id(1L).keycloakId("kc-sub-1").email("ada@example.com").displayName("Ada").build();
+        when(userRepository.findByKeycloakId("kc-sub-1")).thenReturn(Optional.of(user));
+
+        bootstrap(ONBOARDED_PROFILE).run(null);
+
+        assertThat(user.getOnboardingCompleted()).isFalse();
+        assertThat(user.getJobTitle()).isNull();
+        verify(skillProfiles, never()).upsert(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("rien à reprendre : onboarding pas fait en ligne, réglages illisibles ou absents")
+    void nothing_to_take() {
+        User fresh = User.builder().id(1L).keycloakId("kc-sub-1").email("ada@example.com").displayName("Ada").build();
+        when(userRepository.findByKeycloakId("kc-sub-1")).thenReturn(Optional.of(fresh));
+
+        bootstrap("{\"jobTitle\":\"Lead\",\"onboardingCompleted\":false}").run(null);
+        bootstrap("{not json").run(null);
+        bootstrap(null).run(null);
+
+        assertThat(fresh.getOnboardingCompleted()).isFalse();
+        assertThat(fresh.getJobTitle()).isNull();
+        verify(skillProfiles, never()).upsert(any(), any(), any(), any());
+        verify(notificationPreferences, never()).updatePreferences(any(), any());
+        assertThat(settingsTaken()).isFalse();
+    }
+
+    @Test
+    @DisplayName("une reprise qui échoue ne bloque pas le démarrage de l'app")
+    void a_failed_take_never_blocks_the_start() {
+        User user = User.builder().id(1L).keycloakId("kc-sub-1").email("ada@example.com").displayName("Ada").build();
+        when(userRepository.findByKeycloakId("kc-sub-1")).thenReturn(Optional.of(user));
+        when(workspaceRepository.findAllByMemberId(1L)).thenThrow(new IllegalStateException("database unavailable"));
+
+        assertThatCode(() -> bootstrap(ONBOARDED_PROFILE).run(null)).doesNotThrowAnyException();
+        assertThat(settingsTaken()).isFalse();
     }
 }

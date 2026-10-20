@@ -45,6 +45,7 @@ export class Backend {
       TF_DESKTOP_ACCOUNT_EMAIL: options.account.email,
       TF_DESKTOP_ACCOUNT_GIVEN_NAME: options.account.givenName,
       TF_DESKTOP_ACCOUNT_FAMILY_NAME: options.account.familyName,
+      TF_DESKTOP_ACCOUNT_PROFILE: options.account.profile ? JSON.stringify(options.account.profile) : "",
       TF_ENCRYPTION_KEY: options.encryptionKey,
       CORS_ALLOWED_ORIGINS: options.uiOrigin,
       AI_SERVICE_URL: options.ai.url,

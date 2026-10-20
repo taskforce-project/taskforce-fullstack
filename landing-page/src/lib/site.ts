@@ -141,6 +141,7 @@ export const FOOTER_GROUPS: { title: string; links: (NavLink & { external?: bool
       { label: "Legal notice", href: "/legal/notice" },
       { label: "Privacy policy", href: "/legal/privacy" },
       { label: "Terms of use", href: "/legal/terms" },
+      { label: "Code signing policy", href: "/code-signing-policy" },
     ],
   },
 ];
