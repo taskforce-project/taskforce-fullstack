@@ -19,8 +19,24 @@ export function startUpdater(): void {
   started = true;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  // Téléchargement complet, directement : la mise à jour différentielle échouait toujours avant d'y revenir, car
+  // `desktop-latest` ne garde que les fichiers de la dernière version (plus la carte de blocs de la précédente) et
+  // GitHub refuse les requêtes à plusieurs plages. L'installeur n'est pas un installeur web.
+  autoUpdater.disableDifferentialDownload = true;
+  autoUpdater.disableWebInstaller = true;
   // Les erreurs passent par l'événement « error », une seule ligne par échec.
   autoUpdater.logger = { info: log.info, warn: log.warn, error: () => undefined, debug: () => undefined };
+
+  // Avancement noté par quart : un téléchargement de près de 300 Mo prend quelques minutes, le journal dit où il en est.
+  let quarter = 0;
+  autoUpdater.on("update-available", () => (quarter = 0));
+  autoUpdater.on("download-progress", (progress) => {
+    const reached = Math.floor(progress.percent / 25);
+    if (reached > quarter && reached < 4) {
+      quarter = reached;
+      log.info(`Downloading the update: ${reached * 25}%`);
+    }
+  });
 
   autoUpdater.on("update-downloaded", async (info) => {
     log.info(`Update ${info.version} downloaded`);
