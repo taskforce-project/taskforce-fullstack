@@ -14,6 +14,7 @@ vi.mock('../api/workspace-service', () => ({
   updateMemberRole: vi.fn(),
   removeMember: vi.fn(),
   deleteWorkspace: vi.fn(),
+  importWorkspaceBundle: vi.fn(),
 }));
 
 function makeWorkspace(overrides: Partial<Workspace> = {}): Workspace {
@@ -129,6 +130,35 @@ describe('workspace-store', () => {
 
     expect(result).toBeNull();
     expect(useWorkspaceStore.getState().isLoading).toBe(false);
+  });
+
+  it('importWorkspace appends the imported workspace', async () => {
+    act(() => useWorkspaceStore.setState({ workspaces: [makeWorkspace({ id: 1 })], importError: 'old' }));
+    const imported = makeWorkspace({ id: 3, slug: 'acme-copy' });
+    vi.mocked(svc.importWorkspaceBundle).mockResolvedValue(imported);
+    const file = new Blob(['PK']);
+
+    let result: Workspace | null = null;
+    await act(async () => {
+      result = await useWorkspaceStore.getState().importWorkspace(file);
+    });
+
+    expect(result).toEqual(imported);
+    expect(svc.importWorkspaceBundle).toHaveBeenCalledWith(file, undefined);
+    expect(useWorkspaceStore.getState().workspaces.map((w) => w.id)).toEqual([1, 3]);
+    expect(useWorkspaceStore.getState().importError).toBeNull();
+  });
+
+  it("importWorkspace returns null and keeps the server's message on failure", async () => {
+    vi.mocked(svc.importWorkspaceBundle).mockRejectedValue(new Error("This file isn't a TaskForce workspace file."));
+
+    let result: Workspace | null = makeWorkspace();
+    await act(async () => {
+      result = await useWorkspaceStore.getState().importWorkspace(new Blob(['x']));
+    });
+
+    expect(result).toBeNull();
+    expect(useWorkspaceStore.getState().importError).toBe("This file isn't a TaskForce workspace file.");
   });
 
   it('createWorkspace appends the created workspace', async () => {
