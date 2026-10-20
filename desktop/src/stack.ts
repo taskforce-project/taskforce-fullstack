@@ -1,9 +1,13 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
+import { app } from "electron";
 
 import { AiRelay } from "./ai";
+import { backupBeforeMigration } from "./backup";
+import { downloadAccountAvatar } from "./avatar";
 import { Backend } from "./backend";
 import { Frontend } from "./frontend";
+import { GitHubRelay } from "./github-relay";
 import { log } from "./log";
 import { randomToken } from "./net";
 import { accountDataDir } from "./paths";
@@ -20,6 +24,8 @@ export interface Stack {
   origin: string;
   /** Relais vers le fournisseur d'IA choisi (réglages « AI » de l'app). */
   ai: AiRelay;
+  /** Jeton GitHub de la personne (son `gh`), rendu au backend seul (Copilot, pull requests liées). */
+  github: GitHubRelay;
   stop: () => Promise<void>;
 }
 
@@ -57,6 +63,7 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     settings: settings.aiSettings(account.subject),
     apiKey: settings.secret(account.subject, "aiApiKey"),
   }));
+  const github = new GitHubRelay();
 
   // Le runner d'abord : il rend au backend le résultat d'un run interrompu avant que celui-ci s'arrête. Chaque étape a un
   // délai : une étape bloquée ne doit jamais empêcher l'arrêt propre de la base.
@@ -66,18 +73,32 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     await within(frontend.stop(), 10_000);
     await within(backend.stop(), 15_000);
     await within(ai.stop(), 5_000);
+    await within(github.stop(), 5_000);
     await within(database.stop(), 45_000);
   };
 
+  // La photo du compte en ligne se télécharge pendant que la base démarre ; le backend la reprend à son démarrage.
+  const avatar = downloadAccountAvatar(account.avatarUrl, dataDir);
+
   try {
-    if (!database.initialized) onStep("Preparing your workspace for the first time");
+    const fresh = !database.initialized;
+    if (fresh) onStep("Preparing your workspace for the first time");
     await database.init();
     onStep("Starting the database");
     await database.start();
+    // Une nouvelle version de l'app peut faire évoluer la base au démarrage du backend : la coque la copie d'abord.
+    await backupBeforeMigration({
+      dump: (file) => {
+        onStep("Saving a copy of your data before the update");
+        return database.dump(file);
+      },
+    }, dataDir, app.getVersion(), fresh);
 
     const origin = await proxy.reserve(settings.windowPort(account.subject));
     settings.setWindowPort(account.subject, proxy.port);
     await ai.start();
+    await github.start();
+    await avatar;
     onStep("Starting TaskForce");
     await Promise.all([
       backend.start({
@@ -89,6 +110,7 @@ export async function startStack(account: Account, onStep: (step: string) => voi
         launchToken,
         uiOrigin: origin,
         ai: { url: ai.url(), token: ai.token },
+        github: { url: github.url(), token: github.token },
         runnerSecret,
       }),
       frontend.start(join(dataDir, "logs")),
@@ -96,7 +118,7 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     await proxy.start(backend.port, frontend.port);
     runner.start({ apiPort: backend.port, secret: runnerSecret, dataDir });
     log.info(`TaskForce ready at ${origin}`);
-    return { account, dataDir, launchToken, origin, ai, stop };
+    return { account, dataDir, launchToken, origin, ai, github, stop };
   } catch (error) {
     await stop();
     throw error;

@@ -24,6 +24,7 @@ import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.MemberSkillProfileService;
 import com.taskforce.tf_api.core.service.NotificationPreferenceService;
+import com.taskforce.tf_api.core.service.UserService;
 import com.taskforce.tf_api.core.service.WorkspaceService;
 
 import lombok.RequiredArgsConstructor;
@@ -38,7 +39,7 @@ import lombok.extern.slf4j.Slf4j;
  * onboarding fait, profil de compétences, préférences de notification) comblent ce que l'app n'a pas encore : un
  * compte qui a fait l'onboarding en ligne ne le refait pas. Ce qui a été réglé dans l'app n'est jamais écrasé, et les
  * espaces de travail et leurs données ne sont jamais repris : le profil de compétences va dans le premier workspace
- * local.</p>
+ * local. La photo de profil du compte en ligne, que la coque télécharge, est reprise de la même façon.</p>
  */
 @Slf4j
 @Component
@@ -49,8 +50,18 @@ public class DesktopAccountBootstrap implements ApplicationRunner {
     /** Note, dans le dossier du compte, que la reprise des réglages a eu lieu sur ce poste. */
     static final String SETTINGS_TAKEN_MARKER = "account-settings-taken";
 
+    /** Photo du compte en ligne, déposée dans le dossier du compte par la coque (desktop/src/avatar.ts). */
+    static final String AVATAR_FILE = "account-avatar";
+
+    /** Note que la photo du compte en ligne a été reprise sur ce poste, ou que l'app en avait déjà une. */
+    static final String AVATAR_TAKEN_MARKER = "account-avatar-taken";
+
+    /** Plus grande photo reprise ; la coque n'en dépose pas de plus grande. */
+    static final long MAX_AVATAR_BYTES = 5L * 1024 * 1024;
+
     private final DesktopProperties properties;
     private final UserRepository userRepository;
+    private final UserService userService;
     private final WorkspaceService workspaceService;
     private final WorkspaceRepository workspaceRepository;
     private final MemberSkillProfileService skillProfiles;
@@ -70,6 +81,45 @@ public class DesktopAccountBootstrap implements ApplicationRunner {
             transaction.executeWithoutResult(status -> takeAccountSettings(user, account.profile()));
         } catch (RuntimeException e) {
             log.warn("Réglages du compte en ligne non repris : {}", e.getMessage());
+        }
+        takeAccountAvatar(user);
+    }
+
+    /**
+     * Reprend une fois par poste la photo du compte en ligne, que la coque a téléchargée dans le dossier du compte, si
+     * l'utilisateur local n'en a pas : une photo choisie dans l'app l'emporte toujours. Le fichier déposé est effacé
+     * dans tous les cas ; un échec laisse l'avatar généré de l'app, sans bloquer le démarrage.
+     */
+    private void takeAccountAvatar(User user) {
+        Path file = Path.of(properties.dataDir(), AVATAR_FILE);
+        if (!Files.exists(file)) {
+            return;
+        }
+        Path marker = Path.of(properties.dataDir(), AVATAR_TAKEN_MARKER);
+        try {
+            if (Files.exists(marker)) {
+                return;
+            }
+            String outcome = "photo de l'app gardée";
+            if (isBlank(user.getAvatarUrl())) {
+                long size = Files.size(file);
+                if (size == 0 || size > MAX_AVATAR_BYTES) {
+                    outcome = "photo vide ou trop grande";
+                } else {
+                    userService.storeAvatar(user, Files.readAllBytes(file), "image/jpeg");
+                    outcome = "photo reprise";
+                }
+            }
+            Files.writeString(marker, outcome);
+            log.info("Photo du compte en ligne pour l'utilisateur local {} : {}", user.getId(), outcome);
+        } catch (IOException | RuntimeException e) {
+            log.warn("Photo du compte en ligne non reprise : {}", e.getMessage());
+        } finally {
+            try {
+                Files.deleteIfExists(file);
+            } catch (IOException e) {
+                log.warn("Photo du compte en ligne non effacée du dossier du compte : {}", e.getMessage());
+            }
         }
     }
 

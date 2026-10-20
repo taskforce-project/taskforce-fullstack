@@ -127,6 +127,9 @@ const HIDE = new Set([
   // Keycloak, sans intérêt pour un consommateur de l'API. La spec vient du backend DEV, où ils existent.
   "delivery-runner-controller",
   "runner-auth-controller",
+  // Déplacement de projets par l'app desktop, avec sa seule session : le chemin de l'app, pas une API publique. Le
+  // fichier de projet, lui, reste documenté (ProjectBundleController).
+  "desktop-transfer-controller",
 ]);
 let removedInternal = 0;
 for (const [p, item] of Object.entries(spec.paths ?? {})) {

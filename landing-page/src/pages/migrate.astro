@@ -1,7 +1,7 @@
 ---
 /**
- * Migrate : passer de la webapp hébergée à l'app desktop. Les libellés de l'export sont ceux de la webapp
- * (barre d'outils du projet, Réglages > Privacy & Data) ; le contenu de l'export suit `ProjectExportService`.
+ * Migrate : passer de la webapp hébergée à l'app desktop. Les libellés sont ceux de l'app (Projects > From the web
+ * app, menu Export du projet, New project > From a file) ; ce qui voyage suit le fichier de projet (`ProjectBundle`).
  * À tenir à jour : date de fermeture (WEB_APP_CLOSES) et la liste MISSING si un export Brain OS arrive. Les étapes
  * forment une suite : elles sont numérotées, en frise.
  */
@@ -20,7 +20,7 @@ const WEB_APP_CLOSES: string | null = null;
 const WEB_APP_HOST = "app.taskforce-project.fr";
 
 const STEPS = [
-  { n: "01", t: "Install the desktop app", d: "Download TaskForce for macOS, Windows or Linux.", dot: "bg-tint-blue text-ink-blue" },
+  { n: "01", t: "Install the desktop app", d: "Download TaskForce for Windows or Linux (macOS soon).", dot: "bg-tint-blue text-ink-blue" },
   {
     n: "02",
     t: "Sign in with your account",
@@ -30,28 +30,30 @@ const STEPS = [
   {
     n: "03",
     t: "Bring your projects",
-    d: "TaskForce sees your web app projects and asks whether to bring them to this computer. Say yes, and they arrive with their comments and history.",
+    d: "TaskForce shows the projects you have on the web app. Pick the ones to copy to this computer: they arrive with their issues, comments, history, pages and attachments.",
     dot: "bg-tint-pink text-ink-pink",
   },
   {
     n: "04",
     t: "Save what doesn't move",
-    d: "Before the web app closes, copy the Brain OS pages and download the attachments you want to keep. The list is below.",
+    d: "Before the web app closes, copy the Brain OS pages you want to keep, and connect your tools again. The list is below.",
     dot: "bg-tint-yellow text-ink-yellow",
   },
 ];
 
 const INCLUDED = [
-  "Every issue, with its title, description, status, priority and labels",
-  "Dates, story points and subtasks",
-  "Comments, and each issue's history",
+  "Every issue and sub-issue, with its description, status, priority, labels, dates and story points",
+  "Comments, checklists, time entries and each issue's history",
+  "Cycles, project pages and attachments",
 ];
 
 const MISSING = [
   { t: "Brain OS pages", d: "Copy the pages you want to keep before the web app closes." },
-  { t: "Attachments", d: "Download the files attached to your issues." },
-  { t: "Cycles, checklists and time entries", d: "Note what you still need, then recreate it in the app." },
   { t: "Connections and AI settings", d: "Connect GitHub and your tools again, and choose your AI on first launch." },
+  {
+    t: "Your teammates",
+    d: "The desktop app is for one person. Issues and comments keep the names of the people who wrote them.",
+  },
 ];
 
 const FAQ: FaqItem[] = [
@@ -69,7 +71,15 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "Can my team keep working together?",
-    a: "The desktop app is made for one person, with no sync between computers. Each teammate can install it and import the projects they work on.",
+    a: "The desktop app is made for one person, with no sync between computers. Each teammate can install it and copy the projects they work on.",
+  },
+  {
+    q: "Can I send a project back to the web app?",
+    a: "Yes, while the web app is open. In the desktop app, open the project, then Export, then Copy to the web app, and pick a workspace. The project also stays on your computer.",
+  },
+  {
+    q: "Can I keep a copy of a project?",
+    a: "Yes. A project's Export menu offers a TaskForce project file: the whole project in one .zip file. To open it again, in the web app or the desktop app, click New project, then From a file.",
   },
   {
     q: "Can I keep a copy of my account data?",
@@ -84,7 +94,7 @@ const FAQ: FaqItem[] = [
 
 <BaseLayout
   title="Moving from the TaskForce web app to the desktop app | TaskForce"
-  description="The TaskForce web app is closing. Export your projects, install the desktop app and import them: here is how, and what to save by hand."
+  description="The TaskForce web app is closing. Install the desktop app, sign in and copy your projects to your computer: here is how, and what to save by hand."
 >
   <PageHero
     bg="migrate"

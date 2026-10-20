@@ -1,15 +1,19 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, shell } from "electron";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { ACCOUNT_SERVER, accountPageUrl, refresh, revoke, SessionEndedError, signIn, signInError } from "./account";
 import { parseAiInput } from "./ai";
+import { BACKUPS } from "./backup";
 import { connectMcp, disconnectMcp, isPersonalToken, isWorkspaceSlug, mcpConnection } from "./claude";
 import { createRepo, DEVICE_PAGE, findRepo, GitHubSignIn, isNewRepoName, isRepoFullName, listRepos } from "./github";
 import { initLog, log } from "./log";
+import { APP_ID, readNotice } from "./notify";
 import { appLogDir } from "./paths";
 import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
 import { toolsStatus } from "./tools";
+import { readMove, Transfer, type LocalApi } from "./transfer";
 import { check, startUpdater } from "./updater";
 import {
   integratedTitleBar,
@@ -50,6 +54,7 @@ if (!app.requestSingleInstanceLock()) {
 async function main(): Promise<void> {
   initLog(appLogDir());
   log.info(`TaskForce ${app.getVersion()} starting (${process.platform}, Electron ${process.versions.electron})`);
+  if (process.platform === "win32") app.setAppUserModelId(APP_ID);
   Menu.setApplicationMenu(buildMenu());
   registerIpc();
 
@@ -60,9 +65,9 @@ async function main(): Promise<void> {
   let refreshed: Promise<"valid" | "ended" | "offline"> = Promise.resolve("valid");
   if (!account) {
     ({ account, window: signInWin } = await signInWindow());
-  } else if (!account.profile) {
-    // Compte connecté par une version qui ne gardait pas les réglages du compte en ligne : on les relit avant de
-    // démarrer, pour que l'app les reprenne dès ce lancement (hors ligne, elle démarre sans).
+  } else if (!account.profile || account.avatarUrl === undefined) {
+    // Compte connecté par une version qui ne gardait pas les réglages ou la photo du compte en ligne : on les relit
+    // avant de démarrer, pour que l'app les reprenne dès ce lancement (hors ligne, elle démarre sans).
     const state = await refreshAccount(account);
     if (state === "ended") {
       await sessionEnded();
@@ -276,6 +281,25 @@ function registerIpc(): void {
     };
   });
   ipcMain.handle("desktop:account-page", () => shell.openExternal(accountPageUrl()));
+  // Événement reçu pendant que la fenêtre n'est pas au premier plan : notification du système (cf. notify.ts).
+  ipcMain.on("desktop:notify", (event, input: unknown) => {
+    const notice = readNotice(input);
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!notice || !window || window.isFocused() || !Notification.isSupported()) return;
+    const shown = new Notification({ title: notice.title, body: notice.body });
+    // Gardée jusqu'à sa fermeture : une notification ramassée par le ramasse-miettes ne répond plus au clic.
+    notices.add(shown);
+    shown.on("close", () => notices.delete(shown));
+    shown.on("click", () => {
+      notices.delete(shown);
+      if (window.isDestroyed()) return;
+      if (window.isMinimized()) window.restore();
+      window.show();
+      window.focus();
+      if (notice.path) window.webContents.send("desktop:navigate", notice.path);
+    });
+    shown.show();
+  });
   // Réglages d'IA du compte : fournisseur et modèles dans les réglages, clé dans le trousseau, jamais renvoyée à la page.
   ipcMain.handle("desktop:ai-get", () => aiView());
   ipcMain.handle("desktop:ai-save", async (_event, input: unknown) => {
@@ -292,6 +316,13 @@ function registerIpc(): void {
   });
   ipcMain.handle("desktop:check-updates", () => check());
   ipcMain.handle("desktop:open-logs", () => shell.openPath(appLogDir()));
+  // Copies de la base faites avant chaque mise à jour (cf. backup.ts).
+  ipcMain.handle("desktop:open-backups", () => {
+    if (!stack) return undefined;
+    const dir = join(stack.dataDir, BACKUPS);
+    mkdirSync(dir, { recursive: true });
+    return shell.openPath(dir);
+  });
   // Boutons du système aux couleurs du thème de l'interface (clair ou sombre), à la hauteur de la barre qu'elle dessine.
   ipcMain.on("desktop:title-bar-theme", (event, input: unknown) => {
     const { dark, height } = (input ?? {}) as { dark?: unknown; height?: unknown };
@@ -313,7 +344,12 @@ function registerIpc(): void {
   });
   ipcMain.handle("desktop:github-sign-in", () => settle(githubSignIn.start()));
   ipcMain.handle("desktop:github-sign-in-page", () => shell.openExternal(DEVICE_PAGE));
-  ipcMain.handle("desktop:github-sign-in-wait", () => githubSignIn.wait());
+  ipcMain.handle("desktop:github-sign-in-wait", async () => {
+    const outcome = await githubSignIn.wait();
+    // Connecté à GitHub : le backend relit le jeton tout de suite (Copilot, pull requests liées).
+    if (outcome.ok) stack?.github.invalidate();
+    return outcome;
+  });
   ipcMain.handle("desktop:github-sign-in-cancel", () => githubSignIn.cancel());
   // Claude Code de la personne branché sur le serveur MCP d'un espace (mode interactif), à l'adresse de la fenêtre.
   ipcMain.handle("desktop:claude-mcp-status", (_event, slug: unknown) => {
@@ -329,6 +365,22 @@ function registerIpc(): void {
     if (!isWorkspaceSlug(slug)) return { ok: false, error: "Unknown workspace" };
     return settle(disconnectMcp(slug));
   });
+  // Projets entre la webapp et cet ordinateur : la session de l'app reste dans la coque, la page ne voit que le résultat.
+  ipcMain.handle("desktop:web-projects", () => withSession((token) => transfer.webProjects(token)));
+  ipcMain.handle("desktop:bring-project", (_event, input: unknown) => {
+    const move = readMove(input);
+    if (!move) return { ok: false, error: "Unknown project or workspace" };
+    return withSession((token, local) =>
+      transfer.bring(token, { workspace: move.workspace, projectId: move.projectId }, move.target, local));
+  });
+  ipcMain.handle("desktop:send-project", (_event, input: unknown) => {
+    const move = readMove(input);
+    if (!move) return { ok: false, error: "Unknown project or workspace" };
+    return withSession((token, local) =>
+      transfer.send(token, { workspace: move.workspace, projectId: move.projectId }, move.target, local));
+  });
+  ipcMain.handle("desktop:open-web", (_event, url: unknown) =>
+    transfer.isWebAddress(url) ? shell.openExternal(url) : undefined);
   ipcMain.handle("desktop:sign-out", async () => {
     const account = stack?.account ?? settings.account();
     if (account) {
@@ -340,6 +392,26 @@ function registerIpc(): void {
     app.relaunch();
     app.quit();
   });
+}
+
+const transfer = new Transfer();
+
+/** Notifications du système encore affichées. */
+const notices = new Set<Notification>();
+
+/** Action qui joint la webapp avec la session de l'app, et l'API locale avec le jeton de lancement. */
+async function withSession<T>(
+  action: (token: string, local: LocalApi) => Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+  if (!stack) return { ok: false, error: "TaskForce is still starting" };
+  const token = settings.secret(stack.account.subject, "sessionToken");
+  if (!token) return { ok: false, error: "Sign out, then sign in again to reach the web app" };
+  const result = await settle(action(token, { origin: stack.origin, launchToken: stack.launchToken }));
+  if (!result.ok) {
+    log.warn(`Project move failed: ${result.error}`);
+    return { ok: false, error: Transfer.errorMessage(result.error) };
+  }
+  return result;
 }
 
 /** Réponse d'une action de la coque : la valeur, ou le message à montrer. */

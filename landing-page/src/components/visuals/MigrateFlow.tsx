@@ -172,7 +172,7 @@ export default function MigrateFlow({ host }: Readonly<{ host?: string }>) {
                         </motion.div>
                       ))}
                     </div>
-                    <p className="mt-3 text-[10.5px] text-muted-foreground">With their comments and their history</p>
+                    <p className="mt-3 text-[10.5px] text-muted-foreground">With their history and attachments</p>
                   </motion.div>
                 ) : asking ? (
                   <motion.div
@@ -185,17 +185,17 @@ export default function MigrateFlow({ host }: Readonly<{ host?: string }>) {
                   >
                     <p className="text-[13px] font-medium">Welcome back</p>
                     <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
-                      You already have 3 projects on the web app. Bring them to this computer?
+                      You have 3 projects in the web app. Copy them to this computer?
                     </p>
                     <div className="mt-3 flex items-center gap-2">
                       <motion.span
-                        className={cn("inline-flex h-[30px] w-[96px] items-center justify-center rounded-md text-[11px] font-medium text-white", bringing ? "bg-primary-hover" : "bg-primary")}
+                        className={cn("inline-flex h-[30px] w-[112px] items-center justify-center rounded-md text-[11px] font-medium text-white", bringing ? "bg-primary-hover" : "bg-primary")}
                         animate={{ scale: bringing ? 0.96 : 1 }}
                         transition={{ duration: 0.15 }}
                       >
-                        Bring them
+                        Choose projects
                       </motion.span>
-                      <span className="inline-flex h-[30px] items-center rounded-md px-3 text-[11px] shadow-[inset_0_0_0_1px_var(--input)]">Not now</span>
+                      <span className="inline-flex h-[30px] items-center rounded-md px-3 text-[11px] shadow-[inset_0_0_0_1px_var(--input)]">New project</span>
                     </div>
                     <div className="mt-3 h-[3px] overflow-hidden rounded-full bg-muted">
                       <motion.span

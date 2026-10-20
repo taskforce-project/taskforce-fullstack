@@ -3,7 +3,7 @@
 <div align="center">
 
 <!-- BADGES:START -->
-![Version](https://img.shields.io/badge/Version-1.1.4-blue.svg)
+![Version](https://img.shields.io/badge/Version-1.1.5-blue.svg)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)
 ![Java](https://img.shields.io/badge/Java-21-orange.svg)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.6-brightgreen.svg)

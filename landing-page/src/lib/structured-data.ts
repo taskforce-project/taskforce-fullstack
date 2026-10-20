@@ -56,7 +56,7 @@ export function softwareApplicationLd(origin: string, version?: string): JsonLd 
     "@id": `${origin}/${SOFTWARE_HASH}`,
     name: "TaskForce",
     applicationCategory: "DeveloperApplication",
-    operatingSystem: "macOS, Windows, Linux",
+    operatingSystem: "Windows, Linux",
     url: `${origin}/`,
     downloadUrl: `${origin}/download`,
     description: PRODUCT_SUMMARY,

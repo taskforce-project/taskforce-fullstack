@@ -17,6 +17,7 @@ import {
   unfavoriteProject as unfavoriteProjectApi,
   setProjectRepo as setProjectRepoApi,
   unsetProjectRepo as unsetProjectRepoApi,
+  importProjectBundle as importProjectBundleApi,
 } from "../api/project-service";
 
 // ---------------------------------------------------------------------------
@@ -36,6 +37,12 @@ interface ProjectState {
 
   /** Crée un projet et l'ajoute au store */
   createProject: (slug: string, payload: CreateProjectPayload) => Promise<Project | null>;
+
+  /**
+   * Crée un projet depuis un fichier de projet TaskForce et l'ajoute au store. `null` si l'import échoue : le message
+   * du serveur (fichier refusé, trop gros) est dans `error`.
+   */
+  importProject: (slug: string, file: Blob, onProgress?: (pct: number) => void) => Promise<Project | null>;
 
   /** Met à jour un projet dans le store */
   updateProject: (slug: string, id: number, payload: UpdateProjectPayload) => Promise<Project | null>;
@@ -97,6 +104,17 @@ export const useProjectStore = create<ProjectState>((set) => ({
     } catch (err) {
       const message = err instanceof Error ? err.message : "Couldn't create the project";
       set({ error: message });
+      return null;
+    }
+  },
+
+  importProject: async (slug, file, onProgress) => {
+    try {
+      const project = await importProjectBundleApi(slug, file, onProgress);
+      set((state) => ({ projects: [project, ...state.projects], error: null }));
+      return project;
+    } catch (err) {
+      set({ error: getErrorMessage(err) });
       return null;
     }
   },

@@ -27,7 +27,7 @@ const FAMILIES: { os: OsFamily; brand: "macos" | "windows" | "linux"; name: stri
 ];
 
 const NEEDS: RuleItem[] = [
-  { icon: Cpu, tint: "bg-tint-blue text-ink-blue", title: "A 64-bit computer", text: "macOS on Apple silicon or Intel, Windows 10 or 11, or Linux." },
+  { icon: Cpu, tint: "bg-tint-blue text-ink-blue", title: "A 64-bit computer", text: "Windows 10 or 11, or Linux. macOS is coming soon." },
   { icon: MemoryStick, tint: "bg-tint-green text-ink-green", title: "8 GB of memory", text: "Enough for TaskForce itself. A local AI model needs more, see below." },
   { icon: UserRound, tint: "bg-tint-yellow text-ink-yellow", title: "A free TaskForce account", text: "Created when you first open the app, or the one you already use on the web app." },
   { icon: Bot, tint: "bg-tint-pink text-ink-pink", title: "An agent, if you delegate", text: "Claude Code installed and signed in with your own account, or GitHub Copilot's coding agent." },
@@ -42,15 +42,15 @@ const AI_TIERS = [
 ---
 
 <BaseLayout
-  title="Download TaskForce for macOS, Windows and Linux"
-  description="Download TaskForce, the free and open source desktop app for planning your work and handing tasks to AI agents. For macOS, Windows and Linux."
+  title="Download TaskForce for Windows and Linux"
+  description="Download TaskForce, the free and open source desktop app for planning your work and handing tasks to AI agents. For Windows and Linux, macOS soon."
   software
   softwareVersion={release?.version}
 >
   <PageHero
     bg="download"
     label="Download"
-    lead="Free and open source, for macOS, Windows and Linux. Install it, sign in or create your free account, and start with your first project."
+    lead="Free and open source, for Windows and Linux, with macOS coming soon. Install it, sign in or create your free account, and start with your first project."
   >
     <Fragment slot="title">Download <span class="t-word">TaskForce.</span></Fragment>
     {
@@ -88,7 +88,7 @@ const AI_TIERS = [
             return (
               <article class="card-white flex flex-col overflow-hidden" data-reveal style={`--d: ${i * 90}ms`}>
                 <div class={`wash ${f.wash} relative flex h-40 items-center justify-center rounded-none`}>
-                  <span class="absolute top-5 left-5"><Pill tone="glass">{f.files}</Pill></span>
+                  <span class="absolute top-5 left-5"><Pill tone="glass">{f.os === "mac" && !hasMac ? "Coming soon" : f.files}</Pill></span>
                   <BrandMark brand={f.brand} className="anim-float h-14 w-auto" />
                 </div>
                 <div class="flex flex-1 flex-col p-7">
@@ -101,7 +101,7 @@ const AI_TIERS = [
                           <div class="min-w-0 flex-1">
                             <p class="text-[15px] font-medium">{p.detail}</p>
                             <p class="mt-0.5 truncate text-[12.5px] text-subtle">
-                              {asset ? `${asset.name} · ${formatSize(asset.size)}` : "Not published yet"}
+                              {asset ? `${asset.name} · ${formatSize(asset.size)}` : f.os === "mac" ? "Coming soon" : "Not published yet"}
                             </p>
                             {(asset?.virustotal || asset?.sha256) && (
                               <p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] text-subtle">
@@ -123,7 +123,7 @@ const AI_TIERS = [
                               <Download aria-hidden="true" />
                             </a>
                           ) : (
-                            <span class="btn btn-secondary btn-sm" aria-disabled="true" aria-label={`Not published yet for ${f.name}, ${p.detail}`}>
+                            <span class="btn btn-secondary btn-sm" aria-disabled="true" aria-label={`${f.os === "mac" ? "Coming soon" : "Not published yet"} for ${f.name}, ${p.detail}`}>
                               <Download aria-hidden="true" />
                             </span>
                           )}
@@ -203,13 +203,13 @@ const AI_TIERS = [
         lead={
           SIGNED_BUILDS.windows
             ? "TaskForce installs like any other app, and opens when it's done."
-            : "TaskForce installs like any other app. Its installers are not code-signed yet, so your system may ask you to confirm the first time: here is what to expect."
+            : "TaskForce installs like any other app. As a free project, its installers are not code-signed for now (a signing certificate is a paid yearly subscription), so your system may ask you to confirm the first time: here is what to expect."
         }
       >
         <Fragment slot="title">Installed <span class="t-word">in a minute.</span></Fragment>
       </SectionHead>
       <div class:list={["mt-14 grid gap-4 sm:mt-16", hasMac ? "lg:grid-cols-3" : "md:grid-cols-2"]}>
-        <div class="card p-7" data-reveal>
+        <div class="card min-w-0 p-7" data-reveal>
           <p class="t-h4">Windows</p>
           <ol class="install-steps t-small mt-3">
             <li>
@@ -230,7 +230,7 @@ const AI_TIERS = [
             )}
           </ol>
         </div>
-        <div class="card p-7" data-reveal style="--d: 80ms">
+        <div class="card min-w-0 p-7" data-reveal style="--d: 80ms">
           <p class="t-h4">Linux</p>
           <p class="t-small mt-3 font-medium text-foreground">Debian, Ubuntu and derivatives</p>
           <ol class="install-steps t-small mt-2">
@@ -256,7 +256,7 @@ const AI_TIERS = [
           </ol>
         </div>
         {hasMac && (
-          <div class="card p-7" data-reveal style="--d: 160ms">
+          <div class="card min-w-0 p-7" data-reveal style="--d: 160ms">
             <p class="t-h4">macOS</p>
             <p class="t-small mt-3">
               {SIGNED_BUILDS.mac
@@ -302,7 +302,7 @@ const AI_TIERS = [
       <div class="wash wash-yellow flex flex-col gap-6 p-8 sm:flex-row sm:items-center sm:justify-between sm:p-10" data-reveal>
         <div>
           <p class="t-h3">Coming from the TaskForce web app?</p>
-          <p class="t-body mt-2 max-w-xl">Export your projects from the web app and bring them into the desktop app.</p>
+          <p class="t-body mt-2 max-w-xl">Copy your projects from the web app to your computer in a few clicks, with their history and attachments.</p>
         </div>
         <a href="/migrate" class="btn btn-secondary shrink-0">
           Moving from the web app <ArrowRight aria-hidden="true" />
@@ -339,6 +339,13 @@ const AI_TIERS = [
     gap: 0.6rem;
     padding-left: 1.15rem;
     list-style: decimal;
+  }
+  /* Une commande sur une ligne défile dans son cadre au lieu d'élargir la carte sur un téléphone. */
+  .install-steps > li {
+    min-width: 0;
+  }
+  .install-steps code:not(.install-cmd) {
+    overflow-wrap: anywhere;
   }
   .install-steps code,
   .install-steps + p code {

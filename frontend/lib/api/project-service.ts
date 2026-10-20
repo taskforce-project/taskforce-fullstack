@@ -28,15 +28,70 @@ export async function downloadProjectExport(
         }
       : undefined,
   });
-  const url = URL.createObjectURL(res.data as Blob);
-  const link = document.createElement("a");
   const stamp = new Date().toISOString().slice(0, 10);
+  saveBlob(res.data as Blob, `project-${projectId}-export-${stamp}.${format}`);
+}
+
+/** Déclenche le téléchargement navigateur d'un fichier reçu. */
+function saveBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
   link.href = url;
-  link.download = `project-${projectId}-export-${stamp}.${format}`;
+  link.download = fileName;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+/** Nom de fichier d'un en-tête `Content-Disposition` (`attachment; filename="APO-2026-10-20.taskforce.zip"`). */
+export function fileNameFromDisposition(header: unknown): string | null {
+  if (typeof header !== "string") return null;
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(header);
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+/** Envoi ou téléchargement d'un fichier de projet : sans délai maximal, un gros projet peut prendre du temps. */
+const NO_TIMEOUT = 0;
+
+/**
+ * Télécharge le fichier de projet TaskForce (zip) : le projet entier, avec ses tickets, leur historique et leurs
+ * pièces jointes. Il s'importe dans la webapp comme dans l'app desktop, ou se garde comme sauvegarde.
+ */
+export async function downloadProjectBundle(
+  slug: string,
+  projectId: number,
+  onProgress?: (pct: number) => void,
+): Promise<void> {
+  const res = await apiClient.get(PROJECT_ROUTES.BUNDLE(slug, projectId), {
+    responseType: "blob",
+    timeout: NO_TIMEOUT,
+    onDownloadProgress: onProgress
+      ? (e) => {
+          if (e.total) onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      : undefined,
+  });
+  const name = fileNameFromDisposition(res.headers?.["content-disposition"]) ?? `project-${projectId}.taskforce.zip`;
+  saveBlob(res.data as Blob, name);
+}
+
+/** Crée dans l'espace le projet d'un fichier de projet TaskForce, et le rend. */
+export async function importProjectBundle(
+  slug: string,
+  file: Blob,
+  onProgress?: (pct: number) => void,
+): Promise<Project> {
+  const response = await apiClient.post<{ data: Project }>(PROJECT_ROUTES.IMPORT(slug), file, {
+    headers: { "Content-Type": "application/zip" },
+    timeout: NO_TIMEOUT,
+    onUploadProgress: onProgress
+      ? (e) => {
+          if (e.total) onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      : undefined,
+  });
+  return response.data.data;
 }
 
 // ---------------------------------------------------------------------------

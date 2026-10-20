@@ -17,21 +17,20 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
-import com.taskforce.tf_api.core.enums.IntegrationProvider;
-import com.taskforce.tf_api.core.model.Integration;
-import com.taskforce.tf_api.core.repository.IntegrationRepository;
 import com.taskforce.tf_api.core.service.GitHubRepoNames;
+import com.taskforce.tf_api.core.service.GitHubTokenSource;
 
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * L'agent cloud de GitHub Copilot (OSS-5.6, ADR-018) : la tâche part dans le dépôt lié au projet, avec le jeton
- * GitHub du workspace, et revient sous forme de pull request.
+ * GitHub de {@link GitHubTokenSource} (la connexion GitHub du workspace sur le serveur, le compte GitHub de la personne
+ * dans l'app desktop), et revient sous forme de pull request.
  *
  * <p>Démarrée par l'API des tâches d'agent ({@code POST /agents/repos/{owner}/{repo}/tasks}, préversion publique de
  * GitHub), qui rend un état explicite ({@code queued}, {@code in_progress}, {@code completed}, {@code failed}...). Le
  * suivi lit cet état ; la PR se retrouve par la branche du travail. Il faut un abonnement Copilot avec l'agent cloud
- * activé sur le dépôt, pour le compte GitHub connecté au workspace : sinon GitHub refuse, et le run échoue avec un
+ * activé sur le dépôt, pour ce compte GitHub : sinon GitHub refuse, et le run échoue avec un
  * message qui dit quoi vérifier.</p>
  */
 @Component
@@ -44,24 +43,25 @@ public class GitHubCopilotProvider implements DeliveryAgentProvider {
     private static final Pattern TASK_ID = Pattern.compile("^[A-Za-z0-9_-]{1,100}$");
     private static final int MAX_PROMPT = 20_000;
 
-    private final IntegrationRepository integrationRepository;
+    private final GitHubTokenSource tokens;
     private final RestTemplate restTemplate;
     private final boolean githubConfigured;
 
     public GitHubCopilotProvider(
-        IntegrationRepository integrationRepository,
+        GitHubTokenSource tokens,
         RestTemplate restTemplate,
         @Value("${integrations.github.client-id:}") String githubClientId
     ) {
-        this.integrationRepository = integrationRepository;
+        this.tokens = tokens;
         this.restTemplate = restTemplate;
-        this.githubConfigured = githubClientId != null && !githubClientId.isBlank();
+        // L'app desktop n'a pas d'application OAuth : le jeton est celui du GitHub CLI de la personne.
+        this.githubConfigured = tokens.personal() || (githubClientId != null && !githubClientId.isBlank());
     }
 
     @Override public String key()          { return KEY; }
     @Override public String displayName()  { return "GitHub Copilot"; }
     @Override public String logoKey()      { return "githubcopilot"; }
-    /** Disponible quand l'instance sait connecter GitHub (application OAuth configurée). */
+    /** Disponible quand l'instance sait connecter GitHub (application OAuth configurée, ou GitHub CLI dans l'app desktop). */
     @Override public boolean available()   { return githubConfigured; }
     /** Choix automatique du modèle par GitHub. */
     @Override public List<String> models() { return List.of(); }
@@ -72,7 +72,7 @@ public class GitHubCopilotProvider implements DeliveryAgentProvider {
             return "GitHub isn't set up on this instance, so Copilot can't be used.";
         }
         if (context.workspace() != null && token(context.workspace().getId()) == null) {
-            return "Connect GitHub to this workspace first (Settings > Integrations).";
+            return tokens.missingHint();
         }
         if (context.project() != null && !isRepo(context.project().getRepoFullName())) {
             return "Link a GitHub repository to this project first: Copilot works in it and opens a pull request.";
@@ -194,9 +194,9 @@ public class GitHubCopilotProvider implements DeliveryAgentProvider {
 
     private String refusal(HttpClientErrorException e, String repo) {
         int status = e.getStatusCode().value();
-        if (status == 401) return "GitHub refused the workspace's connection: reconnect GitHub in Settings > Integrations.";
+        if (status == 401) return "GitHub refused the connection: " + tokens.refusedHint() + ".";
         if (status == 403 || status == 404) {
-            return "GitHub refused to start Copilot on " + repo + ". Check that the GitHub account connected to the workspace has "
+            return "GitHub refused to start Copilot on " + repo + ". Check that " + tokens.accountLabel() + " has "
                 + "a Copilot plan with the cloud agent, and that the agent is enabled for this repository.";
         }
         return "GitHub refused the Copilot task (HTTP " + status + ").";
@@ -207,17 +207,13 @@ public class GitHubCopilotProvider implements DeliveryAgentProvider {
     }
 
     private String token(Long workspaceId) {
-        if (workspaceId == null) return null;
-        return integrationRepository.findByWorkspaceIdAndProvider(workspaceId, IntegrationProvider.GITHUB)
-            .map(Integration::getAccessToken)
-            .filter(t -> !t.isBlank())
-            .orElse(null);
+        return tokens.token(workspaceId).orElse(null);
     }
 
     private String requireToken(Long workspaceId) {
         String token = token(workspaceId);
         if (token == null) {
-            throw new IllegalStateException("GitHub isn't connected for this workspace: connect it in Settings > Integrations.");
+            throw new IllegalStateException("GitHub isn't connected. " + tokens.missingHint());
         }
         return token;
     }
