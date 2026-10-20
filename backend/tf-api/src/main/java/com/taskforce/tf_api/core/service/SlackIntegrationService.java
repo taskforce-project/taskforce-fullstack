@@ -53,6 +53,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -460,7 +461,7 @@ public class SlackIntegrationService {
             }
         }
         log.info("Sync Slack workspace {} canal {} : {} crees, {} MAJ ({} messages)",
-            workspaceId, slackChannelId, created, updated, messages.size());
+            workspaceId, LogSafe.of(slackChannelId), created, updated, messages.size());
         return new SlackSyncResponse(created, updated, messages.size());
     }
 

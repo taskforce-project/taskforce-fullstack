@@ -13,6 +13,7 @@ import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -73,7 +74,7 @@ public class WorkspaceAccessInterceptor implements HandlerInterceptor {
         }
 
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, userId)) {
-            log.warn("Accès refusé (non-membre) : user {} → workspace '{}'", userId, slug);
+            log.warn("Accès refusé (non-membre) : user {} → workspace '{}'", userId, LogSafe.of(slug));
             throw new ForbiddenException("Access denied: you're not a member of this workspace");
         }
         return true;

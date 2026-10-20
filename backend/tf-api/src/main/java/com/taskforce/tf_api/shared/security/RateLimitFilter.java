@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 /**
  * Filtre de rate limiting par adresse IP.
@@ -77,7 +78,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             // `refillIntervally` rend tous les jetons d'un coup en fin de fenêtre : l'attente réelle
             // va de 0 à 60 s. Sans Retry-After, le client ne peut que deviner — et réessayer trop tôt.
             long waitSeconds = Math.max(1, TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()));
-            log.warn("Rate limit dépassé — ip={} path={} profile={} retryAfter={}s", ip, path, profile, waitSeconds);
+            log.warn("Rate limit dépassé — ip={} path={} profile={} retryAfter={}s", LogSafe.of(ip), LogSafe.of(path), profile, waitSeconds);
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setHeader("Retry-After", String.valueOf(waitSeconds));
             response.setHeader("X-RateLimit-Remaining", "0");

@@ -197,6 +197,8 @@ async function downloadSvg(url, dest, tries = 3) {
     if (res.ok) {
       const svg = await res.text()
       if (!svg.trim().startsWith("<svg")) throw new Error(`Réponse non-SVG - ${url}`)
+      // Le fichier est servi par l'app : aucun script, gestionnaire d'événement ni contenu HTML embarqué.
+      if (/<script|<foreignobject|javascript:|\son[a-z]+\s*=/i.test(svg)) throw new Error(`SVG avec contenu actif - ${url}`)
       await writeFile(dest, svg, "utf8")
       return svg
     }
@@ -233,9 +235,18 @@ function pickBest(list, want) {
   const exact = list.find((s) => t(s) === w)
   if (exact) return exact
   if (list.length === 1) return list[0]
-  const esc = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  const wholeWord = new RegExp(`(^|[^a-z0-9])${esc}([^a-z0-9]|$)`, "i")
-  return list.find((s) => wholeWord.test(t(s))) ?? null
+  return list.find((s) => hasWholeWord(t(s), w)) ?? null
+}
+
+/** `word` apparaît-il dans `text` comme un mot entier (ni lettre ni chiffre collé avant ou après) ? */
+function hasWholeWord(text, word) {
+  const alnum = (c) => (c >= "a" && c <= "z") || (c >= "0" && c <= "9")
+  for (let i = text.indexOf(word); i !== -1; i = text.indexOf(word, i + 1)) {
+    const before = i === 0 ? "" : text[i - 1]
+    const after = text[i + word.length] ?? ""
+    if (!alnum(before) && !alnum(after)) return true
+  }
+  return false
 }
 
 async function main() {

@@ -65,14 +65,23 @@ export async function revokeInvitation(slug: string, invitationId: number): Prom
   await apiClient.delete(WORKSPACE_ROUTES.INVITATION(slug, invitationId))
 }
 
+/**
+ * Jeton d'invitation tel que l'API les émet (32 caractères hexadécimaux) : lettres, chiffres, « - » et « _ » seulement.
+ * Il vient de l'adresse de la page et entre dans le chemin d'une requête authentifiée : un jeton qui changerait ce
+ * chemin (« ../ », « ? », « # ») ferait envoyer une autre requête au nom de la personne. Il est refusé avant tout appel.
+ */
+const INVITATION_TOKEN = /^[A-Za-z0-9_-]{16,128}$/
+
 /** Résout un token d'invitation (public) pour pré-remplir l'inscription. */
 export async function previewInvitation(token: string): Promise<InvitationPreview> {
+  if (!INVITATION_TOKEN.test(token)) throw new Error("This invitation link is not valid")
   const res = await apiClient.get<{ data: InvitationPreview }>(INVITATION_ROUTES.PREVIEW(token))
   return res.data.data
 }
 
 /** Accepte une invitation pour l'utilisateur authentifié (email doit matcher). */
 export async function acceptInvitation(token: string): Promise<void> {
+  if (!INVITATION_TOKEN.test(token)) throw new Error("This invitation link is not valid")
   await apiClient.post(INVITATION_ROUTES.ACCEPT(token), {})
 }
 

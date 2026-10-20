@@ -31,6 +31,11 @@ public class SecurityConfig {
     // Aucun réglage ne désactive l'authentification. L'ancien `keycloak.enabled=false` ouvrait toutes les routes
     // sans jeton : une seule variable mal posée chez un hébergeur suffisait (OSS-1.4). Les tests simulent le jeton.
 
+    // Pas de jeton CSRF dans les trois chaînes : une requête n'est authentifiée que par son en-tête `Authorization`,
+    // qu'un navigateur n'ajoute jamais de lui-même à une requête venue d'un autre site. Seul cookie : le refresh token
+    // (RefreshTokenCookie, HttpOnly, SameSite=Lax, limité à /api/auth sur l'hôte de l'API), qui ne fait que renouveler
+    // une session dont la réponse reste illisible hors de l'origine admise par le CORS.
+
     /** Adresse INTERNE de Keycloak (réseau Docker) — sert à récupérer les clés (JWKS), appel serveur. */
     @Value("${keycloak.url:http://localhost:8080}")
     private String keycloakUrl;

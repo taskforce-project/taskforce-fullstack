@@ -50,11 +50,39 @@ public class PageResponse {
         return (String.valueOf(parts[0].charAt(0)) + String.valueOf(parts[parts.length - 1].charAt(0))).toUpperCase();
     }
 
-    /** Extrait les 150 premiers caractères du contenu (HTML ou texte brut). */
-    private static String buildExcerpt(String content) {
+    private static final int EXCERPT_LENGTH = 150;
+
+    /**
+     * Extrait les 150 premiers caractères du contenu (HTML ou texte brut) : balises retirées, espaces regroupés. En une
+     * passe et sans expression régulière : sur un contenu fait de « < » sans « > », le retrait des balises par
+     * expression régulière prenait un temps quadratique (déni de service sur la liste des pages).
+     */
+    static String buildExcerpt(String content) {
         if (content == null || content.isBlank()) return "No content yet.";
-        // Supprime les balises HTML de base pour l'aperçu
-        String plain = content.replaceAll("<[^>]*>", "").replaceAll("\\s+", " ").trim();
-        return plain.length() > 150 ? plain.substring(0, 150) + "…" : plain;
+        StringBuilder plain = new StringBuilder(EXCERPT_LENGTH + 1);
+        boolean space = false;
+        boolean tagsLeft = true;
+        int i = 0;
+        while (i < content.length() && plain.length() <= EXCERPT_LENGTH) {
+            char c = content.charAt(i);
+            if (c == '<' && tagsLeft) {
+                int close = content.indexOf('>', i + 1);
+                if (close >= 0) {
+                    i = close + 1;
+                    continue;
+                }
+                // Plus aucun « > » : les « < » qui restent sont du texte.
+                tagsLeft = false;
+            }
+            if (c == ' ' || c == '\t' || c == '\n' || c == 0x0B || c == '\f' || c == '\r') {
+                space = plain.length() > 0;
+            } else {
+                if (space) plain.append(' ');
+                space = false;
+                plain.append(c);
+            }
+            i++;
+        }
+        return plain.length() > EXCERPT_LENGTH ? plain.substring(0, EXCERPT_LENGTH) + "…" : plain.toString();
     }
 }
