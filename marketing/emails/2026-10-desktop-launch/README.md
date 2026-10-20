@@ -17,7 +17,7 @@ recipients chosen by hand. The recipient list never goes in this repository.
 | `captures/` | Real captures of the desktop interface used in the visuals |
 | `copy.md` | Subject lines and text variants |
 | `storyboard.md` | Storyboard of a 20 to 25 second launch video (not made yet) |
-| `scripts/` | Capture, composition, steps animation, build, preview and link check |
+| `scripts/` | Capture, composition, animations (header, end, steps), build, preview and link check |
 
 The images are served by the website: `landing-page/public/email/2026-10-desktop-launch/`, online at
 `https://taskforce-project.fr/email/2026-10-desktop-launch/`. They must be online before sending.
@@ -51,17 +51,20 @@ would remove these messages (planned separately).
 
 **Creative decisions.**
 
-- Same world as the website: museum paintings as backgrounds (download page and agents page), cobalt `#2f6bf6`
-  pill buttons, warm greys, Geist, light theme only. The logo opens and closes the email.
+- Same world as the website: museum paintings as backgrounds (download, agents and last band of the website), cobalt
+  `#2f6bf6` pill buttons, warm greys, Geist, light theme only. The header is centered like the website's page heroes,
+  with the end of the title in cobalt, as the website does.
 - The product carries the email: a real capture of the desktop dashboard in a frosted glass window for the hero, then
   three scenes at the real size of the interface (a board, an issue handed to Claude Code, a Brain OS page). Glass and
   blur are baked into the images, since email clients render neither.
-- Two animations, each useful: the product demo, and the three install steps (download, install, sign in) as a
-  vertical stepper that fills in cobalt and ticks each step. Narrow and vertical, it stays readable at its real size
-  on a phone. The first frame of each is a complete image (Outlook on Windows shows only that frame), and every piece
-  of information is also in text.
-- One primary action, "Télécharger pour Windows", at the top and at the end; it opens the download page, which offers
-  the installer in one click and explains each Windows message. GitHub stays secondary.
+- Four animations, each telling something. The header tells the subject: on a Windows desktop, the cursor clicks
+  TaskForce in the taskbar and the app opens from its icon, then fills in, block by block. The product demo. The three
+  install steps (download, install, sign in) as a vertical stepper that fills in cobalt. The end: the TaskForce icon
+  lands on the painting of the website's last band, its three bars sliding in. Outlook on Windows shows only the first
+  frame of a GIF: it gets still images of the header and the end (mso blocks), and the demo and the steps start on a
+  complete frame. Every piece of information is also in text.
+- One primary action, "Télécharger pour Windows" with the Windows logo, at the top and at the end; it opens the
+  download page, which offers the installer in one click and explains each Windows message. GitHub stays secondary.
 - Short copy, in French with "vous", a personal note from Pierre and his P.S. (with a nod to Churchill).
 
 ## 2. Visuals
@@ -69,14 +72,21 @@ would remove these messages (planned separately).
 | File (website) | Size | Made from |
 | --- | --- | --- |
 | `logo.png` | 342 x 63, shown at 114 x 21 | the website logo path (`Logo.astro`) and Geist |
-| `hero.jpg` | 1280 x 800, shown at 640 x 400 | `captures/dashboard.webp` on the download page painting |
+| `hero.gif` | 640 x 400, 6.2 s loop, about 1 MB | `scripts/motion.mjs`: `captures/dashboard.webp` on the download page painting, a taskbar with Lucide icons |
+| `hero.jpg` | 1280 x 800, shown at 640 x 400 | its complete state, for Outlook and the version without animation |
 | `demo.gif` | 600 x 352, 8.3 s loop, about 700 KB | `captures/board.webp`, `delegate.webp`, `brain-note.webp` on the agents page painting |
 | `demo-static.jpg` | 1200 x 704, shown at 600 x 352 | the Claude Code scene, for the version without animation |
 | `steps-fr.gif`, `steps-en.gif` | 600 x 412, shown at 300 x 206, 6.4 s loop, about 180 KB | `scripts/steps.mjs`: Lucide icons of the website, Geist |
 | `steps-fr.png`, `steps-en.png` | the same, still, every step active | for the version without animation |
+| `end.gif` | 640 x 260, 6.4 s loop, about 270 KB | `scripts/motion.mjs`: the logo path and Geist on the painting of the website's last band |
+| `end.jpg` | 1280 x 520, shown at 640 x 260 | its complete state, for Outlook and the version without animation |
+| `windows.png` | 48 x 48, shown at 16 x 16 | the Windows logo of the download page (`landing-page/public/logos/windows.svg`), in white, in both buttons |
 
-Paintings: Smithsonian (download page) and Europeana (agents page), via Unsplash, credited in the footer, as on the
-website (`landing-page/src/lib/backgrounds.ts`). Captures: the desktop build of the interface
+The animated images are 1x: a GIF at 2x would weigh four times more. Everything that moves over a painting adds weight,
+so the header window opens as an empty shell, then fills in once it stands still.
+
+Paintings: Smithsonian (download page and last band) and Europeana (agents page), via Unsplash, credited in the footer,
+as on the website (`landing-page/src/lib/backgrounds.ts`). Captures: the desktop build of the interface
 (`NEXT_PUBLIC_DESKTOP=true`) on the development stack with its demo data (workspace `taskforce-demo`), 1440 x 900 at
 2x, light theme, 20 October 2026.
 
@@ -86,6 +96,7 @@ website (`landing-page/src/lib/backgrounds.ts`). Captures: the desktop build of 
 npm install          # playwright-core (drives Microsoft Edge) and the Geist font package
 npm run build        # template + texts -> dist/<lang>/, checks: keys, tokens, dashes, Brevo tags, alt texts, Gmail size
 npm run preview      # dist/preview/<lang>/desktop.png, mobile.png, gmail.png (system fonts, as Gmail and Outlook show them)
+npm run motion       # the header and end animations, their still images, the Windows logo of the buttons
 npm run steps        # the steps animation, both languages
 npm run check        # every link and image answers (run once the website is deployed)
 ```
@@ -100,7 +111,8 @@ shell, then the capture and the composition:
 ```bash
 KC_USER=admin@taskforce.dev KC_PASS=... KC_SECRET=... node scripts/desktop-relay.cjs   # dev test values from the seed docs
 node scripts/capture.mjs    # captures/*.webp
-npm run compose             # website images, from the captures and the paintings
+npm run compose             # logo and demo, from the captures and the paintings
+npm run motion              # header and end animations
 ```
 
 The Claude Code scene needs the demo account to have its local runner (Settings > Agents in the dev app), otherwise
@@ -135,10 +147,11 @@ work through Brevo, and replace the first name tag by the first name. Or send `d
 ## 6. Checklist before sending
 
 - [ ] `npm run build` passes, `npm run check` says every address answers.
-- [ ] The test email shows both logos, the hero image and both animations (Gmail web, Gmail on Android or iPhone,
-      Outlook on Windows: the animations stay on their first image, which is fine).
+- [ ] The test email shows both logos and the four animations (Gmail web, Gmail on Android or iPhone; Outlook on
+      Windows shows still images for the header and the end, and the first frame of the demo and the steps).
 - [ ] Greeting with the first name; "Bonjour à vous" when the attribute is empty.
-- [ ] Both "Télécharger pour Windows" buttons open the download page, and its Windows button starts the right file.
+- [ ] Both "Télécharger pour Windows" buttons show the white Windows logo, open the download page, and its Windows
+      button starts the right file.
 - [ ] Install guide, VirusTotal report, moving page, GitHub links and the issue page open; "Écrivez-moi" opens an email
       to `contact@taskforce-project.fr`.
 - [ ] "Voir dans le navigateur" and "Se désinscrire" work in the test sent by Brevo.

@@ -1,10 +1,10 @@
 // Visuels de l'e-mail, composés à partir des vraies captures de l'interface desktop (captures/*.webp) et des peintures du
 // site (landing-page/public/images) : une page HTML par visuel, rendue par Edge sans interface, puis figée en image,
 // parce que les clients de messagerie ne savent ni flouter ni superposer. Le GIF est monté par ffmpeg.
+// L'en-tête et le générique de fin sont animés à part (scripts/motion.mjs).
 //
 // Sortie : landing-page/public/email/2026-10-desktop-launch/ (servi par le site sur taskforce-project.fr/email/...).
 //   logo.png          logo officiel et nom, pour l'en-tête et le pied
-//   hero.jpg          tableau de bord dans une fenêtre de verre, sur la peinture de la page de téléchargement
 //   demo.gif          board, délégation à Claude Code, note du Brain OS, en fondu (la 1re image suffit sans animation)
 //   demo-static.jpg   la scène de délégation, pour la version sans animation
 import { execFileSync } from "node:child_process";
@@ -86,14 +86,6 @@ await render("logo", `<div class="stage" style="display:inline-flex;align-items:
     <span style="font-size:17px;font-weight:600;letter-spacing:-0.03em;line-height:1">TaskForce</span>
   </div>`, { width: 200, height: 40, scale: 3, transparent: true });
 execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", join(WORK, "logo.png"), join(OUT, "logo.png")]);
-
-// Visuel principal : le tableau de bord, fenêtre entière, qui sort par le bas du cadre.
-await render("hero", scene({
-  width: 640, height: 400, paint: "download", position: "50% 62%",
-  halo: { top: 18, width: 640, height: 300 },
-  glass: { left: 34, top: 58, padding: 9 },
-  inner: `<img class="shot" src="${capture("dashboard")}" style="width:554px">`,
-}), { width: 640, height: 400, scale: 2, type: "jpeg", quality: 84 });
 
 // Démo : trois scènes à la taille réelle de l'interface, pour qu'elle reste lisible.
 const SCENES = [
