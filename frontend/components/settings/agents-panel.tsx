@@ -3,12 +3,14 @@
 import { useEffect } from "react"
 
 import { BrandLogo } from "@/components/ui/brand-logo"
+import { DesktopGitHubConnect } from "@/components/desktop/desktop-github-connect"
 import { ClaudeCodeMcpSetup } from "@/components/settings/claude-code-mcp-setup"
 import { DesktopClaudeCodeSetup } from "@/components/settings/desktop-claude-code-setup"
 import { LocalRunnerSetup } from "@/components/settings/local-runner-setup"
 import { Badge } from "@/components/ui/badge"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
+import { useDesktopToolsStore } from "@/lib/store/desktop-tools-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 
 /**
@@ -18,12 +20,13 @@ import { useWorkspaceStore } from "@/lib/store/workspace-store"
  */
 export function AgentsPanel() {
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug) ?? ""
-  const allProviders = useDeliveryStore((s) => s.providers)
-  // App desktop : les agents dans le cloud (GitHub Copilot) passent par l'intégration GitHub de l'espace, absente ici.
-  const providers = IS_DESKTOP ? allProviders.filter((p) => p.key === "claude-code") : allProviders
+  const providers = useDeliveryStore((s) => s.providers)
   const fetchProviders = useDeliveryStore((s) => s.fetchProviders)
+  // App desktop : Copilot travaille avec le compte GitHub de la personne (son GitHub CLI) ; une connexion faite ici
+  // le rend prêt, d'où la relecture des agents quand elle change.
+  const githubSignedIn = useDesktopToolsStore((s) => s.status?.github.signedIn ?? null)
 
-  useEffect(() => { if (slug) fetchProviders(slug) }, [slug, fetchProviders])
+  useEffect(() => { if (slug) fetchProviders(slug) }, [slug, fetchProviders, githubSignedIn])
 
   return (
     <div className="flex flex-col gap-4">
@@ -61,6 +64,9 @@ export function AgentsPanel() {
               {/* Mode interactif : le Claude Code de la personne sur le serveur MCP de l'instance (lot 5). L'app
                   desktop le branche elle-même (DesktopClaudeCodeSetup). */}
               {p.key === "claude-code" && slug && !IS_DESKTOP && <ClaudeCodeMcpSetup slug={slug} />}
+              {p.key === "github-copilot" && IS_DESKTOP && (
+                <DesktopGitHubConnect purpose="Copilot works with your GitHub account: sign in to GitHub to delegate issues to it." />
+              )}
             </div>
           ))}
           {providers.length === 0 && (
@@ -77,6 +83,9 @@ function descriptionFor(key: string, available: boolean): string {
     return available
       ? "Your own Claude Code, on your machine: works on a branch and opens a pull request."
       : "Your own Claude Code, on your machine. Not enabled on this instance: an administrator turns it on with DELIVERY_LOCAL_RUNNER_ENABLED=true."
+  }
+  if (key === "github-copilot" && IS_DESKTOP) {
+    return "GitHub's cloud agent: works in the project's repository and opens a pull request, with your GitHub account. Needs a Copilot plan with the cloud agent."
   }
   if (key === "github-copilot") {
     return available
