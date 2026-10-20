@@ -55,7 +55,7 @@ would remove these messages (planned separately).
   `#2f6bf6` pill buttons, warm greys, Geist, light theme only. The header is centered like the website's page heroes,
   with the end of the title in cobalt, as the website does.
 - The product carries the email: a real capture of the desktop dashboard in a frosted glass window for the hero, then
-  three scenes at the real size of the interface (a board, an issue handed to Claude Code, a Brain OS page). Glass and
+  three scenes at the real size of the interface (a board, a task handed to Claude Code, a Brain OS page). Glass and
   blur are baked into the images, since email clients render neither.
 - Four animations, each telling something. The header tells the subject: on a Windows desktop, the cursor clicks
   TaskForce in the taskbar and the app opens from its icon, then fills in, block by block. The product demo. The three
@@ -65,7 +65,9 @@ would remove these messages (planned separately).
   complete frame. Every piece of information is also in text.
 - One primary action, "Télécharger pour Windows" with the Windows logo, at the top and at the end; it opens the
   download page, which offers the installer in one click and explains each Windows message. GitHub stays secondary.
-- Short copy, in French with "vous", a personal note from Pierre and his P.S. (with a nod to Churchill).
+- Short copy, in French with "vous", in plain words for people who are not in tech (tasks and notes, no tickets). Pierre
+  signs as the head of the company, with a line Churchill wrote about de Gaulle, « Un homme d'une ambition insensée. »,
+  here about himself; his P.S. carries the joke on ("des bugs, de la sueur, des larmes… et des mises à jour").
 
 ## 2. Visuals
 

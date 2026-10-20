@@ -11,9 +11,23 @@ The email is in French, the language of its recipients; an English version is bu
 | TaskForce passe sur votre ordinateur | Same idea, a touch more "change" |
 | Votre travail TaskForce, maintenant sur votre ordinateur | Speaks to people with projects on the web app |
 
-Preview text (already hidden at the top of the HTML): *Gratuit, open source, sur Windows. Votre travail vous suit en
-un clic.* English: subject *TaskForce is moving to your desktop*, preview *Free, open source, on Windows. Your work
-comes along in one click.*
+Preview text (already hidden at the top of the HTML): *Gratuit, sur Windows, et votre travail vous suit en un clic.*
+English: subject *TaskForce is moving to your desktop*, preview *Free, on Windows, and your work comes along in one
+click.*
+
+## Words
+
+The recipients are not in tech: the email speaks of tasks, notes and a board, never of tickets, issues or cycles. The
+names of the product (Brain OS, Claude Code) stay, each with what it does; so do the labels of the interface the reader
+will click (Operations, Copy everything, Settings, Agents), which are in English in the app. The one "issue" left is in
+Pierre's P.S., his own words.
+
+## Signature and P.S.
+
+Pierre signs as the head of the company: his name, then « Un homme d'une ambition insensée. », what Churchill said of
+de Gaulle (in *Perles de Churchill*, François Jouffa and Frédéric Pouhier), here said of himself. The P.S. carries
+the joke on with another Churchill line turned around: "je n'ai à vous offrir que des bugs, de la sueur, des larmes…
+et des mises à jour".
 
 ## Concept
 
