@@ -324,6 +324,17 @@ describe('API Client', () => {
       ).toBe('Too many requests, try again in 30 seconds.');
     });
 
+    it.each([
+      ['une page HTML du relais', '<html>413 Request Entity Too Large</html>', 'This file is too large to upload.'],
+      ["le message de l'API", { message: 'This project file is too large.' }, 'This project file is too large.'],
+    ])('dit d’un 413 ce que porte %s', (_name, data, expected) => {
+      vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+      expect(
+        getErrorMessage({ isAxiosError: true, message: 'Request failed with status code 413', response: { status: 413, data } }),
+      ).toBe(expected);
+    });
+
     it('retombe sur error.message quand la réponse ne porte rien', () => {
       vi.mocked(axios.isAxiosError).mockReturnValue(true);
 

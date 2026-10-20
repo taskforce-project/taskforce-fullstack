@@ -99,7 +99,7 @@ export const MENUS: Menu[] = [
         items: [
           { label: "Download", href: "/download", desc: "For Windows and Linux, macOS soon", art: "download", tone: "blue" },
           { label: "Release notes", href: "/download#whats-new", desc: "What changed in each version", art: "releases", tone: "lime" },
-          { label: "Moving from the web app", href: "/migrate", desc: "Bring your projects to the desktop", art: "migrate", tone: "yellow" },
+          { label: "Moving from the web app", href: "/migrate", desc: "Bring all your work to the desktop", art: "migrate", tone: "yellow" },
           { label: "Source code", href: GITHUB, desc: "Open source, under AGPL-3.0", art: "source", tone: "sky", external: true },
         ],
       },

@@ -10,6 +10,8 @@ import {
   updateMemberRole,
   removeMember,
   deleteWorkspace,
+  downloadWorkspaceBundle,
+  importWorkspaceBundle,
 } from './workspace-service';
 import { apiClient } from './client';
 import { WORKSPACE_ROUTES } from '../config/api-routes';
@@ -47,6 +49,57 @@ describe('workspace-service', () => {
     it('propage l’erreur', async () => {
       vi.mocked(apiClient.get).mockRejectedValue(new Error('401'));
       await expect(listWorkspaces()).rejects.toThrow('401');
+    });
+  });
+
+  describe('downloadWorkspaceBundle', () => {
+    it("télécharge le zip de l'espace sous le nom donné par le serveur, avec la progression", async () => {
+      const blob = new Blob(['PK']);
+      vi.mocked(apiClient.get).mockImplementation(async (_url, config) => {
+        config?.onDownloadProgress?.({ loaded: 3, total: 4 } as any);
+        return { data: blob, headers: { 'content-disposition': 'attachment; filename="acme-2026-10-20.taskforce-workspace.zip"' } } as any;
+      });
+      Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:ws'), revokeObjectURL: vi.fn() });
+      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      const progress = vi.fn();
+
+      await downloadWorkspaceBundle(SLUG, progress);
+
+      expect(apiClient.get).toHaveBeenCalledWith(WORKSPACE_ROUTES.BUNDLE(SLUG),
+        expect.objectContaining({ responseType: 'blob', timeout: 0 }));
+      expect(progress).toHaveBeenCalledWith(75);
+      expect((click.mock.contexts[0] as HTMLAnchorElement).download).toBe('acme-2026-10-20.taskforce-workspace.zip');
+      click.mockRestore();
+    });
+
+    it("prend un nom par défaut sans en-tête", async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: new Blob(['PK']), headers: {} } as any);
+      Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:ws'), revokeObjectURL: vi.fn() });
+      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+      await downloadWorkspaceBundle(SLUG);
+
+      expect((click.mock.contexts[0] as HTMLAnchorElement).download).toBe(`${SLUG}.taskforce-workspace.zip`);
+      click.mockRestore();
+    });
+  });
+
+  describe('importWorkspaceBundle', () => {
+    it('POST le fichier en application/zip et rend le nouvel espace', async () => {
+      const file = new Blob(['PK'], { type: 'application/zip' });
+      const workspace = { id: 9, slug: 'acme-copy', name: 'Acme' } as any;
+      vi.mocked(apiClient.post).mockImplementation(async (_url, _body, config) => {
+        config?.onUploadProgress?.({ loaded: 1, total: 2 } as any);
+        return envelope(workspace) as any;
+      });
+      const progress = vi.fn();
+
+      expect(await importWorkspaceBundle(file, progress)).toEqual(workspace);
+      expect(apiClient.post).toHaveBeenCalledWith(WORKSPACE_ROUTES.IMPORT, file, expect.objectContaining({
+        headers: { 'Content-Type': 'application/zip' },
+        timeout: 0,
+      }));
+      expect(progress).toHaveBeenCalledWith(50);
     });
   });
 

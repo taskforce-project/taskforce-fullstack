@@ -15,7 +15,11 @@ const WEB: DesktopWebWorkspace[] = [
 
 /** Pont de la coque, tel que `desktop/src/preload.ts` l'expose : seuls les projets servent ici. */
 function installBridge() {
-  const bridge = { projects: { web: vi.fn(), bring: vi.fn(), send: vi.fn(), openWeb: vi.fn() } };
+  const bridge = {
+    projects: {
+      web: vi.fn(), bring: vi.fn(), send: vi.fn(), bringWorkspace: vi.fn(), sendWorkspace: vi.fn(), openWeb: vi.fn(),
+    },
+  };
   (window as Window & { taskforceDesktop?: unknown }).taskforceDesktop = bridge;
   return bridge;
 }
@@ -87,6 +91,42 @@ describe("useDesktopTransferStore", () => {
     expect(bridge.projects[kind]).toHaveBeenCalledTimes(1);
     expect(bridge.projects[kind]).toHaveBeenCalledWith(MOVE);
     expect(store.getState()).toMatchObject({ moving: null, moved: { "acme/5": moved } });
+  });
+
+  it.each(["bringWorkspace", "sendWorkspace"] as const)("%s: copies a whole workspace, and remembers it", async (kind) => {
+    const bridge = installBridge();
+    const moved = { slug: "acme-2", name: "Acme" };
+    bridge.projects[kind].mockResolvedValue({ ok: true, value: moved });
+    const store = await loadStore();
+
+    expect(await store.getState()[kind]("acme")).toEqual(moved);
+    expect(bridge.projects[kind]).toHaveBeenCalledWith({ workspace: "acme" });
+    expect(store.getState()).toMatchObject({ moving: null, movedWorkspaces: { acme: moved } });
+  });
+
+  it("keeps the shell's message when a workspace copy fails, and copies one thing at a time", async () => {
+    const bridge = installBridge();
+    bridge.projects.sendWorkspace.mockResolvedValue({ ok: false, error: "The session ended: sign in again" });
+    bridge.projects.bringWorkspace.mockRejectedValue(new Error("ipc down"));
+    const store = await loadStore();
+
+    expect(await store.getState().sendWorkspace("acme")).toBeNull();
+    expect(store.getState().error).toBe("The session ended: sign in again");
+    expect(await store.getState().bringWorkspace("acme")).toBeNull();
+    expect(store.getState()).toMatchObject({ moving: null, error: "ipc down" });
+
+    store.setState({ moving: "other/1" });
+    expect(await store.getState().bringWorkspace("acme")).toBeNull();
+    expect(bridge.projects.bringWorkspace).toHaveBeenCalledTimes(1);
+  });
+
+  it("copies no workspace outside the desktop app", async () => {
+    installBridge();
+    const store = await loadStore("false");
+
+    expect(await store.getState().bringWorkspace("acme")).toBeNull();
+    expect(await store.getState().sendWorkspace("acme")).toBeNull();
+    expect(store.getState().error).toMatch(/desktop app/);
   });
 
   it("keeps the shell's message when a copy fails", async () => {

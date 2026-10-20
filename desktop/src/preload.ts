@@ -65,6 +65,8 @@ contextBridge.exposeInMainWorld("taskforceDesktop", {
       ipcRenderer.invoke("desktop:bring-project", input),
     send: (input: { workspace: string; projectId: number; target: string }): Promise<unknown> =>
       ipcRenderer.invoke("desktop:send-project", input),
+    bringWorkspace: (input: { workspace: string }): Promise<unknown> => ipcRenderer.invoke("desktop:bring-workspace", input),
+    sendWorkspace: (input: { workspace: string }): Promise<unknown> => ipcRenderer.invoke("desktop:send-workspace", input),
     openWeb: (url: string): Promise<void> => ipcRenderer.invoke("desktop:open-web", url),
   },
   // Claude Code de la personne branché sur TaskForce (serveur MCP de l'espace) : le jeton va de la page à `claude`.
