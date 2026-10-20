@@ -108,6 +108,14 @@ class AuthUserControllersWebMvcTest {
     }
 
     @Test
+    @DisplayName("GET /users/search sans q → 400 qui nomme le paramètre, pas 500")
+    void user_search_without_q_400() throws Exception {
+        mockMvc.perform(get("/api/users/search").with(jwt().jwt(b -> b.claim("email", EMAIL))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("The request parameter 'q' is required."));
+    }
+
+    @Test
     @DisplayName("GET /users/me sans JWT → 401")
     void user_me_unauthenticated_401() throws Exception {
         mockMvc.perform(get("/api/users/me")).andExpect(status().isUnauthorized());
