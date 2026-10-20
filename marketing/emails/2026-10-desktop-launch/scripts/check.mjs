@@ -1,4 +1,4 @@
-// Vérifie chaque lien et chaque image de dist/email.html et dist/email-static.html, une fois le site déployé :
+// Vérifie chaque lien et chaque image de dist/<langue>/email.html et email-static.html, une fois le site déployé :
 // une image doit répondre 200 avec un type image/*, un lien 200 après redirections. VirusTotal refuse les robots (403),
 // ses liens sont seulement listés, comme la feuille de polices. Les balises Brevo ({{ mirror }}, {{ unsubscribe }}) et les mailto: sont ignorés.
 import { readFileSync } from "node:fs";
@@ -9,11 +9,11 @@ const ROOT = resolve(import.meta.dirname, "..");
 const BOT_BLOCKED = ["www.virustotal.com", "fonts.googleapis.com"];
 
 const urls = new Map();
-for (const file of ["dist/email.html", "dist/email-static.html"]) {
+for (const file of ["fr", "en"].flatMap((lang) => [`dist/${lang}/email.html`, `dist/${lang}/email-static.html`])) {
   const html = readFileSync(join(ROOT, file), "utf8");
   for (const [, kind, raw] of html.matchAll(/\b(href|src)="([^"]+)"/g)) {
     const url = raw.replaceAll("&amp;", "&");
-    if (url.startsWith("{{") || url.startsWith("mailto:")) continue;
+    if (url.startsWith("{{") || url.startsWith("mailto:") || url === "#") continue;
     urls.set(url, kind === "src" ? "image" : "link");
   }
 }
