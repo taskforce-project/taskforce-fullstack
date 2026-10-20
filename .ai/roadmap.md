@@ -10,6 +10,12 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 20/10/2026 - Release 1.2.0 EN PROD (PR #379, `90e18f96`) ; TaskForce Desktop 1.1.0 en publication.** `[release]`
+> - PR #378 fusionnée dans `dev` (CI verte, dont `mvn verify`) ; release = arbre exact de `dev` sur `main` (#377 et #378), version produit 1.2.0 posée par la CI, `--admin --squash`.
+> - Desktop 1.1.0 : workflow `Desktop - Release` lancé depuis `main` (run 39439580273) ; le site sera reconstruit après sa publication.
+> - `dev` réaligné en 1.2.0 (cette trace).
+> - **Demande du CEO (20/10, soir)** : copier TOUT le travail d'un côté à l'autre, Brain OS compris, simplement. En cours : fichier d'espace (espace + Brain OS + tous ses projets) et copie d'un espace entier par l'app, dans les deux sens (desktop 1.2.0).
+
 > **▶ MAJ 20/10/2026 - Projets entre la webapp et l'app desktop, copie avant mise à jour, photo du compte, notifications du système (branche `feature/desktop`).** `[backend + frontend + desktop + landing]`
 > - **Site** (PR #377, fusionnée dans `dev`) : un clic sur un installeur ouvre une fenêtre et lance le téléchargement 3 s après (Windows : installeur non signé, rapport VirusTotal du fichier, Keep, Run anyway, restaurer depuis l'historique de protection de Defender, lien ChatGPT pour les autres antivirus ; Linux : la commande) ; macOS « coming soon » partout ; signature annoncée telle quelle (certificat payant, pas pris) ; la page de téléchargement ne déborde plus sur un téléphone.
 > - **API** (`fea25200`) : paramètre, en-tête ou fichier obligatoire absent, ou paramètre mal typé → 400 qui nomme le paramètre (plus 500).
