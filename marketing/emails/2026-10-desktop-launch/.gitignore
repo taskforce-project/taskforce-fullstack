@@ -2,4 +2,4 @@ node_modules/
 .work/
 # The compiled email is the deliverable imported into Brevo: kept, unlike other dist/ folders of the repository.
 !dist/
-dist/preview/*.png
+dist/preview/**/*.png
