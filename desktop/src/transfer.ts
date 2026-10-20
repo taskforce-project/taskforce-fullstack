@@ -31,6 +31,14 @@ export interface MovedProject {
   url?: string;
 }
 
+/** Espace créé de l'autre côté, avec tout son travail. */
+export interface MovedWorkspace {
+  slug: string;
+  name: string;
+  /** Adresse de l'espace dans la webapp, pour un espace envoyé en ligne. */
+  url?: string;
+}
+
 /** API locale, jointe par le relais de la fenêtre avec le jeton de lancement. */
 export interface LocalApi {
   origin: string;
@@ -88,6 +96,18 @@ function readWorkspaces(value: unknown): WebWorkspace[] {
       }),
     }];
   });
+}
+
+/** Espace demandé par la page, vérifié avant que la coque n'appelle quoi que ce soit. */
+export function readWorkspaceMove(input: unknown): { workspace: string } | null {
+  const { workspace } = (input ?? {}) as Record<string, unknown>;
+  return isWorkspaceSlug(workspace) ? { workspace } : null;
+}
+
+function createdWorkspace(payload: unknown): MovedWorkspace {
+  const workspace = ((payload ?? {}) as { data?: { slug?: unknown; name?: unknown } }).data ?? {};
+  if (typeof workspace.slug !== "string") throw new Error("The workspace was not created");
+  return { slug: workspace.slug, name: typeof workspace.name === "string" ? workspace.name : workspace.slug };
 }
 
 function createdProject(payload: unknown, workspace: string): MovedProject {
@@ -163,6 +183,45 @@ export class Transfer {
     if (!created.ok) throw await failure(created, "The web app didn't create the project", true);
     const project = createdProject(await created.json(), to);
     return { ...project, url: `${this.webUrl}/${to}/projects/${project.id}` };
+  }
+
+  /** Copie un espace entier de la webapp (Brain OS et projets) sur cet ordinateur, comme un nouvel espace. */
+  async bringWorkspace(sessionToken: string, workspace: string, local: LocalApi): Promise<MovedWorkspace> {
+    const download = await this.fetchImpl(`${this.apiUrl}/api/auth/desktop/transfer/workspace`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: sessionToken, workspace }),
+      signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
+    });
+    if (!download.ok) throw await failure(download, "The web app didn't send the workspace", true);
+    const bundle = await bundleOf(download);
+    const created = await this.fetchImpl(`${local.origin}/api/workspaces/import`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${local.launchToken}`, "Content-Type": "application/zip" },
+      body: bundle,
+      signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
+    });
+    if (!created.ok) throw await failure(created, "TaskForce couldn't create the workspace", false);
+    return createdWorkspace(await created.json());
+  }
+
+  /** Copie un espace entier de cet ordinateur (Brain OS et projets) dans la webapp, comme un nouvel espace. */
+  async sendWorkspace(sessionToken: string, workspace: string, local: LocalApi): Promise<MovedWorkspace> {
+    const download = await this.fetchImpl(`${local.origin}/api/workspaces/${workspace}/bundle`, {
+      headers: { Authorization: `Bearer ${local.launchToken}` },
+      signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
+    });
+    if (!download.ok) throw await failure(download, "TaskForce couldn't pack the workspace", false);
+    const bundle = await bundleOf(download);
+    const created = await this.fetchImpl(`${this.apiUrl}/api/auth/desktop/transfer/workspace-import`, {
+      method: "POST",
+      headers: { "X-TaskForce-Session": sessionToken, "Content-Type": "application/zip" },
+      body: bundle,
+      signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
+    });
+    if (!created.ok) throw await failure(created, "The web app didn't create the workspace", true);
+    const moved = createdWorkspace(await created.json());
+    return { ...moved, url: `${this.webUrl}/${moved.slug}` };
   }
 
   /** Message d'un déplacement qui échoue, dit pour la personne ; le message du serveur est gardé quand il y en a un. */
