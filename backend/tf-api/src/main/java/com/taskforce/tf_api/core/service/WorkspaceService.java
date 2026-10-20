@@ -395,6 +395,11 @@ public class WorkspaceService {
     static final Set<String> RESERVED_SLUGS = Set.of(
         "account", "auth", "invitations", "legal-notices", "onboarding", "privacy-policy");
 
+    /** Adresse d'espace libre pour ce nom (« Acme » → « acme », ou « acme-3f2a1b » si elle est prise ou réservée). */
+    public String uniqueSlug(String name) {
+        return generateUniqueSlug(name);
+    }
+
     private String generateUniqueSlug(String base) {
         String normalized = Normalizer.normalize(base, Normalizer.Form.NFD)
             .replaceAll("\\p{M}", "")

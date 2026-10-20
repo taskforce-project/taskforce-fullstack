@@ -1,6 +1,13 @@
 import { create } from "zustand";
 
-import { desktopBridge, type DesktopMovedProject, type DesktopProjectMove, type DesktopWebWorkspace } from "../desktop";
+import {
+  desktopBridge,
+  type DesktopMovedProject,
+  type DesktopMovedWorkspace,
+  type DesktopProjectMove,
+  type DesktopResult,
+  type DesktopWebWorkspace,
+} from "../desktop";
 
 // ---------------------------------------------------------------------------
 // Store des déplacements de projets entre la webapp et l'app desktop (cf. desktop/src/transfer.ts) : les projets de la
@@ -14,6 +21,9 @@ const NOT_IN_APP = "Only available in the TaskForce desktop app";
 export const moveKey = (move: Pick<DesktopProjectMove, "workspace" | "projectId">): string =>
   `${move.workspace}/${move.projectId}`;
 
+/** Clé d'un espace entier en cours de copie : `<espace>/*`. */
+export const workspaceKey = (workspace: string): string => `${workspace}/*`;
+
 interface DesktopTransferState {
   /** Espaces de la personne dans la webapp et leurs projets. `null` = pas encore lus. */
   webWorkspaces: DesktopWebWorkspace[] | null;
@@ -22,6 +32,8 @@ interface DesktopTransferState {
   moving: string | null;
   /** Projets déjà copiés pendant cette session de l'app, par clé d'origine. */
   moved: Record<string, DesktopMovedProject>;
+  /** Espaces entiers déjà copiés pendant cette session de l'app, par slug d'origine. */
+  movedWorkspaces: Record<string, DesktopMovedWorkspace>;
   error: string | null;
 
   fetchWebProjects: () => Promise<DesktopWebWorkspace[] | null>;
@@ -29,6 +41,10 @@ interface DesktopTransferState {
   bring: (move: DesktopProjectMove) => Promise<DesktopMovedProject | null>;
   /** Copie un projet de l'ordinateur dans un espace de la webapp. */
   send: (move: DesktopProjectMove) => Promise<DesktopMovedProject | null>;
+  /** Copie un espace entier de la webapp (Brain OS et projets) sur l'ordinateur. */
+  bringWorkspace: (workspace: string) => Promise<DesktopMovedWorkspace | null>;
+  /** Copie un espace entier de l'ordinateur dans la webapp. */
+  sendWorkspace: (workspace: string) => Promise<DesktopMovedWorkspace | null>;
   openWeb: (url: string) => void;
 }
 
@@ -59,8 +75,37 @@ export const useDesktopTransferStore = create<DesktopTransferState>((set, get) =
     }
   }
 
+  /** Une copie d'espace entier, une à la fois, comme pour les projets. */
+  async function moveWorkspace(
+    run: (workspace: string) => Promise<DesktopResult<DesktopMovedWorkspace>>,
+    workspace: string,
+  ): Promise<DesktopMovedWorkspace | null> {
+    if (get().moving) return null;
+    const key = workspaceKey(workspace);
+    set({ moving: key, error: null });
+    try {
+      const result = await run(workspace);
+      if (!result.ok) {
+        set({ moving: null, error: result.error });
+        return null;
+      }
+      set((state) => ({ moving: null, movedWorkspaces: { ...state.movedWorkspaces, [workspace]: result.value } }));
+      return result.value;
+    } catch (err) {
+      set({ moving: null, error: err instanceof Error ? err.message : "The workspace wasn't copied" });
+      return null;
+    }
+  }
+
+  function bridgeOrFail() {
+    const bridge = desktopBridge();
+    if (!bridge) set({ error: NOT_IN_APP });
+    return bridge;
+  }
+
   return {
     webWorkspaces: null,
+    movedWorkspaces: {},
     loading: false,
     moving: null,
     moved: {},
@@ -89,6 +134,16 @@ export const useDesktopTransferStore = create<DesktopTransferState>((set, get) =
 
     bring: (request) => move("bring", request),
     send: (request) => move("send", request),
+
+    bringWorkspace: async (workspace) => {
+      const bridge = bridgeOrFail();
+      return bridge ? moveWorkspace((slug) => bridge.projects.bringWorkspace({ workspace: slug }), workspace) : null;
+    },
+
+    sendWorkspace: async (workspace) => {
+      const bridge = bridgeOrFail();
+      return bridge ? moveWorkspace((slug) => bridge.projects.sendWorkspace({ workspace: slug }), workspace) : null;
+    },
 
     openWeb: (url) => {
       void desktopBridge()?.projects.openWeb(url);

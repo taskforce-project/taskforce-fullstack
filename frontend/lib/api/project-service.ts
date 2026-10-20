@@ -33,7 +33,7 @@ export async function downloadProjectExport(
 }
 
 /** Déclenche le téléchargement navigateur d'un fichier reçu. */
-function saveBlob(blob: Blob, fileName: string): void {
+export function saveBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

@@ -10,7 +10,7 @@ import {
 import { toast } from "sonner"
 import { useTheme } from "next-themes"
 
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Zone } from "@/components/ui/zone"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -53,6 +53,9 @@ import { getSystemStatus, type SystemStatus } from "@/lib/api/status-service"
 import { apiClient, getErrorMessage } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
 import { cn } from "@/lib/utils"
+import { notifyProgress } from "@/lib/notify"
+import { downloadWorkspaceBundle } from "@/lib/api/workspace-service"
+import { useDesktopTransferStore } from "@/lib/store/desktop-transfer-store"
 import { desktopBridge, IS_DESKTOP } from "@/lib/desktop"
 import { parseServerDate } from "@/lib/utils/server-date"
 
@@ -999,6 +1002,104 @@ function SecurityPanel() {
   )
 }
 
+/**
+ * Déplacer ou garder l'espace entier : son fichier (Brain OS et projets), l'import d'un tel fichier comme nouvel
+ * espace, et dans l'app desktop la copie directe vers la webapp.
+ */
+function WorkspaceMoveCard({ slug }: Readonly<{ slug: string }>) {
+  const router = useRouter()
+  const importWorkspace = useWorkspaceStore((s) => s.importWorkspace)
+  const sendWorkspace = useDesktopTransferStore((s) => s.sendWorkspace)
+  const openWeb = useDesktopTransferStore((s) => s.openWeb)
+  const moving = useDesktopTransferStore((s) => s.moving)
+  const [importing, setImporting] = useState(false)
+
+  async function handleDownload() {
+    const progress = notifyProgress("Exporting the workspace", { description: "Packing its Brain OS and projects…" })
+    try {
+      await downloadWorkspaceBundle(slug, (pct) => progress.setProgress(pct))
+      progress.success("Workspace file ready")
+    } catch {
+      progress.error("Export failed. Please try again.")
+    }
+  }
+
+  async function handleImport(file: File | undefined) {
+    if (!file) return
+    setImporting(true)
+    const workspace = await importWorkspace(file)
+    setImporting(false)
+    if (!workspace) {
+      toast.error(useWorkspaceStore.getState().importError ?? "Import failed. Please try again.")
+      return
+    }
+    toast.success(`Workspace "${workspace.name}" created`)
+    router.push(`/${workspace.slug}`)
+  }
+
+  async function handleSend() {
+    const workspace = await sendWorkspace(slug)
+    if (!workspace) {
+      toast.error(useDesktopTransferStore.getState().error ?? "The workspace wasn't copied. Please try again.")
+      return
+    }
+    const url = workspace.url
+    toast.success(`"${workspace.name}" is in the web app`, url
+      ? { action: { label: "Open", onClick: () => openWeb(url) } }
+      : undefined)
+  }
+
+  return (
+    <SectionCard
+      title="Move or back up this workspace"
+      description="The whole workspace in one file: its Brain OS, and every project you can see with its issues, history, pages and attachments."
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-foreground">Workspace file</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Download it to keep a copy, or to open it in the {IS_DESKTOP ? "web app" : "desktop app"}.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" className="h-8 shrink-0 text-xs" onClick={() => void handleDownload()}>
+            Download
+          </Button>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-foreground">Import a workspace file</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Creates a new workspace from a TaskForce workspace file.</p>
+          </div>
+          <label className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8 shrink-0 cursor-pointer text-xs")}>
+            {importing ? "Importing…" : "Choose a file"}
+            <input
+              type="file"
+              accept=".zip,application/zip"
+              className="sr-only"
+              disabled={importing}
+              onChange={(e) => void handleImport(e.target.files?.[0])}
+            />
+          </label>
+        </div>
+        {IS_DESKTOP && (
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Copy to the web app</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Creates a new workspace in the web app with all of this one. It stays on this computer too.
+              </p>
+            </div>
+            <Button size="sm" className="h-8 shrink-0 text-xs" disabled={moving !== null} onClick={() => void handleSend()}>
+              {moving !== null ? "Copying…" : "Copy"}
+            </Button>
+          </div>
+        )}
+      </div>
+    </SectionCard>
+  )
+}
+
 function WorkspacePanel() {
   const router = useRouter()
   const { activeWorkspace, updateWorkspaceInfo, deleteCurrentWorkspace } = useWorkspaceStore()
@@ -1092,6 +1193,8 @@ function WorkspacePanel() {
           </div>
         </div>
       </SectionCard>
+
+      {activeWorkspace && <WorkspaceMoveCard slug={activeWorkspace.slug} />}
 
       {isOwner && (
         <Zone variant="danger" title="Danger zone" description="Irreversible actions. Use with caution.">

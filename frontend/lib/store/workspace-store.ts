@@ -17,7 +17,9 @@ import {
   updateMemberRole,
   removeMember,
   deleteWorkspace as deleteWorkspaceApi,
+  importWorkspaceBundle,
 } from "../api/workspace-service";
+import { getErrorMessage } from "../api/client";
 
 interface WorkspaceState {
   /** Liste de tous les workspaces de l'utilisateur */
@@ -40,6 +42,13 @@ interface WorkspaceState {
 
   /** Crée un nouveau workspace */
   createWorkspace: (payload: CreateWorkspacePayload) => Promise<Workspace | null>;
+
+  /**
+   * Crée un nouvel espace depuis un fichier d'espace TaskForce et l'ajoute à la liste. `null` si l'import échoue : le
+   * message du serveur est dans `importError`.
+   */
+  importWorkspace: (file: Blob, onProgress?: (pct: number) => void) => Promise<Workspace | null>;
+  importError: string | null;
 
   /** Met à jour les infos du workspace actif */
   updateWorkspaceInfo: (payload: UpdateWorkspacePayload) => Promise<Workspace | null>;
@@ -114,6 +123,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return workspace;
     } catch {
       set({ isLoading: false });
+      return null;
+    }
+  },
+
+  importError: null,
+
+  importWorkspace: async (file, onProgress) => {
+    set({ importError: null });
+    try {
+      const workspace = await importWorkspaceBundle(file, onProgress);
+      set((state) => ({ workspaces: [...state.workspaces, workspace] }));
+      return workspace;
+    } catch (err) {
+      set({ importError: getErrorMessage(err) });
       return null;
     }
   },

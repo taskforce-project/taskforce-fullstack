@@ -245,6 +245,10 @@ export function getErrorMessage(error: unknown): string {
       return rateLimitMessage(error.response.headers?.["retry-after"]);
     }
     const apiError = error.response?.data as ApiError;
+    // Corps refusé par le relais devant l'API (Cloudflare), qui ne répond pas dans l'enveloppe de l'API.
+    if (error.response?.status === 413 && !apiError?.message) {
+      return "This file is too large to upload.";
+    }
     return apiError?.message || error.message || "Something went wrong";
   }
 
