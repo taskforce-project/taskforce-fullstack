@@ -396,6 +396,8 @@ function DesktopAccountPanel() {
 function DesktopAppSection() {
   const bridge = desktopBridge()
   const [checking, setChecking] = useState(false)
+  // Version du Microsoft Store : le Store installe les mises à jour, l'app ne les cherche pas.
+  const fromStore = bridge?.updates === "store"
 
   async function checkUpdates() {
     if (!bridge) return
@@ -412,6 +414,9 @@ function DesktopAppSection() {
       case "development":
         toast.info("Updates are checked in the installed app.")
         break
+      case "store":
+        toast.info("Updates come from the Microsoft Store.")
+        break
       default:
         toast.error("Couldn't check for updates. Check your connection and try again.")
     }
@@ -420,13 +425,19 @@ function DesktopAppSection() {
   return (
     <SectionCard
       title="TaskForce Desktop"
-      description={`Version ${bridge?.version ?? ""}. Updates download by themselves and install when you quit TaskForce.`}
+      description={`Version ${bridge?.version ?? ""}. ${
+        fromStore
+          ? "Updates come from the Microsoft Store."
+          : "Updates download by themselves and install when you quit TaskForce."
+      }`}
     >
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" onClick={() => void checkUpdates()} disabled={checking}>
-          {checking && <Loader2 className="size-3.5 animate-spin" />}
-          Check for updates
-        </Button>
+        {!fromStore && (
+          <Button size="sm" variant="outline" onClick={() => void checkUpdates()} disabled={checking}>
+            {checking && <Loader2 className="size-3.5 animate-spin" />}
+            Check for updates
+          </Button>
+        )}
         <Button size="sm" variant="outline" onClick={() => void bridge?.openLogs?.()}>
           Open logs folder
         </Button>

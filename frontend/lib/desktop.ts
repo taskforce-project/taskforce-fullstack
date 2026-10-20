@@ -102,11 +102,12 @@ export interface DesktopGitHubRepo {
 
 /**
  * Vérification des mises à jour : à jour, nouvelle version en cours de téléchargement (installée à la fermeture),
- * impossible pour l'instant (hors ligne), ou app lancée depuis les sources.
+ * impossible pour l'instant (hors ligne), app lancée depuis les sources, ou version du Microsoft Store (mise à jour par
+ * le Store).
  */
 export type DesktopUpdateCheck =
   | { status: "up-to-date" | "downloading"; version: string }
-  | { status: "unavailable" | "development" };
+  | { status: "unavailable" | "development" | "store" };
 
 /** Ce que la coque expose à la fenêtre de l'app. */
 export interface DesktopBridge {
@@ -117,6 +118,8 @@ export interface DesktopBridge {
   readonly email: string;
   /** Compte déjà configuré sur la webapp (onboarding fait en ligne) : l'app en a repris les réglages. */
   readonly onboardedOnline?: boolean;
+  /** Qui installe les mises à jour : l'app elle-même, ou le Microsoft Store pour sa version Store. Absent : l'app. */
+  readonly updates?: "app" | "store";
   /** Déconnecte le compte de cet ordinateur : la coque oublie la session et rouvre l'écran de connexion. */
   signOut(): Promise<void>;
   /** Ouvre le compte TaskForce en ligne (mot de passe, double authentification, suppression) dans le navigateur. */
