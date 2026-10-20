@@ -2,7 +2,8 @@
 // dist/<langue>/email.html (animations), email-static.html (images fixes), email.txt (texte brut, src/email.<langue>.txt),
 // et dist/preview/<langue>/ (aperçu local : images du dépôt, balises Brevo remplacées par des exemples).
 // S'arrête si une clé de texte manque ou ne sert pas, si un jeton reste, si un tiret long ou demi-long s'est glissé, si
-// une balise Brevo inconnue apparaît, si une image n'a pas de texte alternatif, ou si Gmail couperait le message.
+// une balise Brevo inconnue apparaît, si une image n'a pas de texte alternatif (sauf une image décorative, marquée
+// role="presentation" avec alt=""), ou si Gmail couperait le message.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
@@ -65,7 +66,8 @@ function check(name, content, isHtml) {
   }
   if (isHtml) {
     for (const [img] of content.matchAll(/<img\b[^>]*>/g)) {
-      if (!/\balt="[^"]+"/.test(img)) problems.push(`image without alt text: ${img.slice(0, 80)}`);
+      const decorative = /\brole="presentation"/.test(img) && /\balt=""/.test(img);
+      if (!decorative && !/\balt="[^"]+"/.test(img)) problems.push(`image without alt text: ${img.slice(0, 80)}`);
     }
     const bytes = Buffer.byteLength(content);
     if (bytes > MAX_HTML_BYTES) problems.push(`HTML is ${bytes} bytes, over ${MAX_HTML_BYTES}`);
@@ -73,7 +75,7 @@ function check(name, content, isHtml) {
   if (problems.length) fail(name, problems);
 }
 
-function render(lang, strings, { asset, demo, steps }) {
+function render(lang, strings, { asset, hero, demo, steps, end }) {
   const missing = [...KEYS].filter((key) => !(key in strings));
   const unused = Object.keys(strings).filter((key) => !KEYS.has(key) && key !== "help_subject");
   if (missing.length || unused.length) {
@@ -81,7 +83,8 @@ function render(lang, strings, { asset, demo, steps }) {
   }
   let html = template.replace(/\[\[([a-z0-9_]+)\]\]/g, (_, key) => strings[key]);
   for (const [token, value] of Object.entries(urls(strings))) html = html.replaceAll(`%${token}%`, value.replaceAll("&", "&amp;"));
-  return html.replaceAll("%ASSET%", asset).replaceAll("%DEMO%", demo).replaceAll("%STEPS%", steps);
+  return html.replaceAll("%ASSET%", asset).replaceAll("%HERO%", hero).replaceAll("%DEMO%", demo)
+    .replaceAll("%STEPS%", steps).replaceAll("%END%", end);
 }
 
 function write(file, content, isHtml) {
@@ -102,8 +105,8 @@ for (const lang of LANGS) {
   const preview = join(DIST, "preview", lang);
   mkdirSync(out, { recursive: true });
   mkdirSync(preview, { recursive: true });
-  const animated = { demo: "demo.gif", steps: `steps-${lang}.gif` };
-  const still = { demo: "demo-static.jpg", steps: `steps-${lang}.png` };
+  const animated = { hero: "hero.gif", demo: "demo.gif", steps: `steps-${lang}.gif`, end: "end.gif" };
+  const still = { hero: "hero.jpg", demo: "demo-static.jpg", steps: `steps-${lang}.png`, end: "end.jpg" };
   write(join(out, "email.html"), render(lang, strings, { asset: ASSET, ...animated }), true);
   write(join(out, "email-static.html"), render(lang, strings, { asset: ASSET, ...still }), true);
   write(join(out, "email.txt"), readFileSync(join(ROOT, `src/email.${lang}.txt`), "utf8"), false);

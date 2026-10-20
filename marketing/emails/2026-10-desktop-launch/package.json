@@ -6,6 +6,7 @@
   "scripts": {
     "capture": "node scripts/capture.mjs",
     "compose": "node scripts/compose.mjs",
+    "motion": "node scripts/motion.mjs",
     "steps": "node scripts/steps.mjs",
     "build": "node scripts/build.mjs",
     "preview": "node scripts/preview.mjs",
