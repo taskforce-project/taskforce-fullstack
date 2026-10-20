@@ -10,6 +10,12 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 20/10/2026 - Release 1.1.4 EN PROD (PR #373, `077b3ccb`) et TaskForce Desktop 1.0.3 publiée.** `[release]`
+> - PR #372 fusionnée dans `dev` (CI verte, dont l'installeur Windows construit par GitHub Actions avec `installer.nsh`) ; release = arbre exact de `dev` sur `main`, version produit 1.1.4 posée par la CI (`c945d8a1`), `--admin --squash`.
+> - **En prod** : `taskforce-project.fr/goodbye` répond 200 (hors index, peinture de l'accueil).
+> - TaskForce Desktop 1.0.3 publiée depuis `main` (run 39412111112) : `desktop-v1.0.3` en préversion non signée (installeur Windows 285 Mo, `.deb` 265 Mo, AppImage 303 Mo) ; `desktop-latest` (mises à jour) en 1.0.3.
+> - `dev` réaligné en 1.1.4 (cette trace) ; la release suivante (cette trace seule) reconstruit le site pour qu'il propose la 1.0.3.
+
 > **▶ MAJ 20/10/2026 - Désinstallation : une page « merci » (desktop 1.0.3).** `[desktop + landing]`
 > - **Demande du CEO** : « un truc plus sympa genre merci, avec fond comme la page de login ». Page `/goodbye` du site (`c602eedb`) sur la peinture de l'accueil, celle des pages de connexion : « Thanks for trying TaskForce », les projets restent sur l'ordinateur et le compte reste ouvert, liens vers le téléchargement et les issues GitHub, comment tout effacer (`%APPDATA%\TaskForce`, suppression du compte dans Settings > Privacy & Data). Hors index et hors sitemap.
 > - **Désinstalleur Windows** (`0cd0a7e1`) : `desktop/installer.nsh` (`nsis.include`) ouvre cette page après une désinstallation demandée par la personne ; pas pendant une mise à jour (l'installeur lance l'ancien désinstalleur avec `--updated`), ni en silencieux (`/S`). Le script vit hors de `build/`, dossier généré et ignoré par git. Les désinstalleurs déjà installés (1.0.0 à 1.0.2) n'ont pas ce crochet : il arrive avec la mise à jour en 1.0.3.
