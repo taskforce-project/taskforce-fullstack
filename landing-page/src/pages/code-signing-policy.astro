@@ -1,9 +1,8 @@
 ---
 /**
- * Politique de signature du code, exigée par la SignPath Foundation (certificat gratuit des projets open source) :
- * ce qui est signé et comment, l'équipe et ses rôles, la confidentialité, la mention de SignPath. Liée depuis le pied
- * de page (donc l'accueil) et la page de téléchargement. `SIGNED_BUILDS.windows` passe à vrai quand la signature est
- * en place : le statut de la page suit.
+ * Politique de signature du code : où en est la signature des installeurs, comment ils sont construits, qui publie, la
+ * confidentialité, et comment vérifier un fichier (empreinte SHA-256, rapport VirusTotal). Liée depuis le pied de page
+ * et la page de téléchargement. `SIGNED_BUILDS.windows` passe à vrai quand l'installeur Windows est signé.
  */
 import LegalDoc from "@/layouts/LegalDoc.astro";
 import { LINKS } from "@/lib/site";
@@ -14,39 +13,35 @@ const WORKFLOW = `${LINKS.github}/blob/main/.github/workflows/desktop-release.ym
 
 <LegalDoc
   title="Code signing policy"
-  description="How TaskForce Desktop for Windows is built and signed: from the public source code, by GitHub Actions, with a certificate by the SignPath Foundation."
+  description="How TaskForce Desktop is built and published, whether its installers are signed, and how to check a download."
   updated="20 October 2026"
 >
   <h2>Signing</h2>
   {
     SIGNED_BUILDS.windows ? (
-      <p>
-        Free code signing provided by <a href="https://signpath.io">SignPath.io</a>, certificate by{" "}
-        <a href="https://signpath.org">SignPath Foundation</a>.
-      </p>
+      <p>The TaskForce Desktop installer for Windows is code-signed.</p>
     ) : (
       <p>
-        We are setting up free code signing provided by <a href="https://signpath.io">SignPath.io</a>, certificate by{" "}
-        <a href="https://signpath.org">SignPath Foundation</a>, for TaskForce Desktop for Windows. Until it is in place, the
-        Windows installer is not signed, and Windows or your antivirus may warn you before running it.
+        The installers of TaskForce Desktop are not code-signed yet. Windows, and some antivirus programs that do not
+        know a new file yet, may warn you before running it: the <a href="/download#install">download page</a> says what
+        to do. Until the installers are signed, the sections below say how each file is built and how to check it.
       </p>
     )
   }
 
-  <h2>What we sign</h2>
+  <h2>How a release is built</h2>
   <ul>
     <li>
-      The TaskForce Desktop installer for Windows (<code>TaskForce-Setup-&lt;version&gt;.exe</code>), published on the{" "}
+      The installers (Windows <code>.exe</code>, Linux <code>.deb</code> and AppImage) are published on the{" "}
       <a href="/download">download page</a> and in the project's GitHub releases.
     </li>
     <li>
-      It is built from the public source code of the <code>main</code> branch by the{" "}
-      <a href={WORKFLOW}>Desktop - Release</a> workflow on GitHub Actions. We sign nothing built anywhere else, and only
-      binaries built from this repository.
+      They are built from the public source code of the <code>main</code> branch by the{" "}
+      <a href={WORKFLOW}>Desktop - Release</a> workflow on GitHub Actions. Nothing built anywhere else is published.
     </li>
     <li>
       The app bundles open source components from other projects (Electron, a Java runtime, PostgreSQL). They keep
-      their own publishers' signatures, or none: we do not sign them in their name.
+      their own publishers' signatures, or none.
     </li>
   </ul>
 
@@ -57,9 +52,9 @@ const WORKFLOW = `${LINKS.github}/blob/main/.github/workflows/desktop-release.ym
       Changes from anyone outside the team come as pull requests, reviewed by a committer before they are merged.
     </li>
     <li>
-      <strong>Approvers:</strong> Pierre Michel. Every signing request is approved by hand, release by release.
+      <strong>Release approvers:</strong> Pierre Michel. Every release is started by hand.
     </li>
-    <li>Team members must use two-factor authentication on GitHub and on SignPath.</li>
+    <li>Team members must use two-factor authentication on GitHub.</li>
   </ul>
 
   <h2>Privacy</h2>
@@ -71,7 +66,10 @@ const WORKFLOW = `${LINKS.github}/blob/main/.github/workflows/desktop-release.ym
 
   <h2>Check a download</h2>
   <p>
-    Each file of a release shows its SHA-256 digest on its <a href={`${LINKS.github}/releases`}>GitHub release page</a>.
-    On Windows, compare it with <code>Get-FileHash TaskForce-Setup-&lt;version&gt;.exe</code> in PowerShell.
+    Each file of a release shows its SHA-256 digest on the <a href="/download">download page</a> and on its{" "}
+    <a href={`${LINKS.github}/releases`}>GitHub release page</a>. On Windows, compare it with{" "}
+    <code>Get-FileHash TaskForce-Setup-&lt;version&gt;.exe</code> in PowerShell; on Linux, with{" "}
+    <code>sha256sum</code>. When a file has been sent to VirusTotal, its report is linked next to it on the download
+    page.
   </p>
 </LegalDoc>
