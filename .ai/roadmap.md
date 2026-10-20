@@ -10,7 +10,8 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
-> **▶ MAJ 20/10/2026 (soir) - E-mail de lancement : version française d'abord, plus courte, étapes animées (branche `feature/desktop`).** `[marketing + landing]`
+> **▶ MAJ 20/10/2026 (soir) - Release 1.3.2 EN PROD (PR #389, release #390, `6a24f990`) : e-mail de lancement en français d'abord, plus court, étapes animées.** `[marketing + landing + release]`
+> - Images des étapes en ligne ; `npm run check` : les 21 adresses des deux langues répondent. Vérifications de #389 toutes vertes (le contrôle des étiquettes avait tourné avant la pose de l'étiquette), version produit 1.3.2, `dev` réaligné. Reste au CEO : choisir les destinataires et envoyer `dist/fr/email.html` depuis Brevo.
 > - **Retours du CEO** : tous les destinataires sont francophones ; texte trop long ; dans la partie sécurité, proposer son aide ; mieux faire le motion design des étapes (pas des captures) ; le logo à la fin.
 > - **Fait** (`3e18e139`, `a755cb35`, `f6652d49`) : un gabarit pour deux langues (`src/strings/fr.json`, `en.json`), le build vérifie qu'aucune clé ne manque ni ne traîne ; texte resserré (la partie « valeur » fondue dans la démo, cartes réduites à l'essentiel, vouvoiement comme son P.S.) ; étapes = animation verticale de 300 px (pastilles reliées par une ligne cobalt, onde puis coche, icônes Lucide du site, lisible à taille réelle sur mobile, 1re image complète pour Outlook) avec, à côté, « Si Windows hésite » et « Besoin d'aide ? Écrivez-moi, je vous accompagne » ; logo en pied d'e-mail. `dist/fr/email.html` = ce qui va dans Brevo (23,5 Ko).
 
