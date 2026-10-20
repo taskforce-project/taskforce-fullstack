@@ -1,9 +1,9 @@
 ---
 /**
  * Migrate : passer de la webapp hébergée à l'app desktop. Les libellés sont ceux de l'app (Projects > From the web
- * app, menu Export du projet, New project > From a file) ; ce qui voyage suit le fichier de projet (`ProjectBundle`).
- * À tenir à jour : date de fermeture (WEB_APP_CLOSES) et la liste MISSING si un export Brain OS arrive. Les étapes
- * forment une suite : elles sont numérotées, en frise.
+ * app > Copy everything, Settings > General > Copy to the web app, fichiers d'espace et de projet) ; ce qui voyage suit
+ * les fichiers d'espace et de projet (`WorkspaceBundleService`, `ProjectBundle`). À tenir à jour : date de fermeture
+ * (WEB_APP_CLOSES). Les étapes forment une suite : elles sont numérotées, en frise.
  */
 import { ArrowRight, Check, Minus } from "lucide-react";
 import BaseLayout from "@/layouts/BaseLayout.astro";
@@ -29,30 +29,34 @@ const STEPS = [
   },
   {
     n: "03",
-    t: "Bring your projects",
-    d: "TaskForce shows the projects you have on the web app. Pick the ones to copy to this computer: they arrive with their issues, comments, history, pages and attachments.",
+    t: "Bring your work",
+    d: "In the app, open Projects, then From the web app, and click Copy everything. Each workspace arrives with its Brain OS and its projects, with their issues, comments, history and attachments.",
     dot: "bg-tint-pink text-ink-pink",
   },
   {
     n: "04",
     t: "Save what doesn't move",
-    d: "Before the web app closes, copy the Brain OS pages you want to keep, and connect your tools again. The list is below.",
+    d: "Connect GitHub and your other tools again, and choose your AI. The list is below.",
     dot: "bg-tint-yellow text-ink-yellow",
   },
 ];
 
 const INCLUDED = [
+  "Your workspaces, with their Brain OS pages, links and files",
   "Every issue and sub-issue, with its description, status, priority, labels, dates and story points",
   "Comments, checklists, time entries and each issue's history",
   "Cycles, project pages and attachments",
 ];
 
 const MISSING = [
-  { t: "Brain OS pages", d: "Copy the pages you want to keep before the web app closes." },
   { t: "Connections and AI settings", d: "Connect GitHub and your tools again, and choose your AI on first launch." },
   {
     t: "Your teammates",
     d: "The desktop app is for one person. Issues and comments keep the names of the people who wrote them.",
+  },
+  {
+    t: "AI history",
+    d: "Conversations with the assistant, saved charts and past AI analyses start afresh on your computer.",
   },
 ];
 
@@ -74,12 +78,12 @@ const FAQ: FaqItem[] = [
     a: "The desktop app is made for one person, with no sync between computers. Each teammate can install it and copy the projects they work on.",
   },
   {
-    q: "Can I send a project back to the web app?",
-    a: "Yes, while the web app is open. In the desktop app, open the project, then Export, then Copy to the web app, and pick a workspace. The project also stays on your computer.",
+    q: "Can I send my work back to the web app?",
+    a: "Yes, while the web app is open. In the desktop app, open Settings, then General, and click Copy to the web app: the whole workspace goes, Brain OS included. A single project goes from its Export menu. Your work also stays on your computer.",
   },
   {
-    q: "Can I keep a copy of a project?",
-    a: "Yes. A project's Export menu offers a TaskForce project file: the whole project in one .zip file. To open it again, in the web app or the desktop app, click New project, then From a file.",
+    q: "Can I keep a copy of my work?",
+    a: "Yes. Settings, then General, offers the workspace file: the whole workspace in one .zip file, Brain OS included. A project's Export menu offers the project file. Both open again in the web app or the desktop app.",
   },
   {
     q: "Can I keep a copy of my account data?",
