@@ -317,6 +317,20 @@ class DesktopSessionServiceTest {
         }
 
         @Test
+        @DisplayName("l'utilisateur d'une session valable sert au déplacement de projets, sans prolonger la session")
+        void the_user_of_a_session() {
+            String token = DesktopSessionService.PREFIX + "d".repeat(43);
+            DesktopSession session = session(token);
+            when(sessionRepository.findByTokenHashWithUser(DesktopSessionService.sha256(token))).thenReturn(Optional.of(session));
+
+            assertThat(service.userOf(token)).contains(7L);
+            assertThat(service.userOf("tfa_unknown")).isEmpty();
+            session.setRevokedAt(LocalDateTime.of(2026, 10, 18, 0, 0));
+            assertThat(service.userOf(token)).isEmpty();
+            verify(sessionRepository, never()).save(any());
+        }
+
+        @Test
         @DisplayName("revue moins d'une heure après, la session n'est pas réécrite")
         void touches_at_most_hourly() {
             String token = DesktopSessionService.PREFIX + "b".repeat(43);

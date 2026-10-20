@@ -173,6 +173,15 @@ public class DesktopSessionService {
         return found.map(session -> new DesktopSessionResponse(null, session.getExpiresAt(), account(session.getUser())));
     }
 
+    /**
+     * Utilisateur d'une session encore valable, sans la prolonger : l'app s'en sert pour déplacer des projets entre la
+     * webapp et l'ordinateur. Vide si la session n'est plus valable.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Long> userOf(String token) {
+        return valid(token).map(session -> session.getUser().getId());
+    }
+
     /** Ferme la session de ce jeton ; sans effet s'il est inconnu ou déjà fermé. */
     @Transactional
     public void revoke(String token) {
