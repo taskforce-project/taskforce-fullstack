@@ -20,6 +20,9 @@
 > - **Copie avant mise à jour** (`1692a144`) : version de l'app changée → `pg_dump` dans `backups/` avant Flyway, 3 copies gardées ; Réglages > Privacy & Data ouvre le dossier.
 > - **Notifications du système** (`3ceb3cb5`) : fenêtre en arrière-plan → notification au nom de l'app, un clic ramène sur le ticket.
 > - **Vérifié** : tests ciblés backend (dont `ProjectBundleServiceIntegrationTest` sur un vrai Postgres : export puis import dans un autre espace, dates, numéros, liens, pièces jointes, fichier piégé), coque 184 + 10 tests, frontend 1128 tests avec les seuils de couverture, site construit en conteneur. **Pas encore vu à l'écran avec la vraie app** (prochaine version desktop).
+> - **Copilot et liens de PR dans l'app** (`62d3946b`, `f03cb517`, `1519c80b`, `e00100e2`) : relais du jeton du GitHub CLI par la coque (127.0.0.1, jeton de service) ; `GitHubTokenSource` (espace sur le serveur, `gh` dans l'app) pour Copilot et la relecture des PR ; PR d'un run d'agent liée seule à son ticket ; PR fusionnée = ticket terminé (`MergedPullRequests`, par `IssueService.updateIssue`) ; l'app relit les PR ouvertes toutes les 5 min. Copilot **pas essayé** (pas d'abonnement).
+> - **CRLF** : `ProjectService.java` avait perdu ses fins de ligne CRLF au commit du fichier de projet (`sed -i`) ; rétablies (`327f12f4`), le changement net est d'une ligne.
+> - **App desktop 1.1.0** (`37eb53eb`), à publier après la mise en prod.
 
 > **▶ MAJ 20/10/2026 - Release 1.1.5 EN PROD (PR #376, `72ac837b`) : guide d'installation et vérification des fichiers sur le site.** `[release]`
 > - PR #375 fusionnée dans `dev` (CI verte, dont les paquets Windows et Linux construits avec le workflow de release modifié) ; release = arbre exact de `dev` sur `main`, version produit 1.1.5 posée par la CI (`91fc070d`), `--admin --squash`.
