@@ -10,6 +10,11 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 20/10/2026 (soir) - Release 1.3.0 EN PROD (PR #382, `651f4ec2`) ; TaskForce Desktop 1.2.0 en publication.** `[release]`
+> - PR #381 fusionnée dans `dev` (CI verte : 26 vérifications) ; release = arbre exact de `dev` sur `main`, version produit 1.3.0 posée par la CI (`6b251941`), vérifications du commit de release toutes vertes, `--admin --squash`.
+> - Desktop 1.2.0 : `Desktop - Release` lancé depuis `main` (run 39455682590) ; le site sera reconstruit après sa publication. `dev` réaligné en 1.3.0 (`b2a585ac`).
+> - **Plan du CEO (20/10)** : il passe sa 1.1.0 en 1.2.0 par la mise à jour de l'app (essai de la mise à jour), puis on envoie les e-mails aux utilisateurs (son prompt, son accord avant l'envoi), puis le Microsoft Store à part (version Store en plus du .exe du site, qui garde la mise à jour dans l'app).
+
 > **▶ MAJ 20/10/2026 (soir) - Tout le travail d'un côté à l'autre : le fichier d'espace (espace + Brain OS + projets), desktop 1.2.0 (branche `feature/desktop`).** `[backend + frontend + desktop + landing]`
 > - **Demande du CEO** : passer de la webapp à l'app desktop et inversement avec TOUT son travail (plusieurs espaces, projets, Brain OS complet), simplement.
 > - **Backend** (`349b91f9`, `5d2f5a44`, `ef52549d`) : `GET /api/workspaces/{slug}/bundle` et `POST /api/workspaces/import` (`WorkspaceBundleService`) ; le fichier de projet devient réutilisable sous un préfixe (`projects/<id>/`). L'import crée toujours un **nouvel** espace dont la personne est propriétaire ; projets recréés sans `ProjectCreatedEvent` (l'écouteur réécrirait la fiche projet venue du fichier) ; pages du Brain OS avec `uuid` neuf, parents, références, `metadata` et adresses de fichiers repassés par la correspondance ; vecteurs recalculés par `BrainEmbeddingIndexer` ; tout ou rien. Routes de l'app : `/api/auth/desktop/transfer/workspace` et `/workspace-import`.
