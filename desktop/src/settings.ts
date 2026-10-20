@@ -12,6 +12,11 @@ export interface Account {
   email: string;
   givenName: string;
   familyName: string;
+  /**
+   * Réglages du compte en ligne (rôle, profil de compétences, préférences de notification, onboarding fait), rendus
+   * par l'API à la connexion et à chaque lancement : l'app les reprend tant que son onboarding n'est pas fait.
+   */
+  profile?: Record<string, unknown>;
 }
 
 /** Secrets d'un compte sur ce poste, chiffrés par le système (DPAPI, Trousseau, libsecret). */
