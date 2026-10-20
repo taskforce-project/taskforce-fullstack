@@ -94,7 +94,6 @@ public class ProjectBundleService {
         + "TaskForce can't read. Update TaskForce, then try again.";
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final Pattern FILE_ENTRY = Pattern.compile("files/(\\d{1,18})");
     private static final Pattern EXTENSION = Pattern.compile("\\.[A-Za-z0-9]{1,10}$");
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -174,7 +173,13 @@ public class ProjectBundleService {
     /** Écrit le fichier : le JSON du projet, puis chaque pièce jointe lue dans le stockage (une absente est sautée). */
     public void write(Export export, OutputStream out) throws IOException {
         ZipOutputStream zip = new ZipOutputStream(out);
-        zip.putNextEntry(new ZipEntry(ProjectBundle.MANIFEST));
+        writeEntries(export, zip, "");
+        zip.finish();
+    }
+
+    /** Écrit le projet dans une archive, sous {@code prefix} : vide pour un fichier de projet, {@code projects/<id>/} dans un fichier d'espace. */
+    public void writeEntries(Export export, ZipOutputStream zip, String prefix) throws IOException {
+        zip.putNextEntry(new ZipEntry(prefix + ProjectBundle.MANIFEST));
         zip.write(export.manifest());
         zip.closeEntry();
         for (StoredFile file : export.files()) {
@@ -186,15 +191,14 @@ public class ProjectBundleService {
                 continue;
             }
             try (in) {
-                zip.putNextEntry(new ZipEntry(ProjectBundle.FILES + file.id()));
+                zip.putNextEntry(new ZipEntry(prefix + ProjectBundle.FILES + file.id()));
                 in.transferTo(zip);
                 zip.closeEntry();
             }
         }
-        zip.finish();
     }
 
-    private String schemaVersion() {
+    public String schemaVersion() {
         List<String> versions = jdbc.getJdbcTemplate().queryForList(
             "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1", String.class);
         return versions.isEmpty() ? null : versions.getFirst();
@@ -218,9 +222,8 @@ public class ProjectBundleService {
             throw new BusinessException("You're not a member of this workspace");
         }
         try (ZipFile zip = new ZipFile(file.toFile())) {
-            Map<Long, ZipEntry> attachments = fileEntries(zip);
-            ObjectNode manifest = readManifest(zip);
-            Long projectId = new Importer(workspace, userId, manifest, zip, attachments).run();
+            checkEntryCount(zip);
+            Long projectId = importProject(workspace, userId, zip, "").projectId();
             events.publishEvent(new ProjectCreatedEvent(slug, workspace.getId(), projectId, userId));
             log.info("Projet {} importé dans le workspace {} par l'utilisateur {}", projectId, workspace.getId(), userId);
             return projectId;
@@ -234,16 +237,38 @@ public class ProjectBundleService {
         }
     }
 
-    /** Pièces jointes de l'archive, par identifiant ; les autres entrées sont ignorées (jamais écrites sur le disque). */
-    private static Map<Long, ZipEntry> fileEntries(ZipFile zip) {
+    /** Projet importé : son identifiant, et la correspondance des identifiants du fichier avec ceux de cette base, par table. */
+    public record Imported(Long projectId, Map<String, Map<Long, Long>> ids) {
+    }
+
+    /**
+     * Recrée le projet rangé sous {@code prefix} dans l'archive (vide pour un fichier de projet), sans annoncer sa
+     * création : un espace importé apporte lui-même la fiche de ses projets dans son Brain OS. À appeler dans une
+     * transaction.
+     */
+    public Imported importProject(Workspace workspace, Long userId, ZipFile zip, String prefix) throws IOException {
+        Map<Long, ZipEntry> attachments = fileEntries(zip, prefix);
+        ObjectNode manifest = readManifest(zip, prefix);
+        Importer importer = new Importer(workspace, userId, manifest, zip, attachments);
+        Long projectId = importer.run();
+        return new Imported(projectId, importer.ids);
+    }
+
+    /** Une archive de plus de {@link #MAX_ENTRIES} entrées est refusée avant toute lecture. */
+    static void checkEntryCount(ZipFile zip) {
         if (zip.size() > MAX_ENTRIES) {
             throw new BusinessException(TOO_LARGE);
         }
+    }
+
+    /** Pièces jointes du projet rangé sous {@code prefix}, par identifiant ; rien n'est jamais écrit sur le disque. */
+    private static Map<Long, ZipEntry> fileEntries(ZipFile zip, String prefix) {
+        Pattern fileEntry = Pattern.compile(Pattern.quote(prefix + ProjectBundle.FILES) + "(\\d{1,18})");
         Map<Long, ZipEntry> files = new HashMap<>();
         Enumeration<? extends ZipEntry> entries = zip.entries();
         while (entries.hasMoreElements()) {
             ZipEntry entry = entries.nextElement();
-            Matcher matcher = FILE_ENTRY.matcher(entry.getName());
+            Matcher matcher = fileEntry.matcher(entry.getName());
             if (matcher.matches()) {
                 files.put(Long.parseLong(matcher.group(1)), entry);
             }
@@ -251,8 +276,8 @@ public class ProjectBundleService {
         return files;
     }
 
-    private static ObjectNode readManifest(ZipFile zip) throws IOException {
-        ZipEntry entry = zip.getEntry(ProjectBundle.MANIFEST);
+    private static ObjectNode readManifest(ZipFile zip, String prefix) throws IOException {
+        ZipEntry entry = zip.getEntry(prefix + ProjectBundle.MANIFEST);
         if (entry == null) {
             throw new BusinessException(NOT_A_BUNDLE);
         }
@@ -275,7 +300,7 @@ public class ProjectBundleService {
         return manifest;
     }
 
-    private static JsonNode parse(byte[] json) {
+    static JsonNode parse(byte[] json) {
         try {
             return JSON.readTree(json);
         } catch (IOException e) {
@@ -312,10 +337,10 @@ public class ProjectBundleService {
     }
 
     /** Colonnes d'une table dans cette base : leurs noms, celles qui sont obligatoires, et ses clés étrangères. */
-    private record Columns(Set<String> names, Set<String> required, Set<String> foreignKeys) {
+    public record Columns(Set<String> names, Set<String> required, Set<String> foreignKeys) {
     }
 
-    private Columns columns(String table) {
+    public Columns columns(String table) {
         Map<String, Object> params = Map.of("table", table);
         Set<String> names = new HashSet<>();
         Set<String> required = new HashSet<>();
@@ -333,6 +358,37 @@ public class ProjectBundleService {
             + "WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = current_schema() AND tc.table_name = :table",
             params, String.class));
         return new Columns(names, required, foreignKeys);
+    }
+
+    /**
+     * Recrée une ligne du fichier par {@code json_populate_record}, qui convertit chaque valeur dans le type de sa
+     * colonne. Seules les colonnes qui existent dans cette base sont écrites (aucun nom ne vient du fichier tel quel).
+     *
+     * @param table      table, d'une liste fixe
+     * @param returnId   rendre l'identifiant de la ligne créée
+     * @param onConflict suite de l'INSERT (« ON CONFLICT DO NOTHING ») ou vide
+     * @return l'identifiant, ou {@code null} (pas d'identifiant demandé, ligne vide, ou ignorée sur conflit)
+     */
+    public Long insertRow(String table, Columns columns, ObjectNode row, boolean returnId, String onConflict) {
+        List<String> names = new ArrayList<>();
+        row.fieldNames().forEachRemaining(name -> {
+            if (columns.names().contains(name)) {
+                names.add(name);
+            }
+        });
+        if (names.isEmpty()) {
+            return null;
+        }
+        String list = names.stream().map(name -> '"' + name + '"').collect(Collectors.joining(", "));
+        String sql = "INSERT INTO " + table + " (" + list + ") SELECT " + list
+            + " FROM json_populate_record(NULL::" + table + ", CAST(:row AS json))" + (onConflict.isEmpty() ? "" : " " + onConflict);
+        MapSqlParameterSource params = new MapSqlParameterSource("row", row.toString());
+        if (!returnId) {
+            jdbc.update(sql, params);
+            return null;
+        }
+        List<Long> created = jdbc.queryForList(sql + " RETURNING id", params, Long.class);
+        return created.isEmpty() ? null : created.getFirst();
     }
 
     /** Un import en cours : la correspondance des identifiants du fichier avec ceux de cette base. */
@@ -440,24 +496,7 @@ public class ProjectBundleService {
         }
 
         private Long write(ProjectBundle.Table table, Columns columns, ObjectNode row) {
-            List<String> names = new ArrayList<>();
-            row.fieldNames().forEachRemaining(name -> {
-                if (columns.names().contains(name)) {
-                    names.add(name);
-                }
-            });
-            if (names.isEmpty()) {
-                return null;
-            }
-            String list = names.stream().map(name -> '"' + name + '"').collect(Collectors.joining(", "));
-            String sql = "INSERT INTO " + table.name() + " (" + list + ") SELECT " + list
-                + " FROM json_populate_record(NULL::" + table.name() + ", CAST(:row AS json))";
-            MapSqlParameterSource params = new MapSqlParameterSource("row", row.toString());
-            if (!table.hasId()) {
-                jdbc.update(sql, params);
-                return null;
-            }
-            return jdbc.queryForObject(sql + " RETURNING id", params, Long.class);
+            return insertRow(table.name(), columns, row, table.hasId(), "");
         }
 
         /** Identifiant du projet dans l'espace : celui du fichier, rendu unique (ACME → ACME2). */
