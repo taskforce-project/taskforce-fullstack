@@ -9,6 +9,7 @@ interface Bootstrap {
   version: string;
   platform: string;
   email: string;
+  onboardedOnline: boolean;
 }
 
 const bootstrap = ipcRenderer.sendSync("desktop:bootstrap") as Bootstrap;
@@ -18,6 +19,7 @@ contextBridge.exposeInMainWorld("taskforceDesktop", {
   version: bootstrap.version,
   platform: bootstrap.platform,
   email: bootstrap.email,
+  onboardedOnline: bootstrap.onboardedOnline === true,
   signOut: (): Promise<void> => ipcRenderer.invoke("desktop:sign-out"),
   openAccountPage: (): Promise<void> => ipcRenderer.invoke("desktop:account-page"),
   checkForUpdates: (): Promise<unknown> => ipcRenderer.invoke("desktop:check-updates"),

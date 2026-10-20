@@ -271,6 +271,8 @@ function registerIpc(): void {
       version: app.getVersion(),
       platform: process.platform,
       email: stack?.account.email ?? "",
+      // Compte déjà configuré sur la webapp : l'interface ne remontre pas l'accueil des nouveaux comptes.
+      onboardedOnline: stack?.account.profile?.onboardingCompleted === true,
     };
   });
   ipcMain.handle("desktop:account-page", () => shell.openExternal(accountPageUrl()));

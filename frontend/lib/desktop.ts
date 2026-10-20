@@ -78,6 +78,8 @@ export interface DesktopBridge {
   readonly version: string;
   readonly platform: string;
   readonly email: string;
+  /** Compte déjà configuré sur la webapp (onboarding fait en ligne) : l'app en a repris les réglages. */
+  readonly onboardedOnline?: boolean;
   /** Déconnecte le compte de cet ordinateur : la coque oublie la session et rouvre l'écran de connexion. */
   signOut(): Promise<void>;
   /** Ouvre le compte TaskForce en ligne (mot de passe, double authentification, suppression) dans le navigateur. */
@@ -123,4 +125,12 @@ export interface DesktopBridge {
 export function desktopBridge(): DesktopBridge | null {
   if (!IS_DESKTOP || globalThis.window === undefined) return null;
   return (globalThis.window as Window & { taskforceDesktop?: DesktopBridge }).taskforceDesktop ?? null;
+}
+
+/**
+ * App desktop d'un compte déjà configuré en ligne : la personne connaît TaskForce, l'app ne lui remontre pas l'accueil
+ * des nouveaux comptes (la visite guidée reste rejouable depuis Ctrl+K). Toujours faux sur la webapp.
+ */
+export function onboardedOnline(): boolean {
+  return desktopBridge()?.onboardedOnline === true;
 }
