@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.mockito.ArgumentCaptor;
@@ -236,6 +237,18 @@ class DesktopSessionServiceTest {
             DesktopSessionResponse response = service.exchange(new DesktopTokenRequest(authorize(), VERIFIER, REDIRECT, "PC"));
 
             assertThat(response.account().profile()).isEqualTo(profile);
+        }
+
+        @ParameterizedTest(name = "« {0} »")
+        @NullSource
+        @ValueSource(strings = {"/api/files/avatars/7", "https://avatars.githubusercontent.com/u/1?v=4"})
+        @DisplayName("le compte rendu porte sa photo de profil telle qu'enregistrée, que l'app reprendra")
+        void the_account_carries_its_photo(String avatarUrl) {
+            ada.setAvatarUrl(avatarUrl);
+
+            DesktopSessionResponse response = service.exchange(tokenRequest(authorize()));
+
+            assertThat(response.account().avatarUrl()).isEqualTo(avatarUrl);
         }
 
         @Test

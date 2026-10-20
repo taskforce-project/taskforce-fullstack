@@ -252,7 +252,8 @@ public class DesktopSessionService {
         } catch (RuntimeException e) {
             log.warn("Nom du compte {} illisible pour l'app desktop : {}", user.getId(), e.getMessage());
         }
-        return new DesktopAccountResponse(user.getKeycloakId(), user.getEmail(), given, family, profile(user));
+        return new DesktopAccountResponse(user.getKeycloakId(), user.getEmail(), given, family, profile(user),
+            user.getAvatarUrl());
     }
 
     /** Réglages du compte repris par l'app ; illisibles, l'app se connecte quand même et fait son onboarding. */
