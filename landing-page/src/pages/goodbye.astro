@@ -1,0 +1,42 @@
+---
+/**
+ * Page ouverte par le désinstalleur de l'app desktop sous Windows (desktop/build/installer.nsh), après une vraie
+ * désinstallation : ni mise à jour, ni désinstallation silencieuse. Un merci, sur la peinture de l'accueil, celle des
+ * pages de connexion. Hors index et hors sitemap.
+ */
+import { ArrowRight } from "lucide-react";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Backdrop from "@/components/site/Backdrop.astro";
+import { LINKS } from "@/lib/site";
+---
+
+<BaseLayout
+  title="Thanks for trying TaskForce"
+  description="TaskForce Desktop is uninstalled. Your projects stay on your computer and your account stays open."
+  noindex
+>
+  <section class="relative -mt-16 pt-16">
+    <Backdrop name="home" class="inset-x-0 top-0 h-full" fade veil="center" priority />
+    <div class="container-site relative flex min-h-[78vh] flex-col items-center justify-center py-24 text-center">
+      <span class="pill anim-fade-up" data-tone="glass">TaskForce Desktop is uninstalled</span>
+      <h1 class="t-display anim-fade-up mt-8" style="--d: 70ms">
+        <span class="block">Thanks for trying</span>
+        <span class="block t-word">TaskForce.</span>
+      </h1>
+      <p class="t-lead anim-fade-up mt-8 max-w-[38rem] text-foreground/75" style="--d: 140ms">
+        Your projects stay on this computer: install TaskForce again and they are right where you left them. Your
+        account stays open.
+      </p>
+      <div class="anim-fade-up mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-4" style="--d: 210ms">
+        <a href="/download" class="btn btn-primary">Download TaskForce</a>
+        <a href={`${LINKS.issues}/new`} class="link-arrow text-[15px]">
+          Tell us what didn't work <ArrowRight className="size-4" aria-hidden="true" />
+        </a>
+      </div>
+      <p class="t-small anim-fade-up mt-12 max-w-[34rem] text-muted-foreground" style="--d: 280ms">
+        To remove your projects as well, delete the <code>%APPDATA%\TaskForce</code> folder. To delete your account,
+        open Settings, then Privacy &amp; Data, in the web app.
+      </p>
+    </div>
+  </section>
+</BaseLayout>

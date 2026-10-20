@@ -32,6 +32,8 @@ nsis:
   perMachine: false
   deleteAppDataOnUninstall: false
   shortcutName: TaskForce
+  # Après une désinstallation demandée par la personne, la page « merci » du site (installer.nsh).
+  include: installer.nsh
 
 linux:
   target:
