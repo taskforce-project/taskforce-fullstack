@@ -22,10 +22,20 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { writeFileSync, readFileSync, existsSync } from "node:fs";
+import { writeFileSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DOMAINES, HORS_METIER } from "./lib/domaines.mjs";
+
+/** Contenu actuel du fichier, ou "" s'il n'existe pas encore : lu directement, sans vérification préalable. */
+function lireSiPresent(chemin) {
+  try {
+    return readFileSync(chemin, "utf8");
+  } catch (erreur) {
+    if (erreur.code === "ENOENT") return "";
+    throw erreur;
+  }
+}
 
 const ICI = dirname(fileURLToPath(import.meta.url));
 const DOCS = resolve(ICI, "../../taskforce-docs/v1/03-architecture");
@@ -440,7 +450,7 @@ console.log(`Schéma : ${metier.length} tables métier, ${nbColonnes} colonnes, 
 
 let differe = false;
 for (const { chemin, contenu } of cibles) {
-  const avant = existsSync(chemin) ? readFileSync(chemin, "utf8") : "";
+  const avant = lireSiPresent(chemin);
   if (avant === contenu) {
     console.log(`  inchangé  ${chemin.split(/[\\/]/).pop()}`);
     continue;

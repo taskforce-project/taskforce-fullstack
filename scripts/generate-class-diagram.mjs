@@ -16,10 +16,20 @@
  * Usage : node scripts/generate-class-diagram.mjs [--check]
  */
 
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { resolve, dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DOMAINES, domaineDeTable } from "./lib/domaines.mjs";
+
+/** Contenu actuel du fichier, ou "" s'il n'existe pas encore : lu directement, sans vérification préalable. */
+function lireSiPresent(chemin) {
+  try {
+    return readFileSync(chemin, "utf8");
+  } catch (erreur) {
+    if (erreur.code === "ENOENT") return "";
+    throw erreur;
+  }
+}
 
 const ICI = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(ICI, "../backend/tf-api/src/main/java/com/taskforce/tf_api");
@@ -250,7 +260,7 @@ const doc = [
 
 console.log(`Entités : ${entites.length} · héritages : ${nbHerit} · associations : ${nbAssoc} · références par id : ${nbHybrides}`);
 
-const avant = existsSync(CIBLE) ? readFileSync(CIBLE, "utf8") : "";
+const avant = lireSiPresent(CIBLE);
 if (avant === doc) {
   console.log("  inchangé  Diagramme_Classes_UML.md");
 } else if (CHECK) {
