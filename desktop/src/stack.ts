@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 
 import { AiRelay } from "./ai";
+import { downloadAccountAvatar } from "./avatar";
 import { Backend } from "./backend";
 import { Frontend } from "./frontend";
 import { log } from "./log";
@@ -69,6 +70,9 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     await within(database.stop(), 45_000);
   };
 
+  // La photo du compte en ligne se télécharge pendant que la base démarre ; le backend la reprend à son démarrage.
+  const avatar = downloadAccountAvatar(account.avatarUrl, dataDir);
+
   try {
     if (!database.initialized) onStep("Preparing your workspace for the first time");
     await database.init();
@@ -78,6 +82,7 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     const origin = await proxy.reserve(settings.windowPort(account.subject));
     settings.setWindowPort(account.subject, proxy.port);
     await ai.start();
+    await avatar;
     onStep("Starting TaskForce");
     await Promise.all([
       backend.start({

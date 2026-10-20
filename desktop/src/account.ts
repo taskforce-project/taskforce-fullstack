@@ -60,6 +60,7 @@ export function readAccount(value: unknown, server: string = ACCOUNT_SERVER): Ac
     email: text("email"),
     givenName: text("givenName"),
     familyName: text("familyName"),
+    avatarUrl: text("avatarUrl") || null,
     ...(profile !== null && typeof profile === "object" && !Array.isArray(profile)
       ? { profile: profile as Record<string, unknown> }
       : {}),

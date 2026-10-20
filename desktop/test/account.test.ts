@@ -69,7 +69,7 @@ describe("addresses", () => {
 
 describe("readAccount", () => {
   it("reads the account, tied to the account service that returned it", () => {
-    assert.deepEqual(account.readAccount(ADA, "https://api.example.test"), { issuer: "https://api.example.test", ...ADA });
+    assert.deepEqual(account.readAccount(ADA, "https://api.example.test"), { issuer: "https://api.example.test", ...ADA, avatarUrl: null });
   });
 
   const refused: [string, unknown][] = [
@@ -89,6 +89,12 @@ describe("readAccount", () => {
     assert.equal(account.readAccount({ ...ADA, profile: "lead" }).profile, undefined);
     assert.equal(account.readAccount({ ...ADA, profile: [1] }).profile, undefined);
     assert.equal("profile" in account.readAccount(ADA), false);
+  });
+
+  it("keeps the address of the account's photo, and null without one", () => {
+    assert.equal(account.readAccount({ ...ADA, avatarUrl: "/api/files/avatars/7" }).avatarUrl, "/api/files/avatars/7");
+    assert.equal(account.readAccount({ ...ADA, avatarUrl: 7 }).avatarUrl, null);
+    assert.equal(account.readAccount(ADA).avatarUrl, null);
   });
 
   it("keeps an account without a name", () => {
@@ -142,7 +148,7 @@ describe("signIn", () => {
     assert.equal(pages[0]?.searchParams.get("signup"), null);
     assert.match(pages[0]?.searchParams.get("redirect_uri") ?? "", /^http:\/\/127\.0\.0\.1:4781[2-5]\/callback$/);
     assert.equal(result.sessionToken, "tfa_session");
-    assert.deepEqual(result.account, { issuer: account.ACCOUNT_SERVER, ...ADA });
+    assert.deepEqual(result.account, { issuer: account.ACCOUNT_SERVER, ...ADA, avatarUrl: null });
     assert.equal(calls[0]?.path, "/api/auth/desktop/token");
     assert.equal(calls[0]?.body.redirectUri, pages[0]?.searchParams.get("redirect_uri"));
     assert.equal(typeof calls[0]?.body.deviceName, "string");
