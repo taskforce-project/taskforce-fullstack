@@ -10,6 +10,12 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 20/10/2026 - Désinstallation : une page « merci » (desktop 1.0.3).** `[desktop + landing]`
+> - **Demande du CEO** : « un truc plus sympa genre merci, avec fond comme la page de login ». Page `/goodbye` du site (`c602eedb`) sur la peinture de l'accueil, celle des pages de connexion : « Thanks for trying TaskForce », les projets restent sur l'ordinateur et le compte reste ouvert, liens vers le téléchargement et les issues GitHub, comment tout effacer (`%APPDATA%\TaskForce`, suppression du compte dans Settings > Privacy & Data). Hors index et hors sitemap.
+> - **Désinstalleur Windows** (`0cd0a7e1`) : `desktop/installer.nsh` (`nsis.include`) ouvre cette page après une désinstallation demandée par la personne ; pas pendant une mise à jour (l'installeur lance l'ancien désinstalleur avec `--updated`), ni en silencieux (`/S`). Le script vit hors de `build/`, dossier généré et ignoré par git. Les désinstalleurs déjà installés (1.0.0 à 1.0.2) n'ont pas ce crochet : il arrive avec la mise à jour en 1.0.3.
+> - **Vérifié** : installeur 1.0.3 construit en local avec le crochet (NSIS compile l'installeur et le désinstalleur) ; site : lint et build en conteneur, page regardée en bureau et en mobile. Non lancé : la désinstallation elle-même (elle aurait remplacé l'app installée du CEO).
+> - **Fonds des pages de connexion** (question du CEO) : en prod sur la webapp (connexion et inscription chargent `sign-in-painting.webp`) et dans l'app 1.0.2 (écran de connexion).
+
 > **▶ MAJ 20/10/2026 - Release 1.1.3 EN PROD (PR #371, `35a6fc09`) : 400 sur un corps illisible, alertes CodeQL.** `[release]`
 > - PR #369 et #370 fusionnées dans `dev` (CI verte) ; release = arbre exact de `dev` sur `main` par `commit-tree`, version produit 1.1.3 posée par la CI (`ad8ab6fd`), `--admin --squash`.
 > - **Déployé et vérifié en prod** : webapp en 1.1.3 ; API : `POST /api/auth/desktop/session` sans corps → **400** « The request body is missing or malformed. » (500 la veille), avec un formulaire → **415**, avec un JSON → 401 comme avant.
