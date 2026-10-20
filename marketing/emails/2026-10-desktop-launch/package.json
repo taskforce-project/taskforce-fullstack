@@ -1,0 +1,16 @@
+{
+  "name": "taskforce-email-desktop-launch",
+  "private": true,
+  "description": "Launch email of TaskForce Desktop: visuals from real captures, HTML for Brevo.",
+  "type": "module",
+  "scripts": {
+    "capture": "node scripts/capture.mjs",
+    "compose": "node scripts/compose.mjs",
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/check.mjs"
+  },
+  "devDependencies": {
+    "@fontsource-variable/geist": "5.2.8",
+    "playwright-core": "1.56.1"
+  }
+}

@@ -1,0 +1,76 @@
+TaskForce is moving to your desktop.
+
+Plan your projects, track your issues and keep what you know in one app, on your own computer. When an issue needs a hand, give it to Claude Code.
+
+Download for Windows: https://taskforce-project.fr/download
+Windows 10 and 11, 64-bit. Also for Linux; macOS is coming.
+
+
+Hi {{ contact.FIRSTNAME|default:"there" }},
+
+You were one of the first people to use TaskForce, so you are the first to hear it: TaskForce is now a desktop app. Same account, same interface, and your work lives on your own computer. It is free, and its code is open.
+
+
+PLAN IT, HAND IT OVER, KEEP WHAT YOU LEARN
+
+- Plan on a board: projects, issues, cycles, a roadmap and a backlog.
+- Hand it to Claude Code: pick Claude Code as the assignee; it works on your computer and reports back.
+- Keep it in the Brain OS: pages linked to each other and to your projects.
+
+
+MADE FOR THE WORK YOU DO EVERY DAY
+
+One place for the work. Your projects, their issues, cycles and pages, and a dashboard with your queue and what changed recently.
+
+Help when you want it. Claude Code takes an issue on your computer and opens a pull request when the project has a GitHub repository. The assistant runs on a local model through Ollama, or on your own API key.
+
+Yours. Your projects stay on your computer, the app sends no usage data, and it keeps working offline once you have signed in.
+
+
+INSTALLED IN THREE STEPS (WINDOWS)
+
+1. Download. Get the Windows installer from the download page (TaskForce-Setup-1.2.1.exe today, about 270 MB): https://taskforce-project.fr/download
+2. Install. Open it: it installs for your account, without administrator rights, then opens TaskForce. After that, updates download by themselves and install when you restart it.
+3. Sign in. TaskForce opens your browser: sign in with your usual account, by email, Google or GitHub, or create a free one. Then you are in.
+
+If Windows hesitates: the installer is not code-signed yet (a certificate is a paid subscription this free project does not take), so Windows or your antivirus may stop it the first time. Each file is scanned by dozens of antivirus engines first:
+VirusTotal report: https://www.virustotal.com/gui/file/fbde7957158d715ba9b626e6056cd466da49f00af149d4b72f0a33e3a46a79c0
+The install guide explains each message, SmartScreen, Smart App Control and quarantine: https://taskforce-project.fr/download#install
+
+
+BRING IT ALONG, OR START FRESH
+
+I already use TaskForce
+Sign in with the same account. In the app, open Operations, click From the web app, then Copy everything. Each workspace arrives with its Brain OS and its projects: issues, comments, history, cycles, pages and attachments.
+It is a copy: the web app keeps your work until it closes. The date is not set yet, and you will get an email before.
+To redo by hand: teammates (the app is for one person), GitHub and your other connections, and your AI settings.
+Moving from the web app: https://taskforce-project.fr/migrate
+
+I'm starting fresh
+Install, sign in or create your free account, and go through a three-step setup. TaskForce opens on your own workspace: create a project and add your first issues.
+Want Claude Code to pick up issues? Connect it in one click in Settings, Agents. It needs Claude Code installed and signed in with your own account.
+Changed your mind later? A whole workspace goes back to the web app from Settings, General, while it is open.
+
+
+BUILT IN THE OPEN
+
+The whole of TaskForce is public under the AGPL-3.0 license. You don't need to write code to help: a two-line email is useful too.
+
+- Explore the project: https://github.com/taskforce-project/taskforce-fullstack
+- Star the repository: it helps others find it, and you can follow its releases.
+- Share feedback: open an issue (https://github.com/taskforce-project/taskforce-fullstack/issues/new/choose) or write to contact@taskforce-project.fr
+
+
+The best way to judge it is to try it on a real project. Install it, give it an afternoon, and tell me what you think.
+
+Download for Windows: https://taskforce-project.fr/download
+
+Pierre
+Pierre Michel, creator of TaskForce
+
+P.S. This email is also part of a series of tests 😁. If the app gives you trouble, or if you genuinely want to use it, share it or champion it, tell me: by email, by text message for the happy few who have my number (it was never handed out lightly 😌), or by opening an issue on GitHub (https://github.com/taskforce-project/taskforce-fullstack/issues). Never in the field of project management has so much been owed by one developer to so few beta testers. Thank you 🚀
+
+--
+TaskForce, the free and open source app to plan your work and hand tasks to AI agents.
+https://taskforce-project.fr · https://github.com/taskforce-project · contact@taskforce-project.fr
+You are receiving this email because you have a TaskForce account. Unsubscribe: {{ unsubscribe }}
