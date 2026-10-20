@@ -19,12 +19,22 @@ export interface Dumpable {
   dump(file: string): Promise<void>;
 }
 
-function lastVersion(dataDir: string): string | null {
+/** Version de l'app qui a ouvert la base en dernier, ou `null` (base toute neuve, ou ouverte avant la version 1.1.0). */
+export function lastVersion(dataDir: string): string | null {
   try {
     return readFileSync(join(dataDir, VERSION_FILE), "utf8").trim() || null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Notification du premier lancement d'une nouvelle version, sur une base qu'une version précédente avait ouverte : la
+ * personne voit que la mise à jour est faite, et depuis quelle version. Rien pour une première installation.
+ */
+export function updateNotice(previous: string | null, version: string, fresh: boolean): { title: string; body: string } | null {
+  if (fresh || !previous || previous === version) return null;
+  return { title: `TaskForce ${version} is installed`, body: `Updated from version ${previous}.` };
 }
 
 /** Garde les `keep` copies les plus récentes : leur nom commence par leur date, l'ordre alphabétique est le bon. */

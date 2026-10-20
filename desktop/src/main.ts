@@ -242,6 +242,13 @@ async function openApp(account: Account, previous: BrowserWindow | null): Promis
       mainWindow.show();
     }
     if (!splash.isDestroyed()) splash.close();
+    // Premier lancement d'une nouvelle version : la personne voit que la mise à jour est faite.
+    if (stack?.updateNotice && Notification.isSupported()) {
+      const updated = new Notification(stack.updateNotice);
+      notices.add(updated);
+      updated.on("close", () => notices.delete(updated));
+      updated.show();
+    }
   });
   mainWindow.on("closed", () => (mainWindow = null));
   await mainWindow.loadURL(stack.origin);

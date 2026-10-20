@@ -10,6 +10,10 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 20/10/2026 (soir) - Mise à jour dans l'app vérifiée (1.1.0 vers 1.2.0) ; desktop 1.2.1 pour la revoir (branche `feature/desktop`).** `[desktop]`
+> - **Vérifiée sur le poste du CEO** (journal de l'app) : « Check for updates » à 18:34, téléchargement complet de l'installeur 1.2.0 (285 Mo, ~5 min), « Restart now » à 18:39, installeur lancé avec `--updated --force-run`, base copiée avant (`before-1.2.0.dump`), TaskForce 1.2.0 relancée à 18:40. Piège pour le diagnostic : sous Windows, la taille d'un fichier en cours d'écriture reste à 0 dans la liste du dossier (`pending\temp-...exe`) ; ouvrir le fichier donne la vraie taille.
+> - **Desktop 1.2.1** : téléchargement complet direct (`d68d0740` : la mise à jour différentielle échouait toujours, la carte de blocs de la version précédente n'étant plus dans `desktop-latest` et GitHub refusant les requêtes à plusieurs plages), avancement noté par quart dans le journal ; notification « TaskForce X is installed, updated from version Y » au premier lancement d'une nouvelle version (`07941f4f`). Coque : 214 tests.
+
 > **▶ MAJ 20/10/2026 (soir) - Release 1.3.0 EN PROD (PR #382, `651f4ec2`) et TaskForce Desktop 1.2.0 publiée.** `[release]`
 > - PR #381 fusionnée dans `dev` (CI verte : 26 vérifications) ; release = arbre exact de `dev` sur `main`, version produit 1.3.0 posée par la CI (`6b251941`), vérifications du commit de release toutes vertes, `--admin --squash`.
 > - **En prod (vérifié)** : webapp 1.3.0 ; backend recréé, sain, aucune erreur au démarrage, schéma à jour (aucune migration) ; nouvelles routes `/api/auth/desktop/transfer/workspace` et `/workspace-import`, `/api/workspaces/{slug}/bundle` et `/api/workspaces/import` en 401 sans session ; les deux VM sur `651f4ec2`.

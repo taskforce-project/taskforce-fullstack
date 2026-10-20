@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
-import { BACKUPS, backupBeforeMigration, KEEP, prune, VERSION_FILE } from "../src/backup";
+import { BACKUPS, backupBeforeMigration, KEEP, lastVersion, prune, updateNotice, VERSION_FILE } from "../src/backup";
 
 let dataDir = "";
 let dumps: string[] = [];
@@ -92,5 +92,28 @@ describe("prune", () => {
   it("does nothing without a backups folder", () => {
     assert.deepEqual(prune(join(dataDir, "missing")), []);
     assert.equal(existsSync(join(dataDir, "missing")), false);
+  });
+});
+
+describe("updateNotice", () => {
+  it("says which version replaced which, on the first launch after an update", () => {
+    assert.deepEqual(updateNotice("1.2.0", "1.2.1", false), {
+      title: "TaskForce 1.2.1 is installed",
+      body: "Updated from version 1.2.0.",
+    });
+  });
+
+  for (const [name, previous, fresh] of [
+    ["the same version opens the database again", "1.2.1", false],
+    ["the database is brand new", null, true],
+    ["no version was noted yet", null, false],
+  ] as const) {
+    it(`says nothing when ${name}`, () => assert.equal(updateNotice(previous, "1.2.1", fresh), null));
+  }
+
+  it("reads the version that last opened the database, noted by the copy", async () => {
+    assert.equal(lastVersion(dataDir), null);
+    await backupBeforeMigration(database, dataDir, "1.2.0", true, NOW);
+    assert.equal(lastVersion(dataDir), "1.2.0");
   });
 });
