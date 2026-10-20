@@ -14,7 +14,7 @@
 > - PR #366 fusionnée dans `dev` (`3872293d`, CI verte) ; release = arbre exact de `dev` sur `main` par `commit-tree`, version produit 1.1.2 posée par la CI (`9bfa9434`), `--admin --squash`.
 > - Déployé : webapp de prod en 1.1.2 (vue à 01:06 UTC, 4 min après la fusion) ; backend reconstruit par l'auto-déploiement de la VM1 (construction d'image vue à 01:03 UTC). Vérification directe des conteneurs impossible : Tailscale SSH demande une revalidation du CEO dans son navigateur.
 > - TaskForce Desktop 1.0.2 publiée depuis `main` (workflow `Desktop - Release`, run 39351211925) : `desktop-v1.0.2` en préversion non signée (installeur Windows 285 Mo, `.deb` 265 Mo, AppImage 303 Mo) ; `desktop-latest` (mises à jour) en 1.0.2, donc la 1.0.0 et la 1.0.1 installées se mettent à jour seules.
-> - Faux positifs des antivirus : l'installeur 1.0.2 publié (SHA-256 `67d6e77e…c6c0`) part chez VirusTotal, qui le partage avec les éditeurs dont McAfee ; envoi en cours au moment de cette trace.
+> - Faux positifs des antivirus : l'envoi de l'installeur 1.0.2 publié (SHA-256 `67d6e77e27ffa7e6909ab066d493833b5d9f86c6f5c9568e8b2d853841ccc6c0`) à VirusTotal s'arrête sur un reCAPTCHA (« I'm not a robot ») au moment de confirmer : c'est ce qui bloquait aussi les envois précédents. Je ne passe pas de CAPTCHA : envoi à faire par le CEO (une minute), puis lien VirusTotal à poster chez McAfee.
 > - `dev` réaligné en 1.1.2 (`95d39c61`) ; la release suivante (cette trace seule) reconstruit le site pour qu'il propose la 1.0.2.
 
 > **▶ MAJ 20/10/2026 (matin) - Récupération du compte dans l'app desktop, base restée ouverte, page de signature : desktop 1.0.2.** `[backend + desktop + frontend + landing + ci]`
