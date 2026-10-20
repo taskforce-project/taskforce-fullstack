@@ -9,12 +9,12 @@ import { connectMcp, disconnectMcp, isPersonalToken, isWorkspaceSlug, mcpConnect
 import { createRepo, DEVICE_PAGE, findRepo, GitHubSignIn, isNewRepoName, isRepoFullName, listRepos } from "./github";
 import { initLog, log } from "./log";
 import { APP_ID, readNotice } from "./notify";
-import { appLogDir } from "./paths";
+import { appLogDir, storeDataDir } from "./paths";
 import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
 import { toolsStatus } from "./tools";
 import { readMove, readWorkspaceMove, Transfer, type LocalApi } from "./transfer";
-import { check, startUpdater } from "./updater";
+import { check, fromStore, startUpdater } from "./updater";
 import {
   integratedTitleBar,
   MAIN_TITLE_BAR_HEIGHT,
@@ -38,6 +38,10 @@ const staticPage = (name: string): string => join(__dirname, "..", "static", nam
 
 // Développement : `TF_DESKTOP_USER_DATA` isole les réglages et les données d'essai de ceux de l'app installée.
 if (!app.isPackaged && process.env.TF_DESKTOP_USER_DATA) app.setPath("userData", process.env.TF_DESKTOP_USER_DATA);
+// Version du Microsoft Store : réglages et données dans le dossier du paquet (cf. storeDataDir), avant le verrou
+// d'instance unique, qui en dépend.
+const storeData = fromStore() ? storeDataDir(process.execPath, process.env.LOCALAPPDATA) : null;
+if (storeData) app.setPath("userData", storeData);
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -54,7 +58,9 @@ if (!app.requestSingleInstanceLock()) {
 async function main(): Promise<void> {
   initLog(appLogDir());
   log.info(`TaskForce ${app.getVersion()} starting (${process.platform}, Electron ${process.versions.electron})`);
-  if (process.platform === "win32") app.setAppUserModelId(APP_ID);
+  // Le paquet du Store porte déjà l'identité de l'app : la remplacer enverrait les notifications au nom d'une app sans
+  // raccourci dans le menu Démarrer, et Windows les ignorerait.
+  if (process.platform === "win32" && !fromStore()) app.setAppUserModelId(APP_ID);
   Menu.setApplicationMenu(buildMenu());
   registerIpc();
 
@@ -285,6 +291,8 @@ function registerIpc(): void {
       email: stack?.account.email ?? "",
       // Compte déjà configuré sur la webapp : l'interface ne remontre pas l'accueil des nouveaux comptes.
       onboardedOnline: stack?.account.profile?.onboardingCompleted === true,
+      // Qui installe les mises à jour : l'app elle-même, ou le Microsoft Store pour sa version Store.
+      updates: fromStore() ? "store" : "app",
     };
   });
   ipcMain.handle("desktop:account-page", () => shell.openExternal(accountPageUrl()));
@@ -472,7 +480,7 @@ function buildMenu(): Menu {
       submenu: [
         { label: "Documentation", click: () => void shell.openExternal("https://docs.taskforce-project.fr") },
         { label: "Report an issue", click: () => void shell.openExternal("https://github.com/taskforce-project/taskforce-fullstack/issues") },
-        { label: "Check for updates", click: () => void check() },
+        ...(fromStore() ? [] : [{ label: "Check for updates", click: () => void check() }]),
         { label: "Open logs folder", click: () => void shell.openPath(appLogDir()) },
       ],
     },

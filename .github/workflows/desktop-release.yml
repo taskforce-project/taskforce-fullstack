@@ -9,6 +9,10 @@ name: Desktop - Release
 #
 # Run it by hand once desktop/package.json carries the new version.
 #
+# The Windows build also makes the Microsoft Store package (desktop/electron-builder.yml, appx). It is kept as the
+# `store-package` artifact of the run, never published on GitHub: it is uploaded by hand in Partner Center, and
+# Microsoft signs it when it publishes it.
+#
 # Signing: the Windows installer is signed through the SignPath Foundation once the project is set up there (repository
 # variable SIGNPATH_ORGANIZATION_ID, secret SIGNPATH_API_TOKEN; see landing-page/src/pages/code-signing-policy.astro).
 # Each release then waits for an approver to accept the signing request in SignPath. Until then the builds are not
@@ -163,6 +167,16 @@ jobs:
             desktop/release/latest*.yml
           if-no-files-found: error
           retention-days: 14
+
+      # Its own artifact, outside the `desktop-*` pattern of the publish job: the Store package never reaches the
+      # GitHub releases.
+      - uses: actions/upload-artifact@v4
+        if: matrix.name == 'Windows'
+        with:
+          name: store-package
+          path: desktop/release/*.appx
+          if-no-files-found: error
+          retention-days: 30
 
   publish:
     name: Publish
