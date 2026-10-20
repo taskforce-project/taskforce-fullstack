@@ -207,6 +207,10 @@ export const PROJECT_ROUTES = {
   BY_ID:   (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}`,
   /** Export COMPLET du projet (JSON/CSV) - issues + descriptions + commentaires + activité (P1b bêta). */
   EXPORT:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/export`,
+  /** Fichier de projet TaskForce (zip) : le projet entier, pour le passer de la webapp à l'app desktop et inversement. */
+  BUNDLE:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/bundle`,
+  /** Crée un projet depuis un fichier de projet TaskForce (corps `application/zip`). */
+  IMPORT:  (slug: string) => `/api/workspaces/${slug}/projects/import`,
   UPDATE:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}`,
   ARCHIVE: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/archive`,
   FAVORITE: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/favorite`,

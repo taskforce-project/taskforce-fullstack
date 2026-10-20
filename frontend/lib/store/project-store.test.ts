@@ -14,6 +14,7 @@ vi.mock('../api/project-service', () => ({
   unfavoriteProject: vi.fn(),
   setProjectRepo: vi.fn(),
   unsetProjectRepo: vi.fn(),
+  importProjectBundle: vi.fn(),
 }));
 
 function makeProject(overrides: Partial<Project> = {}): Project {
@@ -104,6 +105,36 @@ describe('project-store', () => {
 
     expect(result).toBeNull();
     expect(useProjectStore.getState().error).toBe('bad');
+  });
+
+  it('importProject prepends the imported project and passes the progress on', async () => {
+    act(() => useProjectStore.setState({ projects: [makeProject({ id: 1 })], error: 'old' }));
+    const imported = makeProject({ id: 3, name: 'Apollo' });
+    vi.mocked(svc.importProjectBundle).mockResolvedValue(imported);
+    const file = new Blob(['PK']);
+    const progress = vi.fn();
+
+    let result: Project | null = null;
+    await act(async () => {
+      result = await useProjectStore.getState().importProject('acme', file, progress);
+    });
+
+    expect(svc.importProjectBundle).toHaveBeenCalledWith('acme', file, progress);
+    expect(result).toEqual(imported);
+    expect(useProjectStore.getState().projects.map((p) => p.id)).toEqual([3, 1]);
+    expect(useProjectStore.getState().error).toBeNull();
+  });
+
+  it("importProject returns null and keeps the server's message on failure", async () => {
+    vi.mocked(svc.importProjectBundle).mockRejectedValue(new Error("This file isn't a TaskForce project file."));
+
+    let result: Project | null = makeProject();
+    await act(async () => {
+      result = await useProjectStore.getState().importProject('acme', new Blob(['x']));
+    });
+
+    expect(result).toBeNull();
+    expect(useProjectStore.getState().error).toBe("This file isn't a TaskForce project file.");
   });
 
   it('updateProject replaces the project by id and updates activeProject', async () => {
