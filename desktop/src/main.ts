@@ -1,8 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell } from "electron";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { ACCOUNT_SERVER, accountPageUrl, refresh, revoke, SessionEndedError, signIn, signInError } from "./account";
 import { parseAiInput } from "./ai";
+import { BACKUPS } from "./backup";
 import { connectMcp, disconnectMcp, isPersonalToken, isWorkspaceSlug, mcpConnection } from "./claude";
 import { createRepo, DEVICE_PAGE, findRepo, GitHubSignIn, isNewRepoName, isRepoFullName, listRepos } from "./github";
 import { initLog, log } from "./log";
@@ -293,6 +295,13 @@ function registerIpc(): void {
   });
   ipcMain.handle("desktop:check-updates", () => check());
   ipcMain.handle("desktop:open-logs", () => shell.openPath(appLogDir()));
+  // Copies de la base faites avant chaque mise à jour (cf. backup.ts).
+  ipcMain.handle("desktop:open-backups", () => {
+    if (!stack) return undefined;
+    const dir = join(stack.dataDir, BACKUPS);
+    mkdirSync(dir, { recursive: true });
+    return shell.openPath(dir);
+  });
   // Boutons du système aux couleurs du thème de l'interface (clair ou sombre), à la hauteur de la barre qu'elle dessine.
   ipcMain.on("desktop:title-bar-theme", (event, input: unknown) => {
     const { dark, height } = (input ?? {}) as { dark?: unknown; height?: unknown };

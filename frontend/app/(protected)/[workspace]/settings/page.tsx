@@ -1623,6 +1623,28 @@ function PrivacyPanel() {
         </div>
       </SectionCard>
 
+      {IS_DESKTOP && (
+        <SectionCard
+          title="Copies before updates"
+          description="Before an update changes its data, TaskForce keeps a copy of this computer's database."
+        >
+          <div className="flex items-start justify-between gap-4">
+            <p className="text-xs text-muted-foreground">
+              The three most recent copies stay in the backups folder. To move or keep a single project, use Export,
+              then TaskForce project file, on the project.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 h-8 text-xs"
+              onClick={() => void desktopBridge()?.openBackups?.()}
+            >
+              Open backups folder
+            </Button>
+          </div>
+        </SectionCard>
+      )}
+
       <SectionCard title="Delete your data" description="Erasing your personal data is done by deleting your account.">
         <p className="text-xs text-muted-foreground">
           Your personal data is erased when you delete your account (GDPR Art. 17 - right to erasure). Manage this from{" "}

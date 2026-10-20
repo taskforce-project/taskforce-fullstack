@@ -117,6 +117,8 @@ export interface DesktopBridge {
   checkForUpdates(): Promise<DesktopUpdateCheck>;
   /** Ouvre le dossier des journaux de l'app (à joindre à un signalement). */
   openLogs(): Promise<void>;
+  /** Ouvre le dossier des copies de la base faites avant chaque mise à jour. */
+  openBackups(): Promise<void>;
   /**
    * Boutons du système (réduire, agrandir, fermer), posés sur la barre du haut de l'interface : couleurs du thème, et
    * hauteur de cette barre depuis le haut de la fenêtre.

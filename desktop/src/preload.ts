@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld("taskforceDesktop", {
   openAccountPage: (): Promise<void> => ipcRenderer.invoke("desktop:account-page"),
   checkForUpdates: (): Promise<unknown> => ipcRenderer.invoke("desktop:check-updates"),
   openLogs: (): Promise<void> => ipcRenderer.invoke("desktop:open-logs"),
+  openBackups: (): Promise<void> => ipcRenderer.invoke("desktop:open-backups"),
   // Le haut de la fenêtre est dessiné par l'interface : les boutons du système prennent les couleurs de son thème.
   setTitleBarTheme: (dark: boolean, height?: number): void => ipcRenderer.send("desktop:title-bar-theme", { dark, height }),
   // IA : fournisseur choisi et état ; la clé d'API part vers le trousseau et ne revient jamais à la page.

@@ -114,6 +114,15 @@ export class EmbeddedPostgres {
     }
   }
 
+  /** Copie complète de la base de l'app, au format de pg_dump que pg_restore relit (`-Fc`). */
+  async dump(file: string): Promise<void> {
+    mkdirSync(dirname(file), { recursive: true });
+    const result = await runCommand(postgresTool("pg_dump"), [
+      "-h", "127.0.0.1", "-p", String(this.port), "-U", DATABASE_USER, "-d", DATABASE, "-Fc", "-f", file,
+    ], { env: this.env(), timeoutMs: 10 * 60_000 });
+    if (result.code !== 0) throw new Error(`pg_dump failed: ${result.output.trim().slice(-500)}`);
+  }
+
   async stop(): Promise<void> {
     if (!this.initialized) return;
     const result = await runCommand(postgresTool("pg_ctl"), [

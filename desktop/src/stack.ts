@@ -1,7 +1,9 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
+import { app } from "electron";
 
 import { AiRelay } from "./ai";
+import { backupBeforeMigration } from "./backup";
 import { downloadAccountAvatar } from "./avatar";
 import { Backend } from "./backend";
 import { Frontend } from "./frontend";
@@ -74,10 +76,18 @@ export async function startStack(account: Account, onStep: (step: string) => voi
   const avatar = downloadAccountAvatar(account.avatarUrl, dataDir);
 
   try {
-    if (!database.initialized) onStep("Preparing your workspace for the first time");
+    const fresh = !database.initialized;
+    if (fresh) onStep("Preparing your workspace for the first time");
     await database.init();
     onStep("Starting the database");
     await database.start();
+    // Une nouvelle version de l'app peut faire évoluer la base au démarrage du backend : la coque la copie d'abord.
+    await backupBeforeMigration({
+      dump: (file) => {
+        onStep("Saving a copy of your data before the update");
+        return database.dump(file);
+      },
+    }, dataDir, app.getVersion(), fresh);
 
     const origin = await proxy.reserve(settings.windowPort(account.subject));
     settings.setWindowPort(account.subject, proxy.port);
