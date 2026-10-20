@@ -59,19 +59,30 @@ export function readMove(input: unknown): { workspace: string; projectId: number
   return { workspace, projectId, target };
 }
 
+/**
+ * Réponses du relais devant la webapp (Cloudflare), sans message de l'API : corps trop gros pour lui (413), ou délai
+ * de réponse dépassé (502, 504, 524) alors que la webapp peut encore finir l'import.
+ */
+const TOO_LARGE_FOR_WEB = "This is too large for the web app to receive in one go. Send the projects one at a time instead.";
+const WEB_APP_TOO_SLOW = "The web app took too long to answer and may still be finishing. Check the web app before trying again.";
+const GATEWAY_TIMEOUTS = new Set([502, 504, 524]);
+
 async function failure(response: Response, fallback: string, online: boolean): Promise<Error> {
   const payload = (await response.json().catch(() => ({}))) as { message?: string };
   if (online && response.status === 401) return new SessionEndedError(payload.message || "The session ended: sign in again");
-  return new Error(payload.message || `${fallback} (${response.status})`);
+  if (payload.message) return new Error(payload.message);
+  if (online && response.status === 413) return new Error(TOO_LARGE_FOR_WEB);
+  if (online && GATEWAY_TIMEOUTS.has(response.status)) return new Error(WEB_APP_TOO_SLOW);
+  return new Error(`${fallback} (${response.status})`);
 }
 
-/** Corps d'un fichier de projet, borné. */
-async function bundleOf(response: Response): Promise<ArrayBuffer> {
+/** Corps d'un fichier de projet ou d'espace, borné. */
+async function bundleOf(response: Response, what: "project" | "workspace" = "project"): Promise<ArrayBuffer> {
   if (Number(response.headers.get("content-length") ?? "0") > MAX_BUNDLE_BYTES) {
-    throw new Error("This project is too large to move");
+    throw new Error(`This ${what} is too large to move`);
   }
   const bundle = await response.arrayBuffer();
-  if (bundle.byteLength > MAX_BUNDLE_BYTES) throw new Error("This project is too large to move");
+  if (bundle.byteLength > MAX_BUNDLE_BYTES) throw new Error(`This ${what} is too large to move`);
   return bundle;
 }
 
@@ -194,7 +205,7 @@ export class Transfer {
       signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
     });
     if (!download.ok) throw await failure(download, "The web app didn't send the workspace", true);
-    const bundle = await bundleOf(download);
+    const bundle = await bundleOf(download, "workspace");
     const created = await this.fetchImpl(`${local.origin}/api/workspaces/import`, {
       method: "POST",
       headers: { Authorization: `Bearer ${local.launchToken}`, "Content-Type": "application/zip" },
@@ -212,7 +223,7 @@ export class Transfer {
       signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
     });
     if (!download.ok) throw await failure(download, "TaskForce couldn't pack the workspace", false);
-    const bundle = await bundleOf(download);
+    const bundle = await bundleOf(download, "workspace");
     const created = await this.fetchImpl(`${this.apiUrl}/api/auth/desktop/transfer/workspace-import`, {
       method: "POST",
       headers: { "X-TaskForce-Session": sessionToken, "Content-Type": "application/zip" },

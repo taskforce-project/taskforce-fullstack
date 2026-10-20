@@ -183,6 +183,27 @@ describe("whole workspaces", () => {
 
     await assert.rejects(transfer().sendWorkspace(TOKEN, "acme-local", local()), /workspace file/);
   });
+
+  for (const [status, message] of [
+    [413, /too large for the web app to receive in one go/],
+    [524, /may still be finishing/],
+    [502, /may still be finishing/],
+  ] as const) {
+    it(`explains a ${status} from the relay in front of the web app, which has no message`, async () => {
+      respond = (call) => call.method === "GET"
+        ? { status: 200, type: "application/zip", body: ZIP }
+        : { status, type: "text/html", body: Buffer.from(`<html><body>${status}</body></html>`) };
+
+      await assert.rejects(transfer().sendWorkspace(TOKEN, "acme-local", local()), message);
+    });
+  }
+
+  it("names the workspace when it is too large to move", async () => {
+    const huge = new Transfer(base, "https://app.example.test", (async () =>
+      new Response(ZIP, { headers: { "content-length": String(1024 * 1024 * 1024) } })) as typeof fetch);
+
+    await assert.rejects(huge.bringWorkspace(TOKEN, "acme", local()), /This workspace is too large to move/);
+  });
 });
 
 describe("messages and addresses", () => {
