@@ -170,6 +170,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      tag: ${{ steps.versioned.outputs.tag }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -182,9 +184,11 @@ jobs:
           merge-multiple: true
 
       - name: Versioned release
+        id: versioned
         run: |
           version="$(jq -r .version desktop/package.json)"
           tag="desktop-v${version}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "::error::$tag already exists: bump desktop/package.json first"
             exit 1
@@ -207,3 +211,12 @@ jobs:
             gh release delete-asset desktop-latest "$name" --yes
           done
           gh release upload desktop-latest out/* --clobber
+
+  virustotal:
+    name: VirusTotal
+    needs: publish
+    uses: ./.github/workflows/desktop-virustotal.yml
+    with:
+      tag: ${{ needs.publish.outputs.tag }}
+    secrets:
+      VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}

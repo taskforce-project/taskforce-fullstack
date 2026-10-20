@@ -1,0 +1,82 @@
+name: Desktop - VirusTotal
+
+# Envoie les installeurs d'une release desktop à VirusTotal et liste leurs rapports dans les notes de la release, sous
+# « ### VirusTotal » : le site les montre à côté de chaque fichier (landing-page/src/lib/release.ts). Un fichier déjà
+# connu de VirusTotal n'est pas renvoyé.
+#
+# Clé : secret VIRUSTOTAL_API_KEY, la clé d'API du compte VirusTotal du projet (API publique : 4 requêtes par minute,
+# fichiers jusqu'à 650 Mo). Sans ce secret, le workflow ne fait rien et le dit.
+#
+# Lancé par « Desktop - Release » après la publication, ou à la main pour une release déjà publiée.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+    secrets:
+      VIRUSTOTAL_API_KEY:
+        required: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Desktop release tag, for example desktop-v1.0.3'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    name: Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VT_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: Without a VirusTotal key
+        if: env.VT_KEY == ''
+        run: |
+          echo "::notice::No VIRUSTOTAL_API_KEY secret: $TAG is not sent to VirusTotal"
+
+      - name: Release files
+        if: env.VT_KEY != ''
+        run: |
+          case "$TAG" in desktop-v*) ;; *) echo "::error::$TAG is not a desktop release"; exit 1 ;; esac
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir files \
+            --pattern '*.exe' --pattern '*.deb' --pattern '*.AppImage'
+          ls -l files
+
+      - name: Send to VirusTotal
+        if: env.VT_KEY != ''
+        run: |
+          set -euo pipefail
+          api="https://www.virustotal.com/api/v3"
+          # API publique : 4 requêtes par minute, d'où une pause après chaque appel.
+          call() { sleep 16; curl -sS --fail-with-body -H "x-apikey: $VT_KEY" "$@"; }
+          : > reports.md
+          for file in files/*; do
+            name="$(basename "$file")"
+            sha="$(sha256sum "$file" | cut -d' ' -f1)"
+            status="$(sleep 16; curl -sS -o /dev/null -w '%{http_code}' -H "x-apikey: $VT_KEY" "$api/files/$sha")"
+            if [ "$status" = "200" ]; then
+              echo "$name already known to VirusTotal"
+            else
+              upload_url="$(call "$api/files/upload_url" | jq -r .data)"
+              call -X POST -F "file=@$file" "$upload_url" > /dev/null
+              echo "$name sent to VirusTotal"
+            fi
+            echo "- [$name](https://www.virustotal.com/gui/file/$sha)" >> reports.md
+          done
+
+          # Notes de la release : la section VirusTotal est remplacée, le reste est gardé.
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > body.md
+          awk '/^### VirusTotal/ { exit } { print }' body.md | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > notes.md
+          printf '\n\n### VirusTotal\n\n' >> notes.md
+          cat reports.md >> notes.md
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
+          cat notes.md
