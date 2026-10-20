@@ -120,6 +120,13 @@ export interface DesktopBridge {
   /** Ouvre le dossier des copies de la base faites avant chaque mise à jour. */
   openBackups(): Promise<void>;
   /**
+   * Notification du système, montrée par la coque seulement quand la fenêtre n'est pas au premier plan ; un clic ramène
+   * l'app sur `path`, une page de l'app.
+   */
+  notify(input: { title: string; body?: string; path?: string }): void;
+  /** Page demandée par la coque (clic sur une notification du système) ; rend de quoi arrêter l'écoute. */
+  onNavigate(callback: (path: string) => void): () => void;
+  /**
    * Boutons du système (réduire, agrandir, fermer), posés sur la barre du haut de l'interface : couleurs du thème, et
    * hauteur de cette barre depuis le haut de la fenêtre.
    */
@@ -170,6 +177,18 @@ export interface DesktopBridge {
 export function desktopBridge(): DesktopBridge | null {
   if (!IS_DESKTOP || globalThis.window === undefined) return null;
   return (globalThis.window as Window & { taskforceDesktop?: DesktopBridge }).taskforceDesktop ?? null;
+}
+
+/**
+ * Notification du système pour un événement reçu dans l'app desktop (la coque ne la montre que si la fenêtre n'est pas
+ * au premier plan). Sans effet sur la webapp.
+ */
+export function notifySystem(input: { title: string; body?: string | null; path?: string | null }): void {
+  desktopBridge()?.notify?.({
+    title: input.title,
+    ...(input.body ? { body: input.body } : {}),
+    ...(input.path ? { path: input.path } : {}),
+  });
 }
 
 /**

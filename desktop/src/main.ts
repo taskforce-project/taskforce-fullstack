@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, shell } from "electron";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -8,6 +8,7 @@ import { BACKUPS } from "./backup";
 import { connectMcp, disconnectMcp, isPersonalToken, isWorkspaceSlug, mcpConnection } from "./claude";
 import { createRepo, DEVICE_PAGE, findRepo, GitHubSignIn, isNewRepoName, isRepoFullName, listRepos } from "./github";
 import { initLog, log } from "./log";
+import { APP_ID, readNotice } from "./notify";
 import { appLogDir } from "./paths";
 import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
@@ -53,6 +54,7 @@ if (!app.requestSingleInstanceLock()) {
 async function main(): Promise<void> {
   initLog(appLogDir());
   log.info(`TaskForce ${app.getVersion()} starting (${process.platform}, Electron ${process.versions.electron})`);
+  if (process.platform === "win32") app.setAppUserModelId(APP_ID);
   Menu.setApplicationMenu(buildMenu());
   registerIpc();
 
@@ -279,6 +281,25 @@ function registerIpc(): void {
     };
   });
   ipcMain.handle("desktop:account-page", () => shell.openExternal(accountPageUrl()));
+  // Événement reçu pendant que la fenêtre n'est pas au premier plan : notification du système (cf. notify.ts).
+  ipcMain.on("desktop:notify", (event, input: unknown) => {
+    const notice = readNotice(input);
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!notice || !window || window.isFocused() || !Notification.isSupported()) return;
+    const shown = new Notification({ title: notice.title, body: notice.body });
+    // Gardée jusqu'à sa fermeture : une notification ramassée par le ramasse-miettes ne répond plus au clic.
+    notices.add(shown);
+    shown.on("close", () => notices.delete(shown));
+    shown.on("click", () => {
+      notices.delete(shown);
+      if (window.isDestroyed()) return;
+      if (window.isMinimized()) window.restore();
+      window.show();
+      window.focus();
+      if (notice.path) window.webContents.send("desktop:navigate", notice.path);
+    });
+    shown.show();
+  });
   // Réglages d'IA du compte : fournisseur et modèles dans les réglages, clé dans le trousseau, jamais renvoyée à la page.
   ipcMain.handle("desktop:ai-get", () => aiView());
   ipcMain.handle("desktop:ai-save", async (_event, input: unknown) => {
@@ -369,6 +390,9 @@ function registerIpc(): void {
 }
 
 const transfer = new Transfer();
+
+/** Notifications du système encore affichées. */
+const notices = new Set<Notification>();
 
 /** Action qui joint la webapp avec la session de l'app, et l'API locale avec le jeton de lancement. */
 async function withSession<T>(

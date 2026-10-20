@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { getSessionToken } from "@/lib/api/session-token"
 import { API_URL } from "@/lib/config/urls"
 import { buildRealtimeUrls } from "@/lib/hooks/use-stomp"
+import { notifySystem } from "@/lib/desktop"
 import { useNotificationStore } from "@/lib/store/notification-store"
 import { useUserStore } from "@/lib/store/user-store"
 import type { NotificationResponse } from "@/lib/api/notification-service"
@@ -45,6 +46,8 @@ export function useNotificationsRealtime(slug: string | undefined) {
         if (notification.urgency === "critical") toast.error(notification.title, opts)
         else if (notification.urgency === "warning") toast.warning(notification.title, opts)
         else toast(notification.title, opts)
+        // App desktop, fenêtre en arrière-plan : notification du système, qui ramène sur le ticket.
+        notifySystem({ title: notification.title, body: notification.body, path: notification.issueUrl || notification.projectUrl })
       } catch {
         // message non-JSON ignoré
       }

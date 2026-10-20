@@ -30,6 +30,12 @@ vi.mock("@/lib/hooks/use-stomp", () => ({
   buildRealtimeUrls: () => ({ wsUrl: "ws://x/ws", sockJsUrl: "http://x/ws-sockjs" }),
 }))
 
+const { mockNotify } = vi.hoisted(() => ({ mockNotify: vi.fn() }))
+vi.mock("@/lib/desktop", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/desktop")>()),
+  notifySystem: mockNotify,
+}))
+
 const mockPushSignal = vi.fn()
 vi.mock("@/lib/store/notification-store", () => ({
   useNotificationStore: (selector: (s: unknown) => unknown) => selector({ pushSignal: mockPushSignal }),
@@ -72,6 +78,13 @@ describe("useNotificationsRealtime", () => {
     const notif = { id: 5, title: "Nouvelle assignation", read: false }
     messageHandler?.({ body: JSON.stringify(notif) })
     expect(mockPushSignal).toHaveBeenCalledWith(notif)
+  })
+
+  it("demande une notification du système qui mène au ticket (app desktop, fenêtre en arrière-plan)", () => {
+    renderHook(() => useNotificationsRealtime("acme"))
+    const notif = { id: 6, title: "Assigned to you", body: "APO-12", issueUrl: "/acme/projects/5/issues/12", projectUrl: "/acme/projects/5" }
+    messageHandler?.({ body: JSON.stringify(notif) })
+    expect(mockNotify).toHaveBeenCalledWith({ title: "Assigned to you", body: "APO-12", path: "/acme/projects/5/issues/12" })
   })
 
   it("ignore un message non-JSON sans lever d'erreur", () => {
