@@ -27,13 +27,16 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
+import com.taskforce.tf_api.core.dto.response.WorkspaceResponse;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.DesktopSessionService;
 import com.taskforce.tf_api.core.service.ProjectService;
+import com.taskforce.tf_api.core.service.WorkspaceService;
 import com.taskforce.tf_api.modules.transfer.service.ProjectBundleService;
+import com.taskforce.tf_api.modules.transfer.service.WorkspaceBundleService;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
 /** Tranche web — {@link DesktopTransferController} : l'app déplace des projets avec sa seule session. */
@@ -54,6 +57,8 @@ class DesktopTransferControllerWebMvcTest {
     @MockitoBean private WorkspaceRepository workspaceRepository;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository;
+    @MockitoBean private WorkspaceBundleService workspaceBundleService;
+    @MockitoBean private WorkspaceService workspaceService;
 
     @Test
     @DisplayName("projects → les espaces de la personne et les projets qu'elle y voit, sans jeton Keycloak")
@@ -102,6 +107,39 @@ class DesktopTransferControllerWebMvcTest {
                 .header(DesktopTransferController.SESSION_HEADER, TOKEN).contentType("application/zip").content(ZIP))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.id").value(42));
+    }
+
+    @Test
+    @DisplayName("workspace → le fichier d'un espace entier, avec les droits de la personne")
+    void downloads_a_whole_workspace() throws Exception {
+        when(sessions.userOf(TOKEN)).thenReturn(Optional.of(7L));
+        when(workspaceBundleService.export("acme", 7L)).thenReturn(new WorkspaceBundleService.Export(
+            "acme-2026-10-20.taskforce-workspace.zip", new byte[0], java.util.Map.of(), 1L, java.util.Set.of()));
+        doAnswer(invocation -> {
+            invocation.<OutputStream>getArgument(1).write(ZIP);
+            return null;
+        }).when(workspaceBundleService).write(any(), any());
+
+        mockMvc.perform(post("/api/auth/desktop/transfer/workspace").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"" + TOKEN + "\",\"workspace\":\"acme\"}"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType("application/zip"))
+            .andExpect(content().bytes(ZIP));
+    }
+
+    @Test
+    @DisplayName("workspace-import → l'espace envoyé par l'app est créé, la personne en est propriétaire")
+    void imports_a_whole_workspace() throws Exception {
+        when(sessions.userOf(TOKEN)).thenReturn(Optional.of(7L));
+        when(workspaceBundleService.importBundle(eq(7L), any()))
+            .thenReturn(com.taskforce.tf_api.core.model.Workspace.builder().id(9L).slug("acme-copy").build());
+        when(workspaceService.getWorkspaceBySlug("acme-copy", 7L))
+            .thenReturn(WorkspaceResponse.builder().id(9L).slug("acme-copy").name("Acme").build());
+
+        mockMvc.perform(post("/api/auth/desktop/transfer/workspace-import")
+                .header(DesktopTransferController.SESSION_HEADER, TOKEN).contentType("application/zip").content(ZIP))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.slug").value("acme-copy"));
     }
 
     @Test

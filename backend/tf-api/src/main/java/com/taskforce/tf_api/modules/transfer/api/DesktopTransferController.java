@@ -23,12 +23,17 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.DesktopSessionTokenRequest;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
+import com.taskforce.tf_api.core.dto.response.WorkspaceResponse;
+import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.DesktopSessionService;
 import com.taskforce.tf_api.core.service.ProjectService;
+import com.taskforce.tf_api.core.service.WorkspaceService;
 import com.taskforce.tf_api.modules.transfer.dto.DesktopTransferRequest;
+import com.taskforce.tf_api.modules.transfer.dto.DesktopWorkspaceRequest;
 import com.taskforce.tf_api.modules.transfer.dto.WebProjectsResponse;
 import com.taskforce.tf_api.modules.transfer.service.ProjectBundleService;
+import com.taskforce.tf_api.modules.transfer.service.WorkspaceBundleService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 
@@ -38,8 +43,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Déplacement de projets entre la webapp et l'app desktop, à la demande de l'app : elle liste les projets de la
- * personne, en télécharge un pour l'importer sur l'ordinateur, ou envoie un projet de l'ordinateur dans un espace.
+ * Déplacement de projets et d'espaces entiers (Brain OS compris) entre la webapp et l'app desktop, à la demande de
+ * l'app : elle liste les espaces et projets de la personne, en télécharge un pour l'importer sur l'ordinateur, ou envoie
+ * un projet ou un espace de l'ordinateur dans la webapp.
  *
  * <p>L'app n'a pas de jeton Keycloak, seulement sa session ({@code tfa_}), qui ne vaut que sous
  * {@code /api/auth/desktop} : elle passe dans le corps des demandes, ou dans l'en-tête {@value #SESSION_HEADER} quand
@@ -58,6 +64,8 @@ public class DesktopTransferController {
     private final ProjectBundleService bundleService;
     private final ProjectService projectService;
     private final WorkspaceRepository workspaceRepository;
+    private final WorkspaceBundleService workspaceBundleService;
+    private final WorkspaceService workspaceService;
 
     /** POST /api/auth/desktop/transfer/projects : les espaces de la personne et les projets qu'elle y voit. */
     @PostMapping("/projects")
@@ -106,6 +114,28 @@ public class DesktopTransferController {
         } finally {
             Files.deleteIfExists(file);
         }
+    }
+
+    /** POST /api/auth/desktop/transfer/workspace : le fichier d'un espace entier dont la personne est membre. */
+    @PostMapping("/workspace")
+    public void workspace(@Valid @RequestBody DesktopWorkspaceRequest request, HttpServletResponse response) throws IOException {
+        WorkspaceBundleService.Export export = workspaceBundleService.export(request.workspace(), userOf(request.token()));
+        response.setContentType(ProjectBundleController.ZIP);
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
+            ContentDisposition.attachment().filename(export.fileName()).build().toString());
+        workspaceBundleService.write(export, response.getOutputStream());
+    }
+
+    /** POST /api/auth/desktop/transfer/workspace-import : crée dans la webapp l'espace envoyé par l'app. */
+    @PostMapping(value = "/workspace-import", consumes = {ProjectBundleController.ZIP, MediaType.APPLICATION_OCTET_STREAM_VALUE})
+    public ResponseEntity<ApiResponse<WorkspaceResponse>> importWorkspace(
+        @RequestHeader(SESSION_HEADER) String token,
+        HttpServletRequest request
+    ) throws IOException {
+        Long userId = userOf(token);
+        Workspace workspace = WorkspaceBundleController.receive(request, file -> workspaceBundleService.importBundle(userId, file));
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse.success("Workspace imported", workspaceService.getWorkspaceBySlug(workspace.getSlug(), userId)));
     }
 
     private Long userOf(String token) {
