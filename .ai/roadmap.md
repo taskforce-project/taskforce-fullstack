@@ -10,9 +10,10 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
-> **▶ MAJ 20/10/2026 (soir) - Release 1.3.0 EN PROD (PR #382, `651f4ec2`) ; TaskForce Desktop 1.2.0 en publication.** `[release]`
+> **▶ MAJ 20/10/2026 (soir) - Release 1.3.0 EN PROD (PR #382, `651f4ec2`) et TaskForce Desktop 1.2.0 publiée.** `[release]`
 > - PR #381 fusionnée dans `dev` (CI verte : 26 vérifications) ; release = arbre exact de `dev` sur `main`, version produit 1.3.0 posée par la CI (`6b251941`), vérifications du commit de release toutes vertes, `--admin --squash`.
-> - Desktop 1.2.0 : `Desktop - Release` lancé depuis `main` (run 39455682590) ; le site sera reconstruit après sa publication. `dev` réaligné en 1.3.0 (`b2a585ac`).
+> - **En prod (vérifié)** : webapp 1.3.0 ; backend recréé, sain, aucune erreur au démarrage, schéma à jour (aucune migration) ; nouvelles routes `/api/auth/desktop/transfer/workspace` et `/workspace-import`, `/api/workspaces/{slug}/bundle` et `/api/workspaces/import` en 401 sans session ; les deux VM sur `651f4ec2`.
+> - Desktop 1.2.0 publiée depuis `main` (run 39455682590) : `desktop-v1.2.0` (installeur 271 Mo, `.deb` 253 Mo, AppImage 289 Mo) avec ses trois rapports VirusTotal ; `desktop-latest` en 1.2.0 (la 1.1.0 du CEO la trouvera). Site reconstruit par la release suivante, sans étiquette. `dev` réaligné en 1.3.0 (`b2a585ac`).
 > - **Plan du CEO (20/10)** : il passe sa 1.1.0 en 1.2.0 par la mise à jour de l'app (essai de la mise à jour), puis on envoie les e-mails aux utilisateurs (son prompt, son accord avant l'envoi), puis le Microsoft Store à part (version Store en plus du .exe du site, qui garde la mise à jour dans l'app).
 
 > **▶ MAJ 20/10/2026 (soir) - Tout le travail d'un côté à l'autre : le fichier d'espace (espace + Brain OS + projets), desktop 1.2.0 (branche `feature/desktop`).** `[backend + frontend + desktop + landing]`
