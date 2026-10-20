@@ -63,6 +63,7 @@ import { listChildIssues, listRelations, addRelation, deleteRelation,
          listWorklogs, addWorklog, deleteWorklog } from "@/lib/api/issue-service"
 import { parseServerDate } from "@/lib/utils/server-date"
 import { IS_DESKTOP } from "@/lib/desktop"
+import { DesktopGitHubConnect } from "@/components/desktop/desktop-github-connect"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -198,7 +199,9 @@ function CollapsibleSection({
 function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; workspaceSlug: string }>) {
   const { githubStatus, githubLinks, fetchGitHubLinks, addGitHubLink, removeGitHubLink } = useIntegrationStore()
   const openSettings = useSettingsStore((s) => s.openSettings)
-  const connected = Boolean(githubStatus?.connected)
+  // App desktop : pas d'intégration d'espace, les liens se lisent toujours ; leur statut se relit avec le compte GitHub
+  // de la personne (son GitHub CLI), que le bloc de connexion propose s'il manque.
+  const connected = IS_DESKTOP || Boolean(githubStatus?.connected)
   const links = githubLinks[issueId] ?? []
   const [loading, setLoading] = useState(false)
 
@@ -259,6 +262,9 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
 
   return (
     <div className="flex flex-col gap-3">
+      {IS_DESKTOP && (
+        <DesktopGitHubConnect purpose="Sign in to GitHub to keep the status of these pull requests up to date. A merged pull request completes its issue." />
+      )}
       {loading && <p className="text-xs text-muted-foreground text-center py-4">Loading…</p>}
 
       {!loading && links.length === 0 && (
@@ -1243,7 +1249,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     listChecklist(workspaceSlug, projectId, id).then((a) => put("checklist", a.length)).catch(() => { /* silent */ })
     listRelations(workspaceSlug, projectId, id).then((a) => put("relations", a.length)).catch(() => { /* silent */ })
     listAttachments(workspaceSlug, projectId, id).then((a) => put("attachments", a.length)).catch(() => { /* silent */ })
-    if (githubStatus?.connected) fetchGitHubLinks(workspaceSlug, id).catch(() => { /* silent */ })
+    if (IS_DESKTOP || githubStatus?.connected) fetchGitHubLinks(workspaceSlug, id).catch(() => { /* silent */ })
   }, [open, workspaceSlug, projectId, issue, githubStatus?.connected, fetchGitHubLinks])
 
   if (!issue) return null
@@ -1572,9 +1578,10 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </CollapsibleSection>
             )}
 
-            {/* GitHub - repliable (le contenu ne se charge qu'à l'ouverture). Liens tenus par l'intégration GitHub de
-                l'espace, absente de l'app desktop : la pull request d'un agent y reste sur son run (« View result »). */}
-            {workspaceSlug && !IS_DESKTOP && (
+            {/* GitHub - repliable (le contenu ne se charge qu'à l'ouverture). La pull request d'un agent s'y lie seule ;
+                sur le serveur, les statuts se relisent avec l'intégration GitHub de l'espace, dans l'app avec le compte
+                GitHub de la personne. */}
+            {workspaceSlug && (
               <CollapsibleSection icon={<BrandLogo slug="github" name="GitHub" className="size-4" />} title="GitHub" count={githubLinks[issueId]?.length ?? 0}>
                 <GitHubTab issueId={issueId} workspaceSlug={workspaceSlug} />
               </CollapsibleSection>

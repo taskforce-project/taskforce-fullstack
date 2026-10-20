@@ -18,6 +18,8 @@ export interface BackendOptions {
   uiOrigin: string;
   /** Relais d'IA de la coque, joint comme l'ai-service de la webapp (cf. ai.ts). */
   ai: { url: string; token: string };
+  /** Relais du jeton GitHub de la personne (cf. github-relay.ts). */
+  github: { url: string; token: string };
   /** Secret du runner de Claude Code que l'app lance (cf. runner.ts). */
   runnerSecret: string;
 }
@@ -50,6 +52,8 @@ export class Backend {
       CORS_ALLOWED_ORIGINS: options.uiOrigin,
       AI_SERVICE_URL: options.ai.url,
       AI_SERVICE_TOKEN: options.ai.token,
+      TF_DESKTOP_GITHUB_URL: options.github.url,
+      TF_DESKTOP_GITHUB_TOKEN: options.github.token,
       TF_DESKTOP_RUNNER_SECRET: options.runnerSecret,
     });
     const args = [

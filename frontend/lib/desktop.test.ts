@@ -31,6 +31,19 @@ describe("desktop bridge", () => {
     expect(desktop.desktopBridge()).toBeNull();
   });
 
+  it("asks the shell for a system notification in the desktop build, and nothing on the web app", async () => {
+    const notify = vi.fn();
+    (window as Window & { taskforceDesktop?: unknown }).taskforceDesktop = { ...bridge, notify };
+
+    (await loadDesktop("true")).notifySystem({ title: "Assigned to you", body: "APO-12", path: "/acme/projects/5" });
+    (await loadDesktop("true")).notifySystem({ title: "Run finished", body: null, path: null });
+    (await loadDesktop("false")).notifySystem({ title: "Hidden" });
+
+    expect(notify).toHaveBeenCalledTimes(2);
+    expect(notify).toHaveBeenNthCalledWith(1, { title: "Assigned to you", body: "APO-12", path: "/acme/projects/5" });
+    expect(notify).toHaveBeenNthCalledWith(2, { title: "Run finished" });
+  });
+
   it("returns what the shell exposes in the desktop build", async () => {
     (window as Window & { taskforceDesktop?: unknown }).taskforceDesktop = bridge;
     const desktop = await loadDesktop("true");

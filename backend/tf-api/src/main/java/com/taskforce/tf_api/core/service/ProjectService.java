@@ -265,7 +265,7 @@ public class ProjectService {
      * seul l'identifiant (préfixe d'issue) doit être unique par workspace. Miroir de la logique de slug
      * unique des workspaces — on ne bloque plus l'utilisateur sur une collision de préfixe.
      */
-    private String uniqueIdentifier(Long workspaceId, String base) {
+    public String uniqueIdentifier(Long workspaceId, String base) {
         if (!projectRepository.existsByWorkspaceIdAndIdentifier(workspaceId, base)) {
             return base;
         }

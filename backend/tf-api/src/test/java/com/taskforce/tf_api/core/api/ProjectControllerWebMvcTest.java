@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -70,6 +71,14 @@ class ProjectControllerWebMvcTest {
         mockMvc.perform(get(P + "/members").with(a)).andExpect(status().isOk());
         mockMvc.perform(get(P + "/teams").with(a)).andExpect(status().isOk());
         mockMvc.perform(get(P + "/labels").with(a)).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("GET avec un identifiant de projet qui n'est pas un nombre → 400 qui nomme le paramètre, pas 500")
+    void non_numeric_id_400() throws Exception {
+        mockMvc.perform(get("/api/workspaces/acme/projects/abc").with(auth()))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("The parameter 'id' has an invalid value."));
     }
 
     @Test

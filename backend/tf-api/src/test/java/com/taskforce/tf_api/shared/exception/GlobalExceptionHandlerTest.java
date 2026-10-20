@@ -1,9 +1,14 @@
 package com.taskforce.tf_api.shared.exception;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -15,6 +20,10 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 
@@ -137,6 +146,47 @@ class GlobalExceptionHandlerTest {
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
         assertThat(r.getHeaders().getAccept()).containsExactly(MediaType.APPLICATION_JSON);
         assertThat(r.getBody().getMessage()).contains("not supported");
+    }
+
+    /** Méthode de contrôleur factice : fournit le {@link MethodParameter} que demandent les exceptions de liaison. */
+    @SuppressWarnings("unused")
+    private static void sampleHandler(String value) {
+        // jamais appelée
+    }
+
+    private static MethodParameter sampleParameter() throws NoSuchMethodException {
+        return new MethodParameter(GlobalExceptionHandlerTest.class.getDeclaredMethod("sampleHandler", String.class), 0);
+    }
+
+    static Stream<Arguments> missingValues() throws NoSuchMethodException {
+        return Stream.of(
+            Arguments.of(new MissingServletRequestParameterException("q", "String"),
+                "The request parameter 'q' is required."),
+            Arguments.of(new MissingRequestHeaderException("Authorization", sampleParameter()),
+                "The request header 'Authorization' is required."),
+            Arguments.of(new MissingServletRequestPartException("file"),
+                "The request part 'file' is required."));
+    }
+
+    @ParameterizedTest(name = "{1}")
+    @MethodSource("missingValues")
+    @DisplayName("paramètre, en-tête ou fichier obligatoire absent → 400 qui nomme ce qui manque")
+    void missing_value_400(Exception ex, String message) {
+        ResponseEntity<ErrorResponse> r = handler.handleMissingRequestValue(ex, req());
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(r.getBody().getMessage()).isEqualTo(message);
+        assertThat(r.getBody().getPath()).isEqualTo("/api/test");
+    }
+
+    @Test
+    @DisplayName("paramètre mal typé → 400 qui nomme le paramètre, sans renvoyer la valeur reçue")
+    void type_mismatch_400() throws NoSuchMethodException {
+        ResponseEntity<ErrorResponse> r = handler.handleArgumentTypeMismatch(
+            new MethodArgumentTypeMismatchException("abc<b>", Long.class, "id", sampleParameter(),
+                new NumberFormatException("For input string: \"abc<b>\"")),
+            req());
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(r.getBody().getMessage()).isEqualTo("The parameter 'id' has an invalid value.");
     }
 
     @Test

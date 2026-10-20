@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { FolderKanban, Loader2, DownloadCloud, Plug, Github } from "lucide-react"
+import { FolderKanban, Loader2, DownloadCloud, Plug, Github, FileArchive } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -47,7 +47,7 @@ interface CreateProjectDialogProps {
   readonly onOpenChange: (open: boolean) => void
 }
 
-type Mode = "blank" | "import"
+type Mode = "blank" | "import" | "file"
 
 /** Catégorie des outils depuis lesquels on peut importer un projet (des issues). */
 const PM_CATEGORY = "PROJECT_MANAGEMENT"
@@ -125,6 +125,11 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const [importName, setImportName] = useState("")
   const [importing, setImporting] = useState(false)
   const [connectingKey, setConnectingKey] = useState<string | null>(null)
+
+  // -- Mode « fichier » : un projet entier, exporté de la webapp ou de l'app desktop --
+  const [projectFile, setProjectFile] = useState<File | null>(null)
+  const [fileProgress, setFileProgress] = useState<number | null>(null)
+  const importProjectFile = useProjectStore((s) => s.importProject)
 
   // Charge les outils MCP-ready de gestion de projet (logos + état connecté) quand on passe en import.
   useEffect(() => {
@@ -326,6 +331,22 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     }
   }
 
+  async function handleFileImport() {
+    if (!projectFile || !slug) return
+    setImporting(true)
+    setFileProgress(0)
+    const project = await importProjectFile(slug, projectFile, setFileProgress)
+    setImporting(false)
+    setFileProgress(null)
+    if (!project) {
+      toast.error(useProjectStore.getState().error ?? "Import failed. Please try again.")
+      return
+    }
+    toast.success(`Imported "${project.name}"`)
+    changeOpen(false)
+    router.push(`/${slug}/projects/${project.id}`)
+  }
+
   const busy = isLoading || importing
 
   return (
@@ -336,7 +357,9 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
           <DialogDescription>
             {mode === "blank"
               ? "Projects help you track work across issues, cycles, and pages."
-              : "Import an existing project's issues from a connected tool into a new TaskForce project."}
+              : mode === "file"
+                ? "Bring a whole project from a TaskForce project file, exported from the web app or the desktop app."
+                : "Import an existing project's issues from a connected tool into a new TaskForce project."}
           </DialogDescription>
         </DialogHeader>
 
@@ -351,6 +374,16 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
             )}
           >
             Blank
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("file")}
+            className={cn(
+              "rounded px-3 py-1.5 transition-colors",
+              mode === "file" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            From a file
           </button>
           <button
             type="button"
@@ -504,6 +537,39 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
               )}
             </div>
           </div>
+        ) : mode === "file" ? (
+          <div className="flex flex-col gap-3 py-2">
+            <label
+              htmlFor="project-file"
+              className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed border-border px-4 py-6 text-center transition-colors hover:bg-accent"
+            >
+              <FileArchive className="size-6 text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground">
+                {projectFile ? projectFile.name : "Choose a TaskForce project file"}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {projectFile ? `${(projectFile.size / (1024 * 1024)).toFixed(1)} MB` : "A .zip file, from a project's Export menu"}
+              </span>
+            </label>
+            <input
+              id="project-file"
+              type="file"
+              accept=".zip,application/zip"
+              className="sr-only"
+              onChange={(e) => setProjectFile(e.target.files?.[0] ?? null)}
+            />
+            {fileProgress !== null && (
+              <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+                <div className="h-full bg-primary transition-[width]" style={{ width: `${fileProgress}%` }} />
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              The project arrives with its issues, sub-issues, comments, history, cycles, pages and attachments.{" "}
+              {IS_DESKTOP
+                ? "Issues and comments keep the names of the people who wrote them."
+                : "People who aren't members of this workspace are replaced by you."}
+            </p>
+          </div>
         ) : (
           <div className="flex flex-col gap-4 py-2">
             {toolsLoading ? (
@@ -581,6 +647,11 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
             <Button size="sm" onClick={handleCreate} disabled={!name.trim() || !identifier.trim() || busy} className="gap-2">
               {isLoading ? <Loader2 className="size-4 animate-spin" /> : <FolderKanban className="size-4" />}
               Create project
+            </Button>
+          ) : mode === "file" ? (
+            <Button size="sm" onClick={handleFileImport} disabled={!projectFile || busy} className="gap-2">
+              {importing ? <Loader2 className="size-4 animate-spin" /> : <DownloadCloud className="size-4" />}
+              Import project
             </Button>
           ) : (
             <Button size="sm" onClick={handleImport} disabled={!importSource || !importName.trim() || busy || toolsLoading} className="gap-2">

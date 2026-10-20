@@ -27,6 +27,7 @@ import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { AgentChat } from "@/components/agent/agent-chat"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useModKeyLabel } from "@/lib/hooks/use-mod-key"
+import { useDesktopNavigation } from "@/lib/hooks/use-desktop-navigation"
 import { desktopBridge, IS_DESKTOP } from "@/lib/desktop"
 import { cn } from "@/lib/utils"
 
@@ -123,6 +124,8 @@ export function AppTopbar() {
   React.useEffect(() => {
     desktopBridge()?.setTitleBarTheme?.(theme === "dark", 64)
   }, [theme])
+  // Clic sur une notification du système : la coque demande la page de l'événement.
+  useDesktopNavigation()
   const [cmdOpen, setCmdOpen] = React.useState(false)
   const togglePanel = usePanelStore((s) => s.togglePanel)
   const openAssistant = React.useCallback(() => {

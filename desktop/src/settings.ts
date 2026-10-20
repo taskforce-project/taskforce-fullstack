@@ -18,6 +18,11 @@ export interface Account {
    * les siens.
    */
   profile?: Record<string, unknown>;
+  /**
+   * Photo de profil du compte en ligne (chemin de l'API ou adresse du fournisseur de connexion), que l'app reprend une
+   * fois par poste ; `null` sans photo, absente pour un compte gardé par une version qui ne la lisait pas.
+   */
+  avatarUrl?: string | null;
 }
 
 /** Secrets d'un compte sur ce poste, chiffrés par le système (DPAPI, Trousseau, libsecret). */

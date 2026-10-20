@@ -112,7 +112,8 @@ class GitHubIntegrationContractTest {
 
         // Ordre du constructeur généré par @RequiredArgsConstructor = ordre de déclaration des champs final :
         // integrationRepository, issueGitHubLinkRepository, workspaceRepository, issueRepository,
-        // oauthStateRepository, restTemplate, visibilityGuard, knowledgeService, nodeRepository, brainSearch, jdbcTemplate, tx
+        // oauthStateRepository, restTemplate, visibilityGuard, tokens, mergedPullRequests, knowledgeService,
+        // nodeRepository, brainSearch, jdbcTemplate, tx
         service = new GitHubIntegrationService(
             integrationRepository,
             issueGitHubLinkRepository,
@@ -121,6 +122,8 @@ class GitHubIntegrationContractTest {
             oauthStateRepository,
             rt,
             visibilityGuard,
+            new WorkspaceGitHubTokenSource(integrationRepository),
+            Mockito.mock(MergedPullRequests.class),
             knowledgeService,
             nodeRepository,
             brainSearch,
