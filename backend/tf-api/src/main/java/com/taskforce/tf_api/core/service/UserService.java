@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -143,6 +144,25 @@ public class UserService {
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
+        byte[] original;
+        try {
+            original = file.getBytes();
+        } catch (IOException e) {
+            throw new RuntimeException("Avatar upload failed: " + e.getMessage(), e);
+        }
+        storeAvatar(user, original, file.getContentType());
+
+        UserRepresentation keycloakUser = keycloakService.getUserById(user.getKeycloakId());
+        return buildUserResponse(user, keycloakUser);
+    }
+
+    /**
+     * Range la photo de profil d'un utilisateur et pointe son {@code avatarUrl} sur le proxy
+     * {@code /api/files/avatars/{id}}. Sert à l'envoi d'une photo, et à la reprise de celle du compte en ligne par
+     * l'app desktop.
+     */
+    @Transactional
+    public void storeAvatar(User user, byte[] original, String contentType) {
         String objectKey = "avatars/" + user.getId() + "/avatar";
 
         try {
@@ -150,12 +170,11 @@ public class UserService {
             // plein format (jusqu'à 3 Mo → ~60 % du poids de la page, cf. audit Lighthouse). ImageUtils
             // le ramène à 256px JPEG ; si l'image n'est pas décodable (format exotique), on retombe sur
             // l'original pour ne jamais casser l'upload.
-            byte[] original = file.getBytes();
             byte[] resized = ImageUtils.resizeAvatar(original);
             if (resized != null) {
                 objectStorage.upload(objectKey, new ByteArrayInputStream(resized), resized.length, "image/jpeg");
             } else {
-                objectStorage.upload(objectKey, new ByteArrayInputStream(original), original.length, file.getContentType());
+                objectStorage.upload(objectKey, new ByteArrayInputStream(original), original.length, contentType);
             }
         } catch (Exception e) {
             throw new RuntimeException("Avatar upload failed: " + e.getMessage(), e);
@@ -166,9 +185,6 @@ public class UserService {
         userRepository.save(user);
 
         log.info("Avatar uploadé pour userId={} → {}", user.getId(), proxyUrl);
-
-        UserRepresentation keycloakUser = keycloakService.getUserById(user.getKeycloakId());
-        return buildUserResponse(user, keycloakUser);
     }
 
     /**
