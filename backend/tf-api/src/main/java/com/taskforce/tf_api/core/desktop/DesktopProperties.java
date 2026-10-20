@@ -24,8 +24,10 @@ public record DesktopProperties(String launchToken, String dataDir, Account acco
      * @param email      adresse du compte
      * @param givenName  prénom, s'il est connu
      * @param familyName nom, s'il est connu
+     * @param profile    réglages du compte en ligne (JSON de {@code DesktopProfileResponse}), repris une fois par
+     *                   poste là où l'app n'a pas encore les siens ; vide si la coque ne les a pas
      */
-    public record Account(String subject, String email, String givenName, String familyName) {
+    public record Account(String subject, String email, String givenName, String familyName, String profile) {
 
         /** Nom affiché : prénom et nom, sinon la partie locale de l'adresse. */
         public String displayName() {

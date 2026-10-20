@@ -7,8 +7,12 @@ name: Desktop - Release
 #   always holds the latest installers and their update files (latest.yml, latest-linux.yml), whatever else the
 #   repository releases.
 #
-# Run it by hand once desktop/package.json carries the new version. The builds are not signed yet
-# (landing-page/src/lib/release.ts, SIGNED_BUILDS): Windows SmartScreen warns on the first launch.
+# Run it by hand once desktop/package.json carries the new version.
+#
+# Signing: the Windows installer is signed through the SignPath Foundation once the project is set up there (repository
+# variable SIGNPATH_ORGANIZATION_ID, secret SIGNPATH_API_TOKEN; see landing-page/src/pages/code-signing-policy.astro).
+# Each release then waits for an approver to accept the signing request in SignPath. Until then the builds are not
+# signed (landing-page/src/lib/release.ts, SIGNED_BUILDS): Windows SmartScreen warns on the first launch.
 
 on:
   workflow_dispatch:
@@ -114,9 +118,39 @@ jobs:
       - name: Installers
         working-directory: desktop
         env:
-          # Not signed yet: electron-builder must not look for a certificate in the runner.
+          # electron-builder never signs here: the runner has no certificate, SignPath signs after the build.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npx electron-builder ${{ matrix.builder }} --publish never
+
+      # Signature by the SignPath Foundation, for a release only and once the project is set up there.
+      - name: Installer to sign
+        id: unsigned
+        if: matrix.name == 'Windows' && github.event_name == 'workflow_dispatch' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer
+          path: desktop/release/TaskForce-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Sign the installer (waits for an approver in SignPath)
+        if: steps.unsigned.outcome == 'success'
+        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'taskforce' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          # The approver has six hours to accept the request.
+          wait-for-completion-timeout-in-seconds: 21600
+          output-artifact-directory: desktop/release/signed
+
+      - name: Signed installer and its update files
+        if: steps.unsigned.outcome == 'success'
+        working-directory: desktop
+        run: node scripts/signed-installer.mjs release release/signed
 
       - uses: actions/upload-artifact@v4
         with:

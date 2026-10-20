@@ -65,6 +65,7 @@ desktop:
     email: ${TF_DESKTOP_ACCOUNT_EMAIL}
     given-name: ${TF_DESKTOP_ACCOUNT_GIVEN_NAME:}
     family-name: ${TF_DESKTOP_ACCOUNT_FAMILY_NAME:}
+    profile: ${TF_DESKTOP_ACCOUNT_PROFILE:}
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://127.0.0.1}

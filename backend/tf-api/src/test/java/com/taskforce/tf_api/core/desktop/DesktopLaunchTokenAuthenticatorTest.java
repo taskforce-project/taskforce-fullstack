@@ -19,7 +19,7 @@ class DesktopLaunchTokenAuthenticatorTest {
 
     private final DesktopLaunchTokenAuthenticator authenticator = new DesktopLaunchTokenAuthenticator(
         new DesktopProperties(TOKEN, "C:/data",
-            new DesktopProperties.Account("kc-sub-1", "ada@example.com", "Ada", "Trial")));
+            new DesktopProperties.Account("kc-sub-1", "ada@example.com", "Ada", "Trial", null)));
 
     @ParameterizedTest(name = "{0} → {1}")
     @CsvSource({
@@ -67,7 +67,7 @@ class DesktopLaunchTokenAuthenticatorTest {
     @DisplayName("sans prénom ni nom, pas de claims vides")
     void no_empty_name_claims() {
         DesktopLaunchTokenAuthenticator anonymous = new DesktopLaunchTokenAuthenticator(
-            new DesktopProperties(TOKEN, "C:/data", new DesktopProperties.Account("kc-sub-2", "bob@example.com", null, "")));
+            new DesktopProperties(TOKEN, "C:/data", new DesktopProperties.Account("kc-sub-2", "bob@example.com", null, "", null)));
 
         Jwt jwt = ((JwtAuthenticationToken) anonymous.authenticate(TOKEN)).getToken();
 
