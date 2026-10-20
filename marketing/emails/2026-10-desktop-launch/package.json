@@ -6,7 +6,9 @@
   "scripts": {
     "capture": "node scripts/capture.mjs",
     "compose": "node scripts/compose.mjs",
+    "steps": "node scripts/steps.mjs",
     "build": "node scripts/build.mjs",
+    "preview": "node scripts/preview.mjs",
     "check": "node scripts/check.mjs"
   },
   "devDependencies": {
