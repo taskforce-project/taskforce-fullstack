@@ -29,6 +29,10 @@ export interface DesktopAsset {
   name: string;
   url: string;
   size: number;
+  /** Empreinte SHA-256 calculée par GitHub, pour vérifier le fichier téléchargé. */
+  sha256?: string;
+  /** Rapport VirusTotal du fichier, quand le workflow « Desktop - VirusTotal » l'a envoyé. */
+  virustotal?: string;
 }
 
 export interface DesktopRelease {
@@ -54,6 +58,8 @@ interface GithubAsset {
   name: string;
   browser_download_url: string;
   size: number;
+  /** « sha256:… », calculé par GitHub à la publication. */
+  digest?: string | null;
 }
 interface GithubRelease {
   tag_name: string;
@@ -80,14 +86,35 @@ export function platformOf(name: string): Platform[] {
   return [];
 }
 
+/** Titre de la section des notes où le workflow « Desktop - VirusTotal » liste les rapports, un par fichier. */
+export const VIRUSTOTAL_HEADING = "### VirusTotal";
+
+/** Rapports VirusTotal listés dans les notes d'une release : nom du fichier → adresse du rapport. */
+export function virustotalReports(body: string): Map<string, string> {
+  const reports = new Map<string, string>();
+  for (const m of body.matchAll(/\[([^\]]+)\]\((https:\/\/www\.virustotal\.com\/gui\/file\/[0-9a-f]{64})\)/g)) {
+    reports.set(m[1], m[2]);
+  }
+  return reports;
+}
+
 export function toDesktopRelease(rel: GithubRelease): DesktopRelease {
+  const body = rel.body ?? "";
+  const reports = virustotalReports(body);
   const assets: Partial<Record<Platform, DesktopAsset>> = {};
   for (const a of rel.assets) {
     for (const platform of platformOf(a.name)) {
       // Un fichier dédié l'emporte sur l'universel s'il y a les deux.
       const existing = assets[platform];
       if (existing && !existing.name.toLowerCase().includes("universal")) continue;
-      assets[platform] = { platform, name: a.name, url: a.browser_download_url, size: a.size };
+      assets[platform] = {
+        platform,
+        name: a.name,
+        url: a.browser_download_url,
+        size: a.size,
+        sha256: a.digest?.startsWith("sha256:") ? a.digest.slice("sha256:".length) : undefined,
+        virustotal: reports.get(a.name),
+      };
     }
   }
   return {
@@ -95,7 +122,8 @@ export function toDesktopRelease(rel: GithubRelease): DesktopRelease {
     tag: rel.tag_name,
     date: rel.published_at ?? "",
     url: rel.html_url,
-    notes: rel.body ?? "",
+    // Les rapports VirusTotal s'affichent à côté des fichiers, pas dans les nouveautés.
+    notes: body.split(VIRUSTOTAL_HEADING)[0].trim(),
     prerelease: rel.prerelease,
     assets,
   };

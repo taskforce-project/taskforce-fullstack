@@ -12,10 +12,12 @@ import SectionHead from "@/components/site/SectionHead.astro";
 import Pill from "@/components/site/Pill.astro";
 import RuleColumns, { type RuleItem } from "@/components/site/RuleColumns.astro";
 import { BrandMark } from "@/components/visuals/brand";
-import { formatDate, formatSize, getDesktopRelease, PLATFORMS, SIGNED_BUILDS, type OsFamily } from "@/lib/release";
+import { formatDate, formatSize, getDesktopRelease, PLATFORMS, SIGNED_BUILDS, type OsFamily, type Platform } from "@/lib/release";
 import { LINKS } from "@/lib/site";
 
 const release = await getDesktopRelease();
+const fileName = (platform: Platform, fallback: string) => release?.assets[platform]?.name ?? fallback;
+const hasMac = Boolean(release?.assets["mac-arm64"] || release?.assets["mac-x64"]);
 const notesHtml = release?.notes ? (await (await createMarkdownProcessor()).render(release.notes)).code : "";
 
 const FAMILIES: { os: OsFamily; brand: "macos" | "windows" | "linux"; name: string; wash: string; files: string }[] = [
@@ -101,6 +103,20 @@ const AI_TIERS = [
                             <p class="mt-0.5 truncate text-[12.5px] text-subtle">
                               {asset ? `${asset.name} · ${formatSize(asset.size)}` : "Not published yet"}
                             </p>
+                            {(asset?.virustotal || asset?.sha256) && (
+                              <p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] text-subtle">
+                                {asset.virustotal && (
+                                  <a href={asset.virustotal} target="_blank" rel="noopener" class="underline underline-offset-2">
+                                    VirusTotal report
+                                  </a>
+                                )}
+                                {asset.sha256 && (
+                                  <span class="font-mono" title={`SHA-256 ${asset.sha256}`}>
+                                    SHA-256 {asset.sha256.slice(0, 10)}…
+                                  </span>
+                                )}
+                              </p>
+                            )}
                           </div>
                           {asset ? (
                             <a href={asset.url} class="btn btn-primary btn-sm" aria-label={`Download for ${f.name}, ${p.detail}`}>
@@ -178,51 +194,87 @@ const AI_TIERS = [
     </div>
   </section>
 
-  {/* ───────── Premier lancement ───────── */}
-  {
-    (!SIGNED_BUILDS.mac || !SIGNED_BUILDS.windows) && (
-      <section class="section pt-0!">
-        <div class="container-site">
-          <SectionHead
-            label="First launch"
-            tone="yellow"
-            lead="The first builds are not code-signed yet, so your system warns you before opening an app it does not know. The code is open on GitHub if you want to check what you install."
-          >
-            <Fragment slot="title">
-              If your system asks, <span class="t-word">here is what to do.</span>
-            </Fragment>
-          </SectionHead>
-          <div class="mt-14 grid gap-4 sm:mt-16 md:grid-cols-3">
-            {!SIGNED_BUILDS.mac && (
-              <div class="card p-7" data-reveal>
-                <p class="t-h4">macOS</p>
-                <p class="t-small mt-2">
-                  If macOS blocks the app, open System Settings, then Privacy and Security, and choose Open Anyway next to
-                  TaskForce.
-                </p>
-              </div>
+  {/* ───────── Installer ───────── */}
+  <section id="install" class="section scroll-mt-16 pt-0!">
+    <div class="container-site">
+      <SectionHead
+        label="Install"
+        tone="yellow"
+        lead={
+          SIGNED_BUILDS.windows
+            ? "TaskForce installs like any other app, and opens when it's done."
+            : "TaskForce installs like any other app. Its installers are not code-signed yet, so your system may ask you to confirm the first time: here is what to expect."
+        }
+      >
+        <Fragment slot="title">Installed <span class="t-word">in a minute.</span></Fragment>
+      </SectionHead>
+      <div class:list={["mt-14 grid gap-4 sm:mt-16", hasMac ? "lg:grid-cols-3" : "md:grid-cols-2"]}>
+        <div class="card p-7" data-reveal>
+          <p class="t-h4">Windows</p>
+          <ol class="install-steps t-small mt-3">
+            <li>
+              Open <code>{fileName("windows", "TaskForce-Setup.exe")}</code>. It installs for your account, without
+              administrator rights, then opens TaskForce.
+            </li>
+            {!SIGNED_BUILDS.windows && (
+              <li>
+                If Windows shows “Windows protected your PC”, choose More info, then Run anyway: Windows does not know
+                the publisher of an installer that is not signed.
+              </li>
             )}
             {!SIGNED_BUILDS.windows && (
-              <div class="card p-7" data-reveal style="--d: 80ms">
-                <p class="t-h4">Windows</p>
-                <p class="t-small mt-2">If SmartScreen shows “Windows protected your PC”, choose More info, then Run anyway.</p>
-                <p class="t-small mt-2">
-                  Some antivirus programs also stop a new installer that is not signed. We are setting up signing for
-                  Windows builds through the SignPath Foundation: see our <a href="/code-signing-policy" class="underline underline-offset-2">code signing policy</a>.
-                </p>
-              </div>
+              <li>
+                If your antivirus stops it, it is reacting to a new file it has never seen. The VirusTotal report next
+                to the file shows what dozens of antivirus engines make of it.
+              </li>
             )}
-            <div class="card p-7" data-reveal style="--d: 160ms">
-              <p class="t-h4">Linux</p>
-              <p class="t-small mt-2">
-                Make the AppImage executable (chmod +x) and open it, or install the .deb with your package manager.
-              </p>
-            </div>
-          </div>
+          </ol>
         </div>
-      </section>
-    )
-  }
+        <div class="card p-7" data-reveal style="--d: 80ms">
+          <p class="t-h4">Linux</p>
+          <p class="t-small mt-3 font-medium text-foreground">Debian, Ubuntu and derivatives</p>
+          <ol class="install-steps t-small mt-2">
+            <li>
+              In a terminal, in the folder of the file:
+              <code class="install-cmd">sudo apt install ./{fileName("linux-deb", "TaskForce-amd64.deb")}</code>
+              apt installs what TaskForce needs with it.
+            </li>
+            <li>Open TaskForce from your applications.</li>
+          </ol>
+          <p class="t-small mt-5 font-medium text-foreground">Any distribution, with the AppImage</p>
+          <ol class="install-steps t-small mt-2">
+            <li>
+              Make it executable:
+              <code class="install-cmd">chmod +x {fileName("linux-appimage", "TaskForce-x86_64.AppImage")}</code>
+              then open it from your file manager, or with <code>./{fileName("linux-appimage", "TaskForce-x86_64.AppImage")}</code>.
+            </li>
+            <li>
+              On Ubuntu 22.04 and later, AppImages need libfuse2 first:
+              <code class="install-cmd">sudo apt install libfuse2</code>
+              (the package is libfuse2t64 on Ubuntu 24.04).
+            </li>
+          </ol>
+        </div>
+        {hasMac && (
+          <div class="card p-7" data-reveal style="--d: 160ms">
+            <p class="t-h4">macOS</p>
+            <p class="t-small mt-3">
+              {SIGNED_BUILDS.mac
+                ? "Open the disk image and drag TaskForce to Applications."
+                : "Open the disk image and drag TaskForce to Applications. If macOS blocks the app, open System Settings, then Privacy and Security, and choose Open Anyway next to TaskForce."}
+            </p>
+          </div>
+        )}
+      </div>
+      <p class="t-small mt-6 max-w-3xl" data-reveal>
+        Every file is built by GitHub Actions from the public source code. To check a download, compare its SHA-256,
+        shown next to the file and on its{" "}
+        <a href={release?.url ?? LINKS.releases} target="_blank" rel="noopener" class="link-inline">GitHub release</a>,
+        with <code>Get-FileHash</code> in PowerShell or <code>sha256sum</code> on Linux. More in our{" "}
+        <a href="/code-signing-policy" class="link-inline">code signing policy</a>.
+      </p>
+    </div>
+  </section>
 
   {/* ───────── Nouveautés ───────── */}
   <section id="whats-new" class="section scroll-mt-16 pt-0!">
@@ -281,6 +333,32 @@ const AI_TIERS = [
     text-decoration: underline;
     text-decoration-color: var(--input);
     text-underline-offset: 3px;
+  }
+  .install-steps {
+    display: grid;
+    gap: 0.6rem;
+    padding-left: 1.15rem;
+    list-style: decimal;
+  }
+  .install-steps code,
+  .install-steps + p code {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+  }
+  .install-cmd {
+    display: block;
+    margin: 0.45rem 0;
+    padding: 0.5rem 0.75rem;
+    overflow-x: auto;
+    border-radius: 8px;
+    background: var(--muted);
+    color: var(--foreground);
+    font-size: 12.5px !important;
+    white-space: nowrap;
+  }
+  p code {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
   }
   .notes :global(code) {
     font-family: var(--font-mono);
