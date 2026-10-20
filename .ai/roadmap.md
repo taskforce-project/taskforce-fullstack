@@ -10,6 +10,11 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 20/10/2026 - API : un corps de requête absent ou illisible répond 400, plus 500 (branche `fix/api-unreadable-body`).** `[backend]`
+> - Vu en prod le 20/10 en vérifiant la release : `POST /api/auth/desktop/session` sans corps répondait **500** (avec un corps JSON : 401 comme prévu). Cause : `HttpMessageNotReadableException` sans handler dans `GlobalExceptionHandler`, donc le fourre-tout `Exception` (500 « Unexpected error » et une trace d'erreur au journal pour une erreur du client).
+> - Correctif (`72a6be33`) : corps absent, JSON mal formé ou d'une autre forme → **400** « The request body is missing or malformed. » (le détail de l'analyseur reste au journal de débogage) ; corps d'un type que la route ne lit pas (formulaire au lieu de JSON) → **415** avec l'en-tête `Accept`.
+> - Vérifié : `@WebMvcTest` paramétré sur l'endpoint réel (5 cas, tous en 500 avant le correctif) et tests unitaires du gestionnaire ; suite backend complète 1745 tests sans échec. Reste possible dans la même famille, hors de ce correctif : paramètre de requête manquant ou d'un mauvais type (`MissingServletRequestParameterException`, `MethodArgumentTypeMismatchException`), sans handler eux non plus dans `GlobalExceptionHandler`, donc pris par le même fourre-tout.
+
 > **▶ MAJ 20/10/2026 (matin) - Release 1.1.2 EN PROD (PR #367, `ccd79dac`) et TaskForce Desktop 1.0.2 publiée.** `[release]`
 > - PR #366 fusionnée dans `dev` (`3872293d`, CI verte) ; release = arbre exact de `dev` sur `main` par `commit-tree`, version produit 1.1.2 posée par la CI (`9bfa9434`), `--admin --squash`.
 > - Déployé : webapp de prod en 1.1.2 (vue à 01:06 UTC, 4 min après la fusion) ; backend reconstruit par l'auto-déploiement de la VM1 (construction d'image vue à 01:03 UTC). Vérification directe des conteneurs impossible : Tailscale SSH demande une revalidation du CEO dans son navigateur.

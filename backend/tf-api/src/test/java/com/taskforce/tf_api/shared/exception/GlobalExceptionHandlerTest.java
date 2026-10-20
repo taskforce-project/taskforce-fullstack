@@ -4,13 +4,18 @@ import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 import com.taskforce.tf_api.shared.dto.ErrorResponse;
@@ -109,6 +114,29 @@ class GlobalExceptionHandlerTest {
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
         assertThat(r.getHeaders().getAllow()).containsExactly(org.springframework.http.HttpMethod.POST);
         assertThat(r.getBody().getMessage()).contains("not allowed");
+    }
+
+    @Test
+    @DisplayName("corps absent ou illisible → 400, sans le détail de l'analyseur")
+    void unreadable_body_400() {
+        ResponseEntity<ErrorResponse> r = handler.handleUnreadableBody(
+            new HttpMessageNotReadableException("JSON parse error: Unexpected end-of-input", new MockHttpInputMessage(new byte[0])),
+            req());
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(r.getBody().getMessage()).isEqualTo("The request body is missing or malformed.");
+        assertThat(r.getBody().getPath()).isEqualTo("/api/test");
+    }
+
+    @Test
+    @DisplayName("type de contenu que la route ne lit pas → 415 avec l'en-tête Accept")
+    void unsupported_media_type_415() {
+        ResponseEntity<ErrorResponse> r = handler.handleUnsupportedMediaType(
+            new HttpMediaTypeNotSupportedException(MediaType.APPLICATION_FORM_URLENCODED, List.of(MediaType.APPLICATION_JSON),
+                HttpMethod.POST),
+            req());
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        assertThat(r.getHeaders().getAccept()).containsExactly(MediaType.APPLICATION_JSON);
+        assertThat(r.getBody().getMessage()).contains("not supported");
     }
 
     @Test
