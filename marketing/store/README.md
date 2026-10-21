@@ -52,6 +52,10 @@ The product is reserved as "TaskForce" (MSIX or PWA app). Each section of the su
 - English (United States), from the package: `listing.en.md`.
 - French (France), with "Add/remove languages": `listing.fr.md`.
 - Screenshots: the four files of `screenshots/`, in order, with their captions.
+- Both at once: Export listings, then
+  `node marketing/store/fill-listings.mjs <exported .csv> <folder>` fills the export from the two listings and copies
+  the screenshots next to it; Import listings, Upload folder, and pick that folder. The Field, ID and Type columns stay
+  as exported, as Partner Center requires.
 
 **Submission options**
 - Publishing: as soon as it passes certification, or by hand.
