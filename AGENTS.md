@@ -15,7 +15,7 @@ assistant needs to change the code without breaking it.
 | `taskforce-plugin` | Claude Code plugin (`/taskforce`) |
 | `keycloak/realms` | Sign-in realms: `dev`, `selfhost` and `prod` |
 | `landing-page` | Public website (Astro) |
-| `marketing` | Emails to TaskForce users (HTML for Brevo) and the scripts that make their visuals |
+| `marketing` | Emails to TaskForce users (HTML for Brevo), the Microsoft Store listing, and the scripts that make their visuals |
 | `fern` | API reference published on docs.taskforce-project.fr |
 | `.ai` | Maintainers' working notes, in French |
 

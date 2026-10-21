@@ -1,6 +1,6 @@
 # TaskForce
 
-> TaskForce is a free, open source desktop app (macOS, Windows, Linux) to plan your projects and hand tasks to AI coding agents such as Claude Code and GitHub Copilot, while you keep the final say.
+> TaskForce is a free, open source desktop app (Windows and Linux, macOS soon) to plan your projects and hand tasks to AI coding agents such as Claude Code and GitHub Copilot, while you keep the final say. On Windows, it is on the Microsoft Store: https://apps.microsoft.com/detail/9PFC2ML6X5SF
 
 You write your issues and keep your project notes (Brain OS) in TaskForce. When an issue is ready, you assign it to an agent. The agent reads the issue and the related notes, works on its own branch, asks before any action outside its limits, and comes back with a pull request, or a comment when there is no code. Nothing is merged without you.
 

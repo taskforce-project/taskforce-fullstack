@@ -7,8 +7,10 @@
 //
 // Usage : node scripts/prepare-resources.mjs [jre] [backend] [postgres] [frontend] [runner]   (sans argument : tout)
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import {
+  cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, rmdirSync, rmSync, statSync, unlinkSync, writeFileSync,
+} from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const desktop = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -41,6 +43,40 @@ function size(dir) {
 
 function report(name) {
   console.log(`  ${name.padEnd(9)} ${(size(join(out, name)) / 1024 / 1024).toFixed(1)} MB`);
+}
+
+/** Liens d'un dossier (sans les suivre). */
+const linksIn = (dir) => (existsSync(dir) ? readdirSync(dir).filter((name) => lstatSync(join(dir, name)).isSymbolicLink()) : []);
+
+/** Retire un lien sans toucher à sa cible ; sous Windows, un lien vers un dossier se retire comme un dossier vide. */
+function removeLink(path) {
+  try {
+    unlinkSync(path);
+  } catch {
+    rmdirSync(path);
+  }
+}
+
+/**
+ * Paquets externes du serveur Next : le build (Turbopack) les relie par `.next/node_modules/<nom>-<empreinte>` à leur
+ * dossier d'origine, hors du serveur autonome, qui en contient pourtant une copie tracée avec ses dépendances. Un lien ne
+ * tient pas dans l'app : le paquet du Store n'en accepte aucun, et la cible n'existe que sur la machine du build. Chacun
+ * devient un petit paquet qui charge cette copie ; le serveur ne les appelle que par leur nom (`require("<nom>-<empreinte>")`).
+ */
+function relayExternals(standalone, dest) {
+  const links = join(standalone, ".next", "node_modules");
+  for (const name of linksIn(links)) {
+    const target = resolve(links, readlinkSync(join(links, name)));
+    // Cible dans le serveur autonome, ou dans le frontend d'origine, dont le serveur reprend l'arborescence.
+    const inStandalone = relative(standalone, target);
+    const path = inStandalone.startsWith("..") || isAbsolute(inStandalone) ? relative(join(repo, "frontend"), target) : inStandalone;
+    const traced = join(dest, path);
+    if (path.startsWith("..") || isAbsolute(path) || !existsSync(traced)) fail(`${name}: the standalone server has no copy of ${target}`);
+    const relay = join(dest, ".next", "node_modules", name);
+    mkdirSync(relay, { recursive: true });
+    writeFileSync(join(relay, "package.json"), `${JSON.stringify({ name, private: true, main: "index.js" }, null, 2)}\n`);
+    writeFileSync(join(relay, "index.js"), `module.exports = require(${JSON.stringify(relative(relay, traced).replaceAll("\\", "/"))});\n`);
+  }
 }
 
 mkdirSync(out, { recursive: true });
@@ -90,8 +126,13 @@ if (step("frontend")) {
   const standalone = join(next, "standalone");
   if (!existsSync(join(standalone, "server.js"))) fail("frontend/.next/standalone is missing: build the frontend in desktop mode first");
   const dest = join(out, "frontend");
+  // Les liens d'un assemblage précédent partent d'abord, seuls : la suppression du dossier ne descend pas dans leur cible.
+  const oldLinks = join(dest, ".next", "node_modules");
+  for (const name of linksIn(oldLinks)) removeLink(join(oldLinks, name));
   rmSync(dest, { recursive: true, force: true });
-  cpSync(standalone, dest, { recursive: true });
+  const externals = join(standalone, ".next", "node_modules");
+  cpSync(standalone, dest, { recursive: true, filter: (src) => dirname(src) !== externals || !lstatSync(src).isSymbolicLink() });
+  relayExternals(standalone, dest);
   // Le serveur autonome ne copie ni les fichiers statiques ni public/ : ils se placent à côté de lui.
   cpSync(join(next, "static"), join(dest, ".next", "static"), { recursive: true });
   if (existsSync(join(repo, "frontend", "public"))) cpSync(join(repo, "frontend", "public"), join(dest, "public"), { recursive: true });

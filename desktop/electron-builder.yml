@@ -22,7 +22,9 @@ extraResources:
 asar: true
 
 win:
-  target: nsis
+  target:
+    - nsis
+    - appx
   icon: build/icon.png
   artifactName: TaskForce-Setup-${version}.exe
 
@@ -34,6 +36,26 @@ nsis:
   shortcutName: TaskForce
   # Après une désinstallation demandée par la personne, la page « merci » du site (installer.nsh).
   include: installer.nsh
+
+# Version Microsoft Store : paquet AppX (le Partner Center le range avec les MSIX), téléversé à la main, jamais
+# publié sur GitHub. Microsoft le signe à la publication : ni SmartScreen ni Smart App Control ne le bloquent.
+# L'identité est celle que le Partner Center a réservée pour TaskForce (Product identity). Le Store installe les mises
+# à jour (updater.ts) et les données vont dans le dossier du paquet (paths.ts, storeDataDir). Tuiles et logos :
+# build/appx, dessinés par `npm run icon`.
+appx:
+  identityName: TaskForceProject.TaskForce
+  publisher: CN=FCE16416-99B3-4A3B-B8BD-9B0C3D4A1EB9
+  publisherDisplayName: TaskForce Project
+  applicationId: TaskForce
+  displayName: TaskForce
+  backgroundColor: "#2f6bf6"
+  # L'interface est en anglais.
+  languages:
+    - en-US
+  # Windows 10 1809 au moins ; déclaré compatible jusqu'à Windows 11 24H2.
+  minVersion: 10.0.17763.0
+  maxVersionTested: 10.0.26100.0
+  artifactName: TaskForce-${version}-store.${ext}
 
 linux:
   target:
