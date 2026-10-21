@@ -14,6 +14,8 @@ export const LINKS = {
   issues: `${GITHUB}/issues`,
   license: `${GITHUB}/blob/main/LICENSE`,
   email: "contact@taskforce-project.fr",
+  /** Page de TaskForce sur le Microsoft Store : la version signée par Microsoft, recommandée sous Windows. */
+  microsoftStore: "https://apps.microsoft.com/detail/9PFC2ML6X5SF",
 } as const;
 
 export type NavLink = { label: string; href: string };

@@ -71,7 +71,14 @@ The product is reserved as "TaskForce" (MSIX or PWA app). Each section of the su
 
 ## After certification
 
+Published on 21 October 2026, rated Everyone (IARC), and recommended on the website's download page for Windows.
+
 - The Store page: `https://apps.microsoft.com/detail/9PFC2ML6X5SF`, or
   `ms-windows-store://pdp/?productid=9PFC2ML6X5SF` to open it in the Store app.
-- Each new desktop version: run `Desktop - Release`, take the `store-package` artifact of the run, start a new
-  submission in Partner Center, replace the package and fill in "What's new in this version".
+- Each new desktop version goes through a new submission; the Store then updates the installed apps by itself:
+  1. Raise the version in `desktop/package.json` (the Store refuses a package that is not newer), then run
+     `Desktop - Release`; it publishes the installer of the website and keeps the Store package of the same run.
+  2. Take the `store-package` artifact of the run (`gh run download <run> -n store-package`).
+  3. In Partner Center: Start update, then Packages: remove the old package and upload the new one; Store listings:
+     "What's new in this version" in both languages (Export listings, edit, Import listings, or by hand).
+  4. Submit for certification: a few hours to three business days, then the Store offers the update.

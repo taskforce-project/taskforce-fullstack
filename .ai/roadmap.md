@@ -10,6 +10,10 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 21/10/2026 (soir) - TaskForce EN LIGNE sur le Microsoft Store (1.2.2, `https://apps.microsoft.com/detail/9PFC2ML6X5SF`, classée Everyone par l'IARC) ; le site le recommande sous Windows.** `[landing + marketing]`
+> - Site (`cfd78fae`, `f7e5579f`) : sous Windows, le bouton principal ouvre la page du Store (logo Windows, « Get it from Microsoft Store ») ; la page de téléchargement met le Store en premier (« Recommended », signé par Microsoft, mis à jour par le Store) et l'installeur en téléchargement direct ; la fenêtre de l'installeur propose le Store et annule le téléchargement si on le choisit ; politique de signature, JSON-LD (`installUrl`), page de migration et `llms.txt` à jour. Lint et build du site passent (conteneur node:22).
+> - Mises à jour de la version Store : une nouvelle soumission par version (paquet plus récent, « What's new »), puis le Store met à jour tout seul (procédure dans `marketing/store/README.md`).
+
 > **▶ MAJ 21/10/2026 - Version Microsoft Store de l'app desktop (1.2.2) SOUMISE, en certification.** `[desktop + frontend + ci + marketing]`
 > - **Soumission 1** (produit « TaskForce », Store ID `9PFC2ML6X5SF`) : paquet `TaskForce-1.2.2-store.appx` validé, fiches EN/FR importées, runFullTrust justifié, compte de test créé par le CEO (identifiants dans « Additional Testing Info » du Partner Center seulement), publication dès la certification (quelques heures à 3 jours ouvrés). PR #396 (identité) fusionnée dans `dev` (`c49ca5c9`).
 > - **Après la publication** : lien Store sur la page de téléchargement du site (et dans l'étape Smart App Control), release `dev` → `main` (texte « Updates come from the Microsoft Store »), puis `Desktop - Release` 1.2.2 pour le .exe, après l'envoi de l'e-mail du 22/10.

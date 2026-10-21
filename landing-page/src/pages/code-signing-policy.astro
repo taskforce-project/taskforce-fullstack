@@ -14,7 +14,7 @@ const WORKFLOW = `${LINKS.github}/blob/main/.github/workflows/desktop-release.ym
 <LegalDoc
   title="Code signing policy"
   description="How TaskForce Desktop is built and published, whether its installers are signed, and how to check a download."
-  updated="20 October 2026"
+  updated="21 October 2026"
 >
   <h2>Signing</h2>
   {
@@ -31,6 +31,10 @@ const WORKFLOW = `${LINKS.github}/blob/main/.github/workflows/desktop-release.ym
       </p>
     )
   }
+  <p>
+    On Windows, the <a href={LINKS.microsoftStore}>Microsoft Store version</a> is signed by Microsoft when it publishes
+    it, so neither Windows nor Smart App Control warns about it.
+  </p>
 
   <h2>How a release is built</h2>
   <ul>
@@ -41,6 +45,10 @@ const WORKFLOW = `${LINKS.github}/blob/main/.github/workflows/desktop-release.ym
     <li>
       They are built from the public source code of the <code>main</code> branch by the{" "}
       <a href={WORKFLOW}>Desktop - Release</a> workflow on GitHub Actions. Nothing built anywhere else is published.
+    </li>
+    <li>
+      The same run builds the Microsoft Store package, from the same code; it is uploaded to Microsoft, which checks it
+      and signs it before publishing it.
     </li>
     <li>
       The app bundles open source components from other projects (Electron, a Java runtime, PostgreSQL). They keep

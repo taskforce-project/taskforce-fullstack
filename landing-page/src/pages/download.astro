@@ -2,6 +2,7 @@
 /**
  * Téléchargement : fichiers de la dernière release desktop (GitHub Releases, lue au build), configuration
  * requise, choix de l'IA, notes d'installation, nouveautés. Sans release publiée : état explicite, aucun lien mort.
+ * Sous Windows, le Microsoft Store passe en premier : sa version est signée par Microsoft, l'installeur ne l'est pas.
  */
 import { createMarkdownProcessor } from "@astrojs/markdown-remark";
 import { ArrowRight, ArrowUpRight, Bell, Bot, Cpu, Download, MemoryStick, UserRound } from "lucide-react";
@@ -22,7 +23,7 @@ const notesHtml = release?.notes ? (await (await createMarkdownProcessor()).rend
 
 const FAMILIES: { os: OsFamily; brand: "macos" | "windows" | "linux"; name: string; wash: string; files: string }[] = [
   { os: "mac", brand: "macos", name: "macOS", wash: "wash-blue", files: "Disk image (.dmg)" },
-  { os: "windows", brand: "windows", name: "Windows", wash: "wash-sky", files: "Installer (.exe)" },
+  { os: "windows", brand: "windows", name: "Windows", wash: "wash-sky", files: "Microsoft Store or .exe" },
   { os: "linux", brand: "linux", name: "Linux", wash: "wash-green", files: "AppImage or .deb" },
 ];
 
@@ -50,7 +51,7 @@ const AI_TIERS = [
   <PageHero
     bg="download"
     label="Download"
-    lead="Free and open source, for Windows and Linux, with macOS coming soon. Install it, sign in or create your free account, and start with your first project."
+    lead="Free and open source, for Windows (on the Microsoft Store) and Linux, with macOS coming soon. Install it, sign in or create your free account, and start with your first project."
   >
     <Fragment slot="title">Download <span class="t-word">TaskForce.</span></Fragment>
     {
@@ -94,12 +95,26 @@ const AI_TIERS = [
                 <div class="flex flex-1 flex-col p-7">
                   <p class="t-h3">{f.name}</p>
                   <ul class="mt-5 flex flex-col divide-y divide-border border-y border-border">
+                    {f.os === "windows" && (
+                      <li class="flex items-center gap-4 py-4">
+                        <div class="min-w-0 flex-1">
+                          <p class="flex flex-wrap items-center gap-2 text-[15px] font-medium">
+                            Microsoft Store
+                            <span class="rounded-full bg-tint-green px-2 py-0.5 text-[11px] font-medium text-ink-green">Recommended</span>
+                          </p>
+                          <p class="mt-0.5 text-[12.5px] text-subtle">Signed by Microsoft, updated by the Store</p>
+                        </div>
+                        <a href={LINKS.microsoftStore} target="_blank" rel="noopener" class="btn btn-primary btn-sm">
+                          Get <ArrowUpRight aria-hidden="true" />
+                        </a>
+                      </li>
+                    )}
                     {files.map((p) => {
                       const asset = release?.assets[p.platform];
                       return (
                         <li class="flex items-center gap-4 py-4">
                           <div class="min-w-0 flex-1">
-                            <p class="text-[15px] font-medium">{p.detail}</p>
+                            <p class="text-[15px] font-medium">{f.os === "windows" ? `Direct download, ${p.detail}` : p.detail}</p>
                             <p class="mt-0.5 truncate text-[12.5px] text-subtle">
                               {asset ? `${asset.name} · ${formatSize(asset.size)}` : f.os === "mac" ? "Coming soon" : "Not published yet"}
                             </p>
@@ -119,7 +134,7 @@ const AI_TIERS = [
                             )}
                           </div>
                           {asset ? (
-                            <a href={asset.url} class="btn btn-primary btn-sm" aria-label={`Download for ${f.name}, ${p.detail}`}>
+                            <a href={asset.url} class:list={["btn btn-sm", f.os === "windows" ? "btn-secondary" : "btn-primary"]} aria-label={`Download for ${f.name}, ${p.detail}`}>
                               <Download aria-hidden="true" />
                             </a>
                           ) : (
@@ -211,7 +226,14 @@ const AI_TIERS = [
       <div class:list={["mt-14 grid gap-4 sm:mt-16", hasMac ? "lg:grid-cols-3" : "md:grid-cols-2"]}>
         <div class="card min-w-0 p-7" data-reveal>
           <p class="t-h4">Windows</p>
-          <ol class="install-steps t-small mt-3">
+          <p class="t-small mt-3">
+            <strong class="font-medium text-foreground">The simplest: the Microsoft Store.</strong> Choose Get on{" "}
+            <a href={LINKS.microsoftStore} target="_blank" rel="noopener" class="link-inline">TaskForce's page</a>.
+            Microsoft signs this version, so Windows doesn't warn you, and the Store installs its updates. It keeps its
+            data apart from the installer's version, and uninstalling it deletes that data.
+          </p>
+          <p class="t-small mt-5 font-medium text-foreground">Or with the installer from this page</p>
+          <ol class="install-steps t-small mt-2">
             <li>
               Open <code>{fileName("windows", "TaskForce-Setup.exe")}</code>. It installs for your account, without
               administrator rights, then opens TaskForce.
@@ -226,7 +248,8 @@ const AI_TIERS = [
               <li>
                 If Windows says Smart App Control blocked it, there is no Run anyway: Smart App Control, on by default on
                 some new Windows 11 PCs, only runs signed apps. To use TaskForce, open Windows Security, then App &amp;
-                browser control, then Smart App Control settings, and choose Off. TaskForce can't open while it is on.
+                browser control, then Smart App Control settings, and choose Off. TaskForce can't open while it is on;
+                the Microsoft Store version, signed, opens either way.
               </li>
             )}
             {!SIGNED_BUILDS.windows && (
