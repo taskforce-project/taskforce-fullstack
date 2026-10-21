@@ -59,6 +59,7 @@ export function softwareApplicationLd(origin: string, version?: string): JsonLd 
     operatingSystem: "Windows, Linux",
     url: `${origin}/`,
     downloadUrl: `${origin}/download`,
+    installUrl: LINKS.microsoftStore,
     description: PRODUCT_SUMMARY,
     license: "https://www.gnu.org/licenses/agpl-3.0.html",
     isAccessibleForFree: true,
