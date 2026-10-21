@@ -11,9 +11,9 @@ installer of the website stays, with its own updates.
 
 ## The package
 
-- **Identity** (Partner Center, Product identity): `TaskForceProject.TaskForceProject`, publisher
-  `CN=FCE16416-99B3-4A3B-B8BD-9B0C3D4A1EB9`, publisher display name `TaskForce Project`, Store ID `9P2V1XQVPXKZ`. It
-  is written in `desktop/electron-builder.yml` (`appx`).
+- **Identity** (Partner Center, Product identity of the "TaskForce" product): `TaskForceProject.TaskForce`, publisher
+  `CN=FCE16416-99B3-4A3B-B8BD-9B0C3D4A1EB9`, publisher display name `TaskForce Project`. It is written in
+  `desktop/electron-builder.yml` (`appx`); Packages refuses a package whose identity differs.
 - **Built by** the `Desktop - Release` workflow, Windows job: the `store-package` artifact of the run,
   `TaskForce-<version>-store.appx`. A push to the desktop branch builds it too, without publishing anything. Locally:
   `npm run dist:store` in `desktop`, with the resources assembled (see `desktop/README.md`).
@@ -67,7 +67,7 @@ The product is reserved as "TaskForce" (MSIX or PWA app). Each section of the su
 
 ## After certification
 
-- The Store page: `https://apps.microsoft.com/detail/9P2V1XQVPXKZ`, or
-  `ms-windows-store://pdp/?productid=9P2V1XQVPXKZ` to open it in the Store app.
+- The Store page: `https://apps.microsoft.com/detail/<Store ID>`, or `ms-windows-store://pdp/?productid=<Store ID>`
+  to open it in the Store app; the Store ID is on the product's Product identity page.
 - Each new desktop version: run `Desktop - Release`, take the `store-package` artifact of the run, start a new
   submission in Partner Center, replace the package and fill in "What's new in this version".
