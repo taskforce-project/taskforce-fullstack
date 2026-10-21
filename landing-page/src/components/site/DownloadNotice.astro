@@ -4,8 +4,10 @@
  * quelques secondes, et la fenêtre explique ce qui peut arriver ensuite. Windows : tant que l'installeur n'est pas
  * signé, l'avertissement de Windows ou du navigateur, Smart App Control (aucune exception possible : le couper) et la
  * quarantaine d'un antivirus, avec le rapport VirusTotal du fichier et comment le sortir de quarantaine. Linux : la commande d'installation. Sans release publiée : rien.
+ * Windows propose d'abord le Microsoft Store, dont la version est signée ; le choisir annule le téléchargement.
  */
 import { getDesktopRelease, SIGNED_BUILDS } from "@/lib/release";
+import { LINKS } from "@/lib/site";
 
 const release = await getDesktopRelease();
 const files = Object.values(release?.assets ?? {}).map((a) => ({
@@ -33,6 +35,13 @@ const files = Object.values(release?.assets ?? {}).map((a) => ({
       </div>
 
       <div data-for="windows" class="mt-6 flex flex-col gap-4">
+        <p class="t-small rounded-lg bg-tint-green px-4 py-3 text-ink-green">
+          <strong class="font-medium">Easier: the Microsoft Store.</strong> Its version is signed by Microsoft, so
+          Windows doesn't warn you, and the Store installs the updates.{" "}
+          <a href={LINKS.microsoftStore} target="_blank" rel="noopener" class="link-inline" data-store>
+            Get it from Microsoft Store
+          </a>
+        </p>
         {!SIGNED_BUILDS.windows && (
           <p class="t-small">
             TaskForce is free, open source and still early, and its installer is not code-signed for now. Windows,
@@ -160,6 +169,15 @@ const files = Object.values(release?.assets ?? {}).map((a) => ({
     if (!file) return;
     event.preventDefault();
     open(dialog, file);
+  });
+
+  // Le Microsoft Store choisi à la place : l'installeur ne se télécharge pas.
+  document.addEventListener("click", (event) => {
+    if (!(event.target as Element | null)?.closest?.("#download-notice [data-store]")) return;
+    pending = null;
+    if (timer !== undefined) window.clearTimeout(timer);
+    timer = undefined;
+    (document.getElementById("download-notice") as HTMLDialogElement | null)?.close();
   });
 
   // Fermée avant la fin du délai : le téléchargement part tout de suite.

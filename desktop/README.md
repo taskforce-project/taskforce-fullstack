@@ -26,7 +26,7 @@ This folder holds the Electron shell. The app itself is the rest of the reposito
 - **Claude Code.** The shell starts the runner with a secret drawn at each start. Claude Code must be installed and
   signed in on the computer.
 - **Updates.** The app checks the `desktop-latest` release at start and every six hours, downloads in the background
-  and installs on quit.
+  and installs on quit. The Microsoft Store version leaves its updates to the Store.
 
 The full design is in the docs repository: `v1/03-architecture/Specification_App_Desktop.md`.
 
@@ -60,9 +60,20 @@ development build:
 ## Package and release
 
 `npm run dist:win` builds the Windows installer (per user, no administrator rights) and `npm run dist:linux` the .deb
-and AppImage, in `release/`. `npm run icon` draws the app icon from the brand mark first.
+and AppImage, in `release/`. `npm run icon` draws the app icon from the brand mark first, with the logos of the
+Microsoft Store package (`build/appx`).
+
+`npm run dist:store` builds the Microsoft Store package (`release/TaskForce-<version>-store.appx`), with the identity
+that Partner Center reserved for TaskForce. It is not signed: Microsoft signs it when it publishes it, so neither
+SmartScreen nor Smart App Control stops it. In this version:
+
+- the Store installs the updates; the app does not look for them;
+- the data goes in the package's folder, `%LOCALAPPDATA%\Packages\<package family>\LocalState`, which Windows deletes
+  when the app is uninstalled; it stays separate from the data of the version from the website;
+- the notifications keep the identity of the package.
 
 Releases are built by the `Desktop - Release` workflow, run by hand once `package.json` carries the new version. It
 publishes the versioned release `desktop-v<version>`, which the website's download page reads, and refreshes the
 rolling release `desktop-latest`, which the installed apps check for updates. The builds are not signed yet: Windows
-SmartScreen warns on the first launch.
+SmartScreen warns on the first launch. The same run keeps the Store package as its `store-package` artifact, to upload
+in Partner Center (Packages); it is never published on GitHub.

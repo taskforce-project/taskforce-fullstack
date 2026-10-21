@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 
+import { LINKS } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 /**
  * Bouton « Download » qui reconnaît le système du visiteur (îlot). Rendu serveur et visiteur inconnu : lien vers
- * /download. Système reconnu ET fichier publié pour lui : téléchargement direct du bon fichier.
+ * /download. Windows : la page de TaskForce sur le Microsoft Store, dont la version est signée par Microsoft (ni
+ * SmartScreen ni Smart App Control ne la bloquent). Autre système reconnu ET fichier publié pour lui : téléchargement
+ * direct du bon fichier.
  */
 
 export type DownloadUrls = {
@@ -17,6 +20,20 @@ export type DownloadUrls = {
 
 type Os = "mac" | "windows" | "linux";
 const OS_LABEL: Record<Os, string> = { mac: "macOS", windows: "Windows", linux: "Linux" };
+
+/** Logo Windows à la couleur du bouton (même tracé que public/logos/windows.svg). */
+function WindowsLogo() {
+  return (
+    <svg viewBox="0 0 88 88" className="size-[16px]" fill="currentColor" aria-hidden="true">
+      <path d="m0 12.402 35.687-4.86.016 34.423-35.67.203zm35.67 33.529.028 34.453L.028 75.48.026 45.7zm4.326-39.025L87.314 0v41.527l-47.318.376zm47.329 39.349-.011 41.34-47.318-6.678-.066-34.739z" />
+    </svg>
+  );
+}
+
+function labelFor(os: Os | null, href: string): string {
+  if (href === LINKS.microsoftStore) return "Get it from Microsoft Store";
+  return os && href !== "/download" ? `Download for ${OS_LABEL[os]}` : "Download TaskForce";
+}
 
 interface UaData {
   platform?: string;
@@ -62,19 +79,24 @@ export default function DownloadButton({
         const url = intel ? urls.macIntel ?? urls.macArm : urls.macArm ?? urls.macIntel;
         if (url) setHref(url);
       });
+    } else if (detected === "windows") {
+      setHref(LINKS.microsoftStore);
     } else if (detected) {
       const url = urls[detected];
       if (url) setHref(url);
     }
   }, [urls]);
 
-  const direct = href !== "/download";
-  const label = os && direct ? `Download for ${OS_LABEL[os]}` : "Download TaskForce";
+  const store = href === LINKS.microsoftStore;
 
   return (
-    <a href={href} className={cn("btn btn-primary", size === "lg" ? "btn-lg" : "", className)}>
-      <Download className="size-[18px]" strokeWidth={2} aria-hidden />
-      {label}
+    <a
+      href={href}
+      className={cn("btn btn-primary", size === "lg" ? "btn-lg" : "", className)}
+      {...(store ? { target: "_blank", rel: "noopener" } : {})}
+    >
+      {store ? <WindowsLogo /> : <Download className="size-[18px]" strokeWidth={2} aria-hidden />}
+      {labelFor(os, href)}
     </a>
   );
 }
