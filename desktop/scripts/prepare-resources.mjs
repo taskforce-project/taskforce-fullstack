@@ -1,12 +1,14 @@
 // Assemble desktop/resources : ce que l'app embarque à côté d'Electron.
 //   jre/       Java minimal (jlink), depuis JAVA_HOME (un JDK 21 avec ses jmods)
 //   backend/   tf-api.jar, construit avant (mvn package dans backend/tf-api)
-//   postgres/  PostgreSQL avec pgvector, depuis TF_POSTGRES_BUNDLE (archive ou dossier du workflow desktop-postgres)
+//   postgres/  PostgreSQL avec pgvector, depuis TF_POSTGRES_BUNDLE (archive ou dossier du workflow desktop-postgres),
+//              et sous Windows, pour la version du Store, pgcmd (bin/pgcmd.exe) et un cluster vide (empty-cluster/)
 //   frontend/  serveur Next autonome, construit avant en mode desktop (cf. desktop/README.md)
 //   runner/    runner de Claude Code (taskforce-runner), construit avant (npm run build)
 //
 // Usage : node scripts/prepare-resources.mjs [jre] [backend] [postgres] [frontend] [runner]   (sans argument : tout)
 import { execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import {
   cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, rmdirSync, rmSync, statSync, unlinkSync, writeFileSync,
 } from "node:fs";
@@ -118,7 +120,60 @@ if (step("postgres")) {
     } else execFileSync("unzip", ["-q", bundle, "-d", dest], { stdio: "inherit" });
   } else execFileSync("tar", ["-xzf", bundle, "-C", dest], { stdio: "inherit" });
   if (!existsSync(join(dest, "bin"))) fail("the PostgreSQL bundle has no bin/ folder");
+  if (process.platform === "win32") {
+    pgcmd(dest);
+    emptyCluster(dest);
+  }
   report("postgres");
+}
+
+/**
+ * pgcmd.exe, remplaçant de cmd.exe pour PostgreSQL dans la version du Microsoft Store (scripts/pgcmd.cs,
+ * desktop/src/postgres.ts), compilé avec le compilateur C# de .NET Framework, présent sur tout Windows.
+ */
+function pgcmd(dest) {
+  const csc = join(process.env.WINDIR ?? "C:\\Windows", "Microsoft.NET", "Framework64", "v4.0.30319", "csc.exe");
+  if (!existsSync(csc)) fail(`the C# compiler of .NET Framework is missing: ${csc}`);
+  execFileSync(csc, [
+    "-nologo", "-target:exe", "-platform:x64", "-optimize+",
+    `-out:${join(dest, "bin", "pgcmd.exe")}`,
+    join(desktop, "scripts", "pgcmd.cs"),
+  ], { stdio: "inherit" });
+}
+
+/**
+ * Cluster vide de la version du Microsoft Store : dans un paquet du Store, Windows refuse à cmd.exe, par lequel initdb
+ * lance postgres, d'exécuter un programme du paquet (desktop/src/postgres.ts). On le crée ici, avec les options
+ * d'EmbeddedPostgres.initdb et un mot de passe jeté, que l'app remplace par celui du compte. Un paquet ne garde pas les
+ * dossiers vides, que PostgreSQL exige : leur liste part à côté du cluster, l'app les recrée.
+ */
+function emptyCluster(dest) {
+  const cluster = join(dest, "empty-cluster");
+  const pwfile = join(out, "empty-cluster.pw");
+  writeFileSync(pwfile, randomBytes(24).toString("hex"));
+  try {
+    execFileSync(join(dest, "bin", "initdb.exe"), [
+      "-D", cluster,
+      "-U", "taskforce",
+      "-A", "scram-sha-256",
+      `--pwfile=${pwfile}`,
+      "-E", "UTF8",
+      "--locale-provider=builtin",
+      "--builtin-locale=C.UTF-8",
+    ], { stdio: "inherit" });
+  } finally {
+    rmSync(pwfile, { force: true });
+  }
+  const directories = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      directories.push(relative(cluster, join(dir, entry.name)).replaceAll("\\", "/"));
+      walk(join(dir, entry.name));
+    }
+  };
+  walk(cluster);
+  writeFileSync(join(dest, "empty-cluster.json"), `${JSON.stringify({ directories }, null, 2)}\n`);
 }
 
 if (step("frontend")) {
