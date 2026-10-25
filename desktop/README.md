@@ -9,7 +9,7 @@ This folder holds the Electron shell. The app itself is the rest of the reposito
 | --- | --- | --- |
 | `jre/` | a JDK 21 (`jlink`) | the Java of the backend |
 | `backend/` | `backend/tf-api` | the API, with the Spring profile `desktop` |
-| `postgres/` | the `desktop-postgres` workflow | PostgreSQL 18 with pgvector, one cluster per account |
+| `postgres/` | the `desktop-postgres` workflow | PostgreSQL 18 with pgvector, one cluster per account; on Windows, the empty cluster and `pgcmd.exe` of the Store version |
 | `frontend/` | `frontend`, built with `NEXT_PUBLIC_DESKTOP=true` | the interface, a Next standalone server |
 | `runner/` | `taskforce-runner` | the runner that lets Claude Code work on delegated tasks |
 
@@ -43,8 +43,9 @@ JAVA_HOME=/path/to/jdk-21 TF_POSTGRES_BUNDLE=/path/to/postgres-bundle.zip npm ru
 npm start
 ```
 
-`TF_POSTGRES_BUNDLE` is the archive of the `desktop-postgres` workflow for your system. Variables read by a
-development build:
+`TF_POSTGRES_BUNDLE` is the archive of the `desktop-postgres` workflow for your system. On Windows the same step
+compiles `pgcmd.exe` with the C# compiler of .NET Framework, which every Windows has, and prepares the empty cluster of
+the Store version. Variables read by a development build:
 
 | Variable | Use |
 | --- | --- |
@@ -70,7 +71,19 @@ SmartScreen nor Smart App Control stops it. In this version:
 - the Store installs the updates; the app does not look for them;
 - the data goes in the package's folder, `%LOCALAPPDATA%\Packages\<package family>\LocalState`, which Windows deletes
   when the app is uninstalled; it stays separate from the data of the version from the website;
-- the notifications keep the identity of the package.
+- the notifications keep the identity of the package;
+- the database starts without `cmd.exe`. In a Store package, a program of the package may start another one only
+  directly: through `cmd.exe`, a system program, Windows refuses ("Access is denied"). `initdb` and `pg_ctl start` go
+  through `cmd.exe`, and so does the server when it checks its own version at start. So the build prepares an empty
+  cluster (`postgres/empty-cluster`, copied for each account, the password set by `postgres --single`), the shell
+  starts `postgres` itself, and `pgcmd.exe` (`scripts/pgcmd.cs`) stands in for `cmd.exe` for the database
+  (`COMSPEC`). `pg_ctl` only stops the server or tells whether it runs, which starts no program;
+- the interface writes nothing next to itself: the package's folder is read-only, so the desktop build serves the
+  images as they are, with no cache on disk (`frontend/next.config.ts`).
+
+A child process stays in the package as long as its program is in the package: the backend, the interface, the runner
+and PostgreSQL can start each other. The person's tools (Claude Code, git, GitHub CLI) run outside it, like any program
+of the computer.
 
 Releases are built by the `Desktop - Release` workflow, run by hand once `package.json` carries the new version. It
 publishes the versioned release `desktop-v<version>`, which the website's download page reads, and refreshes the
