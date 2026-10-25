@@ -34,7 +34,7 @@ Good to know
 
 ## What's new in this version
 
-The first version of TaskForce on the Microsoft Store.
+TaskForce opens again: version 1.2.2 stopped at its first start with "TaskForce could not start". Sign in, and your workspace is ready.
 
 ## Product features
 

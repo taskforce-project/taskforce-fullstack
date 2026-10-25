@@ -9,12 +9,12 @@ import { connectMcp, disconnectMcp, isPersonalToken, isWorkspaceSlug, mcpConnect
 import { createRepo, DEVICE_PAGE, findRepo, GitHubSignIn, isNewRepoName, isRepoFullName, listRepos } from "./github";
 import { initLog, log } from "./log";
 import { APP_ID, readNotice } from "./notify";
-import { appLogDir, storeDataDir } from "./paths";
+import { appLogDir, fromStore, storeDataDir } from "./paths";
 import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
 import { toolsStatus } from "./tools";
 import { readMove, readWorkspaceMove, Transfer, type LocalApi } from "./transfer";
-import { check, fromStore, startUpdater } from "./updater";
+import { check, startUpdater } from "./updater";
 import {
   integratedTitleBar,
   MAIN_TITLE_BAR_HEIGHT,

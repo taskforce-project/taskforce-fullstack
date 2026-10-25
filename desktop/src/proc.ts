@@ -32,25 +32,30 @@ export interface RunResult {
 
 /**
  * Lance une commande courte et attend sa fin (initdb, pg_ctl, psql). La sortie est gardée pour le journal en cas
- * d'échec. Jamais de shell : les arguments passent tels quels, sans interprétation.
+ * d'échec. Jamais de shell : les arguments passent tels quels, sans interprétation. `input` part sur l'entrée standard.
  */
 export function runCommand(
   command: string,
   args: string[],
-  options: { env?: NodeJS.ProcessEnv; cwd?: string; timeoutMs?: number } = {},
+  options: { env?: NodeJS.ProcessEnv; cwd?: string; timeoutMs?: number; input?: string } = {},
 ): Promise<RunResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       env: options.env ?? process.env,
       cwd: options.cwd,
       windowsHide: true,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: [options.input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
     });
+    if (options.input !== undefined && child.stdin) {
+      // Une commande qui sort sans tout lire ferme le tuyau : son code de sortie dit déjà ce qui s'est passé.
+      child.stdin.on("error", () => undefined);
+      child.stdin.end(options.input);
+    }
     let output = "";
     let settled = false;
     let grace: NodeJS.Timeout | null = null;
-    child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()));
-    child.stderr.on("data", (chunk: Buffer) => (output += chunk.toString()));
+    child.stdout?.on("data", (chunk: Buffer) => (output += chunk.toString()));
+    child.stderr?.on("data", (chunk: Buffer) => (output += chunk.toString()));
     const timer = options.timeoutMs
       ? setTimeout(() => {
           child.kill();
@@ -62,8 +67,8 @@ export function runCommand(
       settled = true;
       if (timer) clearTimeout(timer);
       if (grace) clearTimeout(grace);
-      child.stdout.destroy();
-      child.stderr.destroy();
+      child.stdout?.destroy();
+      child.stderr?.destroy();
       resolve({ code: code ?? -1, output });
     };
     child.on("error", (error) => {
