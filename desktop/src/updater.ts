@@ -2,17 +2,12 @@ import { app, dialog, Notification } from "electron";
 import { autoUpdater } from "electron-updater";
 
 import { log } from "./log";
+import { fromStore } from "./paths";
 
 /** Fréquence des vérifications pendant que l'app reste ouverte. */
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 
 let started = false;
-
-/**
- * Version du Microsoft Store (paquet MSIX) : le Store installe ses mises à jour, l'app ne les cherche pas elle-même (ses
- * règles l'interdisent, et l'installeur de `desktop-latest` ne remplacerait pas un paquet).
- */
-export const fromStore = (): boolean => process.windowsStore === true;
 
 /**
  * Mises à jour, comme Claude Desktop : vérifiées au lancement puis toutes les six heures, téléchargées en arrière-plan,
@@ -21,6 +16,8 @@ export const fromStore = (): boolean => process.windowsStore === true;
  * releases du dépôt (backend, site...) ne s'y mélangent pas. Les migrations de la base s'appliquent au redémarrage.
  */
 export function startUpdater(): void {
+  // Version du Microsoft Store : le Store installe ses mises à jour, l'app ne les cherche pas elle-même (ses règles
+  // l'interdisent, et l'installeur de `desktop-latest` ne remplacerait pas un paquet).
   if (started || !app.isPackaged || fromStore()) return;
   started = true;
   autoUpdater.autoDownload = true;

@@ -143,6 +143,11 @@ const nextConfig: NextConfig = {
   // Next 16 : Turbopack est le bundler par défaut (build + dev).
   // Config vide lève le conflit « webpack config sans turbopack config »
   turbopack: {},
+  // App desktop : images servies telles quelles, sans cache sur disque. L'optimisation écrit son cache dans
+  // `.next/cache`, à côté du serveur, or la version Microsoft Store l'installe dans un dossier en lecture seule (EPERM
+  // à chaque image) ; sur la boucle locale, elle n'apporte rien. Sans cache sur disque, une adresse /_next/image restée
+  // dans une page ouverte ne tente plus de créer ce dossier.
+  ...(IS_DESKTOP ? { images: { unoptimized: true, maximumDiskCacheSize: 0 } } : {}),
   experimental: {
     // Tree-shaking ciblé des gros barrels (icônes / anim / charts) → moins de JS d'hydratation.
     optimizePackageImports: ["lucide-react", "recharts", "framer-motion", "date-fns"],

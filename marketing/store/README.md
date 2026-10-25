@@ -20,6 +20,13 @@ installer of the website stays, with its own updates.
 - **Not signed**: the Store signs it. It is never published on GitHub, where nobody could install it.
 - **In this version** the Store installs the updates (the app does not look for them), the data goes in the package's
   folder, which Windows deletes on uninstall, and the Settings say so (`desktop/README.md`).
+- **Inside the package**, a program of the package may start another one only directly, never through `cmd.exe`, and
+  the package's folder is read-only. Version 1.2.2 broke on both at first start ("initdb failed: Access is denied");
+  1.2.3 starts the database without `cmd.exe` and writes nothing next to the interface (`desktop/README.md`).
+- **Before submitting a version**, check it inside the installed package of the previous one: the program of the
+  package runs in its context with `Invoke-CommandInDesktopPackage -PackageFamilyName
+  TaskForceProject.TaskForce_9bkwj5xgjqyyy -AppId TaskForce -Command cmd.exe -Args "/c <script>"`, a debugging command
+  of Windows; a script there can start `app\TaskForce.exe` in Node mode (`ELECTRON_RUN_AS_NODE=1`) on the new code.
 
 ## Partner Center, section by section
 
