@@ -250,6 +250,9 @@ export function AgentChat() {
     setInput("")
     setTurns((t) => [...t, { id: `u${Date.now()}`, role: "user", text: msg }])
     setLoading(true)
+    // Le linter croit `send` appelable pendant le rendu, car elle est passée à la prop `onClick` de
+    // PromptSuggestion ; elle ne tourne que sur un clic ou une touche.
+    // eslint-disable-next-line react-hooks/purity
     startRef.current = Date.now()
     setElapsed(0)
     try {
