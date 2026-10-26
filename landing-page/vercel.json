@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/:path(.*)",
+      "has": [{ "type": "host", "value": "taskforce-fullstack\\.vercel\\.app" }],
+      "destination": "https://taskforce-project.fr/:path",
+      "permanent": true
+    }
+  ]
+}
