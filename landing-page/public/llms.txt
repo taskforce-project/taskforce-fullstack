@@ -13,9 +13,18 @@ TaskForce needs a free account, used to sign in: our server keeps the account (n
 - [Security](https://taskforce-project.fr/security): Where the data lives, what can leave the computer and when, and how to report a vulnerability.
 - [Download](https://taskforce-project.fr/download): The current release, system requirements, AI options and release notes.
 - [Moving from the web app](https://taskforce-project.fr/migrate): The hosted web app is closing: sign in to the desktop app with the same account, and it offers to bring your web app projects to your computer.
+- [Code signing policy](https://taskforce-project.fr/code-signing-policy): How the desktop app is built and published, whether its installers are signed, and how to check a download.
+
+## Docs
+- [Documentation](https://docs.taskforce-project.fr/guides/welcome): Guides on the concepts, AI, coding agents, integrations and self-hosting.
 
 ## About
 - License: GNU AGPL-3.0
 - Source code: https://github.com/taskforce-project/taskforce-fullstack
 - Contact: contact@taskforce-project.fr
 - TaskForce is not affiliated with Anthropic or GitHub. Claude Code and GitHub Copilot are used with each person's own account.
+
+## Optional
+- [Privacy policy](https://taskforce-project.fr/legal/privacy): No cookies and no analytics on the website; the desktop app keeps projects on the computer, and the free account is the only thing held on our server.
+- [Terms of use](https://taskforce-project.fr/legal/terms): The app, the account, the website, and the name and logo.
+- [Legal notice](https://taskforce-project.fr/legal/notice): Who publishes and hosts the website.
