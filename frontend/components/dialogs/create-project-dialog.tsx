@@ -309,7 +309,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
       // Retour fluide : après le consentement, on revient sur ce wizard (mode import, outil sélectionné),
       // pas sur Settings.
       const url = await startMcpOAuth(slug, tool.key, tool.mcpSuggestedUrl, `/${slug}?import=${tool.key}`)
-      window.location.href = url // redirection vers le consentement du service (la page quitte)
+      window.location.assign(url) // redirection vers le consentement du service (la page quitte)
     } catch {
       toast.error("Couldn't start the connection. Please try again.")
       setConnectingKey(null)

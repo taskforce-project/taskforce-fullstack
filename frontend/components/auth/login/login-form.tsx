@@ -54,24 +54,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     stashInvitationToken(new URLSearchParams(window.location.search).get("invitation"))
   }, [])
 
-  // Passkeys suggérées dans le champ e-mail, tant que la page reste ouverte sur l'étape 1.
-  useEffect(() => {
-    if (totpStep) return
-    const controller = new AbortController()
-    autofill.current = controller
-    void (async () => {
-      if (!(await passkeyAutofillAvailable()) || controller.signal.aborted) return
-      try {
-        const result = await loginWithPasskey({ conditional: true, signal: controller.signal })
-        if (result) await finishSignIn(result)
-      } catch (error) {
-        if (!controller.signal.aborted) showPasskeyError(error)
-      }
-    })()
-    return () => controller.abort()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totpStep])
-
   const showPasskeyError = (error: unknown) => {
     const message = error instanceof Error && error.name !== "PasskeyError" ? error.message : ""
     toast.error(t.common.error, { description: message || t.auth.ui.passkeyFailed })
@@ -120,6 +102,25 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     // Connexion demandée par l'app desktop : retour sur son accord plutôt que dans la webapp.
     router.replace(afterSignInPath(result.user?.onboardingCompleted === false ? "/onboarding" : "/"))
   }
+
+  // Passkeys suggérées dans le champ e-mail, tant que la page reste ouverte sur l'étape 1. Déclaré après
+  // `showPasskeyError` et `finishSignIn`, qu'il appelle : le linter refuse une fonction lue avant sa déclaration.
+  useEffect(() => {
+    if (totpStep) return
+    const controller = new AbortController()
+    autofill.current = controller
+    void (async () => {
+      if (!(await passkeyAutofillAvailable()) || controller.signal.aborted) return
+      try {
+        const result = await loginWithPasskey({ conditional: true, signal: controller.signal })
+        if (result) await finishSignIn(result)
+      } catch (error) {
+        if (!controller.signal.aborted) showPasskeyError(error)
+      }
+    })()
+    return () => controller.abort()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totpStep])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -86,7 +86,9 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
   function reset() {
     setQ("")
     setFocused(false)
-    inputRef.current?.blur()
+    // Le champ a toujours le focus ici (Échap, Entrée, ou clic sur une ligne : le menu ne le lui prend pas).
+    // Pas de `inputRef` : les lignes, construites au rendu, capturent `reset`, et le linter y refuse une ref.
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
   }
   function go(path: string) {
     router.push(slug ? `/${slug}${path}` : path)
