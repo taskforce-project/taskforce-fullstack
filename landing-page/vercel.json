@@ -1,0 +1,61 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/:path(.*)",
+      "has": [{ "type": "host", "value": "taskforce-fullstack\\.vercel\\.app" }],
+      "destination": "https://taskforce-project.fr/:path",
+      "permanent": true
+    },
+    { "source": "/og-image.png", "destination": "/og-image.jpg", "permanent": true },
+
+    { "source": "/product/agents", "destination": "/agents", "permanent": true },
+    { "source": "/product/orchestration", "destination": "/agents", "permanent": true },
+    { "source": "/product/approvals", "destination": "/agents", "permanent": true },
+    { "source": "/product/brain-os", "destination": "/features#memory", "permanent": true },
+    { "source": "/product/analytics", "destination": "/features#measure", "permanent": true },
+    { "source": "/product/integrations/:key*", "destination": "/features#connect", "permanent": true },
+    { "source": "/product/:path*", "destination": "/features", "permanent": true },
+
+    { "source": "/pricing", "destination": "/download", "permanent": true },
+    { "source": "/waitlist", "destination": "/download", "permanent": true },
+    { "source": "/book-a-demo", "destination": "/download", "permanent": true },
+    { "source": "/roadmap", "destination": "/download#whats-new", "permanent": true },
+    { "source": "/changelog/:path*", "destination": "/download#whats-new", "permanent": true },
+
+    { "source": "/enterprise", "destination": "/security", "permanent": true },
+    { "source": "/trust", "destination": "/security", "permanent": true },
+    { "source": "/legal/security", "destination": "/security", "permanent": true },
+    { "source": "/legal/ai-transparency", "destination": "/security", "permanent": true },
+
+    { "source": "/legal/accessibility", "destination": "/legal/notice", "permanent": true },
+    { "source": "/legal/cookies", "destination": "/legal/privacy", "permanent": true },
+    { "source": "/legal/dpa", "destination": "/legal/privacy", "permanent": true },
+    { "source": "/legal/subprocessors", "destination": "/legal/privacy", "permanent": true },
+    { "source": "/legal/subscription", "destination": "/legal/terms", "permanent": true },
+    { "source": "/accessibility", "destination": "/legal/notice", "permanent": true },
+    { "source": "/contact", "destination": "/legal/notice", "permanent": true },
+    { "source": "/company/contact", "destination": "/legal/notice", "permanent": true },
+    { "source": "/privacy-policy", "destination": "/legal/privacy", "permanent": true },
+    { "source": "/terms", "destination": "/legal/terms", "permanent": true },
+
+    { "source": "/self-host", "destination": "https://docs.taskforce-project.fr/guides/self-hosting", "permanent": true },
+    { "source": "/docs/:path*", "destination": "https://docs.taskforce-project.fr", "permanent": true },
+
+    { "source": "/vs/claude-code-alone", "destination": "/agents", "permanent": true },
+    { "source": "/vs/copilot", "destination": "/agents", "permanent": true },
+    { "source": "/vs/:path*", "destination": "/", "permanent": true },
+    { "source": "/use-cases/:path*", "destination": "/", "permanent": true },
+    { "source": "/solutions/:path*", "destination": "/", "permanent": true },
+    { "source": "/labs/:path*", "destination": "/", "permanent": true },
+    { "source": "/blog/:path*", "destination": "/", "permanent": true },
+    { "source": "/learn/:path*", "destination": "/", "permanent": true },
+    { "source": "/company/:path*", "destination": "/", "permanent": true },
+    { "source": "/status", "destination": "/", "permanent": true },
+    { "source": "/about", "destination": "/", "permanent": true },
+    { "source": "/customers", "destination": "/", "permanent": true },
+    { "source": "/hero-preview", "destination": "/", "permanent": true },
+    { "source": "/sitemap", "destination": "/", "permanent": true }
+  ]
+}
