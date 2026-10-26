@@ -22,7 +22,18 @@ export const javaPath = (): string => join(resourcesDir(), "jre", "bin", exe("ja
 export const backendJar = (): string => join(resourcesDir(), "backend", "tf-api.jar");
 export const postgresDir = (): string => join(resourcesDir(), "postgres");
 export const postgresTool = (tool: string): string => join(postgresDir(), "bin", exe(tool));
+/** Cluster PostgreSQL vide, préparé à la construction pour la version du Store (postgres.ts), et ses dossiers. */
+export const emptyCluster = (): string => join(postgresDir(), "empty-cluster");
+export const emptyClusterDirs = (): string => join(postgresDir(), "empty-cluster.json");
+/** Remplaçant de cmd.exe pour PostgreSQL dans la version du Store (scripts/pgcmd.cs). */
+export const pgcmd = (): string => join(postgresDir(), "bin", "pgcmd.exe");
 export const frontendServer = (): string => join(resourcesDir(), "frontend", "server.js");
+
+/**
+ * Version du Microsoft Store (paquet MSIX) : le Store installe les mises à jour (updater.ts), les données vont dans le
+ * dossier du paquet (storeDataDir) et la base démarre sans passer par cmd.exe (postgres.ts).
+ */
+export const fromStore = (): boolean => process.windowsStore === true;
 
 /**
  * Dossier de données d'un compte : base, fichiers, journaux. Chaque compte a le sien, un compte ne voit jamais les
