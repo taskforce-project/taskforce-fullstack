@@ -1,5 +1,10 @@
 /**
- * sitemap.xml : les pages indexables du site. La 404 et les anciennes adresses (redirections) n'y figurent pas.
+ * sitemap.xml : les pages tirées des fichiers de `src/pages`, sauf celles construites en `noindex` (404, page d'au
+ * revoir du désinstalleur). Une page ajoutée ou retirée met le sitemap à jour d'elle-même ; les anciennes adresses
+ * (redirections de vercel.json) n'y figurent pas.
+ *
+ * Ni `lastmod` ni `priority` : le site est reconstruit à chaque release desktop, une date de build dirait que toutes
+ * les pages changent à chaque fois, et Google ignore `priority`.
  * Domaine lu dans PUBLIC_BASE_DOMAIN, comme `site` dans astro.config.mjs.
  */
 const BASE_DOMAIN = (import.meta.env.PUBLIC_BASE_DOMAIN ?? "taskforce-project.fr")
@@ -7,24 +12,16 @@ const BASE_DOMAIN = (import.meta.env.PUBLIC_BASE_DOMAIN ?? "taskforce-project.fr
   .replace(/\/+$/, "");
 const SITE = `https://${BASE_DOMAIN}`;
 
-const PAGES: { path: string; priority: string }[] = [
-  { path: "/", priority: "1.0" },
-  { path: "/download", priority: "0.9" },
-  { path: "/features", priority: "0.8" },
-  { path: "/agents", priority: "0.8" },
-  { path: "/security", priority: "0.7" },
-  { path: "/migrate", priority: "0.6" },
-  { path: "/legal/notice", priority: "0.3" },
-  { path: "/legal/privacy", priority: "0.3" },
-  { path: "/legal/terms", priority: "0.3" },
-  { path: "/code-signing-policy", priority: "0.3" },
-];
+// Source de chaque page, pour repérer la prop `noindex` passée à BaseLayout.
+const SOURCES = import.meta.glob<string>("./**/*.astro", { query: "?raw", import: "default", eager: true });
+
+const PATHS = Object.entries(SOURCES)
+  .filter(([file, source]) => !file.includes("[") && !/<BaseLayout\b[^>]*\bnoindex\b/.test(source))
+  .map(([file]) => file.slice(1).replace(/\.astro$/, "").replace(/\/index$/, "") || "/")
+  .sort((a, b) => (a === "/" ? -1 : b === "/" ? 1 : a.localeCompare(b)));
 
 export function GET() {
-  const lastmod = new Date().toISOString().slice(0, 10);
-  const urls = PAGES.map(
-    (p) => `  <url><loc>${SITE}${p.path}</loc><lastmod>${lastmod}</lastmod><priority>${p.priority}</priority></url>`,
-  ).join("\n");
+  const urls = PATHS.map((p) => `  <url><loc>${SITE}${p}</loc></url>`).join("\n");
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls}
