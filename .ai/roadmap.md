@@ -10,6 +10,13 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 26/10/2026 - Releases 1.4.1 et 1.4.2 EN PROD ; desktop 1.2.3 publiée ; version Store 1.2.3 soumise au Microsoft Store.** `[desktop + frontend + release]`
+> - **Release 1.4.1** (PR #399 vers `dev`, release #402, `812c28ef`) : correctif de la version Store (base démarrée sans `cmd.exe`) et interface desktop sans cache d'images sur disque. Vérifications vertes sauf Trivy (alerte Next.js déjà en prod, corrigée par la 1.4.2).
+> - **Desktop 1.2.3** (`Desktop - Release` depuis `main`, run 40195830029) : installeur .exe, .deb et AppImage publiés dans `desktop-v1.2.3` (préversion, comme les précédentes), analyse VirusTotal faite ; les apps du site se mettent à jour par `desktop-latest`.
+> - **Version Store 1.2.3 soumise** le 25/10 par le CEO : paquet de la CI (run 40189969523), vérifié (identité, version 1.2.3.0, `pgcmd.exe` et cluster vide, base démarrée avec ses propres fichiers) ; « What's new » EN et FR saisis à la main (`marketing/store/listing.*.md`). En certification.
+> - **Release 1.4.2** (PR #400 et #401 vers `dev`, release #407, `55f4bf51`) : Next.js 16.4.3 (GHSA-2464-fhr4-w9xw et GHSA-673q-mjm6-r5xr, exécution de code à distance sans authentification), eslint-config-next 16.4.3 et ses erreurs de lint corrigées. Conflit de cette roadmap entre les deux sessions résolu en gardant toutes les entrées. Vérifications vertes, Trivy compris ; `dev` réaligné (`09e27e31`).
+> - **Reste** : certification de la 1.2.3 par le Store, puis une installation depuis le Store à vérifier.
+
 > **▶ MAJ 25/10/2026 - eslint-config-next 16.4.3, comme next ; les 8 erreurs de lint qu'il faisait apparaître corrigées.** `[frontend]`
 > - **Constat** : eslint-config-next 16.4.3 tire eslint-plugin-react-hooks 7.1.1 et typescript-eslint 8.72. Les règles React Compiler, plus strictes, donnaient 8 erreurs (0 avant) et 65 avertissements `set-state-in-effect` (19 avant).
 > - **Corrigé sans changer le comportement** (branche `chore/eslint-config-next-16.4.3`, empilée sur `fix/next-16.4.3`) : `login-form`, l'effet des passkeys suggérées passe après `showPasskeyError` et `finishSignIn`, qu'il appelle ; `create-project-dialog`, `window.location.assign(url)` au lieu d'écrire `href` ; `dashboard-hero`, `reset` sort du champ par l'élément actif, car les lignes de la palette, construites au rendu, ne doivent plus capturer de ref ; `agent-chat`, fausse alerte (`send` passée à la prop `onClick` de PromptSuggestion, un simple bouton), règle coupée sur cette seule ligne, motif écrit.
