@@ -23,23 +23,30 @@ const eslintConfig = defineConfig([
   ]),
   {
     rules: {
-      // `set-state-in-effect` (react-hooks v6, outillage React Compiler) signale tout `setState`
-      // synchrone dans le corps d'un effet, car il provoque un rendu en cascade. C'est une règle de
-      // performance, pas de correction : le comportement observé reste juste.
+      // `set-state-in-effect` (eslint-plugin-react-hooks, outillage React Compiler) signale tout
+      // `setState` synchrone dans le corps d'un effet, car il provoque un rendu en cascade. C'est une
+      // règle de performance, pas de correction : le comportement observé reste juste.
       //
-      // Les 20 occurrences restantes se répartissent en deux familles, toutes deux légitimes en
-      // l'état :
+      // 65 occurrences depuis la version 7.1 du plugin, qui en voit plus que la 7.0 (19). Quatre
+      // familles, toutes légitimes en l'état :
       //
-      //  - Chargement de données (17) : `setLoading(true)` juste avant un appel réseau, dans les
-      //    cartes du dashboard, les pages projet et `issue-sheet`. Le motif est correct mais
-      //    dupliqué. La bonne réponse est de l'extraire dans un hook `useAsyncData` partagé, ce qui
-      //    supprimerait aussi une centaine de lignes redondantes. Chantier planifié, hors périmètre
-      //    de clôture (cf. `.ai/roadmap.md` §4.B) : toucher 17 points d'appel maintenant ferait
-      //    courir un risque sans contrepartie.
+      //  - Chargement de données (33) : `setLoading(true)` juste avant un appel réseau, ou un
+      //    chargeur appelé dans l'effet, dans les cartes du dashboard, les pages projet, les dialogues
+      //    et `issue-sheet`. Le motif est correct mais dupliqué. La bonne réponse est de l'extraire
+      //    dans un hook `useAsyncData` partagé, qui supprimerait aussi ce code répété. Chantier
+      //    planifié (cf. `.ai/roadmap.md` §4.B) : toucher 33 points d'appel pour une montée de
+      //    version ferait courir un risque sans contrepartie.
       //
-      //  - Lecture après hydratation (3) : `localStorage` et le drapeau `mounted` dans
-      //    `cookie-banner` et les deux layouts. Ces valeurs n'existent pas au rendu serveur ; l'effet
-      //    est ici la seule voie possible, il n'y a rien à corriger.
+      //  - Copie d'une donnée reçue dans l'état local (14) : champs préremplis depuis le store, les
+      //    props ou l'adresse (réglages, onboarding, inscription, dialogues), brouillon resynchronisé
+      //    quand la valeur change.
+      //
+      //  - Remise à zéro ou recalcul quand une valeur change (14) : ouverture d'un dialogue ou d'une
+      //    palette, recherche vide ou trop courte, étape la plus loin atteinte de l'onboarding.
+      //
+      //  - Lecture après hydratation (4) : `localStorage`, le drapeau `mounted` et la largeur de la
+      //    fenêtre. Ces valeurs n'existent pas au rendu serveur ; l'effet est ici la seule voie
+      //    possible, il n'y a rien à corriger.
       //
       // En avertissement, la règle reste visible sur toute nouvelle occurrence sans bloquer.
       "react-hooks/set-state-in-effect": "warn",

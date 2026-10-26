@@ -3,11 +3,11 @@
 <div align="center">
 
 <!-- BADGES:START -->
-![Version](https://img.shields.io/badge/Version-1.4.0-blue.svg)
+![Version](https://img.shields.io/badge/Version-1.4.1-blue.svg)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)
 ![Java](https://img.shields.io/badge/Java-21-orange.svg)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.6-brightgreen.svg)
-![Next.js](https://img.shields.io/badge/Next.js-16.3.8-black.svg)
+![Next.js](https://img.shields.io/badge/Next.js-16.4.3-black.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-blue.svg)
 ![Keycloak](https://img.shields.io/badge/Keycloak-26.5.2-blue.svg)
 ![Self-hosted](https://img.shields.io/badge/Self--hosted-Docker-blue.svg)
