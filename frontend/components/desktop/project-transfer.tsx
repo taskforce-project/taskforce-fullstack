@@ -168,7 +168,7 @@ export function BringFromWebDialog({
                   )}
                 </div>
                 {workspace.projects.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No projects: its Brain OS comes with the whole workspace.</p>
+                  <p className="text-xs text-muted-foreground">No projects: its knowledge comes with the whole workspace.</p>
                 )}
                 {workspace.projects.map((project) => {
                   const key = moveKey({ workspace: workspace.slug, projectId: project.id })

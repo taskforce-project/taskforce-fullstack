@@ -468,19 +468,6 @@ export const ROADMAP_ROUTES = {
 } as const;
 
 /**
- * Routes Brain OS (couche de connaissance / knowledge graph)
- * Backend: /api/workspaces/{slug}/brain
- */
-export const BRAIN_ROUTES = {
-  OVERVIEW:    (slug: string) => `/api/workspaces/${slug}/brain`,
-  SEARCH:      (slug: string) => `/api/workspaces/${slug}/brain/search`,
-  NODES:       (slug: string) => `/api/workspaces/${slug}/brain/nodes`,
-  NODE:        (slug: string, nodeId: number) => `/api/workspaces/${slug}/brain/nodes/${nodeId}`,
-  NODE_MOVE:   (slug: string, nodeId: number) => `/api/workspaces/${slug}/brain/nodes/${nodeId}/move`,
-  FILES:       (slug: string) => `/api/workspaces/${slug}/brain/files`,
-} as const;
-
-/**
  * Toutes les routes groupées (export par défaut)
  */
 export const API_ROUTES = {

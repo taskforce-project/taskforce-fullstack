@@ -1025,7 +1025,7 @@ function WorkspaceMoveCard({ slug }: Readonly<{ slug: string }>) {
   const [importing, setImporting] = useState(false)
 
   async function handleDownload() {
-    const progress = notifyProgress("Exporting the workspace", { description: "Packing its Brain OS and projects…" })
+    const progress = notifyProgress("Exporting the workspace", { description: "Packing its notes and projects…" })
     try {
       await downloadWorkspaceBundle(slug, (pct) => progress.setProgress(pct))
       progress.success("Workspace file ready")
@@ -1183,7 +1183,7 @@ function WorkspacePanel() {
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all resize-none"
             />
           </FormField>
-          <FormField label="Activity" hint="What does your company / team do? Feeds the Brain OS so the AI knows your context.">
+          <FormField label="Activity" hint="What does your company / team do? It gives the AI your context.">
             <textarea
               value={activity}
               onChange={(e) => setActivity(e.target.value)}
@@ -1326,7 +1326,7 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
     setSyncing(true)
     try {
       const r = await syncGitHub(slug, repo)
-      toast.success(`Ingested into the Brain OS: ${r.created} created, ${r.updated} updated`)
+      toast.success(`Added to the workspace's knowledge: ${r.created} created, ${r.updated} updated`)
     } catch (e) {
       toast.error(getErrorMessage(e))
     } finally {
@@ -1353,10 +1353,10 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
 
       {repo && (
         <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
-          <p className="text-[11px] text-muted-foreground">Ingest this repository&apos;s issues &amp; PRs into the Brain OS.</p>
+          <p className="text-[11px] text-muted-foreground">Add this repository&apos;s issues &amp; PRs to the workspace&apos;s knowledge.</p>
           <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs shrink-0" onClick={handleSync} disabled={syncing}>
             {syncing ? <Loader2 className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />}
-            {syncing ? "Syncing…" : "Sync → Brain OS"}
+            {syncing ? "Syncing…" : "Sync"}
           </Button>
         </div>
       )}
@@ -1449,7 +1449,7 @@ function IntegrationsPanel() {
     setSyncingChannel(chId)
     try {
       const r = await syncSlack(slug, chId)
-      toast.success(`Ingested into the Brain OS: ${r.created} created, ${r.updated} updated`)
+      toast.success(`Added to the workspace's knowledge: ${r.created} created, ${r.updated} updated`)
     } catch (e) {
       toast.error(getErrorMessage(e))
     } finally {
@@ -1537,7 +1537,7 @@ function IntegrationsPanel() {
                       className="h-7 gap-1 text-xs"
                       disabled={syncingChannel === ch.channelId}
                       onClick={() => handleSyncChannel(ch.channelId)}
-                      title="Ingest this channel's recent messages into the Brain OS"
+                      title="Add this channel's recent messages to the workspace's knowledge"
                     >
                       {syncingChannel === ch.channelId ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
                       Sync

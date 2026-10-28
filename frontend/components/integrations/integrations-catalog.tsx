@@ -587,7 +587,7 @@ function PlaneForm({ slug, tool, onClose, onChanged }: PanelProps) {
     <div className="flex flex-col gap-3">
       <p className="text-xs text-muted-foreground">
         {status?.planeWorkspace && <>Workspace <span className="font-medium text-foreground">{status.planeWorkspace}</span> · </>}
-        {status?.ingestedNodes ?? 0} item(s) ingested into the Brain OS.
+        {status?.ingestedNodes ?? 0} item(s) added to the workspace&apos;s knowledge.
       </p>
       <label className="flex flex-col gap-1">
         <span className="text-xs font-medium text-muted-foreground">Project to sync</span>
@@ -606,7 +606,7 @@ function PlaneForm({ slug, tool, onClose, onChanged }: PanelProps) {
         </Button>
         <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={handleSync} disabled={syncing || !projectId}>
           {syncing ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
-          {syncing ? "Syncing…" : "Sync to the Brain OS"}
+          {syncing ? "Syncing…" : "Sync"}
         </Button>
       </DialogFooter>
     </div>

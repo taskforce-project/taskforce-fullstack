@@ -21,7 +21,7 @@ const PROVIDERS: { value: DesktopAiSettings["provider"]; label: string; hint: st
     label: "An OpenAI-compatible API",
     hint: "OpenAI, Mistral, Groq, OpenRouter, LM Studio... The text of each request goes to that provider.",
   },
-  { value: "off", label: "No AI", hint: "Projects, issues and the Brain OS keep working. Search uses full text." },
+  { value: "off", label: "No AI", hint: "Projects, issues and notes keep working. Search uses full text." },
 ]
 
 /**
@@ -241,7 +241,7 @@ function ModelField({
 function StatusLine({ view }: Readonly<{ view: DesktopAiView }>) {
   const { settings, state } = view
   if (settings.provider === "off") {
-    return <p className="text-xs text-muted-foreground">AI is off. Cortex still searches the Brain OS and cites what it finds.</p>
+    return <p className="text-xs text-muted-foreground">AI is off. Cortex still searches your notes and cites what it finds.</p>
   }
   if (!state.reachable) {
     return settings.provider === "ollama" ? (

@@ -331,7 +331,6 @@ export const CONSTANTS_EN = {
     skills: "Skills",
     analytics: "Intelligence",
     agents: "Agents",
-    brain: "Brain OS",
     messages: "Messages",
     discussions: "Discussions",
     settings: "Settings",
@@ -551,7 +550,7 @@ export const CONSTANTS_EN = {
     workspaceNamePlaceholder: "My team",
     workspaceActivity: "What does your company / team do?",
     workspaceActivityPlaceholder: "e.g. We build a CRM for independent craftspeople",
-    workspaceActivityHint: "One sentence. It feeds your Brain OS so the AI understands your context.",
+    workspaceActivityHint: "One sentence. It gives the AI your context.",
     creating: "Creating…",
   },
 } as const

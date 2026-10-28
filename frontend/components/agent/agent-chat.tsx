@@ -87,8 +87,8 @@ function AiUnavailableNotice() {
       </p>
       <p className="text-xs leading-relaxed text-muted-foreground">
         {IS_DESKTOP
-          ? "Cortex still searches the Brain OS and cites the notes it finds. To get written answers, choose a model: Ollama on this computer, or any OpenAI-compatible API."
-          : "Cortex still searches the Brain OS and cites the notes it finds. To get written answers, an administrator connects a model to the AI service: Ollama on this machine, or any OpenAI-compatible API."}
+          ? "Cortex still searches your workspace's knowledge and cites the notes it finds. To get written answers, choose a model: Ollama on this computer, or any OpenAI-compatible API."
+          : "Cortex still searches your workspace's knowledge and cites the notes it finds. To get written answers, an administrator connects a model to the AI service: Ollama on this machine, or any OpenAI-compatible API."}
       </p>
       {IS_DESKTOP && (
         <button type="button" onClick={() => openSettings("ai")} className="self-start text-xs font-medium text-primary hover:underline">
@@ -359,7 +359,7 @@ export function AgentChat() {
             <div>
               <p className="text-sm font-medium">Cortex</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Taskforce&apos;s AI agent, built on your workspace&apos;s Brain OS. It cites its sources.
+                TaskForce&apos;s AI agent, built on your workspace&apos;s knowledge. It cites its sources.
               </p>
             </div>
             {aiStatus && !aiStatus.chatAvailable && <AiUnavailableNotice />}

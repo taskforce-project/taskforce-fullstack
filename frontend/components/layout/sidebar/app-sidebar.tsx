@@ -11,7 +11,6 @@ import {
   ListChecksIcon,
   LayersIcon,
   ActivityIcon,
-  BrainIcon,
   UserIcon,
   PlusIcon,
   Settings2Icon,
@@ -115,11 +114,6 @@ const NAV_WORK: readonly NavItem[] = [
     key: "nav.analytics",
     url: "/analytics",
     aicon: ActivityIcon,
-  },
-  {
-    key: "nav.brain",
-    url: "/brain",
-    aicon: BrainIcon,
   },
   // Agents retiré (11/07/2026) : non construit, aucune utilité pour l'instant.
 ]

@@ -544,7 +544,7 @@ export default function OnboardingPage() {
                 maxLength={500}
               />
               <span className="mt-1 block text-xs" style={{ color: "var(--label-quaternary)" }}>
-                One sentence. It feeds your Brain OS so the AI understands your context.
+                One sentence. It gives the AI your context.
               </span>
             </label>
             {!IS_DESKTOP && (
