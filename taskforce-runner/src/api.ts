@@ -15,6 +15,8 @@ export interface Claim {
   sessionExpiresAt: string;
   /** Paquet de règles de la mission (contracts/), vérifié par son empreinte avant de lancer l'agent. */
   rules?: unknown;
+  /** Commande de test du projet, lancée par le runner après l'agent (S1, R32) ; absente : aucun test lancé. */
+  testCommand?: string | null;
 }
 
 export interface RunResult {

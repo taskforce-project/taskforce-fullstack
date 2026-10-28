@@ -25,6 +25,7 @@ import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWo
 import { verifiedBundle } from "./harness/rules.js";
 import { log } from "./log.js";
 import { resolveCommand, run } from "./proc.js";
+import { ApprovedTests, runProjectTests } from "./tests.js";
 import { MIN_CLAUDE_CODE, supportsApprovals } from "./version.js";
 
 // Lancé par l'app desktop avec le Node d'Electron (ELECTRON_RUN_AS_NODE) : ni git, ni gh, ni Claude Code ne doivent
@@ -68,6 +69,9 @@ async function ensureAgentVersion(config: RunnerConfig): Promise<void> {
     throw new Error(`Claude Code ${MIN_CLAUDE_CODE} or later is needed for the rules to hold (found: ${version || "none"}). Update it: npm install -g @anthropic-ai/claude-code`);
   }
 }
+
+/** Durée maximale des tests du projet (S1) : au-delà, ils sont arrêtés et le résultat le dit. */
+const TEST_TIMEOUT_MS = 15 * 60_000;
 
 /**
  * Une décision du runner pour la chronologie et le dossier de preuve : une sortie (`exit`), faite ou non, ou le
@@ -121,12 +125,25 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       if (!outcome.ok) throw new Error(outcome.text);
 
       const commits = await finalizeCommits(worktree, claim);
+      // S1 (R32) : les tests du projet, lancés par le runner sur le travail de l'agent, jamais par l'agent. Après les
+      // commits : ce que les tests écrivent (couverture, rapports) ne part pas avec la branche.
+      let report = outcome.text;
+      let prBody = outcome.text;
+      if (commits > 0 && claim.testCommand) {
+        const tests = await runProjectTests(claim.testCommand, claim.repoFullName, worktree.path, TEST_TIMEOUT_MS,
+          { ask, approved: ApprovedTests.in(config.home) }, signal);
+        log.info(tests.summary);
+        await api.events(claim.runId, [{ kind: "test", tool: tests.command.slice(0, 120), text: `${tests.summary}${tests.tail ? `\n${tests.tail.slice(-1500)}` : ""}` }])
+          .catch((e: unknown) => log.warn(`Test result not traced in TaskForce: ${(e as Error).message}`));
+        report = `${outcome.text}\n\n${tests.summary}`;
+        prBody = tests.tail ? `${report}\n\n<details><summary>Test output</summary>\n\n\`\`\`\n${tests.tail}\n\`\`\`\n</details>` : report;
+      }
       if (commits === 0) {
         result = { status: "DONE", summary: `No code change was needed.\n\n${outcome.text}`.slice(0, 7900) };
       } else if (!config.push) {
         result = {
           status: "DONE",
-          summary: `${outcome.text}\n\n${commits} commit(s) on local branch ${worktree.branch} (push disabled on this runner).`.slice(0, 7900),
+          summary: `${report}\n\n${commits} commit(s) on local branch ${worktree.branch} (push disabled on this runner).`.slice(0, 7900),
         };
       } else {
         // Les sorties suivent les règles de la mission (§8.4) : ce qui est demandé attend la personne qui a délégué.
@@ -138,7 +155,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
         if (!push.go) {
           result = {
             status: "DONE",
-            summary: `${outcome.text}\n\n${commits} commit(s) on local branch ${worktree.branch}, not pushed: ${push.why}.`.slice(0, 7900),
+            summary: `${report}\n\n${commits} commit(s) on local branch ${worktree.branch}, not pushed: ${push.why}.`.slice(0, 7900),
           };
         } else {
           await pushBranch(worktree, repo);
@@ -149,10 +166,10 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
               `Open a pull request from ${worktree.branch} on ${where}`, ask);
             log.info(`Pull request: ${pr.why}`);
             await traceExit(api, claim.runId, "gh pr create", pr);
-            if (pr.go) url = await openPullRequest(worktree, repo, claim, outcome.text, config.home);
+            if (pr.go) url = await openPullRequest(worktree, repo, claim, prBody, config.home);
             else note = `\n\nBranch ${worktree.branch} pushed, no pull request: ${pr.why}.`;
           }
-          result = { status: "DONE", summary: `${outcome.text}${note}`.slice(0, 7900), resultUrl: url };
+          result = { status: "DONE", summary: `${report}${note}`.slice(0, 7900), resultUrl: url };
           log.info(url ? `Pull request opened: ${url}` : `Branch pushed: ${worktree.branch}`);
         }
       }
