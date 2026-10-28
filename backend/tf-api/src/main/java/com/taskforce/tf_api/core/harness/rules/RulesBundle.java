@@ -1,4 +1,4 @@
-package com.taskforce.tf_api.modules.harness.rules;
+package com.taskforce.tf_api.core.harness.rules;
 
 import java.util.List;
 

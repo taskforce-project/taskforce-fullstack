@@ -1,10 +1,10 @@
-package com.taskforce.tf_api.modules.harness.rules;
+package com.taskforce.tf_api.core.harness.rules;
 
 import java.util.Map;
 import java.util.function.Function;
 
-import com.taskforce.tf_api.modules.harness.rules.RulesBundle.Condition;
-import com.taskforce.tf_api.modules.harness.rules.RulesBundle.Rule;
+import com.taskforce.tf_api.core.harness.rules.RulesBundle.Condition;
+import com.taskforce.tf_api.core.harness.rules.RulesBundle.Rule;
 
 /**
  * Décision d'une action à partir d'un paquet de règles (contracts/README.md). Code déterministe, sans réseau ni
