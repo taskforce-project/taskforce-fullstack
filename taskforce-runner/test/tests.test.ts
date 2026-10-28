@@ -22,7 +22,7 @@ describe("S1 : les tests du projet, lancés par le runner après l'agent (R32)",
       shell: async () => { ran = true; return result({}); },
     });
     assert.deepEqual([run.ran, run.passed, ran], [false, false, false]);
-    assert.match(asked[0] ?? "", /npm test.*acme\/web.*the agent's included/);
+    assert.match(asked[0] ?? "", /npm test.*acme\/web.*the agent's included$/);
     assert.match(run.summary, /not allowed on this computer/);
     assert.equal(approved.has("acme/web", "npm test"), false);
   });

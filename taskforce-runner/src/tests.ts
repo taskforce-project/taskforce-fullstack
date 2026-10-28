@@ -77,8 +77,9 @@ export async function runProjectTests(
   command: string, repo: string, cwd: string, timeoutMs: number, deps: TestDeps, signal?: AbortSignal,
 ): Promise<TestRun> {
   if (!deps.approved.has(repo, command)) {
+    // Sans point final, comme les autres demandes : l'écran ajoute « : Allowed by ... » une fois la réponse donnée.
     const ok = await deps.ask("Run the project's tests",
-      `\`${command}\` in ${repo}, on your computer: it runs the code of this branch, the agent's included.`);
+      `\`${command}\` in ${repo}, on your computer: it runs the code of this branch, the agent's included`);
     if (!ok) {
       return { command, ran: false, passed: false, summary: `Tests not run: \`${command}\` was not allowed on this computer.`, tail: "" };
     }
