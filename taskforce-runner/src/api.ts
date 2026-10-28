@@ -37,6 +37,9 @@ export interface RunnerEvent {
   rule?: string;
 }
 
+/** Qui pose une demande : l'agent, ou le runner lui-même (sortie, tests du projet, départ d'une mission). */
+export type AskedBy = "agent" | "runner";
+
 /** Demande de validation d'une action de l'agent, décidée dans TaskForce par la personne qui a délégué. */
 export interface Approval {
   approvalId: number;
@@ -92,9 +95,12 @@ export class TaskforceApi {
     await this.send("POST", `/delivery/runner/runs/${runId}/events`, { events });
   }
 
-  /** Ouvre une demande de validation : la personne qui a délégué autorise ou refuse dans l'app. */
-  requestApproval(runId: number, tool: string, summary: string): Promise<Approval> {
-    return this.send<Approval>("POST", `/delivery/runner/runs/${runId}/approvals`, { tool, summary });
+  /**
+   * Ouvre une demande de validation : la personne qui a délégué autorise ou refuse dans l'app. `askedBy` dit qui
+   * demande, l'agent ou le runner lui-même (décision J4).
+   */
+  requestApproval(runId: number, tool: string, summary: string, askedBy: AskedBy = "agent"): Promise<Approval> {
+    return this.send<Approval>("POST", `/delivery/runner/runs/${runId}/approvals`, { tool, summary, askedBy });
   }
 
   approvalStatus(runId: number, approvalId: number): Promise<Approval> {

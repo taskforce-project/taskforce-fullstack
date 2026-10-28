@@ -105,7 +105,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
     log.info(`Rules v${rules.version} (${rules.rules.length} rules, ${rules.digest?.slice(0, 15)}...)`);
     await ensureAgentVersion(config);
     const ask = (tool: string, summary: string): Promise<boolean> =>
-      askInTaskForce(api, claim.runId, tool, summary, config.agent.approvalTimeoutMinutes * 60_000);
+      askInTaskForce(api, claim.runId, tool, summary, config.agent.approvalTimeoutMinutes * 60_000, undefined, "runner");
     // Le démarrage lui-même passe par les règles (R33 : pas de mission sur un dépôt public avant S1).
     const visibility = claim.repoFullName ? await repoVisibility(claim.repoFullName) : null;
     const start = await judgeExit(rules, { action: "mission.start", ...(visibility ? { repoVisibility: visibility } : {}) },
