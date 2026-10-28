@@ -5,103 +5,37 @@
   "description": "What an agent does alone, what is forbidden, what needs a person's decision, with who decided it, why, and when to review it. Evaluated by deterministic code only (see contracts/README.md).",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "format",
-    "workspace",
-    "version",
-    "rules"
-  ],
+  "required": ["format", "workspace", "version", "rules"],
   "properties": {
-    "format": {
-      "const": "taskforce-rules/1"
-    },
-    "workspace": {
-      "type": "string",
-      "minLength": 1
-    },
-    "project": {
-      "type": [
-        "integer",
-        "null"
-      ],
-      "description": "Null for the rules of the whole workspace."
-    },
-    "version": {
-      "type": "integer",
-      "minimum": 1
-    },
+    "format": { "const": "taskforce-rules/1" },
+    "workspace": { "type": "string", "minLength": 1 },
+    "project": { "type": ["integer", "null"], "description": "Null for the rules of the whole workspace." },
+    "version": { "type": "integer", "minimum": 1 },
     "digest": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$",
       "description": "SHA-256 of the canonical JSON of the bundle without this field. Set by the server; the runner refuses a bundle whose digest does not match."
     },
-    "issuedAt": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "rules": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/rule"
-      }
-    }
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "rules": { "type": "array", "items": { "$ref": "#/$defs/rule" } }
   },
   "$defs": {
     "rule": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "id",
-        "when",
-        "class",
-        "effect",
-        "owner",
-        "reason",
-        "review"
-      ],
+      "required": ["id", "when", "class", "effect", "owner", "reason", "review"],
       "properties": {
-        "id": {
-          "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9-]{1,79}$"
-        },
-        "when": {
-          "$ref": "#/$defs/condition"
-        },
-        "class": {
-          "enum": [
-            "read",
-            "sandbox-write",
-            "reversible-exit",
-            "irreversible"
-          ]
-        },
-        "effect": {
-          "enum": [
-            "allow",
-            "ask",
-            "deny"
-          ]
-        },
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,79}$" },
+        "when": { "$ref": "#/$defs/condition" },
+        "class": { "enum": ["read", "sandbox-write", "reversible-exit", "irreversible"] },
+        "effect": { "enum": ["allow", "ask", "deny"] },
         "inverse": {
-          "type": [
-            "string",
-            "null"
-          ],
+          "type": ["string", "null"],
           "description": "The action that undoes this one when it exists (delete-branch, close-pull-request, reopen-issue...). A reversible exit without an inverse is not reversible."
         },
-        "owner": {
-          "type": "string",
-          "minLength": 1,
-          "description": "The named person who answers for the rule."
-        },
-        "reason": {
-          "type": "string",
-          "minLength": 1
-        },
-        "review": {
-          "type": "string",
-          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-        }
+        "owner": { "type": "string", "minLength": 1, "description": "The named person who answers for the rule." },
+        "reason": { "type": "string", "minLength": 1 },
+        "review": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
       }
     },
     "condition": {
@@ -109,74 +43,28 @@
       "additionalProperties": false,
       "minProperties": 1,
       "properties": {
-        "action": {
-          "$ref": "#/$defs/action"
-        },
-        "tool": {
-          "type": "string",
-          "description": "Glob on the agent's tool name, for example Bash or mcp__taskforce__brain_search."
-        },
-        "command": {
-          "type": "string",
-          "description": "Glob on the parsed command: program and arguments joined by single spaces, for example npm test."
-        },
-        "path": {
-          "type": "string",
-          "description": "Glob on the file path, relative to the sandbox."
-        },
-        "branch": {
-          "type": "string",
-          "description": "Glob on the target branch."
-        },
-        "repoVisibility": {
-          "enum": [
-            "public",
-            "private"
-          ]
-        },
-        "server": {
-          "type": "string",
-          "description": "Glob on the key of the MCP server a company tool comes from."
-        },
-        "sensitivity": {
-          "enum": [
-            "public",
-            "internal",
-            "confidential"
-          ]
-        }
+        "action": { "$ref": "#/$defs/action" },
+        "tool": { "type": "string", "description": "Glob on the agent's tool name, for example Bash or mcp__taskforce__brain_search." },
+        "command": { "type": "string", "description": "Glob on the parsed command: program and arguments joined by single spaces, for example npm test." },
+        "path": { "type": "string", "description": "Glob on the file path, relative to the sandbox." },
+        "branch": { "type": "string", "description": "Glob on the target branch." },
+        "repoVisibility": { "enum": ["public", "private"] },
+        "server": { "type": "string", "description": "Glob on the key of the MCP server a company tool comes from." },
+        "sensitivity": { "enum": ["public", "internal", "confidential"] }
       }
     },
     "action": {
       "enum": [
-        "mission.start",
-        "file.read",
-        "file.search",
-        "file.write",
-        "file.delete",
+        "file.read", "file.search", "file.write", "file.delete",
         "shell",
-        "git.commit",
-        "git.push",
-        "git.merge",
-        "pr.open",
-        "pr.merge",
-        "pr.close",
-        "issue.read",
-        "issue.create",
-        "issue.update",
-        "comment.create",
-        "knowledge.search",
-        "knowledge.write",
-        "web.search",
-        "web.fetch",
-        "mcp.read",
-        "mcp.write",
-        "package.publish",
-        "deploy",
-        "message.send",
-        "payment",
-        "secret.use",
-        "harness.change"
+        "git.commit", "git.push", "git.merge",
+        "pr.open", "pr.merge", "pr.close",
+        "issue.read", "issue.create", "issue.update", "comment.create",
+        "knowledge.search", "knowledge.write",
+        "web.search", "web.fetch",
+        "mcp.read", "mcp.write",
+        "package.publish", "deploy", "message.send", "payment", "secret.use",
+        "mission.start", "harness.change"
       ]
     }
   }
