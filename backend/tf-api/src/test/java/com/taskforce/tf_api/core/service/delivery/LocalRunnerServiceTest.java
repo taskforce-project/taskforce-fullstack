@@ -89,6 +89,7 @@ class LocalRunnerServiceTest {
         lenient().when(project.getName()).thenReturn("Website");
         lenient().when(project.getIdentifier()).thenReturn("WEB");
         lenient().when(project.getRepoFullName()).thenReturn("acme/website");
+        lenient().when(project.getTestCommand()).thenReturn("npm test");
         lenient().when(project.getWorkspace()).thenReturn(ws);
         Issue issue = mock(Issue.class);
         lenient().when(issue.getId()).thenReturn(55L);
@@ -122,6 +123,7 @@ class LocalRunnerServiceTest {
         assertThat(claim.workspaceSlug()).isEqualTo("acme");
         assertThat(claim.projectId()).isEqualTo(12L);
         assertThat(claim.repoFullName()).isEqualTo("acme/website");
+        assertThat(claim.testCommand()).isEqualTo("npm test"); // lancée par le runner après l'agent (S1)
         assertThat(claim.sessionExpiresAt()).isAfter(LocalDateTime.now().plusMinutes(100));
         ArgumentCaptor<String> ref = ArgumentCaptor.forClass(String.class);
         verify(runRepository).claim(eq(100L), anyString(), ref.capture(), any(), any(), any());

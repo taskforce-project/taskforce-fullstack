@@ -129,6 +129,17 @@ class DeliveryActivityServiceTest {
     }
 
     @Test
+    void the_runner_s_test_run_is_shown_and_kept_as_a_test_result() {
+        run.setClaimedBy("tf-runner-ada");
+        when(eventRepository.maxSeq(100L)).thenReturn(0);
+
+        service.appendEvents(run, List.of(new RunnerEventsRequest.Event("test", "npm test", "passed in 42 s")));
+
+        verify(eventRepository).save(any());
+        verify(evidenceService).append(eq(run), eq("test.result"), eq(new MissionEvidenceService.Actor("runner", "tf-runner-ada")), any());
+    }
+
+    @Test
     void an_exit_is_shown_and_kept_as_the_runner_s_act() {
         run.setClaimedBy("tf-runner-ada");
         when(eventRepository.maxSeq(100L)).thenReturn(0);

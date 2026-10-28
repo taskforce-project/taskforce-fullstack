@@ -64,7 +64,7 @@ public class DeliveryActivityService {
     /** Type de l'événement du dossier de preuve pour chaque sorte d'événement du runner. */
     private static final Map<String, String> EVIDENCE_TYPE = Map.of(
         "start", "note", "text", "note", "tool", "action.requested", "error", "action.result", "denied", "action.decided",
-        "decision", "action.decided", "exit", "exit.result", "limit", "limit.reached");
+        "decision", "action.decided", "exit", "exit.result", "limit", "limit.reached", "test", "test.result");
     /** Les décisions des règles vont au dossier, pas à la chronologie affichée : une ligne par action la noierait. */
     private static final Set<String> EVIDENCE_ONLY = Set.of("decision");
 
@@ -100,7 +100,7 @@ public class DeliveryActivityService {
     private static MissionEvidenceService.Actor actorOf(DeliveryRun run, RunnerEventsRequest.Event event) {
         return switch (event.kind()) {
             case "decision" -> new MissionEvidenceService.Actor("rule", event.rule() == null || event.rule().isBlank() ? "none" : event.rule().strip());
-            case "exit", "limit" -> new MissionEvidenceService.Actor("runner", run.getClaimedBy() == null ? "runner" : run.getClaimedBy());
+            case "exit", "limit", "test" -> new MissionEvidenceService.Actor("runner", run.getClaimedBy() == null ? "runner" : run.getClaimedBy());
             default -> new MissionEvidenceService.Actor("agent", run.getProviderKey());
         };
     }

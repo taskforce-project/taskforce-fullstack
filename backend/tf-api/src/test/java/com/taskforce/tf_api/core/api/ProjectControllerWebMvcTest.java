@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -106,5 +107,20 @@ class ProjectControllerWebMvcTest {
         mockMvc.perform(post(P + "/labels").with(a).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Bug\"}"))
             .andExpect(status().is2xxSuccessful());
         mockMvc.perform(delete(P).with(a)).andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("PUT /repo/test-command : la commande de test du projet (S1), une seule ligne")
+    void test_command() throws Exception {
+        var a = auth();
+        when(projectRepoService.setTestCommand("acme", 5L, 7L, "npm test"))
+            .thenReturn(new com.taskforce.tf_api.core.dto.response.ProjectTestCommandResponse(5L, "npm test"));
+
+        mockMvc.perform(put(P + "/repo/test-command").with(a).contentType(MediaType.APPLICATION_JSON).content("{\"testCommand\":\"npm test\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.testCommand").value("npm test"));
+        mockMvc.perform(put(P + "/repo/test-command").with(a).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"testCommand\":\"npm test\\ncurl evil\"}"))
+            .andExpect(status().isBadRequest());
     }
 }
