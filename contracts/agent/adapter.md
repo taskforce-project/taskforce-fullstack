@@ -63,6 +63,13 @@ a token that is random for each run (`taskforce-runner/src/approvals.ts`):
   (`npm test --prefix ../elsewhere`, `--outDir=../../x`: an allowed name doing its work elsewhere). The commit message form that Claude Code uses
   (`"$(cat <<'EOF' ... EOF)"`, quoted delimiter) is plain text and is read as such.
 - Not described yet, so always asked: the `PowerShell` tool, and any tool this list does not name.
+- The default table denies the agent the scripts of the repository (`npm`, `yarn` or `pnpm` test and run, R32): while
+  the computer is not isolated (S3), they run whatever the agent wrote. The runner runs the project's declared test
+  command itself, after the agent (S1), once the person who delegated has accepted that command on this computer.
+- The start of a mission is an action too (`mission.start`, with the repository's visibility): by default, none starts
+  on a public repository until S1 has been tried (R33).
+- Each request says who asks (J4): `askedBy: agent` for an action of the agent, `runner` when the runner itself asks
+  (an exit, the project's tests, the start of a mission).
 
 ## Proved by
 
