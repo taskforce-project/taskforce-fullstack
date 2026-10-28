@@ -25,9 +25,10 @@ on:
         description: 'Publish the versioned release as a preview'
         type: boolean
         default: true
-  # On the desktop branch, the installers are built (and kept as artifacts) without being published.
+  # On the desktop branch and the v2 branch, the installers are built (and kept as artifacts) without being published:
+  # a build to try, never an update for the installed apps.
   push:
-    branches: [feature/desktop]
+    branches: [feature/desktop, feature/v2-harness]
     paths:
       - 'desktop/**'
       - '.github/workflows/desktop-release.yml'
