@@ -14,7 +14,7 @@ import { useSettingsStore } from "@/lib/store/settings-store"
 import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useModKeyLabel } from "@/lib/hooks/use-mod-key"
-import { IS_DESKTOP } from "@/lib/desktop"
+import { DESKTOP_HIDDEN_CONNECTORS, IS_DESKTOP } from "@/lib/desktop"
 
 /** Connecteurs mis en avant dans la pilule (clés du catalogue - cf. ConnectorCatalog.java). */
 const PILL_TOOLS = [
@@ -157,7 +157,7 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
         className="group flex items-center gap-2 rounded-full border border-border bg-card py-1.5 pl-2.5 pr-3 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
       >
         <span className="flex items-center gap-1.5">
-          {PILL_TOOLS.map((t) => (
+          {PILL_TOOLS.filter((t) => !IS_DESKTOP || !DESKTOP_HIDDEN_CONNECTORS.has(t.slug)).map((t) => (
             <BrandLogo key={t.slug} slug={t.slug} name={t.name} className="size-3.5 text-[7px]" />
           ))}
         </span>
