@@ -53,6 +53,11 @@ describe("contrat des règles : décisions avec la table par défaut", () => {
     }
   });
 
+  it("chaque règle par défaut gagne au moins un cas écrit d'avance (famille 1)", () => {
+    const winners = new Set(ruleCases.decisions.map((c) => c.expect.rule));
+    for (const r of defaults.rules) assert.ok(winners.has(r.id), `${r.id} n'a aucun cas`);
+  });
+
   it("les identifiants de règle sont uniques", () => {
     const ids = defaults.rules.map((r) => r.id);
     assert.equal(new Set(ids).size, ids.length);

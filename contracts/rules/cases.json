@@ -323,6 +323,240 @@
         "effect": "ask",
         "rule": "fetch-web"
       }
+    },
+    {
+      "name": "searching the copy is allowed",
+      "facts": {
+        "action": "file.search",
+        "path": "src"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "search-files"
+      }
+    },
+    {
+      "name": "reading an issue is allowed",
+      "facts": {
+        "action": "issue.read"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "read-issues"
+      }
+    },
+    {
+      "name": "searching the knowledge is allowed",
+      "facts": {
+        "action": "knowledge.search"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "search-knowledge"
+      }
+    },
+    {
+      "name": "deleting a file of the copy is allowed",
+      "facts": {
+        "action": "file.delete",
+        "path": "tmp/build.log"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "delete-sandbox-files"
+      }
+    },
+    {
+      "name": "a local commit is allowed",
+      "facts": {
+        "action": "git.commit",
+        "command": "git commit -m fix"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "commit-locally"
+      }
+    },
+    {
+      "name": "git status is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "git status"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-reads"
+      }
+    },
+    {
+      "name": "git diff with options is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "git diff --stat"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-reads"
+      }
+    },
+    {
+      "name": "a git command outside the reads asks",
+      "facts": {
+        "action": "shell",
+        "command": "git reset --hard HEAD~1"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "a build with arguments is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "npm run build -- --prod"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-npm-checks"
+      }
+    },
+    {
+      "name": "another npm script asks",
+      "facts": {
+        "action": "shell",
+        "command": "npm run deploy"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "creating an issue is allowed",
+      "facts": {
+        "action": "issue.create"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "create-issue"
+      }
+    },
+    {
+      "name": "updating an issue is allowed",
+      "facts": {
+        "action": "issue.update"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "update-issue"
+      }
+    },
+    {
+      "name": "commenting is allowed",
+      "facts": {
+        "action": "comment.create"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "comment"
+      }
+    },
+    {
+      "name": "a merge asks",
+      "facts": {
+        "action": "git.merge",
+        "branch": "main"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "merge"
+      }
+    },
+    {
+      "name": "merging a pull request asks",
+      "facts": {
+        "action": "pr.merge",
+        "repoVisibility": "private"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "merge-pull-request"
+      }
+    },
+    {
+      "name": "publishing a package asks",
+      "facts": {
+        "action": "package.publish"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "publish-package"
+      }
+    },
+    {
+      "name": "a deployment asks",
+      "facts": {
+        "action": "deploy"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "deploy"
+      }
+    },
+    {
+      "name": "sending a message asks",
+      "facts": {
+        "action": "message.send"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "send-message"
+      }
+    },
+    {
+      "name": "using a secret asks",
+      "facts": {
+        "action": "secret.use"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "use-secret"
+      }
+    },
+    {
+      "name": "action matches by equality, not as a pattern",
+      "facts": {
+        "action": "file.read.all"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "the agent's branch prefix needs its slash",
+      "facts": {
+        "action": "git.push",
+        "branch": "tf",
+        "repoVisibility": "private"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "a nested agent branch goes to a private repository",
+      "facts": {
+        "action": "git.push",
+        "branch": "tf/web/48",
+        "repoVisibility": "private"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "push-agent-branch-private"
+      }
     }
   ],
   "digest": {
