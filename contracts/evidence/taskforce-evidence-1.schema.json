@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://taskforce-project.fr/contracts/taskforce-evidence-1.schema.json",
+  "title": "TaskForce evidence file, version 1",
+  "description": "The chained journal of one mission: who asked, which agent acted, on which sources, under which rules, who decided, what left the sandbox. Each event is chained to the previous one (see contracts/README.md); an exported file is checked without TaskForce by recomputing the hashes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "mission", "events", "root"],
+  "properties": {
+    "format": { "const": "taskforce-evidence/1" },
+    "mission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "workspace", "requestedBy", "agent", "rules"],
+      "properties": {
+        "id": { "type": "integer" },
+        "workspace": { "type": "string" },
+        "project": { "type": ["integer", "null"] },
+        "issue": { "type": ["string", "null"], "description": "The issue key, for example WEB-48." },
+        "requestedBy": { "type": "string", "description": "The person who delegated." },
+        "agent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "enum": ["claude-code", "internal", "codex", "cursor", "gemini", "copilot"] },
+            "version": { "type": ["string", "null"] },
+            "model": { "type": ["string", "null"] }
+          }
+        },
+        "rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "digest"],
+          "properties": {
+            "version": { "type": "integer" },
+            "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+          }
+        },
+        "runner": { "type": ["string", "null"] },
+        "taskforce": { "type": ["string", "null"] }
+      }
+    },
+    "events": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/event" } },
+    "root": { "$ref": "#/$defs/hash" }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "at", "type", "actor", "data", "prev", "hash"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 1 },
+        "at": { "type": "string", "format": "date-time" },
+        "type": {
+          "enum": [
+            "mission.started", "mission.ended",
+            "action.requested", "action.decided", "action.result",
+            "source.read", "test.result",
+            "exit.intent", "exit.result",
+            "human.decision", "limit.reached", "note"
+          ]
+        },
+        "actor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": { "enum": ["agent", "person", "rule", "runner", "server"] },
+            "id": { "type": "string" }
+          }
+        },
+        "data": { "type": "object", "description": "Integers, strings, booleans, null, arrays and objects only: no decimal numbers." },
+        "prev": { "$ref": "#/$defs/hash" },
+        "hash": { "$ref": "#/$defs/hash" }
+      }
+    }
+  }
+}
