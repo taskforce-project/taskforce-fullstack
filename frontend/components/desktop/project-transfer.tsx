@@ -111,8 +111,8 @@ export function BringFromWebDialog({
         <DialogHeader>
           <DialogTitle>From the web app</DialogTitle>
           <DialogDescription>
-            Copy your work from the TaskForce web app to this computer: a whole workspace with its Brain OS and
-            projects, or one project into this workspace. Issues keep their history, pages and attachments. The
+            Copy your work from the TaskForce web app to this computer: a whole workspace with its notes, documents
+            and projects, or one project into this workspace. Issues keep their history and attachments. The
             originals stay in the web app.
           </DialogDescription>
         </DialogHeader>
@@ -283,8 +283,8 @@ export function SendToWebDialog({
         <DialogHeader>
           <DialogTitle>Copy to the web app</DialogTitle>
           <DialogDescription>
-            Copy &ldquo;{projectName}&rdquo; to a workspace of the TaskForce web app, with its issues, history, pages
-            and attachments. It stays on this computer too.
+            Copy &ldquo;{projectName}&rdquo; to a workspace of the TaskForce web app, with its issues, history and
+            attachments. It stays on this computer too.
           </DialogDescription>
         </DialogHeader>
 

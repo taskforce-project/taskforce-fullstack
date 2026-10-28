@@ -1062,7 +1062,7 @@ function WorkspaceMoveCard({ slug }: Readonly<{ slug: string }>) {
   return (
     <SectionCard
       title="Move or back up this workspace"
-      description="The whole workspace in one file: its Brain OS, and every project you can see with its issues, history, pages and attachments."
+      description="The whole workspace in one file: its notes and documents, and every project you can see with its issues, history and attachments."
     >
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4">
@@ -1630,7 +1630,7 @@ function PrivacyPanel() {
       <SectionCard title="Your data" description="Understand what personal data TaskForce stores about you.">
         <ul className="text-sm text-muted-foreground space-y-1.5">
           <li>• <strong className="text-foreground">Account</strong>: name, email, profile picture</li>
-          <li>• <strong className="text-foreground">Workspace activity</strong>: issues, projects, comments, pages</li>
+          <li>• <strong className="text-foreground">Workspace activity</strong>: issues, projects, comments</li>
           <li>• <strong className="text-foreground">Authentication tokens</strong>: stored in your browser&apos;s local storage (never shared)</li>
         </ul>
         <p className="text-xs text-muted-foreground mt-3">

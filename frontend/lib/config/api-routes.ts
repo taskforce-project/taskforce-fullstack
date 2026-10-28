@@ -232,8 +232,6 @@ export const ISSUE_ROUTES = {
   MY_ISSUES: (slug: string) => `/api/workspaces/${slug}/my-issues`,
   /** Vue My Work - cycles de tous les projets visibles, en un appel (évite un appel par projet) */
   MY_CYCLES: (slug: string) => `/api/workspaces/${slug}/my-cycles`,
-  /** Vue My Work - pages récentes de tous les projets visibles, en un appel */
-  MY_PAGES:  (slug: string) => `/api/workspaces/${slug}/my-pages`,
   LIST:    (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues`,
   /** Liste paginée pour l'infinite-scroll du backlog (QA2-33) */
   PAGED:   (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/paged`,
@@ -376,18 +374,6 @@ export const NOTIFICATION_ROUTES = {
  */
 export const PROFILE_ROUTES = {
   GET: (slug: string) => `/api/workspaces/${slug}/profile`,
-} as const;
-
-/**
- * Routes pages/wiki
- * Backend: /api/workspaces/{slug}/projects/{projectId}/pages
- */
-export const PAGE_ROUTES = {
-  LIST:   (slug: string, projectId: string) => `/api/workspaces/${slug}/projects/${projectId}/pages`,
-  CREATE: (slug: string, projectId: string) => `/api/workspaces/${slug}/projects/${projectId}/pages`,
-  GET:    (slug: string, projectId: string, pageId: string) => `/api/workspaces/${slug}/projects/${projectId}/pages/${pageId}`,
-  UPDATE: (slug: string, projectId: string, pageId: string) => `/api/workspaces/${slug}/projects/${projectId}/pages/${pageId}`,
-  DELETE: (slug: string, projectId: string, pageId: string) => `/api/workspaces/${slug}/projects/${projectId}/pages/${pageId}`,
 } as const;
 
 /**

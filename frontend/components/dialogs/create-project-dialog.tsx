@@ -356,7 +356,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
           <DialogTitle>Create project</DialogTitle>
           <DialogDescription>
             {mode === "blank"
-              ? "Projects help you track work across issues, cycles, and pages."
+              ? "Projects help you track work across issues and cycles."
               : mode === "file"
                 ? "Bring a whole project from a TaskForce project file, exported from the web app or the desktop app."
                 : "Import an existing project's issues from a connected tool into a new TaskForce project."}
@@ -564,7 +564,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
               </div>
             )}
             <p className="text-[11px] text-muted-foreground">
-              The project arrives with its issues, sub-issues, comments, history, cycles, pages and attachments.{" "}
+              The project arrives with its issues, sub-issues, comments, history, cycles and attachments.{" "}
               {IS_DESKTOP
                 ? "Issues and comments keep the names of the people who wrote them."
                 : "People who aren't members of this workspace are replaced by you."}

@@ -101,7 +101,6 @@ const NAV_COMMAND: readonly NavItem[] = [
       { key: "nav.sub.myAll",    url: "/my-work" },
       { key: "nav.sub.myIssues", url: "/my-work/issues" },
       { key: "nav.sub.myCycles", url: "/my-work/cycles" },
-      { key: "nav.sub.myPages",  url: "/my-work/pages" },
     ],
   },
 ]

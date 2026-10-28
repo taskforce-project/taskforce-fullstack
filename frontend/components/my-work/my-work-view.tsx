@@ -3,11 +3,10 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
-  CircleDot, CheckCircle2, Clock, RefreshCw, FileText, Layers, Hash, CalendarDays, Check, X,
+  CircleDot, CheckCircle2, Clock, RefreshCw, Layers, Hash, CalendarDays, Check, X,
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -19,7 +18,6 @@ import { IssueSheetLoader, type IssueSheetTarget } from "@/components/sheets/iss
 import { cn } from "@/lib/utils"
 import { PRIORITY_DOT as DOT } from "@/lib/palette"
 import { useUserStore } from "@/lib/store/user-store"
-import { pageService, type WorkspacePage } from "@/lib/api/page-service"
 import { listMyIssues } from "@/lib/api/issue-service"
 import { acceptAssignment, declineAssignment } from "@/lib/api/assignment-service"
 import { listWorkspaceCycles, type WorkspaceCycle } from "@/lib/api/cycle-service"
@@ -29,7 +27,7 @@ import { parseServerDate } from "@/lib/utils/server-date"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type MyWorkTab = "issues" | "cycles" | "pages"
+export type MyWorkTab = "issues" | "cycles"
 
 type IssuePriority = "urgent" | "high" | "medium" | "low" | "none"
 type IssueStatus   = "todo" | "in_progress" | "in_review" | "done" | "cancelled"
@@ -65,17 +63,6 @@ interface Cycle {
   startDate: string
   endDate: string
   daysLeft: number | null
-  url: string
-}
-
-interface Page {
-  id: string
-  title: string
-  project: string
-  projectId: string
-  lastEditedAt: string
-  lastEditedBy: string
-  lastEditedByInitials: string
   url: string
 }
 
@@ -216,30 +203,6 @@ const CYCLE_COLUMNS: DataTableColumn<Cycle>[] = [
   },
 ]
 
-const PAGE_COLUMNS: DataTableColumn<Page>[] = [
-  {
-    key: "title", header: "Page", icon: <FileText className="size-3" />,
-    render: (p) => <span className="text-sm text-foreground">{p.title}</span>,
-    sortValue: (p) => p.title.toLowerCase(),
-  },
-  {
-    key: "project", header: "Project", icon: <Layers className="size-3" />, className: "hidden w-40 sm:table-cell",
-    render: (p) => <span className="block truncate text-xs text-muted-foreground">{p.project}</span>,
-    sortValue: (p) => p.project.toLowerCase(),
-  },
-  {
-    key: "edited", header: "Last edited", align: "right", className: "w-40",
-    render: (p) => (
-      <span className="flex items-center justify-end gap-1.5">
-        <Avatar className="size-5">
-          <AvatarFallback className="text-[8px] font-semibold">{p.lastEditedByInitials}</AvatarFallback>
-        </Avatar>
-        <span className="text-xs text-muted-foreground">{p.lastEditedAt}</span>
-      </span>
-    ),
-  },
-]
-
 // ─── Section (titre + compteur au-dessus d'une table) ────────────────────────
 
 function QueueSection({ label, count, children }: Readonly<{ label: string; count: number; children: React.ReactNode }>) {
@@ -292,32 +255,19 @@ function mapWorkspaceCycle({ cycle: c, projectId, projectName }: WorkspaceCycle,
   }
 }
 
-function mapWorkspacePage({ page: p, projectId, projectName }: WorkspacePage, baseUrl: string): Page {
-  return {
-    id:                   String(p.id),
-    title:                p.title,
-    project:              projectName,
-    projectId:            String(projectId),
-    lastEditedAt:         parseServerDate(p.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    lastEditedBy:         p.createdByName,
-    lastEditedByInitials: p.createdByInitials,
-    url:                  `${baseUrl}/projects/${projectId}/pages/${p.id}`,
-  }
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface MyWorkViewProps {
   readonly defaultTab?: MyWorkTab
 }
 
-type QueueTab = "all" | "issues" | "sprints" | "pages"
+type QueueTab = "all" | "issues" | "sprints"
 
 export function MyWorkView({ defaultTab }: MyWorkViewProps) {
   const router = useRouter()
 
   const initialTab: QueueTab =
-    defaultTab === "cycles" ? "sprints" : defaultTab === "issues" ? "issues" : defaultTab === "pages" ? "pages" : "all"
+    defaultTab === "cycles" ? "sprints" : defaultTab === "issues" ? "issues" : "all"
   const [tab, setTab] = useState<QueueTab>(initialTab)
 
   const params = useParams()
@@ -327,7 +277,6 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
 
   const [myIssues, setMyIssues] = useState<Issue[]>([])
   const [myCycles, setMyCycles] = useState<Cycle[]>([])
-  const [myPages, setMyPages] = useState<Page[]>([])
   const [sheetTarget, setSheetTarget] = useState<IssueSheetTarget | null>(null)
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
@@ -342,26 +291,23 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
     const baseUrl = `/${slug}`
 
     async function load() {
-      // Trois appels agrégés, quel que soit le nombre de projets. Auparavant : `3 + 2N`
-      // (un appel cycles + un appel pages PAR projet), ce qui vidait le quota de rate limiting
-      // en quelques navigations et donnait une application figée.
+      // Deux appels agrégés, quel que soit le nombre de projets (auparavant un appel par projet, ce qui vidait
+      // le quota de rate limiting en quelques navigations).
       //
       // Mode tolérant conservé : une section en échec (droits, indispo ponctuelle) ne doit pas
       // faire tomber toute la vue - `allSettled`, on ne garde que les succès.
-      const [issuesRes, cyclesRes, pagesRes] = await Promise.allSettled([
+      const [issuesRes, cyclesRes] = await Promise.allSettled([
         listMyIssues(slug),
         listWorkspaceCycles(slug),
-        pageService.listWorkspaceRecent(slug),
       ])
 
       if (issuesRes.status === "fulfilled") setMyIssues(issuesRes.value.map((i) => mapMyIssue(i, baseUrl)))
       if (cyclesRes.status === "fulfilled") setMyCycles(cyclesRes.value.map((c) => mapWorkspaceCycle(c, baseUrl)))
-      if (pagesRes.status  === "fulfilled") setMyPages(pagesRes.value.map((p) => mapWorkspacePage(p, baseUrl)))
 
       // Horodaté APRÈS les appels : c'est l'heure de l'état affiché, pas celle de la demande.
       setLastSyncAt(Date.now())
 
-      const failed = [issuesRes, cyclesRes, pagesRes].filter((r) => r.status === "rejected")
+      const failed = [issuesRes, cyclesRes].filter((r) => r.status === "rejected")
       if (failed.length > 0) console.warn("My Queue: partial load", failed)
     }
     void load()
@@ -422,7 +368,7 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
     <PageContainer>
       <PageHeader
         title="My Queue"
-        description="Issues, sprints, and pages assigned to or recently edited by you"
+        description="Issues and sprints assigned to you"
         actions={
           <RefreshControl
             lastSyncAt={lastSyncAt}
@@ -431,7 +377,7 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
         }
       />
 
-      {/* Onglets de tri (All / Issues / Sprints / Pages) - QA2-23 */}
+      {/* Onglets de tri (All / Issues / Sprints) - QA2-23 */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as QueueTab)}>
         <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>
@@ -440,7 +386,6 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
               nombre de sprints ACTIFS alors que la table les liste tous : « Sprints 2 » au-dessus
               d'une liste de 12. */}
           <TabsTrigger value="sprints" className="gap-1.5">Sprints<span className="text-muted-foreground">{myCycles.length}</span></TabsTrigger>
-          <TabsTrigger value="pages" className="gap-1.5">Pages<span className="text-muted-foreground">{myPages.length}</span></TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -469,21 +414,10 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
             />
           </QueueSection>
         )}
-        {(tab === "all" || tab === "pages") && (
-          <QueueSection label="Pages" count={myPages.length}>
-            <DataTable
-              columns={PAGE_COLUMNS}
-              data={myPages}
-              rowKey={(p) => p.id}
-              onRowClick={(p) => router.push(p.url)}
-              emptyMessage="No recent pages."
-            />
-          </QueueSection>
-        )}
       </div>
 
-      {/* Sheet ouvert en place depuis la file (Sprints et Pages restent des redirections :
-          ce sont des contextes avec leur propre navigation). */}
+      {/* Sheet ouvert en place depuis la file (les sprints restent une redirection : c'est un contexte avec sa
+          propre navigation). */}
       {slug && (
         <IssueSheetLoader
           slug={slug}
