@@ -96,10 +96,31 @@ export function splitCommand(command: string): string[] {
   return parts.map((p) => p.trim().replace(/\s+/g, " ")).filter((p) => p.length > 0);
 }
 
-function commandFacts(command: string): Facts[] {
+/** Les mots d'une commande simple, guillemets ôtés ; une option `--clé=valeur` compte pour sa valeur. */
+function words(command: string): string[] {
+  const out: string[] = [];
+  for (const match of command.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)) {
+    const word = match[1] ?? match[2] ?? match[3] ?? "";
+    out.push(word.startsWith("-") && word.includes("=") ? word.slice(word.indexOf("=") + 1) : word);
+  }
+  return out;
+}
+
+/** Un mot qui désigne un chemin hors de la copie : absolu, `~`, qui remonte par `..`, ou dans `.git`. */
+function pointsOutside(word: string, workDir: string): boolean {
+  if (!/[\\/~]/.test(word) && !word.startsWith("..")) return false;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(word)) return false; // une adresse, pas un chemin
+  return word.startsWith("~") || !locate(workDir, word).bounded;
+}
+
+/**
+ * Une commande simple. Elle se borne à son nom et à ses arguments : `npm test --prefix ../ailleurs` ou
+ * `npm run build -- --outDir ../../x` portent le nom d'une commande permise mais travaillent hors de la copie.
+ */
+function commandFacts(command: string, workDir: string): Facts[] {
   // `git commit` reste dans la copie : action à part entière, couverte par sa règle.
   const facts: Facts = { action: /^git commit( |$)/.test(command) ? "git.commit" : "shell", tool: "Bash", command };
-  return OPAQUE.test(command) ? unbounded(facts) : [facts];
+  return OPAQUE.test(command) || words(command).some((w) => pointsOutside(w, workDir)) ? unbounded(facts) : [facts];
 }
 
 /** Le chemin réel, liens suivis ; pour un fichier à créer, celui de son dossier. */
@@ -152,7 +173,7 @@ export function toolFacts(toolName: string, toolInput: unknown, workDir: string)
   if (toolName === "Bash") {
     const command = (typeof input.command === "string" ? input.command : "").replace(/\r\n/g, "\n");
     const parts = splitCommand(command.replace(QUOTED_HEREDOC, "…"));
-    return parts.length > 0 ? parts.flatMap(commandFacts) : [{ tool: "Bash", command }];
+    return parts.length > 0 ? parts.flatMap((part) => commandFacts(part, workDir)) : [{ tool: "Bash", command }];
   }
 
   if (toolName === "WebFetch") return [{ action: "web.fetch", tool: toolName }];
