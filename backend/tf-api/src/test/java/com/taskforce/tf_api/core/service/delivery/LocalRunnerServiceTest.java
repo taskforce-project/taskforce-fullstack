@@ -16,6 +16,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
+import com.taskforce.tf_api.core.harness.rules.RulesBundle;
+
 import com.taskforce.tf_api.core.dto.request.RunnerApprovalRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
@@ -61,6 +64,10 @@ class LocalRunnerServiceTest {
     @Mock private ProjectVisibilityGuard visibilityGuard;
     @Mock private DeliveryRunner deliveryRunner;
     @Mock private DeliveryActivityService activityService;
+    @Mock private HarnessRulesService rulesService;
+
+    private static final RulesBundle RULES = new RulesBundle(
+        RulesBundle.FORMAT, "acme", null, 3, "sha256:" + "a".repeat(64), null, List.of());
 
     private LocalRunnerService service;
     private User owner;
@@ -68,7 +75,8 @@ class LocalRunnerServiceTest {
     @BeforeEach
     void setUp() {
         LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15);
-        service = new LocalRunnerService(runRepository, userRepository, visibilityGuard, deliveryRunner, settings, activityService);
+        service = new LocalRunnerService(runRepository, userRepository, visibilityGuard, deliveryRunner, settings, activityService,
+            rulesService);
         owner = User.builder().id(7L).email(OWNER_EMAIL).keycloakId("kc-7").isActive(true).build();
     }
 
@@ -104,6 +112,7 @@ class LocalRunnerServiceTest {
         when(visibilityGuard.canWrite(any(Project.class), eq(7L))).thenReturn(true);
         when(runRepository.claim(eq(100L), eq("tf-runner-pierre"), anyString(), any(),
             eq(DeliveryRunStatus.QUEUED), eq(DeliveryRunStatus.RUNNING))).thenReturn(1);
+        when(rulesService.bundleFor(any())).thenReturn(RULES);
 
         RunnerClaimResponse claim = service.claim(RUNNER).orElseThrow();
 
@@ -116,6 +125,9 @@ class LocalRunnerServiceTest {
         ArgumentCaptor<String> ref = ArgumentCaptor.forClass(String.class);
         verify(runRepository).claim(eq(100L), anyString(), ref.capture(), any(), any(), any());
         assertThat(ref.getValue()).startsWith("runner:tf-runner-pierre:");
+        // Les règles partent avec la tâche, et le run note ce qui lui a été remis (spécification de la v2, §6.4).
+        assertThat(claim.rules()).isSameAs(RULES);
+        verify(runRepository).recordRules(100L, 3, RULES.digest());
     }
 
     @Test

@@ -95,4 +95,12 @@ public class DeliveryRun extends AuditableEntity {
     /** Dernier signe de vie du runner : muet trop longtemps, le run passe en échec. */
     @Column(name = "heartbeat_at")
     private LocalDateTime heartbeatAt;
+
+    /** Version du paquet de règles remis au runner à la réclamation (spécification de la v2, §6.4). */
+    @Column(name = "rules_version")
+    private Integer rulesVersion;
+
+    /** Empreinte de ce paquet : ce qui a été appliqué, pour le dossier de preuve. */
+    @Column(name = "rules_digest", length = 71)
+    private String rulesDigest;
 }

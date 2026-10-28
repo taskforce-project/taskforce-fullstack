@@ -78,6 +78,11 @@ public interface DeliveryRunRepository extends JpaRepository<DeliveryRun, Long> 
         @Param("queued") DeliveryRunStatus queued,
         @Param("running") DeliveryRunStatus running);
 
+    /** Note sur un run les règles remises à son runner : la version et l'empreinte du paquet. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE DeliveryRun r SET r.rulesVersion = :version, r.rulesDigest = :digest WHERE r.id = :id")
+    int recordRules(@Param("id") Long id, @Param("version") Integer version, @Param("digest") String digest);
+
     /**
      * Clôt en échec un run « pull » que personne n'a réclamé dans le délai. Même garde que {@link #claim} :
      * encore en attente et sans runner, donc un claim concurrent gagne toujours. Renvoie 1 si clos ici.

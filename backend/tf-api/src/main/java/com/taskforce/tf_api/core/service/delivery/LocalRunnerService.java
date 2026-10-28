@@ -15,6 +15,8 @@ import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerClaimResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
+import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
+import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.Project;
@@ -50,6 +52,7 @@ public class LocalRunnerService {
     private final DeliveryRunner deliveryRunner;
     private final LocalRunnerSettings settings;
     private final DeliveryActivityService activityService;
+    private final HarnessRulesService rulesService;
 
     public LocalRunnerService(
         DeliveryRunRepository runRepository,
@@ -57,7 +60,8 @@ public class LocalRunnerService {
         ProjectVisibilityGuard visibilityGuard,
         DeliveryRunner deliveryRunner,
         LocalRunnerSettings settings,
-        DeliveryActivityService activityService
+        DeliveryActivityService activityService,
+        HarnessRulesService rulesService
     ) {
         this.runRepository = runRepository;
         this.userRepository = userRepository;
@@ -65,6 +69,7 @@ public class LocalRunnerService {
         this.deliveryRunner = deliveryRunner;
         this.settings = settings;
         this.activityService = activityService;
+        this.rulesService = rulesService;
     }
 
     /**
@@ -94,6 +99,7 @@ public class LocalRunnerService {
 
             LocalDateTime now = LocalDateTime.now();
             // Tout est lu AVANT la mise à jour : elle vide le contexte de persistance (entités détachées).
+            RulesBundle rules = rulesService.bundleFor(project.getWorkspace());
             RunnerClaimResponse claim = new RunnerClaimResponse(
                 runId,
                 issue.getId(),
@@ -105,12 +111,14 @@ public class LocalRunnerService {
                 project.getWorkspace().getSlug(),
                 project.getRepoFullName(),
                 candidate.getModel(),
-                now.plus(settings.sessionTtl()));
+                now.plus(settings.sessionTtl()),
+                rules);
 
             String externalRef = "runner:" + runner.clientId() + ":" + UUID.randomUUID();
             int won = runRepository.claim(runId, runner.clientId(), externalRef, now,
                 DeliveryRunStatus.QUEUED, DeliveryRunStatus.RUNNING);
             if (won == 1) {
+                runRepository.recordRules(runId, rules.version(), rules.digest());
                 log.info("Run {} réclamé par le runner {} (issue {}, pour {})",
                     runId, runner.clientId(), claim.issueKey(), owner.getId());
                 return Optional.of(claim);
