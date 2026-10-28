@@ -119,6 +119,17 @@ and comments the issue, checks that what must be refused is refused, asks for on
 npm test          # unit tests: rules and facts, branch names, config, tool boundary, live timeline, approvals, result parsing
 ```
 
+## Check the record of a run
+
+Under a finished run, TaskForce offers "Download the record", in JSON or Markdown: every action, the rule that
+judged it, every decision asked of you and your answer, what left the computer. The JSON file follows
+[`contracts/evidence`](../contracts/evidence/taskforce-evidence-1.schema.json) and is checked without TaskForce, by
+recomputing every hash:
+
+```bash
+npm run verify -- evidence-run-42.json
+```
+
 ## Troubleshooting
 
 - **`claude`: "The specified executable is not a valid application for this OS platform"** (Windows, right after

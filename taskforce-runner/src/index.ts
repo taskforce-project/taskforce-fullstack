@@ -20,7 +20,7 @@ import { runAgent, type AgentOutcome } from "./agent.js";
 import { ApiError, TaskforceApi, type Claim, type RunResult } from "./api.js";
 import { askInTaskForce } from "./approvals.js";
 import { loadConfig, type RepoConfig, type RunnerConfig } from "./config.js";
-import { exitFacts, judgeExit } from "./exits.js";
+import { exitFacts, judgeExit, type ExitVerdict } from "./exits.js";
 import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWorktree, repoVisibility, resolveRepo, runSetup, type Worktree } from "./git.js";
 import { verifiedBundle } from "./harness/rules.js";
 import { log } from "./log.js";
@@ -67,6 +67,12 @@ async function ensureAgentVersion(config: RunnerConfig): Promise<void> {
   if (!supportsApprovals(version)) {
     throw new Error(`Claude Code ${MIN_CLAUDE_CODE} or later is needed for the rules to hold (found: ${version || "none"}). Update it: npm install -g @anthropic-ai/claude-code`);
   }
+}
+
+/** Une sortie, faite ou non, pour la chronologie et le dossier de preuve ; un échec d'envoi n'arrête rien. */
+async function traceExit(api: TaskforceApi, runId: number, tool: string, verdict: ExitVerdict): Promise<void> {
+  await api.events(runId, [{ kind: "exit", tool, text: verdict.why, effect: verdict.go ? "allow" : "deny" }])
+    .catch((e: unknown) => log.warn(`Exit not traced in TaskForce: ${(e as Error).message}`));
 }
 
 function logOutcome(outcome: AgentOutcome): void {
@@ -121,6 +127,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
         const push = await judgeExit(rules, exitFacts("git.push", worktree.branch, visibility), "git push",
           `Push the branch ${worktree.branch} to ${where}`, ask);
         log.info(`Push: ${push.why}`);
+        await traceExit(api, claim.runId, "git push", push);
         if (!push.go) {
           result = {
             status: "DONE",
@@ -134,6 +141,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
             const pr = await judgeExit(rules, exitFacts("pr.open", worktree.branch, visibility), "gh pr create",
               `Open a pull request from ${worktree.branch} on ${where}`, ask);
             log.info(`Pull request: ${pr.why}`);
+            await traceExit(api, claim.runId, "gh pr create", pr);
             if (pr.go) url = await openPullRequest(worktree, repo, claim, outcome.text, config.home);
             else note = `\n\nBranch ${worktree.branch} pushed, no pull request: ${pr.why}.`;
           }

@@ -29,6 +29,10 @@ export interface RunnerEvent {
   kind: string;
   tool?: string;
   text: string;
+  /** `decision` : l'effet de la règle ; `exit` : `allow` si la sortie est faite, `deny` sinon. */
+  effect?: "allow" | "ask" | "deny";
+  /** `decision` : la règle qui l'a donnée, absente quand aucune ne s'applique. */
+  rule?: string;
 }
 
 /** Demande de validation d'une action de l'agent, décidée dans TaskForce par la personne qui a délégué. */

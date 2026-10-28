@@ -70,13 +70,14 @@ describe("chronologie : lignes stream-json -> événements", () => {
 });
 
 describe("relais de la chronologie", () => {
-  it("envoie par lots, dans l'ordre, jusqu'au plafond du run", async () => {
+  it("envoie par lots, dans l'ordre, jusqu'au plafond du run, qui se dit par un dernier événement", async () => {
     const sent: RunnerEvent[][] = [];
     const relay = new EventRelay({ events: async (_runId, batch) => { sent.push(batch); } }, 42,
       { flushMs: 10_000, maxBatch: 2, maxEvents: 5 });
     relay.push([1, 2, 3, 4, 5, 6, 7].map((n) => ({ kind: "text", text: String(n) })));
     await relay.close();
-    assert.deepEqual(sent.map((batch) => batch.map((e) => e.text)), [["1", "2"], ["3", "4"], ["5"]]);
+    assert.deepEqual(sent.map((batch) => batch.map((e) => e.kind === "limit" ? "limit" : e.text)), [["1", "2"], ["3", "4"], ["limit"]]);
+    assert.match(sent.at(-1)?.[0]?.text ?? "", /5 events for this run: later ones are not sent/);
   });
 
   it("un échec d'envoi n'interrompt rien", async () => {
@@ -206,6 +207,18 @@ describe("porte locale : le hook PreToolUse jugé par les règles de la mission"
       }
     });
   }
+
+  it("chaque décision part avec l'entrée de l'outil, pour le dossier de preuve", async () => {
+    const seen: unknown[] = [];
+    const server = new ApprovalServer(fakeApi(["ALLOWED"]), 42, WORK, { waitMs: 100, rules: DEFAULT_RULES, onDecision: (_tool, _d, input) => seen.push(input) });
+    await server.start();
+    try {
+      await askHook(server.preToolUseUrl, server.token, { tool_name: "Bash", tool_input: { command: "npm test" } });
+      assert.deepEqual(seen, [{ command: "npm test" }]);
+    } finally {
+      await server.stop();
+    }
+  });
 
   it("sans règles : aucune décision, donc demandé", async () => {
     const server = new ApprovalServer(fakeApi(["ALLOWED"]), 42, WORK, { waitMs: 100 });

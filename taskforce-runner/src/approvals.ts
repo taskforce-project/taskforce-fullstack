@@ -32,8 +32,8 @@ export interface ApprovalApi {
 export interface ApprovalServerOptions {
   /** Les règles de la mission : le hook `PreToolUse` juge chaque action avec elles, sur place. */
   rules?: RulesBundle;
-  /** Chaque décision prise sur place, pour la trace. */
-  onDecision?: (tool: string, decision: Decision) => void;
+  /** Chaque décision prise sur place, avec l'entrée de l'outil, pour la trace. */
+  onDecision?: (tool: string, decision: Decision, input: unknown) => void;
   /** Attente maximale d'une décision ; au-delà, refus. */
   waitMs: number;
   /** Intervalle de lecture de la décision. */
@@ -180,7 +180,7 @@ export class ApprovalServer {
     const decision: Decision = rules
       ? decideAll(rules, toolFacts(tool, input.tool_input, this.workDir))
       : { effect: "ask", rule: null };
-    this.options.onDecision?.(tool, decision);
+    this.options.onDecision?.(tool, decision, input.tool_input);
     return decision;
   }
 

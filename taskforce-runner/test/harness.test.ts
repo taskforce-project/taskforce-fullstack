@@ -10,6 +10,7 @@ import { canonicalJson, chain, firstBrokenLink, ZERO_HASH, type EventInput, type
 import { INTERNAL_TOOLS, splitCommand, TASKFORCE_TOOLS, toolFacts } from "../src/harness/facts.js";
 import { globMatch } from "../src/harness/glob.js";
 import { bundleDigest, decide, decideAll, verifiedBundle, type Effect, type Facts, type RulesBundle } from "../src/harness/rules.js";
+import { verifyEvidence } from "../src/harness/verify.js";
 
 // Tests de contrat (R16) : les cas partagés de contracts/, que le serveur rejoue à l'identique.
 const contract = <T>(path: string): T => JSON.parse(readFileSync(new URL(`../../contracts/${path}`, import.meta.url), "utf8")) as T;
@@ -245,4 +246,25 @@ describe("contrat de la preuve : chaîne d'empreintes", () => {
     const chained = chain(chainCases.chain.events);
     assert.equal(firstBrokenLink([chained[0], chained[2], chained[3]].filter((e) => e !== undefined)), 1);
   });
+});
+
+describe("dossier exporté, vérifié sans TaskForce", () => {
+  const chained = chain(chainCases.chain.events);
+  const file = (events: unknown[], root: unknown = chained.at(-1)?.hash) =>
+    JSON.stringify({ format: "taskforce-evidence/1", mission: {}, events, root });
+  const changed = chained.map((e, i) => (i === 1 ? { ...e, data: { ...e.data, tampered: true } } : e));
+  const cases: Array<[string, string, boolean, RegExp]> = [
+    ["intact", file(chained), true, /Every hash holds: 4 events/],
+    ["un événement changé", file(changed), false, /breaks at event 2/],
+    ["le dernier événement retiré", file(chained.slice(0, -1)), false, /root is not the hash of the last event/],
+    ["pas du JSON", "{not json", false, /Not a JSON file/],
+    ["un autre format", JSON.stringify({ format: "x", events: [] }), false, /Not a TaskForce evidence file/],
+  ];
+  for (const [label, text, ok, message] of cases) {
+    it(`${label} -> ${ok ? "tient" : "ne tient pas"}`, () => {
+      const verdict = verifyEvidence(text);
+      assert.equal(verdict.ok, ok);
+      assert.match(verdict.message, message);
+    });
+  }
 });

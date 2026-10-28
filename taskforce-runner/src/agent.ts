@@ -9,7 +9,7 @@ import type { RulesBundle } from "./harness/rules.js";
 import { log } from "./log.js";
 import { run } from "./proc.js";
 import { buildPrompt, buildReplyPrompt } from "./prompt.js";
-import { parseAgentOutput, toEvents, type AgentOutcome } from "./stream.js";
+import { describeToolInput, parseAgentOutput, toEvents, toolLabel, type AgentOutcome } from "./stream.js";
 
 export type { AgentOutcome } from "./stream.js";
 export { parseAgentOutput } from "./stream.js";
@@ -177,12 +177,19 @@ export async function runAgent(
   const mcpConfigPath = join(tmp, `run-${claim.runId}-mcp.json`);
   const settingsPath = join(tmp, `run-${claim.runId}-settings.json`);
 
+  const relay = new EventRelay(api, claim.runId);
   const approvals = new ApprovalServer(api, claim.runId, workDir, {
     waitMs: config.agent.approvalTimeoutMinutes * 60_000,
     rules: opts.rules,
-    onDecision: (tool, d) => log.info(`Rule decision: ${tool} ${d.effect}${d.rule ? ` (${d.rule.id})` : ""}`),
+    // Chaque décision des règles va au dossier de preuve de la mission (le serveur ne l'affiche pas dans la chronologie).
+    onDecision: (tool, d, input) => {
+      log.info(`Rule decision: ${tool} ${d.effect}${d.rule ? ` (${d.rule.id})` : ""}`);
+      relay.push([{
+        kind: "decision", tool: toolLabel(tool), text: describeToolInput(tool, input, workDir) || "(no details)",
+        effect: d.effect, ...(d.rule ? { rule: d.rule.id } : {}),
+      }]);
+    },
   });
-  const relay = new EventRelay(api, claim.runId);
   const hookUrl = await approvals.start();
 
   writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig(config, claim, sessionToken)), { encoding: "utf8", mode: 0o600 });
