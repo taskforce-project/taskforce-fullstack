@@ -18,9 +18,9 @@ merges anything: the decision stays human.
 | Where | Rights |
 |---|---|
 | Repository | An **isolated worktree** on a new branch `tf/<key>-<title>-r<run>`. Your checkout and your current branch are never touched. |
-| Machine | Pre-approved without asking: read, edit, `git status/diff/log/add/commit/mv/rm`, and the TaskForce MCP tools of the run. **Anything else** (running tests, installing a package, network access) waits for **your approval in TaskForce**, on the issue: Allow or Deny. No answer within 10 minutes means denied. `git push` and `gh` are always refused: the runner pushes and opens the pull request itself, after the agent. The settings of the cloned repository (`.claude/settings*.json`: hooks, API URL) are ignored (`--setting-sources user`): only yours and the runner's apply. |
+| Machine | Each action is judged before it runs by the **rules of the task**, which TaskForce sends with it (default table in [`contracts/rules`](../contracts/rules/default.rules.json)). By default: reading and editing the copy, local commits, `npm test`, `npm run lint/build/typecheck` and `git status/diff/log/show/add` run freely; the web, publishing, messages, payments and **anything the table does not know** wait for **your approval in TaskForce**, on the issue: Allow or Deny. No answer within 10 minutes means denied. A path outside the copy or in `.git`, a command substitution, or a redirection to a file is never allowed by a rule: it is asked or denied. `git push` and `gh` are always refused: the runner pushes and opens the pull request itself, after the agent. The settings of the cloned repository (`.claude/settings*.json`: hooks, API URL) are ignored (`--setting-sources user`): only yours and the runner's apply. |
 | TaskForce | Through the MCP server of the instance, **as the person who delegated**, with their rights as a ceiling, narrowed to: the run's workspace for reading, the issues of the run's project for writing, never a deletion. |
-| GitHub | Nothing. The **runner** pushes the branch and opens the pull request, after the agent. |
+| GitHub | Nothing. The **runner** pushes the branch and opens the pull request, after the agent, each by the rules of the task. By default the agent's branch goes to a private repository without asking; a public repository, or a visibility `gh` cannot tell, waits for your approval in TaskForce. Refused or not approved, the commits stay on the local branch. |
 
 The text of an issue or a note is written by other people. The brief presents it to the agent as task data, never
 as an instruction, and the scope above bounds what an instruction slipped into that text could obtain.
@@ -38,7 +38,7 @@ only, set `acceptRepoless: false` in `runner.config.json`.
 
 ## Install
 
-Requirements: Node 20+, `git`, `gh` signed in (`gh auth status`), **Claude Code 2.1.293 or later**
+Requirements: Node 20+, `git`, `gh` signed in (`gh auth status`), **Claude Code 2.1.295 or later**
 (`npm install -g @anthropic-ai/claude-code`, then run `claude` once to sign in), and a TaskForce instance with the
 local runner enabled (`DELIVERY_LOCAL_RUNNER_ENABLED=true`, the default in dev).
 
@@ -82,7 +82,7 @@ local runner enabled (`DELIVERY_LOCAL_RUNNER_ENABLED=true`, the default in dev).
 | `agent.maxTurns` / `agent.timeoutMinutes` | 60 / 45 | Agent bounds. The duration is also capped by the lifetime of the session token. |
 | `agent.approvalTimeoutMinutes` | 10 | How long an action waits for your answer in TaskForce (60 at most). Then it is denied. |
 | `agent.attribution` | `false` | `false` = no "Co-Authored-By: Claude" in the agent's commits. |
-| `agent.extraAllowedTools` | `[]` | Pre-approved tools on top of the base set, e.g. `["Bash(npm test *)", "Bash(npm run lint *)"]`: they no longer ask for approval. |
+| `agent.extraAllowedTools` | `[]` | Tools you allow in advance on this computer, e.g. `["Bash(mvn test *)"]`: they skip the rules that ask, never one that denies. |
 
 ## Subscription or API key
 
@@ -110,12 +110,13 @@ The details are in ADR-013.
 
 ## Test the chain without using Claude
 
-`test/fixtures/stub-agent` (`.cmd` on Windows) runs instead of `claude`: it goes through the **real** MCP server of
-the instance in a delegated session, reads and comments the issue, checks that what must be refused is refused,
-asks for one approval through the real hook, then leaves a commit. Point `agent.command` to it. Never in production.
+`test/fixtures/stub-agent` (`.cmd` on Windows) runs instead of `claude`: it has three actions judged by the rules
+through the real `PreToolUse` hook, goes through the **real** MCP server of the instance in a delegated session, reads
+and comments the issue, checks that what must be refused is refused, asks for one approval through the real
+`PermissionRequest` hook, then leaves a commit. Point `agent.command` to it. Never in production.
 
 ```bash
-npm test          # unit tests: branch names, config, tool boundary, live timeline, approvals, result parsing
+npm test          # unit tests: rules and facts, branch names, config, tool boundary, live timeline, approvals, result parsing
 ```
 
 ## Troubleshooting
@@ -127,7 +128,9 @@ npm test          # unit tests: branch names, config, tool boundary, live timeli
 - **`npm run check`** says which link is missing: machine token, `git`, `gh`, `claude` (and its version),
   repositories.
 - **Versions.** The options the runner passes to `claude -p` (`--permission-mode manual`, `--permission-prompts none`,
-  the HTTP `PermissionRequest` hook, `--setting-sources user`) were checked against Claude Code 2.1.293.
+  the HTTP `PermissionRequest` hook, `--setting-sources user`) were checked against Claude Code 2.1.293. The
+  `PreToolUse` hook that applies the rules needs `onFailure: "block"`, which came with 2.1.295: the runner refuses an
+  older Claude Code before each task (update it with `npm install -g @anthropic-ai/claude-code`).
 - A failed run keeps its worktree in `~/.taskforce-runner/worktrees/run-<id>`: it is the trace of what the agent did.
   The failure message shows on the issue and in the "AI Workflows" panel.
 

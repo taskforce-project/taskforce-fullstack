@@ -134,6 +134,22 @@ export async function pushBranch(worktree: Worktree, repo: RepoConfig): Promise<
   });
 }
 
+/** `gh repo view --json visibility` -> la visibilité que les règles connaissent ; `INTERNAL` ou illisible : null. */
+export function visibilityOf(output: string): "public" | "private" | null {
+  const value = output.trim().toUpperCase();
+  return value === "PUBLIC" ? "public" : value === "PRIVATE" ? "private" : null;
+}
+
+/**
+ * Visibilité du dépôt sur GitHub, pour juger les sorties. Inconnue (dépôt `internal`, `gh` sans réponse), elle n'est
+ * pas devinée : aucune règle qui la demande ne s'applique, et la sortie est demandée.
+ */
+export async function repoVisibility(fullName: string): Promise<"public" | "private" | null> {
+  const out = await runOrThrow("gh", ["repo", "view", fullName, "--json", "visibility", "--jq", ".visibility"], { timeoutMs: 60_000 })
+    .catch(() => "");
+  return visibilityOf(out);
+}
+
 /** Ouvre la pull request avec `gh` et rend son URL. Aucune fusion : la revue reste humaine. */
 export async function openPullRequest(
   worktree: Worktree, repo: RepoConfig, claim: Claim, summary: string, home: string,

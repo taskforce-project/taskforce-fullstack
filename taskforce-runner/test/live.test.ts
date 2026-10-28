@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import type { Approval, RunnerEvent } from "../src/api.js";
-import { ApprovalServer, hookDecision, type ApprovalApi } from "../src/approvals.js";
+import { ApprovalServer, hookDecision, preToolUseDecision, type ApprovalApi } from "../src/approvals.js";
 import { EventRelay } from "../src/events.js";
+import type { RulesBundle } from "../src/harness/rules.js";
 import { describeToolInput, toEvents, toolLabel } from "../src/stream.js";
 import { supportsApprovals } from "../src/version.js";
 
@@ -173,9 +175,88 @@ describe("serveur local des validations", () => {
   });
 });
 
+const DEFAULT_RULES = JSON.parse(readFileSync(new URL("../../contracts/rules/default.rules.json", import.meta.url), "utf8")) as RulesBundle;
+
+type PreToolUseOutput = { hookSpecificOutput?: { hookEventName: string; permissionDecision: string; permissionDecisionReason: string } };
+
+describe("porte locale : le hook PreToolUse jugé par les règles de la mission", () => {
+  const cases: Array<[string, Record<string, unknown>, string | null]> = [
+    ["lecture dans la copie : autorisée sur place", { tool_name: "Read", tool_input: { file_path: inWork("src/app.ts") } }, "allow"],
+    ["push de l'agent : refusé sur place", { tool_name: "Bash", tool_input: { command: "git push origin HEAD" } }, "deny"],
+    ["publication : aucune décision, l'action va au hook PermissionRequest", { tool_name: "Bash", tool_input: { command: "npm publish" } }, null],
+  ];
+  for (const [label, body, expected] of cases) {
+    it(label, async () => {
+      const api = fakeApi(["ALLOWED"]);
+      const decisions: string[] = [];
+      const server = new ApprovalServer(api, 42, WORK, {
+        waitMs: 100, rules: DEFAULT_RULES, onDecision: (tool, d) => decisions.push(`${tool} ${d.effect}`),
+      });
+      await server.start();
+      try {
+        const { status, json } = await askHook(server.preToolUseUrl, server.token, { hook_event_name: "PreToolUse", ...body });
+        const output = (json as PreToolUseOutput).hookSpecificOutput;
+        assert.equal(status, 200);
+        assert.equal(output?.permissionDecision ?? null, expected);
+        if (expected) assert.equal(output?.hookEventName, "PreToolUse");
+        assert.deepEqual(api.requests, []); // juger ne demande rien à TaskForce
+        assert.deepEqual(decisions, [`${String(body.tool_name)} ${expected ?? "ask"}`]);
+      } finally {
+        await server.stop();
+      }
+    });
+  }
+
+  it("sans règles : aucune décision, donc demandé", async () => {
+    const server = new ApprovalServer(fakeApi(["ALLOWED"]), 42, WORK, { waitMs: 100 });
+    await server.start();
+    try {
+      const { json } = await askHook(server.preToolUseUrl, server.token, { tool_name: "Read", tool_input: { file_path: inWork("a.ts") } });
+      assert.deepEqual(json, {});
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("corps illisible : refusé, au format du hook PreToolUse", async () => {
+    const server = new ApprovalServer(fakeApi(["ALLOWED"]), 42, WORK, { waitMs: 100, rules: DEFAULT_RULES });
+    await server.start();
+    try {
+      const res = await fetch(server.preToolUseUrl, { method: "POST", headers: { Authorization: `Bearer ${server.token}` }, body: "{not json" });
+      const output = ((await res.json()) as PreToolUseOutput).hookSpecificOutput;
+      assert.equal(output?.hookEventName, "PreToolUse");
+      assert.equal(output?.permissionDecision, "deny");
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("jeton absent : 401, rien n'est jugé", async () => {
+    const decisions: string[] = [];
+    const server = new ApprovalServer(fakeApi(["ALLOWED"]), 42, WORK, { waitMs: 100, rules: DEFAULT_RULES, onDecision: (tool) => decisions.push(tool) });
+    await server.start();
+    try {
+      assert.equal((await askHook(server.preToolUseUrl, null, { tool_name: "Read", tool_input: {} })).status, 401);
+      assert.deepEqual(decisions, []);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("raison donnée à l'agent : la règle appliquée, et ne pas réessayer un refus", () => {
+    const rule = DEFAULT_RULES.rules.find((r) => r.id === "no-agent-push");
+    assert.ok(rule);
+    const reason = (preToolUseDecision({ effect: "deny", rule }) as PreToolUseOutput).hookSpecificOutput?.permissionDecisionReason ?? "";
+    assert.match(reason, /no-agent-push/);
+    assert.match(reason, /Do not retry/);
+    assert.deepEqual(preToolUseDecision({ effect: "ask", rule: null }), {});
+  });
+});
+
 describe("version minimale de Claude Code", () => {
   const cases: Array<[string, boolean]> = [
-    ["2.1.293 (Claude Code)", true],
+    ["2.1.295 (Claude Code)", true],
+    ["2.1.293 (Claude Code)", false], // sans onFailure : un hook injoignable laisserait passer
     ["2.1.300 (Claude Code)", true],
     ["2.2.0", true],
     ["3.0.0", true],

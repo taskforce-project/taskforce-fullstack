@@ -3,10 +3,11 @@
  * Agent de SUBSTITUTION pour éprouver le runner de bout en bout sans consommer Claude.
  *
  * Se lance à la place de `claude` (mêmes arguments, prompt sur stdin, sortie `stream-json` sur stdout) et fait ce
- * qu'un agent ferait, en vrai : il parle au serveur MCP de l'instance décrit par `--mcp-config` (HTTP, session
- * déléguée), lit l'issue, la commente, SONDE les limites de la session (ce qui doit être refusé l'est-il ?),
- * demande une validation par le hook `PermissionRequest` du fichier `--settings` (comme Claude Code le ferait pour
- * `npm test`), puis laisse un commit dans le worktree.
+ * qu'un agent ferait, en vrai : il fait juger des actions par le hook `PreToolUse` du fichier `--settings` (les règles
+ * de la mission), parle au serveur MCP de l'instance décrit par `--mcp-config` (HTTP, session déléguée), lit l'issue,
+ * la commente, SONDE les limites de la session (ce qui doit être refusé l'est-il ?), demande une validation par le
+ * hook `PermissionRequest` pour une action que les règles demandent (comme Claude Code le ferait pour
+ * `npm install`), puis laisse un commit dans le worktree.
  *
  * Usage : dans runner.config.json, `"agent": { "command": ".../test/fixtures/stub-agent" }`
  * (`stub-agent.cmd` sous Windows). Jamais en production.
@@ -16,7 +17,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 if (process.argv.includes("--version")) {
-  console.log("2.1.293 (stub-agent: taskforce-runner test fixture, no LLM)");
+  console.log("2.1.295 (stub-agent: taskforce-runner test fixture, no LLM)");
   process.exit(0);
 }
 
@@ -65,20 +66,32 @@ async function call(name, args) {
   return { refused: result?.isError === true, text };
 }
 
-// ---------------------------------------------------------------- validation par le hook PermissionRequest
-async function askApproval(command) {
-  const hook = JSON.parse(readFileSync(argValue("--settings"), "utf8")).hooks.PermissionRequest[0].hooks[0];
+// ---------------------------------------------------------------- hooks du fichier --settings, comme Claude Code
+async function callHook(event, body) {
+  const hook = JSON.parse(readFileSync(argValue("--settings"), "utf8")).hooks[event][0].hooks[0];
   const headers = Object.fromEntries(Object.entries(hook.headers ?? {}).map(([key, value]) => [
     key, String(value).replace(/\$([A-Z_][A-Z0-9_]*)/g, (_, name) => (hook.allowedEnvVars ?? []).includes(name) ? process.env[name] ?? "" : ""),
   ]));
-  emit({ type: "assistant", message: { content: [{ type: "tool_use", id: "toolu_stub_bash", name: "Bash", input: { command } }] } });
   const res = await fetch(hook.url, {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/json" },
-    body: JSON.stringify({ hook_event_name: "PermissionRequest", tool_name: "Bash", tool_input: { command } }),
+    body: JSON.stringify({ hook_event_name: event, ...body }),
     signal: AbortSignal.timeout(hook.timeout * 1000),
   });
-  const decision = (await res.json()).hookSpecificOutput?.decision ?? { behavior: "deny", message: "no decision" };
+  return res.json();
+}
+
+/** La décision des règles sur une action : allow, deny, ou ask (pas de décision : place au hook PermissionRequest). */
+async function judge(toolName, toolInput) {
+  const output = (await callHook("PreToolUse", { tool_name: toolName, tool_input: toolInput })).hookSpecificOutput;
+  return output?.permissionDecision ?? "ask";
+}
+
+// ---------------------------------------------------------------- validation par le hook PermissionRequest
+async function askApproval(command) {
+  emit({ type: "assistant", message: { content: [{ type: "tool_use", id: "toolu_stub_bash", name: "Bash", input: { command } }] } });
+  const output = (await callHook("PermissionRequest", { tool_name: "Bash", tool_input: { command } })).hookSpecificOutput;
+  const decision = output?.decision ?? { behavior: "deny", message: "no decision" };
   if (decision.behavior === "allow") {
     emit({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_stub_bash", is_error: false, content: "(simulated) tests passed" }] } });
     return true;
@@ -95,6 +108,16 @@ const expect = (label, outcome, shouldBeRefused) => {
 };
 
 let allPass = true;
+// Les règles de la mission, jugées par le runner avant chaque action (table par défaut).
+for (const [label, tool, input, expected] of [
+  ["read a file of the copy", "Read", { file_path: join(process.cwd(), "README.md") }, "allow"],
+  ["push from the agent", "Bash", { command: "git push origin HEAD" }, "deny"],
+  ["install a package", "Bash", { command: "npm install left-pad" }, "ask"],
+]) {
+  const verdict = await judge(tool, input);
+  lines.push(`- ${verdict === expected ? "PASS" : "FAIL"} rules: ${label}: ${verdict}`);
+  allPass &= verdict === expected;
+}
 allPass &= expect("read the delegated issue", await call("get_issue", { projectId, issueId }), false);
 allPass &= expect("list workspace projects (read)", await call("list_projects", {}), false);
 allPass &= expect("search the Brain OS (read via POST)", await call("brain_search", { query: "architecture" }), false);
@@ -105,8 +128,8 @@ allPass &= expect("create an issue in ANOTHER project (write, out of scope)",
   await call("create_issue", { projectId: projectId + 1, title: "must be refused" }), true);
 allPass &= expect("ask Cortex (workspace level, out of scope)", await call("ask_cortex", { message: "hello from the stub agent" }), true);
 
-const approved = await askApproval("npm test");
-lines.push(`- INFO approval of "npm test" in TaskForce: ${approved ? "allowed" : "denied"}`);
+const approved = await askApproval("npm install left-pad");
+lines.push(`- INFO approval of "npm install left-pad" in TaskForce: ${approved ? "allowed" : "denied"}`);
 
 let committed = false;
 try {

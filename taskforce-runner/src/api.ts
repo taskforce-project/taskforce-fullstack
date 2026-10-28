@@ -13,6 +13,8 @@ export interface Claim {
   repoFullName: string | null;
   model: string | null;
   sessionExpiresAt: string;
+  /** Paquet de règles de la mission (contracts/), vérifié par son empreinte avant de lancer l'agent. */
+  rules?: unknown;
 }
 
 export interface RunResult {

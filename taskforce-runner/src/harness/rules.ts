@@ -91,6 +91,19 @@ export function verifiedBundle(value: unknown): RulesBundle {
   return bundle;
 }
 
+/**
+ * Plusieurs faits pour un seul appel (une commande composée) : le plus strict l'emporte. Aucun fait (outil interne de
+ * l'agent, sans effet hors de la session) : autorisé, sans règle.
+ */
+export function decideAll(bundle: RulesBundle, factsList: Facts[]): Decision {
+  let strictest: Decision | null = null;
+  for (const facts of factsList) {
+    const d = decide(bundle, facts);
+    if (!strictest || RANK[d.effect] > RANK[strictest.effect]) strictest = d;
+  }
+  return strictest ?? { effect: "allow", rule: null };
+}
+
 /** Refuser l'emporte sur demander, qui l'emporte sur autoriser ; à effet égal, la première règle du paquet. */
 export function decide(bundle: RulesBundle, facts: Facts): Decision {
   let winner: Rule | null = null;

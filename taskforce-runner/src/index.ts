@@ -18,8 +18,11 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { runAgent, type AgentOutcome } from "./agent.js";
 import { ApiError, TaskforceApi, type Claim, type RunResult } from "./api.js";
+import { askInTaskForce } from "./approvals.js";
 import { loadConfig, type RepoConfig, type RunnerConfig } from "./config.js";
-import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWorktree, resolveRepo, runSetup, type Worktree } from "./git.js";
+import { exitFacts, judgeExit } from "./exits.js";
+import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWorktree, repoVisibility, resolveRepo, runSetup, type Worktree } from "./git.js";
+import { verifiedBundle } from "./harness/rules.js";
 import { log } from "./log.js";
 import { resolveCommand, run } from "./proc.js";
 import { MIN_CLAUDE_CODE, supportsApprovals } from "./version.js";
@@ -54,6 +57,18 @@ async function startAgentSession(config: RunnerConfig, api: TaskforceApi): Promi
   return { agentConfig: { ...config, agent: { ...config.agent, timeoutMinutes } }, token: session.token };
 }
 
+/**
+ * Avant chaque mission, pas seulement par `--check` : la version de Claude Code qui tient la garde fermée (hooks avec
+ * `onFailure`, 2.1.295). Plus ancienne, un hook injoignable laisserait passer l'action : la mission ne part pas.
+ */
+async function ensureAgentVersion(config: RunnerConfig): Promise<void> {
+  const probe = await run(config.agent.command, ["--version"], { timeoutMs: 20_000 }).catch(() => null);
+  const version = probe && probe.code === 0 ? (probe.stdout.trim().split(/\r?\n/)[0] ?? "") : "";
+  if (!supportsApprovals(version)) {
+    throw new Error(`Claude Code ${MIN_CLAUDE_CODE} or later is needed for the rules to hold (found: ${version || "none"}). Update it: npm install -g @anthropic-ai/claude-code`);
+  }
+}
+
 function logOutcome(outcome: AgentOutcome): void {
   const meta = [outcome.turns !== null ? `${outcome.turns} turn${outcome.turns === 1 ? "" : "s"}` : "", outcome.costUsd !== null ? `${outcome.costUsd.toFixed(2)} USD` : ""]
     .filter(Boolean).join(", ");
@@ -72,6 +87,10 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
   let repo: RepoConfig | null = null;
   let scratch: string | null = null;
   try {
+    // Pas de mission sans règles : paquet absent ou empreinte qui ne tient pas, le run finit en échec ici.
+    const rules = verifiedBundle(claim.rules);
+    log.info(`Rules v${rules.version} (${rules.rules.length} rules, ${rules.digest?.slice(0, 15)}...)`);
+    await ensureAgentVersion(config);
     if (claim.repoFullName) {
       repo = await resolveRepo(config.repos, config.autoClone, config.home, claim.repoFullName);
       worktree = await prepareWorktree(repo, claim, config.home);
@@ -80,7 +99,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
 
       const { agentConfig, token } = await startAgentSession(config, api);
       log.info("Claude Code at work (follow it live in TaskForce)...");
-      const outcome = await runAgent(agentConfig, claim, worktree.path, token, { mode: "repo", branch: worktree.branch, signal }, api);
+      const outcome = await runAgent(agentConfig, claim, worktree.path, token, { mode: "repo", branch: worktree.branch, signal, rules }, api);
       logOutcome(outcome);
       if (!outcome.ok) throw new Error(outcome.text);
 
@@ -93,10 +112,34 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
           summary: `${outcome.text}\n\n${commits} commit(s) on local branch ${worktree.branch} (push disabled on this runner).`.slice(0, 7900),
         };
       } else {
-        await pushBranch(worktree, repo);
-        const url = config.openPullRequest ? await openPullRequest(worktree, repo, claim, outcome.text, config.home) : undefined;
-        result = { status: "DONE", summary: outcome.text.slice(0, 7900), resultUrl: url };
-        log.info(url ? `Pull request opened: ${url}` : `Branch pushed: ${worktree.branch}`);
+        // Les sorties suivent les règles de la mission (§8.4) : ce qui est demandé attend la personne qui a délégué.
+        const repoName = claim.repoFullName;
+        const visibility = await repoVisibility(repoName);
+        const where = `${repoName} (${visibility ?? "visibility unknown"})`;
+        const ask = (tool: string, summary: string): Promise<boolean> =>
+          askInTaskForce(api, claim.runId, tool, summary, config.agent.approvalTimeoutMinutes * 60_000);
+        const push = await judgeExit(rules, exitFacts("git.push", worktree.branch, visibility), "git push",
+          `Push the branch ${worktree.branch} to ${where}`, ask);
+        log.info(`Push: ${push.why}`);
+        if (!push.go) {
+          result = {
+            status: "DONE",
+            summary: `${outcome.text}\n\n${commits} commit(s) on local branch ${worktree.branch}, not pushed: ${push.why}.`.slice(0, 7900),
+          };
+        } else {
+          await pushBranch(worktree, repo);
+          let url: string | undefined;
+          let note = "";
+          if (config.openPullRequest) {
+            const pr = await judgeExit(rules, exitFacts("pr.open", worktree.branch, visibility), "gh pr create",
+              `Open a pull request from ${worktree.branch} on ${where}`, ask);
+            log.info(`Pull request: ${pr.why}`);
+            if (pr.go) url = await openPullRequest(worktree, repo, claim, outcome.text, config.home);
+            else note = `\n\nBranch ${worktree.branch} pushed, no pull request: ${pr.why}.`;
+          }
+          result = { status: "DONE", summary: `${outcome.text}${note}`.slice(0, 7900), resultUrl: url };
+          log.info(url ? `Pull request opened: ${url}` : `Branch pushed: ${worktree.branch}`);
+        }
       }
     } else {
       // Projet sans dépôt (tâche non-code) : l'agent travaille dans un dossier jetable et rend son travail
@@ -109,7 +152,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
 
       const { agentConfig, token } = await startAgentSession(config, api);
       log.info("Claude Code at work on a repo-less task (follow it live in TaskForce)...");
-      const outcome = await runAgent(agentConfig, claim, scratch, token, { mode: "repoless", signal }, api);
+      const outcome = await runAgent(agentConfig, claim, scratch, token, { mode: "repoless", signal, rules }, api);
       logOutcome(outcome);
       if (!outcome.ok) throw new Error(outcome.text);
       result = { status: "DONE", summary: outcome.text.slice(0, 7900) };
@@ -161,7 +204,7 @@ async function check(config: RunnerConfig, api: TaskforceApi): Promise<boolean> 
     const why = probe === null ? `not found (${where})` : `"${where} --version" exited with code ${probe.code}`;
     const version = found ? (probe.stdout.trim().split(/\r?\n/)[0] ?? "") : "";
     if (found && tool === config.agent.command && !supportsApprovals(version)) {
-      line(false, tool, `${version}: Claude Code ${MIN_CLAUDE_CODE} or later is needed for approvals in TaskForce (npm install -g @anthropic-ai/claude-code)`);
+      line(false, tool, `${version}: Claude Code ${MIN_CLAUDE_CODE} or later is needed for the rules and approvals in TaskForce (npm install -g @anthropic-ai/claude-code)`);
     } else if (found) line(true, tool, version);
     else if (needed) line(false, tool, why);
     else console.log(`  [--] ${tool}: ${why}, not needed here`);
@@ -180,7 +223,7 @@ async function check(config: RunnerConfig, api: TaskforceApi): Promise<boolean> 
   console.log(`  Claude Code sign-in: ${config.agent.auth === "subscription" ? "subscription (the person's own login, in their Claude Code)" : "API key"}`);
   console.log(`  Leaving the machine: ${config.push ? (config.openPullRequest ? "push + pull request" : "push only") : "nothing (local branch)"}`);
   console.log(`  Repo-less tasks (non-code): ${config.acceptRepoless ? "accepted, result posted as a comment" : "refused (code only)"}`);
-  console.log(`  Approvals: actions outside the pre-approved set wait up to ${config.agent.approvalTimeoutMinutes} min for your answer in TaskForce, then are denied`);
+  console.log(`  Rules: each action is judged by the rules TaskForce sends with the task; those they ask for wait up to ${config.agent.approvalTimeoutMinutes} min for your answer in TaskForce, then are denied`);
   return ok;
 }
 
