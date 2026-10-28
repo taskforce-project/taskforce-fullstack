@@ -69,10 +69,13 @@ async function ensureAgentVersion(config: RunnerConfig): Promise<void> {
   }
 }
 
-/** Une sortie, faite ou non, pour la chronologie et le dossier de preuve ; un échec d'envoi n'arrête rien. */
-async function traceExit(api: TaskforceApi, runId: number, tool: string, verdict: ExitVerdict): Promise<void> {
-  await api.events(runId, [{ kind: "exit", tool, text: verdict.why, effect: verdict.go ? "allow" : "deny" }])
-    .catch((e: unknown) => log.warn(`Exit not traced in TaskForce: ${(e as Error).message}`));
+/**
+ * Une décision du runner pour la chronologie et le dossier de preuve : une sortie (`exit`), faite ou non, ou le
+ * démarrage de la mission (`decision`, au seul dossier). Un échec d'envoi n'arrête rien.
+ */
+async function traceExit(api: TaskforceApi, runId: number, tool: string, verdict: ExitVerdict, kind: "exit" | "decision" = "exit"): Promise<void> {
+  await api.events(runId, [{ kind, tool, text: verdict.why, effect: verdict.go ? "allow" : "deny", ...(verdict.rule ? { rule: verdict.rule } : {}) }])
+    .catch((e: unknown) => log.warn(`Decision not traced in TaskForce: ${(e as Error).message}`));
 }
 
 function logOutcome(outcome: AgentOutcome): void {
@@ -97,6 +100,14 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
     const rules = verifiedBundle(claim.rules);
     log.info(`Rules v${rules.version} (${rules.rules.length} rules, ${rules.digest?.slice(0, 15)}...)`);
     await ensureAgentVersion(config);
+    const ask = (tool: string, summary: string): Promise<boolean> =>
+      askInTaskForce(api, claim.runId, tool, summary, config.agent.approvalTimeoutMinutes * 60_000);
+    // Le démarrage lui-même passe par les règles (R33 : pas de mission sur un dépôt public avant S1).
+    const visibility = claim.repoFullName ? await repoVisibility(claim.repoFullName) : null;
+    const start = await judgeExit(rules, { action: "mission.start", ...(visibility ? { repoVisibility: visibility } : {}) },
+      "Start the mission", `Start ${claim.issueKey} on ${claim.repoFullName ?? "a scratch folder"} (${visibility ?? "no repository"})`, ask);
+    await traceExit(api, claim.runId, "mission.start", start, "decision");
+    if (!start.go) throw new Error(`This mission does not start: ${start.why}.`);
     if (claim.repoFullName) {
       repo = await resolveRepo(config.repos, config.autoClone, config.home, claim.repoFullName);
       worktree = await prepareWorktree(repo, claim, config.home);
@@ -119,11 +130,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
         };
       } else {
         // Les sorties suivent les règles de la mission (§8.4) : ce qui est demandé attend la personne qui a délégué.
-        const repoName = claim.repoFullName;
-        const visibility = await repoVisibility(repoName);
-        const where = `${repoName} (${visibility ?? "visibility unknown"})`;
-        const ask = (tool: string, summary: string): Promise<boolean> =>
-          askInTaskForce(api, claim.runId, tool, summary, config.agent.approvalTimeoutMinutes * 60_000);
+        const where = `${claim.repoFullName} (${visibility ?? "visibility unknown"})`;
         const push = await judgeExit(rules, exitFacts("git.push", worktree.branch, visibility), "git push",
           `Push the branch ${worktree.branch} to ${where}`, ask);
         log.info(`Push: ${push.why}`);

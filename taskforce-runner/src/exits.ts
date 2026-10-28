@@ -10,6 +10,8 @@ export interface ExitVerdict {
   go: boolean;
   /** Pourquoi, pour le journal et le résumé du run. */
   why: string;
+  /** La règle qui a décidé, ou qui a demandé ; absente quand aucune ne s'applique. */
+  rule?: string;
 }
 
 /** Pose la demande dans TaskForce et rend la décision de la personne (`askInTaskForce`, ou un faux dans les tests). */
@@ -17,11 +19,12 @@ export type AskPerson = (tool: string, summary: string) => Promise<boolean>;
 
 export async function judgeExit(rules: RulesBundle, facts: Facts, tool: string, summary: string, ask: AskPerson): Promise<ExitVerdict> {
   const d = decide(rules, facts);
-  if (d.effect === "allow") return { go: true, why: `allowed by the rule ${d.rule?.id ?? "?"}` };
-  if (d.effect === "deny") return { go: false, why: `refused by the rule ${d.rule?.id ?? "?"}: ${d.rule?.reason ?? ""}` };
+  const rule = d.rule ? { rule: d.rule.id } : {};
+  if (d.effect === "allow") return { go: true, why: `allowed by the rule ${d.rule?.id ?? "?"}`, ...rule };
+  if (d.effect === "deny") return { go: false, why: `refused by the rule ${d.rule?.id ?? "?"}: ${d.rule?.reason ?? ""}`, ...rule };
   const allowed = await ask(tool, summary);
   const asked = d.rule ? `the rule ${d.rule.id} asks` : "no rule covers it";
-  return { go: allowed, why: allowed ? `allowed in TaskForce (${asked})` : `not allowed in TaskForce (${asked})` };
+  return { go: allowed, why: allowed ? `allowed in TaskForce (${asked})` : `not allowed in TaskForce (${asked})`, ...rule };
 }
 
 /** Les faits d'une sortie vers le dépôt : la visibilité seulement quand on la connaît (sinon aucune règle qui la demande ne s'applique). */
