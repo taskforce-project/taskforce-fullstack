@@ -1,7 +1,9 @@
 package com.taskforce.tf_api.core.service.delivery;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -53,6 +55,7 @@ public class LocalRunnerService {
     private final LocalRunnerSettings settings;
     private final DeliveryActivityService activityService;
     private final HarnessRulesService rulesService;
+    private final MissionEvidenceService evidenceService;
 
     public LocalRunnerService(
         DeliveryRunRepository runRepository,
@@ -61,7 +64,8 @@ public class LocalRunnerService {
         DeliveryRunner deliveryRunner,
         LocalRunnerSettings settings,
         DeliveryActivityService activityService,
-        HarnessRulesService rulesService
+        HarnessRulesService rulesService,
+        MissionEvidenceService evidenceService
     ) {
         this.runRepository = runRepository;
         this.userRepository = userRepository;
@@ -70,6 +74,7 @@ public class LocalRunnerService {
         this.settings = settings;
         this.activityService = activityService;
         this.rulesService = rulesService;
+        this.evidenceService = evidenceService;
     }
 
     /**
@@ -119,6 +124,17 @@ public class LocalRunnerService {
                 DeliveryRunStatus.QUEUED, DeliveryRunStatus.RUNNING);
             if (won == 1) {
                 runRepository.recordRules(runId, rules.version(), rules.digest());
+                Map<String, Object> agent = new LinkedHashMap<>();
+                agent.put("kind", ClaudeCodeProvider.KEY);
+                agent.put("model", claim.model());
+                Map<String, Object> started = new LinkedHashMap<>();
+                started.put("issue", claim.issueKey());
+                started.put("requestedBy", owner.getEmail());
+                started.put("agent", agent);
+                started.put("rules", Map.of("version", rules.version(), "digest", rules.digest()));
+                started.put("runner", runner.clientId());
+                runRepository.findById(runId).ifPresent(run ->
+                    evidenceService.append(run, "mission.started", MissionEvidenceService.Actor.SERVER, started));
                 log.info("Run {} réclamé par le runner {} (issue {}, pour {})",
                     runId, runner.clientId(), claim.issueKey(), owner.getId());
                 return Optional.of(claim);
@@ -151,11 +167,13 @@ public class LocalRunnerService {
         if (done && (result.summary() == null || result.summary().isBlank())) {
             throw new BusinessException("A DONE result must include a summary");
         }
+        String error = done ? null
+            : (result.error() == null || result.error().isBlank()) ? "The runner reported a failure." : result.error().trim();
         DeliveryPoll poll = done
             ? new DeliveryPoll(DeliveryRunStatus.DONE, result.summary().trim(), result.resultUrl(), null)
-            : new DeliveryPoll(DeliveryRunStatus.FAILED, null, null,
-                (result.error() == null || result.error().isBlank()) ? "The runner reported a failure." : result.error().trim());
-        activityService.closeApprovals(runId);
+            : new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, error);
+        // Les demandes sans réponse vont au dossier de preuve avant sa clôture, faite par DeliveryRunner.
+        activityService.closeApprovals(run);
         deliveryRunner.complete(runId, poll);
     }
 

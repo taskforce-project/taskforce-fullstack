@@ -65,6 +65,7 @@ class LocalRunnerServiceTest {
     @Mock private DeliveryRunner deliveryRunner;
     @Mock private DeliveryActivityService activityService;
     @Mock private HarnessRulesService rulesService;
+    @Mock private MissionEvidenceService evidenceService;
 
     private static final RulesBundle RULES = new RulesBundle(
         RulesBundle.FORMAT, "acme", null, 3, "sha256:" + "a".repeat(64), null, List.of());
@@ -76,7 +77,7 @@ class LocalRunnerServiceTest {
     void setUp() {
         LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15);
         service = new LocalRunnerService(runRepository, userRepository, visibilityGuard, deliveryRunner, settings, activityService,
-            rulesService);
+            rulesService, evidenceService);
         owner = User.builder().id(7L).email(OWNER_EMAIL).keycloakId("kc-7").isActive(true).build();
     }
 
@@ -128,6 +129,26 @@ class LocalRunnerServiceTest {
         // Les règles partent avec la tâche, et le run note ce qui lui a été remis (spécification de la v2, §6.4).
         assertThat(claim.rules()).isSameAs(RULES);
         verify(runRepository).recordRules(100L, 3, RULES.digest());
+    }
+
+    @Test
+    @DisplayName("claim : le dossier de preuve s'ouvre, avec la demande, l'agent et les règles remises")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void claim_opens_the_evidence() {
+        DeliveryRun queued = run(100L, DeliveryRunStatus.QUEUED, null, owner, null);
+        when(userRepository.findByEmail(OWNER_EMAIL)).thenReturn(Optional.of(owner));
+        when(runRepository.findClaimable(eq("claude-code"), eq(DeliveryRunStatus.QUEUED), eq(7L), any())).thenReturn(List.of(queued));
+        when(visibilityGuard.canWrite(any(Project.class), eq(7L))).thenReturn(true);
+        when(runRepository.claim(eq(100L), eq("tf-runner-pierre"), anyString(), any(), any(), any())).thenReturn(1);
+        when(rulesService.bundleFor(any())).thenReturn(RULES);
+        when(runRepository.findById(100L)).thenReturn(Optional.of(queued));
+
+        service.claim(RUNNER);
+
+        ArgumentCaptor<java.util.Map<String, Object>> data = (ArgumentCaptor) ArgumentCaptor.forClass(java.util.Map.class);
+        verify(evidenceService).append(eq(queued), eq("mission.started"), eq(MissionEvidenceService.Actor.SERVER), data.capture());
+        assertThat(data.getValue()).containsEntry("issue", "WEB-4").containsEntry("requestedBy", OWNER_EMAIL)
+            .containsEntry("rules", java.util.Map.of("version", 3, "digest", RULES.digest())).containsEntry("runner", "tf-runner-pierre");
     }
 
     @Test
@@ -262,7 +283,7 @@ class LocalRunnerServiceTest {
         assertThat(poll.getValue().summary()).isEqualTo("PR opened");
         assertThat(poll.getValue().resultUrl()).isEqualTo("https://github.com/acme/website/pull/9");
         // Run terminé : les demandes de validation encore ouvertes ne recevront plus de réponse utile.
-        verify(activityService).closeApprovals(100L);
+        verify(activityService).closeApprovals(held2);
     }
 
     @Test

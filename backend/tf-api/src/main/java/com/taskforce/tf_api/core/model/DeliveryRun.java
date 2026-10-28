@@ -103,4 +103,8 @@ public class DeliveryRun extends AuditableEntity {
     /** Empreinte de ce paquet : ce qui a été appliqué, pour le dossier de preuve. */
     @Column(name = "rules_digest", length = 71)
     private String rulesDigest;
+
+    /** Empreinte du dernier événement du dossier de preuve, posée à la fin de la mission : elle scelle le dossier. */
+    @Column(name = "evidence_root", length = 71)
+    private String evidenceRoot;
 }
