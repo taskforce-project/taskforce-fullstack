@@ -347,38 +347,6 @@ export const CONSTANTS_EN = {
   },
 
   // Dashboard page
-  dashboard: {
-    title: "Dashboard",
-    welcomeBack: "Welcome back",
-    stats: {
-      activeProjects: "Active Projects",
-      openIssues: "Open Issues",
-      myTasks: "My Tasks",
-      teamMembers: "Members",
-      completedThisWeek: "Completed this week",
-      overloaded: "Overloaded",
-    },
-    activity: {
-      title: "Recent Activity",
-      empty: "No recent activity",
-      viewAll: "View all activity",
-    },
-    quickActions: {
-      title: "Quick Actions",
-      createProject: "New Project",
-      createIssue: "New Issue",
-      inviteMember: "Invite Member",
-    },
-    workload: {
-      title: "Team Workload",
-      noData: "No workload data available",
-      overloaded: "Overloaded",
-      available: "Available",
-      capacity: "capacity",
-    },
-  },
-
-  // Projects list page
   projects: {
     title: "Projects",
     subtitle: "All your workspace projects",
@@ -423,92 +391,6 @@ export const CONSTANTS_EN = {
   },
 
   // My Work page
-  myWork: {
-    title: "My Work",
-    subtitle: "Your assigned issues, cycles, and pages",
-    tabs: {
-      issues: "My Issues",
-      cycles: "My Cycles",
-      pages: "My Pages",
-    },
-    empty: {
-      issues: "No issues assigned to you",
-      cycles: "You're not part of any active cycle",
-      pages: "You haven't created any pages yet",
-      description: "New items will appear here once assigned",
-    },
-    issues: {
-      priority: "Priority",
-      status: "Status",
-      dueDate: "Due date",
-      project: "Project",
-      noDue: "No due date",
-    },
-    cycles: {
-      active: "Active",
-      upcoming: "Upcoming",
-      completed: "Completed",
-      progress: "Progress",
-      issues: "issues",
-      endsIn: "Ends in",
-      startedAgo: "Started",
-    },
-    pages: {
-      lastEdited: "Last edited",
-      by: "by",
-      viewPage: "View page",
-    },
-  },
-
-  // Inbox page
-  inbox: {
-    title: "Inbox",
-    subtitle: "Stay on top of your notifications",
-    tabs: {
-      all: "All",
-      mentions: "Mentions",
-      alerts: "Alerts",
-      assignments: "Assignments",
-    },
-    empty: {
-      all: "You're all caught up!",
-      mentions: "No mentions yet",
-      alerts: "No alerts",
-      assignments: "No assignments",
-      description: "New notifications will appear here",
-    },
-    markAllRead: "Mark all as read",
-    markRead: "Mark as read",
-    unread: "Unread",
-    types: {
-      mention: "mentioned you",
-      assigned: "assigned you to",
-      commented: "commented on",
-      statusChanged: "changed status of",
-      dueSoon: "Due soon",
-      overdue: "Overdue",
-      completed: "completed",
-    },
-  },
-
-  analytics: {
-    title: "Analytics",
-    subtitle: "Track your team's performance and project health.",
-    overview: "Overview",
-    velocity: "Velocity",
-    workload: "Team Workload",
-    progress: "Project Progress",
-    issuesCreated: "Issues created",
-    issuesCompleted: "Issues completed",
-    cyclesCompleted: "Cycles completed",
-    activeProjects: "Active projects",
-    thisMonth: "this month",
-    vsLastMonth: "vs last month",
-    completionRate: "Completion rate",
-    avgCycleTime: "Avg. cycle time",
-    days: "days",
-  },
-
   settings: {
     title: "Settings",
     profile: "Profile",

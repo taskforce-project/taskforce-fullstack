@@ -62,7 +62,7 @@ interface DashboardHeroProps {
 /**
  * En-tête centré du dashboard (façon page d'accueil Cloudflare) : pilule connecteurs, salutation + H1,
  * puis une <b>palette de commandes INLINE</b> : au focus (clic ou Ctrl+K sur cette page), un dropdown
- * s'ouvre SOUS la barre avec le même contenu que le Ctrl+K (navigation + Labs + actions) ; en tapant,
+ * s'ouvre SOUS la barre avec le même contenu que le Ctrl+K (navigation et actions) ; en tapant,
  * on filtre et on cherche aussi les opérations réelles. Navigation aux flèches ↑↓ + Entrée. Aucun modal.
  */
 export function DashboardHero({ displayName }: DashboardHeroProps) {
@@ -109,7 +109,7 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
     [query, projects],
   )
 
-  // Liste APLATIE (opérations → navigation → Labs → actions) : une seule séquence pour les flèches.
+  // Liste APLATIE (opérations, navigation, actions) : une seule séquence pour les flèches.
   const rows: Row[] = []
   projMatches.forEach((p) => rows.push({
     key: `p-${p.id}`, section: "Operations",

@@ -182,7 +182,6 @@ const nextConfig: NextConfig = {
           "/auth/:path*",
           "/invitations/:path*",
           "/:workspace/members/:path*",
-          "/:workspace/projects/:id/members",
           "/:workspace/projects/:id/teams",
         ]
       : []

@@ -31,9 +31,9 @@ interface Turn {
 }
 
 const SUGGESTIONS = [
-  "Analyze our decisions on embeddings",
-  "What problems have we encountered?",
-  "Summarize TaskForce's architecture",
+  "What changed in this project this week?",
+  "Which issues are blocked, and why?",
+  "Summarize the decisions in our notes",
 ]
 
 /** Reconstruit des tours à partir des messages persistés (rendu de l'historique). */
