@@ -115,14 +115,6 @@ export const USER_ROUTES = {
 } as const;
 
 /**
- * Statut opérationnel (santé services, lue de l'actuator).
- * Backend: @RequestMapping("/api/status")
- */
-export const STATUS_ROUTES = {
-  SYSTEM: "/api/status",
-} as const;
-
-/**
  * Acceptation / refus d'une assignation de tâche (assigné courant).
  * Backend: @RequestMapping("/api/me/assignments")
  */
