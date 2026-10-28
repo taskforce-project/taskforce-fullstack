@@ -27,10 +27,8 @@ import com.taskforce.tf_api.core.service.CycleService;
 import com.taskforce.tf_api.core.service.DashboardCardService;
 import com.taskforce.tf_api.core.service.MemberLeaveService;
 import com.taskforce.tf_api.core.service.MemberSkillProfileService;
-import com.taskforce.tf_api.core.service.PageService;
 import com.taskforce.tf_api.core.service.SkillSuggestionService;
 import com.taskforce.tf_api.core.service.WebhookService;
-import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -44,13 +42,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Tranche web des controllers CRUD de workspace restés à ~0 % (Cycles, Pages, Dashboard-cards,
+ * Tranche web des controllers CRUD de workspace restés à ~0 % (Cycles, Dashboard-cards,
  * Congés, Compétences, Usage IA, Webhooks, Suggestions). Services mockés — on vérifie routage,
  * résolution d'identité (JWT→userId) et 200/401. Comme les autres slices, seul `SecurityConfig`
  * est importé ; les repos workspace sont mockés pour instancier `WorkspaceAccessInterceptor`
  * (fail-open → laisse passer).
  */
-@WebMvcTest({CycleController.class, PageController.class, DashboardCardController.class,
+@WebMvcTest({CycleController.class, DashboardCardController.class,
              MemberLeaveController.class, MemberSkillController.class, AiUsageController.class,
              SkillSuggestionController.class, WebhookController.class})
 @Import(SecurityConfig.class)
@@ -61,14 +59,12 @@ class WorkspaceCrudControllersWebMvcTest {
     @Autowired private MockMvc mockMvc;
 
     @MockitoBean private CycleService cycleService;
-    @MockitoBean private PageService pageService;
     @MockitoBean private DashboardCardService dashboardCardService;
     @MockitoBean private MemberLeaveService memberLeaveService;
     @MockitoBean private MemberSkillProfileService skillService;
     @MockitoBean private AiUsageService aiUsageService;
     @MockitoBean private SkillSuggestionService suggestionService;
     @MockitoBean private WebhookService webhookService;
-    @MockitoBean private JwtIdentityResolver identityResolver; // PageController uniquement
     @MockitoBean private UserRepository userRepository;
     // Requis pour instancier WorkspaceAccessInterceptor (WebMvcConfig chargé dans la slice) ;
     // non stubbés → findBySlug renvoie Optional.empty() → l'intercepteur laisse passer (fail-open).
@@ -80,7 +76,6 @@ class WorkspaceCrudControllersWebMvcTest {
     private RequestPostProcessor auth() {
         when(userRepository.findByEmail(EMAIL))
             .thenReturn(Optional.of(User.builder().id(7L).email(EMAIL).build()));
-        when(identityResolver.resolveEmail(any())).thenReturn(EMAIL);
         return jwt().jwt(b -> b.claim("email", EMAIL));
     }
 
@@ -89,13 +84,6 @@ class WorkspaceCrudControllersWebMvcTest {
     void cycles_list_200() throws Exception {
         when(cycleService.listCycles(anyString(), anyLong(), anyLong())).thenReturn(List.of());
         mockMvc.perform(get("/api/workspaces/acme/projects/1/cycles").with(auth())).andExpect(status().isOk());
-    }
-
-    @Test
-    @DisplayName("GET pages → 200 (via JwtIdentityResolver)")
-    void pages_list_200() throws Exception {
-        when(pageService.listPages(anyString(), anyLong(), anyLong())).thenReturn(List.of());
-        mockMvc.perform(get("/api/workspaces/acme/projects/1/pages").with(auth())).andExpect(status().isOk());
     }
 
     @Test

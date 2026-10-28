@@ -1,0 +1,160 @@
+{
+  "description": "Shared cases: the runner (TypeScript) and the server (Java) must produce exactly these canonical strings and hashes (see contracts/README.md). The zero hash starts the chain.",
+  "zero": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "canonical": [
+    {
+      "name": "keys are sorted",
+      "value": {
+        "b": 1,
+        "a": {
+          "d": true,
+          "c": null
+        }
+      },
+      "canonical": "{\"a\":{\"c\":null,\"d\":true},\"b\":1}"
+    },
+    {
+      "name": "strings keep non-ASCII as is",
+      "value": {
+        "text": "réseau embarqué 🚀"
+      },
+      "canonical": "{\"text\":\"réseau embarqué 🚀\"}"
+    },
+    {
+      "name": "two-character escapes",
+      "value": {
+        "s": "quote \" backslash \\ tab \t line \n return \r"
+      },
+      "canonical": "{\"s\":\"quote \\\" backslash \\\\ tab \\t line \\n return \\r\"}"
+    },
+    {
+      "name": "other control characters as lowercase \\u escapes",
+      "value": {
+        "s": "\u0001\u001f"
+      },
+      "canonical": "{\"s\":\"\\u0001\\u001f\"}"
+    },
+    {
+      "name": "a lone surrogate is escaped",
+      "value": {
+        "s": "\ud800"
+      },
+      "canonical": "{\"s\":\"\\ud800\"}"
+    },
+    {
+      "name": "arrays keep their order",
+      "value": {
+        "list": [
+          3,
+          1,
+          2
+        ],
+        "empty": [],
+        "obj": {}
+      },
+      "canonical": "{\"empty\":[],\"list\":[3,1,2],\"obj\":{}}"
+    },
+    {
+      "name": "keys sort by UTF-16 code units",
+      "value": {
+        "é": 1,
+        "z": 2,
+        "Z": 3,
+        "a": 4
+      },
+      "canonical": "{\"Z\":3,\"a\":4,\"z\":2,\"é\":1}"
+    },
+    {
+      "name": "negative and zero integers",
+      "value": {
+        "n": -12,
+        "z": 0
+      },
+      "canonical": "{\"n\":-12,\"z\":0}"
+    }
+  ],
+  "chain": {
+    "events": [
+      {
+        "seq": 1,
+        "at": "2026-10-28T09:00:00Z",
+        "type": "mission.started",
+        "actor": {
+          "kind": "runner",
+          "id": "runner-pierre"
+        },
+        "data": {
+          "issue": "WEB-48",
+          "agent": "internal",
+          "model": "qwen3:8b"
+        }
+      },
+      {
+        "seq": 2,
+        "at": "2026-10-28T09:00:03Z",
+        "type": "action.decided",
+        "actor": {
+          "kind": "rule",
+          "id": "read-files"
+        },
+        "data": {
+          "action": "file.read",
+          "path": "src/a.ts",
+          "effect": "allow",
+          "rulesVersion": 1
+        }
+      },
+      {
+        "seq": 3,
+        "at": "2026-10-28T09:00:09Z",
+        "type": "source.read",
+        "actor": {
+          "kind": "agent",
+          "id": "internal"
+        },
+        "data": {
+          "document": "MQTT",
+          "version": "5.0",
+          "section": "3.1.2.10 Keep Alive",
+          "pages": [
+            37,
+            38
+          ]
+        }
+      },
+      {
+        "seq": 4,
+        "at": "2026-10-28T09:01:40Z",
+        "type": "human.decision",
+        "actor": {
+          "kind": "person",
+          "id": "pierre"
+        },
+        "data": {
+          "request": 7,
+          "decision": "allow",
+          "note": "Ok, \"tf/web-48\" seulement"
+        }
+      }
+    ],
+    "links": [
+      {
+        "prev": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "hash": "sha256:be4f8271f74245a638016776b769f92305b057a14e1266a875c58b927feece9a"
+      },
+      {
+        "prev": "sha256:be4f8271f74245a638016776b769f92305b057a14e1266a875c58b927feece9a",
+        "hash": "sha256:07f75bc57e3499fece73b66cf50adb48922adb1a6a6e436f013b1d6c317b4311"
+      },
+      {
+        "prev": "sha256:07f75bc57e3499fece73b66cf50adb48922adb1a6a6e436f013b1d6c317b4311",
+        "hash": "sha256:75d354fd2ccddc70734a8996bcf916770b84f37de51f048701e95f31a32445f1"
+      },
+      {
+        "prev": "sha256:75d354fd2ccddc70734a8996bcf916770b84f37de51f048701e95f31a32445f1",
+        "hash": "sha256:96a1c5fab1ccf5eab836f4f8622177ec6d7bf334397444e249d9f2a9e80d38a2"
+      }
+    ],
+    "root": "sha256:96a1c5fab1ccf5eab836f4f8622177ec6d7bf334397444e249d9f2a9e80d38a2"
+  }
+}

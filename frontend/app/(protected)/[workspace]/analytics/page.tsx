@@ -184,7 +184,7 @@ export default function AnalyticsPage() {
           <Brain className="size-7 text-muted-foreground/40" />
           <p className="text-sm font-medium text-foreground">Choose a project for decision support</p>
           <p className="max-w-md text-sm text-muted-foreground">
-            The AI reads the project&apos;s real metrics and the Brain OS, then suggests the situation, the risks
+            The AI reads the project&apos;s real metrics and the workspace&apos;s knowledge, then suggests the situation, the risks
             and the day&apos;s top 3 priorities - convertible into issues in one click.
           </p>
         </div>

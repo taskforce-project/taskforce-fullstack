@@ -216,8 +216,4 @@ export function WorkspaceSwitcher() {
   )
 }
 
-/** @deprecated Utiliser WorkspaceSwitcher à la place */
-export function TeamSwitcher() {
-  return <WorkspaceSwitcher />
-}
 

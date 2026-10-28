@@ -13,6 +13,7 @@ vi.mock('../api/delivery-service', () => ({
   provisionRunner: vi.fn(),
   getRunActivity: vi.fn(),
   decideApproval: vi.fn(),
+  downloadEvidence: vi.fn(),
 }));
 
 function makeRun(overrides: Partial<DeliveryRun> = {}): DeliveryRun {
@@ -173,6 +174,15 @@ describe('delivery-store', () => {
     expect(ok).toBe(true);
     expect(svc.decideApproval).toHaveBeenCalledWith('acme', 100, 9, true);
     expect(useDeliveryStore.getState().activity[100]?.approvals[0]?.status).toBe('ALLOWED');
+  });
+
+  it.each([[true, undefined], [false, new Error('404')]] as const)('downloadEvidence -> %s', async (expected, failure) => {
+    if (failure) vi.mocked(svc.downloadEvidence).mockRejectedValue(failure);
+    else vi.mocked(svc.downloadEvidence).mockResolvedValue(undefined);
+    let ok: boolean | null = null;
+    await act(async () => { ok = await useDeliveryStore.getState().downloadEvidence('acme', 100, 'md'); });
+    expect(ok).toBe(expected);
+    expect(svc.downloadEvidence).toHaveBeenCalledWith('acme', 100, 'md');
   });
 
   it('decideApproval returns false when the server refuses', async () => {

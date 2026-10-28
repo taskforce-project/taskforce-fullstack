@@ -39,11 +39,11 @@ export interface AgentConfig {
   timeoutMinutes: number;
   /** false = pas de mention « Co-Authored-By: Claude » dans les commits de l'agent. */
   attribution: boolean;
-  /** Outils autorisés en plus du socle (ex. `Bash(npm test *)`). */
+  /** Outils autorisés d'avance sur ce poste (ex. `Bash(mvn test *)`) : ils passent outre une règle qui demande, jamais une qui refuse. */
   extraAllowedTools: string[];
   /**
-   * Attente d'une décision dans TaskForce quand l'agent demande une action hors du socle (OSS-5.4). Sans réponse
-   * dans ce délai, l'action est refusée.
+   * Attente d'une décision dans TaskForce pour une action que les règles demandent (OSS-5.4). Sans réponse dans ce
+   * délai, l'action est refusée.
    */
   approvalTimeoutMinutes: number;
 }

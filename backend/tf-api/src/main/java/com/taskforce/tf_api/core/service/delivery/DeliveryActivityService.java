@@ -1,8 +1,12 @@
 package com.taskforce.tf_api.core.service.delivery;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -55,17 +59,32 @@ public class DeliveryActivityService {
     private final ProjectVisibilityGuard visibilityGuard;
     private final NotificationService notificationService;
     private final LocalRunnerSettings settings;
+    private final MissionEvidenceService evidenceService;
+
+    /** Type de l'événement du dossier de preuve pour chaque sorte d'événement du runner. */
+    private static final Map<String, String> EVIDENCE_TYPE = Map.of(
+        "start", "note", "text", "note", "tool", "action.requested", "error", "action.result", "denied", "action.decided",
+        "decision", "action.decided", "exit", "exit.result", "limit", "limit.reached");
+    /** Les décisions des règles vont au dossier, pas à la chronologie affichée : une ligne par action la noierait. */
+    private static final Set<String> EVIDENCE_ONLY = Set.of("decision");
 
     // --------------------------------------------------------------------- runner (autorité déjà vérifiée)
 
-    /** Ajoute des événements à la suite de la chronologie ; le run est verrouillé par l'appelant. */
+    /**
+     * Ajoute des événements à la suite de la chronologie et du dossier de preuve ; le run est verrouillé par
+     * l'appelant. La chronologie a son plafond d'affichage ; le dossier, le sien, plus haut, et le dit quand il est atteint.
+     */
     @Transactional
     public void appendEvents(DeliveryRun run, List<RunnerEventsRequest.Event> events) {
         int seq = eventRepository.maxSeq(run.getId());
         for (RunnerEventsRequest.Event event : events) {
+            evidenceService.append(run, EVIDENCE_TYPE.getOrDefault(event.kind(), "note"), actorOf(run, event), evidenceData(event));
+            if (EVIDENCE_ONLY.contains(event.kind())) {
+                continue;
+            }
             if (seq >= MAX_EVENTS_PER_RUN) {
-                log.debug("Run {} : chronologie pleine, {} événement(s) ignoré(s)", run.getId(), events.size());
-                return;
+                log.debug("Run {} : chronologie pleine, événement {} gardé au seul dossier de preuve", run.getId(), event.kind());
+                continue;
             }
             eventRepository.save(DeliveryRunEvent.builder()
                 .run(run)
@@ -75,6 +94,26 @@ public class DeliveryActivityService {
                 .text(clip(event.text()))
                 .build());
         }
+    }
+
+    /** Qui agit : la règle pour ses décisions, le runner pour les sorties et le plafond, l'agent pour le reste. */
+    private static MissionEvidenceService.Actor actorOf(DeliveryRun run, RunnerEventsRequest.Event event) {
+        return switch (event.kind()) {
+            case "decision" -> new MissionEvidenceService.Actor("rule", event.rule() == null || event.rule().isBlank() ? "none" : event.rule().strip());
+            case "exit", "limit" -> new MissionEvidenceService.Actor("runner", run.getClaimedBy() == null ? "runner" : run.getClaimedBy());
+            default -> new MissionEvidenceService.Actor("agent", run.getProviderKey());
+        };
+    }
+
+    private static Map<String, Object> evidenceData(RunnerEventsRequest.Event event) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("kind", event.kind());
+        data.put("tool", blankToNull(event.tool()));
+        data.put("text", clip(event.text()));
+        if (event.effect() != null) data.put("effect", event.effect());
+        if ("denied".equals(event.kind())) data.put("effect", "deny");
+        if ("error".equals(event.kind())) data.put("ok", false);
+        return data;
     }
 
     /** Ouvre une demande de validation et prévient la personne qui a délégué. */
@@ -87,6 +126,10 @@ public class DeliveryActivityService {
             .expiresAt(LocalDateTime.now().plus(settings.approvalTimeout()))
             .build());
         notificationService.notifyAgentApproval(run.getIssue(), run.getStartedBy(), approval.getTool(), approval.getSummary());
+        Map<String, Object> asked = approvalData(approval);
+        asked.put("effect", "ask");
+        asked.put("asked", run.getStartedBy() != null ? run.getStartedBy().getEmail() : null);
+        evidenceService.append(run, "action.decided", MissionEvidenceService.Actor.SERVER, asked);
         log.info("Run {} : validation {} demandée ({})", run.getId(), approval.getId(), approval.getTool());
         return toRunnerResponse(approval);
     }
@@ -100,10 +143,15 @@ public class DeliveryActivityService {
         return toRunnerResponse(approval);
     }
 
-    /** Run terminé : ses demandes encore ouvertes ne recevront plus de réponse utile. */
+    /** Run terminé : ses demandes encore ouvertes ne recevront plus de réponse utile, et le dossier le dit. */
     @Transactional
-    public void closeApprovals(Long runId) {
-        approvalRepository.expirePending(runId, LocalDateTime.now(), DeliveryApprovalStatus.PENDING, DeliveryApprovalStatus.EXPIRED);
+    public void closeApprovals(DeliveryRun run) {
+        for (DeliveryRunApproval approval : approvalRepository.findByRunIdOrderByCreatedAtAsc(run.getId())) {
+            if (approval.getStatus() == DeliveryApprovalStatus.PENDING) {
+                recordUnanswered(run, approval, "The mission ended before an answer.");
+            }
+        }
+        approvalRepository.expirePending(run.getId(), LocalDateTime.now(), DeliveryApprovalStatus.PENDING, DeliveryApprovalStatus.EXPIRED);
     }
 
     // --------------------------------------------------------------------- personne connectée
@@ -129,6 +177,14 @@ public class DeliveryActivityService {
         return new DeliveryRunActivityResponse(events, approvals);
     }
 
+    /** Le dossier de preuve du run, en JSON ou en Markdown, si le projet est visible ; vide pour un run de la v1. */
+    @Transactional(readOnly = true)
+    public Optional<String> dossier(String slug, Long runId, Long userId, boolean markdown) {
+        DeliveryRun run = scopedRun(slug, runId);
+        visibilityGuard.assertCanView(run.getIssue().getProject(), userId);
+        return markdown ? evidenceService.dossierMarkdown(run) : evidenceService.dossierJson(run);
+    }
+
     /** Autorise ou refuse une action de l'agent. Réservé à la personne qui a délégué, tant que la demande attend. */
     @Transactional
     public void decide(String slug, Long runId, Long approvalId, boolean allow, Long userId) {
@@ -151,6 +207,9 @@ public class DeliveryActivityService {
         approval.setDecidedAt(now);
         approval.setDecidedBy(userRepository.getReferenceById(userId));
         approvalRepository.save(approval);
+        Map<String, Object> decided = approvalData(approval);
+        decided.put("decision", approval.getStatus().name());
+        evidenceService.append(run, "human.decision", new MissionEvidenceService.Actor("person", run.getStartedBy().getEmail()), decided);
         log.info("Run {} : validation {} {} par {}", runId, approvalId, approval.getStatus(), userId);
     }
 
@@ -160,7 +219,24 @@ public class DeliveryActivityService {
         if (approval.getStatus() == DeliveryApprovalStatus.PENDING && !now.isBefore(approval.getExpiresAt())) {
             approval.setStatus(DeliveryApprovalStatus.EXPIRED);
             approvalRepository.save(approval);
+            recordUnanswered(approval.getRun(), approval, "No answer in time.");
         }
+    }
+
+    /** Une demande restée sans réponse : refusée, et ce refus a pour auteur le serveur, pas une personne. */
+    private void recordUnanswered(DeliveryRun run, DeliveryRunApproval approval, String reason) {
+        Map<String, Object> data = approvalData(approval);
+        data.put("effect", "deny");
+        data.put("reason", reason);
+        evidenceService.append(run, "action.decided", MissionEvidenceService.Actor.SERVER, data);
+    }
+
+    private static Map<String, Object> approvalData(DeliveryRunApproval approval) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("approval", approval.getId());
+        data.put("tool", approval.getTool());
+        data.put("summary", approval.getSummary());
+        return data;
     }
 
     /** Run du workspace du chemin ; un run d'un autre workspace répond comme un run inexistant. */

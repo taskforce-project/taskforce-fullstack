@@ -13,11 +13,14 @@ export interface EventSink {
 export interface EventRelayOptions {
   flushMs: number;
   maxBatch: number;
-  /** Plafond par run, aligné sur celui du backend : au-delà, les événements sont abandonnés. */
+  /**
+   * Plafond par run, aligné sur celui du dossier de preuve du serveur. Atteint, un dernier événement `limit` le dit :
+   * rien ne disparaît sans trace.
+   */
   maxEvents: number;
 }
 
-const DEFAULTS: EventRelayOptions = { flushMs: 2_000, maxBatch: 20, maxEvents: 500 };
+const DEFAULTS: EventRelayOptions = { flushMs: 2_000, maxBatch: 20, maxEvents: 10_000 };
 
 export class EventRelay {
   private queue: RunnerEvent[] = [];
@@ -35,7 +38,9 @@ export class EventRelay {
     for (const event of events) {
       if (this.accepted >= this.options.maxEvents) return;
       this.accepted++;
-      this.queue.push(event);
+      this.queue.push(this.accepted === this.options.maxEvents
+        ? { kind: "limit", text: `The runner sent ${this.options.maxEvents} events for this run: later ones are not sent.` }
+        : event);
     }
     if (this.queue.length >= this.options.maxBatch) {
       this.flush();

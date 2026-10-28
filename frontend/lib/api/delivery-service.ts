@@ -4,6 +4,7 @@
  */
 
 import { apiClient } from "./client";
+import { saveBlob } from "./project-service";
 import { DELIVERY_ROUTES } from "../config/api-routes";
 
 /**
@@ -78,7 +79,8 @@ export async function listWorkspaceRuns(slug: string): Promise<DeliveryRun[]> {
 /** Un événement de la chronologie d'un run du runner local (lot 5). */
 export interface DeliveryRunEvent {
   seq: number;
-  kind: "start" | "text" | "tool" | "error" | "denied";
+  /** `exit` : une sortie du runner (push, pull request), faite ou non ; `limit` : le plafond d'événements atteint. */
+  kind: "start" | "text" | "tool" | "error" | "denied" | "exit" | "limit";
   tool: string | null;
   text: string;
   at: string | null;
@@ -113,6 +115,15 @@ export async function getRunActivity(slug: string, runId: number, after: number)
 /** Autorise ou refuse une action demandée par l'agent. */
 export async function decideApproval(slug: string, runId: number, approvalId: number, allow: boolean): Promise<void> {
   await apiClient.post(DELIVERY_ROUTES.DECIDE(slug, runId, approvalId), { decision: allow ? "ALLOW" : "DENY" });
+}
+
+/**
+ * Télécharge le dossier de preuve d'un run : le JSON se vérifie sans TaskForce, le Markdown se lit. Une erreur
+ * (run sans dossier) remonte à l'appelant.
+ */
+export async function downloadEvidence(slug: string, runId: number, format: "json" | "md"): Promise<void> {
+  const res = await apiClient.get(DELIVERY_ROUTES.EVIDENCE(slug, runId), { params: { format }, responseType: "blob", silentError: true });
+  saveBlob(res.data as Blob, `evidence-run-${runId}.${format}`);
 }
 
 /** Runner local de l'utilisateur (ADR-013), tel que le serveur le connaît. Ne contient jamais de secret. */
