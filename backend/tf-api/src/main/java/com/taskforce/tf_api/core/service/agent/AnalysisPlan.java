@@ -46,7 +46,7 @@ public final class AnalysisPlan {
             .subtask("Spot the delays", "Assigned issues overdue or due within 7 days.", "metrics");
 
         plan.addTask(CONTEXT, "Gather the context",
-            "Search the Brain OS: vision, specs, ingested data.", OBSERVE)
+            "Search the workspace's notes: vision, specs, ingested data.", OBSERVE)
             .subtask("Search", "The 6 notes closest to the project.", "brain-search");
 
         plan.addTask(ANALYZE, "Analyze and decide",

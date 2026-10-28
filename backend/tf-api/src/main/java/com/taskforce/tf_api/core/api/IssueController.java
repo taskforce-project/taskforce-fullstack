@@ -179,7 +179,7 @@ public class IssueController {
         Long userId = resolveUserId(jwt);
         KnowledgeNodeResponse node = issueAiService.approveSpec(slug, projectId, issueId, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Spec saved to Brain OS", node));
+            .body(ApiResponse.success("Spec saved to your workspace's notes", node));
     }
 
     @PatchMapping("/{issueId}")
