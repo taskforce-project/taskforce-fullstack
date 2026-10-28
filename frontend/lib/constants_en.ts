@@ -343,7 +343,6 @@ export const CONSTANTS_EN = {
       allNotifications: "All Signals",
       mentions: "Mentions",
       alerts: "Alerts",
-      assignments: "Assigned to me",
     },
   },
 

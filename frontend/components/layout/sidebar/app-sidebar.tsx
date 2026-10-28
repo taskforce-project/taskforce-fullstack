@@ -89,7 +89,6 @@ const NAV_COMMAND: readonly NavItem[] = [
       { key: "nav.sub.allNotifications", url: "/inbox" },
       { key: "nav.sub.mentions",         url: "/inbox/mentions" },
       { key: "nav.sub.alerts",           url: "/inbox/alerts" },
-      { key: "nav.sub.assignments",      url: "/inbox/assignments" },
     ],
   },
   {

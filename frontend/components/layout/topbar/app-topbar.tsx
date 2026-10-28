@@ -57,7 +57,6 @@ function segmentLabel(segment: string): string {
     wiki: "Wiki",
     mentions: "Mentions",
     alerts: "Alerts",
-    assignments: "Assignments",
   }
   return (
     labels[segment] ??
