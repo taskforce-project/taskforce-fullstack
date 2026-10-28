@@ -22,6 +22,9 @@ cases.
    the same effect, the first in the bundle wins.
 4. No matching rule: the action is unknown and the decision is `ask` (invariant 3). Nothing else is implied.
 5. No model, no network, no clock: the same bundle and the same facts always give the same decision (invariant 1).
+6. The bundle's `digest` is `sha256:` followed by the hex SHA-256 of the canonical JSON (see below) of the bundle
+   without its `digest` field and without any member whose value is `null`, at every level. The runner recomputes it
+   and refuses a bundle that does not match: no mission starts without rules.
 
 ## Evidence: how the chain is built
 

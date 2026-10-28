@@ -1,4 +1,4 @@
-package com.taskforce.tf_api.modules.harness;
+package com.taskforce.tf_api.core.harness;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -22,11 +22,12 @@ import org.junit.jupiter.params.provider.MethodSource;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.taskforce.tf_api.modules.harness.evidence.CanonicalJson;
-import com.taskforce.tf_api.modules.harness.evidence.EvidenceChain;
-import com.taskforce.tf_api.modules.harness.rules.Glob;
-import com.taskforce.tf_api.modules.harness.rules.RulesBundle;
-import com.taskforce.tf_api.modules.harness.rules.RulesEngine;
+import com.taskforce.tf_api.core.harness.evidence.CanonicalJson;
+import com.taskforce.tf_api.core.harness.evidence.EvidenceChain;
+import com.taskforce.tf_api.core.harness.rules.Glob;
+import com.taskforce.tf_api.core.harness.rules.RulesBundle;
+import com.taskforce.tf_api.core.harness.rules.RulesDigest;
+import com.taskforce.tf_api.core.harness.rules.RulesEngine;
 
 /**
  * Tests de contrat (R16) : les cas partagés de {@code contracts/}, que le runner rejoue à l'identique. Le dossier se
@@ -97,6 +98,28 @@ class HarnessContractTest {
             assertThat(r.reason()).isNotBlank();
             assertThat(r.review()).matches("\\d{4}-\\d{2}-\\d{2}");
         });
+    }
+
+    @Test
+    @DisplayName("l'empreinte du paquet par défaut est celle du cas de référence, nuls et empreinte compris ou non")
+    void digestMatchesReference() {
+        String expected = contract("rules/cases.json").get("digest").get("expected").asText();
+        ObjectNode bundle = (ObjectNode) contract("rules/default.rules.json");
+        assertThat(RulesDigest.of(bundle)).isEqualTo(expected);
+
+        ObjectNode withDigestAndMoreNulls = bundle.deepCopy();
+        withDigestAndMoreNulls.put("digest", "sha256:" + "f".repeat(64));
+        withDigestAndMoreNulls.putNull("issuedAt");
+        assertThat(RulesDigest.of(withDigestAndMoreNulls)).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("la table par défaut embarquée dans le serveur est celle du contrat")
+    void embeddedDefaultsMatchContract() throws IOException {
+        try (var in = getClass().getClassLoader().getResourceAsStream("harness/default.rules.json")) {
+            assertThat(in).isNotNull();
+            assertThat(JSON.readTree(in)).isEqualTo(contract("rules/default.rules.json"));
+        }
     }
 
     @ParameterizedTest(name = "{0}")

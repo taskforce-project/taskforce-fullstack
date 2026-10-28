@@ -1,3 +1,4 @@
+import { canonicalJson, sha256, type Json } from "./evidence.js";
 import { globMatch } from "./glob.js";
 
 /**
@@ -60,6 +61,34 @@ function matches(when: Condition, facts: Facts): boolean {
     if (EQUALITY.has(key) ? actual !== expected : !globMatch(expected, actual)) return false;
   }
   return true;
+}
+
+function withoutNulls(value: Json): Json {
+  if (Array.isArray(value)) return value.map(withoutNulls);
+  if (value !== null && typeof value === "object") {
+    const out: { [key: string]: Json } = {};
+    for (const [k, v] of Object.entries(value)) if (v !== null) out[k] = withoutNulls(v);
+    return out;
+  }
+  return value;
+}
+
+/** Empreinte du paquet (contracts/README.md, règle 6) : sans son champ `digest` ni aucun membre nul, à tous les niveaux. */
+export function bundleDigest(bundle: RulesBundle): string {
+  const { digest: _ignored, ...rest } = bundle;
+  return sha256(canonicalJson(withoutNulls(rest as unknown as Json)));
+}
+
+/** Le paquet reçu du serveur, s'il est bien formé et que son empreinte tient ; sinon une erreur : pas de mission sans règles. */
+export function verifiedBundle(value: unknown): RulesBundle {
+  const bundle = value as RulesBundle | null;
+  if (!bundle || bundle.format !== "taskforce-rules/1" || !Array.isArray(bundle.rules)) {
+    throw new Error("No valid rules came with the task: the mission does not start without rules.");
+  }
+  if (!bundle.digest || bundleDigest(bundle) !== bundle.digest) {
+    throw new Error("The rules that came with the task do not match their digest: the mission does not start.");
+  }
+  return bundle;
 }
 
 /** Refuser l'emporte sur demander, qui l'emporte sur autoriser ; à effet égal, la première règle du paquet. */
