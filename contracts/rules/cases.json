@@ -303,10 +303,30 @@
         "effect": "ask",
         "rule": null
       }
+    },
+    {
+      "name": "a web search asks: its query leaves the machine",
+      "facts": {
+        "action": "web.search"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "search-web"
+      }
+    },
+    {
+      "name": "fetching a page asks: its address can carry data out",
+      "facts": {
+        "action": "web.fetch"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "fetch-web"
+      }
     }
   ],
   "digest": {
     "description": "The digest of default.rules.json as it is, with or without null members and its own digest field.",
-    "expected": "sha256:5eec69e3c48f5ab6623b74be6db8e4895d44545b0ca69d98d6e5a0b2a587dc38"
+    "expected": "sha256:63cb09bbfe7d11f53667a7773295653686311a72b21bc488d49f53112a4e57b0"
   }
 }
