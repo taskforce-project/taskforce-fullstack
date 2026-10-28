@@ -97,7 +97,7 @@ export function NavUser({
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={() => openSettings("profile")}>
                 <BadgeCheck />
-                {t.settings.account}
+                {t.settings.profile}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => openSettings("notifications")}>
                 <Bell />
