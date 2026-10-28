@@ -34,6 +34,8 @@ export interface ApprovalServerOptions {
   rules?: RulesBundle;
   /** Chaque décision prise sur place, avec l'entrée de l'outil, pour la trace. */
   onDecision?: (tool: string, decision: Decision, input: unknown) => void;
+  /** Avant d'ouvrir une demande dans TaskForce : la trace en attente part d'abord, le dossier garde l'ordre réel. */
+  beforeAsk?: () => Promise<void>;
   /** Attente maximale d'une décision ; au-delà, refus. */
   waitMs: number;
   /** Intervalle de lecture de la décision. */
@@ -166,6 +168,7 @@ export class ApprovalServer {
     }
     const tool = typeof input.tool_name === "string" ? input.tool_name : "unknown tool";
     const summary = describeToolInput(tool, input.tool_input, this.workDir) || "(no details)";
+    await this.options.beforeAsk?.().catch(() => undefined);
     const allow = await this.decide(toolLabel(tool), summary);
     this.reply(res, 200, allow
       ? hookDecision(true)

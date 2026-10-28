@@ -54,8 +54,9 @@ const EQUALITY: ReadonlySet<keyof Condition> = new Set(["action", "repoVisibilit
 const RANK: Record<Effect, number> = { deny: 3, ask: 2, allow: 1 };
 
 function matches(when: Condition, facts: Facts): boolean {
-  for (const [key, expected] of Object.entries(when) as Array<[keyof Condition, string | undefined]>) {
-    if (expected === undefined) continue;
+  for (const [key, expected] of Object.entries(when) as Array<[keyof Condition, string | null | undefined]>) {
+    // Une condition nulle est une condition absente : le serveur envoie ainsi les champs vides de ses règles.
+    if (expected === undefined || expected === null) continue;
     const actual = facts[key];
     if (actual === undefined) return false;
     if (EQUALITY.has(key) ? actual !== expected : !globMatch(expected, actual)) return false;
@@ -79,7 +80,10 @@ export function bundleDigest(bundle: RulesBundle): string {
   return sha256(canonicalJson(withoutNulls(rest as unknown as Json)));
 }
 
-/** Le paquet reçu du serveur, s'il est bien formé et que son empreinte tient ; sinon une erreur : pas de mission sans règles. */
+/**
+ * Le paquet reçu du serveur, s'il est bien formé et que son empreinte tient ; sinon une erreur : pas de mission sans
+ * règles. Il est rendu sans ses membres nuls, comme l'empreinte le lit : le moteur ne voit que ce qui a été signé.
+ */
 export function verifiedBundle(value: unknown): RulesBundle {
   const bundle = value as RulesBundle | null;
   if (!bundle || bundle.format !== "taskforce-rules/1" || !Array.isArray(bundle.rules)) {
@@ -88,7 +92,7 @@ export function verifiedBundle(value: unknown): RulesBundle {
   if (!bundle.digest || bundleDigest(bundle) !== bundle.digest) {
     throw new Error("The rules that came with the task do not match their digest: the mission does not start.");
   }
-  return bundle;
+  return withoutNulls(bundle as unknown as Json) as unknown as RulesBundle;
 }
 
 /**

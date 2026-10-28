@@ -189,6 +189,7 @@ export async function runAgent(
         effect: d.effect, ...(d.rule ? { rule: d.rule.id } : {}),
       }]);
     },
+    beforeAsk: () => relay.flush(),
   });
   const hookUrl = await approvals.start();
 

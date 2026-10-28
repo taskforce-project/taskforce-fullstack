@@ -71,6 +71,20 @@ describe("contrat des règles : empreinte du paquet", () => {
     assert.equal(verifiedBundle(signed).version, defaults.version);
   });
 
+  it("un paquet tel que le serveur l'envoie, conditions vides à null, juge comme le contrat", () => {
+    const empty = { action: null, tool: null, command: null, path: null, branch: null, repoVisibility: null, server: null, sensitivity: null };
+    const fromServer = {
+      ...defaults, project: null, issuedAt: null,
+      rules: defaults.rules.map((r) => ({ ...r, inverse: null, when: { ...empty, ...r.when } })),
+    } as unknown as RulesBundle;
+    const received = verifiedBundle({ ...fromServer, digest: bundleDigest(fromServer) });
+    for (const c of ruleCases.decisions) {
+      assert.equal(decide(received, c.facts).effect, c.expect.effect, c.name);
+      assert.equal(decide(fromServer, c.facts).effect, c.expect.effect, `${c.name} (sans nettoyage)`);
+    }
+    assert.ok(!JSON.stringify(received).includes("null"));
+  });
+
   it("refuse un paquet modifié après son empreinte, ou sans règles", () => {
     const signed = { ...defaults, digest: bundleDigest(defaults) };
     const loosened = { ...signed, rules: signed.rules.map((r) => (r.id === "pay" ? { ...r, effect: "allow" as const } : r)) };

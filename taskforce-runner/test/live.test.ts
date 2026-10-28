@@ -138,6 +138,21 @@ describe("serveur local des validations", () => {
     });
   }
 
+  it("la trace en attente part avant la demande : le dossier garde l'ordre réel", async () => {
+    const order: string[] = [];
+    const api = fakeApi(["ALLOWED"]);
+    const ask = api.requestApproval;
+    api.requestApproval = async (runId, tool, summary) => { order.push("ask"); return ask(runId, tool, summary); };
+    const server = new ApprovalServer(api, 42, WORK, { waitMs: 100, pollMs: 10, beforeAsk: async () => { order.push("flush"); } });
+    const url = await server.start();
+    try {
+      await askHook(url, server.token, BASH_REQUEST);
+      assert.deepEqual(order, ["flush", "ask"]);
+    } finally {
+      await server.stop();
+    }
+  });
+
   it("TaskForce injoignable : refus", async () => {
     const server = new ApprovalServer(fakeApi([], true), 42, WORK, { waitMs: 100, pollMs: 10 });
     const url = await server.start();
