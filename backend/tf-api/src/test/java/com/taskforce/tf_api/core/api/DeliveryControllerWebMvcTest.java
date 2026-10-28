@@ -173,7 +173,7 @@ class DeliveryControllerWebMvcTest {
         var a = auth();
         when(activityService.activity("acme", 100L, 3, 7L)).thenReturn(new DeliveryRunActivityResponse(
             List.of(new DeliveryRunActivityResponse.Event(4, "tool", "Bash", "npm test", null)),
-            List.of(new DeliveryRunActivityResponse.Approval(9L, "Bash", "npm install lodash", "PENDING", null, null, null, null, true))));
+            List.of(new DeliveryRunActivityResponse.Approval(9L, "Bash", "npm install lodash", "PENDING", null, null, null, null, true, "agent"))));
 
         mockMvc.perform(get("/api/workspaces/acme/delivery/runs/100/activity").param("after", "3").with(a))
             .andExpect(status().isOk())

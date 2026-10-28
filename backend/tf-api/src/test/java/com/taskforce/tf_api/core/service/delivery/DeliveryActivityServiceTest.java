@@ -158,7 +158,19 @@ class DeliveryActivityServiceTest {
 
         assertThat(response.status()).isEqualTo("PENDING");
         assertThat(response.expiresAt()).isBetween(LocalDateTime.now().plusMinutes(9), LocalDateTime.now().plusMinutes(11));
-        verify(notificationService).notifyAgentApproval(run.getIssue(), delegator, "Bash", "npm install lodash");
+        verify(notificationService).notifyAgentApproval(run.getIssue(), delegator, "Bash", "npm install lodash", false);
+    }
+
+    @Test
+    void a_request_of_taskforce_itself_says_so() {
+        ArgumentCaptor<DeliveryRunApproval> saved = ArgumentCaptor.forClass(DeliveryRunApproval.class);
+
+        service.openApproval(run, "git push", "Push the branch tf/web-1 to acme/web (visibility unknown)", true);
+
+        verify(approvalRepository).save(saved.capture());
+        assertThat(saved.getValue().getAskedBy()).isEqualTo("runner");
+        verify(notificationService).notifyAgentApproval(run.getIssue(), delegator, "git push",
+            "Push the branch tf/web-1 to acme/web (visibility unknown)", true);
     }
 
     @Test

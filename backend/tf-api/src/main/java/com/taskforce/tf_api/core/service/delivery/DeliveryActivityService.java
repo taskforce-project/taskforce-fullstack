@@ -116,17 +116,28 @@ public class DeliveryActivityService {
         return data;
     }
 
-    /** Ouvre une demande de validation et prévient la personne qui a délégué. */
+    /** Ouvre une demande de l'agent et prévient la personne qui a délégué. */
     @Transactional
     public RunnerApprovalResponse openApproval(DeliveryRun run, String tool, String summary) {
+        return openApproval(run, tool, summary, false);
+    }
+
+    /**
+     * Ouvre une demande de validation et prévient la personne qui a délégué. {@code byRunner} : c'est TaskForce qui
+     * demande (sortie, tests, départ), pas l'agent, et la demande le dit (décision J4).
+     */
+    @Transactional
+    public RunnerApprovalResponse openApproval(DeliveryRun run, String tool, String summary, boolean byRunner) {
         DeliveryRunApproval approval = approvalRepository.save(DeliveryRunApproval.builder()
             .run(run)
             .tool(tool.strip())
             .summary(clip(summary))
+            .askedBy(byRunner ? "runner" : "agent")
             .expiresAt(LocalDateTime.now().plus(settings.approvalTimeout()))
             .build());
-        notificationService.notifyAgentApproval(run.getIssue(), run.getStartedBy(), approval.getTool(), approval.getSummary());
+        notificationService.notifyAgentApproval(run.getIssue(), run.getStartedBy(), approval.getTool(), approval.getSummary(), byRunner);
         Map<String, Object> asked = approvalData(approval);
+        asked.put("askedBy", approval.getAskedBy());
         asked.put("effect", "ask");
         asked.put("asked", run.getStartedBy() != null ? run.getStartedBy().getEmail() : null);
         evidenceService.append(run, "action.decided", MissionEvidenceService.Actor.SERVER, asked);
@@ -172,7 +183,7 @@ public class DeliveryActivityService {
             .peek(a -> expireIfDue(a, now))
             .map(a -> new DeliveryRunActivityResponse.Approval(a.getId(), a.getTool(), a.getSummary(), a.getStatus().name(),
                 a.getCreatedAt(), a.getExpiresAt(), a.getDecidedAt(), displayName(a.getDecidedBy()),
-                delegator && a.getStatus() == DeliveryApprovalStatus.PENDING))
+                delegator && a.getStatus() == DeliveryApprovalStatus.PENDING, a.getAskedBy()))
             .toList();
         return new DeliveryRunActivityResponse(events, approvals);
     }

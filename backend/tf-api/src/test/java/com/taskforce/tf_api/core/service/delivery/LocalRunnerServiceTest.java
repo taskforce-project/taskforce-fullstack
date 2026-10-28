@@ -341,7 +341,7 @@ class LocalRunnerServiceTest {
         service.requestApproval(100L, RUNNER, new RunnerApprovalRequest("Bash", "npm install lodash"));
         service.approvalStatus(100L, 9L, RUNNER);
 
-        verify(activityService).openApproval(held, "Bash", "npm install lodash");
+        verify(activityService).openApproval(held, "Bash", "npm install lodash", false);
         verify(activityService).approvalStatus(held, 9L);
     }
 
