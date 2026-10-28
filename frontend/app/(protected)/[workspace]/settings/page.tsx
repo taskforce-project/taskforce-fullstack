@@ -1460,7 +1460,12 @@ function IntegrationsPanel() {
   return (
     <div className="flex flex-col gap-4">
       {/* ---- Catalogue (le pool générique) ---- */}
-      <SectionCard title="Integrations catalog" description="GitHub, Slack and Plane sync natively; any other tool connects through its MCP server.">
+      <SectionCard
+        title="Integrations catalog"
+        description={IS_DESKTOP
+          ? "Plane syncs natively; any other tool connects through its MCP server."
+          : "GitHub, Slack and Plane sync natively; any other tool connects through its MCP server."}
+      >
 
         {slug && <IntegrationsCatalog slug={slug} />}
       </SectionCard>

@@ -14,6 +14,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { cn } from "@/lib/utils"
+import { IS_DESKTOP } from "@/lib/desktop"
 import { getErrorMessage } from "@/lib/api/client"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import {
@@ -64,6 +65,22 @@ function CatPill({ active, onClick, children }: Readonly<{ active: boolean; onCl
 }
 
 /**
+ * App desktop : la connexion de GitHub et de Slack par OAuth n'y marche pas encore (PC-060) ; on ne montre que ce qui
+ * marche (R12). Masqués avec revue au 30/11/2026 ; d'ici là, GitHub passe par le GitHub CLI de la personne.
+ */
+const DESKTOP_HIDDEN_CONNECTORS = new Set(["github", "slack"])
+
+/** Le catalogue tel que l'app peut le tenir : sans les connecteurs masqués, comptes recalculés. */
+export function catalogForThisApp(catalog: IntegrationCatalog, desktop: boolean = IS_DESKTOP): IntegrationCatalog {
+  if (!desktop) return catalog
+  const categories = catalog.categories
+    .map((g) => ({ ...g, tools: g.tools.filter((t) => !DESKTOP_HIDDEN_CONNECTORS.has(t.key)) }))
+    .filter((g) => g.tools.length > 0)
+  const tools = categories.flatMap((g) => g.tools)
+  return { ...catalog, categories, total: tools.length, connected: tools.filter((t) => t.connected).length }
+}
+
+/**
  * Le catalogue des intégrations (ADR-020) : GitHub, Slack et Plane en natif, les serveurs MCP officiels en
  * préréglage, et tout autre serveur MCP ajouté à la main (« Connect an MCP server »).
  */
@@ -86,7 +103,8 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
     setLoading(true)
     setError(false)
     getIntegrationCatalog(slug)
-      .then((c) => {
+      .then((loaded) => {
+        const c = catalogForThisApp(loaded)
         setCatalog(c)
         setError(false)
         // Garde la fiche ouverte à jour (ex. état « connecté » après connexion) ; un serveur déconnecté
