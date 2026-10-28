@@ -246,7 +246,8 @@ describe("sorties du bac à sable faites par le runner, jugées par la table par
     let asked = false;
     const verdict = await judgeExit(strict, exitFacts("git.push", branch, "private"), "git push", "summary", async () => (asked = true));
     assert.deepEqual([verdict.go, asked], [false, false]);
-    assert.match(verdict.why, /no-exit: Nothing leaves/);
+    // Sans point final : le résumé du run et le message d'échec ajoutent le leur.
+    assert.equal(verdict.why, "refused by the rule no-exit: Nothing leaves");
   });
 
   const visibilities: Array<[string, "public" | "private" | null]> = [["PUBLIC\n", "public"], ["PRIVATE", "private"], ["INTERNAL", null], ["", null]];

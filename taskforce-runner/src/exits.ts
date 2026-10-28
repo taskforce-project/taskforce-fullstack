@@ -8,7 +8,7 @@ import { decide, type Facts, type RulesBundle } from "./harness/rules.js";
 
 export interface ExitVerdict {
   go: boolean;
-  /** Pourquoi, pour le journal et le résumé du run. */
+  /** Pourquoi, pour le journal et le résumé du run ; sans point final, la phrase qui le cite met le sien. */
   why: string;
   /** La règle qui a décidé, ou qui a demandé ; absente quand aucune ne s'applique. */
   rule?: string;
@@ -21,7 +21,9 @@ export async function judgeExit(rules: RulesBundle, facts: Facts, tool: string, 
   const d = decide(rules, facts);
   const rule = d.rule ? { rule: d.rule.id } : {};
   if (d.effect === "allow") return { go: true, why: `allowed by the rule ${d.rule?.id ?? "?"}`, ...rule };
-  if (d.effect === "deny") return { go: false, why: `refused by the rule ${d.rule?.id ?? "?"}: ${d.rule?.reason ?? ""}`, ...rule };
+  if (d.effect === "deny") {
+    return { go: false, why: `refused by the rule ${d.rule?.id ?? "?"}: ${(d.rule?.reason ?? "").replace(/\.\s*$/, "")}`, ...rule };
+  }
   const allowed = await ask(tool, summary);
   const asked = d.rule ? `the rule ${d.rule.id} asks` : "no rule covers it";
   return { go: allowed, why: allowed ? `allowed in TaskForce (${asked})` : `not allowed in TaskForce (${asked})`, ...rule };
