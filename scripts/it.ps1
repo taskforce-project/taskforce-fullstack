@@ -21,6 +21,8 @@ param(
 $net = "tf-it-net"
 $pg  = "tf-it-pg"
 $api = (Resolve-Path "$PSScriptRoot/../backend/tf-api").Path
+# Contrats du harnais (cas partagés avec le runner), lus par les tests de contrat sous /contracts.
+$contracts = (Resolve-Path "$PSScriptRoot/../contracts").Path
 
 Write-Host "==> Network + Postgres pgvector sibling"
 docker network inspect $net *>$null
@@ -46,9 +48,10 @@ try {
   elseif ($Test -eq "ALL") { $mvnArgs = @("clean", "test") }  # clean → exec JaCoCo propre
   else              { $mvnArgs = @("test", "-Dtest=$Test") }
   if ($Offline) { $mvnArgs = @("-o") + $mvnArgs }
+  $mvnArgs = $mvnArgs + @("-Dcontracts.dir=/contracts")
   Write-Host "==> mvn $($mvnArgs -join ' ')"
   docker run --rm --network $net `
-    -v "${api}:/app" -v "tf-m2:/root/.m2" `
+    -v "${api}:/app" -v "${contracts}:/contracts:ro" -v "tf-m2:/root/.m2" `
     -e "SPRING_DATASOURCE_URL=jdbc:postgresql://${pg}:5432/tf" `
     -e "SPRING_DATASOURCE_USERNAME=tf" -e "SPRING_DATASOURCE_PASSWORD=tf" `
     -w /app maven:3.9-eclipse-temurin-21 mvn @mvnArgs

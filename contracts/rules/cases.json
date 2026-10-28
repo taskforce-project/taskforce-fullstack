@@ -1,0 +1,566 @@
+{
+  "description": "Shared cases: the runner (TypeScript) and the server (Java) must give exactly these answers. Decisions use default.rules.json; rule is null when no rule matched.",
+  "globs": [
+    {
+      "pattern": "tf/**",
+      "value": "tf/web-48",
+      "match": true
+    },
+    {
+      "pattern": "tf/**",
+      "value": "tf/a/b",
+      "match": true
+    },
+    {
+      "pattern": "tf/**",
+      "value": "tfx/a",
+      "match": false
+    },
+    {
+      "pattern": "tf/*",
+      "value": "tf/a/b",
+      "match": false
+    },
+    {
+      "pattern": "tf/*",
+      "value": "tf/a",
+      "match": true
+    },
+    {
+      "pattern": "*",
+      "value": "",
+      "match": true
+    },
+    {
+      "pattern": "a.b",
+      "value": "aXb",
+      "match": false
+    },
+    {
+      "pattern": "a.b",
+      "value": "a.b",
+      "match": true
+    },
+    {
+      "pattern": "{a,b}",
+      "value": "c",
+      "match": false
+    },
+    {
+      "pattern": "{a,b}",
+      "value": "b",
+      "match": true
+    },
+    {
+      "pattern": "npm {test,run test}**",
+      "value": "npm run test:unit",
+      "match": true
+    },
+    {
+      "pattern": "npm {test,run test}**",
+      "value": "npm install",
+      "match": false
+    },
+    {
+      "pattern": "git push**",
+      "value": "git push origin main",
+      "match": true
+    },
+    {
+      "pattern": "gh **",
+      "value": "gh pr create --fill",
+      "match": true
+    },
+    {
+      "pattern": "src/*.ts",
+      "value": "src/a/b.ts",
+      "match": false
+    },
+    {
+      "pattern": "src/**.ts",
+      "value": "src/a/b.ts",
+      "match": true
+    }
+  ],
+  "decisions": [
+    {
+      "name": "reading a file is allowed",
+      "facts": {
+        "action": "file.read",
+        "path": "src/a.ts"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "read-files"
+      }
+    },
+    {
+      "name": "writing in the copy is allowed",
+      "facts": {
+        "action": "file.write",
+        "path": "src/a.ts"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "write-sandbox-files"
+      }
+    },
+    {
+      "name": "the project's tests run",
+      "facts": {
+        "action": "shell",
+        "command": "npm test"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-npm-checks"
+      }
+    },
+    {
+      "name": "a test script with a suffix runs",
+      "facts": {
+        "action": "shell",
+        "command": "npm run test:unit"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-npm-checks"
+      }
+    },
+    {
+      "name": "publishing a package from the shell is unknown, so asked",
+      "facts": {
+        "action": "shell",
+        "command": "npm publish"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "an unknown command is asked",
+      "facts": {
+        "action": "shell",
+        "command": "rm -rf build"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "the agent never pushes from its shell",
+      "facts": {
+        "action": "shell",
+        "command": "git push origin tf/web-48"
+      },
+      "expect": {
+        "effect": "deny",
+        "rule": "no-agent-push"
+      }
+    },
+    {
+      "name": "the agent never uses the GitHub CLI",
+      "facts": {
+        "action": "shell",
+        "command": "gh pr create --fill"
+      },
+      "expect": {
+        "effect": "deny",
+        "rule": "no-agent-gh"
+      }
+    },
+    {
+      "name": "the runner pushes the agent's branch to a private repository",
+      "facts": {
+        "action": "git.push",
+        "branch": "tf/web-48",
+        "repoVisibility": "private"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "push-agent-branch-private"
+      }
+    },
+    {
+      "name": "pushing to a public repository is asked",
+      "facts": {
+        "action": "git.push",
+        "branch": "tf/web-48",
+        "repoVisibility": "public"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "push-public-repo"
+      }
+    },
+    {
+      "name": "pushing another branch is unknown, so asked",
+      "facts": {
+        "action": "git.push",
+        "branch": "main",
+        "repoVisibility": "private"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "a missing fact never matches",
+      "facts": {
+        "action": "git.push",
+        "branch": "tf/web-48"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "a pull request on a private repository opens",
+      "facts": {
+        "action": "pr.open",
+        "repoVisibility": "private"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "open-pull-request"
+      }
+    },
+    {
+      "name": "ask beats allow: a pull request on a public repository waits",
+      "facts": {
+        "action": "pr.open",
+        "repoVisibility": "public"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "open-pull-request-public"
+      }
+    },
+    {
+      "name": "a knowledge update is proposed, a person decides",
+      "facts": {
+        "action": "knowledge.write"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "propose-knowledge"
+      }
+    },
+    {
+      "name": "no agent changes the rules",
+      "facts": {
+        "action": "harness.change"
+      },
+      "expect": {
+        "effect": "deny",
+        "rule": "no-harness-change"
+      }
+    },
+    {
+      "name": "reading in a company tool is allowed",
+      "facts": {
+        "action": "mcp.read",
+        "server": "linear",
+        "tool": "mcp__taskforce__linear__list_issues"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "read-company-tools"
+      }
+    },
+    {
+      "name": "writing in a company tool is asked",
+      "facts": {
+        "action": "mcp.write",
+        "server": "stripe",
+        "tool": "mcp__taskforce__stripe__create_refund"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "write-company-tools"
+      }
+    },
+    {
+      "name": "a payment is asked",
+      "facts": {
+        "action": "payment"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "pay"
+      }
+    },
+    {
+      "name": "an action outside the list is unknown, so asked",
+      "facts": {
+        "action": "browser.open"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "a web search asks: its query leaves the machine",
+      "facts": {
+        "action": "web.search"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "search-web"
+      }
+    },
+    {
+      "name": "fetching a page asks: its address can carry data out",
+      "facts": {
+        "action": "web.fetch"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "fetch-web"
+      }
+    },
+    {
+      "name": "searching the copy is allowed",
+      "facts": {
+        "action": "file.search",
+        "path": "src"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "search-files"
+      }
+    },
+    {
+      "name": "reading an issue is allowed",
+      "facts": {
+        "action": "issue.read"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "read-issues"
+      }
+    },
+    {
+      "name": "searching the knowledge is allowed",
+      "facts": {
+        "action": "knowledge.search"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "search-knowledge"
+      }
+    },
+    {
+      "name": "deleting a file of the copy is allowed",
+      "facts": {
+        "action": "file.delete",
+        "path": "tmp/build.log"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "delete-sandbox-files"
+      }
+    },
+    {
+      "name": "a local commit is allowed",
+      "facts": {
+        "action": "git.commit",
+        "command": "git commit -m fix"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "commit-locally"
+      }
+    },
+    {
+      "name": "git status is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "git status"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-reads"
+      }
+    },
+    {
+      "name": "git diff with options is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "git diff --stat"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-reads"
+      }
+    },
+    {
+      "name": "a git command outside the reads asks",
+      "facts": {
+        "action": "shell",
+        "command": "git reset --hard HEAD~1"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "a build with arguments is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "npm run build -- --prod"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-npm-checks"
+      }
+    },
+    {
+      "name": "another npm script asks",
+      "facts": {
+        "action": "shell",
+        "command": "npm run deploy"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "creating an issue is allowed",
+      "facts": {
+        "action": "issue.create"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "create-issue"
+      }
+    },
+    {
+      "name": "updating an issue is allowed",
+      "facts": {
+        "action": "issue.update"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "update-issue"
+      }
+    },
+    {
+      "name": "commenting is allowed",
+      "facts": {
+        "action": "comment.create"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "comment"
+      }
+    },
+    {
+      "name": "a merge asks",
+      "facts": {
+        "action": "git.merge",
+        "branch": "main"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "merge"
+      }
+    },
+    {
+      "name": "merging a pull request asks",
+      "facts": {
+        "action": "pr.merge",
+        "repoVisibility": "private"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "merge-pull-request"
+      }
+    },
+    {
+      "name": "publishing a package asks",
+      "facts": {
+        "action": "package.publish"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "publish-package"
+      }
+    },
+    {
+      "name": "a deployment asks",
+      "facts": {
+        "action": "deploy"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "deploy"
+      }
+    },
+    {
+      "name": "sending a message asks",
+      "facts": {
+        "action": "message.send"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "send-message"
+      }
+    },
+    {
+      "name": "using a secret asks",
+      "facts": {
+        "action": "secret.use"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "use-secret"
+      }
+    },
+    {
+      "name": "action matches by equality, not as a pattern",
+      "facts": {
+        "action": "file.read.all"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "the agent's branch prefix needs its slash",
+      "facts": {
+        "action": "git.push",
+        "branch": "tf",
+        "repoVisibility": "private"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "a nested agent branch goes to a private repository",
+      "facts": {
+        "action": "git.push",
+        "branch": "tf/web/48",
+        "repoVisibility": "private"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "push-agent-branch-private"
+      }
+    }
+  ],
+  "digest": {
+    "description": "The digest of default.rules.json as it is, with or without null members and its own digest field.",
+    "expected": "sha256:63cb09bbfe7d11f53667a7773295653686311a72b21bc488d49f53112a4e57b0"
+  }
+}

@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, Fragment, type ReactNode } from "
 import { useParams, useRouter } from "next/navigation"
 import {
   ChevronRight, Search, ArrowRight, LayoutDashboard, FolderKanban, Inbox, ClipboardCheck, Repeat,
-  CircleDot, Users, Activity, Brain, Plus, Settings,
+  CircleDot, Users, Activity, Plus, Settings,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -35,7 +35,6 @@ const NAV_ITEMS = [
   // App desktop : pas de membres, on y travaille seul avec ses agents.
   ...(IS_DESKTOP ? [] : [{ label: "Members", path: "/members", icon: Users }] as const),
   { label: "Intelligence", path: "/analytics", icon: Activity },
-  { label: "Brain OS", path: "/brain", icon: Brain },
 ] as const
 
 function greetingFor(hour: number): string {
@@ -63,7 +62,7 @@ interface DashboardHeroProps {
 /**
  * En-tête centré du dashboard (façon page d'accueil Cloudflare) : pilule connecteurs, salutation + H1,
  * puis une <b>palette de commandes INLINE</b> : au focus (clic ou Ctrl+K sur cette page), un dropdown
- * s'ouvre SOUS la barre avec le même contenu que le Ctrl+K (navigation + Labs + actions) ; en tapant,
+ * s'ouvre SOUS la barre avec le même contenu que le Ctrl+K (navigation et actions) ; en tapant,
  * on filtre et on cherche aussi les opérations réelles. Navigation aux flèches ↑↓ + Entrée. Aucun modal.
  */
 export function DashboardHero({ displayName }: DashboardHeroProps) {
@@ -110,7 +109,7 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
     [query, projects],
   )
 
-  // Liste APLATIE (opérations → navigation → Labs → actions) : une seule séquence pour les flèches.
+  // Liste APLATIE (opérations, navigation, actions) : une seule séquence pour les flèches.
   const rows: Row[] = []
   projMatches.forEach((p) => rows.push({
     key: `p-${p.id}`, section: "Operations",
@@ -162,7 +161,7 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
             <BrandLogo key={t.slug} slug={t.slug} name={t.name} className="size-3.5 text-[7px]" />
           ))}
         </span>
-        <span>Connect your tools to the Brain OS</span>
+        <span>Connect your tools</span>
         <ChevronRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
       </button>
 

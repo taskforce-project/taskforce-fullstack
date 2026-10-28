@@ -60,6 +60,7 @@ class DeliveryRunnerTest {
     @Mock private IssueRepository issueRepository;
     @Mock private NotificationService notificationService;
     @Mock private IssueGitHubLinkRepository linkRepository;
+    @Mock private MissionEvidenceService evidenceService;
 
     @InjectMocks private DeliveryRunner runner;
 
@@ -178,12 +179,15 @@ class DeliveryRunnerTest {
         when(issueStatusRepository.findByProjectIdOrderByPosition(300L)).thenReturn(List.of());
         when(issueStatusRepository.save(any(IssueStatus.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        runner.complete(31L, new DeliveryPoll(DeliveryRunStatus.DONE, "PR opened", "https://github.com/o/r/pull/1", null));
+        DeliveryPoll done = new DeliveryPoll(DeliveryRunStatus.DONE, "PR opened", "https://github.com/o/r/pull/1", null);
+        runner.complete(31L, done);
 
         assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.DONE);
         assertThat(run.getSummary()).isEqualTo("PR opened");
         assertThat(run.getResultUrl()).isEqualTo("https://github.com/o/r/pull/1");
         verify(issueRepository).save(issue);
+        // Le dossier de preuve de la mission est clos et scellé, une seule fois.
+        verify(evidenceService).end(run, done);
         // La personne qui a délégué est prévenue (OSS-5.5), une seule fois.
         verify(notificationService).notifyAgentRunFinished(issue, null, "The agent", true, "PR opened");
 

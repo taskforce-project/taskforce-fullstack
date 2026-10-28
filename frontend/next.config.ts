@@ -153,15 +153,6 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["lucide-react", "recharts", "framer-motion", "date-fns"],
   },
   transpilePackages: [
-    "@tiptap/react",
-    "@tiptap/pm",
-    "@tiptap/core",
-    "@tiptap/starter-kit",
-    "@tiptap/extension-placeholder",
-    "@tiptap/extension-link",
-    "@tiptap/extension-typography",
-    "@tiptap/extension-task-list",
-    "@tiptap/extension-task-item",
     "@assistant-ui/react",
     "@assistant-ui/core",
     "@assistant-ui/store",
@@ -191,7 +182,6 @@ const nextConfig: NextConfig = {
           "/auth/:path*",
           "/invitations/:path*",
           "/:workspace/members/:path*",
-          "/:workspace/projects/:id/members",
           "/:workspace/projects/:id/teams",
         ]
       : []

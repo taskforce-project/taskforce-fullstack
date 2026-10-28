@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Pencil, Check as CheckIcon } from "lucide-react"
 
 import { Markdown, toggleTaskInMarkdown } from "@/components/ui/lightweight-markdown"
-import { MarkdownEditor } from "@/components/brain/markdown-editor"
+import { MarkdownEditor } from "@/components/editor/markdown-editor"
 import { Button } from "@/components/ui/button"
 
 interface IssueDescriptionProps {

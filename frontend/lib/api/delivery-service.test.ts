@@ -8,9 +8,15 @@ import {
   provisionRunner,
   getRunActivity,
   decideApproval,
+  downloadEvidence,
 } from './delivery-service';
 import { apiClient } from './client';
 import { DELIVERY_ROUTES } from '../config/api-routes';
+import { saveBlob } from './project-service';
+
+vi.mock('./project-service', () => ({ saveBlob: vi.fn() }));
+
+vi.mock('./project-service', () => ({ saveBlob: vi.fn() }));
 
 vi.mock('./client', () => ({
   apiClient: { get: vi.fn(), post: vi.fn(), delete: vi.fn() },
@@ -115,6 +121,16 @@ describe('delivery-service', () => {
     await decideApproval(SLUG, 100, 9, allow);
 
     expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DECIDE(SLUG, 100, 9), { decision });
+  });
+
+  it.each([['json'], ['md']] as const)('télécharge le dossier de preuve en %s, comme fichier', async (format) => {
+    const blob = new Blob(['{}']);
+    vi.mocked(apiClient.get).mockResolvedValue({ data: blob });
+
+    await downloadEvidence(SLUG, 100, format);
+
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.EVIDENCE(SLUG, 100), { params: { format }, responseType: 'blob', silentError: true });
+    expect(saveBlob).toHaveBeenCalledWith(blob, `evidence-run-100.${format}`);
   });
 
   it('GET les agents pour un projet donné', async () => {

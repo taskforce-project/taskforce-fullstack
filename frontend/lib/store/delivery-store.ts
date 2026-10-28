@@ -7,6 +7,7 @@ import {
   getRunnerStatus,
   getRunActivity,
   decideApproval as decideApprovalApi,
+  downloadEvidence as downloadEvidenceApi,
   provisionRunner as provisionRunnerApi,
   type DeliveryProvider,
   type DeliveryRun,
@@ -47,6 +48,8 @@ interface DeliveryState {
   fetchActivity: (slug: string, runId: number) => Promise<DeliveryRunActivity | null>;
   /** Autorise ou refuse une action de l'agent ; `true` si la décision est enregistrée. */
   decideApproval: (slug: string, runId: number, approvalId: number, allow: boolean) => Promise<boolean>;
+  /** Télécharge le dossier de preuve d'un run ; `false` si le run n'en a pas (run de la v1) ou en cas d'erreur. */
+  downloadEvidence: (slug: string, runId: number, format: "json" | "md") => Promise<boolean>;
 }
 
 export const useDeliveryStore = create<DeliveryState>((set, get) => ({
@@ -152,6 +155,15 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
     try {
       await decideApprovalApi(slug, runId, approvalId, allow);
       await get().fetchActivity(slug, runId);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  downloadEvidence: async (slug, runId, format) => {
+    try {
+      await downloadEvidenceApi(slug, runId, format);
       return true;
     } catch {
       return false;

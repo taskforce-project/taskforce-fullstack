@@ -23,7 +23,7 @@ interface TourPoint {
   readonly icon: React.ElementType;
   readonly title: string;
   readonly text: string;
-  /** Couleur de l'icône (défaut : primaire). Ex. la fiole Labs en violet, comme dans l'app. */
+  /** Couleur de l'icône (défaut : primaire). */
   readonly iconClassName?: string;
 }
 
@@ -34,7 +34,7 @@ interface TourStep {
   readonly hero?: boolean;
   /** Icône du hero (si pas de bannière). */
   readonly icon?: React.ElementType;
-  /** Image de bannière de couverture (hero) - ex. le fond « Labs » du site. */
+  /** Image de bannière de couverture (hero). */
   readonly bg?: string;
   /** Points clés listés dans un hero. */
   readonly points?: readonly TourPoint[];
@@ -243,7 +243,7 @@ export function ProductTour() {
         {isHero ? (
           <>
             {step.bg && (
-              // Bannière de couverture (fond « Labs » du site) ; en-tête superposé, lisible via backdrop.
+              // Bannière de couverture ; en-tête superposé, lisible via backdrop.
               <div
                 className="relative h-32 w-full bg-cover bg-center"
                 style={{ backgroundImage: `url(${step.bg})` }}

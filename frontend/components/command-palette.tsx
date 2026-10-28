@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, useMemo, type KeyboardEvent } from "react"
+import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { TextShimmerWave } from "@/components/ui/text-shimmer-wave"
 import {
@@ -25,17 +25,13 @@ import {
   CornerDownLeft,
   ArrowLeft,
   ArrowRight,
-  Brain,
-  FileText,
   Bug,
   Compass,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
-import { cn } from "@/lib/utils"
 import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
-import { useBrainStore } from "@/lib/store/brain-store"
 import { sendAssistantMessage } from "@/lib/api/assistant-service"
 import { IS_DESKTOP } from "@/lib/desktop"
 
@@ -162,7 +158,6 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
     { id: "settings",      label: "Go to Settings",      group: "Navigation", icon: <Settings className="h-4 w-4" />, action: () => openSettingsHere() },
     { id: "profile",       label: "View my profile",     group: "Navigation", icon: <User className="h-4 w-4" />, action: () => openSettingsHere("profile") },
     { id: "intelligence",  label: "Go to Intelligence",  group: "Navigation", icon: <Activity className="h-4 w-4" />, action: () => go("/analytics") },
-    { id: "brain",         label: "Go to Brain OS",      group: "Navigation", icon: <Brain className="h-4 w-4" />,            action: () => go("/brain") },
     // Actions
     { id: "ask-ai",        label: "Ask AI",              group: "Actions",    icon: <Sparkles className="h-4 w-4" />,   action: enterAiMode },
     // La création d'issue est propre à un projet : on mène à la liste des projets, où chacun porte
@@ -179,14 +174,6 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
   ]
 
   const groups = [...new Set(ACTIONS.map((a) => a.group))]
-
-  // Pages du Brain OS dans la palette (facon Linear : un seul Cmd+K pour tout atteindre). Lues du
-  // store si le Brain a deja ete ouvert dans la session ; deep-link `/brain?node=<id>` (pas de fetch ici).
-  const brainNodes = useBrainStore((s) => s.overview?.nodes)
-  const brainPages = useMemo(
-    () => (brainNodes ?? []).filter((n) => !n.system).slice(0, 200),
-    [brainNodes],
-  )
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} onEscapeKeyDown={handleEscape} showCloseButton={false} className="max-w-2xl overflow-hidden rounded-xl border shadow-2xl">
@@ -282,26 +269,6 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
               </div>
             ))}
 
-            {/* Pages du Brain OS (arbre facon Notion) - atteignables au clavier depuis le meme Cmd+K */}
-            {brainPages.length > 0 && (
-              <div>
-                <CommandSeparator />
-                <CommandGroup heading="Brain pages">
-                  {brainPages.map((n) => (
-                    <CommandItem
-                      key={`brain-${n.id}`}
-                      value={`brain ${n.title}`}
-                      onSelect={() => go(`/brain?node=${n.id}`)}
-                      className="group gap-3"
-                    >
-                      <span className="text-muted-foreground"><FileText className="h-4 w-4" /></span>
-                      <span className="min-w-0 flex-1 truncate">{n.title}</span>
-                      <ArrowRight className="ml-auto size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-data-[selected=true]:opacity-100" />
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </div>
-            )}
           </CommandList>
 
           {/* Pied façon Cloudflare : rappels clavier */}

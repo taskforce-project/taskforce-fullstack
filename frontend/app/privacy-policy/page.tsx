@@ -1,7 +1,9 @@
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 
+import { DesktopLegal } from "@/components/legal/desktop-legal"
 import { SelfHostedLegal, isSelfHosted } from "@/components/legal/self-hosted-legal"
+import { IS_DESKTOP } from "@/lib/desktop"
 
 export const metadata = {
   title: "Privacy Policy - TaskForce",
@@ -9,6 +11,8 @@ export const metadata = {
 }
 
 export default function PrivacyPolicyPage() {
+  // App desktop : les projets restent sur l'ordinateur, seul le compte est en ligne.
+  if (IS_DESKTOP) return <DesktopLegal kind="privacy" />
   // Instance auto-hébergée : ses données sont chez son administrateur, sans mesure d'audience du projet.
   if (isSelfHosted()) return <SelfHostedLegal kind="privacy" />
   return (

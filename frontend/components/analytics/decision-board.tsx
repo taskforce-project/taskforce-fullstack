@@ -309,7 +309,7 @@ export function DecisionBoard({
 
       {!brief && !runningJob && (
         <p className="mt-3 text-xs text-muted-foreground">
-          The AI reads the project&apos;s real metrics + the Brain OS, then lays out the situation, the risks, and
+          The AI reads the project&apos;s real metrics and the workspace&apos;s knowledge, then lays out the situation, the risks, and
           tomorrow&apos;s <span className="font-medium text-foreground">3 priorities</span> - which you can turn into issues in one click.
           The analysis runs in the background: you can leave the page.
         </p>

@@ -60,7 +60,7 @@ export function WorkflowsButton() {
     <button
       type="button"
       onClick={toggleWorkflowPanel}
-      title="Workflows IA"
+      title="AI workflows"
       aria-label="Open AI workflows"
       className="relative flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
     >

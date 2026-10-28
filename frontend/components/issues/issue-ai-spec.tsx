@@ -32,7 +32,7 @@ interface IssueAiSpecPanelProps {
  */
 /** Messages du loader de génération de spec (bouclés : Brain OS → contexte → structure → rédaction). */
 const SPEC_PHASES = [
-  "Retrieving from Brain OS…",
+  "Retrieving from your knowledge…",
   "Reading the context…",
   "Structuring the tasks…",
   "Drafting the spec…",
@@ -117,7 +117,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
       toast.success(
         applyToIssue
           ? "Issue filled in (description, type, labels, effort" + (autoAssign ? ", assigned" : "") + ")"
-          : "Spec saved to the Brain OS"
+          : "Spec saved to the workspace's knowledge"
       )
       if (applyToIssue || autoAssign) onApplied?.() // rafraîchir la vue de l'issue
     } catch {
@@ -138,7 +138,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
           <p className="text-sm font-medium">AI-assisted specification</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Generates a spec, an execution prompt ready to paste into Claude Code, and a breakdown -
-            grounded in the real context of your Brain OS.
+            grounded in your workspace&apos;s real context.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -162,7 +162,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
         <Loader2 className="size-6 animate-spin text-primary" />
         <ShimmerLoader phrases={SPEC_PHASES} className="text-sm font-medium" />
         <p className="text-xs text-muted-foreground">
-          Brain OS retrieval + local generation - this may take a few seconds.
+          Search in your knowledge, then local generation: this may take a few seconds.
         </p>
         <p className="text-xs tabular-nums text-muted-foreground/60">{elapsed}s elapsed</p>
       </div>
@@ -195,7 +195,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
         <div className="rounded-md border border-border bg-muted/30 p-3">
           <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <BrainCircuit className="size-3.5" />
-            Seen before? Related notes in the Brain OS
+            Seen before? Related notes
           </div>
           <ul className="flex flex-col gap-1">
             {draft.similar.map((s) => (
@@ -303,7 +303,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
         {saved && (
           <span className="mr-auto flex items-center gap-1.5 text-xs text-ink-green">
             <Check className="size-3.5" />
-            {applyToIssue ? "Issue updated" : "Saved to the Brain OS"}
+            {applyToIssue ? "Issue updated" : "Saved to the workspace's knowledge"}
           </span>
         )}
         <Button
@@ -313,7 +313,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
           disabled={approving || !spec.trim()}
         >
           {approving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-          {applyToIssue ? "Accept & fill in the issue" : "Save to the Brain OS"}
+          {applyToIssue ? "Accept & fill in the issue" : "Save to the workspace's knowledge"}
         </Button>
       </div>
     </div>

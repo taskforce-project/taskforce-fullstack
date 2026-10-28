@@ -19,11 +19,13 @@ interface ProjectVisibilityPickerProps {
   readonly labels?: VisibilityLabels
 }
 
+// Visibilité DANS l'espace, pas sur internet : « Public » se confondait avec un dépôt GitHub public (décision du
+// 28/10/2026).
 const DEFAULT_LABELS: VisibilityLabels = {
-  privateTitle: "Private",
-  privateHint: "Only invited members can see it.",
-  publicTitle: "Public",
-  publicHint: "Visible to everyone in the workspace.",
+  privateTitle: "Collaborators only",
+  privateHint: "Only the project's collaborators can see it.",
+  publicTitle: "Workspace",
+  publicHint: "Everyone in the workspace can see it.",
 }
 
 /**

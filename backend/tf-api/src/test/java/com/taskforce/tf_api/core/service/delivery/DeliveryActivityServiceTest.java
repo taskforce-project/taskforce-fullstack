@@ -3,6 +3,7 @@ package com.taskforce.tf_api.core.service.delivery;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -63,6 +64,7 @@ class DeliveryActivityServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private ProjectVisibilityGuard visibilityGuard;
     @Mock private NotificationService notificationService;
+    @Mock private MissionEvidenceService evidenceService;
 
     private DeliveryActivityService service;
     private User delegator;
@@ -73,7 +75,7 @@ class DeliveryActivityServiceTest {
     void setUp() {
         LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15, 10);
         service = new DeliveryActivityService(runRepository, eventRepository, approvalRepository, userRepository,
-            visibilityGuard, notificationService, settings);
+            visibilityGuard, notificationService, settings, evidenceService);
         delegator = User.builder().id(7L).email("ada@taskforce.dev").displayName("Ada").build();
         teammate = User.builder().id(8L).email("linus@taskforce.dev").build();
         Workspace workspace = Workspace.builder().slug("acme").build();
@@ -103,7 +105,7 @@ class DeliveryActivityServiceTest {
     }
 
     @Test
-    void events_beyond_the_cap_are_dropped() {
+    void events_beyond_the_timeline_cap_still_reach_the_evidence() {
         when(eventRepository.maxSeq(100L)).thenReturn(DeliveryActivityService.MAX_EVENTS_PER_RUN - 1);
         List<RunnerEventsRequest.Event> batch = new ArrayList<>();
         for (int i = 0; i < 5; i++) batch.add(new RunnerEventsRequest.Event("text", null, "e" + i));
@@ -111,6 +113,30 @@ class DeliveryActivityServiceTest {
         service.appendEvents(run, batch);
 
         verify(eventRepository, org.mockito.Mockito.times(1)).save(any());
+        verify(evidenceService, org.mockito.Mockito.times(5)).append(eq(run), eq("note"), any(), any());
+    }
+
+    @Test
+    void a_rule_decision_goes_to_the_evidence_only_with_the_rule_as_its_actor() {
+        when(eventRepository.maxSeq(100L)).thenReturn(0);
+
+        service.appendEvents(run, List.of(new RunnerEventsRequest.Event("decision", "Bash", "git push", "deny", "no-agent-push")));
+
+        verify(eventRepository, never()).save(any());
+        ArgumentCaptor<Map<String, Object>> data = mapCaptor();
+        verify(evidenceService).append(eq(run), eq("action.decided"), eq(new MissionEvidenceService.Actor("rule", "no-agent-push")), data.capture());
+        assertThat(data.getValue()).containsEntry("effect", "deny").containsEntry("tool", "Bash");
+    }
+
+    @Test
+    void an_exit_is_shown_and_kept_as_the_runner_s_act() {
+        run.setClaimedBy("tf-runner-ada");
+        when(eventRepository.maxSeq(100L)).thenReturn(0);
+
+        service.appendEvents(run, List.of(new RunnerEventsRequest.Event("exit", "git push", "allowed by the rule push-agent-branch-private", "allow", null)));
+
+        verify(eventRepository).save(any());
+        verify(evidenceService).append(eq(run), eq("exit.result"), eq(new MissionEvidenceService.Actor("runner", "tf-runner-ada")), any());
     }
 
     // --------------------------------------------------------------------- validations, côté runner
@@ -130,13 +156,20 @@ class DeliveryActivityServiceTest {
         when(approvalRepository.findByIdAndRunId(9L, 100L)).thenReturn(Optional.of(approval));
 
         assertThat(service.approvalStatus(run, 9L).status()).isEqualTo("EXPIRED");
+        ArgumentCaptor<Map<String, Object>> data = mapCaptor();
+        verify(evidenceService).append(eq(run), eq("action.decided"), eq(MissionEvidenceService.Actor.SERVER), data.capture());
+        assertThat(data.getValue()).containsEntry("effect", "deny").containsEntry("reason", "No answer in time.");
     }
 
     @Test
-    void closing_a_run_expires_its_open_approvals() {
-        service.closeApprovals(100L);
+    void closing_a_run_expires_its_open_approvals_and_the_evidence_says_so() {
+        DeliveryRunApproval pending = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        when(approvalRepository.findByRunIdOrderByCreatedAtAsc(100L)).thenReturn(List.of(pending));
+
+        service.closeApprovals(run);
 
         verify(approvalRepository).expirePending(eq(100L), any(), eq(DeliveryApprovalStatus.PENDING), eq(DeliveryApprovalStatus.EXPIRED));
+        verify(evidenceService).append(eq(run), eq("action.decided"), eq(MissionEvidenceService.Actor.SERVER), any());
     }
 
     // --------------------------------------------------------------------- personne connectée
@@ -152,6 +185,9 @@ class DeliveryActivityServiceTest {
         assertThat(approval.getStatus()).isEqualTo(DeliveryApprovalStatus.ALLOWED);
         assertThat(approval.getDecidedBy()).isEqualTo(delegator);
         assertThat(approval.getDecidedAt()).isNotNull();
+        ArgumentCaptor<Map<String, Object>> data = mapCaptor();
+        verify(evidenceService).append(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), data.capture());
+        assertThat(data.getValue()).containsEntry("decision", "ALLOWED").containsEntry("approval", 9L);
     }
 
     @Test
@@ -209,6 +245,11 @@ class DeliveryActivityServiceTest {
 
         assertThatThrownBy(() -> service.activity("acme", 100L, 0, 8L)).isInstanceOf(ForbiddenException.class);
         verify(eventRepository, never()).findByRunIdAndSeqGreaterThanOrderBySeqAsc(any(), anyInt(), any());
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static ArgumentCaptor<Map<String, Object>> mapCaptor() {
+        return (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
     }
 
     private DeliveryRunApproval approval(DeliveryApprovalStatus status, LocalDateTime expiresAt) {

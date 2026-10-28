@@ -79,7 +79,7 @@ class DeliveryRunnerControllerWebMvcTest {
     void claim_returns_brief() throws Exception {
         when(localRunnerService.claim(new RunnerIdentity("tf-runner-pierre", "pierre@taskforce.dev")))
             .thenReturn(Optional.of(new RunnerClaimResponse(100L, 55L, "WEB-4", "Fix the footer", "Details",
-                12L, "Website", "acme", "acme/website", "claude-sonnet-5", LocalDateTime.now().plusHours(2))));
+                12L, "Website", "acme", "acme/website", "claude-sonnet-5", LocalDateTime.now().plusHours(2), null)));
 
         mockMvc.perform(post("/api/delivery/runner/claim").with(runner()))
             .andExpect(status().isOk())

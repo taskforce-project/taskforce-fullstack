@@ -2,6 +2,8 @@ package com.taskforce.tf_api.core.api;
 
 import java.util.List;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -154,6 +156,28 @@ public class DeliveryController {
         boolean allow = "ALLOW".equals(request.decision());
         activityService.decide(slug, runId, approvalId, allow, resolveUserId(jwt));
         return ResponseEntity.ok(ApiResponse.success(allow ? "Action allowed" : "Action denied", null));
+    }
+
+    /**
+     * GET /api/workspaces/{slug}/delivery/runs/{runId}/evidence?format=json|md : le dossier de preuve de la mission
+     * (spécification de la v2, §9). En JSON, le fichier {@code taskforce-evidence/1} tel quel, sans enveloppe : il se
+     * vérifie sans TaskForce, par recalcul des empreintes. En Markdown, le même, lisible, avec le résultat de ce recalcul.
+     * 404 pour un run sans dossier (antérieur à la v2).
+     */
+    @GetMapping("/runs/{runId}/evidence")
+    public ResponseEntity<String> evidence(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long runId,
+        @RequestParam(defaultValue = "json") String format
+    ) {
+        boolean markdown = "md".equalsIgnoreCase(format);
+        String file = activityService.dossier(slug, runId, resolveUserId(jwt), markdown)
+            .orElseThrow(() -> new ResourceNotFoundException("This run has no evidence file"));
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"evidence-run-" + runId + (markdown ? ".md\"" : ".json\""))
+            .contentType(markdown ? MediaType.parseMediaType("text/markdown; charset=UTF-8") : MediaType.APPLICATION_JSON)
+            .body(file);
     }
 
     private Long resolveUserId(Jwt jwt) {
