@@ -102,6 +102,8 @@ export interface DeliveryRunApproval {
   decidedAt: string | null;
   decidedBy: string | null;
   canDecide: boolean;
+  /** Qui demande : l'agent, ou TaskForce lui-même avant une sortie, les tests du projet ou un départ (décision J4). */
+  askedBy?: "agent" | "runner";
 }
 
 export interface DeliveryRunActivity {
