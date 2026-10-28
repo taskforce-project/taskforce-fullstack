@@ -19,6 +19,7 @@ import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.exception.BusinessException;
@@ -47,6 +48,7 @@ public class DeliveryService {
     private final ProjectVisibilityGuard visibilityGuard;
     private final BrainAccessGuard access;
     private final ProjectRepository projectRepository;
+    private final IssueService issueService;
 
     /**
      * Crée un run de délégation (QUEUED) pour une issue vers un provider disponible. Écriture sur
@@ -83,6 +85,8 @@ public class DeliveryService {
             .startedBy(startedBy)
             .build();
         run = runRepository.save(run);
+        // J4 : la délégation se voit, la personne d'abord ; une issue sans assigné prend pour assigné qui délègue.
+        issueService.assignDelegatorIfUnassigned(issue, startedBy);
 
         log.info("Délégation issue {} -> provider {} (run {}, QUEUED)", issueId, provider.key(), run.getId());
         return toResponse(run);
