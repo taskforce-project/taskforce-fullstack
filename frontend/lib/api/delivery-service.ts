@@ -79,8 +79,11 @@ export async function listWorkspaceRuns(slug: string): Promise<DeliveryRun[]> {
 /** Un événement de la chronologie d'un run du runner local (lot 5). */
 export interface DeliveryRunEvent {
   seq: number;
-  /** `exit` : une sortie du runner (push, pull request), faite ou non ; `limit` : le plafond d'événements atteint. */
-  kind: "start" | "text" | "tool" | "error" | "denied" | "exit" | "limit";
+  /**
+   * `exit` : une sortie du runner (push, pull request), faite ou non ; `limit` : le plafond d'événements atteint ;
+   * `test` : les tests du projet, lancés par le runner après l'agent (S1).
+   */
+  kind: "start" | "text" | "tool" | "error" | "denied" | "exit" | "limit" | "test";
   tool: string | null;
   text: string;
   at: string | null;

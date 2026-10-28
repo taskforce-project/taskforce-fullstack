@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Ban, CircleAlert, FileCheck2, Loader2, MessageSquareText, Play, ShieldQuestion, Upload, Wrench } from "lucide-react"
+import { Ban, CircleAlert, FileCheck2, FlaskConical, Loader2, MessageSquareText, Play, ShieldQuestion, Upload, Wrench } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -24,6 +24,7 @@ const EVENT_ICON: Record<DeliveryRunEvent["kind"], React.ElementType> = {
   denied: Ban,
   exit: Upload,
   limit: CircleAlert,
+  test: FlaskConical,
 }
 
 function minutesLeft(expiresAt: string | null): string {

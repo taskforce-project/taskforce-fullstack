@@ -5,6 +5,7 @@ import { ExternalLink, Loader2, Plug } from "lucide-react"
 import { toast } from "sonner"
 
 import { DesktopGitHubConnect } from "@/components/desktop/desktop-github-connect"
+import { ProjectTestCommand } from "@/components/projects/project-test-command"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { BrandLogo } from "@/components/ui/brand-logo"
@@ -156,6 +157,8 @@ export function ProjectRepositoryCard({ workspace, projectId }: Readonly<{ works
           )}
         </div>
       )}
+
+      {repoFullName && !editing && <ProjectTestCommand workspace={workspace} projectId={projectId} />}
 
       {IS_DESKTOP && !connected && (
         <DesktopGitHubConnect
