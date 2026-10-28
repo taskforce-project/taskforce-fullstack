@@ -153,6 +153,10 @@ taskforce:
     email-verification: false
   webhooks:
     allow-private-network: true
+  alerts:
+    # Une personne par app : l'alerte de surcharge préviendrait la personne sur elle-même et renverrait vers les pages
+    # d'équipe, masquées dans l'app (PC-061). "-" coupe la tâche planifiée ; elle reviendra avec les espaces d'équipe.
+    overload-cron: "-"
 
 delivery:
   local-runner:

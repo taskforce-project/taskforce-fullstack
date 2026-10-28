@@ -1,7 +1,9 @@
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 
+import { DesktopLegal } from "@/components/legal/desktop-legal"
 import { SelfHostedLegal, isSelfHosted } from "@/components/legal/self-hosted-legal"
+import { IS_DESKTOP } from "@/lib/desktop"
 
 export const metadata = {
   title: "Legal Notices - TaskForce",
@@ -9,6 +11,8 @@ export const metadata = {
 }
 
 export default function LegalNoticesPage() {
+  // App desktop : l'éditeur du logiciel, et le compte en ligne sous les conditions du service web.
+  if (IS_DESKTOP) return <DesktopLegal kind="legal" />
   // Instance auto-hébergée : son administrateur en répond, pas l'éditeur du service hébergé.
   if (isSelfHosted()) return <SelfHostedLegal kind="legal" />
   return (

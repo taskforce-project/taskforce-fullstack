@@ -119,12 +119,6 @@ export function EditProjectDialog({ project, slug, open, onOpenChange }: EditPro
             <ProjectVisibilityPicker
               value={isPublic}
               onChange={setIsPublic}
-              labels={{
-                privateTitle: "Private",
-                privateHint: "Visible only to invited members.",
-                publicTitle: "Public",
-                publicHint: "Visible to the entire workspace.",
-              }}
             />
           </div>
         </div>

@@ -51,14 +51,12 @@ function segmentLabel(segment: string): string {
     issues: "Issues",
     cycles: "Sprints",
     roadmap: "Roadmap",
-    pages: "Pages",
     modules: "Modules",
     views: "Views",
     spans: "Spans",
     wiki: "Wiki",
     mentions: "Mentions",
     alerts: "Alerts",
-    assignments: "Assignments",
   }
   return (
     labels[segment] ??

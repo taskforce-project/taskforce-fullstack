@@ -5,10 +5,11 @@ import type { Claim } from "./api.js";
 import { ApprovalServer, type ApprovalApi } from "./approvals.js";
 import type { RunnerConfig } from "./config.js";
 import { EventRelay, type EventSink } from "./events.js";
+import type { RulesBundle } from "./harness/rules.js";
 import { log } from "./log.js";
 import { run } from "./proc.js";
 import { buildPrompt, buildReplyPrompt } from "./prompt.js";
-import { parseAgentOutput, toEvents, type AgentOutcome } from "./stream.js";
+import { describeToolInput, parseAgentOutput, toEvents, toolLabel, type AgentOutcome } from "./stream.js";
 
 export type { AgentOutcome } from "./stream.js";
 export { parseAgentOutput } from "./stream.js";
@@ -26,41 +27,15 @@ const HOOK_TOKEN_ENV = "TF_HOOK_TOKEN";
  * Mode d'exécution de l'agent :
  * - `repo` : le projet a un dépôt, l'agent travaille dans un worktree git et livre par pull request ;
  * - `repoless` : le projet n'a pas de dépôt (tâche non-code), l'agent travaille dans un dossier temporaire
- *   jetable et rend son travail dans TaskForce (commentaire markdown). Pas de git, donc aucun outil Bash.
+ *   jetable et rend son travail dans TaskForce (commentaire markdown). Rien à pousser.
  */
 export type AgentMode = "repo" | "repoless";
-
-/** Outils MCP TaskForce ouverts d'office : ceux qui restent dans le périmètre d'une session déléguée. */
-const MCP_TOOLS = [
-  "get_issue", "add_comment", "brain_search", "list_projects", "list_issues", "list_issue_statuses",
-  "list_my_issues", "workspace_kpis", "create_issue", "update_issue",
-];
 
 /**
  * Jamais permis, même validé dans l'app : le runner pousse et ouvre la pull request lui-même, après l'agent. Une
  * règle de refus passe avant le hook de validation.
  */
 export const DENIED_TOOLS = ["Bash(git push)", "Bash(git push *)", "Bash(gh)", "Bash(gh *)"];
-
-/**
- * Outils pré-autorisés : lire et modifier le dossier de travail, les commandes git locales, les outils MCP du run.
- * Toute autre action (installer un paquet, lancer les tests, réseau...) n'est pas refusée d'office : elle devient une
- * demande de validation dans TaskForce (OSS-5.4). En mode `repoless` il n'y a pas de dépôt, donc pas de git.
- */
-export function allowedTools(extra: string[], mode: AgentMode = "repo"): string[] {
-  const local = mode === "repoless"
-    ? ["Read", "Glob", "Grep", "Edit", "Write"]
-    : [
-        "Read", "Glob", "Grep", "Edit", "Write",
-        "Bash(git status *)", "Bash(git status)", "Bash(git diff *)", "Bash(git diff)", "Bash(git log *)",
-        "Bash(git add *)", "Bash(git commit *)", "Bash(git mv *)", "Bash(git rm *)",
-      ];
-  return [
-    ...local,
-    ...MCP_TOOLS.map((tool) => `mcp__${MCP_SERVER}__${tool}`),
-    ...extra,
-  ];
-}
 
 /**
  * Nom de modèle sûr à poser sur une ligne de commande, ou null. Le modèle choisi à la délégation vient du
@@ -71,17 +46,16 @@ export function safeModel(model: string | null | undefined): string | null {
 }
 
 /** Arguments de `claude -p`. Exporté pour les tests : c'est la frontière de sécurité de l'exécution locale. */
-export function agentArgs(config: RunnerConfig, claim: Claim, mcpConfigPath: string, settingsPath: string, mode: AgentMode = "repo"): string[] {
+export function agentArgs(config: RunnerConfig, claim: Claim, mcpConfigPath: string, settingsPath: string): string[] {
   const args = [
     "-p",
     // Suivi en direct : une ligne JSON par message, relayée à la chronologie du run dans TaskForce.
     "--output-format", "stream-json",
     "--verbose",
-    // Validations dans l'app : hors du socle pré-autorisé, une action attend une décision humaine (hook
-    // PermissionRequest du fichier --settings). Personne d'autre ne répond : sans décision, refus.
+    // Les règles de la mission jugent chaque action (hook PreToolUse du fichier --settings). Une action qu'elles
+    // demandent attend une décision humaine (hook PermissionRequest) ; personne d'autre ne répond : sans décision, refus.
     "--permission-mode", "manual",
     "--permission-prompts", "none",
-    "--allowedTools", allowedTools(config.agent.extraAllowedTools, mode).join(","),
     "--disallowedTools", DENIED_TOOLS.join(","),
     "--mcp-config", mcpConfigPath,
     "--strict-mcp-config",
@@ -93,6 +67,10 @@ export function agentArgs(config: RunnerConfig, claim: Claim, mcpConfigPath: str
     "--settings", settingsPath,
     "--max-turns", String(config.agent.maxTurns),
   ];
+  // Rien n'est autorisé d'avance, sauf ce que la personne ajoute sur son poste : une autorisation d'avance passerait
+  // outre une règle qui demande (une règle qui refuse la bloque toujours).
+  const extra = config.agent.extraAllowedTools;
+  if (extra.length > 0) args.push("--allowedTools", extra.join(","));
   const model = safeModel(config.agent.model) ?? safeModel(claim.model);
   if (model) args.push("--model", model);
   return args;
@@ -135,14 +113,29 @@ export function mcpConfig(config: RunnerConfig, claim: Claim, sessionToken: stri
 }
 
 /**
- * Réglages imposés à la session : pas d'attribution (sauf choix contraire), et le hook de validation vers le
- * serveur local du runner. Le délai du hook dépasse l'attente du serveur : c'est le serveur qui répond « refusé ».
+ * Réglages imposés à la session : pas d'attribution (sauf choix contraire), et deux hooks vers le serveur local du
+ * runner : les règles avant chaque action, la décision humaine pour ce qu'elles demandent. Le délai du second dépasse
+ * l'attente du serveur : c'est le serveur qui répond « refusé ».
  */
-export function agentSettings(config: RunnerConfig, hookUrl: string): Record<string, unknown> {
+export function agentSettings(config: RunnerConfig, hookUrl: string, preToolUseUrl: string): Record<string, unknown> {
   return {
     // Les deux clés, l'ancienne et la nouvelle, pour couvrir les versions de Claude Code.
     ...(config.agent.attribution ? {} : { includeCoAuthoredBy: false, attribution: { commit: "", pr: "" } }),
     hooks: {
+      // Avant CHAQUE action, autorisée d'avance ou non : les règles de la mission, jugées sur place. Garde fermée : un
+      // serveur local injoignable bloque l'action au lieu de la laisser passer (onFailure, Claude Code 2.1.295,
+      // d'après son journal des versions).
+      PreToolUse: [{
+        matcher: ".*",
+        hooks: [{
+          type: "http",
+          url: preToolUseUrl,
+          headers: { Authorization: `Bearer $${HOOK_TOKEN_ENV}` },
+          allowedEnvVars: [HOOK_TOKEN_ENV],
+          timeout: 30,
+          onFailure: "block",
+        }],
+      }],
       PermissionRequest: [{
         matcher: ".*",
         hooks: [{
@@ -151,6 +144,7 @@ export function agentSettings(config: RunnerConfig, hookUrl: string): Record<str
           headers: { Authorization: `Bearer $${HOOK_TOKEN_ENV}` },
           allowedEnvVars: [HOOK_TOKEN_ENV],
           timeout: config.agent.approvalTimeoutMinutes * 60 + 60,
+          onFailure: "block",
         }],
       }],
     },
@@ -159,6 +153,8 @@ export function agentSettings(config: RunnerConfig, hookUrl: string): Record<str
 
 export interface AgentRunOptions {
   mode: AgentMode;
+  /** Les règles de la mission, déjà vérifiées par leur empreinte. */
+  rules: RulesBundle;
   /** Nom de la branche git (mode `repo`) ; absent en mode `repoless`. */
   branch?: string;
   /** Arrêt du runner : Claude Code est arrêté tout de suite, le run finit en échec. */
@@ -181,15 +177,27 @@ export async function runAgent(
   const mcpConfigPath = join(tmp, `run-${claim.runId}-mcp.json`);
   const settingsPath = join(tmp, `run-${claim.runId}-settings.json`);
 
-  const approvals = new ApprovalServer(api, claim.runId, workDir, { waitMs: config.agent.approvalTimeoutMinutes * 60_000 });
   const relay = new EventRelay(api, claim.runId);
+  const approvals = new ApprovalServer(api, claim.runId, workDir, {
+    waitMs: config.agent.approvalTimeoutMinutes * 60_000,
+    rules: opts.rules,
+    // Chaque décision des règles va au dossier de preuve de la mission (le serveur ne l'affiche pas dans la chronologie).
+    onDecision: (tool, d, input) => {
+      log.info(`Rule decision: ${tool} ${d.effect}${d.rule ? ` (${d.rule.id})` : ""}`);
+      relay.push([{
+        kind: "decision", tool: toolLabel(tool), text: describeToolInput(tool, input, workDir) || "(no details)",
+        effect: d.effect, ...(d.rule ? { rule: d.rule.id } : {}),
+      }]);
+    },
+    beforeAsk: () => relay.flush(),
+  });
   const hookUrl = await approvals.start();
 
   writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig(config, claim, sessionToken)), { encoding: "utf8", mode: 0o600 });
-  writeFileSync(settingsPath, JSON.stringify(agentSettings(config, hookUrl)), { encoding: "utf8", mode: 0o600 });
+  writeFileSync(settingsPath, JSON.stringify(agentSettings(config, hookUrl, approvals.preToolUseUrl)), { encoding: "utf8", mode: 0o600 });
 
   try {
-    const result = await run(config.agent.command, agentArgs(config, claim, mcpConfigPath, settingsPath, opts.mode), {
+    const result = await run(config.agent.command, agentArgs(config, claim, mcpConfigPath, settingsPath), {
       cwd: workDir,
       env: agentEnv(config, process.env, approvals.token),
       input: opts.mode === "repoless" ? buildReplyPrompt(claim) : buildPrompt(claim, opts.branch ?? ""),

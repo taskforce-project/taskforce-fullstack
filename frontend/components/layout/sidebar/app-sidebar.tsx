@@ -11,7 +11,6 @@ import {
   ListChecksIcon,
   LayersIcon,
   ActivityIcon,
-  BrainIcon,
   UserIcon,
   PlusIcon,
   Settings2Icon,
@@ -90,7 +89,6 @@ const NAV_COMMAND: readonly NavItem[] = [
       { key: "nav.sub.allNotifications", url: "/inbox" },
       { key: "nav.sub.mentions",         url: "/inbox/mentions" },
       { key: "nav.sub.alerts",           url: "/inbox/alerts" },
-      { key: "nav.sub.assignments",      url: "/inbox/assignments" },
     ],
   },
   {
@@ -101,7 +99,6 @@ const NAV_COMMAND: readonly NavItem[] = [
       { key: "nav.sub.myAll",    url: "/my-work" },
       { key: "nav.sub.myIssues", url: "/my-work/issues" },
       { key: "nav.sub.myCycles", url: "/my-work/cycles" },
-      { key: "nav.sub.myPages",  url: "/my-work/pages" },
     ],
   },
 ]
@@ -116,11 +113,6 @@ const NAV_WORK: readonly NavItem[] = [
     key: "nav.analytics",
     url: "/analytics",
     aicon: ActivityIcon,
-  },
-  {
-    key: "nav.brain",
-    url: "/brain",
-    aicon: BrainIcon,
   },
   // Agents retiré (11/07/2026) : non construit, aucune utilité pour l'instant.
 ]

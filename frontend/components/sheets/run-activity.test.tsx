@@ -12,6 +12,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/api/delivery-service", () => ({
   getRunActivity: vi.fn(),
   decideApproval: vi.fn(),
+  downloadEvidence: vi.fn(),
   getRunnerStatus: vi.fn(),
   provisionRunner: vi.fn(),
   getDeliveryProviders: vi.fn(),
@@ -86,6 +87,32 @@ describe("RunActivity : chronologie en direct et validations", () => {
     expect(screen.queryByRole("button", { name: "Allow" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Show activity \(3 steps\)/ }));
     expect(screen.getByText(/Denied by Ada/)).toBeInTheDocument();
+  });
+
+  it("run terminé : le dossier se télécharge en JSON ou en Markdown", async () => {
+    vi.mocked(svc.downloadEvidence).mockResolvedValue(undefined);
+    render(<RunActivity slug="acme" runId={100} activity={activity()} live={false} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "JSON" }));
+    fireEvent.click(screen.getByRole("button", { name: "Markdown" }));
+
+    await waitFor(() => expect(svc.downloadEvidence).toHaveBeenCalledWith("acme", 100, "md"));
+    expect(svc.downloadEvidence).toHaveBeenCalledWith("acme", 100, "json");
+  });
+
+  it("run sans dossier : le dit, sans rien télécharger", async () => {
+    vi.mocked(svc.downloadEvidence).mockRejectedValue(new Error("404"));
+    const { toast } = await import("sonner");
+    render(<RunActivity slug="acme" runId={100} activity={activity()} live={false} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "JSON" }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/No record for this run/)));
+  });
+
+  it("run en cours : pas encore de dossier à télécharger", () => {
+    render(<RunActivity slug="acme" runId={100} activity={activity()} live />);
+    expect(screen.queryByRole("button", { name: "JSON" })).not.toBeInTheDocument();
   });
 
   it("rien à montrer sans activité", () => {

@@ -38,6 +38,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -109,7 +111,7 @@ class DeliveryControllerWebMvcTest {
     @DisplayName("GET /delivery/issues/{id}/run → 200 (data null si aucun run)")
     void latestRun_200_empty() throws Exception {
         var a = auth();
-        when(deliveryService.latestRun(anyString(), anyLong(), anyLong())).thenReturn(java.util.Optional.empty());
+        when(deliveryService.latestRun(anyString(), anyLong(), anyLong())).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/workspaces/acme/delivery/issues/5/run").with(a))
             .andExpect(status().isOk())
@@ -177,6 +179,33 @@ class DeliveryControllerWebMvcTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.events[0].seq").value(4))
             .andExpect(jsonPath("$.data.approvals[0].canDecide").value(true));
+    }
+
+    @ParameterizedTest(name = "GET /runs/100/evidence?format={0} : {1}, sans enveloppe")
+    @CsvSource({
+        "json, application/json, evidence-run-100.json, false",
+        "md, text/markdown, evidence-run-100.md, true",
+    })
+    void evidence_200(String format, String type, String file, boolean markdown) throws Exception {
+        var a = auth();
+        when(activityService.dossier("acme", 100L, 7L, markdown)).thenReturn(Optional.of("FILE"));
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/runs/100/evidence").param("format", format).with(a))
+            .andExpect(status().isOk())
+            .andExpect(content().contentTypeCompatibleWith(type))
+            .andExpect(header()
+                .string("Content-Disposition", "attachment; filename=\"" + file + "\""))
+            .andExpect(content().string("FILE"));
+    }
+
+    @Test
+    @DisplayName("GET /runs/{id}/evidence : 404 pour un run sans dossier")
+    void evidence_404_without_file() throws Exception {
+        var a = auth();
+        when(activityService.dossier("acme", 100L, 7L, false)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/runs/100/evidence").with(a))
+            .andExpect(status().isNotFound());
     }
 
     @ParameterizedTest(name = "POST approval : {0} -> autorisé={1}")

@@ -23,7 +23,7 @@ import type { Signal, Urgency } from "@/lib/store/notification-store"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type NotifTab = "all" | "mentions" | "alerts" | "assignments"
+export type NotifTab = "all" | "mentions" | "alerts"
 
 // ─── Presentation config (Tailwind utilities only) ───────────────────────────
 
@@ -66,7 +66,6 @@ const TABS: { key: NotifTab; icon: React.ElementType; label: string; filter: (s:
   { key: "all",         icon: Radio,         label: "All", filter: () => true },
   { key: "alerts",      icon: ShieldAlert,   label: "Alerts",      filter: (s) => s.type === "dueSoon" || s.type === "overdue" },
   { key: "mentions",    icon: AtSign,        label: "Mentions",    filter: (s) => s.type === "mention" },
-  { key: "assignments", icon: ClipboardList, label: "Assignments", filter: (s) => s.type === "assigned" },
 ]
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
@@ -76,7 +75,6 @@ function EmptyState({ tab }: { readonly tab: NotifTab }) {
     all:         { title: "All clear",        sub: "No signals in your feed." },
     alerts:      { title: "No active alerts",  sub: "Operations are running smoothly." },
     mentions:    { title: "No mentions",       sub: "Nobody has mentioned you yet." },
-    assignments: { title: "Nothing assigned",  sub: "You have no open assignments." },
   }
   const { title, sub } = messages[tab]
   return (
@@ -272,7 +270,7 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Signal Center</h1>
           <p className="text-sm text-muted-foreground">
-            Operational alerts, mentions, and assignments - sorted by urgency
+            Operational alerts and mentions, sorted by urgency. What is assigned to you lives in My Work.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">

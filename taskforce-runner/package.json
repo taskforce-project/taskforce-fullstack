@@ -15,6 +15,7 @@
     "dev": "tsx src/index.ts",
     "check": "tsx src/index.ts --check",
     "once": "tsx src/index.ts --once",
+    "verify": "tsx src/verify-cli.ts",
     "test": "tsx --test test/*.test.ts"
   },
   "engines": {

@@ -64,6 +64,8 @@ export const DELIVERY_ROUTES = {
   /** Autorise ou refuse une action de l'agent (POST, réservé à la personne qui a délégué). */
   DECIDE: (slug: string, runId: number, approvalId: number) =>
     `/api/workspaces/${slug}/delivery/runs/${runId}/approvals/${approvalId}`,
+  /** Dossier de preuve d'un run, `?format=json|md` (GET, fichier sans enveloppe ; 404 pour un run de la v1). */
+  EVIDENCE: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/evidence`,
   /** Serveur MCP de l'instance pour ce workspace (adresse à donner à Claude Code, pas appelée par le front). */
   MCP_SERVER: (slug: string) => `/api/workspaces/${slug}/mcp`,
   /**
@@ -112,14 +114,6 @@ export const USER_ROUTES = {
   SEARCH: (q: string) => `/api/users/search?q=${encodeURIComponent(q)}`,
   /** Clôture du parcours d'onboarding (rôle + drapeau). */
   ONBOARDING: "/api/users/me/onboarding",
-} as const;
-
-/**
- * Statut opérationnel (santé services, lue de l'actuator).
- * Backend: @RequestMapping("/api/status")
- */
-export const STATUS_ROUTES = {
-  SYSTEM: "/api/status",
 } as const;
 
 /**
@@ -240,8 +234,6 @@ export const ISSUE_ROUTES = {
   MY_ISSUES: (slug: string) => `/api/workspaces/${slug}/my-issues`,
   /** Vue My Work - cycles de tous les projets visibles, en un appel (évite un appel par projet) */
   MY_CYCLES: (slug: string) => `/api/workspaces/${slug}/my-cycles`,
-  /** Vue My Work - pages récentes de tous les projets visibles, en un appel */
-  MY_PAGES:  (slug: string) => `/api/workspaces/${slug}/my-pages`,
   LIST:    (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues`,
   /** Liste paginée pour l'infinite-scroll du backlog (QA2-33) */
   PAGED:   (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/paged`,
@@ -387,18 +379,6 @@ export const PROFILE_ROUTES = {
 } as const;
 
 /**
- * Routes pages/wiki
- * Backend: /api/workspaces/{slug}/projects/{projectId}/pages
- */
-export const PAGE_ROUTES = {
-  LIST:   (slug: string, projectId: string) => `/api/workspaces/${slug}/projects/${projectId}/pages`,
-  CREATE: (slug: string, projectId: string) => `/api/workspaces/${slug}/projects/${projectId}/pages`,
-  GET:    (slug: string, projectId: string, pageId: string) => `/api/workspaces/${slug}/projects/${projectId}/pages/${pageId}`,
-  UPDATE: (slug: string, projectId: string, pageId: string) => `/api/workspaces/${slug}/projects/${projectId}/pages/${pageId}`,
-  DELETE: (slug: string, projectId: string, pageId: string) => `/api/workspaces/${slug}/projects/${projectId}/pages/${pageId}`,
-} as const;
-
-/**
  * Routes teams
  * Backend: /api/workspaces/{slug}/teams
  */
@@ -487,19 +467,6 @@ export const ATTACHMENT_ROUTES = {
  */
 export const ROADMAP_ROUTES = {
   SCHEDULED: (slug: string) => `/api/workspaces/${slug}/roadmap`,
-} as const;
-
-/**
- * Routes Brain OS (couche de connaissance / knowledge graph)
- * Backend: /api/workspaces/{slug}/brain
- */
-export const BRAIN_ROUTES = {
-  OVERVIEW:    (slug: string) => `/api/workspaces/${slug}/brain`,
-  SEARCH:      (slug: string) => `/api/workspaces/${slug}/brain/search`,
-  NODES:       (slug: string) => `/api/workspaces/${slug}/brain/nodes`,
-  NODE:        (slug: string, nodeId: number) => `/api/workspaces/${slug}/brain/nodes/${nodeId}`,
-  NODE_MOVE:   (slug: string, nodeId: number) => `/api/workspaces/${slug}/brain/nodes/${nodeId}/move`,
-  FILES:       (slug: string) => `/api/workspaces/${slug}/brain/files`,
 } as const;
 
 /**

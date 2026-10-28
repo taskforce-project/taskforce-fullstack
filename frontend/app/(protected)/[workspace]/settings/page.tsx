@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, useParams } from "next/navigation"
 import {
   User, Bell, Mail, Zap, Globe, Key, Palette, Webhook,
   Upload, Camera, Trash2, Shield, Loader2, RotateCcw,
-  Activity, CheckCircle2, AlertTriangle, Gauge, Search, Bot, Sparkles,
+  Activity, Gauge, Search, Bot, Sparkles,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTheme } from "next-themes"
@@ -49,7 +49,6 @@ import {
   type NotificationPreference,
   type NotificationEventKey,
 } from "@/lib/api/notification-service"
-import { getSystemStatus, type SystemStatus } from "@/lib/api/status-service"
 import { apiClient, getErrorMessage } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
 import { cn } from "@/lib/utils"
@@ -68,7 +67,7 @@ export type SettingsSection =
   | "workspace"
   | "usage"
   | "ai"
-  | "status"
+  | "audit"
   | "integrations"
   | "agents"
   | "privacy"
@@ -91,7 +90,7 @@ const ALL_SECTIONS: SectionConfig[] = [
   { key: "ai",            label: "AI",             icon: <Sparkles className="h-4 w-4" />,    group: "Workspace" },
   { key: "integrations",  label: "Integrations",   icon: <Webhook className="h-4 w-4" />,    group: "Workspace" },
   { key: "agents",        label: "Agents",         icon: <Bot className="h-4 w-4" />,        group: "Workspace" },
-  { key: "status",        label: "Status",         icon: <Activity className="h-4 w-4" />,    group: "Workspace" },
+  { key: "audit",         label: "Audit log",      icon: <Activity className="h-4 w-4" />,    group: "Workspace" },
   { key: "privacy",       label: "Privacy & Data", icon: <Shield className="h-4 w-4" />,     group: "Personal" },
 ]
 
@@ -107,7 +106,7 @@ export const SECTIONS: SectionConfig[] = ALL_SECTIONS.filter((s) =>
 
 export const SECTION_GROUPS = [
   { label: "Personal",  keys: ["profile", "account", "appearance", "notifications", "security", "privacy"] as const },
-  { label: "Workspace", keys: ["workspace", "ai", "usage", "integrations", "agents", "status"] as const },
+  { label: "Workspace", keys: ["workspace", "ai", "usage", "integrations", "agents", "audit"] as const },
 ]
 
 // SKILL_OPTIONS + SkillsTagInput retirés avec le faux champ « Skills » du Profil (TF-SETTINGS-FAKE) :
@@ -1026,7 +1025,7 @@ function WorkspaceMoveCard({ slug }: Readonly<{ slug: string }>) {
   const [importing, setImporting] = useState(false)
 
   async function handleDownload() {
-    const progress = notifyProgress("Exporting the workspace", { description: "Packing its Brain OS and projects…" })
+    const progress = notifyProgress("Exporting the workspace", { description: "Packing its notes and projects…" })
     try {
       await downloadWorkspaceBundle(slug, (pct) => progress.setProgress(pct))
       progress.success("Workspace file ready")
@@ -1063,7 +1062,7 @@ function WorkspaceMoveCard({ slug }: Readonly<{ slug: string }>) {
   return (
     <SectionCard
       title="Move or back up this workspace"
-      description="The whole workspace in one file: its Brain OS, and every project you can see with its issues, history, pages and attachments."
+      description="The whole workspace in one file: its notes and documents, and every project you can see with its issues, history and attachments."
     >
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4">
@@ -1184,7 +1183,7 @@ function WorkspacePanel() {
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all resize-none"
             />
           </FormField>
-          <FormField label="Activity" hint="What does your company / team do? Feeds the Brain OS so the AI knows your context.">
+          <FormField label="Activity" hint="What does your company / team do? It gives the AI your context.">
             <textarea
               value={activity}
               onChange={(e) => setActivity(e.target.value)}
@@ -1234,34 +1233,10 @@ function WorkspacePanel() {
 }
 
 
-// ── Status (santé de l'app, façon status page) ──────────────────────────────
-function StatusPanel() {
+// ── Journal d'audit (OWNER/ADMIN) : ce qui a changé dans l'espace, et qui l'a changé ──────────
+function AuditLogPanel() {
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
-  const [health, setHealth] = useState<SystemStatus | null>(null)
-  const [apiState, setApiState] = useState<"checking" | "ok" | "down">("checking")
   const [logs, setLogs] = useState<AuditLogEntry[]>([])
-
-  // Santé RÉELLE lue du serveur (actuator via /api/status). Robuste : on réessaie avant de crier
-  // à l'incident (évite un faux positif sur un hiccup réseau / redémarrage).
-  useEffect(() => {
-    let alive = true
-    async function load() {
-      for (let attempt = 1; attempt <= 3 && alive; attempt++) {
-        try {
-          const s = await getSystemStatus()
-          if (!alive) return
-          setHealth(s)
-          setApiState("ok")
-          return
-        } catch {
-          if (attempt === 3) { if (alive) setApiState("down"); return }
-          await new Promise((r) => setTimeout(r, 1500))
-        }
-      }
-    }
-    void load()
-    return () => { alive = false }
-  }, [])
 
   useEffect(() => {
     if (!slug) return
@@ -1283,89 +1258,34 @@ function StatusPanel() {
     URL.revokeObjectURL(url)
   }
 
-  // Libellés lisibles pour les indicateurs actuator + normalisation de l'état.
-  const COMPONENT_LABELS: Record<string, string> = {
-    db: "Database", dataSource: "Database", ping: "API ping", diskSpace: "Disk space",
-    redis: "Cache (Redis)", mail: "Email (SMTP)", ssl: "SSL",
-    livenessState: "Liveness", readinessState: "Readiness",
-  }
-  const labelFor = (k: string) => COMPONENT_LABELS[k] ?? k.charAt(0).toUpperCase() + k.slice(1)
-  const kind = (s: string): "UP" | "DOWN" | "DEGRADED" =>
-    s === "UP" ? "UP" : (s === "DOWN" || s === "OUT_OF_SERVICE") ? "DOWN" : "DEGRADED"
-
-  type Row = { name: string; state: "UP" | "DOWN" | "DEGRADED" | "CHECKING"; detail: string }
-  const rows: Row[] = [
-    { name: "App (interface)", state: "UP", detail: "Loaded" },
-    {
-      name: "TaskForce API",
-      state: apiState === "checking" ? "CHECKING" : apiState === "ok" ? "UP" : "DOWN",
-      detail: apiState === "checking" ? "Checking…" : apiState === "ok" ? "Operational" : "Unreachable",
-    },
-    ...(health?.components ?? []).map<Row>((c) => ({ name: labelFor(c.key), state: kind(c.status), detail: c.status })),
-  ]
-  const overall: Row["state"] =
-    apiState === "checking" ? "CHECKING"
-      : apiState === "down" ? "DOWN"
-      : health ? kind(health.status)
-      : "DEGRADED"
-  const dotClass = (s: Row["state"]) =>
-    s === "UP" ? "bg-shape-green" : s === "DOWN" ? "bg-shape-red" : s === "DEGRADED" ? "bg-shape-yellow" : "bg-muted-foreground/40"
-
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
-      <div>
-        <h2 className="text-sm font-semibold text-foreground">Application status</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">Live service health, read from the server.</p>
-      </div>
-
-      <div className={cn(
-        "flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium",
-        overall === "UP" ? "border-shape-green/30 bg-shape-green/10 text-ink-green"
-          : overall === "DOWN" ? "border-destructive/30 bg-destructive/10 text-destructive"
-          : "border-shape-yellow/30 bg-shape-yellow/10 text-ink-yellow"
-      )}>
-        {overall === "UP" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-        {overall === "CHECKING" ? "Checking service health…"
-          : overall === "UP" ? "All systems operational"
-          : overall === "DOWN" ? "Major outage affecting one or more services"
-          : "Degraded - some services report issues"}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Audit log</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">What changed in this workspace, and who changed it.</p>
+        </div>
+        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={exportAuditCsv} disabled={logs.length === 0}>
+          <Upload className="h-3.5 w-3.5" /> Export CSV
+        </Button>
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
-        {rows.map((r, i) => (
-          <div key={r.name} className={cn("flex items-center gap-3 px-4 py-3", i < rows.length - 1 && "border-b border-border/50")}>
-            <span className={cn("size-2 rounded-full shrink-0", dotClass(r.state))} />
-            <span className="flex-1 text-sm text-foreground">{r.name}</span>
-            <span className="text-xs text-muted-foreground">{r.detail}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Journal d'audit (OWNER/ADMIN) + export CSV */}
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">Audit log</h3>
-          <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={exportAuditCsv} disabled={logs.length === 0}>
-            <Upload className="h-3.5 w-3.5" /> Export CSV
-          </Button>
-        </div>
-        <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
-          {logs.length === 0 ? (
-            <p className="px-4 py-6 text-center text-xs text-muted-foreground">No audit entries (admins only).</p>
-          ) : (
-            logs.slice(0, 30).map((l, i) => (
-              <div key={l.id} className={cn("flex items-center gap-3 px-4 py-2.5", i < Math.min(logs.length, 30) - 1 && "border-b border-border/50")}>
-                <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">{l.action}</Badge>
-                <span className="flex-1 truncate text-xs text-muted-foreground">
-                  {l.entityType ? `${l.entityType}${l.entityId ? ` #${l.entityId}` : ""}` : (l.details ?? "-")}
-                </span>
-                <span className="shrink-0 text-[10px] text-muted-foreground/70">
-                  {parseServerDate(l.createdAt).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
+        {logs.length === 0 ? (
+          <p className="px-4 py-6 text-center text-xs text-muted-foreground">No audit entries (admins only).</p>
+        ) : (
+          logs.slice(0, 30).map((l, i) => (
+            <div key={l.id} className={cn("flex items-center gap-3 px-4 py-2.5", i < Math.min(logs.length, 30) - 1 && "border-b border-border/50")}>
+              <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">{l.action}</Badge>
+              <span className="flex-1 truncate text-xs text-muted-foreground">
+                {l.entityType ? `${l.entityType}${l.entityId ? ` #${l.entityId}` : ""}` : (l.details ?? "-")}
+              </span>
+              <span className="shrink-0 text-[10px] text-muted-foreground/70">
+                {parseServerDate(l.createdAt).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}
+              </span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   )
@@ -1406,7 +1326,7 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
     setSyncing(true)
     try {
       const r = await syncGitHub(slug, repo)
-      toast.success(`Ingested into the Brain OS: ${r.created} created, ${r.updated} updated`)
+      toast.success(`Added to the workspace's knowledge: ${r.created} created, ${r.updated} updated`)
     } catch (e) {
       toast.error(getErrorMessage(e))
     } finally {
@@ -1433,10 +1353,10 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
 
       {repo && (
         <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
-          <p className="text-[11px] text-muted-foreground">Ingest this repository&apos;s issues &amp; PRs into the Brain OS.</p>
+          <p className="text-[11px] text-muted-foreground">Add this repository&apos;s issues &amp; PRs to the workspace&apos;s knowledge.</p>
           <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs shrink-0" onClick={handleSync} disabled={syncing}>
             {syncing ? <Loader2 className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />}
-            {syncing ? "Syncing…" : "Sync → Brain OS"}
+            {syncing ? "Syncing…" : "Sync"}
           </Button>
         </div>
       )}
@@ -1529,7 +1449,7 @@ function IntegrationsPanel() {
     setSyncingChannel(chId)
     try {
       const r = await syncSlack(slug, chId)
-      toast.success(`Ingested into the Brain OS: ${r.created} created, ${r.updated} updated`)
+      toast.success(`Added to the workspace's knowledge: ${r.created} created, ${r.updated} updated`)
     } catch (e) {
       toast.error(getErrorMessage(e))
     } finally {
@@ -1540,7 +1460,12 @@ function IntegrationsPanel() {
   return (
     <div className="flex flex-col gap-4">
       {/* ---- Catalogue (le pool générique) ---- */}
-      <SectionCard title="Integrations catalog" description="GitHub, Slack and Plane sync natively; any other tool connects through its MCP server.">
+      <SectionCard
+        title="Integrations catalog"
+        description={IS_DESKTOP
+          ? "Plane syncs natively; any other tool connects through its MCP server."
+          : "GitHub, Slack and Plane sync natively; any other tool connects through its MCP server."}
+      >
 
         {slug && <IntegrationsCatalog slug={slug} />}
       </SectionCard>
@@ -1612,7 +1537,7 @@ function IntegrationsPanel() {
                       className="h-7 gap-1 text-xs"
                       disabled={syncingChannel === ch.channelId}
                       onClick={() => handleSyncChannel(ch.channelId)}
-                      title="Ingest this channel's recent messages into the Brain OS"
+                      title="Add this channel's recent messages to the workspace's knowledge"
                     >
                       {syncingChannel === ch.channelId ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
                       Sync
@@ -1705,7 +1630,7 @@ function PrivacyPanel() {
       <SectionCard title="Your data" description="Understand what personal data TaskForce stores about you.">
         <ul className="text-sm text-muted-foreground space-y-1.5">
           <li>• <strong className="text-foreground">Account</strong>: name, email, profile picture</li>
-          <li>• <strong className="text-foreground">Workspace activity</strong>: issues, projects, comments, pages</li>
+          <li>• <strong className="text-foreground">Workspace activity</strong>: issues, projects, comments</li>
           <li>• <strong className="text-foreground">Authentication tokens</strong>: stored in your browser&apos;s local storage (never shared)</li>
         </ul>
         <p className="text-xs text-muted-foreground mt-3">
@@ -1947,7 +1872,7 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
       {active === "ai"            && <DesktopAiPanel />}
       {active === "integrations"  && <IntegrationsPanel />}
       {active === "agents"        && <AgentsPanel />}
-      {active === "status"        && <StatusPanel />}
+      {active === "audit"         && <AuditLogPanel />}
       {active === "privacy"       && <PrivacyPanel />}
     </>
   )

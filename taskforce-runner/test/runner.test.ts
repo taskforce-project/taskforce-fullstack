@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { agentArgs, agentEnv, agentSettings, allowedTools, DENIED_TOOLS, mcpConfig, parseAgentOutput, safeModel } from "../src/agent.js";
+import { agentArgs, agentEnv, agentSettings, DENIED_TOOLS, mcpConfig, parseAgentOutput, safeModel } from "../src/agent.js";
 import type { Claim } from "../src/api.js";
 import { parseEnvFile, parseRunnerConfigFile, type RunnerConfig } from "../src/config.js";
 import { branchName, ghCredentialArgs, isValidRepoFullName, managedCheckoutDir, pullRequestBody, resolveRepo } from "../src/git.js";
@@ -169,11 +169,6 @@ describe("agent : frontière de sécurité de l'exécution locale", () => {
     assert.equal(args[args.indexOf("--settings") + 1], "/tmp/settings.json");
   });
 
-  it("isole aussi les réglages du dépôt en mode sans dépôt", () => {
-    const args = agentArgs(config(), claim, "/tmp/mcp.json", "/tmp/s.json", "repoless");
-    assert.equal(args[args.indexOf("--setting-sources") + 1], "user");
-  });
-
   it("le modèle de la configuration prime sur celui de la délégation", () => {
     const args = agentArgs(config({ model: "opus" }), claim, "/tmp/mcp.json", "/tmp/settings.json");
     assert.equal(args[args.indexOf("--model") + 1], "opus");
@@ -206,18 +201,15 @@ describe("agent : frontière de sécurité de l'exécution locale", () => {
     assert.ok(!args.some((a) => a.includes("dangerously")));
   });
 
-  it("aucun outil qui sort du poste ou du dépôt : ni push, ni shell libre, ni réseau, ni Cortex", () => {
-    const tools = allowedTools([]);
-    for (const forbidden of ["Bash", "Bash(*)", "WebFetch", "WebSearch", "Bash(git push *)", "Bash(gh *)"]) {
-      assert.ok(!tools.includes(forbidden), `${forbidden} ne doit pas être autorisé par défaut`);
-    }
-    assert.ok(tools.every((t) => !/ask_cortex|smart_assign/.test(t)));
-    assert.ok(tools.includes("mcp__taskforce__get_issue"));
-    assert.ok(tools.includes("mcp__taskforce__add_comment"));
+  it("rien n'est autorisé d'avance : les règles de la mission jugent chaque action (hook PreToolUse)", () => {
+    const args = agentArgs(config(), claim, "/tmp/mcp.json", "/tmp/s.json");
+    assert.ok(!args.includes("--allowedTools"));
+    assert.ok(!args.some((a) => /ask_cortex|smart_assign|WebFetch|WebSearch/.test(a)));
   });
 
-  it("outils supplémentaires de la configuration ajoutés tels quels", () => {
-    assert.ok(allowedTools(["Bash(npm test *)"]).includes("Bash(npm test *)"));
+  it("outils ajoutés par la personne sur son poste : autorisés d'avance, tels quels", () => {
+    const args = agentArgs(config({ extraAllowedTools: ["Bash(npm test *)", "Bash(mvn test *)"] }), claim, "/tmp/mcp.json", "/tmp/s.json");
+    assert.equal(args[args.indexOf("--allowedTools") + 1], "Bash(npm test *),Bash(mvn test *)");
   });
 
   it("abonnement : la clé API ambiante est retirée ; les identifiants du runner ne descendent jamais", () => {
@@ -236,7 +228,7 @@ describe("agent : frontière de sécurité de l'exécution locale", () => {
   it("le jeton du serveur local de validations passe par l'environnement, jamais par un fichier", () => {
     assert.equal(agentEnv(config(), { TF_HOOK_TOKEN: "stale" }, "fresh").TF_HOOK_TOKEN, "fresh");
     assert.equal(agentEnv(config(), { TF_HOOK_TOKEN: "stale" }).TF_HOOK_TOKEN, undefined);
-    assert.ok(!JSON.stringify(agentSettings(config(), "http://127.0.0.1:5000/permission")).includes("fresh"));
+    assert.ok(!JSON.stringify(agentSettings(config(), "http://127.0.0.1:5000/permission", "http://127.0.0.1:5000/pre-tool-use")).includes("fresh"));
   });
 
   it("refus permanents : push et gh restent au runner, même validés dans l'app", () => {
@@ -250,18 +242,29 @@ describe("agent : frontière de sécurité de l'exécution locale", () => {
     assert.deepEqual(server?.headers, { Authorization: "Bearer session-token", "X-TaskForce-Delivery-Run": "42" });
   });
 
-  it("réglages de session : hook PermissionRequest HTTP authentifié, délai au-delà de l'attente du serveur", () => {
-    const settings = agentSettings(config({ approvalTimeoutMinutes: 5 }), "http://127.0.0.1:5000/permission") as {
-      includeCoAuthoredBy?: boolean; hooks: { PermissionRequest: Array<{ matcher: string; hooks: Array<Record<string, unknown>> }> };
-    };
-    const hook = settings.hooks.PermissionRequest[0]?.hooks[0];
-    assert.equal(settings.includeCoAuthoredBy, false);
-    assert.equal(hook?.type, "http");
-    assert.equal(hook?.url, "http://127.0.0.1:5000/permission");
-    assert.deepEqual(hook?.headers, { Authorization: "Bearer $TF_HOOK_TOKEN" });
-    assert.deepEqual(hook?.allowedEnvVars, ["TF_HOOK_TOKEN"]);
-    assert.equal(hook?.timeout, 5 * 60 + 60);
-  });
+  // Les deux hooks de la porte : les règles avant chaque action, puis la décision humaine pour ce qu'elles demandent.
+  const hooks: Array<["PreToolUse" | "PermissionRequest", string, number]> = [
+    ["PreToolUse", "http://127.0.0.1:5000/pre-tool-use", 30],
+    ["PermissionRequest", "http://127.0.0.1:5000/permission", 5 * 60 + 60], // au-delà de l'attente du serveur
+  ];
+  for (const [event, url, timeout] of hooks) {
+    it(`réglages de session : hook ${event} HTTP authentifié, sur toute action, garde fermée`, () => {
+      const settings = agentSettings(config({ approvalTimeoutMinutes: 5 }), "http://127.0.0.1:5000/permission", "http://127.0.0.1:5000/pre-tool-use") as {
+        includeCoAuthoredBy?: boolean;
+        hooks: Record<string, Array<{ matcher: string; hooks: Array<Record<string, unknown>> }>>;
+      };
+      const entry = settings.hooks[event]?.[0];
+      const hook = entry?.hooks[0];
+      assert.equal(settings.includeCoAuthoredBy, false);
+      assert.equal(entry?.matcher, ".*");
+      assert.equal(hook?.type, "http");
+      assert.equal(hook?.url, url);
+      assert.deepEqual(hook?.headers, { Authorization: "Bearer $TF_HOOK_TOKEN" });
+      assert.deepEqual(hook?.allowedEnvVars, ["TF_HOOK_TOKEN"]);
+      assert.equal(hook?.timeout, timeout);
+      assert.equal(hook?.onFailure, "block");
+    });
+  }
 
   it("clé API : conservée, et exigée", () => {
     assert.equal(agentEnv(config({ auth: "api-key" }), { ANTHROPIC_API_KEY: "sk-ant-x" }).ANTHROPIC_API_KEY, "sk-ant-x");
@@ -339,29 +342,6 @@ describe("quoteForCmd", () => {
 });
 
 describe("mode sans dépôt (repoless)", () => {
-  it("repoless : aucun outil Bash (pas de git), l'agent livre par commentaire", () => {
-    const tools = allowedTools([], "repoless");
-    assert.ok(!tools.some((t) => t.startsWith("Bash(")), "aucun Bash en repoless");
-    assert.ok(tools.includes("Write"));
-    assert.ok(tools.includes("mcp__taskforce__add_comment"));
-    assert.ok(tools.includes("mcp__taskforce__get_issue"));
-  });
-
-  it("repo (défaut) : outils git présents, jamais push/gh/shell libre", () => {
-    const tools = allowedTools([]);
-    assert.ok(tools.includes("Bash(git commit *)"));
-    for (const forbidden of ["Bash", "Bash(*)", "Bash(git push *)", "Bash(gh *)", "WebFetch", "WebSearch"]) {
-      assert.ok(!tools.includes(forbidden), `${forbidden} interdit`);
-    }
-  });
-
-  it("agentArgs passe la liste d'outils repoless (sans git) à --allowedTools", () => {
-    const args = agentArgs(config(), claim, "/tmp/mcp.json", "/tmp/s.json", "repoless");
-    const allowed = args[args.indexOf("--allowedTools") + 1] ?? "";
-    assert.ok(!/Bash\(/.test(allowed));
-    assert.match(allowed, /mcp__taskforce__add_comment/);
-  });
-
   it("brief repoless : pas de dépôt, livraison par commentaire, texte TaskForce = donnée, pas de PR", () => {
     const prompt = buildReplyPrompt(claim);
     assert.match(prompt, /no git repository/i);

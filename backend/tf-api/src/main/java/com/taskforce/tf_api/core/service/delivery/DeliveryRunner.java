@@ -59,6 +59,7 @@ public class DeliveryRunner {
     private final IssueRepository issueRepository;
     private final NotificationService notificationService;
     private final IssueGitHubLinkRepository linkRepository;
+    private final MissionEvidenceService evidenceService;
 
     /** Adresse d'une pull request sur GitHub : le dépôt et le numéro. */
     private static final Pattern PULL_REQUEST =
@@ -216,13 +217,17 @@ public class DeliveryRunner {
         log.info("Delivery run {} : {} (résultat poussé, provider {})", runId, run.getStatus(), run.getProviderKey());
     }
 
-    /** Applique le résultat d'un poll au run : DONE -> « In review by AI », FAILED -> « Blocked », sinon RUNNING. */
+    /**
+     * Applique le résultat d'un poll au run : DONE -> « In review by AI », FAILED -> « Blocked », sinon RUNNING. Une
+     * mission qui a un dossier de preuve y est close ici, quelle que soit la fin : résultat du runner, runner perdu.
+     */
     private void applyPoll(DeliveryRun run, DeliveryPoll poll) {
         switch (poll.status()) {
             case DONE -> {
                 run.setStatus(DeliveryRunStatus.DONE);
                 run.setSummary(poll.summary());
                 run.setResultUrl(poll.resultUrl());
+                evidenceService.end(run, poll);
                 linkPullRequest(run);
                 moveIssueTo(run, STATUS_IN_REVIEW, IssueStatusCategory.STARTED, COLOR_IN_REVIEW);
                 notifyFinished(run);
@@ -230,6 +235,7 @@ public class DeliveryRunner {
             case FAILED -> {
                 run.setStatus(DeliveryRunStatus.FAILED);
                 run.setError(poll.error());
+                evidenceService.end(run, poll);
                 moveIssueTo(run, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
                 notifyFinished(run);
             }

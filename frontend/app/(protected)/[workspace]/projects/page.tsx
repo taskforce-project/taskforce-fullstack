@@ -191,7 +191,7 @@ function VisibilityBadge({ isPublic }: { readonly isPublic: boolean }) {
   return (
     <Badge variant="secondary" className="gap-1 font-normal text-muted-foreground" title={isPublic ? "Visible to the entire workspace" : "Restricted to project collaborators"}>
       {isPublic ? <Globe className="size-2.5" /> : <Lock className="size-2.5" />}
-      {isPublic ? "Public" : "Private"}
+      {isPublic ? "Workspace" : "Collaborators only"}
     </Badge>
   )
 }

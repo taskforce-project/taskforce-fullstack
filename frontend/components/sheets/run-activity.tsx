@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Ban, CircleAlert, Loader2, MessageSquareText, Play, ShieldQuestion, Wrench } from "lucide-react"
+import { Ban, CircleAlert, FileCheck2, Loader2, MessageSquareText, Play, ShieldQuestion, Upload, Wrench } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -22,6 +22,8 @@ const EVENT_ICON: Record<DeliveryRunEvent["kind"], React.ElementType> = {
   tool: Wrench,
   error: CircleAlert,
   denied: Ban,
+  exit: Upload,
+  limit: CircleAlert,
 }
 
 function minutesLeft(expiresAt: string | null): string {
@@ -86,11 +88,19 @@ export function RunActivity({ slug, runId, activity, live }: Readonly<{
   live: boolean
 }>) {
   const [expanded, setExpanded] = useState(live)
+  const downloadEvidence = useDeliveryStore((s) => s.downloadEvidence)
   const events = activity?.events ?? []
   const pending = live ? (activity?.approvals ?? []).filter((a) => a.status === "PENDING") : []
   const answered = (activity?.approvals ?? []).filter((a) => a.status !== "PENDING")
 
   if (events.length === 0 && pending.length === 0 && answered.length === 0) return null
+
+  /** Le dossier de la mission : chaque action, règle et décision, chaînées pour qu'un changement se voie. */
+  async function download(format: "json" | "md") {
+    if (!(await downloadEvidence(slug, runId, format))) {
+      toast.error("No record for this run: it ran before TaskForce kept them.")
+    }
+  }
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -107,7 +117,7 @@ export function RunActivity({ slug, runId, activity, live }: Readonly<{
             const Icon = EVENT_ICON[event.kind] ?? Wrench
             return (
               <li key={event.seq} className="flex items-start gap-1.5 text-[11px] leading-snug">
-                <Icon className={cn("mt-0.5 size-3 shrink-0", event.kind === "error" || event.kind === "denied"
+                <Icon className={cn("mt-0.5 size-3 shrink-0", event.kind === "error" || event.kind === "denied" || event.kind === "limit"
                   ? "text-destructive" : "text-muted-foreground")} />
                 <span className="min-w-0 break-words text-foreground">
                   {event.tool && <span className="font-medium">{event.tool} </span>}
@@ -127,6 +137,17 @@ export function RunActivity({ slug, runId, activity, live }: Readonly<{
             </li>
           ))}
         </ol>
+      )}
+
+      {!live && (
+        <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
+          title="Every action, rule and decision of this run, chained so that any later change shows.">
+          <FileCheck2 className="size-3 shrink-0" />
+          Download the record:
+          <button type="button" className="hover:text-foreground hover:underline" onClick={() => void download("json")}>JSON</button>
+          <span aria-hidden="true">·</span>
+          <button type="button" className="hover:text-foreground hover:underline" onClick={() => void download("md")}>Markdown</button>
+        </p>
       )}
     </div>
   )

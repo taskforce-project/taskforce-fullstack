@@ -2,6 +2,8 @@ package com.taskforce.tf_api.core.dto.response;
 
 import java.time.LocalDateTime;
 
+import com.taskforce.tf_api.core.harness.rules.RulesBundle;
+
 /**
  * Tâche remise à un runner local qui vient de réclamer un run (ADR-013) : de quoi préparer le dépôt et
  * briefer l'agent. Le contexte riche (commentaires, Brain OS) se lit ensuite par le MCP TaskForce, dans
@@ -18,6 +20,7 @@ import java.time.LocalDateTime;
  * @param repoFullName     dépôt lié au projet ({@code owner/name}), ou null si aucun
  * @param model            modèle choisi à la délégation, ou null
  * @param sessionExpiresAt fin de validité de la session déléguée
+ * @param rules            paquet de règles que le runner applique à chaque action, avec son empreinte
  */
 public record RunnerClaimResponse(
     Long runId,
@@ -30,5 +33,6 @@ public record RunnerClaimResponse(
     String workspaceSlug,
     String repoFullName,
     String model,
-    LocalDateTime sessionExpiresAt
+    LocalDateTime sessionExpiresAt,
+    RulesBundle rules
 ) {}
