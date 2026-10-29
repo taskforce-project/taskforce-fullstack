@@ -397,17 +397,25 @@ public class AgentService {
     /** Les écritures de TaskForce : seule la réussite de l'une d'elles permet d'annoncer une création. */
     private static final Set<String> WRITE_TOOLS = Set.of("create_issue", "create_project", "create_note");
 
-    private static final int REGEX_FLAGS = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS;
+    private static final int REGEX_FLAGS = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS
+        | Pattern.DOTALL;
 
-    /** Une demande de création : un verbe et un objet de l'espace, en anglais ou en français. */
+    /**
+     * Une demande de création : le message COMMENCE par le verbe (après « please », « can you », « peux-tu »…), puis un
+     * objet de l'espace, en anglais ou en français. « Show me the open issues » n'en est pas une.
+     */
     private static final Pattern WRITE_REQUEST = Pattern.compile(
-        "\\b(create|add|make|open|file|log|crée[rz]?|cree[rz]?|ajoute[rz]?|ouvre[rz]?)\\b.*"
+        "^\\s*(please\\s+|can\\s+you\\s+|could\\s+you\\s+|peux-tu\\s+|pourrais-tu\\s+|merci\\s+de\\s+)?"
+            + "(create|add|make|file|log|open\\s+(a|an)|crée[rz]?|cree[rz]?|ajoute[rz]?)\\b.*"
             + "\\b(issues?|tickets?|tasks?|bugs?|projects?|notes?|tâches?|taches?|projets?)\\b", REGEX_FLAGS);
 
-    /** Une phrase qui annonce une création faite, toujours rattachée à son objet. */
+    /**
+     * Une phrase qui annonce une création faite, toujours rattachée à son objet. Pas « opened » : « 3 issues opened this
+     * week » décrit l'espace, n'annonce rien.
+     */
     private static final Pattern WRITE_CLAIM = Pattern.compile(
-        "\\b(issue|ticket|task|project|note)s?\\s+(has\\s+been\\s+|have\\s+been\\s+|was\\s+|were\\s+)?(created|added|opened)\\b"
-            + "|\\b(created|added|opened)\\s+(a\\s+|an\\s+|the\\s+|your\\s+|\\d+\\s+)?(new\\s+)?(issue|ticket|task|project|note)s?\\b"
+        "\\b(issue|ticket|task|project|note)s?\\s+(has\\s+been\\s+|have\\s+been\\s+|was\\s+|were\\s+)?(created|added)\\b"
+            + "|\\b(created|added)\\s+(a\\s+|an\\s+|the\\s+|your\\s+|\\d+\\s+)?(new\\s+)?(issue|ticket|task|project|note)s?\\b"
             + "|\\b(issue|ticket|tâche|tache|projet|note)s?\\s+(a\\s+été\\s+|ont\\s+été\\s+)?(créée?s?|ajoutée?s?)"
             + "|\\b(créé|ajouté)e?s?\\s+(une\\s+|un\\s+|la\\s+|le\\s+|les\\s+|\\d+\\s+)?(nouvelle\\s+|nouveau\\s+)?"
             + "(issue|ticket|tâche|tache|projet|note)s?\\b", REGEX_FLAGS);

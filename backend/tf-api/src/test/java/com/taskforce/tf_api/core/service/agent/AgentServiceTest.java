@@ -243,6 +243,8 @@ class AgentServiceTest {
         "Create a plan for the project                 | I have created a plan: first, the board. | false",
         "Which issues were created this week?          | Issue TF-12 was created on Monday.    | false",
         "How do I create an issue?                     | Open the board and click New issue.   | false",
+        "Show me the open issues                       | 3 issues opened this week: TF-1, TF-2. | false",
+        "What did I add to the notes?                  | You added a note about the release.   | false",
     })
     @DisplayName("la garde ne touche qu'une création annoncée sans outil, sur une demande de création")
     void honest_answer_detection(String message, String answer, boolean replaced) {
