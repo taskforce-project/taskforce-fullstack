@@ -47,10 +47,12 @@ marketing (OSS-MKT.1 du plan de release). Spec : `Specification_App_Desktop.md` 
 | --- | --- |
 | Jetons, typo, boutons, voiles, cartes en paire, reveal, transitions | `src/styles/global.css` |
 | Peintures de fond (sources, cadrage, crédits) | `src/lib/backgrounds.ts`, `src/components/site/Backdrop.astro` |
-| Blocs de section | `site/PaintBand.astro`, `DuoCard.astro`, `BentoCard.astro`, `RuleColumns.astro`, `ProductSection.astro`, `FeatureRow.astro` |
+| Blocs de section | `site/PaintBand.astro`, `DuoCard.astro`, `BentoCard.astro`, `RuleColumns.astro`, `ProductSection.astro` |
+| Mouvement au défilement (titres mot par mot, peintures en parallaxe, fenêtre qui se redresse, manifeste qui s'éclaire) | `src/scripts/motion.js` (attributs `data-words`, `data-parallax`, `data-tilt`, `data-fill`) |
+| Composeur flottant en bas de page (démo locale, sans serveur ni IA) | `src/components/site/Composer.astro` |
 | En-tête (menus illustrés, mobile) | `src/components/nav/SiteNav.tsx`, `MenuArt.tsx` (îlot persistant) |
 | App animée du héros (boucle 19 s) | `src/components/visuals/HeroApp.tsx` |
-| Vignettes animées (20) | `src/components/visuals/vignettes/` (registre `index.ts`) |
+| Vignettes animées (17) | `src/components/visuals/vignettes/` (registre `index.ts`) |
 | Frise d'un run liée au défilement | `src/components/visuals/RunPipeline.tsx` |
 | Trajet webapp → desktop | `src/components/visuals/MigrateFlow.tsx` |
 | Release desktop lue au build (`desktop-v*`) | `src/lib/release.ts` |
@@ -68,8 +70,13 @@ marketing (OSS-MKT.1 du plan de release). Spec : `Specification_App_Desktop.md` 
 - `backdrop-filter` sur l'en-tête rend `position: fixed` relatif à l'en-tête : le menu mobile est rendu à côté de
   `<header>`, pas dedans.
 - Le Vite du conteneur Docker de dev lit les `<script>` des `.astro` sans TypeScript : script de `BaseLayout` en JS.
-- Navigation sans rechargement : la classe `js` de `<html>` est remise sur `astro:after-swap`, le reveal relancé sur
-  `astro:page-load`.
+- Navigation sans rechargement : la classe `js` de `<html>` est remise sur `astro:after-swap`, le reveal et `motion.js`
+  relancés sur `astro:page-load`. Ils tournent aussi dès leur chargement : au premier chargement, `astro:page-load`
+  n'arrive qu'une fois toutes les images chargées (titre du héros à 6,2 s au lieu de 2,0 s en 4G lente).
+- Texte découpé en mots (`motion.js`) : une copie `.sr-only` du texte pour les lecteurs d'écran, jamais un `aria-label`
+  (ignoré sur un `<p>`), prise dans `innerText`, qui garde l'espace entre deux lignes en bloc.
+- Une image de fond CSS se télécharge dès le rendu, même tout en bas de la page : la peinture du grand mot du pied de
+  page n'est posée qu'avec `.is-in` (`[data-reveal]`).
 - Unsplash bloque les navigateurs sans tête (BotStopper) : la recherche d'images passe par le navigateur intégré.
 - Le panneau navigateur du Code tab fait 608 px : vérifier en Playwright (`design-assets/node_modules/playwright`).
 
@@ -79,7 +86,6 @@ marketing (OSS-MKT.1 du plan de release). Spec : `Specification_App_Desktop.md` 
 - Date de fermeture de la webapp (`WEB_APP_CLOSES` dans `src/pages/migrate.astro`).
 - Signature des builds (`SIGNED_BUILDS` dans `src/lib/release.ts`), nommage `desktop-v*` des releases, reconstruction du
   site après chaque release (hook de déploiement Vercel depuis la CI desktop).
-- Brain OS n'a pas d'export : à ajouter côté webapp avant la fermeture, ou garder la consigne « copiez vos pages ».
 - Mise en prod : la webapp part sur main avec l'ancien site ; ce site desktop reste sur dev jusqu'à la sortie du desktop.
 
 ## Dépendances (19/10)
