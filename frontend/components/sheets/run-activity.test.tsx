@@ -73,6 +73,12 @@ describe("RunActivity : chronologie en direct et validations", () => {
     await waitFor(() => expect(svc.decideApproval).toHaveBeenCalledWith("acme", 100, 9, false));
   });
 
+  it("une demande de TaskForce lui-même le dit (J4)", () => {
+    render(<RunActivity slug="acme" runId={100} activity={activity([approval({ tool: "git push", askedBy: "runner" })])} live />);
+    expect(screen.getByText("TaskForce asks: git push")).toBeInTheDocument();
+    expect(screen.queryByText(/Claude Code asks/)).not.toBeInTheDocument();
+  });
+
   it("un coéquipier voit la demande, sans pouvoir y répondre", () => {
     render(<RunActivity slug="acme" runId={100} activity={activity([approval({ canDecide: false })])} live />);
 

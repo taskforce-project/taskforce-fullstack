@@ -734,6 +734,7 @@ public class ProjectService {
             .growthMode(project.isGrowthMode())
             .repoProvider(project.getRepoProvider())
             .repoFullName(project.getRepoFullName())
+            .testCommand(project.getTestCommand())
             .createdAt(project.getCreatedAt())
             .updatedAt(project.getUpdatedAt())
             .build();

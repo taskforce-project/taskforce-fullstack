@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Ban, CircleAlert, FileCheck2, Loader2, MessageSquareText, Play, ShieldQuestion, Upload, Wrench } from "lucide-react"
+import { Ban, CircleAlert, FileCheck2, FlaskConical, Loader2, MessageSquareText, Play, ShieldQuestion, Upload, Wrench } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -24,6 +24,7 @@ const EVENT_ICON: Record<DeliveryRunEvent["kind"], React.ElementType> = {
   denied: Ban,
   exit: Upload,
   limit: CircleAlert,
+  test: FlaskConical,
 }
 
 function minutesLeft(expiresAt: string | null): string {
@@ -47,7 +48,8 @@ function PendingApproval({ slug, runId, approval }: Readonly<{ slug: string; run
     <div className="flex flex-col gap-1.5 rounded border border-shape-yellow/40 bg-shape-yellow/5 p-2" role="group"
       aria-label={`Approval request: ${approval.tool}`}>
       <span className="flex items-center gap-1.5 font-medium text-foreground">
-        <ShieldQuestion className="size-3.5 text-ink-yellow" /> Claude Code asks to run {approval.tool}
+        <ShieldQuestion className="size-3.5 text-ink-yellow" />
+        {approval.askedBy === "runner" ? `TaskForce asks: ${approval.tool}` : `Claude Code asks to run ${approval.tool}`}
       </span>
       <code className="block overflow-x-auto whitespace-pre-wrap break-all rounded bg-muted px-1.5 py-1 font-mono text-[11px]">
         {approval.summary}

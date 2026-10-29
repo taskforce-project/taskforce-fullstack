@@ -18,7 +18,7 @@ merges anything: the decision stays human.
 | Where | Rights |
 |---|---|
 | Repository | An **isolated worktree** on a new branch `tf/<key>-<title>-r<run>`. Your checkout and your current branch are never touched. |
-| Machine | Each action is judged before it runs by the **rules of the task**, which TaskForce sends with it (default table in [`contracts/rules`](../contracts/rules/default.rules.json)). By default: reading and editing the copy, local commits, `npm test`, `npm run lint/build/typecheck` and `git status/diff/log/show/add` run freely; the web, publishing, messages, payments and **anything the table does not know** wait for **your approval in TaskForce**, on the issue: Allow or Deny. No answer within 10 minutes means denied. A path outside the copy or in `.git`, a command substitution, or a redirection to a file is never allowed by a rule: it is asked or denied. `git push` and `gh` are always refused: the runner pushes and opens the pull request itself, after the agent. The settings of the cloned repository (`.claude/settings*.json`: hooks, API URL) are ignored (`--setting-sources user`): only yours and the runner's apply. |
+| Machine | Each action is judged before it runs by the **rules of the task**, which TaskForce sends with it (default table in [`contracts/rules`](../contracts/rules/default.rules.json)). By default: reading and editing the copy, local commits and `git status/diff/log/show/add` run freely; the web, publishing, messages, payments and **anything the table does not know** wait for **your approval in TaskForce**, on the issue: Allow or Deny. No answer within 10 minutes means denied. The agent does not run the repository's scripts (`npm`, `yarn` or `pnpm` test and run): while your computer is not isolated, they would run whatever the agent wrote, so the **runner runs the project's test command itself, after the agent** (below). A path outside the copy or in `.git`, a command substitution, a redirection to a file, or an argument naming a path outside the copy is never allowed by a rule: it is asked or denied. `git push` and `gh` are always refused: the runner pushes and opens the pull request itself, after the agent. A mission on a public repository does not start for now (decided on 28/10/2026, until the runner's tests have been tried). The settings of the cloned repository (`.claude/settings*.json`: hooks, API URL) are ignored (`--setting-sources user`): only yours and the runner's apply. |
 | TaskForce | Through the MCP server of the instance, **as the person who delegated**, with their rights as a ceiling, narrowed to: the run's workspace for reading, the issues of the run's project for writing, never a deletion. |
 | GitHub | Nothing. The **runner** pushes the branch and opens the pull request, after the agent, each by the rules of the task. By default the agent's branch goes to a private repository without asking; a public repository, or a visibility `gh` cannot tell, waits for your approval in TaskForce. Refused or not approved, the commits stay on the local branch. |
 
@@ -118,6 +118,17 @@ and comments the issue, checks that what must be refused is refused, asks for on
 ```bash
 npm test          # unit tests: rules and facts, branch names, config, tool boundary, live timeline, approvals, result parsing
 ```
+
+## The project's tests, run after the agent
+
+In the project's settings, next to its repository, "Tests after an agent's work" holds the project's test command
+(`npm test`, `npm run lint && npm test`...). Once the agent is done and its work committed, the runner runs it in the
+copy, at most 15 minutes, and the result goes to the issue, the pull request and the record of the run.
+
+It runs on your computer, with the code of the branch, the agent's included: the first time, and whenever the command
+changes, TaskForce asks you before running it. Your answer is kept on this computer
+(`~/.taskforce-runner/approved-tests.json`), per repository and per exact command. Leave the command empty to run no
+tests.
 
 ## Check the record of a run
 

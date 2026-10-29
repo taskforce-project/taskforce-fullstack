@@ -107,6 +107,13 @@ public class Project {
     @Column(name = "repo_full_name", length = 255)
     private String repoFullName;
 
+    /**
+     * Commande de test du projet (« npm test »), lancée par le runner après le travail de l'agent (S1, R32). NULL :
+     * aucun test lancé.
+     */
+    @Column(name = "test_command", length = 500)
+    private String testCommand;
+
     /** Utilisateur ayant créé le projet */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)

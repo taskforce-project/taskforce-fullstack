@@ -8,6 +8,13 @@
 /** Vrai dans le build desktop de l'interface (`NEXT_PUBLIC_DESKTOP=true`), figé au build comme toute `NEXT_PUBLIC_*`. */
 export const IS_DESKTOP = process.env.NEXT_PUBLIC_DESKTOP === "true";
 
+/**
+ * App desktop : la connexion de GitHub et de Slack par OAuth n'y marche pas encore (PC-060) ; on ne montre que ce qui
+ * marche (R12), ni dans le catalogue ni dans la pilule de l'accueil. Masqués avec revue au 30/11/2026 ; d'ici là,
+ * GitHub passe par le GitHub CLI de la personne.
+ */
+export const DESKTOP_HIDDEN_CONNECTORS: ReadonlySet<string> = new Set(["github", "slack"]);
+
 /** Fournisseur d'IA choisi sur cet ordinateur (cf. `desktop/src/ai.ts`). Un modèle vide est choisi automatiquement. */
 export interface DesktopAiSettings {
   provider: "ollama" | "custom" | "off";

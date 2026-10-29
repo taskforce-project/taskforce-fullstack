@@ -59,9 +59,17 @@ a token that is random for each run (`taskforce-runner/src/approvals.ts`):
     go through the hook themselves.
 - What cannot be bounded can be denied or asked by a rule, never allowed. That covers a path outside the copy or
   inside `.git` (a hook written there would run at the next commit), a search pattern that leaves the copy, and a
-  command with a substitution, a redirection to a file or `--output`. The commit message form that Claude Code uses
+  command with a substitution, a redirection to a file, `--output`, or an argument naming a path outside the copy
+  (`npm test --prefix ../elsewhere`, `--outDir=../../x`: an allowed name doing its work elsewhere). The commit message form that Claude Code uses
   (`"$(cat <<'EOF' ... EOF)"`, quoted delimiter) is plain text and is read as such.
 - Not described yet, so always asked: the `PowerShell` tool, and any tool this list does not name.
+- The default table denies the agent the scripts of the repository (`npm`, `yarn` or `pnpm` test and run, R32): while
+  the computer is not isolated (S3), they run whatever the agent wrote. The runner runs the project's declared test
+  command itself, after the agent (S1), once the person who delegated has accepted that command on this computer.
+- The start of a mission is an action too (`mission.start`, with the repository's visibility): by default, none starts
+  on a public repository until S1 has been tried (R33).
+- Each request says who asks (J4): `askedBy: agent` for an action of the agent, `runner` when the runner itself asks
+  (an exit, the project's tests, the start of a mission).
 
 ## Proved by
 

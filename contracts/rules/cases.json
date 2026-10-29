@@ -80,6 +80,16 @@
       "pattern": "src/**.ts",
       "value": "src/a/b.ts",
       "match": true
+    },
+    {
+      "pattern": "{npm,yarn,pnpm} {test,run}**",
+      "value": "pnpm run lint",
+      "match": true
+    },
+    {
+      "pattern": "{npm,yarn,pnpm} {test,run}**",
+      "value": "npm install",
+      "match": false
     }
   ],
   "decisions": [
@@ -106,25 +116,25 @@
       }
     },
     {
-      "name": "the project's tests run",
+      "name": "the agent running the tests is denied: the runner runs them (S1)",
       "facts": {
         "action": "shell",
         "command": "npm test"
       },
       "expect": {
-        "effect": "allow",
-        "rule": "run-npm-checks"
+        "effect": "deny",
+        "rule": "no-agent-scripts"
       }
     },
     {
-      "name": "a test script with a suffix runs",
+      "name": "the agent running a test script is denied",
       "facts": {
         "action": "shell",
         "command": "npm run test:unit"
       },
       "expect": {
-        "effect": "allow",
-        "rule": "run-npm-checks"
+        "effect": "deny",
+        "rule": "no-agent-scripts"
       }
     },
     {
@@ -411,25 +421,25 @@
       }
     },
     {
-      "name": "a build with arguments is allowed",
+      "name": "the agent running a build is denied",
       "facts": {
         "action": "shell",
         "command": "npm run build -- --prod"
       },
       "expect": {
-        "effect": "allow",
-        "rule": "run-npm-checks"
+        "effect": "deny",
+        "rule": "no-agent-scripts"
       }
     },
     {
-      "name": "another npm script asks",
+      "name": "any npm run by the agent is denied",
       "facts": {
         "action": "shell",
         "command": "npm run deploy"
       },
       "expect": {
-        "effect": "ask",
-        "rule": null
+        "effect": "deny",
+        "rule": "no-agent-scripts"
       }
     },
     {
@@ -557,10 +567,64 @@
         "effect": "allow",
         "rule": "push-agent-branch-private"
       }
+    },
+    {
+      "name": "a mission starts on a private repository",
+      "facts": {
+        "action": "mission.start",
+        "repoVisibility": "private"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "start-mission"
+      }
+    },
+    {
+      "name": "a mission without a repository starts",
+      "facts": {
+        "action": "mission.start"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "start-mission"
+      }
+    },
+    {
+      "name": "no mission starts on a public repository before S1",
+      "facts": {
+        "action": "mission.start",
+        "repoVisibility": "public"
+      },
+      "expect": {
+        "effect": "deny",
+        "rule": "no-mission-public-repo"
+      }
+    },
+    {
+      "name": "yarn tests by the agent are denied too",
+      "facts": {
+        "action": "shell",
+        "command": "yarn test --watch=false"
+      },
+      "expect": {
+        "effect": "deny",
+        "rule": "no-agent-scripts"
+      }
+    },
+    {
+      "name": "installing a package still asks",
+      "facts": {
+        "action": "shell",
+        "command": "npm install left-pad"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
     }
   ],
   "digest": {
     "description": "The digest of default.rules.json as it is, with or without null members and its own digest field.",
-    "expected": "sha256:63cb09bbfe7d11f53667a7773295653686311a72b21bc488d49f53112a4e57b0"
+    "expected": "sha256:b99a74b05337fca361fb893652013018fb8a170f50f50b0722e11b41d4d8b34c"
   }
 }

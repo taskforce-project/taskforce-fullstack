@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import type { RunnerProvision } from "@/lib/api/delivery-service"
 import { API_URL } from "@/lib/config/urls"
+import { MIN_CLAUDE_CODE } from "@/lib/utils/claude-code"
 
 /**
  * « Connect a runner » en libre-service (ADR-013) : crée l'identité machine du runner local de l'utilisateur
@@ -126,7 +127,7 @@ export function LocalRunnerSetup() {
           <CopyableCode label="2. Save as taskforce-runner/.env" text={runnerEnvFile(credentials)} />
           <CopyableCode label="3. Check, then start" text={RUN_COMMANDS} />
           <p className="text-[10px] text-muted-foreground">
-            Needs Claude Code 2.1.293 or later, installed and signed in once (npm install -g @anthropic-ai/claude-code,
+            Needs Claude Code {MIN_CLAUDE_CODE} or later, installed and signed in once (npm install -g @anthropic-ai/claude-code,
             then claude), and gh signed in so the runner can open pull requests. While it works, follow it live on the
             issue, and allow or deny the actions it asks for.
           </p>

@@ -5,6 +5,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.dto.request.ProjectRepoLinkRequest;
 import com.taskforce.tf_api.core.dto.response.ProjectRepoResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectTestCommandResponse;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.shared.exception.BusinessException;
@@ -60,6 +61,20 @@ public class ProjectRepoService {
         projectRepository.save(project);
         log.info("Projet {} lié au dépôt {}:{}", projectId, PROVIDER_GITHUB, fullName);
         return new ProjectRepoResponse(project.getId(), PROVIDER_GITHUB, fullName);
+    }
+
+    /**
+     * La commande de test du projet, que le runner lance après le travail de l'agent (S1, R32). Écriture sur le projet,
+     * comme le dépôt ; vide : aucun test lancé. Elle s'exécute sur l'ordinateur de qui délègue, qui l'accepte d'abord.
+     */
+    @Transactional
+    public ProjectTestCommandResponse setTestCommand(String workspaceSlug, Long projectId, Long userId, String testCommand) {
+        Project project = resolveWritableProject(workspaceSlug, projectId, userId);
+        String command = isBlank(testCommand) ? null : testCommand.strip();
+        project.setTestCommand(command);
+        projectRepository.save(project);
+        log.info("Projet {} : commande de test {}", projectId, command == null ? "retirée" : "posée");
+        return new ProjectTestCommandResponse(project.getId(), command);
     }
 
     @Transactional
