@@ -24,6 +24,8 @@ export interface RunResult {
   summary?: string;
   resultUrl?: string;
   error?: string;
+  /** Une règle a refusé la mission au départ : ce n'est pas une panne (R38). */
+  refused?: boolean;
 }
 
 /** Événement de la chronologie d'un run (miroir de `RunnerEventsRequest` côté backend). */
@@ -78,8 +80,13 @@ export class TaskforceApi {
     return this.cached;
   }
 
-  claim(): Promise<Claim | null> {
-    return this.send<Claim | null>("POST", "/delivery/runner/claim");
+  /**
+   * Réclame une tâche, en disant si l'agent peut partir sur ce poste. Avec un problème connu, TaskForce ne remet rien et
+   * ne propose plus l'agent, avec la cause (R37) ; un serveur plus ancien ignore ce corps.
+   */
+  claim(agentProblem: string | null = null): Promise<Claim | null> {
+    return this.send<Claim | null>("POST", "/delivery/runner/claim",
+      { agentReady: agentProblem === null, agentProblem: agentProblem ?? undefined });
   }
 
   async heartbeat(runId: number): Promise<void> {

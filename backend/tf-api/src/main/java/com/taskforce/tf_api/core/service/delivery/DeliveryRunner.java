@@ -290,6 +290,10 @@ public class DeliveryRunner {
             DeliveryAgentProvider provider = registry.get(run.getProviderKey());
             String agent = provider != null ? provider.displayName() : "The agent";
             boolean done = run.getStatus() == DeliveryRunStatus.DONE;
+            if (!done && run.isRefused()) {
+                notificationService.notifyAgentRunNotStarted(run.getIssue(), run.getStartedBy(), agent, run.getError());
+                return;
+            }
             notificationService.notifyAgentRunFinished(run.getIssue(), run.getStartedBy(), agent, done,
                 done ? run.getSummary() : run.getError());
         } catch (Exception e) {

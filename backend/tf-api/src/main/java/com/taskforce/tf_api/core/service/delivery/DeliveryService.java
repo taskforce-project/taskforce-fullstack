@@ -137,6 +137,7 @@ public class DeliveryService {
             r.getSummary(),
             r.getResultUrl(),
             r.getError(),
+            r.isRefused(),
             r.getStartedBy() != null ? r.getStartedBy().getId() : null,
             r.getCreatedAt(),
             r.getUpdatedAt());

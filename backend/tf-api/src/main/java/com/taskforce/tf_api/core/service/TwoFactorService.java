@@ -113,10 +113,14 @@ public class TwoFactorService {
         totpFails.remove(userId); // succès → on oublie les échecs
     }
 
-    /** Désactive le 2FA (supprime le secret). */
+    /**
+     * Désactive le 2FA (supprime le secret), sur un code valide : une session ouverte ne suffit plus, sinon le second
+     * facteur tombait avec le premier (recette du 29/10/2026, R42). Les mauvais codes sont bornés comme au login.
+     */
     @Transactional
-    public void disable(String email) {
+    public void disable(String email, String code) {
         User user = requireUser(email);
+        verifyOrThrow(user.getId(), code);
         repository.deleteByUserId(user.getId());
         log.info("2FA désactivé pour userId={}", user.getId());
     }

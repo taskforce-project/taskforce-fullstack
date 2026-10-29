@@ -20,6 +20,7 @@ import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 
 import com.taskforce.tf_api.core.dto.request.RunnerApprovalRequest;
+import com.taskforce.tf_api.core.dto.request.RunnerReadinessRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
 import com.taskforce.tf_api.core.dto.response.RunnerClaimResponse;
@@ -72,12 +73,13 @@ class LocalRunnerServiceTest {
 
     private LocalRunnerService service;
     private User owner;
+    private final RunnerPresenceService presence = new RunnerPresenceService();
 
     @BeforeEach
     void setUp() {
         LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15);
         service = new LocalRunnerService(runRepository, userRepository, visibilityGuard, deliveryRunner, settings, activityService,
-            rulesService, evidenceService);
+            rulesService, evidenceService, presence);
         owner = User.builder().id(7L).email(OWNER_EMAIL).keycloakId("kc-7").isActive(true).build();
     }
 
@@ -103,6 +105,30 @@ class LocalRunnerServiceTest {
     }
 
     // ── claim ────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("claim : un runner dont l'agent ne peut pas partir ne reçoit rien, et le problème est noté (R37)")
+    void claim_refused_when_the_agent_cannot_start() {
+        when(userRepository.findByEmail(OWNER_EMAIL)).thenReturn(Optional.of(owner));
+
+        Optional<RunnerClaimResponse> claim = service.claim(RUNNER, new RunnerReadinessRequest(false, "claude-signed-out"));
+
+        assertThat(claim).isEmpty();
+        verify(runRepository, never()).findClaimable(any(), any(), any(), any());
+        assertThat(presence.problem(7L)).contains("claude-signed-out");
+    }
+
+    @Test
+    @DisplayName("claim : un runner prêt efface le problème qu'il avait signalé")
+    void claim_ready_clears_the_problem() {
+        when(userRepository.findByEmail(OWNER_EMAIL)).thenReturn(Optional.of(owner));
+        when(runRepository.findClaimable(any(), any(), any(), any())).thenReturn(List.of());
+        service.claim(RUNNER, new RunnerReadinessRequest(false, "claude-signed-out"));
+
+        service.claim(RUNNER, new RunnerReadinessRequest(true, null));
+
+        assertThat(presence.problem(7L)).isEmpty();
+    }
 
     @Test
     @DisplayName("claim : réclame le plus ancien run du propriétaire et rend le brief de la tâche")
@@ -277,7 +303,7 @@ class LocalRunnerServiceTest {
         DeliveryRun held2 = run(100L, DeliveryRunStatus.RUNNING, "tf-runner-pierre", owner, LocalDateTime.now());
         when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(held2));
 
-        service.complete(100L, RUNNER, new RunnerResultRequest("DONE", " PR opened ", "https://github.com/acme/website/pull/9", null));
+        service.complete(100L, RUNNER, new RunnerResultRequest("DONE", " PR opened ", "https://github.com/acme/website/pull/9", null, null));
 
         ArgumentCaptor<DeliveryPoll> poll = ArgumentCaptor.forClass(DeliveryPoll.class);
         verify(deliveryRunner).complete(eq(100L), poll.capture());
@@ -294,12 +320,26 @@ class LocalRunnerServiceTest {
         DeliveryRun held3 = run(100L, DeliveryRunStatus.RUNNING, "tf-runner-pierre", owner, LocalDateTime.now());
         when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(held3));
 
-        service.complete(100L, RUNNER, new RunnerResultRequest("FAILED", null, null, " "));
+        service.complete(100L, RUNNER, new RunnerResultRequest("FAILED", null, null, " ", null));
 
         ArgumentCaptor<DeliveryPoll> poll = ArgumentCaptor.forClass(DeliveryPoll.class);
         verify(deliveryRunner).complete(eq(100L), poll.capture());
         assertThat(poll.getValue().status()).isEqualTo(DeliveryRunStatus.FAILED);
         assertThat(poll.getValue().error()).isNotBlank();
+        assertThat(held3.isRefused()).isFalse();
+    }
+
+    @Test
+    @DisplayName("complete FAILED refusé par une règle : le run est marqué, l'écran dira « Not started » (R38)")
+    void complete_refused_marks_the_run() {
+        DeliveryRun held4 = run(100L, DeliveryRunStatus.RUNNING, "tf-runner-pierre", owner, LocalDateTime.now());
+        when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(held4));
+
+        service.complete(100L, RUNNER, new RunnerResultRequest("FAILED", null, null,
+            "TaskForce doesn't start missions on public repositories yet.", true));
+
+        assertThat(held4.isRefused()).isTrue();
+        verify(deliveryRunner).complete(eq(100L), any());
     }
 
     @Test
@@ -307,12 +347,12 @@ class LocalRunnerServiceTest {
     void complete_refusals() {
         DeliveryRun held4 = run(100L, DeliveryRunStatus.RUNNING, "tf-runner-pierre", owner, LocalDateTime.now());
         when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(held4));
-        assertThatThrownBy(() -> service.complete(100L, RUNNER, new RunnerResultRequest("DONE", " ", null, null)))
+        assertThatThrownBy(() -> service.complete(100L, RUNNER, new RunnerResultRequest("DONE", " ", null, null, null)))
             .isInstanceOf(BusinessException.class);
 
         DeliveryRun held5 = run(200L, DeliveryRunStatus.RUNNING, "tf-runner-mallory", owner, LocalDateTime.now());
         when(runRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(held5));
-        assertThatThrownBy(() -> service.complete(200L, RUNNER, new RunnerResultRequest("DONE", "ok", null, null)))
+        assertThatThrownBy(() -> service.complete(200L, RUNNER, new RunnerResultRequest("DONE", "ok", null, null, null)))
             .isInstanceOf(ForbiddenException.class);
 
         verify(deliveryRunner, never()).complete(anyLong(), any());

@@ -5,7 +5,7 @@ from app.config import load_settings
 from app.main import create_app
 from app.services.provider import ProviderGateway
 from app.services.status import ProviderStatus
-from tests.conftest import AUTH, make_client
+from tests.conftest import AUTH, http_error, make_client
 
 CHOICE = {"choices": [{"message": {"role": "assistant", "content": "ok"}}], "usage": {"total_tokens": 4}}
 
@@ -50,6 +50,15 @@ def test_chat_indisponible_repond_503(provider, env):
     response = make_client(provider, **env).post(
         "/v1/chat", json={"messages": [{"role": "user", "content": "q"}]}, headers=AUTH)
     assert response.status_code == 503
+
+
+def test_chat_outils_refuses_repond_422(provider):
+    provider.reply("/chat/completions", http_error(400))
+    response = make_client(provider).post(
+        "/v1/chat", json={"messages": [{"role": "user", "content": "q"}],
+                          "tools": [{"type": "function", "function": {"name": "t"}}]}, headers=AUTH)
+    assert response.status_code == 422
+    assert response.json() == {"detail": "AI provider refused the tools (HTTP 400)"}
 
 
 def test_embeddings(provider):

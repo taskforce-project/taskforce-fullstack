@@ -6,6 +6,7 @@ import {
   AiRelay,
   DEFAULT_AI_SETTINGS,
   EMBEDDING_DIM,
+  nativeReasoningOff,
   parseAiInput,
   pickModel,
   resolveModels,
@@ -30,6 +31,20 @@ describe("withNoThink", () => {
   for (const [name, model, think] of unchanged) {
     it(`leaves the messages alone for ${name}`, () => {
       assert.equal(withNoThink(messages, model, think), messages);
+    });
+  }
+});
+
+describe("nativeReasoningOff", () => {
+  const cases: [AiSettings["provider"], string, boolean, boolean][] = [
+    ["ollama", "qwen3:8b", false, true],
+    ["ollama", "qwen3:8b", true, false],
+    ["ollama", "llama3.1:8b", false, false],
+    ["custom", "qwen3:8b", false, false],
+  ];
+  for (const [provider, model, think, off] of cases) {
+    it(`${provider}, ${model}, think ${think}: ${off ? "off" : "untouched"}`, () => {
+      assert.equal(nativeReasoningOff(provider, model, think), off);
     });
   }
 });
@@ -220,6 +235,22 @@ describe("AiRelay", () => {
     assert.equal(status, 200);
     const sizes = provider.requests.filter((r) => r.path === "/v1/chat/completions").map((r) => (r.body.tools as unknown[]).length);
     assert.deepEqual(sizes, [8, 4, 2]);
+  });
+
+  it("never answers without the tools: refused down to the last one, it says so", async () => {
+    provider.maxTools = 0;
+    const tools = Array.from({ length: 8 }, (_, i) => ({ type: "function", function: { name: `t${i}` } }));
+    const { status, body } = await ask("/v1/chat", { messages: [{ role: "user", content: "Hi" }], tools });
+    assert.equal(status, 422);
+    assert.equal(body.detail, "AI provider refused the tools (HTTP 413)");
+    const sizes = provider.requests.filter((r) => r.path === "/v1/chat/completions").map((r) => (r.body.tools as unknown[] | undefined)?.length ?? 0);
+    assert.deepEqual(sizes, [8, 4, 2, 1], "no request goes out without the tools");
+  });
+
+  it("keeps the reasoning setting to Ollama, where it is known", async () => {
+    await ask("/v1/chat", { messages: [{ role: "user", content: "Hi" }], tier: "fast" });
+    const sent = provider.requests.find((r) => r.path === "/v1/chat/completions")?.body;
+    assert.equal(sent?.reasoning_effort, undefined);
   });
 
   it("returns the vectors in the order of the texts", async () => {

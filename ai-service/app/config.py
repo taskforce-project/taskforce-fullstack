@@ -33,6 +33,7 @@ class Settings(BaseModel):
     """Paramètres du service (immuables après démarrage). Les URL de base incluent ``/v1``."""
 
     enabled: bool
+    chat_provider: str = "custom"         # "ollama", "groq" ou "custom" (toute autre API compatible OpenAI)
     chat_base_url: str
     chat_api_key: str
     model: str
@@ -64,17 +65,20 @@ def load_settings(env: Optional[Mapping[str, str]] = None) -> Settings:
     groq_key = _first(env, "GROQ_API_KEY")
 
     if explicit:
+        provider = "custom"
         chat_base = explicit
         chat_key = _first(env, "AI_API_KEY")
         model = _first(env, "AI_MODEL", default="qwen3:8b")
         model_fast = _first(env, "AI_MODEL_FAST", default=model)
     elif groq_key:
         # Alias historique : la clé Groq bascule le chat sur Groq (instance publique d'avant le lot 4).
+        provider = "groq"
         chat_base = _first(env, "GROQ_BASE_URL", default=DEFAULT_GROQ_URL)
         chat_key = _first(env, "AI_API_KEY", "GROQ_API_KEY")
         model = _first(env, "AI_MODEL", "GROQ_MODEL", default="openai/gpt-oss-120b")
         model_fast = _first(env, "AI_MODEL_FAST", "GROQ_MODEL_FAST", default="openai/gpt-oss-20b")
     else:
+        provider = "ollama"
         chat_base = ollama_v1
         chat_key = _first(env, "AI_API_KEY")
         model = _first(env, "AI_MODEL", "OLLAMA_MODEL", default="qwen3:8b")
@@ -93,6 +97,7 @@ def load_settings(env: Optional[Mapping[str, str]] = None) -> Settings:
 
     return Settings(
         enabled=_first(env, "AI_PROVIDER").lower() != "none",
+        chat_provider=provider,
         chat_base_url=chat_base.rstrip("/"),
         chat_api_key=chat_key,
         model=model,
