@@ -236,7 +236,8 @@ public class DeliveryRunner {
                 run.setStatus(DeliveryRunStatus.FAILED);
                 run.setError(poll.error());
                 evidenceService.end(run, poll);
-                moveIssueTo(run, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
+                // Une mission refusée au départ par une règle n'est pas une panne : l'issue reste où elle est (R38).
+                if (!run.isRefused()) moveIssueTo(run, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
                 notifyFinished(run);
             }
             default -> run.setStatus(DeliveryRunStatus.RUNNING); // encore en cours (poll ultérieur)
