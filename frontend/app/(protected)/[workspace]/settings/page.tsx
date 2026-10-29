@@ -958,8 +958,9 @@ function SecurityPanel() {
       setDisabling(false)
       setCode("")
       toast.success("Two-factor authentication disabled.")
-    } catch {
-      toast.error("That code didn't work. Enter the code your authenticator app shows now.")
+    } catch (e) {
+      // Le message du serveur dit la vraie cause : code faux, trop d'essais (attendre une minute), ou panne.
+      toast.error(getErrorMessage(e))
     } finally {
       setBusy(false)
     }

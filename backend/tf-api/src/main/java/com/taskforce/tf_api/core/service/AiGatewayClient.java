@@ -114,14 +114,29 @@ public class AiGatewayClient implements LlmClient {
             accumulateUsage(root.path("usage"));
             return root.path("message");
         } catch (Exception ex) {
-            if (ex instanceof HttpClientErrorException refused && refused.getStatusCode().value() == 422) {
-                // Le fournisseur refuse les outils, même un seul. Il répond : son état reste valable.
+            if (toolsRefused(ex)) { // le fournisseur répond : son état reste valable
                 log.error("AI provider refused the tools: {}", ex.getMessage());
                 throw new LlmToolsRefusedException("The AI provider refused the tools", ex);
             }
             log.error("AI service call failed: {}", ex.getMessage());
             status.invalidate(); // le fournisseur est peut-être tombé : on relira son état au prochain appel
             throw new LlmException("AI service unavailable: " + ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * Le fournisseur refuse les outils, même un seul : 422 avec le code {@code tools_refused}. FastAPI répond aussi 422
+     * pour un corps invalide, et son message peut citer ce qu'on lui a envoyé : on lit le code, pas le texte.
+     */
+    private boolean toolsRefused(Exception ex) {
+        if (!(ex instanceof HttpClientErrorException error) || error.getStatusCode().value() != 422) {
+            return false;
+        }
+        try {
+            JsonNode detail = objectMapper.readTree(error.getResponseBodyAsString()).path("detail");
+            return "tools_refused".equals(detail.path("code").asText());
+        } catch (Exception unreadable) {
+            return false;
         }
     }
 

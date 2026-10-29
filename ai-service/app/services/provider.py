@@ -163,7 +163,10 @@ class ProviderGateway:
                 if exc.code in (400, 413) and attempt_tools:
                     keep = len(attempt_tools) // 2
                     if keep == 0:
-                        logger.error("Provider answered %s even with a single tool: the tools are refused", exc.code)
+                        logger.error("Provider answered %s even with a single tool", exc.code)
+                        if exc.code == 413:
+                            # Trop gros même avec un seul outil : c'est la conversation, pas les outils.
+                            raise ProviderError("AI provider: the request is too large (HTTP 413)") from exc
                         raise ToolsRefusedError(f"AI provider refused the tools (HTTP {exc.code})") from exc
                     logger.warning("Provider answered %s with %d tool(s), retrying with %d",
                                    exc.code, len(attempt_tools), keep)

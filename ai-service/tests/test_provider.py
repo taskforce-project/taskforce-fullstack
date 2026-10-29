@@ -83,6 +83,17 @@ def test_outils_refuses_jusqu_au_dernier(provider):
     assert [len(r["body"].get("tools", [])) for r in provider.requests] == [8, 4, 2, 1]
 
 
+def test_trop_gros_meme_avec_un_outil_n_est_pas_un_refus_des_outils(provider):
+    # Un 413 qui tient avec un seul outil vient de la conversation : ce n'est pas aux outils qu'on le reproche.
+    provider.reply("/chat/completions", http_error(413))
+    gateway = ProviderGateway(load_settings({}), provider)
+    tools = [{"type": "function", "function": {"name": f"t{i}"}} for i in range(4)]
+    with pytest.raises(ProviderError) as raised:
+        gateway.chat([{"role": "user", "content": "q"}], tools=tools)
+    assert not isinstance(raised.value, ToolsRefusedError)
+    assert "too large" in str(raised.value)
+
+
 FAILED_CALL = b'{"error":{"message":"Tool call validation failed","type":"invalid_request_error","code":"tool_use_failed"}}'
 
 

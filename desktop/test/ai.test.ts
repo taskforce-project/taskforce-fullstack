@@ -114,6 +114,8 @@ class FakeProvider {
   models = ["qwen3:8b", "bge-m3:latest"];
   /** Taille de requête refusée au-delà de ce nombre d'outils (413), comme un fournisseur au payload borné. */
   maxTools = Number.POSITIVE_INFINITY;
+  /** Réponse au-delà de `maxTools` : 413 (trop gros) ou 400 (schéma refusé). */
+  toolsStatus = 413;
   dimensions = EMBEDDING_DIM;
 
   async start(): Promise<void> {
@@ -127,7 +129,7 @@ class FakeProvider {
       };
       if (path === "/v1/models") return json(200, { data: this.models.map((id) => ({ id })) });
       if (path === "/v1/chat/completions") {
-        if (Array.isArray(body.tools) && body.tools.length > this.maxTools) return json(413, { error: "too large" });
+        if (Array.isArray(body.tools) && body.tools.length > this.maxTools) return json(this.toolsStatus, { error: "refused" });
         return json(200, {
           choices: [{ message: { role: "assistant", content: `<think>x</think>answer from ${String(body.model)}` } }],
           usage: { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5 },
@@ -182,6 +184,7 @@ describe("AiRelay", () => {
   beforeEach(() => {
     provider.requests = [];
     provider.maxTools = Number.POSITIVE_INFINITY;
+    provider.toolsStatus = 413;
     provider.dimensions = EMBEDDING_DIM;
     current = {
       settings: { ...DEFAULT_AI_SETTINGS, provider: "custom", baseUrl: `http://127.0.0.1:${provider.port}/v1` },
@@ -239,12 +242,21 @@ describe("AiRelay", () => {
 
   it("never answers without the tools: refused down to the last one, it says so", async () => {
     provider.maxTools = 0;
+    provider.toolsStatus = 400;
     const tools = Array.from({ length: 8 }, (_, i) => ({ type: "function", function: { name: `t${i}` } }));
     const { status, body } = await ask("/v1/chat", { messages: [{ role: "user", content: "Hi" }], tools });
     assert.equal(status, 422);
-    assert.equal(body.detail, "AI provider refused the tools (HTTP 413)");
+    assert.deepEqual(body.detail, { code: "tools_refused", message: "AI provider refused the tools (HTTP 400)" });
     const sizes = provider.requests.filter((r) => r.path === "/v1/chat/completions").map((r) => (r.body.tools as unknown[] | undefined)?.length ?? 0);
     assert.deepEqual(sizes, [8, 4, 2, 1], "no request goes out without the tools");
+  });
+
+  it("too large even with a single tool: the conversation, not the tools", async () => {
+    provider.maxTools = 0;
+    const tools = Array.from({ length: 4 }, (_, i) => ({ type: "function", function: { name: `t${i}` } }));
+    const { status, body } = await ask("/v1/chat", { messages: [{ role: "user", content: "Hi" }], tools });
+    assert.equal(status, 503);
+    assert.equal(body.detail, "AI provider: the request is too large (HTTP 413)");
   });
 
   it("keeps the reasoning setting to Ollama, where it is known", async () => {

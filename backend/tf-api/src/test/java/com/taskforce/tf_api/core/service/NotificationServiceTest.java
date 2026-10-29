@@ -355,7 +355,7 @@ class NotificationServiceTest {
             "asked    | agentApproval | warning | Fix bug: TaskForce asks: git push",
             "done     | agentDone     | info    | Fix bug: Claude Code finished, ready for your review",
             "failed   | agentFailed   | warning | Fix bug: Claude Code failed",
-            "refused  | agentFailed   | info    | Fix bug: Claude Code didn't start",
+            "refused  | agentNotStarted | info  | Fix bug: Claude Code didn't start",
         })
         void notifies_the_delegator(String which, String type, String urgency, String title) {
             User delegator = user(40L, "ada");
