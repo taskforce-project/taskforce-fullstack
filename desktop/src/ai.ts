@@ -54,7 +54,8 @@ export interface AiState {
 }
 
 class ProviderError extends Error {
-  constructor(message: string, readonly status = 503) {
+  /** `code` : pour un refus des outils, que le backend distingue du 422 d'une requête invalide (même forme que l'ai-service). */
+  constructor(message: string, readonly status = 503, readonly code?: string) {
     super(message);
   }
 }
@@ -242,7 +243,7 @@ export class AiRelay {
       } catch (error) {
         const failure = error instanceof ProviderError ? error : new ProviderError((error as Error).message);
         if (path === "/v1/chat") this.invalidate();
-        send(res, failure.status, { detail: failure.message });
+        send(res, failure.status, { detail: failure.code ? { code: failure.code, message: failure.message } : failure.message });
       }
       return;
     }
@@ -300,8 +301,10 @@ export class AiRelay {
         if (error instanceof HttpError && (error.status === 400 || error.status === 413) && tools) {
           const keep = Math.floor(tools.length / 2);
           if (keep === 0) {
-            log.error(`AI provider answered ${error.status} even with a single tool: the tools are refused`);
-            throw new ProviderError(`AI provider refused the tools (HTTP ${error.status})`, 422);
+            log.error(`AI provider answered ${error.status} even with a single tool`);
+            // Trop gros même avec un seul outil : c'est la conversation, pas les outils.
+            if (error.status === 413) throw new ProviderError("AI provider: the request is too large (HTTP 413)");
+            throw new ProviderError(`AI provider refused the tools (HTTP ${error.status})`, 422, "tools_refused");
           }
           log.warn(`AI provider answered ${error.status} with ${tools.length} tool(s), retrying with ${keep}`);
           tools = tools.slice(0, keep);
