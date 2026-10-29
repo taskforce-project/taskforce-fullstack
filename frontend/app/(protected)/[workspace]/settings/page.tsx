@@ -1237,13 +1237,27 @@ function WorkspacePanel() {
 function AuditLogPanel() {
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
   const [logs, setLogs] = useState<AuditLogEntry[]>([])
+  // Vide, réservé, ou en échec : trois cas que l'écran ne confond plus (recette du 29/10/2026, R38).
+  const [access, setAccess] = useState<"loading" | "ready" | "denied" | "error">("loading")
 
   useEffect(() => {
     if (!slug) return
     let alive = true
-    getAuditLogs(slug).then((l) => { if (alive) setLogs(l) }).catch(() => { /* OWNER/ADMIN only */ })
+    getAuditLogs(slug)
+      .then((l) => { if (alive) { setLogs(l); setAccess("ready") } })
+      .catch((e: unknown) => {
+        const status = (e as { response?: { status?: number } } | null)?.response?.status
+        if (alive) setAccess(status === 403 ? "denied" : "error")
+      })
     return () => { alive = false }
   }, [slug])
+
+  const emptyText = {
+    loading: "Loading the audit log…",
+    ready: "No audit entries yet. Role changes and member removals show up here.",
+    denied: "Only the workspace's owners and admins can read the audit log.",
+    error: "The audit log couldn't be loaded. Try again in a moment.",
+  }[access]
 
   function exportAuditCsv() {
     const esc = (v: unknown) => `"${String(v ?? "").replaceAll('"', '""')}"`
@@ -1272,7 +1286,7 @@ function AuditLogPanel() {
 
       <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
         {logs.length === 0 ? (
-          <p className="px-4 py-6 text-center text-xs text-muted-foreground">No audit entries (admins only).</p>
+          <p className="px-4 py-6 text-center text-xs text-muted-foreground">{emptyText}</p>
         ) : (
           logs.slice(0, 30).map((l, i) => (
             <div key={l.id} className={cn("flex items-center gap-3 px-4 py-2.5", i < Math.min(logs.length, 30) - 1 && "border-b border-border/50")}>
