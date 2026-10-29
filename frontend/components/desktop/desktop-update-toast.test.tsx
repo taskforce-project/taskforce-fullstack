@@ -27,9 +27,9 @@ function installBridge(initial: DesktopUpdateState) {
 async function load() {
   vi.stubEnv("NEXT_PUBLIC_DESKTOP", "true")
   vi.resetModules()
-  const module = await import("./desktop-update-toast")
+  const loaded = await import("./desktop-update-toast")
   const { toast } = await import("sonner")
-  return { ...module, toast }
+  return { ...loaded, toast }
 }
 
 describe("DesktopUpdateToast: the app update, inside the app", () => {
