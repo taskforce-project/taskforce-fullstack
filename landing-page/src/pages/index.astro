@@ -1,9 +1,9 @@
 ---
 /**
  * Accueil. Structure variée, façon duna.com, cluely.com et dust.tt : héros sur une peinture avec l'app au travail,
- * logos, manifeste en trois colonnes, deux cartes en paire (l'issue, puis l'agent), section mémoire à liste
- * dépliante, bande peinte pleine largeur, trois cartes « contrôle », bandeau open source, FAQ, appel final. Tout ce
- * qui est montré existe dans l'app.
+ * logos en défilé, manifeste en trois colonnes, deux cartes en paire (l'issue, puis l'agent), bande peinte pleine
+ * largeur, trois cartes « contrôle », bandeau open source, FAQ, appel final. Tout ce qui est montré existe dans l'app ;
+ * le Brain OS n'a plus d'écran depuis la 1.5.0 (le moteur reste : les agents y cherchent le contexte d'une tâche).
  */
 import { ArrowRight, Eye, FileSearch, ShieldCheck } from "lucide-react";
 import BaseLayout from "@/layouts/BaseLayout.astro";
@@ -15,11 +15,9 @@ import Faq, { type FaqItem } from "@/components/site/Faq.astro";
 import HeroDownload from "@/components/site/HeroDownload.astro";
 import PaintBand from "@/components/site/PaintBand.astro";
 import Pill from "@/components/site/Pill.astro";
-import ProductSection from "@/components/site/ProductSection.astro";
 import RuleColumns, { type RuleItem } from "@/components/site/RuleColumns.astro";
 import HeroApp from "@/components/visuals/HeroApp";
 import { BrandMark } from "@/components/visuals/brand";
-import type { TabItem } from "@/components/visuals/FeatureTabs";
 import { BRANDS, type BrandKey } from "@/lib/brands";
 import { getDesktopRelease } from "@/lib/release";
 import { LINKS } from "@/lib/site";
@@ -33,7 +31,7 @@ const PROMISES: RuleItem[] = [
     icon: FileSearch,
     tint: "bg-tint-green text-ink-green",
     title: "Context comes with the task",
-    text: "Agents look up your decisions and conventions in Brain OS before they start, so they don't begin from a blank page.",
+    text: "Before they start, agents search your workspace's knowledge for the decisions and conventions that relate to the task.",
   },
   {
     icon: Eye,
@@ -49,13 +47,6 @@ const PROMISES: RuleItem[] = [
   },
 ];
 
-const MEMORY: TabItem[] = [
-  { title: "Pages in a tree", desc: "Write in Markdown, nest pages under each other and tag them.", art: "tree", icon: "tree" },
-  { title: "Linked notes", desc: "Link pages with [[wikilinks]] and #tags, and see how your notes connect.", art: "links", icon: "links" },
-  { title: "Search by meaning", desc: "Find a decision by what it says, not only by its words, when an embedding model is available.", art: "search", icon: "search" },
-  { title: "Read by your agents", desc: "Agents and the assistant search Brain OS for the decisions that relate to a task.", art: "agentReads", icon: "reads" },
-];
-
 const FAQ: FaqItem[] = [
   {
     q: "Is TaskForce free?",
@@ -67,7 +58,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "Which AI does it use?",
-    a: "The one you choose: a local model through Ollama, free and private, or any OpenAI-compatible API with your own key, such as OpenAI, Groq, Mistral, OpenRouter or LM Studio. TaskForce also works without AI: the board, Brain OS and analytics don't need it.",
+    a: "The one you choose: a local model through Ollama, free and private, or any OpenAI-compatible API with your own key, such as OpenAI, Groq, Mistral, OpenRouter or LM Studio. TaskForce also works without AI: the board and analytics don't need it.",
   },
   {
     q: "Do I need Claude Code or Copilot?",
@@ -80,7 +71,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "Where is my data stored?",
-    a: "Your projects, Brain OS pages and files stay in the app's data folder on your computer: they never go to our servers. We only keep your account, with your name and email address.",
+    a: "Your projects, notes and files stay in the app's data folder on your computer: they never go to our servers. We only keep your account, with your name and email address.",
   },
   {
     q: "I used the TaskForce web app. What happens to my projects?",
@@ -92,7 +83,7 @@ const FAQ: FaqItem[] = [
 
 <BaseLayout
   title="TaskForce: plan your work and hand it to AI agents, from your desktop"
-  description="A free, open source desktop app to plan your work, keep your project's memory and hand tasks to Claude Code or GitHub Copilot. It runs on your computer and asks before anything risky."
+  description="A free, open source desktop app to plan your work and hand tasks to Claude Code or GitHub Copilot. It runs on your computer and asks before anything risky."
   software
   softwareVersion={release?.version}
 >
@@ -101,7 +92,7 @@ const FAQ: FaqItem[] = [
     <Backdrop name="home" class="inset-x-0 top-0 h-[1040px] sm:h-[1240px]" fade veil="top" priority />
     <div class="container-wide relative flex flex-col items-center pt-20 text-center sm:pt-24 lg:pt-28">
       <span class="anim-fade-up"><Pill tone="glass">Free and open source · Windows, Linux · macOS soon</Pill></span>
-      <h1 class="t-display anim-fade-up mt-8" style="--d: 70ms">
+      <h1 class="t-display mt-8" data-words="load" style="--d: 120ms">
         <span class="block">Delegate to AI agents.</span>
         <span class="block">Keep the <span class="t-word">final say.</span></span>
       </h1>
@@ -112,7 +103,9 @@ const FAQ: FaqItem[] = [
       <HeroDownload class="anim-fade-up mt-10" align="center" secondary={{ label: "See how it works", href: "#how" }} />
     </div>
     <div class="container-wide anim-fade-up relative mt-14 sm:mt-16" style="--d: 260ms">
-      <HeroApp client:load />
+      <div data-tilt>
+        <HeroApp client:load />
+      </div>
     </div>
   </section>
 
@@ -120,28 +113,34 @@ const FAQ: FaqItem[] = [
   <section class="pt-20 sm:pt-24">
     <div class="container-site">
       <p class="text-center text-[15px] text-muted-foreground" data-reveal>Works with the agents and tools you already use</p>
-      <ul class="mt-9 flex flex-wrap items-center justify-center gap-x-10 gap-y-6" data-reveal style="--d: 80ms">
-        {
-          WORKS_WITH.map((key) => (
-            <li class="flex items-center gap-2.5 text-[16px] font-medium tracking-[-0.015em] text-foreground/85">
-              <BrandMark brand={key} className="size-6" />
-              {BRANDS[key].name}
-            </li>
-          ))
-        }
-      </ul>
+      <div class="marquee mt-9" data-reveal style="--d: 80ms">
+        <div class="marquee-track">
+          {
+            [0, 1].map((copy) => (
+              <ul class="flex shrink-0 items-center gap-14 pr-14" aria-hidden={copy === 1 ? "true" : undefined}>
+                {WORKS_WITH.map((key) => (
+                  <li class="flex shrink-0 items-center gap-2.5 text-[16px] font-medium tracking-[-0.015em] text-foreground/85">
+                    <BrandMark brand={key} className="size-6" />
+                    {BRANDS[key].name}
+                  </li>
+                ))}
+              </ul>
+            ))
+          }
+        </div>
+      </div>
     </div>
   </section>
 
   {/* ───────── Manifeste : trois promesses, en colonnes séparées par des filets (façon Duna) ───────── */}
   <section class="section">
     <div class="container-site">
-      <h2 class="t-h2 max-w-4xl" data-reveal>
+      <h2 class="t-h2 max-w-4xl" data-words>
         AI agents do the work. <span class="t-word">You make the calls.</span>
       </h2>
-      <p class="t-lead mt-7 max-w-2xl" data-reveal style="--d: 80ms">
+      <p class="t-lead mt-7 max-w-2xl" data-fill>
         Agents are fast, but working with them is still messy: context gets lost, you can't see what they do, and
-        results land unchecked. TaskForce puts the plan, the memory and the agents in one app, with you in charge.
+        results land unchecked. TaskForce puts the plan, the context and the agents in one app, with you in charge.
       </p>
       <RuleColumns items={PROMISES} class="mt-16" />
     </div>
@@ -150,9 +149,9 @@ const FAQ: FaqItem[] = [
   {/* ───────── De l'idée à la pull request : deux cartes en paire (façon Cluely) ───────── */}
   <section id="how" class="scroll-mt-16 pb-24 sm:pb-32">
     <div class="container-site">
-      <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between" data-reveal>
-        <h2 class="t-h2 max-w-2xl">From your idea <span class="t-word">to a pull request.</span></h2>
-        <a href="/features" class="btn btn-secondary btn-sm self-start lg:self-end">
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <h2 class="t-h2 max-w-2xl" data-words>From your idea <span class="t-word">to a pull request.</span></h2>
+        <a href="/features" class="btn btn-secondary btn-sm self-start lg:self-end" data-reveal style="--d: 300ms">
           All features <ArrowRight aria-hidden="true" />
         </a>
       </div>
@@ -160,7 +159,7 @@ const FAQ: FaqItem[] = [
         <DuoCard
           accent
           title="You write the issue"
-          text="Plan it on the board or in a cycle, the way you deliver. The decisions you keep in Brain OS travel with it."
+          text="Plan it on the board or in a cycle, the way you deliver. Its description and comments go to the agent with it."
           art="board"
         />
         <DuoCard
@@ -172,19 +171,6 @@ const FAQ: FaqItem[] = [
       </div>
     </div>
   </section>
-
-  {/* ───────── La mémoire du projet : liste dépliante qui pilote l'illustration (façon Duna) ───────── */}
-  <ProductSection
-    id="memory"
-    label="Brain OS"
-    tone="green"
-    lead="Brain OS keeps your specs, decisions and notes in one place, so people and agents start from what you already decided."
-    items={MEMORY}
-    more={{ href: "/features#memory" }}
-    reverse
-  >
-    <Fragment slot="title">Git remembers what changed. <span class="t-word">TaskForce remembers why.</span></Fragment>
-  </ProductSection>
 
   {/* ───────── Bande peinte : tout reste sur l'ordinateur ───────── */}
   <PaintBand bg="band" label="Local first">
@@ -201,9 +187,9 @@ const FAQ: FaqItem[] = [
   {/* ───────── Le contrôle : trois cartes, la légende dessous (façon Cluely) ───────── */}
   <section class="section">
     <div class="container-site">
-      <div class="flex flex-col items-center text-center" data-reveal>
-        <h2 class="t-h2 max-w-3xl">Stay in control <span class="t-word">without watching every step.</span></h2>
-        <p class="t-lead mt-6 max-w-2xl">Agents ask before anything outside their limits, and their work comes back to you.</p>
+      <div class="flex flex-col items-center text-center">
+        <h2 class="t-h2 max-w-3xl" data-words>Stay in control <span class="t-word">without watching every step.</span></h2>
+        <p class="t-lead mt-6 max-w-2xl" data-reveal style="--d: 250ms">Agents ask before anything outside their limits, and their work comes back to you.</p>
       </div>
       <div class="mt-14 grid gap-x-6 gap-y-12 sm:mt-16 md:grid-cols-3">
         <BentoCard
@@ -235,7 +221,7 @@ const FAQ: FaqItem[] = [
     <div class="container-site">
       <div class="card grid items-center gap-10 p-8 sm:p-12 lg:grid-cols-[1fr_auto] lg:gap-16 lg:p-14">
         <div data-reveal>
-          <h2 class="t-h2">Open source, <span class="t-word">from the first line.</span></h2>
+          <h2 class="t-h2" data-words>Open source, <span class="t-word">from the first line.</span></h2>
           <p class="t-lead mt-5 max-w-xl">
             Every part of TaskForce is published under the AGPL-3.0 license. Read how it handles your data, build it
             yourself, or adapt it for your company.
@@ -245,14 +231,18 @@ const FAQ: FaqItem[] = [
             Read the code on GitHub
           </a>
         </div>
-        <ul class="flex flex-wrap justify-start gap-4 lg:justify-end" data-reveal style="--d: 100ms">
+        <ul class="flex flex-wrap justify-start gap-4 lg:justify-end">
           {
             [
               { t: "AGPL-3.0", d: "Open source", dot: "bg-shape-blue" },
               { t: "Free", d: "No subscription", dot: "bg-shape-green" },
               { t: "No telemetry", d: "No usage data sent", dot: "bg-shape-pink" },
-            ].map((s) => (
-              <li class="flex size-32 flex-col items-center justify-center rounded-full bg-white text-center shadow-sm ring-1 ring-black/5">
+            ].map((s, i) => (
+              <li
+                class="flex size-32 flex-col items-center justify-center rounded-full bg-white text-center shadow-sm ring-1 ring-black/5"
+                data-reveal
+                style={`--d: ${150 + i * 120}ms`}
+              >
                 <span class={`mb-2 size-2.5 rounded-full ${s.dot}`} />
                 <span class="text-[17px] font-medium tracking-[-0.02em]">{s.t}</span>
                 <span class="mt-1 text-[12.5px] text-muted-foreground">{s.d}</span>
@@ -268,7 +258,7 @@ const FAQ: FaqItem[] = [
   <section class="pb-24 sm:pb-32">
     <div class="container-site">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between" data-reveal>
-        <h2 class="t-h2">Questions <span class="t-word">people ask first.</span></h2>
+        <h2 class="t-h2" data-words>Questions <span class="t-word">people ask first.</span></h2>
         <p class="t-body max-w-sm">
           Something else? Ask on{" "}
           <a href={LINKS.issues} target="_blank" rel="noopener" class="link-inline">GitHub</a> or write to{" "}

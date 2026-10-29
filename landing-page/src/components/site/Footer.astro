@@ -1,5 +1,8 @@
 ---
-/** Pied de page : logo et promesse, liens par groupe, ligne de bas de page. Fond papier, coins du haut arrondis. */
+/**
+ * Pied de page : logo et promesse, liens par groupe, ligne de bas de page, puis le grand mot « TaskForce » rempli
+ * d'une peinture du site (décoratif). Fond papier, coins du haut arrondis.
+ */
 import { ArrowUpRight } from "lucide-react";
 import Logo from "./Logo.astro";
 import { FOOTER_GROUPS, LINKS } from "@/lib/site";
@@ -13,7 +16,7 @@ const year = new Date().getFullYear();
     <div class="max-w-sm">
       <Logo class="text-foreground" />
       <p class="t-small mt-5">
-        The desktop app to plan your work, keep its memory and hand tasks to AI agents. Free and open source.
+        The desktop app to plan your work and hand tasks to AI agents. Free and open source.
       </p>
       <a href="/download" class="btn btn-primary btn-sm mt-7">Download TaskForce</a>
     </div>
@@ -50,5 +53,9 @@ const year = new Date().getFullYear();
         <a href={`mailto:${LINKS.email}`} class="hover:text-foreground">{LINKS.email}</a>
       </p>
     </div>
+  </div>
+
+  <div class="container-wide overflow-hidden pt-4" aria-hidden="true">
+    <p class="footer-mark text-center" data-reveal>TaskForce</p>
   </div>
 </footer>

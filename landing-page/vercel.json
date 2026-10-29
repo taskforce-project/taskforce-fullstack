@@ -13,7 +13,7 @@
     { "source": "/product/agents", "destination": "/agents", "permanent": true },
     { "source": "/product/orchestration", "destination": "/agents", "permanent": true },
     { "source": "/product/approvals", "destination": "/agents", "permanent": true },
-    { "source": "/product/brain-os", "destination": "/features#memory", "permanent": true },
+    { "source": "/product/brain-os", "destination": "/features", "permanent": true },
     { "source": "/product/analytics", "destination": "/features#measure", "permanent": true },
     { "source": "/product/integrations/:key*", "destination": "/features#connect", "permanent": true },
     { "source": "/product/:path*", "destination": "/features", "permanent": true },

@@ -26,7 +26,7 @@ const STAGES: Stage[] = [
   },
   {
     title: "It gets the context",
-    text: "The agent reads the issue and its comments, and searches Brain OS for the decisions that relate to it.",
+    text: "The agent reads the issue and its comments, and searches your workspace's knowledge for the decisions that relate to it.",
     badge: "bg-shape-green text-white",
     chip: (
       <span className="inline-flex items-center gap-1.5 bg-tint-green px-2 py-1 text-[11.5px] whitespace-nowrap text-ink-green rounded-md">

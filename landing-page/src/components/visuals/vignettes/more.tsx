@@ -52,7 +52,7 @@ export function AskArt({ playing, reduce }: Readonly<VProps>) {
                 <AnimatePresence>
                   {step >= 3 && (
                     <motion.p {...rise} className="mt-3 text-[11px] text-subtle">
-                      Based on your board and your Brain OS pages
+                      Based on your board and your notes
                     </motion.p>
                   )}
                 </AnimatePresence>
@@ -177,7 +177,7 @@ const EVERY_STEPS = [700, 700, 700, 900, 2200] as const;
 export function EverydayArt({ playing, reduce }: Readonly<VProps>) {
   const step = useSequence(EVERY_STEPS, playing, reduce);
   // les commandes de la vraie palette (frontend/components/command-palette.tsx)
-  const rows = ["Create issue", "Go to Brain OS", "Ask AI", "Switch to dark mode"];
+  const rows = ["Create issue", "Go to My Queue", "Ask AI", "Switch to dark mode"];
   const hl = Math.min(step, 3);
   const dark = step >= 4;
   return (

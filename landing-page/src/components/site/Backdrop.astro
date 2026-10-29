@@ -2,7 +2,8 @@
 /**
  * Fond peint d'une zone (héros, bande, appel final) : l'image couvre la zone, cadrée sur ce qui compte. `fade` fond le
  * bas de l'image dans la page ; `veil` pose un voile clair très doux là où passe le texte, pour qu'il se lise sur la
- * peinture. Décorative : sans texte alternatif, ignorée des lecteurs d'écran.
+ * peinture. La peinture vit : elle défile un peu moins vite que la page (`parallax`, part de la hauteur de la zone,
+ * scripts/motion.js) et dérive très lentement. Décorative : sans texte alternatif, ignorée des lecteurs d'écran.
  */
 import { BACKGROUNDS, type BackgroundName } from "@/lib/backgrounds";
 
@@ -15,21 +16,26 @@ interface Props {
   veil?: "top" | "center";
   /** Image du haut de page : chargée tout de suite, en priorité. */
   priority?: boolean;
+  /** Décalage de défilement, en part de la hauteur de la zone (0 : la peinture suit la page). */
+  parallax?: number;
 }
-const { name, class: cls, fade = false, veil, priority = false } = Astro.props;
+const { name, class: cls, fade = false, veil, priority = false, parallax = 0.1 } = Astro.props;
 const bg = BACKGROUNDS[name];
 ---
 
 <div class:list={["backdrop", fade && "backdrop-fade", cls]} aria-hidden="true">
-  <img
-    src={bg.src}
-    srcset={bg.srcset}
-    sizes="100vw"
-    alt=""
-    style={`object-position: ${bg.position}`}
-    loading={priority ? "eager" : "lazy"}
-    fetchpriority={priority ? "high" : "auto"}
-    decoding="async"
-  />
+  <div class="backdrop-layer" data-parallax={parallax > 0 ? parallax : undefined}>
+    <img
+      class="backdrop-drift"
+      src={bg.src}
+      srcset={bg.srcset}
+      sizes="100vw"
+      alt=""
+      style={`object-position: ${bg.position}`}
+      loading={priority ? "eager" : "lazy"}
+      fetchpriority={priority ? "high" : "auto"}
+      decoding="async"
+    />
+  </div>
   {veil && <div class:list={["backdrop-veil", `backdrop-veil-${veil}`]} />}
 </div>
