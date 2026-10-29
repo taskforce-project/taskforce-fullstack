@@ -36,7 +36,7 @@ class AgentToolRegistryTest {
     /** Les sept outils internes ; leurs schémas ne touchent pas aux services, d'où les dépendances nulles. */
     static Stream<Arguments> internalTools() {
         return Stream.<AgentTool>of(new CreateIssueTool(null, null), new CreateNoteTool(null), new CreateProjectTool(null),
-                new FindIntegrationTool(null), new ListIssuesTool(null), new ListProjectsTool(null, null, null),
+                new FindIntegrationTool(null), new ListIssuesTool(null, null, null), new ListProjectsTool(null, null, null),
                 new SearchBrainTool(null))
             .map(tool -> Arguments.of(tool.name(), tool));
     }
