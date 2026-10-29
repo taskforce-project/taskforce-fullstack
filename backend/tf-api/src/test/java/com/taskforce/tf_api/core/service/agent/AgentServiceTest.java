@@ -350,6 +350,11 @@ class AgentServiceTest {
         List<Map<String, Object>> sent = captor.getValue();
         assertThat(sent).hasSize(4);
         assertThat(sent.get(0)).containsEntry("role", "system");
+        // La notion du temps (R48) : la date du jour, et le Backlog sauf si le travail doit commencer maintenant.
+        String today = java.time.LocalDate.now(java.time.ZoneOffset.UTC)
+            .format(java.time.format.DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", java.util.Locale.ENGLISH));
+        assertThat((String) sent.get(0).get("content")).contains("Today is " + today + " (UTC)")
+            .contains("keep it in the Backlog unless the work must start now");
         assertThat(sent.get(1)).containsEntry("content", "My project is called Zephyr");
         assertThat(sent.get(2)).containsEntry("role", "assistant");
         assertThat(sent.get(3)).containsEntry("content", "Remind me of its name");

@@ -133,7 +133,9 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       // S1 (R32) : les tests du projet, lancés par le runner sur le travail de l'agent, jamais par l'agent. Après les
       // commits : ce que les tests écrivent (couverture, rapports) ne part pas avec la branche.
       let report = outcome.text;
-      let prBody = outcome.text;
+      // Les tests tels que le runner les a lancés : une ligne des faits de la pull request, jamais une phrase de l'agent.
+      let testsFact = "No test command is set for this project: no test ran.";
+      let testOutput: string | undefined;
       if (commits > 0 && claim.testCommand) {
         const tests = await runProjectTests(claim.testCommand, claim.repoFullName, worktree.path, TEST_TIMEOUT_MS,
           { ask, approved: ApprovedTests.in(config.home) }, signal);
@@ -141,7 +143,8 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
         await api.events(claim.runId, [{ kind: "test", tool: tests.command.slice(0, 120), text: `${tests.summary}${tests.tail ? `\n${tests.tail.slice(-1500)}` : ""}` }])
           .catch((e: unknown) => log.warn(`Test result not traced in TaskForce: ${(e as Error).message}`));
         report = `${outcome.text}\n\n${tests.summary}`;
-        prBody = tests.tail ? `${report}\n\n<details><summary>Test output</summary>\n\n\`\`\`\n${tests.tail}\n\`\`\`\n</details>` : report;
+        testsFact = tests.summary;
+        testOutput = tests.tail || undefined;
       }
       if (commits === 0) {
         result = { status: "DONE", summary: `No code change was needed.\n\n${outcome.text}`.slice(0, 7900) };
@@ -164,6 +167,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
           };
         } else {
           await pushBranch(worktree, repo);
+          const pushed = `Pushed the branch \`${worktree.branch}\` (${commits} commit${commits > 1 ? "s" : ""}): ${push.why}.`;
           let url: string | undefined;
           let note = "";
           if (config.openPullRequest) {
@@ -171,7 +175,10 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
               `Open a pull request from ${worktree.branch} on ${where}`, ask);
             log.info(`Pull request: ${pr.why}`);
             await traceExit(api, claim.runId, "gh pr create", pr);
-            if (pr.go) url = await openPullRequest(worktree, repo, claim, prBody, config.home);
+            if (pr.go) {
+              const facts = [pushed, `Opened this pull request: ${pr.why}.`, testsFact];
+              url = await openPullRequest(worktree, repo, claim, { facts, summary: outcome.text, testOutput }, config.home);
+            }
             else note = `\n\nBranch ${worktree.branch} pushed, no pull request: ${pr.why}.`;
           }
           result = { status: "DONE", summary: `${report}${note}`.slice(0, 7900), resultUrl: url };

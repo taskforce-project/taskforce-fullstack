@@ -150,13 +150,27 @@ export async function repoVisibility(fullName: string): Promise<"public" | "priv
   return visibilityOf(out);
 }
 
+/**
+ * Ce que porte la pull request (R49, séance n°8) : les faits du runner d'abord, chacun tiré de ce qu'il a vraiment fait,
+ * puis le résumé de l'agent sous son nom. Le récit de l'agent, écrit avant le push, ne dit plus « nothing pushed » au
+ * dessus d'une branche poussée.
+ */
+export interface PullRequestReport {
+  /** Ce que TaskForce a fait : la branche poussée, la pull request ouverte et par quelle règle, les tests. */
+  facts: string[];
+  /** Le résumé de l'agent, tel qu'il l'a écrit. */
+  summary: string;
+  /** La fin de la sortie des tests, quand ils ont tourné. */
+  testOutput?: string;
+}
+
 /** Ouvre la pull request avec `gh` et rend son URL. Aucune fusion : la revue reste humaine. */
 export async function openPullRequest(
-  worktree: Worktree, repo: RepoConfig, claim: Claim, summary: string, home: string,
+  worktree: Worktree, repo: RepoConfig, claim: Claim, report: PullRequestReport, home: string,
 ): Promise<string> {
   const bodyFile = join(home, "tmp", `run-${claim.runId}-pr.md`);
   mkdirSync(join(home, "tmp"), { recursive: true });
-  writeFileSync(bodyFile, pullRequestBody(claim, summary), "utf8");
+  writeFileSync(bodyFile, pullRequestBody(claim, report), "utf8");
   try {
     const out = await runOrThrow("gh", [
       "pr", "create",
@@ -174,17 +188,28 @@ export async function openPullRequest(
   }
 }
 
-export function pullRequestBody(claim: Claim, summary: string): string {
-  return [
+export function pullRequestBody(claim: Claim, report: PullRequestReport): string {
+  const lines = [
     `## ${claim.issueKey}: ${claim.title}`,
     "",
-    summary.trim(),
+    "### What TaskForce did",
+    ...report.facts.map((fact) => `- ${fact}`),
+    "",
+    "### The agent's summary",
+    "",
+    report.summary.trim(),
+  ];
+  if (report.testOutput) {
+    lines.push("", "<details><summary>Test output</summary>", "", "```", report.testOutput, "```", "</details>");
+  }
+  lines.push(
     "",
     "---",
     `Delegated from TaskForce (${claim.projectName}, run #${claim.runId}) and produced by a coding agent.`,
     "Review before merging: nothing is merged automatically.",
     "",
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 
 export async function removeWorktree(repo: RepoConfig, worktree: Worktree): Promise<void> {

@@ -276,6 +276,17 @@ describe('API Client', () => {
       expect(toast.error).not.toHaveBeenCalled();
     });
 
+    it('montre tel quel le message de la garde IA, qui dit la limite et l’attente', async () => {
+      const message = 'This instance allows 1 AI request per minute for each account. Try again in 23 s.';
+      const error = axiosError({
+        response: { status: 429, headers: { 'retry-after': '23' }, data: { error: 'AI Rate Limited', message } },
+      });
+
+      await expect(onResponseError(error)).rejects.toBeDefined();
+
+      expect(toast.warning).toHaveBeenCalledWith(message, expect.objectContaining({ id: 'api-rate-limit' }));
+    });
+
     it('reste muet sur un 429 lors d’un appel de fond', async () => {
       const error = axiosError({
         response: { status: 429, headers: { 'retry-after': '2' } },
@@ -322,6 +333,21 @@ describe('API Client', () => {
           },
         }),
       ).toBe('Too many requests, try again in 30 seconds.');
+    });
+
+    it('dit d’un 429 de la garde IA son propre message', () => {
+      vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+      expect(
+        getErrorMessage({
+          isAxiosError: true,
+          response: {
+            status: 429,
+            headers: { 'retry-after': '23' },
+            data: { error: 'AI Rate Limited', message: 'Your AI budget for this minute is used. Try again in 23 s.' },
+          },
+        }),
+      ).toBe('Your AI budget for this minute is used. Try again in 23 s.');
     });
 
     it.each([
