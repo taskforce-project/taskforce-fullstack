@@ -2,8 +2,6 @@ package com.taskforce.tf_api.core.service.delivery;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -47,7 +45,6 @@ public class MissionEvidenceService {
     static final String LIMIT_REACHED = "limit.reached";
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final DateTimeFormatter AT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC);
 
     private final DeliveryRunEvidenceRepository repository;
     private final DeliveryRunRepository runRepository;
@@ -76,9 +73,9 @@ public class MissionEvidenceService {
             data = Map.of("max", MAX_EVENTS, "text", "The evidence of this mission is full: later events are not kept.");
         }
         String prev = last.map(DeliveryRunEvidence::getHash).orElse(EvidenceChain.ZERO_HASH);
-        String at = AT.format(Instant.now());
+        String at = EvidenceChain.AT.format(Instant.now());
         ObjectNode content = JSON.valueToTree(data);
-        String hash = EvidenceChain.link(prev, eventNode(seq, at, type, actor.kind(), actor.id(), content)).get("hash").asText();
+        String hash = EvidenceChain.link(prev, EvidenceChain.event(seq, at, type, actor.kind(), actor.id(), content)).get("hash").asText();
         repository.save(DeliveryRunEvidence.builder()
             .run(run).seq(seq).at(at).type(type).actorKind(actor.kind()).actorId(actor.id())
             .data(CanonicalJson.of(content)).prev(prev).hash(hash)
@@ -115,7 +112,7 @@ public class MissionEvidenceService {
     public List<ObjectNode> events(Long runId) {
         List<ObjectNode> events = new ArrayList<>();
         for (DeliveryRunEvidence e : repository.findByRunIdOrderBySeqAsc(runId)) {
-            ObjectNode node = eventNode(e.getSeq(), e.getAt(), e.getType(), e.getActorKind(), e.getActorId(), parse(e.getData()));
+            ObjectNode node = EvidenceChain.event(e.getSeq(), e.getAt(), e.getType(), e.getActorKind(), e.getActorId(), parse(e.getData()));
             node.put("prev", e.getPrev());
             node.put("hash", e.getHash());
             events.add(node);
@@ -203,18 +200,6 @@ public class MissionEvidenceService {
         mission.put("runner", run.getClaimedBy());
         mission.putNull("taskforce");
         return mission;
-    }
-
-    private static ObjectNode eventNode(int seq, String at, String type, String actorKind, String actorId, JsonNode data) {
-        ObjectNode event = JSON.createObjectNode();
-        event.put("seq", seq);
-        event.put("at", at);
-        event.put("type", type);
-        ObjectNode actor = event.putObject("actor");
-        actor.put("kind", actorKind);
-        actor.put("id", actorId);
-        event.set("data", data);
-        return event;
     }
 
     private static JsonNode parse(String json) {
