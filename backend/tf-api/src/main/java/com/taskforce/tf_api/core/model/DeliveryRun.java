@@ -79,6 +79,14 @@ public class DeliveryRun extends AuditableEntity {
     @Column(columnDefinition = "TEXT")
     private String error;
 
+    /**
+     * Mission refusée au départ par une règle (par exemple sur un dépôt public) : FAILED pour la file, « Not started » à
+     * l'écran, car ce n'est pas une panne (recette du 29/10/2026, R38).
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean refused = false;
+
     /** Qui a lancé la délégation (null si compte supprimé depuis). */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "started_by")

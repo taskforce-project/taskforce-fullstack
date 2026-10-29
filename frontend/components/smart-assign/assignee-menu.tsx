@@ -53,7 +53,10 @@ interface AssigneeMenuProps {
   issueId: number
   assignee: AssigneeRef | null
   members: ProjectMember[]
-  /** Agents disponibles (available=true) - proposés dans la section "Delegate". */
+  /**
+   * Agents disponibles (available=true) - proposés dans la section "Delegate". Celui qui ne peut pas partir
+   * (ready=false) reste visible, grisé, avec ce qui manque (R37).
+   */
   agents: DeliveryProvider[]
   onAssign: (userId: number) => void | Promise<void>
   onUnassign: () => void | Promise<void>
@@ -273,13 +276,23 @@ export function AssigneeMenu({
                     <CommandItem
                       key={a.key}
                       value={`agent ${a.displayName} ${a.key}`}
+                      disabled={!a.ready}
                       onSelect={() => choose(() => onDelegate(a.key))}
                       className="gap-2"
                     >
                       <span className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted p-0.5">
                         <BrandLogo slug={a.logoKey} name={a.displayName} className="size-full" />
                       </span>
-                      <span className="truncate">{a.displayName}</span>
+                      {a.ready ? (
+                        <span className="truncate">{a.displayName}</span>
+                      ) : (
+                        <span className="min-w-0">
+                          <span className="block truncate">{a.displayName}</span>
+                          {a.reason && (
+                            <span className="block whitespace-normal text-xs text-muted-foreground">{a.reason}</span>
+                          )}
+                        </span>
+                      )}
                     </CommandItem>
                   ))}
                 </CommandGroup>

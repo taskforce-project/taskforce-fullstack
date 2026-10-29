@@ -294,6 +294,18 @@ public class NotificationService {
         dispatch(notif);
     }
 
+    /**
+     * Mission refusée au départ par une règle (R38) : ce n'est pas une panne, la notification ne dit pas « failed ».
+     * {@code detail} porte la raison, écrite pour la personne.
+     */
+    @Transactional
+    public void notifyAgentRunNotStarted(Issue issue, User delegator, String agentName, String detail) {
+        if (delegator == null) return;
+        Notification notif = buildNotification(issue, null, delegator, "agentFailed", "info",
+            issue.getTitle() + ": " + agentName + " didn't start", truncate(detail, 200));
+        dispatch(notif);
+    }
+
     // =========================================================================
     // Helpers privés
     // =========================================================================

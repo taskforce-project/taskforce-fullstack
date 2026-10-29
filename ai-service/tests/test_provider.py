@@ -1,8 +1,8 @@
 import pytest
 
 from app.config import load_settings
-from app.services.provider import (NotConfiguredError, ProviderError, ProviderGateway, strip_thinking,
-                                   with_no_think)
+from app.services.provider import (NotConfiguredError, ProviderError, ProviderGateway, ToolsRefusedError,
+                                   strip_thinking, with_no_think)
 from tests.conftest import http_error
 
 CHOICE = {"choices": [{"message": {"role": "assistant", "content": "ok"}}],
@@ -71,6 +71,33 @@ def test_trop_d_outils_reessaye_avec_moins(provider, code):
     tools = [{"type": "function", "function": {"name": f"t{i}"}} for i in range(8)]
     gateway.chat([{"role": "user", "content": "q"}], tools=tools)
     assert [len(r["body"].get("tools", [])) for r in provider.requests] == [8, 4, 2]
+
+
+def test_outils_refuses_jusqu_au_dernier(provider):
+    provider.reply("/chat/completions", http_error(400))
+    gateway = ProviderGateway(load_settings({}), provider)
+    tools = [{"type": "function", "function": {"name": f"t{i}"}} for i in range(8)]
+    with pytest.raises(ToolsRefusedError):
+        gateway.chat([{"role": "user", "content": "q"}], tools=tools)
+    # Jamais de requête sans outils : le modèle y annonçait des actions qu'il n'avait pas faites (recette du 29/10).
+    assert [len(r["body"].get("tools", [])) for r in provider.requests] == [8, 4, 2, 1]
+
+
+@pytest.mark.parametrize(
+    "env, tier, model, effort",
+    [
+        ({}, "fast", "qwen3:8b", "none"),                                          # Ollama, sans raisonnement
+        ({}, "deep", "qwen3:8b", None),                                            # raisonnement voulu
+        ({"OLLAMA_MODEL": "llama3.1:8b"}, "fast", "llama3.1:8b", None),            # pas un Qwen3
+        ({"GROQ_API_KEY": "gsk", "GROQ_MODEL_FAST": "qwen/qwen3-32b"}, "fast", "qwen/qwen3-32b", None),
+        ({"AI_BASE_URL": "https://api.example.com/v1"}, "fast", "qwen3:8b", None),  # réglage inconnu ailleurs
+    ],
+)
+def test_raisonnement_coupe_par_le_reglage_d_ollama(provider, env, tier, model, effort):
+    provider.reply("/chat/completions", CHOICE)
+    used, _, _ = ProviderGateway(load_settings(env), provider).chat([{"role": "user", "content": "q"}], tier=tier)
+    assert used == model
+    assert provider.requests[0]["body"].get("reasoning_effort") == effort
 
 
 @pytest.mark.parametrize("error", [http_error(500), http_error(401)])

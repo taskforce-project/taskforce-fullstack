@@ -355,6 +355,7 @@ class NotificationServiceTest {
             "asked    | agentApproval | warning | Fix bug: TaskForce asks: git push",
             "done     | agentDone     | info    | Fix bug: Claude Code finished, ready for your review",
             "failed   | agentFailed   | warning | Fix bug: Claude Code failed",
+            "refused  | agentFailed   | info    | Fix bug: Claude Code didn't start",
         })
         void notifies_the_delegator(String which, String type, String urgency, String title) {
             User delegator = user(40L, "ada");
@@ -364,6 +365,8 @@ class NotificationServiceTest {
                 case "approval" -> service.notifyAgentApproval(issue(null, null), delegator, "Bash", "npm install lodash");
                 case "asked" -> service.notifyAgentApproval(issue(null, null), delegator, "git push", "Push the branch", true);
                 case "done" -> service.notifyAgentRunFinished(issue(null, null), delegator, "Claude Code", true, "PR opened");
+                case "refused" -> service.notifyAgentRunNotStarted(issue(null, null), delegator, "Claude Code",
+                    "TaskForce doesn't start missions on public repositories yet.");
                 default -> service.notifyAgentRunFinished(issue(null, null), delegator, "Claude Code", false, "Tests failed");
             }
 

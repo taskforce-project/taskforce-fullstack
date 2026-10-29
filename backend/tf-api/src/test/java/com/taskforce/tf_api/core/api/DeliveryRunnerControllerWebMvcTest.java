@@ -19,6 +19,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import com.taskforce.tf_api.core.dto.request.RunnerReadinessRequest;
 import com.taskforce.tf_api.core.config.DeliverySessionFilterConfig;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerClaimResponse;
@@ -77,7 +78,7 @@ class DeliveryRunnerControllerWebMvcTest {
     @Test
     @DisplayName("POST /claim : un runner reçoit le brief du run réclamé")
     void claim_returns_brief() throws Exception {
-        when(localRunnerService.claim(new RunnerIdentity("tf-runner-pierre", "pierre@taskforce.dev")))
+        when(localRunnerService.claim(eq(new RunnerIdentity("tf-runner-pierre", "pierre@taskforce.dev")), any()))
             .thenReturn(Optional.of(new RunnerClaimResponse(100L, 55L, "WEB-4", "Fix the footer", "Details",
                 12L, "Website", "acme", "acme/website", "claude-sonnet-5", LocalDateTime.now().plusHours(2), null, "npm test")));
 
@@ -93,11 +94,24 @@ class DeliveryRunnerControllerWebMvcTest {
     @Test
     @DisplayName("POST /claim : file vide -> 200 avec data null")
     void claim_empty() throws Exception {
-        when(localRunnerService.claim(any())).thenReturn(Optional.empty());
+        when(localRunnerService.claim(any(), any())).thenReturn(Optional.empty());
 
         mockMvc.perform(post("/api/delivery/runner/claim").with(runner()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("POST /claim : le runner dit que l'agent ne peut pas partir ; le service le reçoit (R37)")
+    void claim_passes_the_readiness() throws Exception {
+        when(localRunnerService.claim(any(), any())).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/api/delivery/runner/claim").with(runner())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"agentReady\":false,\"agentProblem\":\"claude-signed-out\"}"))
+            .andExpect(status().isOk());
+
+        verify(localRunnerService).claim(any(), eq(new RunnerReadinessRequest(false, "claude-signed-out")));
     }
 
     @ParameterizedTest(name = "jeton d'utilisateur refusé (403) : POST {0}")
@@ -109,7 +123,7 @@ class DeliveryRunnerControllerWebMvcTest {
         mockMvc.perform(post(path).with(user()))
             .andExpect(status().isForbidden());
 
-        verify(localRunnerService, never()).claim(any());
+        verify(localRunnerService, never()).claim(any(), any());
         verify(localRunnerService, never()).heartbeat(any(), any());
     }
 

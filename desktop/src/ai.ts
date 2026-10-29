@@ -77,6 +77,15 @@ export function withNoThink(messages: Message[], model: string, think: boolean):
   return out;
 }
 
+/**
+ * Vrai quand le raisonnement se coupe par le réglage natif d'Ollama (`reasoning_effort: "none"`) : Ollama 0.40 ignore
+ * `/no_think`, et Qwen3 raisonnait à chaque réponse (même appel d'outil : 2,9 s puis 0,5 s, mesuré le 29/10/2026).
+ * Ailleurs, le réglage n'est pas garanti : on ne l'envoie pas.
+ */
+export function nativeReasoningOff(provider: AiSettings["provider"], model: string, think: boolean): boolean {
+  return !think && provider === "ollama" && isQwen3(model);
+}
+
 /** Retire un bloc `<think>…</think>` resté dans la réponse : les appelants attendent la réponse seule, parfois un JSON. */
 export function stripThinking(message: Message): Message {
   const content = message.content;
@@ -265,7 +274,8 @@ export class AiRelay {
     };
     if (body.json_mode === true) request.response_format = { type: "json_object" };
 
-    const { baseUrl, apiKey } = this.endpoint();
+    const { baseUrl, apiKey, settings } = this.endpoint();
+    if (nativeReasoningOff(settings.provider, model, think)) request.reasoning_effort = "none";
     let tools = Array.isArray(body.tools) && body.tools.length > 0 ? [...body.tools] : null;
     for (;;) {
       if (tools) {
@@ -285,11 +295,16 @@ export class AiRelay {
         return { model, message: stripThinking(message), usage: payload.usage ?? {} };
       } catch (error) {
         // Un serveur MCP riche peut dépasser la taille de requête du fournisseur (413) ou exposer un schéma d'outil
-        // qu'il refuse (400) : on réessaie avec moitié moins d'outils (le backend les trie par pertinence).
+        // qu'il refuse (400) : on réessaie avec moitié moins d'outils (le backend les trie par pertinence). Jamais
+        // jusqu'à zéro : sans outils, le modèle annonçait des actions qu'il n'avait pas faites (recette du 29/10/2026).
         if (error instanceof HttpError && (error.status === 400 || error.status === 413) && tools) {
           const keep = Math.floor(tools.length / 2);
+          if (keep === 0) {
+            log.error(`AI provider answered ${error.status} even with a single tool: the tools are refused`);
+            throw new ProviderError(`AI provider refused the tools (HTTP ${error.status})`, 422);
+          }
           log.warn(`AI provider answered ${error.status} with ${tools.length} tool(s), retrying with ${keep}`);
-          tools = keep > 0 ? tools.slice(0, keep) : null;
+          tools = tools.slice(0, keep);
           continue;
         }
         if (error instanceof HttpError) throw new ProviderError(`AI provider refused the request (HTTP ${error.status})`);

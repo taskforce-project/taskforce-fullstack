@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { formatDistanceToNow } from "date-fns"
 import {
   Layers, Loader2, RefreshCw, Trash2, ChevronRight, Send, Network, ExternalLink, ArrowUpRight,
-  CheckCircle2, XCircle, PauseCircle, CircleDashed,
+  CheckCircle2, XCircle, PauseCircle, CircleDashed, Ban,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -43,6 +43,9 @@ const STATUS: Record<JobStatus, { label: string; pill: string; Icon: typeof Load
   DONE:              { label: "Done",            pill: "text-ink-green bg-shape-green/12",                  Icon: CheckCircle2 },
   FAILED:            { label: "Failed",          pill: "text-destructive bg-destructive/12",                        Icon: XCircle },
 }
+
+/** Une délégation refusée au départ par une règle : ce n'est pas une panne (R38). */
+const NOT_STARTED = { label: "Not started", pill: "text-muted-foreground bg-muted", Icon: Ban, spin: false }
 
 function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
   const router = useRouter()
@@ -146,7 +149,7 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
 function RunCard({ slug, run, provider }: Readonly<{ slug: string; run: DeliveryRun; provider?: DeliveryProvider }>) {
   const router = useRouter()
   const [expanded, setExpanded] = useState(isActiveRun(run.status))
-  const meta = STATUS[run.status]
+  const meta = run.refused ? NOT_STARTED : STATUS[run.status]
   const agentName = provider?.displayName ?? run.providerKey
   const when = run.updatedAt ?? run.createdAt
   const title = [run.issueKey, run.issueTitle].filter(Boolean).join(" · ") || `Issue #${run.issueId}`
@@ -181,7 +184,12 @@ function RunCard({ slug, run, provider }: Readonly<{ slug: string; run: Delivery
           {run.status === "DONE" && (
             <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground">{run.summary ?? "Done."}</p>
           )}
-          {run.status === "FAILED" && (
+          {run.status === "FAILED" && run.refused && (
+            <p className="rounded-lg bg-muted px-2.5 py-2 text-xs text-muted-foreground">
+              Not started{run.error ? `: ${run.error}` : "."}
+            </p>
+          )}
+          {run.status === "FAILED" && !run.refused && (
             <p className="rounded-lg bg-destructive/[0.08] px-2.5 py-2 text-xs text-destructive">{run.error ?? "The agent failed."}</p>
           )}
 

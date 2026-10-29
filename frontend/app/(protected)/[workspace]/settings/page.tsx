@@ -927,6 +927,9 @@ function SecurityPanel() {
   const router = useRouter()
   const [twoFa, setTwoFa] = useState<boolean | null>(null)
   const [busy, setBusy] = useState(false)
+  // Désactiver le 2FA demande le code en cours : une session ouverte ne suffit plus (R42).
+  const [disabling, setDisabling] = useState(false)
+  const [code, setCode] = useState("")
 
   useEffect(() => {
     getTwoFactorStatus().then(setTwoFa).catch(() => setTwoFa(null))
@@ -941,11 +944,13 @@ function SecurityPanel() {
   const onDisable2fa = async () => {
     setBusy(true)
     try {
-      await disableTwoFactor()
+      await disableTwoFactor(code)
       setTwoFa(false)
+      setDisabling(false)
+      setCode("")
       toast.success("Two-factor authentication disabled.")
     } catch {
-      toast.error("Couldn't disable two-factor authentication.")
+      toast.error("That code didn't work. Enter the code your authenticator app shows now.")
     } finally {
       setBusy(false)
     }
@@ -986,16 +991,36 @@ function SecurityPanel() {
                   )}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {twoFa
-                    ? "An authenticator app is required at sign-in."
-                    : "Add an authenticator app (TOTP) for an extra layer of security."}
+                  {disabling
+                    ? "To turn it off, enter the code your authenticator app shows now."
+                    : twoFa
+                      ? "An authenticator app is required at sign-in."
+                      : "Add an authenticator app (TOTP) for an extra layer of security."}
                 </p>
               </div>
             </div>
             {twoFa === null ? (
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
+            ) : twoFa && disabling ? (
+              <div className="flex shrink-0 items-center gap-2">
+                <StyledInput
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="6-digit code"
+                  aria-label="Current authenticator code"
+                  className="w-28"
+                />
+                <Button size="sm" variant="outline" onClick={onDisable2fa} disabled={busy || code.length !== 6}>
+                  Confirm
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { setDisabling(false); setCode("") }} disabled={busy}>
+                  Cancel
+                </Button>
+              </div>
             ) : twoFa ? (
-              <Button size="sm" variant="outline" onClick={onDisable2fa} disabled={busy}>
+              <Button size="sm" variant="outline" onClick={() => setDisabling(true)} disabled={busy}>
                 Disable
               </Button>
             ) : (
@@ -1237,13 +1262,27 @@ function WorkspacePanel() {
 function AuditLogPanel() {
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
   const [logs, setLogs] = useState<AuditLogEntry[]>([])
+  // Vide, réservé, ou en échec : trois cas que l'écran ne confond plus (recette du 29/10/2026, R38).
+  const [access, setAccess] = useState<"loading" | "ready" | "denied" | "error">("loading")
 
   useEffect(() => {
     if (!slug) return
     let alive = true
-    getAuditLogs(slug).then((l) => { if (alive) setLogs(l) }).catch(() => { /* OWNER/ADMIN only */ })
+    getAuditLogs(slug)
+      .then((l) => { if (alive) { setLogs(l); setAccess("ready") } })
+      .catch((e: unknown) => {
+        const status = (e as { response?: { status?: number } } | null)?.response?.status
+        if (alive) setAccess(status === 403 ? "denied" : "error")
+      })
     return () => { alive = false }
   }, [slug])
+
+  const emptyText = {
+    loading: "Loading the audit log…",
+    ready: "No audit entries yet. Role changes and member removals show up here.",
+    denied: "Only the workspace's owners and admins can read the audit log.",
+    error: "The audit log couldn't be loaded. Try again in a moment.",
+  }[access]
 
   function exportAuditCsv() {
     const esc = (v: unknown) => `"${String(v ?? "").replaceAll('"', '""')}"`
@@ -1272,7 +1311,7 @@ function AuditLogPanel() {
 
       <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
         {logs.length === 0 ? (
-          <p className="px-4 py-6 text-center text-xs text-muted-foreground">No audit entries (admins only).</p>
+          <p className="px-4 py-6 text-center text-xs text-muted-foreground">{emptyText}</p>
         ) : (
           logs.slice(0, 30).map((l, i) => (
             <div key={l.id} className={cn("flex items-center gap-3 px-4 py-2.5", i < Math.min(logs.length, 30) - 1 && "border-b border-border/50")}>

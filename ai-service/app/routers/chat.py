@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.schemas import ChatRequest, ChatResponse
 from app.security import require_token
-from app.services.provider import ProviderError
+from app.services.provider import ProviderError, ToolsRefusedError
 
 router = APIRouter(prefix="/v1", tags=["chat"], dependencies=[Depends(require_token)])
 
@@ -23,6 +23,8 @@ def chat(payload: ChatRequest, request: Request) -> ChatResponse:
             tier=payload.tier,
             think=payload.think,
         )
+    except ToolsRefusedError as exc:  # le fournisseur répond, mais refuse les outils : l'agent ne peut pas agir
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ProviderError as exc:  # IA coupée ou fournisseur indisponible
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return ChatResponse(model=model, message=message, usage=usage)

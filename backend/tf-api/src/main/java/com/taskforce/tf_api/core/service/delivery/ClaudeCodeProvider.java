@@ -3,6 +3,7 @@ package com.taskforce.tf_api.core.service.delivery;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
@@ -29,16 +30,29 @@ public class ClaudeCodeProvider implements DeliveryAgentProvider {
 
     public static final String KEY = "claude-code";
 
+    /** Ce que la personne lit quand son runner signale un problème (codes de {@code taskforce-runner/src/readiness.ts}). */
+    private static final Map<String, String> RUNNER_PROBLEMS = Map.of(
+        "claude-signed-out", "Claude Code isn't signed in on the computer that runs your runner. Sign in there with "
+            + "claude auth login, then delegate again.",
+        "claude-outdated", "Claude Code is too old on the computer that runs your runner. Update it with "
+            + "npm install -g @anthropic-ai/claude-code, then delegate again.",
+        "claude-missing", "Claude Code isn't installed on the computer that runs your runner. Install it with "
+            + "npm install -g @anthropic-ai/claude-code, then delegate again.");
+    private static final String RUNNER_PROBLEM =
+        "Your runner can't start Claude Code right now: open Settings > Agents to see what is missing.";
+
     private final LocalRunnerSettings settings;
     private final DeliveryRunRepository runRepository;
     /** Absent quand le runner local est désactivé (bean conditionnel). */
     private final ObjectProvider<RunnerProvisioningService> provisioning;
+    private final RunnerPresenceService presence;
 
     public ClaudeCodeProvider(LocalRunnerSettings settings, DeliveryRunRepository runRepository,
-                              ObjectProvider<RunnerProvisioningService> provisioning) {
+                              ObjectProvider<RunnerProvisioningService> provisioning, RunnerPresenceService presence) {
         this.settings = settings;
         this.runRepository = runRepository;
         this.provisioning = provisioning;
+        this.presence = presence;
     }
 
     @Override public String key()          { return KEY; }
@@ -50,7 +64,10 @@ public class ClaudeCodeProvider implements DeliveryAgentProvider {
     @Override public Duration claimTimeout() { return settings.claimTimeout(); }
     @Override public List<String> models() { return List.of("claude-opus-5", "claude-sonnet-5"); }
 
-    /** Prêt quand la personne qui délègue a créé son runner local : c'est lui qui prendra la tâche. */
+    /**
+     * Prêt quand la personne qui délègue a créé son runner local, c'est lui qui prendra la tâche, et que ce runner ne
+     * signale aucun problème sur son poste (R37) : sinon la mission partirait pour échouer au démarrage.
+     */
     @Override
     public String unavailableReason(DeliveryContext context) {
         if (!settings.enabled()) {
@@ -59,6 +76,10 @@ public class ClaudeCodeProvider implements DeliveryAgentProvider {
         RunnerProvisioningService service = provisioning.getIfAvailable();
         if (service != null && context.userId() != null && !service.hasRunner(context.userId())) {
             return "Set up your local runner first (Settings > Agents), then start it on your machine.";
+        }
+        if (context.userId() != null) {
+            String problem = presence.problem(context.userId()).orElse(null);
+            if (problem != null) return RUNNER_PROBLEMS.getOrDefault(problem, RUNNER_PROBLEM);
         }
         return null;
     }

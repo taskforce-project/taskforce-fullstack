@@ -241,6 +241,14 @@ describe("sorties du bac à sable faites par le runner, jugées par la table par
     });
   }
 
+  it("un refus porte la raison écrite pour la personne, sans identifiant de règle ni mot interne (R38)", async () => {
+    const verdict = await judgeExit(defaults, { action: "mission.start", repoVisibility: "public" }, "Start the mission", "summary",
+      async () => assert.fail("rien n'est demandé"));
+    assert.equal(verdict.reason, "TaskForce doesn't start missions on public repositories yet: link a private repository to delegate this task");
+    assert.doesNotMatch(verdict.reason ?? "", /no-mission-public-repo|\bS1\b|\bR3\d\b/);
+    assert.match(verdict.why, /no-mission-public-repo/, "the journal and the record keep the rule");
+  });
+
   it("refusée par une règle : reste, sans rien demander, et dit pourquoi", async () => {
     const strict: RulesBundle = { ...defaults, rules: [{ id: "no-exit", when: { action: "git.push" }, class: "irreversible", effect: "deny", owner: "x", reason: "Nothing leaves.", review: "2027-01-01" }] };
     let asked = false;

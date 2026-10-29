@@ -96,6 +96,19 @@ describe("WorkflowPanelContent : historique des délégations", () => {
     expect(screen.queryByRole("link", { name: /View result/ })).not.toBeInTheDocument();
   });
 
+  it("une délégation refusée par une règle dit « Not started » avec sa raison, pas « Failed » (R38)", () => {
+    seed([makeRun({
+      id: 8, status: "FAILED", summary: null, resultUrl: null, refused: true,
+      error: "TaskForce doesn't start missions on public repositories yet.",
+    })]);
+    render(<WorkflowPanelContent />);
+    fireEvent.click(screen.getByText("SOLO-151 · Runner self-test: add a hello file"));
+
+    expect(screen.getByText("Not started")).toBeInTheDocument();
+    expect(screen.queryByText("Failed")).not.toBeInTheDocument();
+    expect(screen.getByText("Not started: TaskForce doesn't start missions on public repositories yet.")).toBeInTheDocument();
+  });
+
   it("une délégation active est dépliée d'office et dit ce qui se passe", () => {
     seed([makeRun({ id: 9, status: "QUEUED", summary: null, resultUrl: null })]);
     render(<WorkflowPanelContent />);

@@ -45,6 +45,8 @@ export interface DeliveryRun {
   summary: string | null;
   resultUrl: string | null;
   error: string | null;
+  /** Refusée au départ par une règle (FAILED pour la file) : l'écran dit « Not started », pas une panne (R38). */
+  refused?: boolean;
   startedById: number | null;
   createdAt: string | null;
   updatedAt: string | null;

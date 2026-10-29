@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { getMe, updateMe, searchUsers } from './user-service';
+import { getMe, updateMe, searchUsers, disableTwoFactor } from './user-service';
 import { apiClient } from './client';
 import { USER_ROUTES } from '../config/api-routes';
 
@@ -62,5 +62,13 @@ describe('user-service', () => {
   it('getMe: propagates errors', async () => {
     vi.mocked(apiClient.get).mockRejectedValue(new Error('boom'));
     await expect(getMe()).rejects.toThrow('boom');
+  });
+
+  it('disableTwoFactor: sends the current code, a session alone no longer turns 2FA off (R42)', async () => {
+    vi.mocked(apiClient.delete).mockResolvedValue(envelope(null));
+
+    await disableTwoFactor('123456');
+
+    expect(apiClient.delete).toHaveBeenCalledWith(USER_ROUTES.TWO_FACTOR, { data: { code: '123456' }, silentError: true });
   });
 });
