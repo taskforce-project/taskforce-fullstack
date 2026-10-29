@@ -958,13 +958,20 @@
   letter-spacing: -0.06em;
   line-height: 0.8;
   padding-bottom: 0.06em;
-  background-image: url("/images/bg-band-1920.webp");
+  background-color: rgb(25 23 21 / 0.12);
   background-size: cover;
   background-position: 50% 55%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   user-select: none;
+}
+/* La peinture ne se charge qu'à l'approche du pied de page ([data-reveal] → .is-in), pas en même temps que l'image
+   principale de la page ; un voile d'encre tient sa place le temps qu'elle arrive. */
+.footer-mark.is-in,
+:root:not(.js) .footer-mark {
+  background-image: url("/images/bg-band-1280.webp");
+  background-image: image-set(url("/images/bg-band-1280.webp") 1x, url("/images/bg-band-1920.webp") 2x);
 }
 
 /* ─────────────────────────────  Transitions de page (ClientRouter)  ───────────────────────────── */

@@ -131,6 +131,8 @@ const pageTransition = { forwards: pageAnimation, backwards: pageAnimation };
         );
         items.forEach((el) => io?.observe(el));
       }
+      // Dès le premier chargement : astro:page-load ne vient qu'une fois toutes les images chargées.
+      reveal();
       document.addEventListener("astro:page-load", reveal);
     </script>
   </body>

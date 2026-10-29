@@ -155,5 +155,9 @@ function init() {
   };
 }
 
+// Au premier chargement, sans attendre astro:page-load, qui ne vient qu'une fois les images (les peintures)
+// chargées : les titres du haut de page resteraient cachés plusieurs secondes sur un réseau lent. Relancer init à
+// astro:page-load est sans effet sur ce qui est déjà découpé.
+init();
 document.addEventListener("astro:page-load", init);
 document.addEventListener("astro:before-swap", () => cleanup());
