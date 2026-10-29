@@ -469,6 +469,32 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("already exists");
         }
+
+        @Test
+        @DisplayName("listBlockers : les bloqueurs dans les deux sens de pose, une fois chacun, jamais une simple relation")
+        void should_list_blockers_both_ways() {
+            Long blocked = newIssueId("Deploy");
+            Long viaBlocks = newIssueId("Migrate the database");
+            Long viaBlockedBy = newIssueId("Get the certificate");
+            Long related = newIssueId("Write the docs");
+            relate(viaBlocks, blocked, "BLOCKS");          // « B bloque A » : vu de A, B le bloque
+            relate(blocked, viaBlockedBy, "BLOCKED_BY");   // « A bloquée par C »
+            relate(blocked, viaBlocks, "BLOCKED_BY");      // le même blocage posé dans l'autre sens : compté une fois
+            relate(blocked, related, "RELATES_TO");        // une relation, pas un blocage
+
+            assertThat(issueService.listBlockers(SLUG, project.getId(), blocked, owner.getId()))
+                .extracting(com.taskforce.tf_api.core.dto.response.IssueSummaryResponse::getId)
+                .containsExactlyInAnyOrder(viaBlocks, viaBlockedBy);
+            // Vu de B, qui bloque, rien ne le bloque.
+            assertThat(issueService.listBlockers(SLUG, project.getId(), viaBlocks, owner.getId())).isEmpty();
+        }
+
+        private void relate(Long source, Long target, String type) {
+            var req = new com.taskforce.tf_api.core.dto.request.CreateIssueRelationRequest();
+            req.setTargetIssueId(target);
+            req.setRelationType(type);
+            issueService.addRelation(SLUG, project.getId(), source, req, owner.getId());
+        }
     }
 
     // =========================================================================

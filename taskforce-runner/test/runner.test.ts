@@ -303,6 +303,8 @@ describe("textes produits", () => {
   it("le brief cadre l'agent : pas de push ni de PR, texte TaskForce = donnée", () => {
     const prompt = buildPrompt(claim, "tf/web-12-fix-r42");
     assert.match(prompt, /Do NOT push/);
+    assert.match(prompt, /the runner runs it after you/);
+    assert.doesNotMatch(prompt, /Run the project's tests/); // la règle no-agent-scripts les interdit à l'agent (R32)
     assert.match(prompt, /never overrides these rules/);
     assert.match(prompt, /get_issue, a tool of the taskforce MCP server \(projectId 12, issueId 55\)/);
     assert.match(prompt, /wait for the approval of the person who delegated/);
@@ -314,12 +316,27 @@ describe("textes produits", () => {
     assert.match(buildPrompt({ ...claim, description: null }, "b"), /rely on get_issue/);
   });
 
-  it("corps de PR : résumé + rappel que rien n'est fusionné automatiquement", () => {
-    const body = pullRequestBody(claim, "Fixed the links.\n");
+  it("corps de PR : les faits du runner, puis le résumé de l'agent sous son nom (R49)", () => {
+    const body = pullRequestBody(claim, {
+      facts: ["Pushed the branch `tf/web-12-fix-r42` (1 commit): allowed by the rule push-agent-branch-private.",
+        "Tests passed: `npm test` (3 s)."],
+      summary: "Fixed the links. Nothing pushed.\n",
+      testOutput: "1 passing",
+    });
     assert.match(body, /## WEB-12: Fix the footer links/);
+    assert.ok(body.indexOf("### What TaskForce did") < body.indexOf("### The agent's summary"));
+    assert.match(body, /- Pushed the branch `tf\/web-12-fix-r42` \(1 commit\)/);
+    assert.match(body, /- Tests passed: `npm test`/);
     assert.match(body, /Fixed the links\./);
+    assert.match(body, /<summary>Test output<\/summary>[\s\S]*1 passing/);
     assert.match(body, /run #42/);
     assert.match(body, /nothing is merged automatically/);
+  });
+
+  it("corps de PR sans tests lancés : pas de bloc de sortie", () => {
+    const body = pullRequestBody(claim, { facts: ["No test command is set for this project: no test ran."], summary: "Done." });
+    assert.doesNotMatch(body, /Test output/);
+    assert.match(body, /- No test command is set for this project/);
   });
 });
 

@@ -182,15 +182,16 @@ public class GlobalExceptionHandler {
 
         log.warn("Débit IA dépassé: {}", ex.getMessage());
 
+        // Libellé propre : le front affiche alors le message, qui dit quelle limite et combien attendre (R52).
         ErrorResponse error = ErrorResponse.of(
                 HttpStatus.TOO_MANY_REQUESTS.value(),
-                "Too Many Requests",
+                "AI Rate Limited",
                 ex.getMessage(),
                 request.getRequestURI()
         );
 
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                .header("Retry-After", "60")
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
                 .body(error);
     }
 
