@@ -1,0 +1,189 @@
+---
+/**
+ * Composeur flottant en bas de l'écran (façon offloop.org) : une invitation à confier une tâche à un agent. Des exemples
+ * de tâches s'écrivent seuls dans le champ ; ce que la personne tape devient, une fois envoyé, l'aperçu de l'issue
+ * qu'elle créerait dans TaskForce, avec le téléchargement. Aucune IA derrière et rien n'est envoyé : la page le dit.
+ * Il apparaît une fois le haut de page passé et s'efface au pied de page.
+ */
+import { BrandMark } from "@/components/visuals/brand";
+---
+
+<aside class="composer" data-composer aria-label="Hand a task to an agent" inert>
+  <div class="composer-pop" data-pop hidden role="dialog" aria-labelledby="composer-pop-title">
+    <div class="flex items-start justify-between gap-4">
+      <p id="composer-pop-title" class="t-label" tabindex="-1">In TaskForce, this becomes an issue</p>
+      <button type="button" class="composer-close" data-close aria-label="Close">×</button>
+    </div>
+    <div class="composer-issue">
+      <p class="font-mono text-[11.5px] text-muted-foreground">Your project · New issue</p>
+      <p class="mt-1.5 text-[17px] font-medium leading-snug tracking-[-0.02em]" data-title></p>
+      <div class="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
+        <span class="composer-chip"><span class="size-2 rounded-full bg-shape-blue"></span>Todo</span>
+        <span class="composer-chip"><BrandMark brand="claude-code" className="size-3.5" />Assigned to Claude Code</span>
+      </div>
+    </div>
+    <p class="t-small mt-4 text-muted-foreground">
+      Hand it to Claude Code or GitHub Copilot, follow the run live and review the pull request. Nothing was sent from
+      this page.
+    </p>
+    <div class="mt-5 flex flex-wrap gap-2.5">
+      <a href="/download" class="btn btn-primary btn-sm">Download TaskForce</a>
+      <a href="/agents" class="btn btn-secondary btn-sm">How agents work</a>
+    </div>
+  </div>
+
+  <form class="composer-box" data-form>
+    <div class="composer-agents" aria-hidden="true">
+      <span class="flex">
+        <span class="composer-avatar"><BrandMark brand="claude-code" className="size-3.5" /></span>
+        <span class="composer-avatar -ml-1.5"><BrandMark brand="github-copilot" className="size-3.5" /></span>
+      </span>
+      Your agents are ready when you are
+    </div>
+    <div class="flex items-center gap-2">
+      <label for="composer-input" class="sr-only">Describe a task for an agent</label>
+      <input
+        id="composer-input"
+        data-input
+        type="text"
+        autocomplete="off"
+        maxlength="140"
+        placeholder="Describe a task for an agent"
+        class="composer-input"
+      />
+      <button type="submit" class="composer-send" aria-label="Hand it to an agent">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 19V5M5 12l7-7 7 7" />
+        </svg>
+      </button>
+    </div>
+  </form>
+</aside>
+
+<script>
+  // En JavaScript simple, comme scripts/motion.js (le Vite du conteneur Docker de dev lit les scripts sans TypeScript).
+  const PROMPTS = [
+    "Fix the flaky sign-in test and open a pull request",
+    "Add dark mode to the settings page",
+    "Write the release notes for the next version",
+    "Find out why the nightly sync fails on Mondays",
+    "Draft a spec for exporting the board as CSV",
+  ];
+  const IDLE = "Describe a task for an agent";
+
+  let cleanup = () => {};
+
+  function setup() {
+    cleanup();
+    const root = document.querySelector("[data-composer]");
+    if (!root) return;
+    const form = root.querySelector("[data-form]");
+    const input = root.querySelector("[data-input]");
+    const pop = root.querySelector("[data-pop]");
+    const title = root.querySelector("[data-title]");
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    let shown = false;
+    let timer = 0;
+    let prompt = 0;
+    let typed = 0;
+    let erasing = false;
+
+    // Les exemples s'écrivent puis s'effacent, un à un, tant que le champ est vide et sans le focus.
+    function type() {
+      window.clearTimeout(timer);
+      if (!shown || input.value || document.activeElement === input) return;
+      if (still) {
+        input.placeholder = PROMPTS[prompt];
+        return;
+      }
+      const text = PROMPTS[prompt];
+      if (!erasing) {
+        typed += 1;
+        input.placeholder = text.slice(0, typed);
+        if (typed >= text.length) {
+          erasing = true;
+          timer = window.setTimeout(type, 2200);
+        } else timer = window.setTimeout(type, 38);
+      } else {
+        typed -= 1;
+        input.placeholder = text.slice(0, typed) || " ";
+        if (typed <= 0) {
+          erasing = false;
+          prompt = (prompt + 1) % PROMPTS.length;
+          timer = window.setTimeout(type, 380);
+        } else timer = window.setTimeout(type, 14);
+      }
+    }
+
+    // Caché, le composeur est aussi hors d'atteinte du clavier et des lecteurs d'écran (inert).
+    function setShown(value) {
+      if (value === shown) return;
+      shown = value;
+      root.classList.toggle("is-shown", value);
+      root.inert = !value;
+      if (value) type();
+      else window.clearTimeout(timer);
+    }
+
+    // Visible une fois le haut de page passé, caché quand le pied de page arrive ; laissé ouvert avec l'aperçu ou
+    // pendant qu'on s'en sert.
+    function onScroll() {
+      const footer = document.querySelector("footer");
+      const nearEnd = footer ? footer.getBoundingClientRect().top < window.innerHeight - 24 : false;
+      setShown((window.scrollY > window.innerHeight * 0.55 && !nearEnd) || !pop.hidden || root.contains(document.activeElement));
+    }
+
+    // L'aperçu fermé, le focus revient au champ s'il était dans l'aperçu.
+    function closePop() {
+      const hadFocus = pop.contains(document.activeElement);
+      pop.hidden = true;
+      root.classList.remove("is-open");
+      if (hadFocus) input.focus({ preventScroll: true });
+      onScroll();
+    }
+
+    const onFocus = () => {
+      window.clearTimeout(timer);
+      input.placeholder = IDLE;
+    };
+    const onBlur = () => {
+      if (input.value) return;
+      typed = 0;
+      erasing = false;
+      type();
+    };
+    const onSubmit = (event) => {
+      event.preventDefault();
+      title.textContent = input.value.trim() || PROMPTS[prompt];
+      pop.hidden = false;
+      root.classList.add("is-open");
+      pop.querySelector("[tabindex='-1']")?.focus();
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape" && !pop.hidden) closePop();
+    };
+    const onClose = () => closePop();
+    const onFocusOut = () => window.setTimeout(onScroll, 0);
+
+    root.addEventListener("focusout", onFocusOut);
+    input.addEventListener("focus", onFocus);
+    input.addEventListener("blur", onBlur);
+    form.addEventListener("submit", onSubmit);
+    root.querySelector("[data-close]").addEventListener("click", onClose);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    onScroll();
+
+    cleanup = () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }
+
+  document.addEventListener("astro:page-load", setup);
+  document.addEventListener("astro:before-swap", () => cleanup());
+</script>

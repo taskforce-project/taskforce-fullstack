@@ -1,7 +1,6 @@
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react";
 import {
   BarChart3,
-  Brain,
   Check,
   ChevronDown,
   FileText,
@@ -70,7 +69,7 @@ const COMPACT = { w: 560, h: 720 };
 
 const TIMELINE: { beat: number; icon: "start" | "read" | "edit"; verb: string; detail: string }[] = [
   { beat: B.TL1, icon: "start", verb: "Run started", detail: "on its own branch" },
-  { beat: B.TL2, icon: "read", verb: "Searched", detail: "Brain OS, found “Design tokens”" },
+  { beat: B.TL2, icon: "read", verb: "Searched", detail: "your notes, found “Design tokens”" },
   { beat: B.TL3, icon: "read", verb: "Read", detail: "app/settings/page.tsx" },
   { beat: B.TL4, icon: "edit", verb: "Edit", detail: "styles/theme.css" },
   { beat: B.TL5, icon: "edit", verb: "Edit", detail: "app/settings/appearance.tsx" },
@@ -177,7 +176,6 @@ function Sidebar({ running }: Readonly<{ running: boolean }>) {
     { icon: LayoutDashboard, t: "Dashboard" },
     { icon: ListTodo, t: "My Queue", n: "2" },
     { icon: Inbox, t: "Inbox" },
-    { icon: Brain, t: "Brain OS" },
     { icon: BarChart3, t: "Analytics" },
   ];
   return (

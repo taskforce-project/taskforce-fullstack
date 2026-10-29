@@ -65,48 +65,6 @@ function PlanArt() {
   );
 }
 
-function MemoryArt() {
-  const pages = ["Engineering", "Design tokens", "Decisions", "Release checklist"];
-  return (
-    <>
-      <Sheet className="top-[28px] left-[18px] w-[132px] p-2">
-        {pages.map((p, i) => (
-          <p
-            key={p}
-            className={cn(
-              "flex items-center gap-1 px-1 py-[3px] text-[9.5px]",
-              i === 1 ? "bg-tint-green text-ink-green" : "text-muted-foreground",
-              (i === 1 || i === 3) && "pl-3",
-            )}
-          >
-            <FileText className="size-2.5 shrink-0" /> {p}
-          </p>
-        ))}
-      </Sheet>
-      <svg className="absolute inset-0" viewBox="0 0 280 208" aria-hidden="true">
-        <motion.path
-          d="M150 60 C 190 60, 186 120, 214 122"
-          fill="none"
-          stroke="var(--shape-green)"
-          strokeWidth="1.5"
-          animate={{ pathLength: [0, 1, 1, 0] }}
-          transition={loop(4.2, [0, 0.4, 0.85, 1])}
-        />
-      </svg>
-      <motion.div
-        className="absolute top-[110px] left-[196px] bg-white px-2 py-1 font-mono text-[9.5px] shadow-float rounded-md"
-        animate={{ opacity: [0, 0, 1, 1, 0], scale: [0.9, 0.9, 1, 1, 0.9] }}
-        transition={loop(4.2, [0, 0.35, 0.45, 0.85, 1])}
-      >
-        [[Theming]]
-      </motion.div>
-      <Sheet className="top-[150px] left-[18px] px-2 py-1.5 text-[9.5px] text-muted-foreground">
-        <span className="font-medium text-foreground">Why</span> · decided after the contrast review
-      </Sheet>
-    </>
-  );
-}
-
 function AssignArt() {
   const rows = [
     { t: "You", agent: null },
@@ -181,7 +139,7 @@ function AskArt() {
             animate={{ opacity: [0, 0, 1, 1, 0] }}
             transition={loop(5, [0, 0.55, 0.62, 0.92, 1])}
           >
-            <FileText className="size-2.5" /> Based on your board and Brain OS
+            <FileText className="size-2.5" /> Based on your board and your notes
           </motion.p>
         </div>
       </div>
@@ -254,7 +212,7 @@ function ConnectArt() {
 }
 
 function PaletteArt() {
-  const rows = ["Create issue", "Go to Brain OS", "Ask AI", "Switch to dark mode"];
+  const rows = ["Create issue", "Go to My Queue", "Ask AI", "Switch to dark mode"];
   return (
     <Sheet className="top-[28px] left-[30px] w-[220px]">
       <p className="flex items-center gap-1.5 border-b border-black/[0.06] px-2.5 py-2 text-[10px] text-subtle">
@@ -419,7 +377,7 @@ function DownloadArt() {
 function ReleasesArt() {
   const rows = [
     { v: "Latest", d: "Agents ask before acting" },
-    { v: "Previous", d: "Brain OS page tree" },
+    { v: "Previous", d: "Whole workspaces, web to desktop" },
     { v: "Earlier", d: "Analytics: workload" },
   ];
   return (
@@ -491,7 +449,6 @@ function SourceArt() {
 
 const ARTS: Record<ArtKey, () => React.ReactElement> = {
   plan: PlanArt,
-  memory: MemoryArt,
   assign: AssignArt,
   ask: AskArt,
   chart: ChartArt,

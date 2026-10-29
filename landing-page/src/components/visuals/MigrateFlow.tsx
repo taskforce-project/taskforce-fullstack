@@ -172,7 +172,7 @@ export default function MigrateFlow({ host }: Readonly<{ host?: string }>) {
                         </motion.div>
                       ))}
                     </div>
-                    <p className="mt-3 text-[10.5px] text-muted-foreground">With their Brain OS, history and attachments</p>
+                    <p className="mt-3 text-[10.5px] text-muted-foreground">With their notes, history and attachments</p>
                   </motion.div>
                 ) : asking ? (
                   <motion.div
@@ -185,7 +185,7 @@ export default function MigrateFlow({ host }: Readonly<{ host?: string }>) {
                   >
                     <p className="text-[13px] font-medium">Welcome back</p>
                     <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
-                      2 workspaces, 3 projects and their Brain OS are in the web app. Copy them to this computer?
+                      2 workspaces and 3 projects, with their notes, are in the web app. Copy them to this computer?
                     </p>
                     <div className="mt-3 flex items-center gap-2">
                       <motion.span

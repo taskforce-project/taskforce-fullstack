@@ -20,7 +20,7 @@ const { bg, label, id } = Astro.props;
   <Backdrop name={bg} class="inset-0" veil="center" />
   <div class="container-site relative flex min-h-[540px] flex-col items-center justify-center py-24 text-center sm:min-h-[600px]">
     <span data-reveal><Pill tone="glass">{label}</Pill></span>
-    <h2 class="t-h2 mt-7 max-w-3xl" data-reveal style="--d: 70ms"><slot name="title" /></h2>
+    <h2 class="t-h2 mt-7 max-w-3xl" data-words style="--d: 70ms"><slot name="title" /></h2>
     <slot />
   </div>
 </section>

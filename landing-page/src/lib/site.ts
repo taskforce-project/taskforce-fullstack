@@ -23,7 +23,6 @@ export type NavLink = { label: string; href: string };
 /** Illustration animée montrée dans la carte d'un menu quand on survole l'entrée (components/nav/MenuArt). */
 export type MenuArt =
   | "plan"
-  | "memory"
   | "assign"
   | "ask"
   | "chart"
@@ -59,7 +58,6 @@ export const MENUS: Menu[] = [
         title: "Product",
         items: [
           { label: "Plan", href: "/features#plan", desc: "Boards, cycles and a roadmap", art: "plan", tone: "blue" },
-          { label: "Memory", href: "/features#memory", desc: "Brain OS keeps the why next to the work", art: "memory", tone: "green" },
           { label: "Agents", href: "/features#agents", desc: "Hand issues to Claude Code or Copilot", art: "assign", tone: "pink" },
           { label: "Assistant", href: "/features#assistant", desc: "Answers drawn from your own work", art: "ask", tone: "sky" },
         ],
