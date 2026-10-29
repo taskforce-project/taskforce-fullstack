@@ -13,6 +13,7 @@ public record DeliveryRunActivityResponse(List<Event> events, List<Approval> app
 
     /**
      * @param canDecide la personne qui lit est celle qui a délégué, et la demande attend encore sa réponse
+     * @param askedBy   {@code agent} ou {@code runner} : qui pose la demande, l'agent ou TaskForce (décision J4)
      */
     public record Approval(
         Long id,
@@ -23,6 +24,7 @@ public record DeliveryRunActivityResponse(List<Event> events, List<Approval> app
         LocalDateTime expiresAt,
         LocalDateTime decidedAt,
         String decidedBy,
-        boolean canDecide
+        boolean canDecide,
+        String askedBy
     ) {}
 }

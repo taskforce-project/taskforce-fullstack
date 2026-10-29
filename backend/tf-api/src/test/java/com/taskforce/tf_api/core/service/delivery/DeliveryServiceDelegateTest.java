@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.taskforce.tf_api.core.dto.response.DeliveryProviderResponse;
 import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
@@ -48,6 +49,7 @@ class DeliveryServiceDelegateTest {
     @Mock private ProjectVisibilityGuard visibilityGuard;
     @Mock private BrainAccessGuard access;
     @Mock private ProjectRepository projectRepository;
+    @Mock private com.taskforce.tf_api.core.service.IssueService issueService;
 
     @InjectMocks private DeliveryService service;
 
@@ -74,6 +76,23 @@ class DeliveryServiceDelegateTest {
             .hasMessageContaining("Set up your local runner first");
         verify(claude).unavailableReason(argThat(ctx -> ctx.userId() == 7L && ctx.project() == project && ctx.workspace() == workspace));
         verify(runRepository, never()).save(any());
+    }
+
+    @Test
+    void delegating_assigns_an_unassigned_issue_to_the_person_who_delegates() {
+        Issue issue = Issue.builder().id(55L).project(project).build();
+        User ada = User.builder().id(7L).email("ada@acme.dev").build();
+        when(issueRepository.findById(55L)).thenReturn(Optional.of(issue));
+        when(registry.get("claude-code")).thenReturn(claude);
+        when(claude.available()).thenReturn(true);
+        when(claude.key()).thenReturn("claude-code");
+        when(claude.models()).thenReturn(java.util.List.of("claude-sonnet-5"));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(ada));
+        when(runRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.delegate("acme", 55L, "claude-code", null, 7L);
+
+        verify(issueService).assignDelegatorIfUnassigned(issue, ada);
     }
 
     @Test

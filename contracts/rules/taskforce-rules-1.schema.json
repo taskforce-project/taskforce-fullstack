@@ -64,7 +64,7 @@
         "web.search", "web.fetch",
         "mcp.read", "mcp.write",
         "package.publish", "deploy", "message.send", "payment", "secret.use",
-        "harness.change"
+        "mission.start", "harness.change"
       ]
     }
   }

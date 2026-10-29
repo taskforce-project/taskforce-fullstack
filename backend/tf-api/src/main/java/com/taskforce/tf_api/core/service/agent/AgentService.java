@@ -74,7 +74,7 @@ public class AgentService {
 
     private static final int MAX_TOOL_ITERS = 5;
 
-    private static final String STEP_SEARCH = "Searching the Brain OS";
+    private static final String STEP_SEARCH = "Searching your workspace's notes";
     private static final String STEP_ANSWER = "Writing the answer";
 
     public AssistantAnswer run(String slug, Long userId, String message) {
@@ -128,7 +128,7 @@ public class AgentService {
         } catch (Exception ex) {
             log.warn("Agent LLM indisponible (slug={}): {}", LogSafe.of(slug), LogSafe.of(ex.getMessage()));
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
-                "The model did not answer: here are the Brain OS notes"));
+                "The model did not answer: here are the notes of your workspace"));
             LlmUsage usage = llm.currentUsage(); // usage partiel réel (appels déjà faits avant l'échec)
             recordUsage(ws.getId(), usage);
             return new AssistantAnswer(fallbackAnswer(hits), null, "fallback", sources, steps, List.of(), toUsage(usage));
@@ -217,7 +217,7 @@ public class AgentService {
 
     private static String smallTalkFallback() {
         return "Hello! I'm **Cortex**, the AI copilot of your workspace. Ask me about your projects, "
-            + "decisions or docs and I'll look in the Brain OS.";
+            + "decisions or docs and I'll look in your workspace's notes.";
     }
 
     // -------------------------------------------------------------------------
@@ -360,9 +360,9 @@ public class AgentService {
     private String fallbackAnswer(List<KnowledgeNode> hits) {
         StringBuilder sb = new StringBuilder();
         if (hits.isEmpty()) {
-            sb.append("I found no relevant note in the Brain OS for this request.");
+            sb.append("I found no relevant note in your workspace for this request.");
         } else {
-            sb.append("Here are the most relevant notes of your **Brain OS**:\n\n");
+            sb.append("Here are the most relevant notes of your workspace:\n\n");
             for (KnowledgeNode n : hits) {
                 sb.append("- [[").append(n.getTitle()).append("]] (").append(n.getDomain()).append(")\n");
             }

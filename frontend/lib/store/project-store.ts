@@ -16,6 +16,7 @@ import {
   favoriteProject as favoriteProjectApi,
   unfavoriteProject as unfavoriteProjectApi,
   setProjectRepo as setProjectRepoApi,
+  setProjectTestCommand as setProjectTestCommandApi,
   unsetProjectRepo as unsetProjectRepoApi,
   importProjectBundle as importProjectBundleApi,
 } from "../api/project-service";
@@ -61,6 +62,8 @@ interface ProjectState {
 
   /** Délie le dépôt d'un projet. `true` si délié, `false` si l'appel a échoué (erreur avalée). */
   unlinkRepo: (slug: string, id: number) => Promise<boolean>;
+  /** Pose la commande de test du projet (S1) ; `true` si elle est enregistrée. */
+  setTestCommand: (slug: string, id: number, testCommand: string) => Promise<boolean>;
 
   /** Définit le projet actif */
   setActiveProject: (project: Project | null) => void;
@@ -134,6 +137,20 @@ export const useProjectStore = create<ProjectState>((set) => ({
     } catch (err) {
       set({ error: getErrorMessage(err) });
       return null;
+    }
+  },
+
+  setTestCommand: async (slug, id, testCommand) => {
+    try {
+      const saved = await setProjectTestCommandApi(slug, id, testCommand);
+      set((state) => ({
+        projects: state.projects.map((p) => (p.id === id ? { ...p, testCommand: saved } : p)),
+        activeProject: state.activeProject?.id === id ? { ...state.activeProject, testCommand: saved } : state.activeProject,
+      }));
+      return true;
+    } catch (err) {
+      set({ error: getErrorMessage(err) });
+      return false;
     }
   },
 

@@ -13,6 +13,7 @@ vi.mock('../api/project-service', () => ({
   favoriteProject: vi.fn(),
   unfavoriteProject: vi.fn(),
   setProjectRepo: vi.fn(),
+  setProjectTestCommand: vi.fn(),
   unsetProjectRepo: vi.fn(),
   importProjectBundle: vi.fn(),
 }));
@@ -314,6 +315,30 @@ describe('project-store', () => {
     expect(ok).toBe(true);
     expect(useProjectStore.getState().projects[0].repoFullName).toBeNull();
     expect(useProjectStore.getState().activeProject?.repoProvider).toBeNull();
+  });
+
+  it('setTestCommand keeps the saved command on the project and returns true', async () => {
+    const original = makeProject({ id: 5, repoFullName: 'me/web' });
+    act(() => useProjectStore.setState({ projects: [original], activeProject: original }));
+    vi.mocked(svc.setProjectTestCommand).mockResolvedValue('npm test');
+
+    let ok = false;
+    await act(async () => { ok = await useProjectStore.getState().setTestCommand('acme', 5, 'npm test'); });
+
+    expect(ok).toBe(true);
+    expect(useProjectStore.getState().projects[0].testCommand).toBe('npm test');
+    expect(useProjectStore.getState().activeProject?.testCommand).toBe('npm test');
+  });
+
+  it('setTestCommand sets error and returns false on failure', async () => {
+    act(() => useProjectStore.setState({ projects: [makeProject({ id: 5 })] }));
+    vi.mocked(svc.setProjectTestCommand).mockRejectedValue(new Error('forbidden'));
+
+    let ok = true;
+    await act(async () => { ok = await useProjectStore.getState().setTestCommand('acme', 5, 'npm test'); });
+
+    expect(ok).toBe(false);
+    expect(useProjectStore.getState().error).toBe('forbidden');
   });
 
   it('unlinkRepo sets error and returns false on failure', async () => {

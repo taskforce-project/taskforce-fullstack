@@ -215,6 +215,8 @@ export const PROJECT_ROUTES = {
   DELETE:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}`,
   /** Lien projet <-> dépôt de code (PUT lier/créer, DELETE délier) - TF-AGENT-DELIVERY */
   REPO:    (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/repo`,
+  /** Commande de test du projet (PUT), lancée par le runner après l'agent (S1). */
+  REPO_TEST_COMMAND: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/repo/test-command`,
   MEMBERS: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/members`,
   MEMBER:  (slug: string, id: number, memberId: number) => `/api/workspaces/${slug}/projects/${id}/members/${memberId}`,
   LABELS:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/labels`,

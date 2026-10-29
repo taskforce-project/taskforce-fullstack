@@ -9,6 +9,7 @@ import {
   unfavoriteProject,
   deleteProject,
   setProjectRepo,
+  setProjectTestCommand,
   unsetProjectRepo,
   listProjectMembers,
   addProjectMember,
@@ -63,6 +64,15 @@ describe('project-service', () => {
       vi.mocked(apiClient.get).mockRejectedValue(new Error('boom'));
       await expect(listProjects(SLUG)).rejects.toThrow('boom');
     });
+  });
+
+  it('PUT la commande de test du projet (S1) et rend celle gardée', async () => {
+    vi.mocked(apiClient.put).mockResolvedValue(envelope({ projectId: PROJECT_ID, testCommand: 'npm test' }));
+
+    const saved = await setProjectTestCommand(SLUG, PROJECT_ID, 'npm test');
+
+    expect(apiClient.put).toHaveBeenCalledWith(PROJECT_ROUTES.REPO_TEST_COMMAND(SLUG, PROJECT_ID), { testCommand: 'npm test' });
+    expect(saved).toBe('npm test');
   });
 
   describe('setProjectRepo / unsetProjectRepo', () => {

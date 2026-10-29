@@ -22,16 +22,17 @@ public record RunnerEventsRequest(
 
     /**
      * @param kind   {@code start}, {@code text}, {@code tool}, {@code error}, {@code denied} (l'agent), {@code decision}
-     *               (une règle, au seul dossier de preuve), {@code exit} (une sortie faite ou non par le runner) ou
-     *               {@code limit} (le plafond d'événements du runner atteint)
+     *               (une règle, au seul dossier de preuve), {@code exit} (une sortie faite ou non par le runner),
+     *               {@code limit} (le plafond d'événements du runner atteint) ou {@code test} (les tests du projet
+     *               lancés par le runner après l'agent, S1)
      * @param effect pour {@code decision}, l'effet de la règle ; pour {@code exit}, ce qui s'est passé : {@code allow}
      *               si la sortie est faite, {@code deny} sinon
      * @param rule   pour {@code decision}, la règle qui l'a donnée ; absente quand aucune ne s'applique
      */
     public record Event(
         @NotBlank
-        @Pattern(regexp = "start|text|tool|error|denied|decision|exit|limit",
-            message = "kind must be start, text, tool, error, denied, decision, exit or limit")
+        @Pattern(regexp = "start|text|tool|error|denied|decision|exit|limit|test",
+            message = "kind must be start, text, tool, error, denied, decision, exit, limit or test")
         String kind,
 
         @Size(max = 120)

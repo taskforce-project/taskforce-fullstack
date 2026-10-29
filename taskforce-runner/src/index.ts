@@ -25,6 +25,7 @@ import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWo
 import { verifiedBundle } from "./harness/rules.js";
 import { log } from "./log.js";
 import { resolveCommand, run } from "./proc.js";
+import { ApprovedTests, runProjectTests } from "./tests.js";
 import { MIN_CLAUDE_CODE, supportsApprovals } from "./version.js";
 
 // Lancé par l'app desktop avec le Node d'Electron (ELECTRON_RUN_AS_NODE) : ni git, ni gh, ni Claude Code ne doivent
@@ -69,10 +70,16 @@ async function ensureAgentVersion(config: RunnerConfig): Promise<void> {
   }
 }
 
-/** Une sortie, faite ou non, pour la chronologie et le dossier de preuve ; un échec d'envoi n'arrête rien. */
-async function traceExit(api: TaskforceApi, runId: number, tool: string, verdict: ExitVerdict): Promise<void> {
-  await api.events(runId, [{ kind: "exit", tool, text: verdict.why, effect: verdict.go ? "allow" : "deny" }])
-    .catch((e: unknown) => log.warn(`Exit not traced in TaskForce: ${(e as Error).message}`));
+/** Durée maximale des tests du projet (S1) : au-delà, ils sont arrêtés et le résultat le dit. */
+const TEST_TIMEOUT_MS = 15 * 60_000;
+
+/**
+ * Une décision du runner pour la chronologie et le dossier de preuve : une sortie (`exit`), faite ou non, ou le
+ * démarrage de la mission (`decision`, au seul dossier). Un échec d'envoi n'arrête rien.
+ */
+async function traceExit(api: TaskforceApi, runId: number, tool: string, verdict: ExitVerdict, kind: "exit" | "decision" = "exit"): Promise<void> {
+  await api.events(runId, [{ kind, tool, text: verdict.why, effect: verdict.go ? "allow" : "deny", ...(verdict.rule ? { rule: verdict.rule } : {}) }])
+    .catch((e: unknown) => log.warn(`Decision not traced in TaskForce: ${(e as Error).message}`));
 }
 
 function logOutcome(outcome: AgentOutcome): void {
@@ -97,6 +104,14 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
     const rules = verifiedBundle(claim.rules);
     log.info(`Rules v${rules.version} (${rules.rules.length} rules, ${rules.digest?.slice(0, 15)}...)`);
     await ensureAgentVersion(config);
+    const ask = (tool: string, summary: string): Promise<boolean> =>
+      askInTaskForce(api, claim.runId, tool, summary, config.agent.approvalTimeoutMinutes * 60_000, undefined, "runner");
+    // Le démarrage lui-même passe par les règles (R33 : pas de mission sur un dépôt public avant S1).
+    const visibility = claim.repoFullName ? await repoVisibility(claim.repoFullName) : null;
+    const start = await judgeExit(rules, { action: "mission.start", ...(visibility ? { repoVisibility: visibility } : {}) },
+      "Start the mission", `Start ${claim.issueKey} on ${claim.repoFullName ?? "a scratch folder"} (${visibility ?? "no repository"})`, ask);
+    await traceExit(api, claim.runId, "mission.start", start, "decision");
+    if (!start.go) throw new Error(`This mission does not start: ${start.why}.`);
     if (claim.repoFullName) {
       repo = await resolveRepo(config.repos, config.autoClone, config.home, claim.repoFullName);
       worktree = await prepareWorktree(repo, claim, config.home);
@@ -110,20 +125,29 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       if (!outcome.ok) throw new Error(outcome.text);
 
       const commits = await finalizeCommits(worktree, claim);
+      // S1 (R32) : les tests du projet, lancés par le runner sur le travail de l'agent, jamais par l'agent. Après les
+      // commits : ce que les tests écrivent (couverture, rapports) ne part pas avec la branche.
+      let report = outcome.text;
+      let prBody = outcome.text;
+      if (commits > 0 && claim.testCommand) {
+        const tests = await runProjectTests(claim.testCommand, claim.repoFullName, worktree.path, TEST_TIMEOUT_MS,
+          { ask, approved: ApprovedTests.in(config.home) }, signal);
+        log.info(tests.summary);
+        await api.events(claim.runId, [{ kind: "test", tool: tests.command.slice(0, 120), text: `${tests.summary}${tests.tail ? `\n${tests.tail.slice(-1500)}` : ""}` }])
+          .catch((e: unknown) => log.warn(`Test result not traced in TaskForce: ${(e as Error).message}`));
+        report = `${outcome.text}\n\n${tests.summary}`;
+        prBody = tests.tail ? `${report}\n\n<details><summary>Test output</summary>\n\n\`\`\`\n${tests.tail}\n\`\`\`\n</details>` : report;
+      }
       if (commits === 0) {
         result = { status: "DONE", summary: `No code change was needed.\n\n${outcome.text}`.slice(0, 7900) };
       } else if (!config.push) {
         result = {
           status: "DONE",
-          summary: `${outcome.text}\n\n${commits} commit(s) on local branch ${worktree.branch} (push disabled on this runner).`.slice(0, 7900),
+          summary: `${report}\n\n${commits} commit(s) on local branch ${worktree.branch} (push disabled on this runner).`.slice(0, 7900),
         };
       } else {
         // Les sorties suivent les règles de la mission (§8.4) : ce qui est demandé attend la personne qui a délégué.
-        const repoName = claim.repoFullName;
-        const visibility = await repoVisibility(repoName);
-        const where = `${repoName} (${visibility ?? "visibility unknown"})`;
-        const ask = (tool: string, summary: string): Promise<boolean> =>
-          askInTaskForce(api, claim.runId, tool, summary, config.agent.approvalTimeoutMinutes * 60_000);
+        const where = `${claim.repoFullName} (${visibility ?? "visibility unknown"})`;
         const push = await judgeExit(rules, exitFacts("git.push", worktree.branch, visibility), "git push",
           `Push the branch ${worktree.branch} to ${where}`, ask);
         log.info(`Push: ${push.why}`);
@@ -131,7 +155,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
         if (!push.go) {
           result = {
             status: "DONE",
-            summary: `${outcome.text}\n\n${commits} commit(s) on local branch ${worktree.branch}, not pushed: ${push.why}.`.slice(0, 7900),
+            summary: `${report}\n\n${commits} commit(s) on local branch ${worktree.branch}, not pushed: ${push.why}.`.slice(0, 7900),
           };
         } else {
           await pushBranch(worktree, repo);
@@ -142,10 +166,10 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
               `Open a pull request from ${worktree.branch} on ${where}`, ask);
             log.info(`Pull request: ${pr.why}`);
             await traceExit(api, claim.runId, "gh pr create", pr);
-            if (pr.go) url = await openPullRequest(worktree, repo, claim, outcome.text, config.home);
+            if (pr.go) url = await openPullRequest(worktree, repo, claim, prBody, config.home);
             else note = `\n\nBranch ${worktree.branch} pushed, no pull request: ${pr.why}.`;
           }
-          result = { status: "DONE", summary: `${outcome.text}${note}`.slice(0, 7900), resultUrl: url };
+          result = { status: "DONE", summary: `${report}${note}`.slice(0, 7900), resultUrl: url };
           log.info(url ? `Pull request opened: ${url}` : `Branch pushed: ${worktree.branch}`);
         }
       }
