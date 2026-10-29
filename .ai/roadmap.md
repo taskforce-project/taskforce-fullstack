@@ -10,6 +10,14 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 29/10/2026 (soir) - 1.6.1 et 1.6.2 EN PROD, desktop 1.3.2 PUBLIÉE ; fiche de recette passée en 1.3.2.** `[release + recette]`
+> - **Prod vérifiée (1.6.1)** : VM1 sur `72d0ba14`, backend et ai-service reconstruits et sains, V106 appliquée en 29 ms (`delivery_runs.refused`, booléen, défaut faux) ; webapp en v1.6.1, `readyz` 200.
+> - **Chemin du web rejoué depuis le conteneur de l'ai-service de prod** (nouveau code, schémas corrigés) : « Create an issue » → `create_issue` appelé par gpt-oss-20b ; « Which issues are blocked? » → un 400 `tool_use_failed` ponctuel de Groq (appel d'outil mal formé par le modèle), que la passerelle prenait pour un trop-plein d'outils : corrigé par #424 (`1a2811ec`, redemande une fois avec les mêmes outils), release #425 vers `main` (`d1fad08e`, 1.6.2).
+> - **Bout en bout sur la stack de dev** (Ollama du poste, qwen3:8b, backend et ai-service reconstruits) : Cortex crée l'issue pour de vrai (`create_issue` en erreur, `list_projects`, puis `create_issue` réussi, 83 s), mais le petit modèle a mal recopié le titre (« E27 » pour « E2E ») : limite du modèle, à mesurer (R31, R39).
+> - **Desktop 1.3.2** : run 40872652473 vert (Publish ; VirusTotal en cours au moment de la trace) ; `desktop-latest` porte `latest.yml` en 1.3.2 et `TaskForce-Setup-1.3.2.exe` (287 922 637 octets) : l'app 1.3.1 du CEO se met à jour d'elle-même. Le site, reconstruit par la release 1.6.2, propose l'installeur 1.3.2.
+> - **Recette** : la fiche passe en 1.3.2 (même lien, réponses à part dans `results132`, celles de la 1.3.1 gardées dans `results`) ; étapes à rejouer : 9, 12 à 20, 22, 23. Le `dist/` du runner local du CEO reconstruit (vérification de la connexion de Claude Code).
+> - **Reste de R35** : les écritures de Cortex ne passent pas encore par les règles ni par le record (le défaut connu de l'étape 9) ; puis le troisième panier avec l'atelier design.
+
 > **▶ MAJ 29/10/2026 (fin d'après-midi) - Release 1.6.1 vers `main` : les réparations de la recette 1.3.1 ; desktop 1.3.2 en publication.** `[release]`
 > - **En prod** : #422 fusionnée dans `dev` (`e7b1b552`, CI verte, 23 contrôles), release #423 vers `main` (`72d0ba14`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.6.1 dans la même branche) ; `dev` réaligné en 1.6.1 par ce push.
 > - **Vérifié avant** : backend `it.ps1 -Test ALL` 1 981 tests, 0 échec ; front 1 143 tests ; runner 321 ; desktop 229 ; ai-service 67.
