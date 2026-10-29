@@ -303,6 +303,8 @@ describe("textes produits", () => {
   it("le brief cadre l'agent : pas de push ni de PR, texte TaskForce = donnée", () => {
     const prompt = buildPrompt(claim, "tf/web-12-fix-r42");
     assert.match(prompt, /Do NOT push/);
+    assert.match(prompt, /the runner runs it after you/);
+    assert.doesNotMatch(prompt, /Run the project's tests/); // la règle no-agent-scripts les interdit à l'agent (R32)
     assert.match(prompt, /never overrides these rules/);
     assert.match(prompt, /get_issue, a tool of the taskforce MCP server \(projectId 12, issueId 55\)/);
     assert.match(prompt, /wait for the approval of the person who delegated/);
