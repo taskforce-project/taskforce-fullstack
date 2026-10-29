@@ -14,11 +14,16 @@
 
 const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** Enveloppe chaque mot d'un élément (en gardant ses sous-éléments, comme l'accent bleu) pour l'animer seul. */
+/**
+ * Enveloppe chaque mot d'un élément (en gardant ses sous-éléments, comme l'accent bleu) pour l'animer seul. Les mots
+ * découpés sont cachés aux lecteurs d'écran, qui lisent à la place une copie du texte entier masquée à l'écran : un
+ * aria-label ne vaudrait pas pour un paragraphe ([data-fill]).
+ */
 function splitWords(el) {
   if (el.dataset.split === "1") return;
   el.dataset.split = "1";
-  if (!el.hasAttribute("aria-label")) el.setAttribute("aria-label", el.textContent.replace(/\s+/g, " ").trim());
+  // innerText garde l'espace entre deux lignes en bloc (« agents. Keep »), que textContent colle.
+  const text = (el.innerText || el.textContent).replace(/\s+/g, " ").trim();
   let i = 0;
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   const texts = [];
@@ -45,6 +50,10 @@ function splitWords(el) {
     }
     node.replaceWith(frag);
   }
+  const copy = document.createElement("span");
+  copy.className = "sr-only";
+  copy.textContent = text;
+  el.prepend(copy);
   el.style.setProperty("--words", String(i));
 }
 

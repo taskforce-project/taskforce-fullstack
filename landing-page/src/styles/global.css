@@ -770,6 +770,9 @@
       opacity: 1;
       transform: none;
     }
+    .mwi {
+      transition-delay: 0s !important;
+    }
     .backdrop-drift {
       animation: none;
     }
