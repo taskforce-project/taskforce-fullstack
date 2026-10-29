@@ -9,6 +9,7 @@ import { ClientRouter } from "astro:transitions";
 import Header from "@/components/site/Header.astro";
 import Footer from "@/components/site/Footer.astro";
 import DownloadNotice from "@/components/site/DownloadNotice.astro";
+import Composer from "@/components/site/Composer.astro";
 import { breadcrumbLd, organizationLd, softwareApplicationLd, websiteLd } from "@/lib/structured-data";
 
 interface Props {
@@ -101,6 +102,7 @@ const pageTransition = { forwards: pageAnimation, backwards: pageAnimation };
     </main>
     <Footer />
     <DownloadNotice />
+    {!noindex && <Composer />}
 
     <script>
       import "../scripts/motion.js";
