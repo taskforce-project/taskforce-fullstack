@@ -5,6 +5,7 @@
  * (Groq tool-calling si une clé est configurée, sinon repli RAG : sources réelles).
  */
 import { apiClient, AI_TIMEOUT_MS } from "./client"
+import { executeMcpAction } from "./integration-service"
 import { ASSISTANT_ROUTES } from "../config/api-routes"
 
 export interface AssistantSource {
@@ -20,9 +21,18 @@ export interface AssistantStep {
 }
 export interface AssistantToolCall {
   name: string
+  /** success, error, pending (proposé, il attend l'accord de la personne) ou refused (les règles de l'espace le refusent). */
   status: string
   input: string | null
   output: string | null
+  /** Le dossier de la réponse, que l'accord prolonge ; absent d'une réponse rendue avant le noyau. */
+  record?: string | null
+}
+/** Ce que devient une action accordée : faite, refusée par les règles de l'espace (elles ont pu changer), ou en échec. */
+export interface AssistantActionResult {
+  tool: string
+  status: "success" | "refused" | "error"
+  output: string
 }
 /** Tokens réellement consommés par le tour (usage LLM cumulé). */
 export interface AssistantUsage {
@@ -62,6 +72,30 @@ export async function sendAgentMessage(
     { timeout: AI_TIMEOUT_MS },
   )
   return res.data.data
+}
+
+/**
+ * Une action proposée que la personne peut accorder : celle d'une réponse du noyau, qui porte son dossier, ou une écriture
+ * externe d'une réponse plus ancienne.
+ */
+export function isApprovable(call: AssistantToolCall): boolean {
+  return call.status === "pending" && (Boolean(call.record) || call.name.includes("__"))
+}
+
+/**
+ * Accorde une action proposée par Cortex. Avec le dossier de la réponse, le serveur la rejuge par les règles de l'espace
+ * et la garde au dossier (R35) ; sans dossier, une écriture externe passe par la route de la console MCP.
+ */
+export async function approveAction(slug: string, call: AssistantToolCall): Promise<AssistantActionResult> {
+  if (call.record) {
+    const res = await apiClient.post<{ data: AssistantActionResult }>(
+      ASSISTANT_ROUTES.ACTION_EXECUTE(slug),
+      { tool: call.name, input: call.input ?? "{}", record: call.record },
+    )
+    return res.data.data
+  }
+  const args = call.input ? (JSON.parse(call.input) as Record<string, unknown>) : {}
+  return { tool: call.name, status: "success", output: await executeMcpAction(slug, call.name, args) }
 }
 
 /** Variante texte (compat) : renvoie seulement la réponse markdown. */

@@ -52,6 +52,11 @@ public class ExternalMcpTool implements AgentTool {
         return def.readOnly();
     }
 
+    /** Le connecteur qui porte l'outil ({@code linear}…) : le fait {@code server} que jugent les règles. */
+    public String connectorKey() {
+        return server.connectorKey();
+    }
+
     @Override
     public String description() {
         String d = def.description() != null ? def.description() : "";

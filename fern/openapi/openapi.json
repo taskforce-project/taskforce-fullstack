@@ -15,7 +15,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:18080",
+      "url": "http://localhost:8080",
       "description": "Generated server url"
     }
   ],
@@ -4070,6 +4070,46 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseChatTurnResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/assistant/actions/execute": {
+      "post": {
+        "tags": [
+          "AI assistant"
+        ],
+        "operationId": "runApproved",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAssistantActionResult"
                 }
               }
             }
@@ -13460,6 +13500,9 @@
           },
           "output": {
             "type": "string"
+          },
+          "record": {
+            "type": "string"
           }
         }
       },
@@ -13492,6 +13535,62 @@
           },
           "answer": {
             "$ref": "#/components/schemas/AssistantAnswer"
+          }
+        }
+      },
+      "AssistantActionRequest": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "input": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 0
+          },
+          "record": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "record",
+          "tool"
+        ]
+      },
+      "ApiResponseAssistantActionResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AssistantActionResult"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AssistantActionResult": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "output": {
+            "type": "string"
           }
         }
       },

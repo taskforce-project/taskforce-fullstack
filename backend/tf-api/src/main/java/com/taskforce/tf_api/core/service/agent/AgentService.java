@@ -9,20 +9,24 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.taskforce.tf_api.core.dto.response.AssistantActionResult;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantSource;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantStep;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantToolCall;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage;
+import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.AiUsageService;
@@ -34,6 +38,8 @@ import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.core.service.mcp.ExternalMcpTool;
 import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
+import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
@@ -67,6 +73,8 @@ public class AgentService {
     private final AiUsageService      aiUsageService;
     private final WorkspaceMcpService workspaceMcp;
     private final AuthorizationService authorization;
+    private final CortexGate          gate;
+    private final CortexRecordService records;
 
     // Tier des tours avec outils externes MCP. Défaut "fast" ; "standard" pour plus de fiabilité
     // multi-outils si le matériel suit.
@@ -88,6 +96,82 @@ public class AgentService {
 
     public AssistantAnswer run(String slug, Long userId, String message) {
         return run(slug, userId, message, List.of());
+    }
+
+    /**
+     * Lance une action que Cortex a proposée et que la personne vient d'accorder (R35). L'accord ne vaut que pour
+     * une proposition du dossier, une seule fois ; l'action est rejugée par les règles de l'espace, qui ont pu changer,
+     * puis exécutée avec les droits de la personne, et gardée au dossier de la réponse qui l'a proposée. Une écriture
+     * externe reste réservée aux propriétaires et administrateurs (OSS-1.5).
+     */
+    public AssistantActionResult runApproved(String slug, Long userId, String toolName, String argsJson, String recordRef) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        AgentContext ctx = new AgentContext(slug, ws.getId(), userId);
+        UUID record = recordId(recordRef);
+        if (!records.owns(record, ctx)) {
+            throw new ResourceNotFoundException("This conversation's record was not found.");
+        }
+        AgentTool tool = tools.get(toolName);
+        if (tool == null && toolName.contains("__")) {
+            tool = tools.get(toolName, workspaceMcp.toolsFor(ctx));
+        }
+        if (tool == null) {
+            throw new BusinessException("This action is no longer available.");
+        }
+        if (tool instanceof ExternalMcpTool && !authorization.isManager(ws.getId(), userId)) {
+            throw new BusinessException("Only workspace owners and admins can approve a change in an external tool.");
+        }
+        if (!records.approve(record, toolName, userId, argsJson)) {
+            throw new BusinessException("This action is no longer waiting for your approval.");
+        }
+        CortexGate.Verdict verdict = gate.judge(gate.rulesFor(ctx), tool);
+        traceBefore(record, "action.decided", CortexRecordService.Actor.rule(verdict.ruleId()),
+            Map.of("effect", verdict.effect(), "facts", verdict.facts()));
+        String status = "success";
+        String output;
+        try {
+            if (verdict.denied()) {
+                status = "refused";
+                output = "Not run: the rules of this workspace refuse it. " + verdict.reason();
+            } else {
+                Map<String, Object> args = objectMapper.readValue(argsJson == null || argsJson.isBlank() ? "{}" : argsJson,
+                    new TypeReference<Map<String, Object>>() {});
+                output = tool.execute(args, ctx);
+            }
+        } catch (JsonProcessingException e) {
+            status = "error";
+            output = "The arguments of this action are not readable.";
+        } catch (RuntimeException e) {
+            traceAfter(record, toolName, "error", e.getMessage());
+            throw e;
+        }
+        traceAfter(record, toolName, status, output);
+        return new AssistantActionResult(toolName, status, output);
+    }
+
+    /** Tracer avant d'agir : un événement que le dossier ne prend plus (il est plein) arrête l'action. */
+    private void traceBefore(UUID record, String type, CortexRecordService.Actor actor, Map<String, ?> data) {
+        if (records.append(record, type, actor, data).isEmpty()) {
+            throw new BusinessException("The record of this answer is full, so the action does not run.");
+        }
+    }
+
+    /** Le résultat au dossier. Une panne ici ne défait pas ce qui a été fait, ni ne le dit raté : elle se journalise. */
+    private void traceAfter(UUID record, String tool, String status, String output) {
+        try {
+            records.append(record, "action.result", CortexRecordService.Actor.SERVER,
+                Map.of("tool", tool, "status", status, "output", CortexRecordService.shorten(output)));
+        } catch (RuntimeException e) {
+            log.warn("Cortex : résultat de {} non gardé au dossier : {}", LogSafe.of(tool), LogSafe.of(e.getMessage()));
+        }
+    }
+
+    private static UUID recordId(String ref) {
+        try {
+            return UUID.fromString(ref);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new BusinessException("This conversation's record is not valid.");
+        }
     }
 
     /**
@@ -276,6 +360,8 @@ public class AgentService {
         List<Map<String, Object>> messages = withHistory(systemPrompt(hits, external), history, message);
         List<Map<String, Object>> toolDefs = tools.toolDefinitions(external);
         String tier = external.isEmpty() ? "fast" : mcpToolTier;
+        // Le noyau (R35) : les règles de l'espace et le dossier de la réponse, ouverts au premier outil.
+        Kernel kernel = new Kernel(ctx, message);
 
         for (int i = 0; i < MAX_TOOL_ITERS; i++) {
             JsonNode msg = llm.rawChat(messages, toolDefs, tier);
@@ -295,31 +381,78 @@ public class AgentService {
                     if (tool == null) {
                         result = "Unknown tool: " + name;
                         status = "error";
-                    } else if (tool instanceof ExternalMcpTool ext && !ext.isReadOnly()) {
-                        // Écriture externe : jamais exécutée par le modèle. Proposée seulement à qui peut la
-                        // valider (propriétaire ou administrateur, OSS-1.5), refusée d'emblée aux autres.
-                        if (authorization.isManager(ctx.workspaceId(), ctx.userId())) {
-                            result = "Action proposed to the user, waiting for their approval in the conversation. "
-                                + "Do not call this tool again; just summarize the action you propose.";
-                            status = "pending";
-                        } else {
-                            result = "Not run: only workspace owners and admins can approve a change in an external "
-                                + "tool. Tell the user that an owner or admin has to make this change.";
-                            status = "error";
-                        }
                     } else {
-                        Map<String, Object> args = objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {});
-                        result = tool.execute(args, ctx);
+                        // Tracer avant d'agir : la demande et la décision entrent au dossier avant tout effet.
+                        CortexGate.Verdict verdict = kernel.judge(tool, argsJson);
+                        if (verdict.denied()) {
+                            result = "Not run: the rules of this workspace refuse it. " + verdict.reason()
+                                + " Do not try again; tell the user why it was not done.";
+                            status = "refused";
+                        } else if (!verdict.allowed()) {
+                            // Demandé : jamais exécuté par le modèle. Une écriture externe ne se propose qu'à qui peut
+                            // la valider (propriétaire ou administrateur, OSS-1.5) ; les autres l'apprennent d'emblée.
+                            if (tool instanceof ExternalMcpTool && !authorization.isManager(ctx.workspaceId(), ctx.userId())) {
+                                result = "Not run: only workspace owners and admins can approve a change in an external "
+                                    + "tool. Tell the user that an owner or admin has to make this change.";
+                                status = "error";
+                            } else {
+                                result = "Action proposed to the user, waiting for their approval in the conversation. "
+                                    + "Do not call this tool again; just summarize the action you propose.";
+                                status = "pending";
+                            }
+                        } else {
+                            Map<String, Object> args = objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {});
+                            result = tool.execute(args, ctx);
+                        }
+                        kernel.result(name, status, result);
                     }
                 } catch (Exception e) {
                     result = "Tool " + name + " failed: " + e.getMessage();
                     status = "error";
+                    kernel.result(name, status, result);
                 }
-                toolCalls.add(new AssistantToolCall(name, status, argsJson, result));
+                toolCalls.add(new AssistantToolCall(name, status, argsJson, result, kernel.recordRef()));
                 messages.add(Map.of("role", "tool", "tool_call_id", id, "content", result));
             }
         }
         return "Answer interrupted (too many tool steps).";
+    }
+
+    /**
+     * Le noyau pour une réponse de Cortex : les règles de l'espace et le dossier, ouverts au premier outil seulement,
+     * pour qu'une réponse sans outil ne laisse pas de dossier vide.
+     */
+    private final class Kernel {
+        private final AgentContext ctx;
+        private final String question;
+        private RulesBundle bundle;
+        private UUID record;
+
+        Kernel(AgentContext ctx, String question) {
+            this.ctx = ctx;
+            this.question = question;
+        }
+
+        /** La demande, puis la décision des règles, au dossier avant tout effet : sans dossier, l'action ne part pas. */
+        CortexGate.Verdict judge(AgentTool tool, String argsJson) {
+            if (bundle == null) bundle = gate.rulesFor(ctx);
+            if (record == null) record = records.open(ctx, question);
+            traceBefore(record, "action.requested", CortexRecordService.Actor.CORTEX,
+                Map.of("tool", tool.name(), "arguments", CortexRecordService.shorten(argsJson)));
+            CortexGate.Verdict verdict = gate.judge(bundle, tool);
+            traceBefore(record, "action.decided", CortexRecordService.Actor.rule(verdict.ruleId()),
+                Map.of("effect", verdict.effect(), "facts", verdict.facts()));
+            return verdict;
+        }
+
+        /** Le résultat au dossier, s'il s'est ouvert. */
+        void result(String tool, String status, String output) {
+            if (record != null) traceAfter(record, tool, status, output);
+        }
+
+        String recordRef() {
+            return record == null ? null : record.toString();
+        }
     }
 
     /**
@@ -444,6 +577,9 @@ public class AgentService {
         if (wrote || !WRITE_REQUEST.matcher(message).find() || !WRITE_CLAIM.matcher(answer).find()) return answer;
         if (toolCalls.stream().anyMatch(call -> "pending".equals(call.status()))) {
             return "Nothing has changed yet: the action below waits for your approval.";
+        }
+        if (toolCalls.stream().anyMatch(call -> "refused".equals(call.status()))) {
+            return "Nothing was created: the rules of this workspace refuse this action.";
         }
         boolean failed = toolCalls.stream()
             .anyMatch(call -> WRITE_TOOLS.contains(call.name()) && "error".equals(call.status()));
