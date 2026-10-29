@@ -24,6 +24,8 @@ public record DeliveryRunResponse(
     String summary,
     String resultUrl,
     String error,
+    /** Refusée au départ par une règle : l'écran dit « Not started », pas « Agent failed » (R38). */
+    boolean refused,
     Long startedById,
     LocalDateTime createdAt,
     LocalDateTime updatedAt

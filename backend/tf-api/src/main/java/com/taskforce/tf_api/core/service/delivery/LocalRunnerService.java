@@ -192,6 +192,8 @@ public class LocalRunnerService {
         DeliveryPoll poll = done
             ? new DeliveryPoll(DeliveryRunStatus.DONE, result.summary().trim(), result.resultUrl(), null)
             : new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, error);
+        // Une mission refusée au départ par une règle n'est pas une panne : l'écran la dira « Not started » (R38).
+        if (!done && Boolean.TRUE.equals(result.refused())) run.setRefused(true);
         // Les demandes sans réponse vont au dossier de preuve avant sa clôture, faite par DeliveryRunner.
         activityService.closeApprovals(run);
         deliveryRunner.complete(runId, poll);

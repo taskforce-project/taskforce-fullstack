@@ -12,6 +12,8 @@ import jakarta.validation.constraints.Size;
  * @param resultUrl lien du résultat, typiquement la pull request ; http(s) uniquement, car il est rendu
  *                  cliquable dans l'interface
  * @param error     message d'échec (attendu quand FAILED)
+ * @param refused   vrai quand une règle a refusé la mission au départ : ce n'est pas une panne (R38) ; un runner plus
+ *                  ancien ne l'envoie pas
  */
 public record RunnerResultRequest(
     @NotBlank @Pattern(regexp = "DONE|FAILED", message = "status must be DONE or FAILED")
@@ -24,5 +26,7 @@ public record RunnerResultRequest(
     String resultUrl,
 
     @Size(max = 4000)
-    String error
+    String error,
+
+    Boolean refused
 ) {}
