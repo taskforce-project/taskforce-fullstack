@@ -10,6 +10,16 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 30/10/2026 - Séance n°12 retenue : les solutions aux quatre réserves de la banque d'évaluations, dans l'ordre de Jobs.** `[conseil + direction]`
+> - **Décision du CEO** : « je suis d'accord avec tout les R, et je suis aussi d'accord avec Jobs sur ses points donc on le suit ». Et des explications plus explicites.
+> - **R72** : un cas garde la trace de ce qu'il a lu (les notes servies, les projets et les issues de ses lectures, la version des règles) ; si l'espace a changé depuis, il sort du score et s'adapte d'un clic en un nouveau cas, l'ancien gardant ses notes. Lu dans la banque au moment du rejeu, pas dans une alerte.
+> - **R73** : la banque est celle de l'entreprise, pas de Cortex ; l'équipe de Jobs la dessine là où l'on change de modèle (workflow 9) et là où une tâche échoue (workflow 8) ; les réglages ne gardent que l'interrupteur.
+> - **R74** : « Add as proposed » ajoute un cas d'un clic ; la file des cas que TaskForce proposera depuis ses dossiers (refus, actions accordées qui échouent) attend les écrans de base.
+> - **R75** : les huit routes de l'API existent ; les outils MCP de la banque attendent les écrans de base.
+> - **L'ordre** : 1. l'atelier des écrans de base (R54, R55 à R59) et la banque dans les workflows 8 et 9 ; 2. le lot 2 (R72, « Add as proposed ») ; 3. la file des cas proposés et les outils MCP ; 4. le registre des modèles par tâche, puis l'export (R64).
+> - **Doc** (`taskforce-docs`) : PV de la séance n°12, registre et journal (`56b0efb`) ; spec v2, §14 et §20 (`9df09fa`).
+> - **En attente du CEO** : la recette 1.3.6 (`results136`) ; « go release » pour la banque (dans `dev`, pas en prod) ; Q13 ; R27 à R30.
+
 > **▶ MAJ 29/10/2026 (nuit, release) - Release 1.6.6 EN PROD : une note accordée n'échoue plus sur un type inventé ; desktop 1.3.6 publiée ; séance n°11 retenue.** `[release + conseil]`
 > - **Décision du CEO** : R66 à R71 retenues, avec les réserves de Shotwell (R66 : un cas s'adapte quand l'espace change ; R68 : confirmer ne ralentit pas la banque ; R71 : l'écran ne la retarde pas) et de Duflo (R67 : Cortex n'est pas le produit, un changement d'UI/UX côté Jobs), chacune à résoudre. Puis « On y va » : la release du correctif, puis R61.
 > - **En prod** : #438 fusionnée dans `dev` (`0307cb05`), `chore(desktop)` 1.3.6 (`7c0518f9`), release #439 vers `main` (`aa4432a5`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.6.6 en plomberie). Desktop 1.3.6 publiée : run 40966766707 depuis `main`, vert ; `latest.yml` en 1.3.6 ; le site est reconstruit pour la proposer.
