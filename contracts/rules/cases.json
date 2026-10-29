@@ -453,6 +453,16 @@
       }
     },
     {
+      "name": "creating a project is allowed",
+      "facts": {
+        "action": "project.create"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "create-project"
+      }
+    },
+    {
       "name": "updating an issue is allowed",
       "facts": {
         "action": "issue.update"
@@ -625,6 +635,6 @@
   ],
   "digest": {
     "description": "The digest of default.rules.json as it is, with or without null members and its own digest field.",
-    "expected": "sha256:97d35bd6e4599e96ba04098ff3ac5efe2525b978f86840ae5dee19f6fba5a5ba"
+    "expected": "sha256:00ce3ad11d34d48c3440dfaebb218553ff2e25d39cd8b291d0476a9c0e973c28"
   }
 }

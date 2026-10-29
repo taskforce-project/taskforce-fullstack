@@ -81,7 +81,7 @@ class CortexGateTest {
         "find_integration, allow, read-company-tools",
         "create_issue,     allow, create-issue",      // se défait : une issue se ferme d'un geste
         "create_note,      ask,   propose-knowledge", // une personne décide de ce qui entre au Brain OS
-        "create_project,   ask,",                     // aucune règle ne couvre project.create
+        "create_project,   allow, create-project",    // la Présidence, 30/10/2026 : Cortex crée le projet demandé
         "make_coffee,      ask,",                     // un outil inconnu n'a pas d'action : demandé
     })
     void the_default_rules_judge_every_internal_tool(String name, String effect, String ruleId) {
@@ -95,7 +95,7 @@ class CortexGateTest {
     @Test
     @DisplayName("une action qu'aucune règle ne couvre attend la personne, et le dit")
     void an_uncovered_action_waits_for_the_person() {
-        CortexGate.Verdict verdict = gate.judge(defaults, internal("create_project"));
+        CortexGate.Verdict verdict = gate.judge(bundle(), internal("create_project"));
 
         assertThat(verdict.allowed()).isFalse();
         assertThat(verdict.denied()).isFalse();
