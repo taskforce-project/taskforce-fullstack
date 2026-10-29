@@ -1,14 +1,14 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronRight, Wrench, Check, X, Loader2 } from "lucide-react"
+import { ChevronRight, Wrench, Check, X, Loader2, Ban } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 /**
  * Carte d'appel d'outil (tool call) pour un agent. Affiche le nom, le statut, et déplie
  * l'entrée/sortie. Prêt à câbler sur le deep-path (Groq/Claude tool calling).
  */
-export type ToolStatus = "pending" | "running" | "success" | "error"
+export type ToolStatus = "pending" | "running" | "success" | "error" | "refused"
 
 export interface ToolProps {
   name: string
@@ -24,6 +24,7 @@ const STATUS: Record<ToolStatus, { label: string; cls: string; icon: React.Eleme
   running: { label: "Running", cls: "text-ink-yellow", icon: Loader2, spin: true },
   success: { label: "Completed", cls: "text-ink-green", icon: Check },
   error: { label: "Error", cls: "text-destructive", icon: X },
+  refused: { label: "Refused by a rule", cls: "text-ink-red", icon: Ban },
 }
 
 function asText(v: unknown): string {
@@ -34,7 +35,7 @@ function asText(v: unknown): string {
 
 export function Tool({ name, status = "success", input, output, defaultOpen = false, className }: ToolProps) {
   const [open, setOpen] = useState(defaultOpen)
-  const s = STATUS[status]
+  const s = STATUS[status] ?? STATUS.pending // un statut que cette version ne connaît pas encore
   const Icon = s.icon
   return (
     <div className={cn("my-2 overflow-hidden rounded-lg border bg-muted/30 text-sm", className)}>
