@@ -1,5 +1,8 @@
 ---
-/** Pied de page : logo et promesse, liens par groupe, ligne de bas de page. Fond papier, coins du haut arrondis. */
+/**
+ * Pied de page : logo et promesse, liens par groupe, ligne de bas de page, puis le grand mot « TaskForce » rempli
+ * d'une peinture du site (décoratif). Fond papier, coins du haut arrondis.
+ */
 import { ArrowUpRight } from "lucide-react";
 import Logo from "./Logo.astro";
 import { FOOTER_GROUPS, LINKS } from "@/lib/site";
@@ -50,5 +53,9 @@ const year = new Date().getFullYear();
         <a href={`mailto:${LINKS.email}`} class="hover:text-foreground">{LINKS.email}</a>
       </p>
     </div>
+  </div>
+
+  <div class="container-wide overflow-hidden pt-4" aria-hidden="true">
+    <p class="footer-mark text-center" data-reveal>TaskForce</p>
   </div>
 </footer>

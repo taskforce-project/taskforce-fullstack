@@ -30,7 +30,7 @@ const center = align === "center";
 >
   <div class:list={["flex flex-col gap-6", center ? "items-center" : "items-start"]}>
     <Pill tone={tone}>{label}</Pill>
-    <h2 class:list={["t-h2", center ? "max-w-4xl" : "max-w-3xl"]}><slot name="title" /></h2>
+    <h2 class:list={["t-h2", center ? "max-w-4xl" : "max-w-3xl"]} data-words style="--d: 120ms"><slot name="title" /></h2>
     {lead && <p class:list={["t-lead max-w-2xl", center && "mx-auto"]}>{lead}</p>}
   </div>
   {

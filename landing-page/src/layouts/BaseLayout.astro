@@ -103,6 +103,8 @@ const pageTransition = { forwards: pageAnimation, backwards: pageAnimation };
     <DownloadNotice />
 
     <script>
+      import "../scripts/motion.js";
+
       // Apparition au défilement des blocs [data-reveal], relancée à chaque page (navigation sans rechargement) ;
       // tout apparaît d'un coup si l'utilisateur réduit les animations. En JavaScript simple : le Vite du conteneur
       // Docker de dev lit ce script sans TypeScript.
