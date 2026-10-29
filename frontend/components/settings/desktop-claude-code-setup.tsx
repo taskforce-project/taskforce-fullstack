@@ -10,6 +10,7 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useAccessTokenStore } from "@/lib/store/access-token-store"
 import { useDesktopToolsStore } from "@/lib/store/desktop-tools-store"
+import { claudeCodeUpToDate, MIN_CLAUDE_CODE } from "@/lib/utils/claude-code"
 
 /** Page de téléchargement de git. */
 export const GIT_URL = "https://git-scm.com/downloads"
@@ -40,7 +41,9 @@ export function DesktopClaudeCodeSetup({ slug }: Readonly<{ slug: string }>) {
   }
 
   const { claude, git, github } = status
-  const claudeReady = claude.installed && claude.signedIn !== false
+  // Trop ancien, Claude Code ne tient pas la porte du runner : la mission serait refusée au départ.
+  const claudeUpToDate = claudeCodeUpToDate(claude.version)
+  const claudeReady = claude.installed && claudeUpToDate && claude.signedIn !== false
   const ready = claudeReady && git.installed && github.signedIn
 
   return (
@@ -55,11 +58,15 @@ export function DesktopClaudeCodeSetup({ slug }: Readonly<{ slug: string }>) {
         ok={claudeReady}
         name="Claude Code"
         detail={claude.installed
-          ? [claude.version && `version ${claude.version}`, claude.signedIn === false ? "not signed in" : claude.signedIn && "signed in"]
+          ? [claude.version && `version ${claude.version}`, !claudeUpToDate && `update needed (${MIN_CLAUDE_CODE} or later)`,
+            claude.signedIn === false ? "not signed in" : claude.signedIn && "signed in"]
             .filter(Boolean).join(", ")
           : "not installed"}
       >
         {!claude.installed && <CopyableCode label="Install it, then restart TaskForce" text="npm install -g @anthropic-ai/claude-code" />}
+        {claude.installed && !claudeUpToDate && (
+          <CopyableCode label="Update it, then check again" text="npm install -g @anthropic-ai/claude-code" />
+        )}
         {claude.installed && claude.signedIn === false && (
           <CopyableCode label="Sign in once with your Claude account, in a terminal" text="claude" />
         )}

@@ -129,6 +129,17 @@ class DeliveryActivityServiceTest {
     }
 
     @Test
+    void the_runner_s_test_run_is_shown_and_kept_as_a_test_result() {
+        run.setClaimedBy("tf-runner-ada");
+        when(eventRepository.maxSeq(100L)).thenReturn(0);
+
+        service.appendEvents(run, List.of(new RunnerEventsRequest.Event("test", "npm test", "passed in 42 s")));
+
+        verify(eventRepository).save(any());
+        verify(evidenceService).append(eq(run), eq("test.result"), eq(new MissionEvidenceService.Actor("runner", "tf-runner-ada")), any());
+    }
+
+    @Test
     void an_exit_is_shown_and_kept_as_the_runner_s_act() {
         run.setClaimedBy("tf-runner-ada");
         when(eventRepository.maxSeq(100L)).thenReturn(0);
@@ -147,7 +158,19 @@ class DeliveryActivityServiceTest {
 
         assertThat(response.status()).isEqualTo("PENDING");
         assertThat(response.expiresAt()).isBetween(LocalDateTime.now().plusMinutes(9), LocalDateTime.now().plusMinutes(11));
-        verify(notificationService).notifyAgentApproval(run.getIssue(), delegator, "Bash", "npm install lodash");
+        verify(notificationService).notifyAgentApproval(run.getIssue(), delegator, "Bash", "npm install lodash", false);
+    }
+
+    @Test
+    void a_request_of_taskforce_itself_says_so() {
+        ArgumentCaptor<DeliveryRunApproval> saved = ArgumentCaptor.forClass(DeliveryRunApproval.class);
+
+        service.openApproval(run, "git push", "Push the branch tf/web-1 to acme/web (visibility unknown)", true);
+
+        verify(approvalRepository).save(saved.capture());
+        assertThat(saved.getValue().getAskedBy()).isEqualTo("runner");
+        verify(notificationService).notifyAgentApproval(run.getIssue(), delegator, "git push",
+            "Push the branch tf/web-1 to acme/web (visibility unknown)", true);
     }
 
     @Test

@@ -264,15 +264,22 @@ public class NotificationService {
         }
     }
 
-    /**
-     * L'agent de code demande à exécuter une action hors de son socle (OSS-5.4) : seule la personne qui a délégué
-     * peut répondre, puisque l'action tourne sur sa machine. Le lien mène à l'issue, où se trouvent les boutons.
-     */
+    /** Une demande de l'agent de code (OSS-5.4). */
     @Transactional
     public void notifyAgentApproval(Issue issue, User delegator, String tool, String summary) {
+        notifyAgentApproval(issue, delegator, tool, summary, false);
+    }
+
+    /**
+     * Une demande de validation pendant un run (OSS-5.4) : seule la personne qui a délégué peut répondre, puisque
+     * l'action tourne sur sa machine. Le lien mène à l'issue, où se trouvent les boutons. Le titre dit qui demande,
+     * l'agent ou TaskForce (décision J4).
+     */
+    @Transactional
+    public void notifyAgentApproval(Issue issue, User delegator, String tool, String summary, boolean byRunner) {
         if (delegator == null) return;
         Notification notif = buildNotification(issue, null, delegator, "agentApproval", "warning",
-            issue.getTitle() + ": Claude Code asks to run " + tool, truncate(summary, 200));
+            issue.getTitle() + (byRunner ? ": TaskForce asks: " : ": Claude Code asks to run ") + tool, truncate(summary, 200));
         dispatch(notif);
     }
 

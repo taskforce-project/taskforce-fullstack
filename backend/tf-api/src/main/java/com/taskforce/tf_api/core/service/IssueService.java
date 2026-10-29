@@ -1110,6 +1110,20 @@ public class IssueService {
         return next;
     }
 
+    /**
+     * Une issue déléguée sans assigné (décision J4 de l'atelier design) : la personne qui délègue en devient l'assignée,
+     * acceptée d'office comme une auto-assignation, et l'historique le garde. Une issue déjà assignée garde son assigné.
+     */
+    @Transactional
+    public void assignDelegatorIfUnassigned(Issue issue, User delegator) {
+        if (issue.getAssignee() != null || delegator == null) return;
+        issue.setAssignee(delegator);
+        issue.setAssignedBy(delegator);
+        issue.setAssignmentStatus(AssignmentStatus.ACCEPTED);
+        logActivity(issue, delegator, IssueActivityType.ASSIGNEE_CHANGED, null, delegator.getEmail());
+        issueRepository.save(issue);
+    }
+
     private void logActivity(Issue issue, User actor, IssueActivityType action, String oldValue, String newValue) {
         IssueActivity activity = IssueActivity.builder()
             .issue(issue)

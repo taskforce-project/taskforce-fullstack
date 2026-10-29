@@ -64,7 +64,7 @@ public class DeliveryActivityService {
     /** Type de l'événement du dossier de preuve pour chaque sorte d'événement du runner. */
     private static final Map<String, String> EVIDENCE_TYPE = Map.of(
         "start", "note", "text", "note", "tool", "action.requested", "error", "action.result", "denied", "action.decided",
-        "decision", "action.decided", "exit", "exit.result", "limit", "limit.reached");
+        "decision", "action.decided", "exit", "exit.result", "limit", "limit.reached", "test", "test.result");
     /** Les décisions des règles vont au dossier, pas à la chronologie affichée : une ligne par action la noierait. */
     private static final Set<String> EVIDENCE_ONLY = Set.of("decision");
 
@@ -100,7 +100,7 @@ public class DeliveryActivityService {
     private static MissionEvidenceService.Actor actorOf(DeliveryRun run, RunnerEventsRequest.Event event) {
         return switch (event.kind()) {
             case "decision" -> new MissionEvidenceService.Actor("rule", event.rule() == null || event.rule().isBlank() ? "none" : event.rule().strip());
-            case "exit", "limit" -> new MissionEvidenceService.Actor("runner", run.getClaimedBy() == null ? "runner" : run.getClaimedBy());
+            case "exit", "limit", "test" -> new MissionEvidenceService.Actor("runner", run.getClaimedBy() == null ? "runner" : run.getClaimedBy());
             default -> new MissionEvidenceService.Actor("agent", run.getProviderKey());
         };
     }
@@ -116,17 +116,28 @@ public class DeliveryActivityService {
         return data;
     }
 
-    /** Ouvre une demande de validation et prévient la personne qui a délégué. */
+    /** Ouvre une demande de l'agent et prévient la personne qui a délégué. */
     @Transactional
     public RunnerApprovalResponse openApproval(DeliveryRun run, String tool, String summary) {
+        return openApproval(run, tool, summary, false);
+    }
+
+    /**
+     * Ouvre une demande de validation et prévient la personne qui a délégué. {@code byRunner} : c'est TaskForce qui
+     * demande (sortie, tests, départ), pas l'agent, et la demande le dit (décision J4).
+     */
+    @Transactional
+    public RunnerApprovalResponse openApproval(DeliveryRun run, String tool, String summary, boolean byRunner) {
         DeliveryRunApproval approval = approvalRepository.save(DeliveryRunApproval.builder()
             .run(run)
             .tool(tool.strip())
             .summary(clip(summary))
+            .askedBy(byRunner ? "runner" : "agent")
             .expiresAt(LocalDateTime.now().plus(settings.approvalTimeout()))
             .build());
-        notificationService.notifyAgentApproval(run.getIssue(), run.getStartedBy(), approval.getTool(), approval.getSummary());
+        notificationService.notifyAgentApproval(run.getIssue(), run.getStartedBy(), approval.getTool(), approval.getSummary(), byRunner);
         Map<String, Object> asked = approvalData(approval);
+        asked.put("askedBy", approval.getAskedBy());
         asked.put("effect", "ask");
         asked.put("asked", run.getStartedBy() != null ? run.getStartedBy().getEmail() : null);
         evidenceService.append(run, "action.decided", MissionEvidenceService.Actor.SERVER, asked);
@@ -172,7 +183,7 @@ public class DeliveryActivityService {
             .peek(a -> expireIfDue(a, now))
             .map(a -> new DeliveryRunActivityResponse.Approval(a.getId(), a.getTool(), a.getSummary(), a.getStatus().name(),
                 a.getCreatedAt(), a.getExpiresAt(), a.getDecidedAt(), displayName(a.getDecidedBy()),
-                delegator && a.getStatus() == DeliveryApprovalStatus.PENDING))
+                delegator && a.getStatus() == DeliveryApprovalStatus.PENDING, a.getAskedBy()))
             .toList();
         return new DeliveryRunActivityResponse(events, approvals);
     }

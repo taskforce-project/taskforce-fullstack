@@ -23,6 +23,7 @@ import com.taskforce.tf_api.core.dto.request.CreateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
 import com.taskforce.tf_api.core.dto.request.ProjectRepoLinkRequest;
+import com.taskforce.tf_api.core.dto.request.ProjectTestCommandRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateProjectRequest;
 import com.taskforce.tf_api.core.dto.response.ProjectActivitySeriesResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectHealthPointResponse;
@@ -31,6 +32,7 @@ import com.taskforce.tf_api.core.dto.response.ProjectMemberResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectRepoResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectTeamResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectTestCommandResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.ProjectRepoService;
@@ -106,6 +108,22 @@ public class ProjectController {
         Long userId = resolveUserId(jwt);
         ProjectRepoResponse repo = projectRepoService.linkRepo(slug, id, userId, request);
         return ResponseEntity.ok(ApiResponse.success("Repository linked to the project", repo));
+    }
+
+    /**
+     * PUT /api/workspaces/{slug}/projects/{id}/repo/test-command : la commande de test du projet, lancée par le runner
+     * après le travail de l'agent (S1). Vide : aucun test lancé. Écriture (LEAD/ADMIN/OWNER).
+     */
+    @PutMapping("/{id}/repo/test-command")
+    public ResponseEntity<ApiResponse<ProjectTestCommandResponse>> setTestCommand(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long id,
+        @Valid @RequestBody ProjectTestCommandRequest request
+    ) {
+        Long userId = resolveUserId(jwt);
+        ProjectTestCommandResponse saved = projectRepoService.setTestCommand(slug, id, userId, request.testCommand());
+        return ResponseEntity.ok(ApiResponse.success(saved.testCommand() == null ? "Test command removed" : "Test command saved", saved));
     }
 
     /** DELETE /api/workspaces/{slug}/projects/{id}/repo — délie le dépôt du projet. */

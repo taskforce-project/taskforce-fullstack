@@ -65,6 +65,9 @@ public class ProjectResponse {
     /** Dépôt de code lié ("owner/name"), ou null si aucun */
     private String repoFullName;
 
+    /** Commande de test que le runner lance après l'agent (S1), ou null */
+    private String testCommand;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

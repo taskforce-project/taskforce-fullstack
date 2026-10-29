@@ -112,6 +112,8 @@ let allPass = true;
 for (const [label, tool, input, expected] of [
   ["read a file of the copy", "Read", { file_path: join(process.cwd(), "README.md") }, "allow"],
   ["push from the agent", "Bash", { command: "git push origin HEAD" }, "deny"],
+  // R32 : les scripts du dépôt ne sont pas pour l'agent ; le runner lance les tests du projet après lui (S1).
+  ["run the repository's tests", "Bash", { command: "npm test" }, "deny"],
   ["install a package", "Bash", { command: "npm install left-pad" }, "ask"],
 ]) {
   const verdict = await judge(tool, input);

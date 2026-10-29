@@ -47,6 +47,7 @@ class DeliveryServiceRunsTest {
     @Mock private ProjectVisibilityGuard visibilityGuard;
     @Mock private BrainAccessGuard access;
     @Mock private IntegrationRepository integrationRepository;
+    @Mock private com.taskforce.tf_api.core.service.IssueService issueService;
 
     @InjectMocks private DeliveryService service;
 

@@ -86,20 +86,30 @@ export function quoteForCmd(arg: string): string {
  * prompt passe par stdin, le nom de branche est réduit à `[a-z0-9-/]`, le modèle est validé par l'appelant.
  */
 export function run(command: string, args: string[], options: ProcOptions = {}): Promise<ProcResult> {
+  const env = options.env ?? process.env;
+  const resolved = resolveCommand(command, env);
+  if (resolved.viaCmd) {
+    const line = [quoteForCmd(resolved.file), ...args.map(quoteForCmd)].join(" ");
+    return spawnCollect(env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `"${line}"`], true, options);
+  }
+  return spawnCollect(resolved.file, args, false, options);
+}
+
+/**
+ * Une ligne de commande passée telle quelle au shell du système (`cmd.exe` sous Windows, `sh` ailleurs). Seul usage :
+ * la commande de test déclarée d'un projet (S1, R32), qu'une personne a acceptée sur cet ordinateur avant tout
+ * lancement. C'est la seule chaîne venue de TaskForce qui s'exécute sans être un tableau d'arguments validés.
+ */
+export function runShell(commandLine: string, options: ProcOptions = {}): Promise<ProcResult> {
+  const env = options.env ?? process.env;
+  return process.platform === "win32"
+    ? spawnCollect(env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `"${commandLine}"`], true, options)
+    : spawnCollect("sh", ["-c", commandLine], false, options);
+}
+
+function spawnCollect(file: string, finalArgs: string[], verbatim: boolean, options: ProcOptions): Promise<ProcResult> {
   return new Promise((resolvePromise, reject) => {
     const env = options.env ?? process.env;
-    const resolved = resolveCommand(command, env);
-
-    let file = resolved.file;
-    let finalArgs = args;
-    let verbatim = false;
-    if (resolved.viaCmd) {
-      const line = [quoteForCmd(resolved.file), ...args.map(quoteForCmd)].join(" ");
-      file = env.ComSpec ?? "cmd.exe";
-      finalArgs = ["/d", "/s", "/c", `"${line}"`];
-      verbatim = true;
-    }
-
     const child = spawn(file, finalArgs, {
       cwd: options.cwd,
       env,

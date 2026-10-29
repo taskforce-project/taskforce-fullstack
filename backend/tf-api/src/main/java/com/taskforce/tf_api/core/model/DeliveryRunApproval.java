@@ -50,6 +50,11 @@ public class DeliveryRunApproval extends AuditableEntity {
     @Column(nullable = false, length = 2000)
     private String summary;
 
+    /** Qui demande : {@code agent} (une action de l'agent) ou {@code runner} (TaskForce lui-même : sortie, tests, départ). */
+    @Column(name = "asked_by", nullable = false, length = 16)
+    @Builder.Default
+    private String askedBy = "agent";
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     @Builder.Default

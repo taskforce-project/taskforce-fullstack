@@ -41,7 +41,7 @@ public class ConnectorCatalog {
 
         // ── Gestion de projet ────────────────────────────────────────────────
         nativeIntegration("plane", "Plane", ConnectorCategory.PROJECT_MANAGEMENT, ConnectorAuthType.API_KEY,
-            "Projects and work items, synced into the Brain OS",
+            "Projects and work items, synced into your workspace's knowledge",
             "https://developers.plane.so/api-reference/introduction",
             "In Plane: your avatar > Settings > Personal access tokens > Add token, then paste the key here. "
             + "The workspace slug is in the URL: app.plane.so/<slug>/...",

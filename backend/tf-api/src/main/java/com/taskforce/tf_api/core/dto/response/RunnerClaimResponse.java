@@ -21,6 +21,7 @@ import com.taskforce.tf_api.core.harness.rules.RulesBundle;
  * @param model            modèle choisi à la délégation, ou null
  * @param sessionExpiresAt fin de validité de la session déléguée
  * @param rules            paquet de règles que le runner applique à chaque action, avec son empreinte
+ * @param testCommand      commande de test du projet, lancée par le runner après l'agent (S1), ou null
  */
 public record RunnerClaimResponse(
     Long runId,
@@ -34,5 +35,6 @@ public record RunnerClaimResponse(
     String repoFullName,
     String model,
     LocalDateTime sessionExpiresAt,
-    RulesBundle rules
+    RulesBundle rules,
+    String testCommand
 ) {}

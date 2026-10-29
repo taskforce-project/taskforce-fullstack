@@ -352,6 +352,7 @@ class NotificationServiceTest {
         @org.junit.jupiter.params.ParameterizedTest(name = "{0}")
         @org.junit.jupiter.params.provider.CsvSource(delimiter = '|', value = {
             "approval | agentApproval | warning | Fix bug: Claude Code asks to run Bash",
+            "asked    | agentApproval | warning | Fix bug: TaskForce asks: git push",
             "done     | agentDone     | info    | Fix bug: Claude Code finished, ready for your review",
             "failed   | agentFailed   | warning | Fix bug: Claude Code failed",
         })
@@ -361,6 +362,7 @@ class NotificationServiceTest {
 
             switch (which) {
                 case "approval" -> service.notifyAgentApproval(issue(null, null), delegator, "Bash", "npm install lodash");
+                case "asked" -> service.notifyAgentApproval(issue(null, null), delegator, "git push", "Push the branch", true);
                 case "done" -> service.notifyAgentRunFinished(issue(null, null), delegator, "Claude Code", true, "PR opened");
                 default -> service.notifyAgentRunFinished(issue(null, null), delegator, "Claude Code", false, "Tests failed");
             }

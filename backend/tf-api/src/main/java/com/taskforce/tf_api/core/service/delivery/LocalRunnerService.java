@@ -117,7 +117,8 @@ public class LocalRunnerService {
                 project.getRepoFullName(),
                 candidate.getModel(),
                 now.plus(settings.sessionTtl()),
-                rules);
+                rules,
+                project.getTestCommand());
 
             String externalRef = "runner:" + runner.clientId() + ":" + UUID.randomUUID();
             int won = runRepository.claim(runId, runner.clientId(), externalRef, now,
@@ -192,7 +193,7 @@ public class LocalRunnerService {
         DeliveryRun run = runRepository.findById(runId)
             .orElseThrow(() -> new ForbiddenException(REFUSED));
         assertHeldBy(run, runner);
-        return activityService.openApproval(run, request.tool(), request.summary());
+        return activityService.openApproval(run, request.tool(), request.summary(), request.byRunner());
     }
 
     /** Décision sur une demande, lue par le runner jusqu'à ce qu'elle ne soit plus en attente. */

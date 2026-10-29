@@ -144,6 +144,8 @@ export interface Project {
   repoProvider: string | null;
   /** Dépôt de code lié ("owner/name"), ou null */
   repoFullName: string | null;
+  /** Commande de test que le runner lance après le travail de l'agent (S1), ou null */
+  testCommand?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -251,6 +253,14 @@ export async function deleteProject(slug: string, id: number): Promise<void> {
 export async function setProjectRepo(slug: string, id: number, payload: ProjectRepoLinkPayload): Promise<ProjectRepoResult> {
   const response = await apiClient.put<{ data: ProjectRepoResult }>(PROJECT_ROUTES.REPO(slug, id), payload);
   return response.data.data;
+}
+
+/** Pose la commande de test du projet, lancée par le runner après l'agent (S1) ; vide = aucun test lancé. */
+export async function setProjectTestCommand(slug: string, id: number, testCommand: string): Promise<string | null> {
+  const response = await apiClient.put<{ data: { projectId: number; testCommand: string | null } }>(
+    PROJECT_ROUTES.REPO_TEST_COMMAND(slug, id), { testCommand },
+  );
+  return response.data.data.testCommand;
 }
 
 /** Délie le dépôt du projet */

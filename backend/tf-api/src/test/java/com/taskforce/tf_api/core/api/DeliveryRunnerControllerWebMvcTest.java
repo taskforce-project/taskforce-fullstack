@@ -79,14 +79,15 @@ class DeliveryRunnerControllerWebMvcTest {
     void claim_returns_brief() throws Exception {
         when(localRunnerService.claim(new RunnerIdentity("tf-runner-pierre", "pierre@taskforce.dev")))
             .thenReturn(Optional.of(new RunnerClaimResponse(100L, 55L, "WEB-4", "Fix the footer", "Details",
-                12L, "Website", "acme", "acme/website", "claude-sonnet-5", LocalDateTime.now().plusHours(2), null)));
+                12L, "Website", "acme", "acme/website", "claude-sonnet-5", LocalDateTime.now().plusHours(2), null, "npm test")));
 
         mockMvc.perform(post("/api/delivery/runner/claim").with(runner()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.runId").value(100))
             .andExpect(jsonPath("$.data.issueKey").value("WEB-4"))
             .andExpect(jsonPath("$.data.workspaceSlug").value("acme"))
-            .andExpect(jsonPath("$.data.repoFullName").value("acme/website"));
+            .andExpect(jsonPath("$.data.repoFullName").value("acme/website"))
+            .andExpect(jsonPath("$.data.testCommand").value("npm test"));
     }
 
     @Test

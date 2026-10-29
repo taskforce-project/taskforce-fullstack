@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import type { Approval } from "./api.js";
+import type { Approval, AskedBy } from "./api.js";
 import { toolFacts } from "./harness/facts.js";
 import { decideAll, type Decision, type RulesBundle } from "./harness/rules.js";
 import { log } from "./log.js";
@@ -25,7 +25,7 @@ import { describeToolInput, toolLabel } from "./stream.js";
 
 /** Ce que le serveur attend de l'API TaskForce (le client réel, ou un faux dans les tests). */
 export interface ApprovalApi {
-  requestApproval(runId: number, tool: string, summary: string): Promise<Approval>;
+  requestApproval(runId: number, tool: string, summary: string, askedBy?: AskedBy): Promise<Approval>;
   approvalStatus(runId: number, approvalId: number): Promise<Approval>;
 }
 
@@ -80,12 +80,12 @@ export function hookDecision(allow: boolean, message?: string): Record<string, u
  * elle autorise. Sert aux actions de l'agent comme aux sorties que le runner fait après lui.
  */
 export async function askInTaskForce(
-  api: ApprovalApi, runId: number, tool: string, summary: string, waitMs: number, pollMs = 2_000,
+  api: ApprovalApi, runId: number, tool: string, summary: string, waitMs: number, pollMs = 2_000, askedBy: AskedBy = "agent",
 ): Promise<boolean> {
   const deadline = Date.now() + waitMs;
   let approval: Approval;
   try {
-    approval = await api.requestApproval(runId, tool, summary);
+    approval = await api.requestApproval(runId, tool, summary, askedBy);
     log.info(`Approval requested in TaskForce: ${tool} ${summary.slice(0, 80)}`);
   } catch (e) {
     log.warn(`Approval request refused by TaskForce, action denied: ${(e as Error).message}`);
