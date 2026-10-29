@@ -97,7 +97,7 @@ export function AssignArt({ playing, reduce }: Readonly<VProps>) {
         <AnimatePresence>
           {assigned && (
             <motion.p {...rise} className="mt-4 flex items-center gap-2 bg-tint-green px-3 py-2 text-[11.5px] text-ink-green rounded-md">
-              <Check className="size-3.5" strokeWidth={2.6} /> Claude Code picked it up, with the issue and its Brain OS pages
+              <Check className="size-3.5" strokeWidth={2.6} /> Claude Code picked it up, with the issue and its comments
             </motion.p>
           )}
         </AnimatePresence>
@@ -197,7 +197,7 @@ export function LiveArt({ playing, reduce }: Readonly<VProps>) {
   const step = useSequence(LIVE_STEPS, playing, reduce);
   const rows = [
     { icon: GitBranch, v: "Run started", d: "on its own branch", mono: false },
-    { icon: FileText, v: "Searched", d: "Brain OS, found “Design tokens”", mono: false },
+    { icon: FileText, v: "Searched", d: "your notes, found “Design tokens”", mono: false },
     { icon: FileText, v: "Read", d: "app/settings/page.tsx", mono: true },
     { icon: Wrench, v: "Edit", d: "styles/theme.css", mono: true },
     { icon: Wrench, v: "Edit", d: "app/settings/appearance.tsx", mono: true },

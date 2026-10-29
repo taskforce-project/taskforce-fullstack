@@ -16,7 +16,7 @@ const SITE_HASH = "#website";
 const SOFTWARE_HASH = "#software";
 
 export const PRODUCT_SUMMARY =
-  "TaskForce is a free, open source desktop app for planning your work, keeping your project's memory and handing tasks to AI coding agents such as Claude Code or GitHub Copilot. It runs on your computer and works with your own AI model.";
+  "TaskForce is a free, open source desktop app for planning your work and handing tasks to AI coding agents such as Claude Code or GitHub Copilot. It runs on your computer and works with your own AI model.";
 
 export function organizationLd(origin: string): JsonLd {
   return {

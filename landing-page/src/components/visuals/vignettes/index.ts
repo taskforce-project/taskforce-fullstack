@@ -1,6 +1,5 @@
 import type { ComponentType } from "react";
 
-import { AgentReadsArt, LinksArt, SearchArt, TreeArt } from "./memory";
 import { AgentsArt, ApproveArt, AssignArt, BranchArt, CommentArt, LiveArt, MergeArt, PrArt, PrCopilotArt } from "./agents";
 import { AskArt, ChartArt, ConnectArt, EverydayArt } from "./more";
 import { BoardArt, CyclesArt, QueueArt, SubtasksArt, type VProps } from "./plan";
@@ -11,10 +10,6 @@ export const VIGNETTES = {
   cycles: CyclesArt,
   subtasks: SubtasksArt,
   queue: QueueArt,
-  tree: TreeArt,
-  links: LinksArt,
-  search: SearchArt,
-  agentReads: AgentReadsArt,
   assign: AssignArt,
   branch: BranchArt,
   live: LiveArt,
