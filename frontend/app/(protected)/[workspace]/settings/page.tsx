@@ -927,6 +927,9 @@ function SecurityPanel() {
   const router = useRouter()
   const [twoFa, setTwoFa] = useState<boolean | null>(null)
   const [busy, setBusy] = useState(false)
+  // Désactiver le 2FA demande le code en cours : une session ouverte ne suffit plus (R42).
+  const [disabling, setDisabling] = useState(false)
+  const [code, setCode] = useState("")
 
   useEffect(() => {
     getTwoFactorStatus().then(setTwoFa).catch(() => setTwoFa(null))
@@ -941,11 +944,13 @@ function SecurityPanel() {
   const onDisable2fa = async () => {
     setBusy(true)
     try {
-      await disableTwoFactor()
+      await disableTwoFactor(code)
       setTwoFa(false)
+      setDisabling(false)
+      setCode("")
       toast.success("Two-factor authentication disabled.")
     } catch {
-      toast.error("Couldn't disable two-factor authentication.")
+      toast.error("That code didn't work. Enter the code your authenticator app shows now.")
     } finally {
       setBusy(false)
     }
@@ -986,16 +991,36 @@ function SecurityPanel() {
                   )}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {twoFa
-                    ? "An authenticator app is required at sign-in."
-                    : "Add an authenticator app (TOTP) for an extra layer of security."}
+                  {disabling
+                    ? "To turn it off, enter the code your authenticator app shows now."
+                    : twoFa
+                      ? "An authenticator app is required at sign-in."
+                      : "Add an authenticator app (TOTP) for an extra layer of security."}
                 </p>
               </div>
             </div>
             {twoFa === null ? (
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
+            ) : twoFa && disabling ? (
+              <div className="flex shrink-0 items-center gap-2">
+                <StyledInput
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="6-digit code"
+                  aria-label="Current authenticator code"
+                  className="w-28"
+                />
+                <Button size="sm" variant="outline" onClick={onDisable2fa} disabled={busy || code.length !== 6}>
+                  Confirm
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { setDisabling(false); setCode("") }} disabled={busy}>
+                  Cancel
+                </Button>
+              </div>
             ) : twoFa ? (
-              <Button size="sm" variant="outline" onClick={onDisable2fa} disabled={busy}>
+              <Button size="sm" variant="outline" onClick={() => setDisabling(true)} disabled={busy}>
                 Disable
               </Button>
             ) : (
