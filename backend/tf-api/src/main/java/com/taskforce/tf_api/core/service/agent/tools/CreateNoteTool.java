@@ -2,12 +2,15 @@ package com.taskforce.tf_api.core.service.agent.tools;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
 import com.taskforce.tf_api.core.dto.request.CreateKnowledgeNodeRequest;
 import com.taskforce.tf_api.core.dto.response.KnowledgeNodeResponse;
+import com.taskforce.tf_api.core.enums.NodeDomain;
+import com.taskforce.tf_api.core.enums.NodeType;
 import com.taskforce.tf_api.core.service.KnowledgeService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
@@ -48,9 +51,11 @@ public class CreateNoteTool implements AgentTool {
     }
 
     @Override public String execute(Map<String, Object> args, AgentContext ctx) {
+        NodeDomain domain = known(NodeDomain.class, args.get("domain"), NodeDomain.PROJET);
+        NodeType type = known(NodeType.class, args.get("type"), NodeType.NOTE);
         CreateKnowledgeNodeRequest req = new CreateKnowledgeNodeRequest();
-        req.setDomain(String.valueOf(args.get("domain")));
-        req.setType(String.valueOf(args.get("type")));
+        req.setDomain(domain.name());
+        req.setType(type.name());
         req.setTitle(String.valueOf(args.get("title")));
         req.setContent(args.get("content") != null ? String.valueOf(args.get("content")) : null);
         if (args.get("tags") instanceof List<?> raw) {
@@ -59,6 +64,27 @@ public class CreateNoteTool implements AgentTool {
             req.setTags(tags);
         }
         KnowledgeNodeResponse node = knowledgeService.createNode(ctx.slug(), ctx.userId(), req);
-        return "Note created: \"" + node.getTitle() + "\" in " + node.getDomain() + " (id " + node.getId() + ").";
+        return "Note created: \"" + node.getTitle() + "\" in " + node.getDomain() + " (id " + node.getId() + ")."
+            + replaced("domain", args.get("domain"), domain) + replaced("type", args.get("type"), type);
+    }
+
+    /**
+     * Une valeur que la note ne connaît pas prend la valeur par défaut. Un petit modèle invente parfois un type
+     * (« TEST ») ; depuis que les règles de l'espace font accorder une note, l'erreur n'arrivait qu'après le clic de la
+     * personne, sans que le modèle puisse se reprendre.
+     */
+    private static <E extends Enum<E>> E known(Class<E> kind, Object value, E fallback) {
+        if (value == null) return fallback;
+        try {
+            return Enum.valueOf(kind, String.valueOf(value).strip().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException unknown) {
+            return fallback;
+        }
+    }
+
+    /** Dit quelle valeur a remplacé celle demandée, pour que la personne le voie dans la sortie. */
+    private static String replaced(String what, Object asked, Enum<?> kept) {
+        if (asked == null || String.valueOf(asked).strip().equalsIgnoreCase(kept.name())) return "";
+        return " Its " + what + " is " + kept.name() + ": " + asked + " is not a note " + what + ".";
     }
 }

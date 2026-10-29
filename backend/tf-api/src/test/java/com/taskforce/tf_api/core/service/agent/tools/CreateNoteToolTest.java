@@ -6,6 +6,8 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -81,5 +83,24 @@ class CreateNoteToolTest {
         org.mockito.Mockito.verify(knowledgeService).createNode(any(), any(), cap.capture());
         assertThat(cap.getValue().getContent()).isNull();
         assertThat(cap.getValue().getTags()).isNullOrEmpty();
+    }
+
+    @ParameterizedTest(name = "{0} / {1} : {2} / {3}")
+    @CsvSource(delimiter = '|', value = {
+        "ENGINEERING | TEST     | ENGINEERING | NOTE     | ' Its type is NOTE: TEST is not a note type.'",     // un type inventé
+        "QA          | DECISION | PROJET      | DECISION | ' Its domain is PROJET: QA is not a note domain.'", // un domaine inventé
+        "decisions   | decision | DECISIONS   | DECISION | ''",                                                 // la casse ne compte pas
+    })
+    @DisplayName("une valeur inconnue prend la valeur par défaut, et la sortie le dit : l'accord ne finit pas en erreur")
+    void unknown_values_fall_back(String domain, String type, String keptDomain, String keptType, String said) {
+        when(knowledgeService.createNode(any(), any(), any())).thenReturn(node());
+
+        String out = tool().execute(Map.of("domain", domain, "type", type, "title", "T"), new AgentContext("acme", 1L, 7L));
+
+        ArgumentCaptor<CreateKnowledgeNodeRequest> cap = ArgumentCaptor.forClass(CreateKnowledgeNodeRequest.class);
+        org.mockito.Mockito.verify(knowledgeService).createNode(any(), any(), cap.capture());
+        assertThat(cap.getValue().getDomain()).isEqualTo(keptDomain);
+        assertThat(cap.getValue().getType()).isEqualTo(keptType);
+        assertThat(out).isEqualTo("Note created: \"Choix Postgres\" in DECISIONS (id 42)." + said);
     }
 }

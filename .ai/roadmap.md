@@ -10,6 +10,12 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 29/10/2026 (nuit, release) - Release 1.6.6 EN PROD : une note accordée n'échoue plus sur un type inventé ; desktop 1.3.6 en construction ; séance n°11 retenue.** `[release + conseil]`
+> - **Décision du CEO** : R66 à R71 retenues, avec les réserves de Shotwell (R66 : un cas s'adapte quand l'espace change ; R68 : confirmer ne ralentit pas la banque ; R71 : l'écran ne la retarde pas) et de Duflo (R67 : Cortex n'est pas le produit, un changement d'UI/UX côté Jobs), chacune à résoudre. Puis « On y va » : la release du correctif, puis R61.
+> - **En prod** : #438 fusionnée dans `dev` (`0307cb05`), `chore(desktop)` 1.3.6 (`7c0518f9`), release #439 vers `main` (`aa4432a5`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.6.6 en plomberie). Desktop 1.3.6 : en construction.
+> - **Conseil** : le PV de la séance n°11, sa ligne au registre et l'entrée du journal commités dans `taskforce-docs` (`fb32f25`).
+> - **Suite** : R61 (#437, en brouillon) : fusionner `dev` dans la branche, la doc et la référence d'API, puis la fusion dans `dev` ; les solutions aux quatre réserves, au Conseil ; la fiche de recette en 1.3.6.
+
 > **▶ MAJ 29/10/2026 (nuit) - Le premier lot de R61 construit sur `feat/r61-eval-bank` : la banque d'évaluations de Cortex ; la PR vers `dev` attend la décision sur R66 à R71.** `[backend + frontend + conseil]`
 > - **Décision du CEO** : « go release, puis enchaîne sur R61 » (R61, séance n°10, retenue) ; « consulte le conseil à chaque fois » : séance n°11, R66 à R71 en attente de décision. Pas de fusion avant cette décision.
 > - **Le dossier garde ce qui a répondu** : le modèle (lu dans la réponse de la passerelle), le tier et les notes servies entrent à `mission.started`.
@@ -25,6 +31,7 @@
 > - **En prod** : `chore(desktop)` 1.3.5 (`dc2fdb7d`), release #435 vers `main` (`57a94cf3`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.6.5 en plomberie) ; webapp en v1.6.5, backend de prod sain, V107 appliquée à 19:08 ; `dev` réaligné (`b7bd836b`). Desktop 1.3.5 publiée : run 40937148292 depuis `main`, vert ; `latest.yml` en 1.3.5, installeur de 288 Mo ; le site est reconstruit pour la proposer.
 > - **Séance n°11 du Conseil** (restreinte 7, Duflo contradictrice, ordre tiré 19:09 UTC) : PV `taskforce-docs/recherche/conseil/seances/2026-10-29-boucle-premier-lot.md`, R66 à R71 en attente de décision : le cas figé (la question, les lectures gardées au dossier, des critères qu'un programme vérifie) ; le rejeu à blanc ; le premier lot sur Cortex ; l'attendu tiré de l'acte validé et figé avant la comparaison ; des notes par du code ; le modèle au dossier de chaque réponse ; pas de capture sans lecteur ni interrupteur (leçon de V81, capture retirée le 18/10).
 > - **Suite** : le premier lot de R61 sur une branche, sans fusion avant la décision du CEO ; la publication du desktop 1.3.5 et le site ; la fiche de recette 1.3.5.
+> - **Défaut trouvé en vérifiant la recette 1.3.5** (dev, Ollama qwen3:8b) : un petit modèle invente un type de note (« TEST ») ; depuis que la règle `propose-knowledge` fait accorder une note, l'erreur `Invalid page type` n'arrivait qu'après le clic de la personne. `CreateNoteTool` : un type ou un domaine inconnu prend la valeur par défaut (`NOTE`, `PROJET`), et la sortie le dit. PR séparée vers `dev`, hors R61.
 
 > **▶ MAJ 29/10/2026 (soir, direction) - Séances n°9 et n°10 retenues : posséder son intelligence, la boucle avant les poids ; le noyau pour Cortex fusionné dans `dev`.** `[conseil + direction + design]`
 > - **Décision du CEO** : « on suit le conseil sur tout, go » : R55 à R59 (séance n°9, l'arrivée et la carte des workflows) et R60 à R65 (séance n°10) retenues. Dans `taskforce-docs` : les PV (`d14442c`, `5872763`) avec le Journal, E12 à E14 et Q13 ; la spécification en 0.4 (`08de114`) ; les notes du noyau tel que construit (`861194b`).
