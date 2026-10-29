@@ -24,6 +24,8 @@ export interface RunResult {
   summary?: string;
   resultUrl?: string;
   error?: string;
+  /** Une règle a refusé la mission au départ : ce n'est pas une panne (R38). */
+  refused?: boolean;
 }
 
 /** Événement de la chronologie d'un run (miroir de `RunnerEventsRequest` côté backend). */

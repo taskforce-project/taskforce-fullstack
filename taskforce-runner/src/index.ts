@@ -34,6 +34,12 @@ import { MIN_CLAUDE_CODE, supportsApprovals } from "./version.js";
 delete process.env.ELECTRON_RUN_AS_NODE;
 
 const HEARTBEAT_MS = 30_000;
+
+/**
+ * Une règle refuse la mission au départ (par exemple sur un dépôt public) : ce n'est pas une panne. Le résultat le dit
+ * (`refused`), et TaskForce affiche « Not started » avec la raison, pas « Agent failed » (R38).
+ */
+class MissionNotStarted extends Error {}
 /** Marge gardée sur la durée de vie du jeton de session : l'agent doit finir avant son expiration. */
 const TOKEN_SAFETY_MS = 3 * 60_000;
 
@@ -110,7 +116,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
     const start = await judgeExit(rules, { action: "mission.start", ...(visibility ? { repoVisibility: visibility } : {}) },
       "Start the mission", `Start ${claim.issueKey} on ${claim.repoFullName ?? "a scratch folder"} (${visibility ?? "no repository"})`, ask);
     await traceExit(api, claim.runId, "mission.start", start, "decision");
-    if (!start.go) throw new Error(`This mission does not start: ${start.why}.`);
+    if (!start.go) throw new MissionNotStarted(start.reason ? `${start.reason}.` : `This mission does not start: ${start.why}.`);
     if (claim.repoFullName) {
       repo = await resolveRepo(config.repos, config.autoClone, config.home, claim.repoFullName);
       worktree = await prepareWorktree(repo, claim, config.home);
@@ -190,8 +196,13 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    log.error(`Run #${claim.runId} failed: ${message}`);
-    result = { status: "FAILED", error: message.slice(0, 3900) };
+    if (e instanceof MissionNotStarted) {
+      log.warn(`Run #${claim.runId} not started: ${message}`);
+      result = { status: "FAILED", error: message.slice(0, 3900), refused: true };
+    } else {
+      log.error(`Run #${claim.runId} failed: ${message}`);
+      result = { status: "FAILED", error: message.slice(0, 3900) };
+    }
   } finally {
     clearInterval(heartbeat);
   }
