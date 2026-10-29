@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.dto.request.RunnerApprovalRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
+import com.taskforce.tf_api.core.dto.request.RunnerReadinessRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerClaimResponse;
@@ -56,6 +58,7 @@ public class LocalRunnerService {
     private final DeliveryActivityService activityService;
     private final HarnessRulesService rulesService;
     private final MissionEvidenceService evidenceService;
+    private final RunnerPresenceService presence;
 
     public LocalRunnerService(
         DeliveryRunRepository runRepository,
@@ -65,7 +68,8 @@ public class LocalRunnerService {
         LocalRunnerSettings settings,
         DeliveryActivityService activityService,
         HarnessRulesService rulesService,
-        MissionEvidenceService evidenceService
+        MissionEvidenceService evidenceService,
+        RunnerPresenceService presence
     ) {
         this.runRepository = runRepository;
         this.userRepository = userRepository;
@@ -75,6 +79,7 @@ public class LocalRunnerService {
         this.activityService = activityService;
         this.rulesService = rulesService;
         this.evidenceService = evidenceService;
+        this.presence = presence;
     }
 
     /**
@@ -85,7 +90,21 @@ public class LocalRunnerService {
      */
     @Transactional
     public Optional<RunnerClaimResponse> claim(RunnerIdentity runner) {
+        return claim(runner, null);
+    }
+
+    /**
+     * Comme {@link #claim(RunnerIdentity)}, avec ce que le runner dit de son poste. Si l'agent ne peut pas partir (Claude
+     * Code déconnecté, absent, trop ancien), rien n'est remis et l'agent n'est plus proposé à la personne, avec la cause
+     * (R37) : la tâche attendrait sinon d'être réclamée pour échouer au démarrage.
+     */
+    @Transactional
+    public Optional<RunnerClaimResponse> claim(RunnerIdentity runner, RunnerReadinessRequest readiness) {
         User owner = activeOwner(runner);
+        boolean ready = readiness == null || readiness.ready();
+        presence.report(owner.getId(), runner.clientId(),
+            ready ? null : Objects.requireNonNullElse(readiness.agentProblem(), "unknown"));
+        if (!ready) return Optional.empty();
         List<DeliveryRun> candidates = runRepository.findClaimable(
             ClaudeCodeProvider.KEY, DeliveryRunStatus.QUEUED, owner.getId(), PageRequest.of(0, CLAIM_BATCH));
 

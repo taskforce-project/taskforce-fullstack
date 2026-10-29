@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.RunnerApprovalRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
+import com.taskforce.tf_api.core.dto.request.RunnerReadinessRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerClaimResponse;
@@ -42,10 +43,16 @@ public class DeliveryRunnerController {
     private final LocalRunnerService localRunnerService;
     private final RunnerIdentityResolver identityResolver;
 
-    /** POST /api/delivery/runner/claim : réclame le plus ancien run en attente (data null s'il n'y en a pas). */
+    /**
+     * POST /api/delivery/runner/claim : réclame le plus ancien run en attente (data null s'il n'y en a pas). Le corps,
+     * facultatif, dit si l'agent peut partir sur le poste du runner ; sinon, rien n'est remis (R37).
+     */
     @PostMapping("/claim")
-    public ResponseEntity<ApiResponse<RunnerClaimResponse>> claim(@AuthenticationPrincipal Jwt jwt) {
-        RunnerClaimResponse claim = localRunnerService.claim(identityResolver.resolve(jwt)).orElse(null);
+    public ResponseEntity<ApiResponse<RunnerClaimResponse>> claim(
+        @AuthenticationPrincipal Jwt jwt,
+        @Valid @RequestBody(required = false) RunnerReadinessRequest readiness
+    ) {
+        RunnerClaimResponse claim = localRunnerService.claim(identityResolver.resolve(jwt), readiness).orElse(null);
         return ResponseEntity.ok(ApiResponse.success(claim != null ? "Run claimed" : "No run is waiting", claim));
     }
 
