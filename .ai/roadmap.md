@@ -10,11 +10,17 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 30/10/2026 (ter) - Séance n°13 retenue, sauf la voix : une entrée d'écriture et de voix sur chaque écran, « Undo », les trois écrans des retours, la banque aux deux moments.** `[conseil + design]`
+> - **Décision du CEO** : R76 modifiée (la voix démarre d'un clic et s'arrête d'un second, sans appui maintenu ; rien ne part tant que la personne n'envoie pas, avec Entrée ou le bouton d'envoi) ; R77 à R79 retenues ; R80 (la voix sur la machine) à préciser : le CEO la veut « comme la webapp » et demande si elle servira à entraîner des modèles ; la réponse du secrétariat est au PV (pas d'entraînement cette année, R61 ; la voix du navigateur ne nous parvient pas).
+> - **Q13 répondue** : le CEO y passe ses journées ; le texte de la séance n°10 vient d'un post d'une personne de Y Combinator, à qui écrire ; le partenaire de conception, plus tard ; les mots de la cible : audit, traçabilité, IQ, OQ, PQ, réglementation, référentiel. La clé PostHog `phx_` et le jeton de la recette 1.3.1 sont révoqués.
+> - **Maquettes** : https://claude.ai/artifact/THpWp7FCEA9RBU1Q4L1R6f (sept écrans). **Doc** : PV de la séance n°13 (`53478e2`), Q13, E14 et la spec (`d3af983`).
+> - **Suite** : construire la barre sur chaque écran (R76) et « Undo » (R77) ; les trois écrans (R78) ; la banque au refus et au changement de modèle (R79) ; la décision sur R80 ; un message à Y Combinator.
+
 > **▶ MAJ 30/10/2026 (bis) - Cortex crée le projet qu'on lui demande, sans accord : la règle `create-project` dans la table par défaut.** `[backend + contrats]`
 > - **Décision du CEO** : « Cortex peut créer un projet oui, tout passera par un input de chat + vocal globalement ».
 > - **Fait** : `create-project` (`project.create`, sortie réversible, `allow`) dans les deux copies de la table (`contracts/rules/` et les ressources du backend) ; un cas de décision de plus et la nouvelle empreinte de la table dans `contracts/rules/cases.json`, vérifiés par le serveur et par le runner.
 > - **Contrôles** : backend, tests ciblés (160, dont le contrat partagé) ; runner `npm test` (323) ; la suite complète tourne en CI.
-> - **Reste** : « Undo » sur la réponse (R77 de la séance n°13, en attente) ; la doc (spec §13.11) à la fusion, après la reconstruction du site.
+> - **Fusionné** dans `dev` (#442, `25920081`) après la reconstruction du site ; en prod à la prochaine release. Doc : spec §13.11 (`d3af983`). Reste : « Undo » sur la réponse (R77, retenue).
 
 > **▶ MAJ 30/10/2026 - Release 1.6.7 EN PROD : la banque d'évaluations de Cortex ; desktop 1.3.7 publiée ; l'atelier des écrans de base lancé.** `[release + conseil + design]`
 > - **Décision du CEO** : « lance l'atelier, et go release en même temps ». Q13 : pas encore d'hébergement, un VPS OVH VPS-3 dès que possible ; E12 sur Kaggle ; Cortex peut créer un projet, « tout passera par un input de chat + vocal globalement » ; la recette se fera quand le produit sera complet et à jour.
