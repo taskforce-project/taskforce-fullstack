@@ -129,10 +129,13 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("Two-factor authentication enabled", null));
     }
 
-    /** Désactive le 2FA (supprime le secret). DELETE /api/users/me/2fa */
+    /** Désactive le 2FA (supprime le secret), sur le code en cours de l'application. DELETE /api/users/me/2fa */
     @DeleteMapping("/me/2fa")
-    public ResponseEntity<ApiResponse<Void>> disableTwoFactor(@AuthenticationPrincipal Jwt jwt) {
-        twoFactorService.disable(identityResolver.resolveEmail(jwt));
+    public ResponseEntity<ApiResponse<Void>> disableTwoFactor(
+        @AuthenticationPrincipal Jwt jwt,
+        @Valid @RequestBody TwoFactorConfirmRequest request
+    ) {
+        twoFactorService.disable(identityResolver.resolveEmail(jwt), request.getCode());
         return ResponseEntity.ok(ApiResponse.success("Two-factor authentication disabled", null));
     }
 

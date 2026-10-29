@@ -154,9 +154,28 @@ class TwoFactorServiceTest {
     }
 
     @Test
-    void disable_deletesRow() {
+    void disable_withValidCode_deletesRow() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
-        service.disable(EMAIL);
+        when(repository.findByUserId(UID))
+            .thenReturn(Optional.of(UserTwoFactor.builder().userId(UID).secret("S").enabled(true).build()));
+        when(totp.verify("S", "123456")).thenReturn(true);
+
+        service.disable(EMAIL, "123456");
+
         verify(repository).deleteByUserId(UID);
+    }
+
+    @Test
+    void disable_withWrongCode_keepsTheSecondFactor() {
+        // Une session ouverte ne suffit plus pour faire tomber le second facteur (recette du 29/10/2026, R42).
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+        when(repository.findByUserId(UID))
+            .thenReturn(Optional.of(UserTwoFactor.builder().userId(UID).secret("S").enabled(true).build()));
+        when(totp.verify("S", "000000")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.disable(EMAIL, "000000"))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining("Invalid authentication code");
+        verify(repository, never()).deleteByUserId(any());
     }
 }

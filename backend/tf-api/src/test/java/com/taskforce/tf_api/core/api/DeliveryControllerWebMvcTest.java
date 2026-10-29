@@ -91,7 +91,7 @@ class DeliveryControllerWebMvcTest {
     void delegate_200() throws Exception {
         var a = auth();
         var run = new DeliveryRunResponse(1L, 5L, "WEB-5", "Fix the footer", 12L, "Website", "claude-code", "claude-sonnet-5", "QUEUED",
-            null, null, null, 7L, null, null);
+            null, null, null, false, 7L, null, null);
         when(deliveryService.delegate(anyString(), anyLong(), anyString(), org.mockito.ArgumentMatchers.any(), anyLong()))
             .thenReturn(run);
 
@@ -120,7 +120,7 @@ class DeliveryControllerWebMvcTest {
 
     private static DeliveryRunResponse run(long id, String status) {
         return new DeliveryRunResponse(id, 5L, "WEB-5", "Fix the footer", 12L, "Website", "claude-code", "Claude Code",
-            status, null, null, null, 7L, null, null);
+            status, null, null, null, false, 7L, null, null);
     }
 
     @ParameterizedTest(name = "dernier run {0} : relu = {1}")

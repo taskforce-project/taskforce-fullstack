@@ -80,7 +80,7 @@ export async function confirmTwoFactor(code: string): Promise<void> {
   await apiClient.post(USER_ROUTES.TWO_FACTOR_CONFIRM, { code }, { silentError: true });
 }
 
-/** Désactive le 2FA (supprime le secret). */
-export async function disableTwoFactor(): Promise<void> {
-  await apiClient.delete(USER_ROUTES.TWO_FACTOR, { silentError: true });
+/** Désactive le 2FA (supprime le secret), sur le code en cours de l'application d'authentification (R42). */
+export async function disableTwoFactor(code: string): Promise<void> {
+  await apiClient.delete(USER_ROUTES.TWO_FACTOR, { data: { code }, silentError: true });
 }

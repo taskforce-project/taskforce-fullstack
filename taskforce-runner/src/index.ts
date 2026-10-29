@@ -25,6 +25,7 @@ import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWo
 import { verifiedBundle } from "./harness/rules.js";
 import { log } from "./log.js";
 import { resolveCommand, run } from "./proc.js";
+import { agentProblem, PROBLEM_TEXT, Readiness, signedIn, type AgentProblem } from "./readiness.js";
 import { ApprovedTests, runProjectTests } from "./tests.js";
 import { MIN_CLAUDE_CODE, supportsApprovals } from "./version.js";
 
@@ -33,6 +34,12 @@ import { MIN_CLAUDE_CODE, supportsApprovals } from "./version.js";
 delete process.env.ELECTRON_RUN_AS_NODE;
 
 const HEARTBEAT_MS = 30_000;
+
+/**
+ * Une règle refuse la mission au départ (par exemple sur un dépôt public) : ce n'est pas une panne. Le résultat le dit
+ * (`refused`), et TaskForce affiche « Not started » avec la raison, pas « Agent failed » (R38).
+ */
+class MissionNotStarted extends Error {}
 /** Marge gardée sur la durée de vie du jeton de session : l'agent doit finir avant son expiration. */
 const TOKEN_SAFETY_MS = 3 * 60_000;
 
@@ -60,14 +67,12 @@ async function startAgentSession(config: RunnerConfig, api: TaskforceApi): Promi
 
 /**
  * Avant chaque mission, pas seulement par `--check` : la version de Claude Code qui tient la garde fermée (hooks avec
- * `onFailure`, 2.1.295). Plus ancienne, un hook injoignable laisserait passer l'action : la mission ne part pas.
+ * `onFailure`, 2.1.295), et sa connexion. Plus ancienne, un hook injoignable laisserait passer l'action ; déconnectée,
+ * la mission échouait au démarrage (recette du 29/10/2026). Dans les deux cas, la mission ne part pas.
  */
-async function ensureAgentVersion(config: RunnerConfig): Promise<void> {
-  const probe = await run(config.agent.command, ["--version"], { timeoutMs: 20_000 }).catch(() => null);
-  const version = probe && probe.code === 0 ? (probe.stdout.trim().split(/\r?\n/)[0] ?? "") : "";
-  if (!supportsApprovals(version)) {
-    throw new Error(`Claude Code ${MIN_CLAUDE_CODE} or later is needed for the rules to hold (found: ${version || "none"}). Update it: npm install -g @anthropic-ai/claude-code`);
-  }
+async function ensureAgentReady(config: RunnerConfig): Promise<void> {
+  const problem = await agentProblem(config);
+  if (problem) throw new Error(PROBLEM_TEXT[problem]);
 }
 
 /** Durée maximale des tests du projet (S1) : au-delà, ils sont arrêtés et le résultat le dit. */
@@ -103,7 +108,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
     // Pas de mission sans règles : paquet absent ou empreinte qui ne tient pas, le run finit en échec ici.
     const rules = verifiedBundle(claim.rules);
     log.info(`Rules v${rules.version} (${rules.rules.length} rules, ${rules.digest?.slice(0, 15)}...)`);
-    await ensureAgentVersion(config);
+    await ensureAgentReady(config);
     const ask = (tool: string, summary: string): Promise<boolean> =>
       askInTaskForce(api, claim.runId, tool, summary, config.agent.approvalTimeoutMinutes * 60_000, undefined, "runner");
     // Le démarrage lui-même passe par les règles (R33 : pas de mission sur un dépôt public avant S1).
@@ -111,7 +116,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
     const start = await judgeExit(rules, { action: "mission.start", ...(visibility ? { repoVisibility: visibility } : {}) },
       "Start the mission", `Start ${claim.issueKey} on ${claim.repoFullName ?? "a scratch folder"} (${visibility ?? "no repository"})`, ask);
     await traceExit(api, claim.runId, "mission.start", start, "decision");
-    if (!start.go) throw new Error(`This mission does not start: ${start.why}.`);
+    if (!start.go) throw new MissionNotStarted(start.reason ? `${start.reason}.` : `This mission does not start: ${start.why}.`);
     if (claim.repoFullName) {
       repo = await resolveRepo(config.repos, config.autoClone, config.home, claim.repoFullName);
       worktree = await prepareWorktree(repo, claim, config.home);
@@ -191,8 +196,13 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    log.error(`Run #${claim.runId} failed: ${message}`);
-    result = { status: "FAILED", error: message.slice(0, 3900) };
+    if (e instanceof MissionNotStarted) {
+      log.warn(`Run #${claim.runId} not started: ${message}`);
+      result = { status: "FAILED", error: message.slice(0, 3900), refused: true };
+    } else {
+      log.error(`Run #${claim.runId} failed: ${message}`);
+      result = { status: "FAILED", error: message.slice(0, 3900) };
+    }
   } finally {
     clearInterval(heartbeat);
   }
@@ -252,7 +262,14 @@ async function check(config: RunnerConfig, api: TaskforceApi): Promise<boolean> 
     const probe = await run("git", ["-C", repo.path, "rev-parse", "--is-inside-work-tree"]).catch(() => null);
     line(probe !== null && probe.code === 0, `Repository ${name}`, `${repo.path} (base ${repo.baseBranch})`);
   }
-  console.log(`  Claude Code sign-in: ${config.agent.auth === "subscription" ? "subscription (the person's own login, in their Claude Code)" : "API key"}`);
+  if (config.agent.auth === "subscription") {
+    const state = await signedIn(config);
+    if (state === false) line(false, "Claude Code sign-in", "not signed in. Run: claude auth login");
+    else if (state === null) console.log("  [--] Claude Code sign-in: could not be read (claude auth status)");
+    else line(true, "Claude Code sign-in", "signed in with the person's own Claude account");
+  } else {
+    console.log("  Claude Code sign-in: API key");
+  }
   console.log(`  Leaving the machine: ${config.push ? (config.openPullRequest ? "push + pull request" : "push only") : "nothing (local branch)"}`);
   console.log(`  Repo-less tasks (non-code): ${config.acceptRepoless ? "accepted, result posted as a comment" : "refused (code only)"}`);
   console.log(`  Rules: each action is judged by the rules TaskForce sends with the task; those they ask for wait up to ${config.agent.approvalTimeoutMinutes} min for your answer in TaskForce, then are denied`);
@@ -293,12 +310,22 @@ async function main(): Promise<void> {
 
   log.info(`Runner ${config.clientId} listening to ${config.apiUrl} (every ${config.pollSeconds} s)`);
   let lastError = "";
+  // Un problème connu (Claude Code déconnecté…) : le runner ne prend rien et le dit à TaskForce à chaque passage.
+  const readiness = new Readiness(() => agentProblem(config));
+  let reported: AgentProblem | null = null;
   while (!stopping) {
     try {
-      const claim = await api.claim();
+      const problem = await readiness.current();
+      if (problem !== reported) {
+        if (problem) log.warn(`${PROBLEM_TEXT[problem]}. The runner takes no task until then.`);
+        else log.info("Claude Code is ready: the runner takes tasks again.");
+        reported = problem;
+      }
+      const claim = await api.claim(problem);
       lastError = "";
       if (claim) {
         await processRun(config, api, claim, shutdown.signal);
+        readiness.invalidate();
         if (args.has("--once")) break;
         continue;
       }

@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.stereotype.Component;
 
@@ -70,10 +71,18 @@ public class AgentToolRegistry {
         return s.length() <= MAX_DESC ? s : s.substring(0, MAX_DESC).stripTrailing() + "…";
     }
 
+    /** Mots-clés dont la valeur associe des noms à des schémas : leurs clés sont des noms, jamais des mots-clés. */
+    private static final Set<String> NAMED_SCHEMAS =
+        Set.of("properties", "patternProperties", "$defs", "definitions", "dependentSchemas");
+
     /**
      * Allège récursivement un JSON schema de paramètres : tronque les `description`/`title`, retire les
      * `examples`/`$schema`, borne les `enum` longs. Garde la structure utile (noms, types, required) →
      * réduit fortement le payload des gros serveurs MCP sans casser le tool-calling.
+     *
+     * <p>Seuls les mots-clés s'allègent. Sous {@code properties}, une clé est le nom d'un paramètre : le paramètre
+     * {@code title} de {@code create_issue} reste un schéma. Le prendre pour le mot-clé en faisait du texte, un schéma
+     * qu'Ollama et Groq refusent (400), et Cortex perdait tous ses outils (recette du 29/10/2026).</p>
      */
     private static Object trimSchema(Object node) {
         if (node instanceof Map<?, ?> m) {
@@ -81,9 +90,14 @@ public class AgentToolRegistry {
             for (Map.Entry<?, ?> e : m.entrySet()) {
                 String k = String.valueOf(e.getKey());
                 Object v = e.getValue();
-                if ("examples".equals(k) || "example".equals(k) || "$schema".equals(k)) continue;
-                if ("description".equals(k) || "title".equals(k)) {
-                    out.put(k, trimText(String.valueOf(v)));
+                if (NAMED_SCHEMAS.contains(k) && v instanceof Map<?, ?> named) {
+                    Map<String, Object> schemas = new LinkedHashMap<>();
+                    named.forEach((name, schema) -> schemas.put(String.valueOf(name), trimSchema(schema)));
+                    out.put(k, schemas);
+                } else if ("examples".equals(k) || "example".equals(k) || "$schema".equals(k)) {
+                    continue;
+                } else if (("description".equals(k) || "title".equals(k)) && v instanceof String text) {
+                    out.put(k, trimText(text));
                 } else if ("enum".equals(k) && v instanceof List<?> l && l.size() > 20) {
                     out.put(k, new ArrayList<>(l.subList(0, 20)));
                 } else {

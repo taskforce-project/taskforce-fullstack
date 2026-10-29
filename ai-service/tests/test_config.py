@@ -4,26 +4,27 @@ from app.config import load_settings
 
 
 @pytest.mark.parametrize(
-    "env, chat_base, model, model_fast, embed_base",
+    "env, provider, chat_base, model, model_fast, embed_base",
     [
         # Rien de posé : Ollama sur la machine hôte, un seul modèle pour les deux tiers, embeddings au même endroit.
-        ({}, "http://host.docker.internal:11434/v1", "qwen3:8b", "qwen3:8b", "http://host.docker.internal:11434/v1"),
+        ({}, "ollama", "http://host.docker.internal:11434/v1", "qwen3:8b", "qwen3:8b", "http://host.docker.internal:11434/v1"),
         # Alias OLLAMA_* d'une instance existante.
         ({"OLLAMA_BASE_URL": "http://gpu:11434/", "OLLAMA_MODEL": "qwen3:14b", "OLLAMA_MODEL_FAST": "qwen3:8b"},
-         "http://gpu:11434/v1", "qwen3:14b", "qwen3:8b", "http://gpu:11434/v1"),
+         "ollama", "http://gpu:11434/v1", "qwen3:14b", "qwen3:8b", "http://gpu:11434/v1"),
         # Alias GROQ_* : le chat part chez Groq, les embeddings restent sur Ollama (Groq n'en propose pas).
-        ({"GROQ_API_KEY": "gsk"}, "https://api.groq.com/openai/v1", "openai/gpt-oss-120b", "openai/gpt-oss-20b",
+        ({"GROQ_API_KEY": "gsk"}, "groq", "https://api.groq.com/openai/v1", "openai/gpt-oss-120b", "openai/gpt-oss-20b",
          "http://host.docker.internal:11434/v1"),
         # Format générique : tout fournisseur compatible OpenAI, embeddings au même endroit par défaut.
         ({"AI_BASE_URL": "https://openrouter.ai/api/v1/", "AI_MODEL": "m", "GROQ_API_KEY": "ignored"},
-         "https://openrouter.ai/api/v1", "m", "m", "https://openrouter.ai/api/v1"),
+         "custom", "https://openrouter.ai/api/v1", "m", "m", "https://openrouter.ai/api/v1"),
         # Embeddings ailleurs que le chat.
         ({"AI_BASE_URL": "https://api.groq.com/openai/v1", "AI_EMBED_BASE_URL": "http://ollama:11434/v1"},
-         "https://api.groq.com/openai/v1", "qwen3:8b", "qwen3:8b", "http://ollama:11434/v1"),
+         "custom", "https://api.groq.com/openai/v1", "qwen3:8b", "qwen3:8b", "http://ollama:11434/v1"),
     ],
 )
-def test_resolution_des_fournisseurs(env, chat_base, model, model_fast, embed_base):
+def test_resolution_des_fournisseurs(env, provider, chat_base, model, model_fast, embed_base):
     s = load_settings(env)
+    assert s.chat_provider == provider
     assert (s.chat_base_url, s.model, s.model_fast, s.embed_base_url) == (chat_base, model, model_fast, embed_base)
     assert s.enabled
 

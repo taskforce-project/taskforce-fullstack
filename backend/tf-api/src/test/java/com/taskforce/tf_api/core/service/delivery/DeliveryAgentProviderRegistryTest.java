@@ -27,7 +27,8 @@ class DeliveryAgentProviderRegistryTest {
         DeliveryAgentProvider other = mock(DeliveryAgentProvider.class);
         when(other.key()).thenReturn("other-agent");
         var reg = new DeliveryAgentProviderRegistry(List.of(
-            new ClaudeCodeProvider(runnerOff, mock(DeliveryRunRepository.class), mock(ObjectProvider.class)), other));
+            new ClaudeCodeProvider(runnerOff, mock(DeliveryRunRepository.class), mock(ObjectProvider.class),
+                new RunnerPresenceService()), other));
 
         assertThat(reg.all()).hasSize(2);
         assertThat(reg.all().get(0).key()).isEqualTo("claude-code"); // ordre conservé

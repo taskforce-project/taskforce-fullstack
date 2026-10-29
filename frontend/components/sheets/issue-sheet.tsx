@@ -1176,8 +1176,9 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const fetchDeliveryProviders = useDeliveryStore((s) => s.fetchProjectProviders)
   const delegateToAgent = useDeliveryStore((s) => s.delegate)
   const fetchDeliveryRun = useDeliveryStore((s) => s.fetchRun)
-  // Seuls les agents prêts pour la personne et pour ce projet sont proposés (lot 5) : runner créé, dépôt lié...
-  const availableAgents = useMemo(() => (deliveryProviders ?? []).filter((p) => p.available && p.ready), [deliveryProviders])
+  // Les agents de l'instance sont tous montrés ; celui qui ne peut pas partir pour la personne ou pour ce projet (runner
+  // à créer, Claude Code déconnecté, dépôt à lier...) l'est grisé, avec ce qui manque (R37) : il ne disparaît plus.
+  const availableAgents = useMemo(() => (deliveryProviders ?? []).filter((p) => p.available), [deliveryProviders])
 
   useEffect(() => { if (editingTitle) titleRef.current?.focus() }, [editingTitle])
 

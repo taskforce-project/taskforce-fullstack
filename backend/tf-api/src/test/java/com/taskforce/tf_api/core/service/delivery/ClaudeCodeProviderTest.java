@@ -27,13 +27,15 @@ class ClaudeCodeProviderTest {
 
     private final DeliveryRunRepository runRepository = mock(DeliveryRunRepository.class);
     private final RunnerProvisioningService provisioning = mock(RunnerProvisioningService.class);
+    private final RunnerPresenceService presence = new RunnerPresenceService();
 
     @SuppressWarnings("unchecked")
     private ClaudeCodeProvider provider(boolean enabled, RunnerProvisioningService service) {
         ObjectProvider<RunnerProvisioningService> beans = mock(ObjectProvider.class);
         when(beans.getIfAvailable()).thenReturn(service);
         return new ClaudeCodeProvider(
-            new LocalRunnerSettings(enabled, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15), runRepository, beans);
+            new LocalRunnerSettings(enabled, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15), runRepository, beans,
+            presence);
     }
 
     private ClaudeCodeProvider provider(boolean enabled) {
@@ -49,6 +51,24 @@ class ClaudeCodeProviderTest {
         assertThat(provider(true).unavailableReason(ada)).contains("Set up your local runner first");
         assertThat(provider(true).unavailableReason(ada)).isNull();
         assertThat(provider(false).unavailableReason(ada)).contains("isn't enabled on this instance");
+    }
+
+    @ParameterizedTest(name = "« {0} » : {1}")
+    @CsvSource(delimiter = '|', value = {
+        "claude-signed-out | isn't signed in on the computer that runs your runner",
+        "claude-outdated   | is too old on the computer that runs your runner",
+        "claude-missing    | isn't installed on the computer that runs your runner",
+        "something-new     | open Settings > Agents to see what is missing",
+    })
+    @DisplayName("le runner signale un problème sur son poste : l'agent n'est plus proposé, avec la cause (R37)")
+    void runner_problem_makes_it_unavailable(String problem, String reason) {
+        when(provisioning.hasRunner(7L)).thenReturn(true);
+        presence.report(7L, "tf-runner-pierre", problem);
+
+        assertThat(provider(true).unavailableReason(new DeliveryContext(7L, null, null))).contains(reason);
+
+        presence.report(7L, "tf-runner-pierre", null);
+        assertThat(provider(true).unavailableReason(new DeliveryContext(7L, null, null))).isNull();
     }
 
     @Test

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { Loader2, CircleCheck, TriangleAlert, ExternalLink } from "lucide-react"
+import { Ban, Loader2, CircleCheck, TriangleAlert, ExternalLink } from "lucide-react"
 
 import { RunActivity } from "@/components/sheets/run-activity"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
@@ -73,6 +73,11 @@ export function DelegateAgentControl({
             </a>
           )}
         </>
+      ) : run.refused ? (
+        // Une règle a refusé la mission au départ : ce n'est pas une panne, la raison dit quoi faire (R38).
+        <span className="flex items-center gap-1.5 text-muted-foreground">
+          <Ban className="size-3.5" /> Not started{run.error ? ` - ${run.error}` : ""}
+        </span>
       ) : (
         <span className="flex items-center gap-1.5 text-destructive">
           <TriangleAlert className="size-3.5" /> Agent failed{run.error ? ` - ${run.error}` : ""}

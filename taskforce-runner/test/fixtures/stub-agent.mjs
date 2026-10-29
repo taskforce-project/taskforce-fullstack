@@ -21,6 +21,12 @@ if (process.argv.includes("--version")) {
   process.exit(0);
 }
 
+// Le runner vérifie la connexion de Claude Code avant de prendre une mission (R37) ; STUB_SIGNED_OUT=1 la coupe.
+if (process.argv[2] === "auth" && process.argv[3] === "status") {
+  console.log(JSON.stringify({ loggedIn: process.env.STUB_SIGNED_OUT !== "1", authMethod: "stub" }));
+  process.exit(0);
+}
+
 const emit = (line) => process.stdout.write(JSON.stringify(line) + "\n");
 const argValue = (flag) => {
   const i = process.argv.indexOf(flag);
