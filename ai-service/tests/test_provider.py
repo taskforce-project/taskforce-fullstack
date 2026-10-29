@@ -83,6 +83,26 @@ def test_outils_refuses_jusqu_au_dernier(provider):
     assert [len(r["body"].get("tools", [])) for r in provider.requests] == [8, 4, 2, 1]
 
 
+FAILED_CALL = b'{"error":{"message":"Tool call validation failed","type":"invalid_request_error","code":"tool_use_failed"}}'
+
+
+def test_appel_d_outil_mal_forme_redemande_avec_les_memes_outils(provider):
+    provider.reply("/chat/completions", http_error(400, FAILED_CALL), CHOICE)
+    gateway = ProviderGateway(load_settings({"GROQ_API_KEY": "gsk"}), provider)
+    tools = [{"type": "function", "function": {"name": f"t{i}"}} for i in range(7)]
+    gateway.chat([{"role": "user", "content": "q"}], tools=tools)
+    # Un tirage raté se redemande tel quel : retirer des outils ôtait justement celui qu'il fallait (29/10/2026).
+    assert [len(r["body"].get("tools", [])) for r in provider.requests] == [7, 7]
+
+
+def test_appel_d_outil_mal_forme_deux_fois_puis_moins_d_outils(provider):
+    provider.reply("/chat/completions", http_error(400, FAILED_CALL), http_error(400, FAILED_CALL), CHOICE)
+    gateway = ProviderGateway(load_settings({"GROQ_API_KEY": "gsk"}), provider)
+    tools = [{"type": "function", "function": {"name": f"t{i}"}} for i in range(7)]
+    gateway.chat([{"role": "user", "content": "q"}], tools=tools)
+    assert [len(r["body"].get("tools", [])) for r in provider.requests] == [7, 7, 3]
+
+
 @pytest.mark.parametrize(
     "env, tier, model, effort",
     [

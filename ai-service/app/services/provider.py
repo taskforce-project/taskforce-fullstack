@@ -70,6 +70,14 @@ def strip_thinking(message: dict) -> dict:
     return message
 
 
+def _is_failed_tool_call(exc: urllib.error.HTTPError) -> bool:
+    """Vrai pour le 400 `tool_use_failed` de Groq : le modèle a produit un appel d'outil invalide."""
+    try:
+        return b"tool_use_failed" in exc.read()
+    except Exception:  # noqa: BLE001 - corps illisible : ce n'est pas ce cas
+        return False
+
+
 class ProviderGateway:
     """Appels au fournisseur configuré. ``opener`` est injectable pour les tests (défaut : ``urlopen``)."""
 
@@ -130,6 +138,9 @@ class ProviderGateway:
 
         url = self._settings.chat_base_url + "/chat/completions"
         attempt_tools = list(tools) if tools else None
+        # Groq refuse (400 `tool_use_failed`) une réponse où le modèle a mal formé un appel d'outil : c'est un tirage
+        # raté, pas un outil de trop. On redemande une fois avec les mêmes outils avant d'en retirer (29/10/2026).
+        retried_generation = False
         while True:
             if attempt_tools:
                 body["tools"] = attempt_tools
@@ -141,6 +152,10 @@ class ProviderGateway:
                 payload = self._call(url, body, self._settings.chat_api_key, self._settings.timeout_s)
                 break
             except urllib.error.HTTPError as exc:
+                if exc.code == 400 and attempt_tools and not retried_generation and _is_failed_tool_call(exc):
+                    logger.warning("Provider rejected a malformed tool call from the model: asking again")
+                    retried_generation = True
+                    continue
                 # Un serveur MCP riche peut dépasser la taille de requête du fournisseur (413) ou exposer un schéma
                 # d'outil qu'il refuse (400) : on réessaie avec moitié moins d'outils. Le backend les trie par
                 # pertinence, on garde donc le début de la liste. Jamais jusqu'à zéro : sans outils, le modèle
