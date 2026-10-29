@@ -25,6 +25,18 @@ contextBridge.exposeInMainWorld("taskforceDesktop", {
   signOut: (): Promise<void> => ipcRenderer.invoke("desktop:sign-out"),
   openAccountPage: (): Promise<void> => ipcRenderer.invoke("desktop:account-page"),
   checkForUpdates: (): Promise<unknown> => ipcRenderer.invoke("desktop:check-updates"),
+  // Mise à jour : son état (téléchargement, prête), reçu à chaque changement, et le redémarrage sur la nouvelle version.
+  updater: {
+    state: (): Promise<unknown> => ipcRenderer.invoke("desktop:update-state"),
+    install: (): Promise<void> => ipcRenderer.invoke("desktop:install-update"),
+    onState: (callback: (state: unknown) => void): (() => void) => {
+      const listener = (_event: unknown, state: unknown) => callback(state);
+      ipcRenderer.on("desktop:update-state", listener);
+      return () => {
+        ipcRenderer.removeListener("desktop:update-state", listener);
+      };
+    },
+  },
   openLogs: (): Promise<void> => ipcRenderer.invoke("desktop:open-logs"),
   openBackups: (): Promise<void> => ipcRenderer.invoke("desktop:open-backups"),
   // Événement reçu pendant que la fenêtre n'est pas au premier plan : notification du système, qui ramène sur sa page.
