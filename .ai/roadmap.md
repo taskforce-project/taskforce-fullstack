@@ -10,11 +10,31 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 30/10/2026 - Séance n°12 retenue : les solutions aux quatre réserves de la banque d'évaluations, dans l'ordre de Jobs.** `[conseil + direction]`
+> - **Décision du CEO** : « je suis d'accord avec tout les R, et je suis aussi d'accord avec Jobs sur ses points donc on le suit ». Et des explications plus explicites.
+> - **R72** : un cas garde la trace de ce qu'il a lu (les notes servies, les projets et les issues de ses lectures, la version des règles) ; si l'espace a changé depuis, il sort du score et s'adapte d'un clic en un nouveau cas, l'ancien gardant ses notes. Lu dans la banque au moment du rejeu, pas dans une alerte.
+> - **R73** : la banque est celle de l'entreprise, pas de Cortex ; l'équipe de Jobs la dessine là où l'on change de modèle (workflow 9) et là où une tâche échoue (workflow 8) ; les réglages ne gardent que l'interrupteur.
+> - **R74** : « Add as proposed » ajoute un cas d'un clic ; la file des cas que TaskForce proposera depuis ses dossiers (refus, actions accordées qui échouent) attend les écrans de base.
+> - **R75** : les huit routes de l'API existent ; les outils MCP de la banque attendent les écrans de base.
+> - **L'ordre** : 1. l'atelier des écrans de base (R54, R55 à R59) et la banque dans les workflows 8 et 9 ; 2. le lot 2 (R72, « Add as proposed ») ; 3. la file des cas proposés et les outils MCP ; 4. le registre des modèles par tâche, puis l'export (R64).
+> - **Doc** (`taskforce-docs`) : PV de la séance n°12, registre et journal (`56b0efb`) ; spec v2, §14 et §20 (`9df09fa`).
+> - **En attente du CEO** : la recette 1.3.6 (`results136`) ; « go release » pour la banque (dans `dev`, pas en prod) ; Q13 ; R27 à R30.
+
 > **▶ MAJ 29/10/2026 (nuit, release) - Release 1.6.6 EN PROD : une note accordée n'échoue plus sur un type inventé ; desktop 1.3.6 publiée ; séance n°11 retenue.** `[release + conseil]`
 > - **Décision du CEO** : R66 à R71 retenues, avec les réserves de Shotwell (R66 : un cas s'adapte quand l'espace change ; R68 : confirmer ne ralentit pas la banque ; R71 : l'écran ne la retarde pas) et de Duflo (R67 : Cortex n'est pas le produit, un changement d'UI/UX côté Jobs), chacune à résoudre. Puis « On y va » : la release du correctif, puis R61.
 > - **En prod** : #438 fusionnée dans `dev` (`0307cb05`), `chore(desktop)` 1.3.6 (`7c0518f9`), release #439 vers `main` (`aa4432a5`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.6.6 en plomberie). Desktop 1.3.6 publiée : run 40966766707 depuis `main`, vert ; `latest.yml` en 1.3.6 ; le site est reconstruit pour la proposer.
 > - **Conseil** : le PV de la séance n°11, sa ligne au registre et l'entrée du journal commités dans `taskforce-docs` (`fb32f25`).
 > - **Suite** : R61 (#437, en brouillon) : fusionner `dev` dans la branche, la doc et la référence d'API, puis la fusion dans `dev` ; les solutions aux quatre réserves, au Conseil ; la fiche de recette en 1.3.6.
+
+> **▶ MAJ 29/10/2026 (nuit) - Le premier lot de R61 construit sur `feat/r61-eval-bank` : la banque d'évaluations de Cortex ; R66 à R71 retenues, la PR fusionne dans `dev`.** `[backend + frontend + conseil]`
+> - **Décision du CEO** : « go release, puis enchaîne sur R61 » (R61, séance n°10, retenue) ; « consulte le conseil à chaque fois » : séance n°11, R66 à R71 retenues le 29/10 avec quatre réserves à résoudre (voir la release 1.6.6, ci-dessus).
+> - **Le dossier garde ce qui a répondu** : le modèle (lu dans la réponse de la passerelle), le tier et les notes servies entrent à `mission.started`.
+> - **Le rejeu d'un cas figé** (`AgentService.replay`) : la date et les notes du cas vont au prompt ; une lecture permise est servie par la cassette (même outil, mêmes arguments canoniques), sinon notée en erreur sans toucher l'espace ; une écriture est proposée, jamais exécutée ; un refus des règles reste un refus ; aucun dossier ne s'écrit. La boucle d'outils est partagée avec les réponses ; la passerelle accepte un modèle nommé sans tier.
+> - **La banque** (V108 : `eval_cases`, `eval_runs`, `eval_results`, `eval_bank_settings` ; `EvalService`, `EvalController` sous `/api/workspaces/{slug}/evals`) : un cas se tire du dossier d'une réponse de la personne ; le serveur refait le contenu figé depuis le dossier et date les critères ; 200 cas actifs au plus. Un rejeu ne compte que les cas figés avant son départ et note un cas par requête, sous le quota et le frein de débit de l'IA. Les notes viennent du code (`EvalGrader`). L'interrupteur est au propriétaire ou à l'admin ; sans ligne, la banque est ouverte (un cas ne naît que d'un geste).
+> - **Dans l'app** : « Add to test bank » sous une réponse de Cortex qui a un dossier (le brouillon : ce que Cortex a fait, les critères proposés, à confirmer ou corriger) ; Réglages > Test bank : l'interrupteur et sa règle, les cas, le rejeu sur un modèle nommé (il attend le frein de débit sur un 429, s'arrête à la demande), le score de chaque modèle et le détail par critère.
+> - **Contrôles** : backend, tests ciblés (141) puis `it.ps1 -Test ALL` : 2 120 tests, 0 échec (1 ignoré) ; front `tsc`, lint (0 erreur), `vitest run --coverage` : 106 fichiers, 1 194 tests, `eval-store.ts` et `eval-service.ts` à 100 % des lignes.
+> - **Doc** (`taskforce-docs`) : le §5 du flywheel et la spec v2 (§14) disent la capture `ai_generations` retirée (`5700e4b1`). À la fusion : les notes Backend, API et Frontend, et la spec (§14, la boucle construite, les réserves). La référence d'API Fern est régénérée sur la branche (`29bd00a0`), section « Test bank ».
+> - **Reste** : les solutions aux quatre réserves (R66, R67, R68, R71), au Conseil ; dix cas rejoués sur deux modèles du desktop, avec leur score ; l'export en format ouvert (R64) ; le registre des modèles par tâche, le lot suivant.
 
 > **▶ MAJ 29/10/2026 (soir, release) - Release 1.6.5 EN PROD : le noyau pour Cortex ; desktop 1.3.5 publiée ; séance n°11 sur le premier lot de R61.** `[release + conseil]`
 > - **Décision du CEO** : « go release, puis enchaîne sur R61 » ; « consulte le conseil à chaque fois ».

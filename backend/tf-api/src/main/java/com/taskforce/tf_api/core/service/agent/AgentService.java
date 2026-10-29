@@ -5,6 +5,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -27,6 +28,7 @@ import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantStep;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantToolCall;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
+import com.taskforce.tf_api.core.enums.NodeDomain;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.AiUsageService;
@@ -357,14 +359,70 @@ public class AgentService {
                 external.stream().map(AgentTool::name).toList());
         }
 
-        List<Map<String, Object>> messages = withHistory(systemPrompt(hits, external), history, message);
+        List<Map<String, Object>> messages = withHistory(systemPrompt(hits, external, LocalDate.now(ZoneOffset.UTC)),
+            history, message);
         List<Map<String, Object>> toolDefs = tools.toolDefinitions(external);
         String tier = external.isEmpty() ? "fast" : mcpToolTier;
         // Le noyau (R35) : les règles de l'espace et le dossier de la réponse, ouverts au premier outil.
-        Kernel kernel = new Kernel(ctx, message);
+        Kernel kernel = new Kernel(ctx, message, origin(tier, hits));
+        return toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel);
+    }
 
+    /**
+     * Rejoue un cas de la banque avec un modèle nommé, ou le tier rapide s'il n'y en a pas. Le modèle
+     * reçoit les notes et la date du cas ; une lecture est servie par sa cassette, une écriture est proposée et jamais
+     * exécutée, et aucun dossier ne s'écrit. Le quota et le frein de débit sont à l'appelant, comme pour une réponse.
+     */
+    public ReplayOutcome replay(AgentContext ctx, ReplayCase replayCase, String model) {
+        List<KnowledgeNode> notes = replayCase.notes().stream()
+            .map(note -> KnowledgeNode.builder().title(note.title()).domain(domainOf(note.domain()))
+                .content(note.content()).build())
+            .toList();
+        List<Map<String, Object>> messages = withHistory(systemPrompt(notes, List.of(), replayCase.askedOn()),
+            List.of(), replayCase.question());
+        ReplayStep step = new ReplayStep(replayCase, gate.rulesFor(ctx));
+        llm.beginUsageCapture();
+        try {
+            String answer = toolLoop(messages, tools.toolDefinitions(List.of()), List.of(), new ArrayList<>(),
+                (msgs, defs) -> model == null || model.isBlank()
+                    ? llm.rawChat(msgs, defs, "fast")
+                    : llm.rawChatWithModel(msgs, defs, model),
+                step);
+            return new ReplayOutcome(answer, step.calls, llm.currentModel(), llm.currentUsage());
+        } finally {
+            llm.endUsageCapture();
+        }
+    }
+
+    /** Ce qui appelle le modèle : le tier d'une réponse, ou un modèle nommé au rejeu. */
+    @FunctionalInterface
+    private interface ModelCall {
+        JsonNode call(List<Map<String, Object>> messages, List<Map<String, Object>> toolDefs);
+    }
+
+    /** Ce que devient un appel d'outil : par le noyau dans une réponse, par la cassette au rejeu. */
+    private interface ToolStep {
+        ToolOutcome apply(AgentTool tool, String name, String argsJson);
+
+        String recordRef();
+    }
+
+    private record ToolOutcome(String status, String result) {
+    }
+
+    private static final String PROPOSED = "Action proposed to the user, waiting for their approval in the conversation. "
+        + "Do not call this tool again; just summarize the action you propose.";
+
+    private static String refusedText(CortexGate.Verdict verdict) {
+        return "Not run: the rules of this workspace refuse it. " + verdict.reason()
+            + " Do not try again; tell the user why it was not done.";
+    }
+
+    /** La boucle : le modèle appelle des outils ou répond, cinq tours au plus. */
+    private String toolLoop(List<Map<String, Object>> messages, List<Map<String, Object>> toolDefs,
+                            List<AgentTool> external, List<AssistantToolCall> toolCalls, ModelCall model, ToolStep step) {
         for (int i = 0; i < MAX_TOOL_ITERS; i++) {
-            JsonNode msg = llm.rawChat(messages, toolDefs, tier);
+            JsonNode msg = model.call(messages, toolDefs);
             JsonNode calls = msg.path("tool_calls");
             if (!calls.isArray() || calls.isEmpty()) {
                 return msg.path("content").asText("");
@@ -374,69 +432,131 @@ public class AgentService {
                 String id = call.path("id").asText();
                 String name = call.path("function").path("name").asText();
                 String argsJson = call.path("function").path("arguments").asText("{}");
-                String result;
-                String status = "success";
-                try {
-                    AgentTool tool = tools.get(name, external);
-                    if (tool == null) {
-                        result = "Unknown tool: " + name;
-                        status = "error";
-                    } else {
-                        // Tracer avant d'agir : la demande et la décision entrent au dossier avant tout effet.
-                        CortexGate.Verdict verdict = kernel.judge(tool, argsJson);
-                        if (verdict.denied()) {
-                            result = "Not run: the rules of this workspace refuse it. " + verdict.reason()
-                                + " Do not try again; tell the user why it was not done.";
-                            status = "refused";
-                        } else if (!verdict.allowed()) {
-                            // Demandé : jamais exécuté par le modèle. Une écriture externe ne se propose qu'à qui peut
-                            // la valider (propriétaire ou administrateur, OSS-1.5) ; les autres l'apprennent d'emblée.
-                            if (tool instanceof ExternalMcpTool && !authorization.isManager(ctx.workspaceId(), ctx.userId())) {
-                                result = "Not run: only workspace owners and admins can approve a change in an external "
-                                    + "tool. Tell the user that an owner or admin has to make this change.";
-                                status = "error";
-                            } else {
-                                result = "Action proposed to the user, waiting for their approval in the conversation. "
-                                    + "Do not call this tool again; just summarize the action you propose.";
-                                status = "pending";
-                            }
-                        } else {
-                            Map<String, Object> args = objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {});
-                            result = tool.execute(args, ctx);
-                        }
-                        kernel.result(name, status, result);
-                    }
-                } catch (Exception e) {
-                    result = "Tool " + name + " failed: " + e.getMessage();
-                    status = "error";
-                    kernel.result(name, status, result);
-                }
-                toolCalls.add(new AssistantToolCall(name, status, argsJson, result, kernel.recordRef()));
-                messages.add(Map.of("role", "tool", "tool_call_id", id, "content", result));
+                AgentTool tool = tools.get(name, external);
+                ToolOutcome outcome = tool == null
+                    ? new ToolOutcome("error", "Unknown tool: " + name)
+                    : step.apply(tool, name, argsJson);
+                toolCalls.add(new AssistantToolCall(name, outcome.status(), argsJson, outcome.result(), step.recordRef()));
+                messages.add(Map.of("role", "tool", "tool_call_id", id, "content", outcome.result()));
             }
         }
         return "Answer interrupted (too many tool steps).";
+    }
+
+    /** Ce qui a répondu : le tier et les notes servies ; le modèle s'y ajoute à l'ouverture du dossier. */
+    private static Map<String, Object> origin(String tier, List<KnowledgeNode> hits) {
+        Map<String, Object> origin = new LinkedHashMap<>();
+        origin.put("tier", tier);
+        origin.put("notes", hits.stream().map(note -> {
+            Map<String, Object> served = new LinkedHashMap<>();
+            served.put("id", note.getId());
+            served.put("title", note.getTitle());
+            return served;
+        }).toList());
+        return origin;
+    }
+
+    private static NodeDomain domainOf(String domain) {
+        try {
+            return domain == null ? NodeDomain.PROJET : NodeDomain.valueOf(domain);
+        } catch (IllegalArgumentException unknown) {
+            return NodeDomain.PROJET;
+        }
+    }
+
+    /**
+     * Le rejeu : la règle de l'espace juge chaque appel comme dans une réponse, sans rien garder ; une lecture
+     * autorisée est servie par la cassette, et tout le reste est proposé, jamais exécuté.
+     */
+    private final class ReplayStep implements ToolStep {
+        private final ReplayCase replayCase;
+        private final RulesBundle bundle;
+        private final List<ReplayOutcome.ReplayCall> calls = new ArrayList<>();
+
+        ReplayStep(ReplayCase replayCase, RulesBundle bundle) {
+            this.replayCase = replayCase;
+            this.bundle = bundle;
+        }
+
+        @Override
+        public ToolOutcome apply(AgentTool tool, String name, String argsJson) {
+            CortexGate.Verdict verdict = gate.judge(bundle, tool);
+            ToolOutcome outcome;
+            if (verdict.denied()) {
+                outcome = new ToolOutcome("refused", refusedText(verdict));
+            } else if (verdict.allowed() && CortexGate.READS.contains(verdict.facts().get("action"))) {
+                String served = replayCase.served(name, argsJson);
+                outcome = served == null
+                    ? new ToolOutcome("error", "Not available in this test case: this read was not made when it was "
+                        + "written. Answer from what you have.")
+                    : new ToolOutcome("success", served);
+            } else {
+                outcome = new ToolOutcome("pending", PROPOSED);
+            }
+            calls.add(new ReplayOutcome.ReplayCall(name, argsJson, verdict.effect(), outcome.status()));
+            return outcome;
+        }
+
+        @Override
+        public String recordRef() {
+            return null;
+        }
     }
 
     /**
      * Le noyau pour une réponse de Cortex : les règles de l'espace et le dossier, ouverts au premier outil seulement,
      * pour qu'une réponse sans outil ne laisse pas de dossier vide.
      */
-    private final class Kernel {
+    private final class Kernel implements ToolStep {
         private final AgentContext ctx;
         private final String question;
+        private final Map<String, Object> origin;
         private RulesBundle bundle;
         private UUID record;
 
-        Kernel(AgentContext ctx, String question) {
+        Kernel(AgentContext ctx, String question, Map<String, Object> origin) {
             this.ctx = ctx;
             this.question = question;
+            this.origin = origin;
+        }
+
+        /** Tracer avant d'agir : la demande et la décision entrent au dossier avant tout effet. */
+        @Override
+        public ToolOutcome apply(AgentTool tool, String name, String argsJson) {
+            String result;
+            String status = "success";
+            try {
+                CortexGate.Verdict verdict = judge(tool, argsJson);
+                if (verdict.denied()) {
+                    result = refusedText(verdict);
+                    status = "refused";
+                } else if (!verdict.allowed()) {
+                    // Demandé : jamais exécuté par le modèle. Une écriture externe ne se propose qu'à qui peut la valider
+                    // (propriétaire ou administrateur, OSS-1.5) ; les autres l'apprennent d'emblée.
+                    if (tool instanceof ExternalMcpTool && !authorization.isManager(ctx.workspaceId(), ctx.userId())) {
+                        result = "Not run: only workspace owners and admins can approve a change in an external "
+                            + "tool. Tell the user that an owner or admin has to make this change.";
+                        status = "error";
+                    } else {
+                        result = PROPOSED;
+                        status = "pending";
+                    }
+                } else {
+                    Map<String, Object> args = objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {});
+                    result = tool.execute(args, ctx);
+                }
+            } catch (Exception e) {
+                result = "Tool " + name + " failed: " + e.getMessage();
+                status = "error";
+            }
+            result(name, status, result);
+            return new ToolOutcome(status, result);
         }
 
         /** La demande, puis la décision des règles, au dossier avant tout effet : sans dossier, l'action ne part pas. */
         CortexGate.Verdict judge(AgentTool tool, String argsJson) {
             if (bundle == null) bundle = gate.rulesFor(ctx);
-            if (record == null) record = records.open(ctx, question);
+            if (record == null) record = records.open(ctx, question, withModel(origin));
             traceBefore(record, "action.requested", CortexRecordService.Actor.CORTEX,
                 Map.of("tool", tool.name(), "arguments", CortexRecordService.shorten(argsJson)));
             CortexGate.Verdict verdict = gate.judge(bundle, tool);
@@ -450,8 +570,17 @@ public class AgentService {
             if (record != null) traceAfter(record, tool, status, output);
         }
 
-        String recordRef() {
+        @Override
+        public String recordRef() {
             return record == null ? null : record.toString();
+        }
+
+        /** Le modèle qui a répondu, connu dès le premier appel d'outil. */
+        private Map<String, Object> withModel(Map<String, Object> origin) {
+            Map<String, Object> withModel = new LinkedHashMap<>();
+            withModel.put("model", llm.currentModel());
+            withModel.putAll(origin);
+            return withModel;
         }
     }
 
@@ -493,7 +622,7 @@ public class AgentService {
         return messages;
     }
 
-    private String systemPrompt(List<KnowledgeNode> hits, List<AgentTool> external) {
+    private String systemPrompt(List<KnowledgeNode> hits, List<AgentTool> external, LocalDate today) {
         StringBuilder sb = new StringBuilder();
         sb.append("You are Cortex, the AI copilot of a TaskForce workspace. Answer in the user's language, ")
           .append("concisely, grounded in the real context. ")
@@ -507,7 +636,7 @@ public class AgentService {
           .append("the integration exists but is not connected, invite the user to connect it (Settings > ")
           .append("Integrations); when it is not in the catalog, say so plainly and add that a tool with an MCP ")
           .append("server can still be connected there. Never make data up. ")
-          .append("Today is ").append(LocalDate.now(ZoneOffset.UTC).format(TODAY)).append(" (UTC). ")
+          .append("Today is ").append(today.format(TODAY)).append(" (UTC). ")
           .append("When you create an issue, place it in time from its goal: read the project's columns and active ")
           .append("cycle, keep it in the Backlog unless the work must start now, and set a due date only when the goal ")
           .append("or the person gives one. When the project or the timing is unclear, ask the person, with the ")

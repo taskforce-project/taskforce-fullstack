@@ -22,6 +22,12 @@ public interface LlmClient {
     /** Complétion brute (messages libres et outils) : renvoie le message assistant, qui peut porter des {@code tool_calls}. */
     JsonNode rawChat(List<Map<String, Object>> messages, List<Map<String, Object>> tools, String tier);
 
+    /**
+     * Complétion brute avec un modèle nommé, sans tier : le rejeu d'un cas de la banque compare deux modèles (R61,
+     * séance n°10). La passerelle prend le modèle demandé quand aucun tier n'est donné.
+     */
+    JsonNode rawChatWithModel(List<Map<String, Object>> messages, List<Map<String, Object>> tools, String model);
+
     /** Complétion multi-tours ({@code {role, content}}, ordre chronologique), sans outils, renvoie le contenu texte. */
     default String chat(List<Map<String, Object>> messages, String tier) {
         JsonNode msg = rawChat(messages, List.of(), tier);
@@ -40,4 +46,7 @@ public interface LlmClient {
 
     /** Termine l'accumulation et libère l'accumulateur du thread. */
     default void endUsageCapture() { /* no-op */ }
+
+    /** Le modèle qui a répondu au dernier appel depuis {@link #beginUsageCapture()}, s'il est connu. */
+    default String currentModel() { return null; }
 }

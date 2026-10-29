@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, useParams } from "next/navigation"
 import {
   User, Bell, Mail, Zap, Globe, Key, Palette, Webhook,
   Upload, Camera, Trash2, Shield, Loader2, RotateCcw,
-  Activity, Gauge, Search, Bot, Sparkles,
+  Activity, Gauge, Search, Bot, Sparkles, FlaskConical,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTheme } from "next-themes"
@@ -32,6 +32,7 @@ import { WebhooksPanel } from "@/components/settings/webhooks-panel"
 import { EventPicker } from "@/components/settings/event-picker"
 import { AgentsPanel } from "@/components/settings/agents-panel"
 import { DesktopAiPanel } from "@/components/settings/desktop-ai-panel"
+import { EvalBankPanel } from "@/components/settings/eval-bank-panel"
 import { DesktopSessionsCard } from "@/components/settings/desktop-sessions-card"
 import { showUpdateState } from "@/components/desktop/desktop-update-toast"
 import { PasskeysCard } from "@/components/settings/passkeys-card"
@@ -67,6 +68,7 @@ export type SettingsSection =
   | "security"
   | "workspace"
   | "usage"
+  | "evals"
   | "ai"
   | "audit"
   | "integrations"
@@ -88,6 +90,7 @@ const ALL_SECTIONS: SectionConfig[] = [
   { key: "security",      label: "Security",       icon: <Key className="h-4 w-4" />,        group: "Personal" },
   { key: "workspace",     label: "General",        icon: <Globe className="h-4 w-4" />,      group: "Workspace" },
   { key: "usage",         label: "Cortex usage",   icon: <Gauge className="h-4 w-4" />,       group: "Workspace" },
+  { key: "evals",         label: "Test bank",      icon: <FlaskConical className="h-4 w-4" />, group: "Workspace" },
   { key: "ai",            label: "AI",             icon: <Sparkles className="h-4 w-4" />,    group: "Workspace" },
   { key: "integrations",  label: "Integrations",   icon: <Webhook className="h-4 w-4" />,    group: "Workspace" },
   { key: "agents",        label: "Agents",         icon: <Bot className="h-4 w-4" />,        group: "Workspace" },
@@ -107,7 +110,7 @@ export const SECTIONS: SectionConfig[] = ALL_SECTIONS.filter((s) =>
 
 export const SECTION_GROUPS = [
   { label: "Personal",  keys: ["profile", "account", "appearance", "notifications", "security", "privacy"] as const },
-  { label: "Workspace", keys: ["workspace", "ai", "usage", "integrations", "agents", "audit"] as const },
+  { label: "Workspace", keys: ["workspace", "ai", "usage", "evals", "integrations", "agents", "audit"] as const },
 ]
 
 // SKILL_OPTIONS + SkillsTagInput retirés avec le faux champ « Skills » du Profil (TF-SETTINGS-FAKE) :
@@ -1918,6 +1921,7 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
       {active === "security"      && <SecurityPanel />}
       {active === "workspace"     && <WorkspacePanel />}
       {active === "usage"         && <UsagePanel />}
+      {active === "evals"         && <EvalBankPanel />}
       {active === "ai"            && <DesktopAiPanel />}
       {active === "integrations"  && <IntegrationsPanel />}
       {active === "agents"        && <AgentsPanel />}

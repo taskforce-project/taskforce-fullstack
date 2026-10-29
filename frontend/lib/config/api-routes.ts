@@ -350,6 +350,22 @@ export const ASSISTANT_ROUTES = {
 } as const;
 
 /**
+ * Banque d'évaluations de Cortex (R61, séance n°10) : les cas tirés des réponses, leurs rejeux par
+ * modèle et leurs notes. Backend: @RequestMapping("/api/workspaces/{slug}/evals").
+ */
+export const EVAL_ROUTES = {
+  BANK: (slug: string) => `/api/workspaces/${slug}/evals`,
+  CASE_DRAFT: (slug: string) => `/api/workspaces/${slug}/evals/cases/draft`,
+  CASES: (slug: string) => `/api/workspaces/${slug}/evals/cases`,
+  CASE: (slug: string, caseId: number) => `/api/workspaces/${slug}/evals/cases/${caseId}`,
+  RUNS: (slug: string) => `/api/workspaces/${slug}/evals/runs`,
+  RUN: (slug: string, runId: number) => `/api/workspaces/${slug}/evals/runs/${runId}`,
+  RUN_CASE: (slug: string, runId: number, caseId: number) =>
+    `/api/workspaces/${slug}/evals/runs/${runId}/cases/${caseId}`,
+  SETTINGS: (slug: string) => `/api/workspaces/${slug}/evals/settings`,
+} as const;
+
+/**
  * Consommation IA (tokens) du workspace - mois courant + plafond de l'instance (illimité par défaut).
  * Backend: @RequestMapping("/api/workspaces/{slug}/ai"). État de l'IA de l'instance : GET /api/ai/status.
  */

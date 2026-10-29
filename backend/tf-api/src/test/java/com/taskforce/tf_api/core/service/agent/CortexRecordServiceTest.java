@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service.agent;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -68,7 +69,7 @@ class CortexRecordServiceTest {
 
     /** Une réponse où Cortex a proposé une note : la demande, la décision des règles, le résultat en attente. */
     private UUID proposedNote() {
-        UUID id = service.open(ctx, "Write the release notes");
+        UUID id = service.open(ctx, "Write the release notes", Map.of());
         service.append(id, "action.requested", Actor.CORTEX, Map.of("tool", "create_note", "arguments", "{}"));
         service.append(id, "action.decided", Actor.rule("propose-knowledge"), Map.of("effect", "ask"));
         service.append(id, "action.result", Actor.SERVER, Map.of("tool", "create_note", "status", "pending", "output", "Proposed"));
@@ -78,7 +79,7 @@ class CortexRecordServiceTest {
     @Test
     @DisplayName("le dossier s'ouvre sur la question, posée par la personne à l'agent interne")
     void opens_on_the_question() {
-        UUID id = service.open(ctx, "Write the release notes");
+        UUID id = service.open(ctx, "Write the release notes", Map.of());
 
         assertThat(records.get(id).getWorkspaceId()).isEqualTo(1L);
         assertThat(records.get(id).getUserId()).isEqualTo(7L);
@@ -117,7 +118,7 @@ class CortexRecordServiceTest {
     @Test
     @DisplayName("un dossier plein ne prend plus rien")
     void a_full_record_takes_nothing_more() {
-        UUID id = service.open(ctx, "Write the release notes");
+        UUID id = service.open(ctx, "Write the release notes", Map.of());
         stored.add(CortexRecordEvent.builder().recordId(id).seq(CortexRecordService.MAX_EVENTS)
             .hash("sha256:" + "b".repeat(64)).build());
 
@@ -146,7 +147,7 @@ class CortexRecordServiceTest {
         "create_project, pending, false", // une autre action attend, pas celle-ci
     })
     void only_a_waiting_proposal_can_be_approved(String tool, String status, boolean approvable) {
-        UUID id = service.open(ctx, "Write the release notes");
+        UUID id = service.open(ctx, "Write the release notes", Map.of());
         service.append(id, "action.result", Actor.SERVER, Map.of("tool", tool, "status", status, "output", "..."));
 
         assertThat(service.approve(id, "create_note", 7L, "{}")).isEqualTo(approvable);
@@ -182,5 +183,21 @@ class CortexRecordServiceTest {
     @DisplayName("un texte absent est gardé vide")
     void a_missing_text_is_empty() {
         assertThat(CortexRecordService.shorten(null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("le dossier s'ouvre aussi sur ce qui a répondu ; une valeur absente n'y entre pas, la question reste")
+    void opens_with_what_answered() {
+        Map<String, Object> origin = new LinkedHashMap<>();
+        origin.put("model", "qwen3:8b");
+        origin.put("tier", "fast");
+        origin.put("notes", List.of(Map.of("id", 12, "title", "Release plan")));
+        origin.put("absent", null);
+        origin.put("question", "not this one");
+
+        service.open(ctx, "Write the release notes", origin);
+
+        assertThat(stored.getFirst().getData()).isEqualTo("{\"agent\":\"internal\",\"model\":\"qwen3:8b\","
+            + "\"notes\":[{\"id\":12,\"title\":\"Release plan\"}],\"question\":\"Write the release notes\",\"tier\":\"fast\"}");
     }
 }

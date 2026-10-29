@@ -22,6 +22,7 @@ import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { CortexUsage } from "./cortex-usage"
+import { EvalCaseButton } from "./eval-case-dialog"
 
 interface Turn {
   id: string
@@ -475,6 +476,9 @@ export function AgentChat() {
 /** Rend la réponse structurée : étapes → raisonnement → outils → texte → sources → feedback. */
 function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: string }) {
   const hasBreakdown = answer.usage && (answer.usage.promptTokens > 0 || answer.usage.completionTokens > 0)
+  // Le dossier de la réponse, que porte chacun de ses appels d'outil : il fait d'elle un cas de la banque (R61,
+  // séance n°10).
+  const record = answer.toolCalls.find((tc) => tc.record)?.record
   return (
     <div className="space-y-1">
       {answer.steps.length > 0 && (
@@ -493,7 +497,10 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
         <Sources items={answer.sources.map((s) => ({ title: s.title, snippet: s.domain, score: s.score ?? undefined }))} />
       )}
       <div className="mt-1 flex items-center justify-between gap-2">
-        <FeedbackBar onCopy={() => navigator.clipboard?.writeText(answer.answer)} />
+        <div className="flex items-center gap-1">
+          <FeedbackBar onCopy={() => navigator.clipboard?.writeText(answer.answer)} />
+          {record && <EvalCaseButton slug={slug} record={record} />}
+        </div>
         {answer.usage && answer.usage.totalTokens > 0 && (
           <span className="flex shrink-0 items-center gap-1.5 text-[10px] tabular-nums text-muted-foreground/60">
             <span className="rounded bg-muted px-1 py-px font-medium uppercase tracking-wide">{answer.mode}</span>

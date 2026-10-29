@@ -279,3 +279,14 @@ export function getErrorMessage(error: unknown): string {
 export function getErrorStatus(error: unknown): number | undefined {
   return axios.isAxiosError(error) ? error.response?.status : undefined;
 }
+
+/**
+ * Attente annoncée par un 429 (`Retry-After`, en secondes), pour qu'un appelant qui enchaîne des appels attende plutôt
+ * que d'échouer ; `null` pour toute autre erreur, ou un 429 qui n'annonce pas d'attente lisible.
+ */
+export function getRetryAfterSeconds(error: unknown): number | null {
+  if (!axios.isAxiosError(error) || error.response?.status !== 429) return null;
+  const headers = error.response.headers as Record<string, unknown> | undefined;
+  const seconds = Number(headers?.["retry-after"]);
+  return Number.isFinite(seconds) && seconds >= 0 ? Math.ceil(seconds) : null;
+}
