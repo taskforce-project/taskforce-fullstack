@@ -61,22 +61,27 @@ public class AiRateGuard {
             return; // fail-open : pas de Redis (dev/test)
         }
         try {
-            String minute = LocalDateTime.now().format(MINUTE);
+            LocalDateTime now = LocalDateTime.now();
+            String minute = now.format(MINUTE);
+            // Les fenetres sont des minutes calendaires : elles se vident a la minute suivante, c'est l'attente vraie.
+            long wait = 60L - now.getSecond();
             if (globalTpm > 0 && read(redis, "ai:tpm:g:" + minute) >= globalTpm) {
                 throw new AiRateLimitedException(
-                    "The AI is busy right now (shared rate reached). Try again in a moment.");
+                    "The AI is busy: the budget shared by this instance for this minute is used. Try again in "
+                        + wait + " s.", wait);
             }
             if (accountTpm > 0 && read(redis, "ai:tpm:a:" + accountId + ":" + minute) >= accountTpm) {
                 throw new AiRateLimitedException(
-                    "Too many AI requests in the last minute. Try again in a moment.");
+                    "Your AI budget for this minute is used. Try again in " + wait + " s.", wait);
             }
             // Throttle par NOMBRE de requetes/minute/compte (ex. beta : ~5 users a 1 req/min tiennent
             // dans le budget Groq partage). On compte la requete admise ici (le debit tokens vient apres).
             if (accountRpm > 0) {
                 String rpmKey = "ai:rpm:a:" + accountId + ":" + minute;
                 if (read(redis, rpmKey) >= accountRpm) {
-                    throw new AiRateLimitedException(
-                        "Too many AI requests in the last minute. Try again in a moment.");
+                    throw new AiRateLimitedException("This instance allows " + accountRpm + " AI request"
+                        + (accountRpm > 1 ? "s" : "") + " per minute for each account. Try again in " + wait + " s.",
+                        wait);
                 }
                 bump(redis, rpmKey, 1L);
             }
