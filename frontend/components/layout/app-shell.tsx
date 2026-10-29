@@ -14,6 +14,7 @@ import { SettingsModal } from "@/components/settings/settings-modal"
 import { CreateProjectModal } from "@/components/dialogs/create-project-modal"
 import { ProductTour } from "@/components/tour/product-tour"
 import { PendingInvitationsBanner } from "@/components/invitations/pending-invitations-banner"
+import { DesktopUpdateToast } from "@/components/desktop/desktop-update-toast"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { cn } from "@/lib/utils"
 
@@ -28,6 +29,8 @@ export function AppShell({ children }: AppShellProps) {
     <SidebarProvider className="h-full">
       {/* App desktop, façon Claude Desktop : le contenu est une carte arrondie dans le cadre de la barre latérale. */}
       {IS_DESKTOP && <div className="desktop-top-drag" aria-hidden="true" />}
+      {/* Mise à jour de l'app : avancement du téléchargement, puis « Restart now », dans un toast qui reste. */}
+      {IS_DESKTOP && <DesktopUpdateToast />}
       <AppSidebar />
       <SidebarInset className={cn("overflow-hidden", IS_DESKTOP && "desktop-content md:border md:border-border/70")}>
         <AppTopbar />

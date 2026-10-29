@@ -14,7 +14,7 @@ import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
 import { toolsStatus } from "./tools";
 import { readMove, readWorkspaceMove, Transfer, type LocalApi } from "./transfer";
-import { check, startUpdater } from "./updater";
+import { check, installNow, startUpdater, updateState } from "./updater";
 import {
   integratedTitleBar,
   MAIN_TITLE_BAR_HEIGHT,
@@ -330,6 +330,9 @@ function registerIpc(): void {
     }
   });
   ipcMain.handle("desktop:check-updates", () => check());
+  // Le toast de la mise à jour lit l'état à son ouverture, puis le reçoit à chaque changement (cf. updater.ts).
+  ipcMain.handle("desktop:update-state", () => updateState());
+  ipcMain.handle("desktop:install-update", () => installNow());
   ipcMain.handle("desktop:open-logs", () => shell.openPath(appLogDir()));
   // Copies de la base faites avant chaque mise à jour (cf. backup.ts).
   ipcMain.handle("desktop:open-backups", () => {

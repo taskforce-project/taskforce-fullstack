@@ -50,7 +50,7 @@ public enum NotificationEvent {
             case "statusChanged", "completed" -> Optional.of(STATUS_CHANGED);
             case "dueSoon", "overdue" -> Optional.of(DUE_DATE);
             case "overload" -> Optional.of(OVERLOAD);
-            case "agentApproval", "agentDone", "agentFailed" -> Optional.of(AGENT);
+            case "agentApproval", "agentDone", "agentFailed", "agentNotStarted" -> Optional.of(AGENT);
             default -> Optional.empty();
         };
     }
