@@ -89,7 +89,7 @@ class AgentServiceTest {
             .owner(User.builder().email("owner@acme.test").build()).build();
         lenient().when(workspaces.findById(1L)).thenReturn(Optional.of(owned));
         ReflectionTestUtils.setField(service, "gate", new CortexGate(new HarnessRulesService(ruleSets), workspaces));
-        lenient().when(records.open(any(), any())).thenReturn(RECORD);
+        lenient().when(records.open(any(), any(), any())).thenReturn(RECORD);
         lenient().when(records.append(any(), any(), any(), any())).thenReturn(Optional.of("hash"));
     }
 
@@ -479,7 +479,7 @@ class AgentServiceTest {
         service.run("acme", 7L, "Create an issue \"Release notes\"");
 
         InOrder order = Mockito.inOrder(records, tool);
-        order.verify(records).open(any(), eq("Create an issue \"Release notes\""));
+        order.verify(records).open(any(), eq("Create an issue \"Release notes\""), any());
         order.verify(records).append(eq(RECORD), eq("action.requested"), eq(CortexRecordService.Actor.CORTEX), any());
         order.verify(records).append(eq(RECORD), eq("action.decided"), eq(CortexRecordService.Actor.rule("create-issue")), any());
         order.verify(tool).execute(any(), any());
@@ -497,14 +497,14 @@ class AgentServiceTest {
 
         service.run("acme", 7L, "Give me the status of the project");
 
-        verify(records, never()).open(any(), any());
+        verify(records, never()).open(any(), any(), any());
     }
 
     @Test
     @DisplayName("sans dossier, pas d'action : une panne du dossier arrête l'outil")
     void no_record_no_action() throws Exception {
         AgentTool tool = stubInternalCall("create_issue");
-        when(records.open(any(), any())).thenThrow(new IllegalStateException("database down"));
+        when(records.open(any(), any(), any())).thenThrow(new IllegalStateException("database down"));
 
         AssistantAnswer answer = service.run("acme", 7L, "Create an issue \"Release notes\"");
 
@@ -731,5 +731,25 @@ class AgentServiceTest {
             .contains("external system")
             .contains("target TaskForce by default")
             .contains("find_integration");
+    }
+
+    // -------------------------------------------------------------------------
+    // Le modèle au dossier
+    // -------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("le dossier garde ce qui a répondu : le modèle, le tier, les notes servies")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void the_record_keeps_what_answered() throws Exception {
+        AgentTool tool = stubInternalCall("create_issue");
+        when(tool.execute(any(), any())).thenReturn("Created TF-31");
+        when(llm.currentModel()).thenReturn("qwen3:8b");
+
+        service.run("acme", 7L, "Create an issue \"Release notes\"");
+
+        ArgumentCaptor<Map<String, Object>> origin = (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
+        verify(records).open(any(), eq("Create an issue \"Release notes\""), origin.capture());
+        assertThat(origin.getValue()).containsEntry("model", "qwen3:8b").containsEntry("tier", "fast")
+            .containsEntry("notes", List.of());
     }
 }

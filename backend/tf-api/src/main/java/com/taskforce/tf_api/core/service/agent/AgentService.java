@@ -5,6 +5,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -361,7 +362,7 @@ public class AgentService {
         List<Map<String, Object>> toolDefs = tools.toolDefinitions(external);
         String tier = external.isEmpty() ? "fast" : mcpToolTier;
         // Le noyau (R35) : les règles de l'espace et le dossier de la réponse, ouverts au premier outil.
-        Kernel kernel = new Kernel(ctx, message);
+        Kernel kernel = new Kernel(ctx, message, origin(tier, hits));
 
         for (int i = 0; i < MAX_TOOL_ITERS; i++) {
             JsonNode msg = llm.rawChat(messages, toolDefs, tier);
@@ -418,6 +419,19 @@ public class AgentService {
         return "Answer interrupted (too many tool steps).";
     }
 
+    /** Ce qui a répondu : le tier et les notes servies ; le modèle s'y ajoute à l'ouverture du dossier. */
+    private static Map<String, Object> origin(String tier, List<KnowledgeNode> hits) {
+        Map<String, Object> origin = new LinkedHashMap<>();
+        origin.put("tier", tier);
+        origin.put("notes", hits.stream().map(note -> {
+            Map<String, Object> served = new LinkedHashMap<>();
+            served.put("id", note.getId());
+            served.put("title", note.getTitle());
+            return served;
+        }).toList());
+        return origin;
+    }
+
     /**
      * Le noyau pour une réponse de Cortex : les règles de l'espace et le dossier, ouverts au premier outil seulement,
      * pour qu'une réponse sans outil ne laisse pas de dossier vide.
@@ -425,18 +439,20 @@ public class AgentService {
     private final class Kernel {
         private final AgentContext ctx;
         private final String question;
+        private final Map<String, Object> origin;
         private RulesBundle bundle;
         private UUID record;
 
-        Kernel(AgentContext ctx, String question) {
+        Kernel(AgentContext ctx, String question, Map<String, Object> origin) {
             this.ctx = ctx;
             this.question = question;
+            this.origin = origin;
         }
 
         /** La demande, puis la décision des règles, au dossier avant tout effet : sans dossier, l'action ne part pas. */
         CortexGate.Verdict judge(AgentTool tool, String argsJson) {
             if (bundle == null) bundle = gate.rulesFor(ctx);
-            if (record == null) record = records.open(ctx, question);
+            if (record == null) record = records.open(ctx, question, withModel(origin));
             traceBefore(record, "action.requested", CortexRecordService.Actor.CORTEX,
                 Map.of("tool", tool.name(), "arguments", CortexRecordService.shorten(argsJson)));
             CortexGate.Verdict verdict = gate.judge(bundle, tool);
@@ -452,6 +468,14 @@ public class AgentService {
 
         String recordRef() {
             return record == null ? null : record.toString();
+        }
+
+        /** Le modèle qui a répondu, connu dès le premier appel d'outil. */
+        private Map<String, Object> withModel(Map<String, Object> origin) {
+            Map<String, Object> withModel = new LinkedHashMap<>();
+            withModel.put("model", llm.currentModel());
+            withModel.putAll(origin);
+            return withModel;
         }
     }
 

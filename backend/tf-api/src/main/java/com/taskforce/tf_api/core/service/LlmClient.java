@@ -40,4 +40,7 @@ public interface LlmClient {
 
     /** Termine l'accumulation et libère l'accumulateur du thread. */
     default void endUsageCapture() { /* no-op */ }
+
+    /** Le modèle qui a répondu au dernier appel depuis {@link #beginUsageCapture()}, s'il est connu. */
+    default String currentModel() { return null; }
 }

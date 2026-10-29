@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service.agent;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -62,13 +63,22 @@ public class CortexRecordService {
     private final CortexRecordRepository records;
     private final CortexRecordEventRepository eventRepository;
 
-    /** Ouvre le dossier d'une réponse, sur la question telle que la personne l'a posée. */
+    /**
+     * Ouvre le dossier d'une réponse, sur la question telle que la personne l'a posée, et ce qui y a répondu : le
+     * modèle, le tier, les notes servies. Une valeur nulle de l'origine n'entre pas au dossier.
+     */
     @Transactional
-    public UUID open(AgentContext ctx, String question) {
+    public UUID open(AgentContext ctx, String question, Map<String, ?> origin) {
         UUID id = UUID.randomUUID();
         records.save(CortexRecord.builder().id(id).workspaceId(ctx.workspaceId()).userId(ctx.userId())
             .createdAt(LocalDateTime.now()).build());
-        append(id, "mission.started", Actor.person(ctx.userId()), Map.of("agent", "internal", "question", shorten(question)));
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("agent", "internal");
+        data.put("question", shorten(question));
+        if (origin != null) {
+            origin.forEach((key, value) -> { if (value != null) data.putIfAbsent(key, value); });
+        }
+        append(id, "mission.started", Actor.person(ctx.userId()), data);
         return id;
     }
 
