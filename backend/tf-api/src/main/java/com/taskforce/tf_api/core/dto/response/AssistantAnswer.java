@@ -30,8 +30,11 @@ public record AssistantAnswer(
         public AssistantStep(String label, String status) { this(label, status, null); }
     }
 
-    /** Un appel d'outil effectué par l'agent. status : success | error | running. */
-    public record AssistantToolCall(String name, String status, String input, String output) {}
+    /**
+     * Un appel d'outil de l'agent. status : success | error | pending (proposé, il attend l'accord de la personne) |
+     * refused (les règles de l'espace le refusent). {@code record} : le dossier de la réponse, que l'accord prolonge.
+     */
+    public record AssistantToolCall(String name, String status, String input, String output, String record) {}
 
     /** Tokens réellement consommés par ce tour (cumulés sur les appels LLM). */
     public record AssistantUsage(long promptTokens, long completionTokens, long totalTokens) {

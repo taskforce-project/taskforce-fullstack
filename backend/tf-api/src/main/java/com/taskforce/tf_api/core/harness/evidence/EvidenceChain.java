@@ -3,10 +3,14 @@ package com.taskforce.tf_api.core.harness.evidence;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
@@ -18,7 +22,29 @@ public final class EvidenceChain {
 
     public static final String ZERO_HASH = "sha256:" + "0".repeat(64);
 
+    /** L'heure d'un événement, telle qu'elle entre dans l'empreinte : ISO-8601, UTC, à la milliseconde. */
+    public static final DateTimeFormatter AT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+        .withZone(ZoneOffset.UTC);
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+
     private EvidenceChain() {
+    }
+
+    /**
+     * Un événement du dossier, avant chaînage (contracts/evidence) : la même forme pour le dossier d'une mission et
+     * pour celui d'une réponse de Cortex, l'agent interne.
+     */
+    public static ObjectNode event(int seq, String at, String type, String actorKind, String actorId, JsonNode data) {
+        ObjectNode event = JSON.createObjectNode();
+        event.put("seq", seq);
+        event.put("at", at);
+        event.put("type", type);
+        ObjectNode actor = event.putObject("actor");
+        actor.put("kind", actorKind);
+        actor.put("id", actorId);
+        event.set("data", data);
+        return event;
     }
 
     public static String sha256(String text) {

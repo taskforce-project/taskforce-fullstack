@@ -9,13 +9,15 @@ import {
 } from "@/components/chat"
 import { Markdown } from "@/components/ui/lightweight-markdown"
 import { cn } from "@/lib/utils"
-import { sendAgentMessage, type AssistantAnswer } from "@/lib/api/assistant-service"
+import {
+  sendAgentMessage, approveAction, isApprovable, type AssistantAnswer, type AssistantToolCall,
+} from "@/lib/api/assistant-service"
 import { getErrorMessage, getErrorStatus } from "@/lib/api/client"
 import {
   listConversations, getConversation, deleteConversation,
   type ConversationSummary, type ConversationMessage,
 } from "@/lib/api/ai-conversation-service"
-import { executeMcpAction, getMcpServers } from "@/lib/api/integration-service"
+import { getMcpServers } from "@/lib/api/integration-service"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { IS_DESKTOP } from "@/lib/desktop"
@@ -99,20 +101,28 @@ function AiUnavailableNotice() {
   )
 }
 
+const OUTCOME: Record<"success" | "refused" | "error", string> = {
+  success: "Done. ",
+  refused: "",
+  error: "The action failed: ",
+}
+
 /**
- * Écriture sur un outil externe (MCP) proposée par Cortex. Rien n'est fait sans le clic de l'utilisateur :
- * l'action passe alors par la même route que la console MCP (réservée aux gestionnaires du workspace).
+ * Action proposée par Cortex, interne (une note, un projet) ou dans un outil connecté : les règles de l'espace la
+ * demandent à la personne. Rien n'est fait sans son clic ; l'accord part avec le dossier de la réponse, où le serveur
+ * la rejuge et la garde.
  */
-function PendingAction({ slug, toolRef, input }: { slug: string; toolRef: string; input: string | null }) {
-  const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle")
+function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }) {
+  const [state, setState] = useState<"idle" | "running" | "success" | "refused" | "error">("idle")
   const [output, setOutput] = useState<string | null>(null)
+  const external = call.name.includes("__")
 
   const run = async () => {
     setState("running")
     try {
-      const args = input ? (JSON.parse(input) as Record<string, unknown>) : {}
-      setOutput(await executeMcpAction(slug, toolRef, args))
-      setState("done")
+      const result = await approveAction(slug, call)
+      setOutput(result.output)
+      setState(result.status)
     } catch (e) {
       setOutput(getErrorMessage(e))
       setState("error")
@@ -122,8 +132,8 @@ function PendingAction({ slug, toolRef, input }: { slug: string; toolRef: string
   return (
     <div className="my-2 flex flex-col gap-2 border border-shape-yellow/35 bg-shape-yellow/[0.06] p-2.5 text-xs">
       <p className="text-muted-foreground">
-        Cortex proposes to run <span className="font-mono text-foreground">{toolRef}</span> on a connected tool.
-        Nothing is sent until you approve it.
+        Cortex proposes to run <span className="font-mono text-foreground">{call.name}</span>
+        {external ? " on a connected tool. Nothing is sent until you approve it." : ". Nothing changes until you approve it."}
       </p>
       {state === "idle" || state === "running" ? (
         <button
@@ -135,8 +145,9 @@ function PendingAction({ slug, toolRef, input }: { slug: string; toolRef: string
           <Play className="size-3" /> {state === "running" ? "Running…" : "Approve and run"}
         </button>
       ) : (
-        <p className={cn("whitespace-pre-wrap break-words", state === "error" ? "text-destructive" : "text-ink-green")}>
-          {state === "done" ? "Done. " : "The action failed: "}{output}
+        <p className={cn("whitespace-pre-wrap break-words",
+          state === "success" ? "text-ink-green" : state === "refused" ? "text-ink-red" : "text-destructive")}>
+          {OUTCOME[state]}{output}
         </p>
       )}
     </div>
@@ -263,13 +274,16 @@ export function AgentChat() {
       void loadConversations()
     } catch (e) {
       // 409 = plafond de tokens IA atteint → carte d'info + CTA (pas un repli « réessayez » trompeur
-      // qui laisse croire à un bug). Tout autre cas reste un repli générique.
-      if (getErrorStatus(e) === 409) {
+      // qui laisse croire à un bug). 429 = le frein de débit : sa limite et la vraie attente, comme le toast (R52).
+      // Tout autre cas reste un repli générique.
+      const status = getErrorStatus(e)
+      if (status === 409) {
         setTurns((t) => [...t, { id: `a${Date.now()}`, role: "assistant", kind: "quota" }])
       } else {
+        const text = status === 429 ? getErrorMessage(e) : "Sorry, I couldn't answer. Please try again."
         setTurns((t) => [...t, {
           id: `a${Date.now()}`, role: "assistant",
-          answer: { answer: "Sorry, I couldn't answer. Please try again.", reasoning: null, mode: "fallback", sources: [], steps: [], toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 } },
+          answer: { answer: text, reasoning: null, mode: "fallback", sources: [], steps: [], toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 } },
         }])
       }
     } finally {
@@ -470,10 +484,8 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
       {answer.toolCalls.map((tc, i) => (
         <div key={i}>
           <Tool name={tc.name} status={tc.status as ToolStatus} input={tc.input ?? undefined} output={tc.output ?? undefined} />
-          {/* Écriture externe proposée (outil « <service>__… ») : validation explicite de l'utilisateur. */}
-          {tc.status === "pending" && tc.name.includes("__") && (
-            <PendingAction slug={slug} toolRef={tc.name} input={tc.input} />
-          )}
+          {/* Action demandée par les règles de l'espace : validation explicite de l'utilisateur. */}
+          {isApprovable(tc) && <PendingAction slug={slug} call={tc} />}
         </div>
       ))}
       <Markdown content={answer.answer} />

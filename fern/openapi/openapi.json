@@ -37,11 +37,19 @@
       "description": "Workspaces: creation, members and settings."
     },
     {
+      "name": "Workspace files",
+      "description": "A whole workspace as one file, its Brain OS and all its projects: download it, or create a new workspace from it."
+    },
+    {
       "name": "Projects",
       "description": "Projects, their visibility, statuses and issue types."
     },
     {
       "name": "Project export"
+    },
+    {
+      "name": "Project files",
+      "description": "A whole project as one file: download it, or create a project from it."
     },
     {
       "name": "Issues",
@@ -50,10 +58,6 @@
     {
       "name": "Cycles",
       "description": "Cycles: time-boxed iterations and their progress."
-    },
-    {
-      "name": "Pages",
-      "description": "Documents attached to a project."
     },
     {
       "name": "Roadmap",
@@ -77,6 +81,14 @@
     {
       "name": "Personal access tokens",
       "description": "Personal access tokens, valid on the MCP server only."
+    },
+    {
+      "name": "Passkeys",
+      "description": "The person's passkeys: add one, list them, remove one. Signing in with a passkey is under Authentication."
+    },
+    {
+      "name": "Desktop sessions",
+      "description": "The desktop app's sessions of the person: approve a sign-in from the web app, list the computers, sign one out."
     },
     {
       "name": "Invitations"
@@ -157,9 +169,6 @@
     },
     {
       "name": "Attachments"
-    },
-    {
-      "name": "Status"
     }
   ],
   "paths": {
@@ -328,6 +337,55 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseProjectRepoResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/projects/{id}/repo/test-command": {
+      "put": {
+        "tags": [
+          "Projects"
+        ],
+        "operationId": "setTestCommand",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectTestCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProjectTestCommandResponse"
                 }
               }
             }
@@ -1190,92 +1248,6 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseProjectResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/workspaces/{slug}/projects/{projectId}/pages": {
-      "get": {
-        "tags": [
-          "Pages"
-        ],
-        "operationId": "listPages",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "projectId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseListPageResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Pages"
-        ],
-        "operationId": "createPage",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "projectId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreatePageRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponsePageResponse"
                 }
               }
             }
@@ -2856,6 +2828,36 @@
         }
       }
     },
+    "/api/workspaces/{slug}/projects/import": {
+      "post": {
+        "tags": [
+          "Project files"
+        ],
+        "operationId": "importProject",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProjectResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/priorities/{priorityId}/pin": {
       "post": {
         "tags": [
@@ -3281,7 +3283,7 @@
         "tags": [
           "MCP actions"
         ],
-        "operationId": "importProject",
+        "operationId": "importProject_1",
         "parameters": [
           {
             "name": "slug",
@@ -4075,6 +4077,46 @@
         }
       }
     },
+    "/api/workspaces/{slug}/assistant/actions/execute": {
+      "post": {
+        "tags": [
+          "AI assistant"
+        ],
+        "operationId": "runApproved",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAssistantActionResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/analytics/charts": {
       "get": {
         "tags": [
@@ -4340,6 +4382,26 @@
         }
       }
     },
+    "/api/workspaces/import": {
+      "post": {
+        "tags": [
+          "Workspace files"
+        ],
+        "operationId": "importWorkspace",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseWorkspaceResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/users/me/tokens": {
       "get": {
         "tags": [
@@ -4388,6 +4450,74 @@
         }
       }
     },
+    "/api/users/me/passkeys": {
+      "get": {
+        "tags": [
+          "Passkeys"
+        ],
+        "operationId": "list_4",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListPasskeyResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Passkeys"
+        ],
+        "operationId": "register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyRegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePasskeyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me/passkeys/options": {
+      "post": {
+        "tags": [
+          "Passkeys"
+        ],
+        "operationId": "options",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/users/me/onboarding": {
       "post": {
         "tags": [
@@ -4411,6 +4541,36 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me/desktop-sessions/authorize": {
+      "post": {
+        "tags": [
+          "Desktop sessions"
+        ],
+        "operationId": "authorize",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesktopAuthorizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDesktopAuthorizeResponse"
                 }
               }
             }
@@ -4762,7 +4922,7 @@
         "tags": [
           "Authentication"
         ],
-        "operationId": "register",
+        "operationId": "register_1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4811,6 +4971,56 @@
               }
             }
           }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAuthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/passkey/options": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "operationId": "options_1",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePasskeySignInOptionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/passkey/login": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeySignInRequest"
+              }
+            }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -4921,7 +5131,7 @@
         "tags": [
           "Authentication"
         ],
-        "operationId": "login",
+        "operationId": "login_1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -5188,156 +5398,6 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseTeamResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/workspaces/{slug}/projects/{projectId}/pages/{pageId}": {
-      "get": {
-        "tags": [
-          "Pages"
-        ],
-        "operationId": "getPage",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "projectId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "pageId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponsePageResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Pages"
-        ],
-        "operationId": "deletePage",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "projectId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "pageId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "Pages"
-        ],
-        "operationId": "updatePage",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "projectId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "pageId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdatePageRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponsePageResponse"
                 }
               }
             }
@@ -7115,6 +7175,38 @@
         }
       }
     },
+    "/api/workspaces/{slug}/projects/{projectId}/bundle": {
+      "get": {
+        "tags": [
+          "Project files"
+        ],
+        "operationId": "export_1",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/projects/{projectId}/brief": {
       "get": {
         "tags": [
@@ -7287,36 +7379,6 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseListNotificationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/workspaces/{slug}/my-pages": {
-      "get": {
-        "tags": [
-          "My work"
-        ],
-        "operationId": "listMyPages",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseListMyWorkPageResponse"
                 }
               }
             }
@@ -7768,6 +7830,54 @@
         }
       }
     },
+    "/api/workspaces/{slug}/delivery/runs/{runId}/evidence": {
+      "get": {
+        "tags": [
+          "Coding agents"
+        ],
+        "operationId": "evidence",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "json"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/delivery/runs/{runId}/activity": {
       "get": {
         "tags": [
@@ -7891,6 +8001,29 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/bundle": {
+      "get": {
+        "tags": [
+          "Workspace files"
+        ],
+        "operationId": "export_2",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -8223,7 +8356,7 @@
         "tags": [
           "AI assistant"
         ],
-        "operationId": "list_4",
+        "operationId": "list_5",
         "parameters": [
           {
             "name": "slug",
@@ -8354,6 +8487,26 @@
         }
       }
     },
+    "/api/users/me/desktop-sessions": {
+      "get": {
+        "tags": [
+          "Desktop sessions"
+        ],
+        "operationId": "list_6",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListDesktopSessionInfoResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/users/me/2fa": {
       "get": {
         "tags": [
@@ -8378,6 +8531,16 @@
           "Users"
         ],
         "operationId": "disableTwoFactor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TwoFactorConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -8385,26 +8548,6 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/status": {
-      "get": {
-        "tags": [
-          "Status"
-        ],
-        "operationId": "status_1",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseStatusResponse"
                 }
               }
             }
@@ -8617,7 +8760,7 @@
         "tags": [
           "OAuth login"
         ],
-        "operationId": "authorize",
+        "operationId": "authorize_1",
         "parameters": [
           {
             "name": "provider",
@@ -8675,7 +8818,18 @@
         "tags": [
           "AI status"
         ],
-        "operationId": "status_2",
+        "operationId": "status_1",
+        "parameters": [
+          {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -9192,7 +9346,7 @@
         "tags": [
           "Invitations"
         ],
-        "operationId": "revoke",
+        "operationId": "revoke_1",
         "parameters": [
           {
             "name": "slug",
@@ -9477,10 +9631,71 @@
         "tags": [
           "Personal access tokens"
         ],
-        "operationId": "revoke_1",
+        "operationId": "revoke_2",
         "parameters": [
           {
             "name": "tokenId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me/passkeys/{passkeyId}": {
+      "delete": {
+        "tags": [
+          "Passkeys"
+        ],
+        "operationId": "delete_3",
+        "parameters": [
+          {
+            "name": "passkeyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me/desktop-sessions/{sessionId}": {
+      "delete": {
+        "tags": [
+          "Desktop sessions"
+        ],
+        "operationId": "revoke_3",
+        "parameters": [
+          {
+            "name": "sessionId",
             "in": "path",
             "required": true,
             "schema": {
@@ -9630,6 +9845,47 @@
             "type": "string"
           },
           "repoFullName": {
+            "type": "string"
+          }
+        }
+      },
+      "ProjectTestCommandRequest": {
+        "type": "object",
+        "properties": {
+          "testCommand": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0,
+            "pattern": "[^\\r\\n]*"
+          }
+        }
+      },
+      "ApiResponseProjectTestCommandResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProjectTestCommandResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectTestCommandResponse": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "testCommand": {
             "type": "string"
           }
         }
@@ -10720,6 +10976,9 @@
           "repoFullName": {
             "type": "string"
           },
+          "testCommand": {
+            "type": "string"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -10733,80 +10992,6 @@
           },
           "isFavorite": {
             "type": "boolean"
-          }
-        }
-      },
-      "CreatePageRequest": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "maxLength": 500,
-            "minLength": 0
-          },
-          "emoji": {
-            "type": "string",
-            "maxLength": 10,
-            "minLength": 0
-          },
-          "content": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "title"
-        ]
-      },
-      "ApiResponsePageResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/PageResponse"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "PageResponse": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "title": {
-            "type": "string"
-          },
-          "emoji": {
-            "type": "string"
-          },
-          "excerpt": {
-            "type": "string"
-          },
-          "content": {
-            "type": "string"
-          },
-          "createdByName": {
-            "type": "string"
-          },
-          "createdByInitials": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },
@@ -13003,6 +13188,9 @@
           "error": {
             "type": "string"
           },
+          "refused": {
+            "type": "boolean"
+          },
           "startedById": {
             "type": "integer",
             "format": "int64"
@@ -13312,6 +13500,9 @@
           },
           "output": {
             "type": "string"
+          },
+          "record": {
+            "type": "string"
           }
         }
       },
@@ -13344,6 +13535,62 @@
           },
           "answer": {
             "$ref": "#/components/schemas/AssistantAnswer"
+          }
+        }
+      },
+      "AssistantActionRequest": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "input": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 0
+          },
+          "record": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "record",
+          "tool"
+        ]
+      },
+      "ApiResponseAssistantActionResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AssistantActionResult"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AssistantActionResult": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "output": {
+            "type": "string"
           }
         }
       },
@@ -13708,6 +13955,79 @@
           }
         }
       },
+      "PasskeyRegistrationRequest": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "credential": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "credential"
+        ]
+      },
+      "ApiResponsePasskeyResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PasskeyResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PasskeyResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseMapStringObject": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "CompleteOnboardingRequest": {
         "type": "object",
         "properties": {
@@ -13777,6 +14097,57 @@
           "scheduledPurgeAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "DesktopAuthorizeRequest": {
+        "type": "object",
+        "properties": {
+          "codeChallenge": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "redirectUri": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "state": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "codeChallenge",
+          "redirectUri",
+          "state"
+        ]
+      },
+      "ApiResponseDesktopAuthorizeResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DesktopAuthorizeResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DesktopAuthorizeResponse": {
+        "type": "object",
+        "properties": {
+          "redirectUrl": {
+            "type": "string"
           }
         }
       },
@@ -13910,6 +14281,9 @@
             "type": "string",
             "maxLength": 4000,
             "minLength": 0
+          },
+          "refused": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -13922,7 +14296,7 @@
           "kind": {
             "type": "string",
             "minLength": 1,
-            "pattern": "start|text|tool|error|denied"
+            "pattern": "start|text|tool|error|denied|decision|exit|limit|test"
           },
           "tool": {
             "type": "string",
@@ -13932,6 +14306,15 @@
           "text": {
             "type": "string",
             "maxLength": 4000,
+            "minLength": 0
+          },
+          "effect": {
+            "type": "string",
+            "pattern": "allow|ask|deny"
+          },
+          "rule": {
+            "type": "string",
+            "maxLength": 80,
             "minLength": 0
           }
         },
@@ -13968,6 +14351,10 @@
             "type": "string",
             "maxLength": 4000,
             "minLength": 0
+          },
+          "askedBy": {
+            "type": "string",
+            "pattern": "agent|runner"
           }
         },
         "required": [
@@ -14009,6 +14396,18 @@
           }
         }
       },
+      "RunnerReadinessRequest": {
+        "type": "object",
+        "properties": {
+          "agentReady": {
+            "type": "boolean"
+          },
+          "agentProblem": {
+            "type": "string",
+            "pattern": "[a-z][a-z-]{0,39}"
+          }
+        }
+      },
       "ApiResponseRunnerClaimResponse": {
         "type": "object",
         "properties": {
@@ -14024,6 +14423,95 @@
           "timestamp": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "Condition": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "repoVisibility": {
+            "type": "string"
+          },
+          "server": {
+            "type": "string"
+          },
+          "sensitivity": {
+            "type": "string"
+          }
+        }
+      },
+      "Rule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "when": {
+            "$ref": "#/components/schemas/Condition"
+          },
+          "class": {
+            "type": "string"
+          },
+          "effect": {
+            "type": "string"
+          },
+          "inverse": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "review": {
+            "type": "string"
+          }
+        }
+      },
+      "RulesBundle": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string"
+          },
+          "workspace": {
+            "type": "string"
+          },
+          "project": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "issuedAt": {
+            "type": "string"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Rule"
+            }
           }
         }
       },
@@ -14066,6 +14554,12 @@
           "sessionExpiresAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/RulesBundle"
+          },
+          "testCommand": {
+            "type": "string"
           }
         }
       },
@@ -14335,6 +14829,54 @@
           }
         }
       },
+      "ApiResponsePasskeySignInOptionsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PasskeySignInOptionsResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PasskeySignInOptionsResponse": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "PasskeySignInRequest": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "credential": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "credential",
+          "requestId"
+        ]
+      },
       "CallbackRequest": {
         "type": "object",
         "properties": {
@@ -14394,6 +14936,233 @@
           "email"
         ]
       },
+      "DesktopWorkspaceRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "workspace": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "token",
+          "workspace"
+        ]
+      },
+      "DesktopSessionTokenRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "ApiResponseWebProjectsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/WebProjectsResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WebProject": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "issueCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "WebProjectsResponse": {
+        "type": "object",
+        "properties": {
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WebWorkspace"
+            }
+          }
+        }
+      },
+      "WebWorkspace": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WebProject"
+            }
+          }
+        }
+      },
+      "DesktopTransferRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "workspace": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "projectId",
+          "token",
+          "workspace"
+        ]
+      },
+      "DesktopTokenRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "codeVerifier": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "redirectUri": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "deviceName": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "code",
+          "codeVerifier",
+          "redirectUri"
+        ]
+      },
+      "ApiResponseDesktopSessionResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DesktopSessionResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DesktopAccountResponse": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "givenName": {
+            "type": "string"
+          },
+          "familyName": {
+            "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/DesktopProfileResponse"
+          },
+          "avatarUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "DesktopProfileResponse": {
+        "type": "object",
+        "properties": {
+          "jobTitle": {
+            "type": "string"
+          },
+          "onboardingCompleted": {
+            "type": "boolean"
+          },
+          "skills": {
+            "$ref": "#/components/schemas/UpsertMemberSkillsRequest"
+          },
+          "notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            }
+          }
+        }
+      },
+      "DesktopSessionResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "account": {
+            "$ref": "#/components/schemas/DesktopAccountResponse"
+          }
+        }
+      },
       "UpdateWorkspaceRequest": {
         "type": "object",
         "properties": {
@@ -14441,24 +15210,6 @@
             "type": "string",
             "maxLength": 50,
             "minLength": 0
-          }
-        }
-      },
-      "UpdatePageRequest": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "maxLength": 500,
-            "minLength": 0
-          },
-          "emoji": {
-            "type": "string",
-            "maxLength": 10,
-            "minLength": 0
-          },
-          "content": {
-            "type": "string"
           }
         }
       },
@@ -14990,27 +15741,6 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ProjectResponse"
-            }
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "ApiResponseListPageResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PageResponse"
             }
           },
           "timestamp": {
@@ -15637,42 +16367,6 @@
           }
         }
       },
-      "ApiResponseListMyWorkPageResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MyWorkPageResponse"
-            }
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "MyWorkPageResponse": {
-        "type": "object",
-        "properties": {
-          "projectId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "projectName": {
-            "type": "string"
-          },
-          "page": {
-            "$ref": "#/components/schemas/PageResponse"
-          }
-        }
-      },
       "ApiResponseListMyWorkCycleResponse": {
         "type": "object",
         "properties": {
@@ -16234,6 +16928,9 @@
           },
           "canDecide": {
             "type": "boolean"
+          },
+          "askedBy": {
+            "type": "string"
           }
         }
       },
@@ -16987,6 +17684,72 @@
           }
         }
       },
+      "ApiResponseListPasskeyResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PasskeyResponse"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseListDesktopSessionInfoResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DesktopSessionInfoResponse"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DesktopSessionInfoResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "ApiResponseBoolean": {
         "type": "object",
         "properties": {
@@ -17002,49 +17765,6 @@
           "timestamp": {
             "type": "string",
             "format": "date-time"
-          }
-        }
-      },
-      "ApiResponseStatusResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/StatusResponse"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "ComponentStatus": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          }
-        }
-      },
-      "StatusResponse": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string"
-          },
-          "components": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ComponentStatus"
-            }
           }
         }
       },
@@ -17139,25 +17859,6 @@
           },
           "projectName": {
             "type": "string"
-          }
-        }
-      },
-      "ApiResponseMapStringObject": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "object",
-            "additionalProperties": {}
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },
