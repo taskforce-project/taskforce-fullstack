@@ -113,8 +113,18 @@ export interface DesktopGitHubRepo {
  * le Store).
  */
 export type DesktopUpdateCheck =
-  | { status: "up-to-date" | "downloading"; version: string }
+  | { status: "up-to-date" | "downloading" | "ready"; version: string }
   | { status: "unavailable" | "development" | "store" };
+
+/**
+ * État de la mise à jour, envoyé par la coque à chaque changement (cf. `desktop/src/update-state.ts`) : le toast de la
+ * mise à jour en montre l'avancement, puis le bouton de redémarrage.
+ */
+export type DesktopUpdateState =
+  | { status: "idle" }
+  | { status: "downloading"; version: string; percent: number }
+  | { status: "ready"; version: string }
+  | { status: "failed"; version: string; message: string };
 
 /** Ce que la coque expose à la fenêtre de l'app. */
 export interface DesktopBridge {
@@ -132,6 +142,13 @@ export interface DesktopBridge {
   /** Ouvre le compte TaskForce en ligne (mot de passe, double authentification, suppression) dans le navigateur. */
   openAccountPage(): Promise<void>;
   checkForUpdates(): Promise<DesktopUpdateCheck>;
+  /** Mise à jour de l'app : son état, reçu à chaque changement, et le redémarrage sur la version téléchargée. */
+  readonly updater?: {
+    state(): Promise<DesktopUpdateState>;
+    install(): Promise<void>;
+    /** Rend de quoi arrêter l'écoute. */
+    onState(callback: (state: DesktopUpdateState) => void): () => void;
+  };
   /** Ouvre le dossier des journaux de l'app (à joindre à un signalement). */
   openLogs(): Promise<void>;
   /** Ouvre le dossier des copies de la base faites avant chaque mise à jour. */
