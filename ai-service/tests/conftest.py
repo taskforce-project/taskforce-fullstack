@@ -52,8 +52,8 @@ class FakeProvider:
         raise urllib.error.URLError("connection refused")
 
 
-def http_error(code: int) -> urllib.error.HTTPError:
-    return urllib.error.HTTPError("http://provider", code, "error", {}, io.BytesIO(b"{}"))
+def http_error(code: int, body: bytes = b"{}") -> urllib.error.HTTPError:
+    return urllib.error.HTTPError("http://provider", code, "error", {}, io.BytesIO(body))
 
 
 @pytest.fixture
