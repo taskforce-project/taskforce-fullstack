@@ -16,9 +16,9 @@
 > - **Contrôles** : backend, tests ciblés (160, dont le contrat partagé) ; runner `npm test` (323) ; la suite complète tourne en CI.
 > - **Reste** : « Undo » sur la réponse (R77 de la séance n°13, en attente) ; la doc (spec §13.11) à la fusion, après la reconstruction du site.
 
-> **▶ MAJ 30/10/2026 - Release 1.6.7 EN PROD : la banque d'évaluations de Cortex ; desktop 1.3.7 en construction ; l'atelier des écrans de base lancé.** `[release + conseil + design]`
+> **▶ MAJ 30/10/2026 - Release 1.6.7 EN PROD : la banque d'évaluations de Cortex ; desktop 1.3.7 publiée ; l'atelier des écrans de base lancé.** `[release + conseil + design]`
 > - **Décision du CEO** : « lance l'atelier, et go release en même temps ». Q13 : pas encore d'hébergement, un VPS OVH VPS-3 dès que possible ; E12 sur Kaggle ; Cortex peut créer un projet, « tout passera par un input de chat + vocal globalement » ; la recette se fera quand le produit sera complet et à jour.
-> - **En prod** : `chore(desktop)` 1.3.7 (`ac54efcf`), release #441 vers `main` (`23585081`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.6.7 en plomberie). La banque (#437, V108) : le modèle au dossier de chaque réponse, « Add to test bank », Réglages > Test bank. Desktop 1.3.7 : en construction.
+> - **En prod** : `chore(desktop)` 1.3.7 (`ac54efcf`), release #441 vers `main` (`23585081`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.6.7 en plomberie). La banque (#437, V108) : le modèle au dossier de chaque réponse, « Add to test bank », Réglages > Test bank. Desktop 1.3.7 publiée : run 40971583297 depuis `main`, vert ; `latest.yml` en 1.3.7 ; le site est reconstruit pour la proposer.
 > - **Suite** : l'atelier des écrans de base (séance n°13), puis le lot 2 de la banque ; la règle `project.create` (Cortex crée un projet sans demander) après la reconstruction du site.
 
 > **▶ MAJ 30/10/2026 - Séance n°12 retenue : les solutions aux quatre réserves de la banque d'évaluations, dans l'ordre de Jobs.** `[conseil + direction]`
