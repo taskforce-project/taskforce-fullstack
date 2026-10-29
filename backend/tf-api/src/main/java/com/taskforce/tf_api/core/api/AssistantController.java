@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.taskforce.tf_api.core.dto.response.AssistantActionResult;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
 import com.taskforce.tf_api.core.dto.response.ChatTurnResponse;
 import com.taskforce.tf_api.core.model.AiConversation;
@@ -87,6 +88,21 @@ public class AssistantController {
         return ResponseEntity.ok(ApiResponse.success(new ChatTurnResponse(conv.getId(), title, answer)));
     }
 
+    /**
+     * Lance une action que Cortex a proposée et que la personne accorde (« Approve and run ») : le service la rejuge par
+     * les règles de l'espace et la garde au dossier de la réponse (R35).
+     */
+    @PostMapping(value = "/actions/execute", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<AssistantActionResult>> runApproved(
+        @PathVariable String slug,
+        @Valid @RequestBody AssistantActionRequest body,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success(
+            agentService.runApproved(slug, userId, body.tool(), body.input(), body.record())));
+    }
+
     // -------------------------------------------------------------------------
     // DTOs internes
     // -------------------------------------------------------------------------
@@ -94,5 +110,12 @@ public class AssistantController {
     public record AssistantRequest(
         @NotBlank @Size(max = 4000) String message,
         Long conversationId
+    ) {}
+
+    /** L'action proposée, telle que la réponse l'a rendue : son outil, ses arguments, le dossier qui l'a vue naître. */
+    public record AssistantActionRequest(
+        @NotBlank @Size(max = 128) String tool,
+        @Size(max = 20000) String input,
+        @NotBlank @Size(max = 64) String record
     ) {}
 }
