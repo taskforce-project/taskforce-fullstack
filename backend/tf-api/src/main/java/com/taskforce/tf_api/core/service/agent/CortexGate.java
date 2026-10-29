@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service.agent;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +39,9 @@ public class CortexGate {
         "create_issue", "issue.create",
         "create_project", "project.create",
         "create_note", "knowledge.write");
+
+    /** Les actions qui lisent sans rien changer : au rejeu d'un cas, la cassette les sert. */
+    static final Set<String> READS = Set.of("knowledge.search", "issue.read", "mcp.read");
 
     private static final String NO_RULE = "No rule of this workspace covers this action, so it waits for the person.";
 

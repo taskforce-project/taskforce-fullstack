@@ -98,16 +98,22 @@ public class AiGatewayClient implements LlmClient {
         JsonNode message = callChat(
             List.of(Map.of("role", "system", "content", systemPrompt),
                     Map.of("role", "user",   "content", userPrompt)),
-            null, jsonMode, tier);
+            null, jsonMode, tier, null);
         return message.path("content").asText("");
     }
 
     @Override
     public JsonNode rawChat(List<Map<String, Object>> messages, List<Map<String, Object>> tools, String tier) {
-        return callChat(messages, tools, false, tier);
+        return callChat(messages, tools, false, tier, null);
     }
 
-    private JsonNode callChat(List<?> messages, List<Map<String, Object>> tools, boolean jsonMode, String tier) {
+    @Override
+    public JsonNode rawChatWithModel(List<Map<String, Object>> messages, List<Map<String, Object>> tools, String model) {
+        return callChat(messages, tools, false, null, model);
+    }
+
+    private JsonNode callChat(List<?> messages, List<Map<String, Object>> tools, boolean jsonMode, String tier,
+                              String model) {
         if (!isConfigured()) {
             throw new LlmException("AI is not available on this instance", null);
         }
@@ -116,6 +122,8 @@ public class AiGatewayClient implements LlmClient {
         body.put("json_mode", jsonMode);
         if (tier != null) {
             body.put("tier", tier);
+        } else if (model != null && !model.isBlank()) {
+            body.put("model", model); // sans tier : la passerelle prend ce modèle
         }
         if (tools != null && !tools.isEmpty()) {
             body.put("tools", tools);
