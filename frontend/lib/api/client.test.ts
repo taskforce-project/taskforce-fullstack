@@ -33,7 +33,7 @@ vi.mock('sonner', () => ({
 }));
 
 // Import après les mocks : c'est cet import qui enregistre les intercepteurs.
-const { apiClient, getErrorMessage, AI_TIMEOUT_MS } = await import('./client');
+const { apiClient, getErrorMessage, getRetryAfterSeconds, AI_TIMEOUT_MS } = await import('./client');
 
 /**
  * Les gestionnaires sont capturés **une fois**, au chargement du module. Les lire ici plutôt que
@@ -394,6 +394,25 @@ describe('API Client', () => {
 
       expect(getErrorMessage(null)).toBe('Something went wrong');
       expect(getErrorMessage(undefined)).toBe('Something went wrong');
+    });
+  });
+
+  describe('getRetryAfterSeconds', () => {
+    it.each([
+      ['un 429 qui annonce son attente', { status: 429, headers: { 'retry-after': '41.2' } }, 42],
+      ['un 429 sans attente', { status: 429, headers: {} }, null],
+      ['un 429 à l’attente illisible', { status: 429, headers: { 'retry-after': 'soon' } }, null],
+      ['une autre erreur', { status: 409, headers: { 'retry-after': '41' } }, null],
+    ])('%s', (_label, response, expected) => {
+      vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+      expect(getRetryAfterSeconds({ isAxiosError: true, response })).toBe(expected);
+    });
+
+    it('rien pour une erreur hors Axios', () => {
+      vi.mocked(axios.isAxiosError).mockReturnValue(false);
+
+      expect(getRetryAfterSeconds(new Error('down'))).toBeNull();
     });
   });
 });
