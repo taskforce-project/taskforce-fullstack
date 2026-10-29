@@ -195,7 +195,7 @@ class AgentServiceTest {
         AssistantAnswer answer = service.run("acme", 7L, "Create an issue \"Cortex test\" in TaskForce");
 
         assertThat(answer.mode()).isEqualTo("fallback");
-        assertThat(answer.answer()).contains("Cortex could not act").contains("nothing was created or changed");
+        assertThat(answer.answer()).startsWith("> [!warning] Cortex could not act").contains("nothing was created or changed");
         assertThat(answer.steps()).anyMatch(s -> "error".equals(s.status()) && s.description().contains("refused"));
     }
 

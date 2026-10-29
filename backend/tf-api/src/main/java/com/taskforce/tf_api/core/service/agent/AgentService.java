@@ -442,34 +442,25 @@ public class AgentService {
 
     /** Le fournisseur a refusé les outils : rien n'a été fait, on le dit, avec les notes trouvées. */
     private static String toolsRefusedAnswer(List<KnowledgeNode> hits) {
-        StringBuilder sb = new StringBuilder();
-        if (!hits.isEmpty()) {
-            sb.append("Here are the most relevant notes of your workspace:\n\n");
-            for (KnowledgeNode n : hits) {
-                sb.append("- [[").append(n.getTitle()).append("]] (").append(n.getDomain()).append(")\n");
-            }
-            sb.append("\n\n");
-        }
-        sb.append("> [!warning] Cortex could not act\n")
-          .append("> The AI provider refused the tools Cortex needs, so nothing was created or changed. ")
-          .append("Try again in a moment.");
-        return sb.toString();
+        String warning = "> [!warning] Cortex could not act\n"
+            + "> The AI provider refused the tools Cortex needs, so nothing was created or changed. Try again in a moment.";
+        return hits.isEmpty() ? warning : notesList(hits) + "\n\n" + warning;
     }
 
     /** Réponse sans modèle : les notes trouvées par la recherche, et l'état de l'IA. */
-    private String fallbackAnswer(List<KnowledgeNode> hits) {
-        StringBuilder sb = new StringBuilder();
-        if (hits.isEmpty()) {
-            sb.append("I found no relevant note in your workspace for this request.");
-        } else {
-            sb.append("Here are the most relevant notes of your workspace:\n\n");
-            for (KnowledgeNode n : hits) {
-                sb.append("- [[").append(n.getTitle()).append("]] (").append(n.getDomain()).append(")\n");
-            }
+    private static String fallbackAnswer(List<KnowledgeNode> hits) {
+        return notesList(hits) + "\n\n> [!note] AI unavailable\n"
+            + "> Generated answers, reasoning and actions need an AI provider: Ollama on this machine, "
+            + "or any OpenAI-compatible API, configured on the AI service of the instance.";
+    }
+
+    /** Les notes trouvées par la recherche, en liens ; une phrase quand il n'y en a aucune. */
+    private static String notesList(List<KnowledgeNode> hits) {
+        if (hits.isEmpty()) return "I found no relevant note in your workspace for this request.";
+        StringBuilder sb = new StringBuilder("Here are the most relevant notes of your workspace:\n\n");
+        for (KnowledgeNode n : hits) {
+            sb.append("- [[").append(n.getTitle()).append("]] (").append(n.getDomain()).append(")\n");
         }
-        sb.append("\n\n> [!note] AI unavailable\n")
-          .append("> Generated answers, reasoning and actions need an AI provider: Ollama on this machine, ")
-          .append("or any OpenAI-compatible API, configured on the AI service of the instance.");
-        return sb.toString();
+        return sb.toString().stripTrailing();
     }
 }
