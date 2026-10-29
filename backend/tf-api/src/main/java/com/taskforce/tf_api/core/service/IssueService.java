@@ -1015,6 +1015,31 @@ public class IssueService {
             .toList();
     }
 
+    /**
+     * Les issues qui bloquent celle-ci, quel que soit le sens où la relation a été posée : « A bloque B » se lit depuis B
+     * comme « B est bloquée par A ». Sert à Cortex pour dire pourquoi une issue est bloquée (R52, séance n°8).
+     */
+    @Transactional(readOnly = true)
+    public List<IssueSummaryResponse> listBlockers(String workspaceSlug, Long projectId, Long issueId, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        visibilityGuard.assertCanView(project, userId);
+        Issue issue = resolveIssue(issueId, project.getId());
+        // Une fois chacune : « A bloquée par B » et « B bloque A » peuvent avoir été posées toutes les deux.
+        Map<Long, IssueSummaryResponse> blockers = new LinkedHashMap<>();
+        relationRepository.findByIssueId(issue.getId()).stream()
+            .filter(r -> blocks(r, issue.getId()))
+            .map(r -> r.getSource().getId().equals(issue.getId()) ? r.getTarget() : r.getSource())
+            .forEach(other -> blockers.putIfAbsent(other.getId(), toIssueSummary(other)));
+        return List.copyOf(blockers.values());
+    }
+
+    /** Vrai si la relation fait de l'autre issue un bloqueur de {@code issueId}. */
+    private static boolean blocks(IssueRelation r, Long issueId) {
+        boolean isSource = r.getSource().getId().equals(issueId);
+        return isSource ? r.getRelationType() == IssueRelationType.BLOCKED_BY : r.getRelationType() == IssueRelationType.BLOCKS;
+    }
+
     @Transactional
     public IssueRelationResponse addRelation(String workspaceSlug, Long projectId, Long issueId,
                                               CreateIssueRelationRequest request, Long userId) {
