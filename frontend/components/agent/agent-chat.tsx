@@ -274,13 +274,16 @@ export function AgentChat() {
       void loadConversations()
     } catch (e) {
       // 409 = plafond de tokens IA atteint → carte d'info + CTA (pas un repli « réessayez » trompeur
-      // qui laisse croire à un bug). Tout autre cas reste un repli générique.
-      if (getErrorStatus(e) === 409) {
+      // qui laisse croire à un bug). 429 = le frein de débit : sa limite et la vraie attente, comme le toast (R52).
+      // Tout autre cas reste un repli générique.
+      const status = getErrorStatus(e)
+      if (status === 409) {
         setTurns((t) => [...t, { id: `a${Date.now()}`, role: "assistant", kind: "quota" }])
       } else {
+        const text = status === 429 ? getErrorMessage(e) : "Sorry, I couldn't answer. Please try again."
         setTurns((t) => [...t, {
           id: `a${Date.now()}`, role: "assistant",
-          answer: { answer: "Sorry, I couldn't answer. Please try again.", reasoning: null, mode: "fallback", sources: [], steps: [], toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 } },
+          answer: { answer: text, reasoning: null, mode: "fallback", sources: [], steps: [], toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 } },
         }])
       }
     } finally {
