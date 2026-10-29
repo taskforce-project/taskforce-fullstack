@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +24,7 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.LlmClient;
+import com.taskforce.tf_api.core.service.LlmToolsRefusedException;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
@@ -119,12 +121,26 @@ public class AgentService {
         try {
             steps.add(new AssistantStep(STEP_ANSWER, "active", "Cortex answers, with its tools if needed"));
             List<AssistantToolCall> toolCalls = new ArrayList<>();
-            String answer = runToolLoop(message, hits, ctx, toolCalls, hist);
-            steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", toolsDescription(toolCalls)));
+            String modelAnswer = runToolLoop(message, hits, ctx, toolCalls, hist);
+            String answer = honestAnswer(message, modelAnswer, toolCalls);
+            if (answer.equals(modelAnswer)) {
+                steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", toolsDescription(toolCalls)));
+            } else {
+                log.warn("Cortex (ws={}) : la réponse annonçait une écriture qu'aucun outil n'a faite, remplacée",
+                    ws.getId());
+                steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", "No action ran: nothing was created"));
+            }
             LlmUsage usage = llm.currentUsage();
             recordUsage(ws.getId(), usage);
             return new AssistantAnswer(answer, null, toolCalls.isEmpty() ? "fast" : "deep",
                 sources, steps, toolCalls, toUsage(usage));
+        } catch (LlmToolsRefusedException ex) {
+            log.warn("Cortex (slug={}) : le fournisseur refuse les outils", LogSafe.of(slug));
+            steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
+                "The AI provider refused Cortex's tools: nothing was done"));
+            LlmUsage usage = llm.currentUsage();
+            recordUsage(ws.getId(), usage);
+            return new AssistantAnswer(toolsRefusedAnswer(hits), null, "fallback", sources, steps, List.of(), toUsage(usage));
         } catch (Exception ex) {
             log.warn("Agent LLM indisponible (slug={}): {}", LogSafe.of(slug), LogSafe.of(ex.getMessage()));
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
@@ -326,9 +342,12 @@ public class AgentService {
         StringBuilder sb = new StringBuilder();
         sb.append("You are Cortex, the AI copilot of a TaskForce workspace. Answer in the user's language, ")
           .append("concisely, grounded in the real context. ")
-          .append("Use your tools only when they help: Brain OS search (search_brain), TaskForce projects and ")
-          .append("issues (list_projects, create_project, list_issues, create_issue), Brain OS notes (create_note). ")
+          .append("Use your tools only when they help: search the workspace's notes, list or create TaskForce ")
+          .append("projects and issues, write a note. ")
           .append("Never create anything the user did not ask for. ")
+          .append("Say that you created, changed or deleted something only when a tool result in this conversation ")
+          .append("confirms it; if no tool ran or a tool failed, say plainly that it was not done. ")
+          .append("Never name your tools or describe your internal steps to the user. ")
           .append("If you need data from an external system you have no tool for, call find_integration: when ")
           .append("the integration exists but is not connected, invite the user to connect it (Settings > ")
           .append("Integrations); when it is not in the catalog, say so plainly and add that a tool with an MCP ")
@@ -345,7 +364,7 @@ public class AgentService {
               .append("asked for it; it never runs directly: an owner or admin approves it in the conversation. ");
         }
         if (!hits.isEmpty()) {
-            sb.append("\n\nContext (Brain OS):\n");
+            sb.append("\n\nContext (the workspace's notes):\n");
             for (KnowledgeNode n : hits) {
                 String c = n.getContent() != null ? n.getContent() : "";
                 if (c.length() > 400) c = c.substring(0, 400) + "…";
@@ -353,6 +372,64 @@ public class AgentService {
                   .append(": ").append(c.replace("\n", " ")).append("\n");
             }
         }
+        return sb.toString();
+    }
+
+    // -------------------------------------------------------------------------
+    // Une action ne se dit faite que si un outil l'a faite (R35, séance n°7 du Conseil)
+    // -------------------------------------------------------------------------
+
+    /** Les écritures de TaskForce : seule la réussite de l'une d'elles permet d'annoncer une création. */
+    private static final Set<String> WRITE_TOOLS = Set.of("create_issue", "create_project", "create_note");
+
+    private static final int REGEX_FLAGS = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS;
+
+    /** Une demande de création : un verbe et un objet de l'espace, en anglais ou en français. */
+    private static final Pattern WRITE_REQUEST = Pattern.compile(
+        "\\b(create|add|make|open|file|log|crée[rz]?|cree[rz]?|ajoute[rz]?|ouvre[rz]?)\\b.*"
+            + "\\b(issues?|tickets?|tasks?|bugs?|projects?|notes?|tâches?|taches?|projets?)\\b", REGEX_FLAGS);
+
+    /** Une phrase qui annonce une création faite, toujours rattachée à son objet. */
+    private static final Pattern WRITE_CLAIM = Pattern.compile(
+        "\\b(issue|ticket|task|project|note)s?\\s+(has\\s+been\\s+|have\\s+been\\s+|was\\s+|were\\s+)?(created|added|opened)\\b"
+            + "|\\b(created|added|opened)\\s+(a\\s+|an\\s+|the\\s+|your\\s+|\\d+\\s+)?(new\\s+)?(issue|ticket|task|project|note)s?\\b"
+            + "|\\b(issue|ticket|tâche|tache|projet|note)s?\\s+(a\\s+été\\s+|ont\\s+été\\s+)?(créée?s?|ajoutée?s?)"
+            + "|\\b(créé|ajouté)e?s?\\s+(une\\s+|un\\s+|la\\s+|le\\s+|les\\s+|\\d+\\s+)?(nouvelle\\s+|nouveau\\s+)?"
+            + "(issue|ticket|tâche|tache|projet|note)s?\\b", REGEX_FLAGS);
+
+    /**
+     * La réponse à montrer : celle du modèle, sauf s'il annonce une création qu'aucun outil n'a faite. Un petit modèle
+     * l'a fait le 29/10/2026 (« Issue created », rien de créé) ; c'est le résultat de l'outil qui fait foi, pas la
+     * phrase. Ne joue que sur une demande de création, pour ne pas toucher une réponse qui raconte l'historique.
+     */
+    static String honestAnswer(String message, String answer, List<AssistantToolCall> toolCalls) {
+        if (answer == null || message == null) return answer == null ? "" : answer;
+        boolean wrote = toolCalls.stream()
+            .anyMatch(call -> WRITE_TOOLS.contains(call.name()) && "success".equals(call.status()));
+        if (wrote || !WRITE_REQUEST.matcher(message).find() || !WRITE_CLAIM.matcher(answer).find()) return answer;
+        if (toolCalls.stream().anyMatch(call -> "pending".equals(call.status()))) {
+            return "Nothing has changed yet: the action below waits for your approval.";
+        }
+        boolean failed = toolCalls.stream()
+            .anyMatch(call -> WRITE_TOOLS.contains(call.name()) && "error".equals(call.status()));
+        return failed
+            ? "I couldn't do it, so nothing was created. Ask me again, or create it from the board."
+            : "I didn't create anything: no action ran. Ask me again with the project's name, or create it from the board.";
+    }
+
+    /** Le fournisseur a refusé les outils : rien n'a été fait, on le dit, avec les notes trouvées. */
+    private static String toolsRefusedAnswer(List<KnowledgeNode> hits) {
+        StringBuilder sb = new StringBuilder();
+        if (!hits.isEmpty()) {
+            sb.append("Here are the most relevant notes of your workspace:\n\n");
+            for (KnowledgeNode n : hits) {
+                sb.append("- [[").append(n.getTitle()).append("]] (").append(n.getDomain()).append(")\n");
+            }
+            sb.append("\n\n");
+        }
+        sb.append("> [!warning] Cortex could not act\n")
+          .append("> The AI provider refused the tools Cortex needs, so nothing was created or changed. ")
+          .append("Try again in a moment.");
         return sb.toString();
     }
 

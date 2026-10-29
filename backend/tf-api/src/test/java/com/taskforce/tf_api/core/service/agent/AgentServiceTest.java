@@ -18,6 +18,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantToolCall;
 import com.taskforce.tf_api.core.enums.NodeDomain;
 import com.taskforce.tf_api.core.enums.NodeType;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
@@ -25,6 +26,7 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.LlmClient;
+import com.taskforce.tf_api.core.service.LlmToolsRefusedException;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
@@ -178,6 +180,83 @@ class AgentServiceTest {
 
         assertThat(answer.mode()).isEqualTo("fallback");
         assertThat(answer.steps()).anyMatch(s -> "error".equals(s.status()));
+    }
+
+    @Test
+    @DisplayName("le fournisseur refuse les outils : Cortex dit qu'il n'a rien fait, au lieu de répondre sans eux")
+    void tools_refused_says_nothing_was_done() {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString()))
+            .thenThrow(new LlmToolsRefusedException("The AI provider refused the tools", null));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Create an issue \"Cortex test\" in TaskForce");
+
+        assertThat(answer.mode()).isEqualTo("fallback");
+        assertThat(answer.answer()).contains("Cortex could not act").contains("nothing was created or changed");
+        assertThat(answer.steps()).anyMatch(s -> "error".equals(s.status()) && s.description().contains("refused"));
+    }
+
+    @Test
+    @DisplayName("une création annoncée sans outil est remplacée par la vérité (recette du 29/10)")
+    void claimed_write_without_tool_is_replaced() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(
+            "{\"content\":\"**Issue created**: Project TaskForce (TF), Title Cortex test. Use list_issues to verify.\"}"));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Create an issue \"Cortex test\" in TaskForce");
+
+        assertThat(answer.answer()).startsWith("I didn't create anything").doesNotContain("list_issues");
+        assertThat(answer.steps()).anyMatch(s -> "error".equals(s.status()) && s.description().contains("nothing was created"));
+    }
+
+    @Test
+    @DisplayName("une création faite par l'outil garde la réponse du modèle")
+    void real_write_keeps_the_answer() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"create_issue\",\"arguments\":\"{}\"}}]}"),
+            json.readTree("{\"content\":\"Issue created: TF-31 Cortex test.\"}"));
+        AgentTool tool = Mockito.mock(AgentTool.class);
+        when(tools.get(eq("create_issue"), anyList())).thenReturn(tool);
+        when(tool.execute(any(), any())).thenReturn("Created TF-31");
+
+        AssistantAnswer answer = service.run("acme", 7L, "Create an issue \"Cortex test\" in TaskForce");
+
+        assertThat(answer.answer()).isEqualTo("Issue created: TF-31 Cortex test.");
+        assertThat(answer.steps()).noneMatch(s -> "error".equals(s.status()));
+    }
+
+    @ParameterizedTest(name = "« {0} » puis « {1} » : remplacée {2}")
+    @CsvSource(delimiter = '|', value = {
+        "Create an issue \"Cortex test\" in TaskForce | **Issue created**: Title Cortex test   | true",
+        "Crée une issue « Test » dans TaskForce        | Issue créée : Test, dans TaskForce.   | true",
+        "Add a note about the release                  | I added a note about the release.     | true",
+        "Create a plan for the project                 | I have created a plan: first, the board. | false",
+        "Which issues were created this week?          | Issue TF-12 was created on Monday.    | false",
+        "How do I create an issue?                     | Open the board and click New issue.   | false",
+    })
+    @DisplayName("la garde ne touche qu'une création annoncée sans outil, sur une demande de création")
+    void honest_answer_detection(String message, String answer, boolean replaced) {
+        assertThat(AgentService.honestAnswer(message, answer, List.of()).equals(answer)).isEqualTo(!replaced);
+    }
+
+    @Test
+    @DisplayName("une écriture externe en attente d'accord : rien n'a encore changé, la réponse le dit")
+    void pending_write_is_not_announced_as_done() {
+        List<AssistantToolCall> calls = List.of(new AssistantToolCall("linear__save_issue", "pending", "{}", "proposed"));
+
+        String answer = AgentService.honestAnswer("Create an issue in Linear", "Issue created in Linear.", calls);
+
+        assertThat(answer).isEqualTo("Nothing has changed yet: the action below waits for your approval.");
     }
 
     @ParameterizedTest(name = "« {0} » conversationnel : {1}")

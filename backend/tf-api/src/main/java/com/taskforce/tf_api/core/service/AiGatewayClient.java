@@ -10,6 +10,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -113,6 +114,11 @@ public class AiGatewayClient implements LlmClient {
             accumulateUsage(root.path("usage"));
             return root.path("message");
         } catch (Exception ex) {
+            if (ex instanceof HttpClientErrorException refused && refused.getStatusCode().value() == 422) {
+                // Le fournisseur refuse les outils, même un seul. Il répond : son état reste valable.
+                log.error("AI provider refused the tools: {}", ex.getMessage());
+                throw new LlmToolsRefusedException("The AI provider refused the tools", ex);
+            }
             log.error("AI service call failed: {}", ex.getMessage());
             status.invalidate(); // le fournisseur est peut-être tombé : on relira son état au prochain appel
             throw new LlmException("AI service unavailable: " + ex.getMessage(), ex);
