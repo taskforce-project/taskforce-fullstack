@@ -10,6 +10,12 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 29/10/2026 (nuit, release) - Release 1.6.6 EN PROD : une note accordée n'échoue plus sur un type inventé ; desktop 1.3.6 publiée ; séance n°11 retenue.** `[release + conseil]`
+> - **Décision du CEO** : R66 à R71 retenues, avec les réserves de Shotwell (R66 : un cas s'adapte quand l'espace change ; R68 : confirmer ne ralentit pas la banque ; R71 : l'écran ne la retarde pas) et de Duflo (R67 : Cortex n'est pas le produit, un changement d'UI/UX côté Jobs), chacune à résoudre. Puis « On y va » : la release du correctif, puis R61.
+> - **En prod** : #438 fusionnée dans `dev` (`0307cb05`), `chore(desktop)` 1.3.6 (`7c0518f9`), release #439 vers `main` (`aa4432a5`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.6.6 en plomberie). Desktop 1.3.6 publiée : run 40966766707 depuis `main`, vert ; `latest.yml` en 1.3.6 ; le site est reconstruit pour la proposer.
+> - **Conseil** : le PV de la séance n°11, sa ligne au registre et l'entrée du journal commités dans `taskforce-docs` (`fb32f25`).
+> - **Suite** : R61 (#437, en brouillon) : fusionner `dev` dans la branche, la doc et la référence d'API, puis la fusion dans `dev` ; les solutions aux quatre réserves, au Conseil ; la fiche de recette en 1.3.6.
+
 > **▶ MAJ 29/10/2026 (soir, release) - Release 1.6.5 EN PROD : le noyau pour Cortex ; desktop 1.3.5 publiée ; séance n°11 sur le premier lot de R61.** `[release + conseil]`
 > - **Décision du CEO** : « go release, puis enchaîne sur R61 » ; « consulte le conseil à chaque fois ».
 > - **En prod** : `chore(desktop)` 1.3.5 (`dc2fdb7d`), release #435 vers `main` (`57a94cf3`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.6.5 en plomberie) ; webapp en v1.6.5, backend de prod sain, V107 appliquée à 19:08 ; `dev` réaligné (`b7bd836b`). Desktop 1.3.5 publiée : run 40937148292 depuis `main`, vert ; `latest.yml` en 1.3.5, installeur de 288 Mo ; le site est reconstruit pour la proposer.
