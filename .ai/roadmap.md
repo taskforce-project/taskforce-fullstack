@@ -10,6 +10,11 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 30/10/2026 - Release 1.6.7 EN PROD : la banque d'évaluations de Cortex ; desktop 1.3.7 publiée ; l'atelier des écrans de base lancé.** `[release + conseil + design]`
+> - **Décision du CEO** : « lance l'atelier, et go release en même temps ». Q13 : pas encore d'hébergement, un VPS OVH VPS-3 dès que possible ; E12 sur Kaggle ; Cortex peut créer un projet, « tout passera par un input de chat + vocal globalement » ; la recette se fera quand le produit sera complet et à jour.
+> - **En prod** : `chore(desktop)` 1.3.7 (`ac54efcf`), release #441 vers `main` (`23585081`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.6.7 en plomberie). La banque (#437, V108) : le modèle au dossier de chaque réponse, « Add to test bank », Réglages > Test bank. Desktop 1.3.7 publiée : run 40971583297 depuis `main`, vert ; `latest.yml` en 1.3.7 ; le site est reconstruit pour la proposer.
+> - **Suite** : l'atelier des écrans de base (séance n°13), puis le lot 2 de la banque ; la règle `project.create` (Cortex crée un projet sans demander) après la reconstruction du site.
+
 > **▶ MAJ 30/10/2026 - Séance n°12 retenue : les solutions aux quatre réserves de la banque d'évaluations, dans l'ordre de Jobs.** `[conseil + direction]`
 > - **Décision du CEO** : « je suis d'accord avec tout les R, et je suis aussi d'accord avec Jobs sur ses points donc on le suit ». Et des explications plus explicites.
 > - **R72** : un cas garde la trace de ce qu'il a lu (les notes servies, les projets et les issues de ses lectures, la version des règles) ; si l'espace a changé depuis, il sort du score et s'adapte d'un clic en un nouveau cas, l'ancien gardant ses notes. Lu dans la banque au moment du rejeu, pas dans une alerte.
