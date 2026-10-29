@@ -22,7 +22,7 @@ const { label, lead, bg } = Astro.props;
   <Backdrop name={bg} class="inset-x-0 top-0 h-[760px] sm:h-[820px]" fade veil="top" priority />
   <div class="container-wide relative flex flex-col items-center pt-20 pb-6 text-center sm:pt-24 lg:pt-28">
     <span class="anim-fade-up"><Pill tone="glass">{label}</Pill></span>
-    <h1 class="t-h1 anim-fade-up mt-8 max-w-4xl" style="--d: 70ms"><slot name="title" /></h1>
+    <h1 class="t-h1 mt-8 max-w-4xl" data-words="load" style="--d: 120ms"><slot name="title" /></h1>
     <p class="t-lead anim-fade-up mt-7 max-w-2xl text-foreground/75" style="--d: 140ms">{lead}</p>
     <slot />
   </div>

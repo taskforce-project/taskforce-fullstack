@@ -9,7 +9,6 @@ import BaseLayout from "@/layouts/BaseLayout.astro";
 import BentoCard from "@/components/site/BentoCard.astro";
 import CtaBand from "@/components/site/CtaBand.astro";
 import DuoCard from "@/components/site/DuoCard.astro";
-import FeatureRow from "@/components/site/FeatureRow.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import ProductSection from "@/components/site/ProductSection.astro";
 import RuleColumns, { type RuleItem } from "@/components/site/RuleColumns.astro";
@@ -20,7 +19,6 @@ import { BRANDS, type BrandKey } from "@/lib/brands";
 
 const NAV = [
   ["#plan", "Plan"],
-  ["#memory", "Memory"],
   ["#agents", "Agents"],
   ["#approvals", "Approvals"],
   ["#assistant", "Assistant"],
@@ -53,15 +51,15 @@ const EVERYDAY: RuleItem[] = [
 ---
 
 <BaseLayout
-  title="Features: plan, remember, delegate and measure | TaskForce"
-  description="Boards and cycles, a project memory, AI agents that ask before acting, an assistant that knows your work, and analytics. Everything TaskForce does today, on your desktop."
+  title="Features: plan, delegate, ask and measure | TaskForce"
+  description="Boards and cycles, AI agents that ask before acting, an assistant that knows your work, and analytics. Everything TaskForce does today, on your desktop."
 >
   <PageHero
     bg="features"
     label="Features"
-    lead="TaskForce keeps your projects, your notes and your AI agents together on your desktop. Here is what it does today."
+    lead="TaskForce keeps your projects and your AI agents together on your desktop. Here is what it does today."
   >
-    <Fragment slot="title">One app for the plan, <span class="t-word">the memory and the agents.</span></Fragment>
+    <Fragment slot="title">One app for the plan <span class="t-word">and the agents.</span></Fragment>
     <nav aria-label="On this page" class="anim-fade-up mt-10 flex max-w-3xl flex-wrap justify-center gap-2" style="--d: 200ms">
       {
         NAV.map(([href, label]) => (
@@ -83,24 +81,6 @@ const EVERYDAY: RuleItem[] = [
   >
     <Fragment slot="title">Plan the work <span class="t-word">your way.</span></Fragment>
   </ProductSection>
-
-  {/* ───────── La mémoire : rangée avec vignette ───────── */}
-  <FeatureRow
-    id="memory"
-    label="Memory"
-    tone="green"
-    art="tree"
-    reverse
-    lead="Brain OS holds what you know about a project: specs, decisions, notes and documents."
-    points={[
-      "Pages in a tree, written in Markdown, with #tags and [[wikilinks]]",
-      "Search by meaning when an embedding model is available, by keywords otherwise",
-      "Attach images and documents to your pages",
-      "Agents and the assistant search it before they start",
-    ]}
-  >
-    <Fragment slot="title">A memory that <span class="t-word">stays with the project.</span></Fragment>
-  </FeatureRow>
 
   {/* ───────── Agents et validations : deux cartes en paire ───────── */}
   <section class="section pt-0!">
@@ -149,9 +129,9 @@ const EVERYDAY: RuleItem[] = [
         <BentoCard
           id="assistant"
           title="An assistant that knows your work"
-          text="Ask about your projects in plain words. It reads your board and Brain OS, and can use the tools you connect."
+          text="Ask about your projects in plain words. It reads your board, searches your workspace's knowledge, and can use the tools you connect."
           points={[
-            "Answers grounded in your board and your Brain OS pages",
+            "Answers grounded in your board and in the notes it cites",
             "Drafts issues from a rough idea",
             "Uses the tools of the MCP servers you connect",
             "Runs on your local model or on the API key you choose",
