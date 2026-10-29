@@ -78,8 +78,13 @@ export class TaskforceApi {
     return this.cached;
   }
 
-  claim(): Promise<Claim | null> {
-    return this.send<Claim | null>("POST", "/delivery/runner/claim");
+  /**
+   * Réclame une tâche, en disant si l'agent peut partir sur ce poste. Avec un problème connu, TaskForce ne remet rien et
+   * ne propose plus l'agent, avec la cause (R37) ; un serveur plus ancien ignore ce corps.
+   */
+  claim(agentProblem: string | null = null): Promise<Claim | null> {
+    return this.send<Claim | null>("POST", "/delivery/runner/claim",
+      { agentReady: agentProblem === null, agentProblem: agentProblem ?? undefined });
   }
 
   async heartbeat(runId: number): Promise<void> {
