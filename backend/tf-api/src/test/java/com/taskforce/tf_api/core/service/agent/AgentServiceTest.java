@@ -2,13 +2,17 @@ package com.taskforce.tf_api.core.service.agent;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -17,12 +21,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.taskforce.tf_api.core.dto.response.AssistantActionResult;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantToolCall;
 import com.taskforce.tf_api.core.enums.NodeDomain;
 import com.taskforce.tf_api.core.enums.NodeType;
+import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
+import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.repository.HarnessRuleSetRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.LlmClient;
@@ -33,6 +42,8 @@ import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.core.service.mcp.ExternalMcpTool;
 import com.taskforce.tf_api.core.service.mcp.McpClient;
 import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
+import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -42,6 +53,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -62,8 +74,24 @@ class AgentServiceTest {
     @Mock private AiUsageService aiUsageService;
     @Mock private WorkspaceMcpService workspaceMcp;
     @Mock private AuthorizationService authorization;
+    @Mock private CortexRecordService records;
+    @Mock private HarnessRuleSetRepository ruleSets;
+    @Mock private WorkspaceRepository workspaces;
 
     @InjectMocks private AgentService service;
+
+    private static final UUID RECORD = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
+
+    /** Le vrai noyau derrière Cortex : les règles par défaut de l'espace, jugées par RulesEngine ; le dossier simulé. */
+    @BeforeEach
+    void realKernel() {
+        Workspace owned = Workspace.builder().id(1L).slug("acme").name("Acme")
+            .owner(User.builder().email("owner@acme.test").build()).build();
+        lenient().when(workspaces.findById(1L)).thenReturn(Optional.of(owned));
+        ReflectionTestUtils.setField(service, "gate", new CortexGate(new HarnessRulesService(ruleSets), workspaces));
+        lenient().when(records.open(any(), any())).thenReturn(RECORD);
+        lenient().when(records.append(any(), any(), any(), any())).thenReturn(Optional.of("hash"));
+    }
 
     private final ObjectMapper json = new ObjectMapper();
 
@@ -139,6 +167,7 @@ class AgentServiceTest {
             json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"search_brain\",\"arguments\":\"{}\"}}]}"),
             json.readTree("{\"content\":\"Final answer\"}"));
         AgentTool tool = Mockito.mock(AgentTool.class);
+        when(tool.name()).thenReturn("search_brain");
         when(tools.get(eq("search_brain"), anyList())).thenReturn(tool);
         when(tool.execute(any(), any())).thenReturn("tool result");
 
@@ -226,6 +255,7 @@ class AgentServiceTest {
             json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"create_issue\",\"arguments\":\"{}\"}}]}"),
             json.readTree("{\"content\":\"Issue created: TF-31 Cortex test.\"}"));
         AgentTool tool = Mockito.mock(AgentTool.class);
+        when(tool.name()).thenReturn("create_issue");
         when(tools.get(eq("create_issue"), anyList())).thenReturn(tool);
         when(tool.execute(any(), any())).thenReturn("Created TF-31");
 
@@ -262,6 +292,7 @@ class AgentServiceTest {
             .thenReturn(json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"create_issue\",\"arguments\":\"{}\"}}]}"))
             .thenThrow(new LlmToolsRefusedException("The AI provider refused the tools", null));
         AgentTool tool = Mockito.mock(AgentTool.class);
+        when(tool.name()).thenReturn("create_issue");
         when(tools.get(eq("create_issue"), anyList())).thenReturn(tool);
         when(tool.execute(any(), any())).thenReturn("Created TF-31");
 
@@ -275,7 +306,7 @@ class AgentServiceTest {
     @Test
     @DisplayName("une écriture externe en attente d'accord : rien n'a encore changé, la réponse le dit")
     void pending_write_is_not_announced_as_done() {
-        List<AssistantToolCall> calls = List.of(new AssistantToolCall("linear__save_issue", "pending", "{}", "proposed"));
+        List<AssistantToolCall> calls = List.of(new AssistantToolCall("linear__save_issue", "pending", "{}", "proposed", null));
 
         String answer = AgentService.honestAnswer("Create an issue in Linear", "Issue created in Linear.", calls);
 
@@ -392,6 +423,270 @@ class AgentServiceTest {
     }
 
     private final McpClient extClient = Mockito.mock(McpClient.class);
+
+    // -------------------------------------------------------------------------
+    // Le noyau pour Cortex (R35) : chaque outil jugé par les règles de l'espace, chaque décision au dossier
+    // -------------------------------------------------------------------------
+
+    /** Un outil interne que le modèle appelle une fois, puis une réponse. */
+    private AgentTool stubInternalCall(String name) throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"" + name + "\",\"arguments\":\"{}\"}}]}"),
+            json.readTree("{\"content\":\"Done.\"}"));
+        AgentTool tool = Mockito.mock(AgentTool.class);
+        lenient().when(tool.name()).thenReturn(name); // lu au dossier, que certains cas font tomber avant
+        when(tools.get(eq(name), anyList())).thenReturn(tool);
+        return tool;
+    }
+
+    /** Une règle de l'espace qui refuse tout. */
+    private void denyEverything(String reason) {
+        CortexGate deny = Mockito.mock(CortexGate.class);
+        when(deny.judge(any(), any())).thenReturn(new CortexGate.Verdict("deny", "frozen", reason, Map.of()));
+        ReflectionTestUtils.setField(service, "gate", deny);
+    }
+
+    @ParameterizedTest(name = "{0} : {1}, par les règles par défaut")
+    @CsvSource({
+        "search_brain,   success", // knowledge.search : autorisée
+        "create_issue,   success", // issue.create : autorisée, se défait
+        "create_note,    pending", // knowledge.write : demandée, proposée à la personne
+        "create_project, pending", // aucune règle ne la couvre : demandée
+    })
+    void the_rules_decide_whether_a_tool_runs(String name, String status) throws Exception {
+        AgentTool tool = stubInternalCall(name);
+        lenient().when(tool.execute(any(), any())).thenReturn("done");
+
+        AssistantAnswer answer = service.run("acme", 7L, "Write the release notes");
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
+            assertThat(call.status()).isEqualTo(status);
+            assertThat(call.record()).isEqualTo(RECORD.toString());
+        });
+        verify(tool, "success".equals(status) ? Mockito.times(1) : never()).execute(any(), any());
+    }
+
+    @Test
+    @DisplayName("tracer avant d'agir : la demande puis la décision au dossier avant l'outil, le résultat après")
+    void every_tool_is_recorded_before_it_runs() throws Exception {
+        AgentTool tool = stubInternalCall("create_issue");
+        when(tool.execute(any(), any())).thenReturn("Created TF-31");
+
+        service.run("acme", 7L, "Create an issue \"Release notes\"");
+
+        InOrder order = Mockito.inOrder(records, tool);
+        order.verify(records).open(any(), eq("Create an issue \"Release notes\""));
+        order.verify(records).append(eq(RECORD), eq("action.requested"), eq(CortexRecordService.Actor.CORTEX), any());
+        order.verify(records).append(eq(RECORD), eq("action.decided"), eq(CortexRecordService.Actor.rule("create-issue")), any());
+        order.verify(tool).execute(any(), any());
+        order.verify(records).append(eq(RECORD), eq("action.result"), eq(CortexRecordService.Actor.SERVER), any());
+    }
+
+    @Test
+    @DisplayName("une réponse sans outil n'ouvre pas de dossier")
+    void no_tool_no_record() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Direct answer\"}"));
+
+        service.run("acme", 7L, "Give me the status of the project");
+
+        verify(records, never()).open(any(), any());
+    }
+
+    @Test
+    @DisplayName("sans dossier, pas d'action : une panne du dossier arrête l'outil")
+    void no_record_no_action() throws Exception {
+        AgentTool tool = stubInternalCall("create_issue");
+        when(records.open(any(), any())).thenThrow(new IllegalStateException("database down"));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Create an issue \"Release notes\"");
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
+            assertThat(call.status()).isEqualTo("error");
+            assertThat(call.record()).isNull();
+        });
+        verify(tool, never()).execute(any(), any());
+    }
+
+    @Test
+    @DisplayName("un dossier plein arrête l'action : la demande n'y entre plus, l'outil ne tourne pas")
+    void a_full_record_stops_the_action() throws Exception {
+        AgentTool tool = stubInternalCall("create_issue");
+        when(records.append(any(), eq("action.requested"), any(), any())).thenReturn(Optional.empty());
+
+        AssistantAnswer answer = service.run("acme", 7L, "Create an issue \"Release notes\"");
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
+            assertThat(call.status()).isEqualTo("error");
+            assertThat(call.output()).contains("record of this answer is full");
+        });
+        verify(tool, never()).execute(any(), any());
+    }
+
+    @Test
+    @DisplayName("une règle qui refuse : l'outil ne tourne pas, la raison revient au modèle")
+    void a_rule_that_denies_refuses_the_tool() throws Exception {
+        AgentTool tool = stubInternalCall("create_issue");
+        denyEverything("Issues are frozen until the release.");
+
+        AssistantAnswer answer = service.run("acme", 7L, "Create an issue \"Release notes\"");
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
+            assertThat(call.status()).isEqualTo("refused");
+            assertThat(call.output()).contains("Issues are frozen until the release.").contains("Do not try again");
+        });
+        verify(tool, never()).execute(any(), any());
+    }
+
+    @Test
+    @DisplayName("une création refusée par les règles ne se dit pas faite")
+    void refused_write_is_not_announced_as_done() {
+        List<AssistantToolCall> calls = List.of(new AssistantToolCall("create_issue", "refused", "{}", "Not run", null));
+
+        String answer = AgentService.honestAnswer("Create an issue \"X\"", "Issue created: X.", calls);
+
+        assertThat(answer).isEqualTo("Nothing was created: the rules of this workspace refuse this action.");
+    }
+
+    /** Une action interne que Cortex a proposée au dossier, et que la personne accorde. */
+    private AgentTool approvedInternal(String name) {
+        stubWorkspace();
+        AgentTool tool = Mockito.mock(AgentTool.class);
+        lenient().when(tool.name()).thenReturn(name);
+        when(tools.get(name)).thenReturn(tool);
+        when(records.owns(eq(RECORD), any())).thenReturn(true);
+        when(records.approve(any(), any(), any(), any())).thenReturn(true);
+        return tool;
+    }
+
+    @Test
+    @DisplayName("une action accordée : l'accord gardé, les règles rejugées, l'outil lancé avec les droits de la personne")
+    void approved_action_runs_and_is_recorded() {
+        AgentTool tool = approvedInternal("create_note");
+        when(tool.execute(any(), any())).thenReturn("Note created");
+
+        AssistantActionResult result = service.runApproved("acme", 7L, "create_note", "{\"title\":\"T\"}", RECORD.toString());
+
+        assertThat(result.status()).isEqualTo("success");
+        assertThat(result.output()).isEqualTo("Note created");
+        InOrder order = Mockito.inOrder(records, tool);
+        order.verify(records).approve(RECORD, "create_note", 7L, "{\"title\":\"T\"}");
+        order.verify(records).append(eq(RECORD), eq("action.decided"), eq(CortexRecordService.Actor.rule("propose-knowledge")), any());
+        order.verify(tool).execute(eq(Map.of("title", "T")), any());
+        order.verify(records).append(eq(RECORD), eq("action.result"), eq(CortexRecordService.Actor.SERVER), any());
+    }
+
+    @Test
+    @DisplayName("un accord sans proposition qui l'attend (jamais proposée, ou déjà accordée) : rien ne tourne")
+    void approval_without_a_waiting_proposal_is_refused() {
+        stubWorkspace();
+        AgentTool tool = Mockito.mock(AgentTool.class);
+        when(tools.get("create_note")).thenReturn(tool);
+        when(records.owns(eq(RECORD), any())).thenReturn(true);
+        when(records.approve(any(), any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> service.runApproved("acme", 7L, "create_note", "{}", RECORD.toString()))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("no longer waiting");
+        verify(tool, never()).execute(any(), any());
+    }
+
+    @ParameterizedTest(name = "dossier « {0} » : refusé")
+    @CsvSource({"not-a-uuid", "''"})
+    void approval_with_an_unreadable_record_is_refused(String ref) {
+        stubWorkspace();
+
+        assertThatThrownBy(() -> service.runApproved("acme", 7L, "create_note", "{}", ref))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("record is not valid");
+        verify(records, never()).approve(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("le dossier d'une autre personne ne se prolonge pas")
+    void approval_on_someone_elses_record_is_refused() {
+        stubWorkspace();
+        when(records.owns(eq(RECORD), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> service.runApproved("acme", 7L, "create_note", "{}", RECORD.toString()))
+            .isInstanceOf(ResourceNotFoundException.class);
+        verify(records, never()).approve(any(), any(), any(), any());
+        verify(records, never()).append(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("une écriture externe accordée par un simple membre : refusée, rien n'est envoyé (OSS-1.5)")
+    void external_approval_by_a_member_is_refused() throws Exception {
+        stubWorkspace();
+        when(records.owns(eq(RECORD), any())).thenReturn(true);
+        var writeDef = new McpClient.ToolDef("do_write", "writes something", json.readTree("{\"type\":\"object\"}"), false);
+        var extTool = new ExternalMcpTool(extClient, new McpClient.ServerRef("srv", "http://x/mcp", null), writeDef, json);
+        when(tools.get("srv__do_write")).thenReturn(null); // pas un outil interne : cherché parmi les connecteurs
+        when(workspaceMcp.toolsFor(any())).thenReturn(List.of(extTool));
+        when(tools.get(eq("srv__do_write"), anyList())).thenReturn(extTool);
+        when(authorization.isManager(1L, 7L)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.runApproved("acme", 7L, "srv__do_write", "{}", RECORD.toString()))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("owners and admins");
+        verify(records, never()).approve(any(), any(), any(), any());
+        verify(extClient, never()).initialize(any());
+    }
+
+    @Test
+    @DisplayName("les règles refusent depuis la proposition : rien ne tourne, le refus est gardé")
+    void approval_refused_when_the_rules_changed() {
+        AgentTool tool = approvedInternal("create_note");
+        denyEverything("Notes are frozen.");
+
+        AssistantActionResult result = service.runApproved("acme", 7L, "create_note", "{}", RECORD.toString());
+
+        assertThat(result.status()).isEqualTo("refused");
+        assertThat(result.output()).contains("Notes are frozen.");
+        verify(tool, never()).execute(any(), any());
+        verify(records).append(eq(RECORD), eq("action.result"), eq(CortexRecordService.Actor.SERVER), any());
+    }
+
+    @Test
+    @DisplayName("des arguments illisibles : l'action ne tourne pas, l'erreur est gardée")
+    void approval_with_unreadable_arguments() {
+        AgentTool tool = approvedInternal("create_note");
+
+        AssistantActionResult result = service.runApproved("acme", 7L, "create_note", "{not json", RECORD.toString());
+
+        assertThat(result.status()).isEqualTo("error");
+        assertThat(result.output()).contains("not readable");
+        verify(tool, never()).execute(any(), any());
+        verify(records).append(eq(RECORD), eq("action.result"), eq(CortexRecordService.Actor.SERVER), any());
+    }
+
+    @Test
+    @DisplayName("un outil qui échoue après l'accord : l'échec est gardé au dossier, puis remonte tel quel")
+    void a_failed_approved_action_is_recorded_then_raised() {
+        AgentTool tool = approvedInternal("create_project");
+        when(tool.execute(any(), any())).thenThrow(new BusinessException("A project with this key exists."));
+
+        assertThatThrownBy(() -> service.runApproved("acme", 7L, "create_project", "{}", RECORD.toString()))
+            .isInstanceOf(BusinessException.class).hasMessage("A project with this key exists.");
+        verify(records).append(eq(RECORD), eq("action.result"), eq(CortexRecordService.Actor.SERVER), any());
+    }
+
+    @Test
+    @DisplayName("une panne du dossier après l'action ne la dit pas ratée : elle a eu lieu")
+    void a_record_failure_after_the_action_keeps_its_result() {
+        AgentTool tool = approvedInternal("create_note");
+        when(tool.execute(any(), any())).thenReturn("Note created");
+        when(records.append(any(), eq("action.result"), any(), any())).thenThrow(new IllegalStateException("database down"));
+
+        AssistantActionResult result = service.runApproved("acme", 7L, "create_note", "{}", RECORD.toString());
+
+        assertThat(result.status()).isEqualTo("success");
+        assertThat(result.output()).isEqualTo("Note created");
+    }
 
     /** Un outil MCP d'écriture connecté, que le modèle appelle puis résume. */
     private void stubExternalWrite() throws Exception {

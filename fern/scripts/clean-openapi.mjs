@@ -23,7 +23,6 @@ const TAG_MAP = {
   "project-controller": "Projects",
   "workspace-controller": "Workspaces",
   "cycle-controller": "Cycles",
-  "page-controller": "Pages",
   "roadmap-controller": "Roadmap",
   "team-controller": "Teams",
   "member-skill-controller": "Member skills",
@@ -31,6 +30,7 @@ const TAG_MAP = {
   "user-controller": "Users",
   "profile-controller": "Profile",
   "auth-controller": "Authentication",
+  "passkey-sign-in-controller": "Authentication",
   "o-auth-login-controller": "OAuth login",
   "invitation-controller": "Invitations",
   "notification-controller": "Notifications",
@@ -54,27 +54,31 @@ const TAG_MAP = {
   "attachment-controller": "Attachments",
   "file-controller": "Files",
   "client-log-controller": "Client logs",
-  "status-controller": "Status",
   "ai-status-controller": "AI status",
   "delivery-controller": "Coding agents",
   "runner-provisioning-controller": "Coding agent runners",
   "mcp-server-controller": "MCP server",
   "personal-access-token-controller": "Personal access tokens",
   "project-export-controller": "Project export",
+  "project-bundle-controller": "Project files",
+  "workspace-bundle-controller": "Workspace files",
+  "passkey-controller": "Passkeys",
+  "desktop-session-controller": "Desktop sessions",
 };
 
 // Ordre d'affichage des sections dans la référence (les tags absents d'ici sont ajoutés à la fin).
 const TAG_ORDER = [
   "Authentication", "OAuth login",
-  "Workspaces", "Projects", "Project export", "Issues", "Cycles", "Pages", "Roadmap",
-  "Teams", "Users", "Member skills", "Membership", "Profile", "Personal access tokens", "Invitations",
+  "Workspaces", "Workspace files", "Projects", "Project export", "Project files", "Issues", "Cycles", "Roadmap",
+  "Teams", "Users", "Member skills", "Membership", "Profile", "Personal access tokens", "Passkeys", "Desktop sessions",
+  "Invitations",
   "Assignments", "Assignment redistribution", "My work", "Notifications", "Notification preferences",
   "AI assistant", "AI analysis (workflows)", "Skill suggestions", "Brain OS", "Brain OS attachments", "AI usage",
   "AI status", "Coding agents", "Coding agent runners", "MCP server",
   "Dashboard", "Analytics",
   "Integrations", "Webhooks", "MCP actions",
   "GDPR",
-  "Files", "Attachments", "Client logs", "Status",
+  "Files", "Attachments", "Client logs",
 ];
 
 // Descriptions courtes des sections principales (facultatif, améliore la référence).
@@ -84,7 +88,6 @@ const TAG_DESC = {
   "Projects": "Projects, their visibility, statuses and issue types.",
   "Issues": "Issues: status, priority, relations, subtasks and comments.",
   "Cycles": "Cycles: time-boxed iterations and their progress.",
-  "Pages": "Documents attached to a project.",
   "Roadmap": "Work planned over time.",
   "Assignments": "Accepting and declining issue assignments.",
   "Notifications": "In-app notifications (Signals) and their state.",
@@ -95,6 +98,10 @@ const TAG_DESC = {
   "Coding agent runners": "Each person's local runner identity, created once, its secret shown once.",
   "MCP server": "The workspace's MCP server (JSON-RPC over HTTP), for Claude Code with a personal access token.",
   "Personal access tokens": "Personal access tokens, valid on the MCP server only.",
+  "Passkeys": "The person's passkeys: add one, list them, remove one. Signing in with a passkey is under Authentication.",
+  "Desktop sessions": "The desktop app's sessions of the person: approve a sign-in from the web app, list the computers, sign one out.",
+  "Project files": "A whole project as one file: download it, or create a project from it.",
+  "Workspace files": "A whole workspace as one file, its Brain OS and all its projects: download it, or create a new workspace from it.",
   "Webhooks": "Signed outgoing webhooks (HMAC-SHA256): events, test and delivery history.",
   "Analytics": "Indicators: throughput, velocity, workload and burndown.",
   "Integrations": "Connecting external tools: GitHub, Slack, Plane and MCP servers.",
@@ -130,6 +137,9 @@ const HIDE = new Set([
   // Déplacement de projets par l'app desktop, avec sa seule session : le chemin de l'app, pas une API publique. Le
   // fichier de projet, lui, reste documenté (ProjectBundleController).
   "desktop-transfer-controller",
+  // Ce que l'app desktop appelle elle-même pour ouvrir, relire et fermer sa session : son chemin, pas une API publique.
+  // L'accord de la personne et ses sessions, eux, restent documentés (DesktopSessionController).
+  "desktop-sign-in-controller",
 ]);
 let removedInternal = 0;
 for (const [p, item] of Object.entries(spec.paths ?? {})) {

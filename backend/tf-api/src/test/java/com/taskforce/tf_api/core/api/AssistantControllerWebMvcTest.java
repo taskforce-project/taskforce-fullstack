@@ -4,6 +4,8 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -12,6 +14,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.taskforce.tf_api.core.dto.response.AssistantActionResult;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
@@ -21,13 +24,17 @@ import com.taskforce.tf_api.shared.security.SecurityConfig;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Tests de tranche web — {@link AssistantController} (endpoint chat JSON). {@code AgentService} mocké.
+ * Tests de tranche web — {@link AssistantController} (endpoint chat JSON, accord d'une action proposée).
+ * {@code AgentService} mocké.
  */
 @WebMvcTest(AssistantController.class)
 @Import(SecurityConfig.class)
@@ -114,5 +121,32 @@ class AssistantControllerWebMvcTest {
                 .accept(MediaType.APPLICATION_JSON)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Bonjour\"}"))
             .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("POST actions/execute → 200 : l'action accordée part au noyau, avec son dossier")
+    void approved_action_200() throws Exception {
+        String record = "00000000-0000-0000-0000-0000000000aa";
+        when(agentService.runApproved("acme", 7L, "create_note", "{\"title\":\"T\"}", record))
+            .thenReturn(new AssistantActionResult("create_note", "success", "Note created"));
+
+        mockMvc.perform(post(URL + "/actions/execute").with(auth())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tool\":\"create_note\",\"input\":\"{\\\"title\\\":\\\"T\\\"}\",\"record\":\"" + record + "\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("success"))
+            .andExpect(jsonPath("$.data.output").value("Note created"));
+    }
+
+    @ParameterizedTest(name = "{0} → 400")
+    @ValueSource(strings = {
+        "{\"tool\":\"create_note\",\"input\":\"{}\"}",                 // sans dossier
+        "{\"tool\":\"\",\"input\":\"{}\",\"record\":\"r\"}",          // sans outil
+    })
+    void approved_action_without_tool_or_record_400(String body) throws Exception {
+        mockMvc.perform(post(URL + "/actions/execute").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isBadRequest());
+        verify(agentService, never()).runApproved(any(), any(), any(), any(), any());
     }
 }
