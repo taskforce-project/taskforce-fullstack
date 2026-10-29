@@ -200,7 +200,7 @@ apiClient.interceptors.response.use(
         // il frappe TOUS les appels de l'onglet pendant la fenêtre. Sans message dédié, l'appli
         // paraissait simplement figée (les stores avalent l'erreur en silence). `id` stable →
         // un seul toast même quand une rafale d'appels est rejetée d'un coup.
-        const message = rateLimitMessage(error.response?.headers?.["retry-after"])
+        const message = tooManyRequestsMessage(error.response)
         console.warn(`[api] 429 ${error.config?.url ?? ""} - ${message}`)
         if (!silent) {
           toast.warning(message, { id: "api-rate-limit" })
@@ -236,13 +236,25 @@ export function rateLimitMessage(retryAfter: unknown): string {
 }
 
 /**
+ * Message d'un 429. La garde IA dit elle-même quelle limite s'applique et combien attendre (« This instance allows
+ * 1 AI request per minute… ») : on le montre tel quel. Les autres 429 viennent du limiteur général, qui n'annonce que
+ * l'attente.
+ */
+export function tooManyRequestsMessage(response: { headers?: unknown; data?: unknown } | undefined): string {
+  const data = response?.data as Partial<ApiError> | undefined;
+  if (data?.error === "AI Rate Limited" && typeof data.message === "string" && data.message) return data.message;
+  const headers = response?.headers as Record<string, unknown> | undefined;
+  return rateLimitMessage(headers?.["retry-after"]);
+}
+
+/**
  * Fonction helper pour extraire le message d'erreur
  */
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     // Un 429 se dit de la même façon partout : toast global, formulaires, états d'erreur des stores.
     if (error.response?.status === 429) {
-      return rateLimitMessage(error.response.headers?.["retry-after"]);
+      return tooManyRequestsMessage(error.response);
     }
     const apiError = error.response?.data as ApiError;
     // Corps refusé par le relais devant l'API (Cloudflare), qui ne répond pas dans l'enveloppe de l'API.
