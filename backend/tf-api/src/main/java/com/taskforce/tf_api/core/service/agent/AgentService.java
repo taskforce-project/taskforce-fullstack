@@ -118,9 +118,10 @@ public class AgentService {
         aiUsageService.assertWithinQuota(ws.getId());
 
         llm.beginUsageCapture();
+        // Hors du try : si le modèle ou le fournisseur s'arrête après une écriture, la réponse doit encore la montrer.
+        List<AssistantToolCall> toolCalls = new ArrayList<>();
         try {
             steps.add(new AssistantStep(STEP_ANSWER, "active", "Cortex answers, with its tools if needed"));
-            List<AssistantToolCall> toolCalls = new ArrayList<>();
             String modelAnswer = runToolLoop(message, hits, ctx, toolCalls, hist);
             String answer = honestAnswer(message, modelAnswer, toolCalls);
             if (answer.equals(modelAnswer)) {
@@ -136,21 +137,35 @@ public class AgentService {
                 sources, steps, toolCalls, toUsage(usage));
         } catch (LlmToolsRefusedException ex) {
             log.warn("Cortex (slug={}) : le fournisseur refuse les outils", LogSafe.of(slug));
-            steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
-                "The AI provider refused Cortex's tools: nothing was done"));
             LlmUsage usage = llm.currentUsage();
             recordUsage(ws.getId(), usage);
+            if (!toolCalls.isEmpty()) return stopped(steps, sources, toolCalls, usage, "The AI provider refused Cortex's tools");
+            steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
+                "The AI provider refused Cortex's tools: nothing was done"));
             return new AssistantAnswer(toolsRefusedAnswer(hits), null, "fallback", sources, steps, List.of(), toUsage(usage));
         } catch (Exception ex) {
             log.warn("Agent LLM indisponible (slug={}): {}", LogSafe.of(slug), LogSafe.of(ex.getMessage()));
-            steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
-                "The model did not answer: here are the notes of your workspace"));
             LlmUsage usage = llm.currentUsage(); // usage partiel réel (appels déjà faits avant l'échec)
             recordUsage(ws.getId(), usage);
+            if (!toolCalls.isEmpty()) return stopped(steps, sources, toolCalls, usage, "The model stopped answering");
+            steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
+                "The model did not answer: here are the notes of your workspace"));
             return new AssistantAnswer(fallbackAnswer(hits), null, "fallback", sources, steps, List.of(), toUsage(usage));
         } finally {
             llm.endUsageCapture();
         }
+    }
+
+    /**
+     * Arrêt en cours de route, après des appels d'outils : ce qui a été fait reste dans la réponse, avec ses étapes, pour
+     * que la personne le voie et ne le redemande pas (une issue déjà créée ne doit pas passer pour « rien n'a été fait »).
+     */
+    private static AssistantAnswer stopped(List<AssistantStep> steps, List<AssistantSource> sources,
+                                           List<AssistantToolCall> toolCalls, LlmUsage usage, String cause) {
+        steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", cause + ": Cortex stopped before the end"));
+        String answer = "> [!warning] Cortex stopped before the end\n> " + cause
+            + ". What it had already done shows in its steps: check it before asking again, so nothing is done twice.";
+        return new AssistantAnswer(answer, null, "deep", sources, steps, toolCalls, toUsage(usage));
     }
 
     /** Détail de l'étape de réponse une fois terminée : outils mobilisés, s'il y en a eu. */

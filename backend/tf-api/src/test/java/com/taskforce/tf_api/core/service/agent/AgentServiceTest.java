@@ -250,6 +250,27 @@ class AgentServiceTest {
     }
 
     @Test
+    @DisplayName("le fournisseur s'arrête après une création : la réponse la garde, au lieu de dire que rien n'a été fait")
+    void stop_after_a_write_keeps_what_was_done() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString()))
+            .thenReturn(json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"create_issue\",\"arguments\":\"{}\"}}]}"))
+            .thenThrow(new LlmToolsRefusedException("The AI provider refused the tools", null));
+        AgentTool tool = Mockito.mock(AgentTool.class);
+        when(tools.get(eq("create_issue"), anyList())).thenReturn(tool);
+        when(tool.execute(any(), any())).thenReturn("Created TF-31");
+
+        AssistantAnswer answer = service.run("acme", 7L, "Create an issue \"Cortex test\" in TaskForce");
+
+        assertThat(answer.answer()).contains("Cortex stopped before the end").doesNotContain("nothing was created");
+        assertThat(answer.toolCalls()).anyMatch(c -> "create_issue".equals(c.name()) && "success".equals(c.status()));
+        assertThat(answer.mode()).isEqualTo("deep");
+    }
+
+    @Test
     @DisplayName("une écriture externe en attente d'accord : rien n'a encore changé, la réponse le dit")
     void pending_write_is_not_announced_as_done() {
         List<AssistantToolCall> calls = List.of(new AssistantToolCall("linear__save_issue", "pending", "{}", "proposed"));
