@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { sendAgentMessage, sendAssistantMessage } from './assistant-service';
+import {
+  sendAgentMessage, sendAssistantMessage, isApprovable, approveAction, type AssistantToolCall,
+} from './assistant-service';
 import { apiClient } from './client';
+import { executeMcpAction } from './integration-service';
 import { ASSISTANT_ROUTES } from '../config/api-routes';
 
 vi.mock('./client', () => ({
@@ -14,6 +17,8 @@ vi.mock('./client', () => ({
   getErrorMessage: vi.fn((e: { message?: string }) => e?.message || 'error'),
   AI_TIMEOUT_MS: 180000, // requis : assistant-service importe ce timeout pour les appels agent
 }));
+
+vi.mock('./integration-service', () => ({ executeMcpAction: vi.fn() }));
 
 const envelope = <T,>(data: T) => ({ data: { success: true, message: 'ok', data } });
 
@@ -60,5 +65,67 @@ describe('assistant-service', () => {
   it('sendAgentMessage: propagates errors', async () => {
     vi.mocked(apiClient.post).mockRejectedValue(new Error('boom'));
     await expect(sendAgentMessage(slug, 'hi')).rejects.toThrow('boom');
+  });
+});
+
+describe('assistant-service: the approval of a proposed action', () => {
+  const slug = 'acme';
+  const RECORD = '00000000-0000-0000-0000-0000000000aa';
+  const call = (over: Partial<AssistantToolCall>): AssistantToolCall =>
+    ({ name: 'create_note', status: 'pending', input: '{"title":"T"}', output: 'Proposed', ...over });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    ['an internal proposal with its record', call({ record: RECORD }), true],
+    ['an external proposal with its record', call({ name: 'linear__save_issue', record: RECORD }), true],
+    ['an external proposal from an answer without a record', call({ name: 'linear__save_issue' }), true],
+    ['an internal proposal without a record', call({ record: null }), false],
+    ['an action that already ran', call({ status: 'success', record: RECORD }), false],
+    ['an action the rules refused', call({ status: 'refused', record: RECORD }), false],
+  ])('isApprovable: %s -> %s', (_label, toolCall, expected) => {
+    expect(isApprovable(toolCall)).toBe(expected);
+  });
+
+  it('approveAction: sends the tool, its input and the record of the answer', async () => {
+    const result = { tool: 'create_note', status: 'success' as const, output: 'Note created' };
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(result));
+
+    await expect(approveAction(slug, call({ record: RECORD }))).resolves.toEqual(result);
+
+    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.ACTION_EXECUTE(slug),
+      { tool: 'create_note', input: '{"title":"T"}', record: RECORD });
+    expect(executeMcpAction).not.toHaveBeenCalled();
+  });
+
+  it('approveAction: an action without input sends an empty object', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope({ tool: 'create_note', status: 'refused', output: 'Not run' }));
+
+    const result = await approveAction(slug, call({ input: null, record: RECORD }));
+
+    expect(result.status).toBe('refused');
+    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.ACTION_EXECUTE(slug),
+      { tool: 'create_note', input: '{}', record: RECORD });
+  });
+
+  it.each([
+    ['{"title":"T"}', { title: 'T' }],
+    [null, {}],
+  ])('approveAction: without a record, an external write goes through the MCP console route (input %s)', async (input, args) => {
+    vi.mocked(executeMcpAction).mockResolvedValue('Issue saved');
+
+    const result = await approveAction(slug, call({ name: 'linear__save_issue', input }));
+
+    expect(executeMcpAction).toHaveBeenCalledWith(slug, 'linear__save_issue', args);
+    expect(result).toEqual({ tool: 'linear__save_issue', status: 'success', output: 'Issue saved' });
+    expect(apiClient.post).not.toHaveBeenCalled();
+  });
+
+  it('approveAction: propagates a refusal of the server', async () => {
+    vi.mocked(apiClient.post).mockRejectedValue(new Error('This action is no longer waiting for your approval.'));
+
+    await expect(approveAction(slug, call({ record: RECORD }))).rejects.toThrow('no longer waiting');
   });
 });
