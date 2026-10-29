@@ -456,7 +456,7 @@ class AgentServiceTest {
         "search_brain,   success", // knowledge.search : autorisée
         "create_issue,   success", // issue.create : autorisée, se défait
         "create_note,    pending", // knowledge.write : demandée, proposée à la personne
-        "create_project, pending", // aucune règle ne la couvre : demandée
+        "create_project, success", // project.create : autorisée (30/10/2026), un projet s'archive d'un geste
     })
     void the_rules_decide_whether_a_tool_runs(String name, String status) throws Exception {
         AgentTool tool = stubInternalCall(name);
