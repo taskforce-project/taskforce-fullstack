@@ -118,9 +118,10 @@ public class AgentService {
         aiUsageService.assertWithinQuota(ws.getId());
 
         llm.beginUsageCapture();
+        // Hors du try : si le modèle ou le fournisseur s'arrête après une écriture, la réponse doit encore la montrer.
+        List<AssistantToolCall> toolCalls = new ArrayList<>();
         try {
             steps.add(new AssistantStep(STEP_ANSWER, "active", "Cortex answers, with its tools if needed"));
-            List<AssistantToolCall> toolCalls = new ArrayList<>();
             String modelAnswer = runToolLoop(message, hits, ctx, toolCalls, hist);
             String answer = honestAnswer(message, modelAnswer, toolCalls);
             if (answer.equals(modelAnswer)) {
@@ -136,21 +137,35 @@ public class AgentService {
                 sources, steps, toolCalls, toUsage(usage));
         } catch (LlmToolsRefusedException ex) {
             log.warn("Cortex (slug={}) : le fournisseur refuse les outils", LogSafe.of(slug));
-            steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
-                "The AI provider refused Cortex's tools: nothing was done"));
             LlmUsage usage = llm.currentUsage();
             recordUsage(ws.getId(), usage);
+            if (!toolCalls.isEmpty()) return stopped(steps, sources, toolCalls, usage, "The AI provider refused Cortex's tools");
+            steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
+                "The AI provider refused Cortex's tools: nothing was done"));
             return new AssistantAnswer(toolsRefusedAnswer(hits), null, "fallback", sources, steps, List.of(), toUsage(usage));
         } catch (Exception ex) {
             log.warn("Agent LLM indisponible (slug={}): {}", LogSafe.of(slug), LogSafe.of(ex.getMessage()));
-            steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
-                "The model did not answer: here are the notes of your workspace"));
             LlmUsage usage = llm.currentUsage(); // usage partiel réel (appels déjà faits avant l'échec)
             recordUsage(ws.getId(), usage);
+            if (!toolCalls.isEmpty()) return stopped(steps, sources, toolCalls, usage, "The model stopped answering");
+            steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
+                "The model did not answer: here are the notes of your workspace"));
             return new AssistantAnswer(fallbackAnswer(hits), null, "fallback", sources, steps, List.of(), toUsage(usage));
         } finally {
             llm.endUsageCapture();
         }
+    }
+
+    /**
+     * Arrêt en cours de route, après des appels d'outils : ce qui a été fait reste dans la réponse, avec ses étapes, pour
+     * que la personne le voie et ne le redemande pas (une issue déjà créée ne doit pas passer pour « rien n'a été fait »).
+     */
+    private static AssistantAnswer stopped(List<AssistantStep> steps, List<AssistantSource> sources,
+                                           List<AssistantToolCall> toolCalls, LlmUsage usage, String cause) {
+        steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", cause + ": Cortex stopped before the end"));
+        String answer = "> [!warning] Cortex stopped before the end\n> " + cause
+            + ". What it had already done shows in its steps: check it before asking again, so nothing is done twice.";
+        return new AssistantAnswer(answer, null, "deep", sources, steps, toolCalls, toUsage(usage));
     }
 
     /** Détail de l'étape de réponse une fois terminée : outils mobilisés, s'il y en a eu. */
@@ -382,17 +397,25 @@ public class AgentService {
     /** Les écritures de TaskForce : seule la réussite de l'une d'elles permet d'annoncer une création. */
     private static final Set<String> WRITE_TOOLS = Set.of("create_issue", "create_project", "create_note");
 
-    private static final int REGEX_FLAGS = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS;
+    private static final int REGEX_FLAGS = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS
+        | Pattern.DOTALL;
 
-    /** Une demande de création : un verbe et un objet de l'espace, en anglais ou en français. */
+    /**
+     * Une demande de création : le message COMMENCE par le verbe (après « please », « can you », « peux-tu »…), puis un
+     * objet de l'espace, en anglais ou en français. « Show me the open issues » n'en est pas une.
+     */
     private static final Pattern WRITE_REQUEST = Pattern.compile(
-        "\\b(create|add|make|open|file|log|crée[rz]?|cree[rz]?|ajoute[rz]?|ouvre[rz]?)\\b.*"
+        "^\\s*(please\\s+|can\\s+you\\s+|could\\s+you\\s+|peux-tu\\s+|pourrais-tu\\s+|merci\\s+de\\s+)?"
+            + "(create|add|make|file|log|open\\s+(a|an)|crée[rz]?|cree[rz]?|ajoute[rz]?)\\b.*"
             + "\\b(issues?|tickets?|tasks?|bugs?|projects?|notes?|tâches?|taches?|projets?)\\b", REGEX_FLAGS);
 
-    /** Une phrase qui annonce une création faite, toujours rattachée à son objet. */
+    /**
+     * Une phrase qui annonce une création faite, toujours rattachée à son objet. Pas « opened » : « 3 issues opened this
+     * week » décrit l'espace, n'annonce rien.
+     */
     private static final Pattern WRITE_CLAIM = Pattern.compile(
-        "\\b(issue|ticket|task|project|note)s?\\s+(has\\s+been\\s+|have\\s+been\\s+|was\\s+|were\\s+)?(created|added|opened)\\b"
-            + "|\\b(created|added|opened)\\s+(a\\s+|an\\s+|the\\s+|your\\s+|\\d+\\s+)?(new\\s+)?(issue|ticket|task|project|note)s?\\b"
+        "\\b(issue|ticket|task|project|note)s?\\s+(has\\s+been\\s+|have\\s+been\\s+|was\\s+|were\\s+)?(created|added)\\b"
+            + "|\\b(created|added)\\s+(a\\s+|an\\s+|the\\s+|your\\s+|\\d+\\s+)?(new\\s+)?(issue|ticket|task|project|note)s?\\b"
             + "|\\b(issue|ticket|tâche|tache|projet|note)s?\\s+(a\\s+été\\s+|ont\\s+été\\s+)?(créée?s?|ajoutée?s?)"
             + "|\\b(créé|ajouté)e?s?\\s+(une\\s+|un\\s+|la\\s+|le\\s+|les\\s+|\\d+\\s+)?(nouvelle\\s+|nouveau\\s+)?"
             + "(issue|ticket|tâche|tache|projet|note)s?\\b", REGEX_FLAGS);
@@ -419,34 +442,25 @@ public class AgentService {
 
     /** Le fournisseur a refusé les outils : rien n'a été fait, on le dit, avec les notes trouvées. */
     private static String toolsRefusedAnswer(List<KnowledgeNode> hits) {
-        StringBuilder sb = new StringBuilder();
-        if (!hits.isEmpty()) {
-            sb.append("Here are the most relevant notes of your workspace:\n\n");
-            for (KnowledgeNode n : hits) {
-                sb.append("- [[").append(n.getTitle()).append("]] (").append(n.getDomain()).append(")\n");
-            }
-            sb.append("\n\n");
-        }
-        sb.append("> [!warning] Cortex could not act\n")
-          .append("> The AI provider refused the tools Cortex needs, so nothing was created or changed. ")
-          .append("Try again in a moment.");
-        return sb.toString();
+        String warning = "> [!warning] Cortex could not act\n"
+            + "> The AI provider refused the tools Cortex needs, so nothing was created or changed. Try again in a moment.";
+        return hits.isEmpty() ? warning : notesList(hits) + "\n\n" + warning;
     }
 
     /** Réponse sans modèle : les notes trouvées par la recherche, et l'état de l'IA. */
-    private String fallbackAnswer(List<KnowledgeNode> hits) {
-        StringBuilder sb = new StringBuilder();
-        if (hits.isEmpty()) {
-            sb.append("I found no relevant note in your workspace for this request.");
-        } else {
-            sb.append("Here are the most relevant notes of your workspace:\n\n");
-            for (KnowledgeNode n : hits) {
-                sb.append("- [[").append(n.getTitle()).append("]] (").append(n.getDomain()).append(")\n");
-            }
+    private static String fallbackAnswer(List<KnowledgeNode> hits) {
+        return notesList(hits) + "\n\n> [!note] AI unavailable\n"
+            + "> Generated answers, reasoning and actions need an AI provider: Ollama on this machine, "
+            + "or any OpenAI-compatible API, configured on the AI service of the instance.";
+    }
+
+    /** Les notes trouvées par la recherche, en liens ; une phrase quand il n'y en a aucune. */
+    private static String notesList(List<KnowledgeNode> hits) {
+        if (hits.isEmpty()) return "I found no relevant note in your workspace for this request.";
+        StringBuilder sb = new StringBuilder("Here are the most relevant notes of your workspace:\n\n");
+        for (KnowledgeNode n : hits) {
+            sb.append("- [[").append(n.getTitle()).append("]] (").append(n.getDomain()).append(")\n");
         }
-        sb.append("\n\n> [!note] AI unavailable\n")
-          .append("> Generated answers, reasoning and actions need an AI provider: Ollama on this machine, ")
-          .append("or any OpenAI-compatible API, configured on the AI service of the instance.");
-        return sb.toString();
+        return sb.toString().stripTrailing();
     }
 }

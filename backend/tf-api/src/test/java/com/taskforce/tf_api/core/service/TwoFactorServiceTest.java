@@ -64,6 +64,19 @@ class TwoFactorServiceTest {
     }
 
     @Test
+    void setup_whenAlreadyOn_isRefused_andKeepsTheSecondFactor() {
+        // Remplacer le secret désactivait le 2FA sans code : la règle de disable (R42) se contournait par setup.
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+        when(repository.findByUserId(UID))
+            .thenReturn(Optional.of(UserTwoFactor.builder().userId(UID).secret("S").enabled(true).build()));
+
+        assertThatThrownBy(() -> service.setup(EMAIL))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining("already on");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void setup_unknownUser_throws() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.setup(EMAIL)).isInstanceOf(ResourceNotFoundException.class);

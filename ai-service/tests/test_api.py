@@ -58,7 +58,8 @@ def test_chat_outils_refuses_repond_422(provider):
         "/v1/chat", json={"messages": [{"role": "user", "content": "q"}],
                           "tools": [{"type": "function", "function": {"name": "t"}}]}, headers=AUTH)
     assert response.status_code == 422
-    assert response.json() == {"detail": "AI provider refused the tools (HTTP 400)"}
+    # Un code dans le corps : le 422 d'une requête invalide (FastAPI) ne doit pas passer pour un refus des outils.
+    assert response.json() == {"detail": {"code": "tools_refused", "message": "AI provider refused the tools (HTTP 400)"}}
 
 
 def test_embeddings(provider):

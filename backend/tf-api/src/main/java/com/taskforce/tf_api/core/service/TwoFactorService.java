@@ -36,12 +36,18 @@ public class TwoFactorService {
     private final UserTwoFactorRepository repository;
     private final TotpService totp;
 
-    /** Démarre l'activation : (ré)génère un secret EN ATTENTE et renvoie le QR/URI à scanner. */
+    /**
+     * Démarre l'activation : (ré)génère un secret EN ATTENTE et renvoie le QR/URI à scanner. Refusé quand le 2FA est
+     * déjà actif : remplacer le secret le désactivait sans code, et contournait la règle de {@link #disable} (R42).
+     */
     @Transactional
     public TwoFactorSetupResponse setup(String email) {
         User user = requireUser(email);
-        String secret = totp.generateSecret();
         UserTwoFactor row = repository.findByUserId(user.getId()).orElseGet(UserTwoFactor::new);
+        if (row.isEnabled()) {
+            throw new BusinessException("Two-factor authentication is already on. Turn it off first, with a code from your app.");
+        }
+        String secret = totp.generateSecret();
         row.setUserId(user.getId());
         row.setSecret(secret);
         row.setEnabled(false);

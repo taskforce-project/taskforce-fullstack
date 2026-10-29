@@ -24,7 +24,8 @@ def chat(payload: ChatRequest, request: Request) -> ChatResponse:
             think=payload.think,
         )
     except ToolsRefusedError as exc:  # le fournisseur répond, mais refuse les outils : l'agent ne peut pas agir
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        # Un code dans le corps : FastAPI répond aussi 422 pour une requête invalide, qui n'a rien à voir.
+        raise HTTPException(status_code=422, detail={"code": "tools_refused", "message": str(exc)}) from exc
     except ProviderError as exc:  # IA coupée ou fournisseur indisponible
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return ChatResponse(model=model, message=message, usage=usage)

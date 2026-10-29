@@ -198,6 +198,26 @@ class DeliveryRunnerTest {
         verifyNoMoreInteractions(notificationService);
     }
 
+    @Test
+    @DisplayName("complete : une mission refusée par une règle reste où elle est, sans passer en « Blocked » (R38)")
+    void refused_run_does_not_move_the_issue() {
+        Issue issue = mock(Issue.class);
+        DeliveryRun run = DeliveryRun.builder()
+            .id(32L).issue(issue).providerKey("claude-code").status(DeliveryRunStatus.RUNNING).refused(true).build();
+        when(runRepository.findById(32L)).thenReturn(Optional.of(run));
+        DeliveryPoll refused = new DeliveryPoll(DeliveryRunStatus.FAILED, null, null,
+            "TaskForce doesn't start missions on public repositories yet.");
+
+        runner.complete(32L, refused);
+
+        assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.FAILED);
+        verify(issue, never()).setStatus(any(IssueStatus.class));
+        verify(issueRepository, never()).save(issue);
+        verify(evidenceService).end(run, refused);
+        verify(notificationService).notifyAgentRunNotStarted(issue, null, "The agent",
+            "TaskForce doesn't start missions on public repositories yet.");
+    }
+
     /** Run de Claude Code terminé, sur un ticket du projet 400, délégué par la personne 9. */
     private DeliveryRun finishedRun(User delegator) {
         Project project = mock(Project.class);

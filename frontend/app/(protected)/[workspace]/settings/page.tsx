@@ -33,6 +33,7 @@ import { EventPicker } from "@/components/settings/event-picker"
 import { AgentsPanel } from "@/components/settings/agents-panel"
 import { DesktopAiPanel } from "@/components/settings/desktop-ai-panel"
 import { DesktopSessionsCard } from "@/components/settings/desktop-sessions-card"
+import { showUpdateState } from "@/components/desktop/desktop-update-toast"
 import { PasskeysCard } from "@/components/settings/passkeys-card"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { ProfileOverview } from "@/components/profile/profile-overview"
@@ -408,8 +409,16 @@ function DesktopAppSection() {
         toast.success(`TaskForce ${result.version} is up to date`)
         break
       case "downloading":
-        toast.success(`TaskForce ${result.version} is downloading`, { description: "It installs when you quit TaskForce." })
+      case "ready": {
+        // Le toast de la mise à jour en montre l'avancement, puis le redémarrage (cf. DesktopUpdateToast).
+        const state = await bridge.updater?.state().catch(() => null)
+        if (state && state.status !== "idle") {
+          showUpdateState(state, () => void bridge.updater?.install(), () => void checkUpdates())
+        } else {
+          toast.success(`TaskForce ${result.version} is downloading`, { description: "It installs when you quit TaskForce." })
+        }
         break
+      }
       case "development":
         toast.info("Updates are checked in the installed app.")
         break
@@ -949,8 +958,9 @@ function SecurityPanel() {
       setDisabling(false)
       setCode("")
       toast.success("Two-factor authentication disabled.")
-    } catch {
-      toast.error("That code didn't work. Enter the code your authenticator app shows now.")
+    } catch (e) {
+      // Le message du serveur dit la vraie cause : code faux, trop d'essais (attendre une minute), ou panne.
+      toast.error(getErrorMessage(e))
     } finally {
       setBusy(false)
     }

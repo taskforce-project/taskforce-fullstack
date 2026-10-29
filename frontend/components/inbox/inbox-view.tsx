@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation"
 import {
   Radio, AtSign, ShieldAlert, ClipboardList,
   CheckCheck, Flame, AlertTriangle, Clock, CheckCircle2,
-  MessageSquare, ArrowRight, ArrowUpRight, X, RefreshCw, ShieldQuestion, Bot, OctagonX,
+  MessageSquare, ArrowRight, ArrowUpRight, X, RefreshCw, ShieldQuestion, Bot, OctagonX, Ban,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -46,6 +46,8 @@ const TYPE_CONFIG: Partial<Record<string, TypeCfg>> = {
   agentApproval: { icon: ShieldQuestion, label: "Approval needed",  color: "text-ink-yellow" },
   agentDone:     { icon: Bot,            label: "Agent finished",   color: "text-ink-green" },
   agentFailed:   { icon: OctagonX,       label: "Agent failed",     color: "text-destructive" },
+  // Une règle a refusé la mission au départ : ce n'est pas une panne (R38).
+  agentNotStarted: { icon: Ban,          label: "Agent didn't start", color: "text-muted-foreground" },
 }
 
 // Fallback pour tout type non mappé → évite le crash si le backend renvoie un type inconnu.

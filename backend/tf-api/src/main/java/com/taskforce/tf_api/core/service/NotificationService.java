@@ -301,7 +301,7 @@ public class NotificationService {
     @Transactional
     public void notifyAgentRunNotStarted(Issue issue, User delegator, String agentName, String detail) {
         if (delegator == null) return;
-        Notification notif = buildNotification(issue, null, delegator, "agentFailed", "info",
+        Notification notif = buildNotification(issue, null, delegator, "agentNotStarted", "info",
             issue.getTitle() + ": " + agentName + " didn't start", truncate(detail, 200));
         dispatch(notif);
     }
@@ -367,18 +367,19 @@ public class NotificationService {
     private String emailLabel(String type) {
         if (type == null) return "Notification";
         return switch (type) {
-            case "assigned"      -> "Assigned to you";
-            case "mention"       -> "You were mentioned";
-            case "commented"     -> "New comment";
-            case "statusChanged" -> "Status update";
-            case "completed"     -> "Completed";
-            case "dueSoon"       -> "Due soon";
-            case "overdue"       -> "Overdue";
-            case "overload"      -> "Workload alert";
-            case "agentApproval" -> "Approval needed";
-            case "agentDone"     -> "Agent finished";
-            case "agentFailed"   -> "Agent failed";
-            default              -> "Notification";
+            case "assigned"        -> "Assigned to you";
+            case "mention"         -> "You were mentioned";
+            case "commented"       -> "New comment";
+            case "statusChanged"   -> "Status update";
+            case "completed"       -> "Completed";
+            case "dueSoon"         -> "Due soon";
+            case "overdue"         -> "Overdue";
+            case "overload"        -> "Workload alert";
+            case "agentApproval"   -> "Approval needed";
+            case "agentDone"       -> "Agent finished";
+            case "agentFailed"     -> "Agent failed";
+            case "agentNotStarted" -> "Agent didn't start";
+            default                -> "Notification";
         };
     }
 
