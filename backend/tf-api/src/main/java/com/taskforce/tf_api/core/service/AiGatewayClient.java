@@ -38,6 +38,7 @@ public class AiGatewayClient implements LlmClient {
 
     /** Accumulateur d'usage par thread : [prompt, completion, total]. {@code null} = capture inactive. */
     private final ThreadLocal<long[]> usageAccumulator = new ThreadLocal<>();
+    private final ThreadLocal<String> lastModel = new ThreadLocal<>();
 
     public AiGatewayClient(ObjectMapper objectMapper, AiStatusService status,
                            @Value("${ai.service.url:http://ai-service:8000}") String serviceUrl,
@@ -65,6 +66,7 @@ public class AiGatewayClient implements LlmClient {
     @Override
     public void beginUsageCapture() {
         usageAccumulator.set(new long[3]);
+        lastModel.remove();
     }
 
     @Override
@@ -76,6 +78,19 @@ public class AiGatewayClient implements LlmClient {
     @Override
     public void endUsageCapture() {
         usageAccumulator.remove();
+        lastModel.remove();
+    }
+
+    @Override
+    public String currentModel() {
+        return lastModel.get();
+    }
+
+    /** Garde le modèle qui a répondu, pendant une capture seulement : hors capture, rien ne le lira. */
+    private void rememberModel(String model) {
+        if (usageAccumulator.get() != null && !model.isBlank()) {
+            lastModel.set(model);
+        }
     }
 
     @Override
@@ -83,16 +98,22 @@ public class AiGatewayClient implements LlmClient {
         JsonNode message = callChat(
             List.of(Map.of("role", "system", "content", systemPrompt),
                     Map.of("role", "user",   "content", userPrompt)),
-            null, jsonMode, tier);
+            null, jsonMode, tier, null);
         return message.path("content").asText("");
     }
 
     @Override
     public JsonNode rawChat(List<Map<String, Object>> messages, List<Map<String, Object>> tools, String tier) {
-        return callChat(messages, tools, false, tier);
+        return callChat(messages, tools, false, tier, null);
     }
 
-    private JsonNode callChat(List<?> messages, List<Map<String, Object>> tools, boolean jsonMode, String tier) {
+    @Override
+    public JsonNode rawChatWithModel(List<Map<String, Object>> messages, List<Map<String, Object>> tools, String model) {
+        return callChat(messages, tools, false, null, model);
+    }
+
+    private JsonNode callChat(List<?> messages, List<Map<String, Object>> tools, boolean jsonMode, String tier,
+                              String model) {
         if (!isConfigured()) {
             throw new LlmException("AI is not available on this instance", null);
         }
@@ -101,6 +122,8 @@ public class AiGatewayClient implements LlmClient {
         body.put("json_mode", jsonMode);
         if (tier != null) {
             body.put("tier", tier);
+        } else if (model != null && !model.isBlank()) {
+            body.put("model", model); // sans tier : la passerelle prend ce modèle
         }
         if (tools != null && !tools.isEmpty()) {
             body.put("tools", tools);
@@ -112,6 +135,7 @@ public class AiGatewayClient implements LlmClient {
             String raw = restTemplate.postForObject(chatUrl, new HttpEntity<>(body, headers), String.class);
             JsonNode root = objectMapper.readTree(raw);
             accumulateUsage(root.path("usage"));
+            rememberModel(root.path("model").asText(""));
             return root.path("message");
         } catch (Exception ex) {
             if (toolsRefused(ex)) { // le fournisseur répond : son état reste valable

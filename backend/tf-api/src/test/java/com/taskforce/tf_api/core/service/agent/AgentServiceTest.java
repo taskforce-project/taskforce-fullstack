@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.service.agent;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -89,7 +90,7 @@ class AgentServiceTest {
             .owner(User.builder().email("owner@acme.test").build()).build();
         lenient().when(workspaces.findById(1L)).thenReturn(Optional.of(owned));
         ReflectionTestUtils.setField(service, "gate", new CortexGate(new HarnessRulesService(ruleSets), workspaces));
-        lenient().when(records.open(any(), any())).thenReturn(RECORD);
+        lenient().when(records.open(any(), any(), any())).thenReturn(RECORD);
         lenient().when(records.append(any(), any(), any(), any())).thenReturn(Optional.of("hash"));
     }
 
@@ -479,7 +480,7 @@ class AgentServiceTest {
         service.run("acme", 7L, "Create an issue \"Release notes\"");
 
         InOrder order = Mockito.inOrder(records, tool);
-        order.verify(records).open(any(), eq("Create an issue \"Release notes\""));
+        order.verify(records).open(any(), eq("Create an issue \"Release notes\""), any());
         order.verify(records).append(eq(RECORD), eq("action.requested"), eq(CortexRecordService.Actor.CORTEX), any());
         order.verify(records).append(eq(RECORD), eq("action.decided"), eq(CortexRecordService.Actor.rule("create-issue")), any());
         order.verify(tool).execute(any(), any());
@@ -497,14 +498,14 @@ class AgentServiceTest {
 
         service.run("acme", 7L, "Give me the status of the project");
 
-        verify(records, never()).open(any(), any());
+        verify(records, never()).open(any(), any(), any());
     }
 
     @Test
     @DisplayName("sans dossier, pas d'action : une panne du dossier arrête l'outil")
     void no_record_no_action() throws Exception {
         AgentTool tool = stubInternalCall("create_issue");
-        when(records.open(any(), any())).thenThrow(new IllegalStateException("database down"));
+        when(records.open(any(), any(), any())).thenThrow(new IllegalStateException("database down"));
 
         AssistantAnswer answer = service.run("acme", 7L, "Create an issue \"Release notes\"");
 
@@ -731,5 +732,102 @@ class AgentServiceTest {
             .contains("external system")
             .contains("target TaskForce by default")
             .contains("find_integration");
+    }
+
+    // -------------------------------------------------------------------------
+    // Le modèle au dossier et le rejeu d'un cas de la banque
+    // -------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("le dossier garde ce qui a répondu : le modèle, le tier, les notes servies")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void the_record_keeps_what_answered() throws Exception {
+        AgentTool tool = stubInternalCall("create_issue");
+        when(tool.execute(any(), any())).thenReturn("Created TF-31");
+        when(llm.currentModel()).thenReturn("qwen3:8b");
+
+        service.run("acme", 7L, "Create an issue \"Release notes\"");
+
+        ArgumentCaptor<Map<String, Object>> origin = (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
+        verify(records).open(any(), eq("Create an issue \"Release notes\""), origin.capture());
+        assertThat(origin.getValue()).containsEntry("model", "qwen3:8b").containsEntry("tier", "fast")
+            .containsEntry("notes", List.of());
+    }
+
+    private static final ReplayCase CASE = new ReplayCase("Which issues are blocked, and why?", LocalDate.of(2026, 10, 29),
+        List.of(new ReplayCase.FrozenNote("Release plan", "PROJET", "Ship on Friday.")),
+        List.of(new ReplayCase.CassetteEntry("list_issues", ReplayCase.canonical("{\"status\":\"Blocked\"}"),
+            "TF-4 Deploy [Blocked], blocked by TF-3")));
+
+    private AgentTool stubReplayTool(String name) {
+        when(tools.toolDefinitions(anyList())).thenReturn(List.of());
+        AgentTool tool = Mockito.mock(AgentTool.class);
+        lenient().when(tool.name()).thenReturn(name);
+        when(tools.get(eq(name), anyList())).thenReturn(tool);
+        return tool;
+    }
+
+    @Test
+    @DisplayName("au rejeu, le modèle nommé lit la cassette, avec la date et les notes du cas ; l'espace n'est pas touché")
+    @SuppressWarnings("unchecked")
+    void a_replay_serves_reads_from_the_cassette() throws Exception {
+        AgentTool tool = stubReplayTool("list_issues");
+        when(llm.rawChatWithModel(anyList(), anyList(), eq("llama3.2"))).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"list_issues\","
+                + "\"arguments\":\"{\\\"status\\\": \\\"Blocked\\\"}\"}}]}"),
+            json.readTree("{\"content\":\"TF-4 is blocked by TF-3.\"}"));
+        when(llm.currentModel()).thenReturn("llama3.2");
+
+        ReplayOutcome outcome = service.replay(new AgentContext("acme", 1L, 7L), CASE, "llama3.2");
+
+        assertThat(outcome.answer()).isEqualTo("TF-4 is blocked by TF-3.");
+        assertThat(outcome.model()).isEqualTo("llama3.2");
+        assertThat(outcome.calls()).singleElement().satisfies(call -> {
+            assertThat(call.status()).isEqualTo("success");
+            assertThat(call.effect()).isEqualTo("allow");
+        });
+        ArgumentCaptor<List<Map<String, Object>>> messages = ArgumentCaptor.forClass(List.class);
+        verify(llm, Mockito.times(2)).rawChatWithModel(messages.capture(), anyList(), eq("llama3.2"));
+        assertThat((String) messages.getValue().get(0).get("content"))
+            .contains("Today is Thursday 29 October 2026 (UTC)").contains("Release plan");
+        assertThat(messages.getValue()).anyMatch(m -> "TF-4 Deploy [Blocked], blocked by TF-3".equals(m.get("content")));
+        verify(tool, never()).execute(any(), any());
+        verify(records, never()).open(any(), any(), any());
+        verify(search, never()).retrieveRelevant(anyLong(), anyString(), anyInt());
+    }
+
+    @ParameterizedTest(name = "{0} au rejeu : {1}, jamais lancé")
+    @CsvSource({
+        "create_issue,  pending", // une écriture se joue à blanc : proposée, jamais exécutée
+        "list_projects, error",   // une lecture que le cas n'a pas faite : notée, jamais lancée sur l'espace
+    })
+    void a_replay_never_acts_on_the_workspace(String name, String status) throws Exception {
+        AgentTool tool = stubReplayTool(name);
+        when(llm.rawChat(anyList(), anyList(), eq("fast"))).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"" + name + "\",\"arguments\":\"{}\"}}]}"),
+            json.readTree("{\"content\":\"Done.\"}"));
+
+        ReplayOutcome outcome = service.replay(new AgentContext("acme", 1L, 7L), CASE, null);
+
+        assertThat(outcome.calls()).singleElement().satisfies(call -> assertThat(call.status()).isEqualTo(status));
+        verify(tool, never()).execute(any(), any());
+        verify(records, never()).open(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("au rejeu, une règle qui refuse est gardée telle quelle dans la note")
+    void a_replay_keeps_a_refusal() throws Exception {
+        stubReplayTool("create_issue");
+        denyEverything("Issues are frozen.");
+        when(llm.rawChat(anyList(), anyList(), eq("fast"))).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"create_issue\",\"arguments\":\"{}\"}}]}"),
+            json.readTree("{\"content\":\"It is refused.\"}"));
+
+        ReplayOutcome outcome = service.replay(new AgentContext("acme", 1L, 7L), CASE, " ");
+
+        assertThat(outcome.calls()).singleElement().satisfies(call -> {
+            assertThat(call.status()).isEqualTo("refused");
+            assertThat(call.effect()).isEqualTo("deny");
+        });
     }
 }
