@@ -17,6 +17,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.taskforce.tf_api.shared.exception.AiRateLimitedException;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -74,8 +75,12 @@ class AiRateGuardTest {
         when(redisProvider.getIfAvailable()).thenReturn(redis);
         when(ops.get(startsWith("ai:tpm:g:"))).thenReturn("100");   // global sous le seuil
         when(ops.get(startsWith("ai:tpm:a:"))).thenReturn("6000");  // compte au seuil
+        // La vraie attente : la fenêtre se vide à la minute suivante (R52, séance n°8).
         assertThatThrownBy(() -> guard.assertWithinRate(99L))
-            .isInstanceOf(AiRateLimitedException.class);
+            .isInstanceOfSatisfying(AiRateLimitedException.class, e -> {
+                assertThat(e).hasMessageStartingWith("Your AI budget for this minute is used. Try again in ");
+                assertThat(e.getRetryAfterSeconds()).isBetween(1L, 60L);
+            });
     }
 
     @Test
@@ -122,8 +127,12 @@ class AiRateGuardTest {
         when(ops.get(startsWith("ai:tpm:g:"))).thenReturn("0");    // tokens sous les seuils
         when(ops.get(startsWith("ai:tpm:a:"))).thenReturn("0");
         when(ops.get(startsWith("ai:rpm:a:99:"))).thenReturn("1"); // déjà 1 requête cette minute == accountRpm
+        // Le frein dit ce qu'il est, une requête par minute, et combien attendre : pas « trop de requêtes ».
         assertThatThrownBy(() -> guard.assertWithinRate(99L))
-            .isInstanceOf(AiRateLimitedException.class);
+            .isInstanceOfSatisfying(AiRateLimitedException.class, e -> {
+                assertThat(e).hasMessageStartingWith("This instance allows 1 AI request per minute for each account. Try again in ");
+                assertThat(e.getRetryAfterSeconds()).isBetween(1L, 60L);
+            });
     }
 
     @Test

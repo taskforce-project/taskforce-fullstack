@@ -1,8 +1,12 @@
 package com.taskforce.tf_api.core.service.agent;
 
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -75,6 +79,9 @@ public class AgentService {
     private int maxExternalTools;
 
     private static final int MAX_TOOL_ITERS = 5;
+
+    /** La date du jour, dite au modèle pour qu'il place une issue dans le temps (R48, séance n°8). */
+    private static final DateTimeFormatter TODAY = DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", Locale.ENGLISH);
 
     private static final String STEP_SEARCH = "Searching your workspace's notes";
     private static final String STEP_ANSWER = "Writing the answer";
@@ -366,7 +373,12 @@ public class AgentService {
           .append("If you need data from an external system you have no tool for, call find_integration: when ")
           .append("the integration exists but is not connected, invite the user to connect it (Settings > ")
           .append("Integrations); when it is not in the catalog, say so plainly and add that a tool with an MCP ")
-          .append("server can still be connected there. Never make data up. ");
+          .append("server can still be connected there. Never make data up. ")
+          .append("Today is ").append(LocalDate.now(ZoneOffset.UTC).format(TODAY)).append(" (UTC). ")
+          .append("When you create an issue, place it in time from its goal: read the project's columns and active ")
+          .append("cycle, keep it in the Backlog unless the work must start now, and set a due date only when the goal ")
+          .append("or the person gives one. When the project or the timing is unclear, ask the person, with the ")
+          .append("choices, before creating anything. Name the project and the column as the result gives them. ");
         if (!external.isEmpty()) {
             String names = external.stream().map(AgentTool::name).collect(Collectors.joining(", "));
             sb.append("External tools are connected (MCP servers): ").append(names).append(". ")
