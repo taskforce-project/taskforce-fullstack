@@ -279,6 +279,7 @@ class DeliveryControllerWebMvcTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"Keep the Privacy link\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.id").value(101));
+        verify(deliveryRunner).execute(101L);
     }
 
     @Test

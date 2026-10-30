@@ -215,8 +215,9 @@ public class DeliveryController {
         @Valid @RequestBody(required = false) MissionRetryRequest request
     ) {
         String note = request == null ? null : request.note();
-        return ResponseEntity.ok(ApiResponse.success("Delegated again",
-            missionResults.retry(slug, runId, resolveUserId(jwt), note)));
+        DeliveryRunResponse run = missionResults.retry(slug, runId, resolveUserId(jwt), note);
+        deliveryRunner.execute(run.id()); // async, une fois le run committé, comme une délégation
+        return ResponseEntity.ok(ApiResponse.success("Delegated again", run));
     }
 
     /** La remarque de la personne pour la nouvelle mission ; elle va sur l'issue, où l'agent la lit. */

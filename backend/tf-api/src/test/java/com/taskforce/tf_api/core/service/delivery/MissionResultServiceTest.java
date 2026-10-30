@@ -166,6 +166,21 @@ class MissionResultServiceTest {
     }
 
     @Test
+    @DisplayName("Try again refusé par l'agent : la pull request reste ouverte, le résultat reste à trancher")
+    void retry_refused_by_the_agent_keeps_the_pull_request() {
+        when(deliveryService.delegate("acme", 55L, "claude-code", "sonnet", 7L))
+            .thenThrow(new BusinessException("Start the runner on your computer first."));
+
+        assertThatThrownBy(() -> service.retry("acme", 100L, 7L, "Keep the Privacy link"))
+            .isInstanceOf(BusinessException.class);
+
+        verify(pullRequests, never()).close(anyLong(), any(), anyInt());
+        verify(pullRequests, never()).deleteBranch(anyLong(), any(), any());
+        verify(issueService, never()).addComment(any(), any(), any(), any(), any());
+        assertThat(run.getOutcome()).isNull();
+    }
+
+    @Test
     @DisplayName("un coéquipier ne tranche pas pour la personne qui a délégué")
     void only_the_delegator_decides() {
         assertThatThrownBy(() -> service.apply("acme", 100L, 8L)).isInstanceOf(ForbiddenException.class);

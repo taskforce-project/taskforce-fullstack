@@ -77,22 +77,24 @@ public class MissionResultService {
     }
 
     /**
-     * Écarte le résultat, poste la remarque de la personne sur l'issue, puis relance la mission avec le même agent : la
-     * nouvelle mission lit la remarque avec le reste de l'issue.
+     * Relance la mission avec le même agent, écarte le résultat et poste la remarque de la personne sur l'issue : la
+     * nouvelle mission lit la remarque avec le reste de l'issue. La relance d'abord : un agent qui ne peut pas repartir
+     * refuse le geste avant que GitHub ferme la pull request et supprime sa branche.
      */
     @Transactional
     public DeliveryRunResponse retry(String slug, Long runId, Long userId, String note) {
         DeliveryRun run = decidable(slug, runId, userId);
+        Issue issue = run.getIssue();
+        DeliveryRunResponse next = deliveryService.delegate(slug, issue.getId(), run.getProviderKey(), run.getModel(), userId);
         withdraw(run);
         decided(run, DeliveryRunOutcome.RETRIED, userId);
-        Issue issue = run.getIssue();
         if (note != null && !note.isBlank()) {
             CreateIssueCommentRequest comment = new CreateIssueCommentRequest();
             comment.setContent("Try again: " + note.strip());
             issueService.addComment(slug, issue.getProject().getId(), issue.getId(), comment, userId);
         }
         log.info("Run {} : relancé par {}", runId, userId);
-        return deliveryService.delegate(slug, issue.getId(), run.getProviderKey(), run.getModel(), userId);
+        return next;
     }
 
     // ---------------------------------------------------------------------
