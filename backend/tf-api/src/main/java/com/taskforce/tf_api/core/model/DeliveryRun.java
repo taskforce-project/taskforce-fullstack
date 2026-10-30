@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.model;
 
 import java.time.LocalDateTime;
 
+import com.taskforce.tf_api.core.enums.DeliveryRunOutcome;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.shared.audit.AuditableEntity;
 
@@ -145,4 +146,15 @@ public class DeliveryRun extends AuditableEntity {
     @Column(name = "ended_at")
     private LocalDateTime endedAt;
 
+    /** Le geste de la personne sur la carte de résultat, qui et quand ; vide tant qu'elle n'a pas tranché. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 16)
+    private DeliveryRunOutcome outcome;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "outcome_by")
+    private User outcomeBy;
+
+    @Column(name = "outcome_at")
+    private LocalDateTime outcomeAt;
 }

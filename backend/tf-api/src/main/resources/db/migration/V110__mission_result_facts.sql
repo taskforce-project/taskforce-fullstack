@@ -11,3 +11,10 @@ ALTER TABLE delivery_runs
     ADD COLUMN tests_total        INTEGER,
     ADD COLUMN ended_at           TIMESTAMP;
 
+-- Le geste de la personne sur la carte (R78) : appliquer (la pull request fusionnée), écarter (fermée, sa branche
+-- supprimée) ou relancer (écartée, puis une nouvelle mission). Le dossier de preuve est scellé à la fin de la mission :
+-- le geste se garde ici, avec qui et quand.
+ALTER TABLE delivery_runs
+    ADD COLUMN outcome    VARCHAR(16),
+    ADD COLUMN outcome_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    ADD COLUMN outcome_at TIMESTAMP;

@@ -38,7 +38,10 @@ public record DeliveryRunResponse(
     String branch,
     Integer commits,
     /** Les tests du projet tels que le runner les a lancés (R32), jamais ce que l'agent en dit ; absents sans tests. */
-    Tests tests
+    Tests tests,
+    /** Le geste de la personne sur la carte : APPLIED, DISCARDED ou RETRIED, et quand ; vides tant qu'elle n'a pas tranché. */
+    String outcome,
+    LocalDateTime outcomeAt
 ) {
 
     /** Un run sans les faits de la carte de résultat. */
@@ -46,7 +49,7 @@ public record DeliveryRunResponse(
                                String providerKey, String model, String status, String summary, String resultUrl, String error,
                                boolean refused, Long startedById, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this(id, issueId, issueKey, issueTitle, projectId, projectName, providerKey, model, status, summary, resultUrl, error,
-            refused, startedById, createdAt, updatedAt, null, null, null, null, null, null);
+            refused, startedById, createdAt, updatedAt, null, null, null, null, null, null, null, null);
     }
 
     /** {@code passedCount} sur {@code total}, quand la sortie des tests le dit. */
