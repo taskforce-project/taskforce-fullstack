@@ -14,6 +14,9 @@ public record DeliveryRunActivityResponse(List<Event> events, List<Approval> app
     /**
      * @param canDecide la personne qui lit est celle qui a délégué, et la demande attend encore sa réponse
      * @param askedBy   {@code agent} ou {@code runner} : qui pose la demande, l'agent ou TaskForce (décision J4)
+     * @param action    l'action que les règles ont jugée, pour la dire en mots (R78) ; vide pour un runner plus ancien
+     * @param rule      la règle qui demande, et {@code reason} sa raison ; vides quand aucune ne couvre l'action
+     * @param scope     la portée d'un accord : {@code ONCE}, ou {@code MISSION} pour le reste de la mission (R46)
      */
     public record Approval(
         Long id,
@@ -25,6 +28,10 @@ public record DeliveryRunActivityResponse(List<Event> events, List<Approval> app
         LocalDateTime decidedAt,
         String decidedBy,
         boolean canDecide,
-        String askedBy
+        String askedBy,
+        String action,
+        String rule,
+        String reason,
+        String scope
     ) {}
 }

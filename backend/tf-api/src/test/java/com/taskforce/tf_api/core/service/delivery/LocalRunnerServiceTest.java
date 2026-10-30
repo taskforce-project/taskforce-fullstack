@@ -378,10 +378,11 @@ class LocalRunnerServiceTest {
         DeliveryRun held = run(100L, DeliveryRunStatus.RUNNING, "tf-runner-pierre", owner, LocalDateTime.now());
         when(runRepository.findById(100L)).thenReturn(Optional.of(held));
 
-        service.requestApproval(100L, RUNNER, new RunnerApprovalRequest("Bash", "npm install lodash"));
+        RunnerApprovalRequest request = new RunnerApprovalRequest("Bash", "npm install lodash");
+        service.requestApproval(100L, RUNNER, request);
         service.approvalStatus(100L, 9L, RUNNER);
 
-        verify(activityService).openApproval(held, "Bash", "npm install lodash", false);
+        verify(activityService).openApproval(held, "Bash", "npm install lodash", false, request);
         verify(activityService).approvalStatus(held, 9L);
     }
 

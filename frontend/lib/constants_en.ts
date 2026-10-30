@@ -438,6 +438,88 @@ export const CONSTANTS_EN = {
     creating: "Creating…",
   },
 
+  // Delegated missions: what an agent asks while it works (R78, the Allow screen).
+  missions: {
+    agent: "Claude Code",
+    taskforce: "TaskForce",
+    wantsTo: "wants to",
+    willDo: "What it will do",
+    whyWeAsk: "Why we ask",
+    understood: "Its task",
+    ifRefused: "If you refuse",
+    noRule: "No rule of this workspace covers this action, so it waits for you.",
+    refuse: "Refuse",
+    allowOnce: "Allow",
+    allowForMission: "Allow for this mission",
+    forMissionHint: "Requests of the same kind won't be asked again until the mission ends.",
+    noAnswerMeansNo: "No answer in {minutes} min means no. You will see that it was refused.",
+    noAnswerSoon: "No answer in less than a minute means no. You will see that it was refused.",
+    showCommand: "Show the command",
+    waitingFor: "Waiting for the person who delegated this task to answer.",
+    allowed: "Allowed: the agent goes on",
+    allowedForMission: "Allowed for this mission",
+    refused: "Refused: the agent goes on without it",
+    // What became of a request, in the activity.
+    outcomeAllowed: "Allowed by {who}",
+    outcomeAllowedForMission: "Allowed for this mission by {who}",
+    outcomeRefused: "Refused by {who}",
+    outcomeNoAnswer: "No answer in time: refused",
+    theDelegator: "the person who delegated",
+    // What each kind of action does, as the person reads it.
+    actions: {
+      "web.search": {
+        want: "search the web",
+        will: "Send this query to a search engine, outside this computer. A query that has left can't be taken back.",
+        ifRefused: "It continues without this search.",
+      },
+      "web.fetch": {
+        want: "open a web page",
+        will: "Fetch this address from the internet. An address can carry words from your project out of this computer.",
+        ifRefused: "It continues without this page.",
+      },
+      shell: {
+        want: "run a command",
+        will: "Run this command on this computer, in the mission's copy of the project.",
+        ifRefused: "It continues without running it.",
+      },
+      "file.write": {
+        want: "change a file",
+        will: "Write this file in the mission's copy of the project.",
+        ifRefused: "It continues without changing it.",
+      },
+      "file.delete": {
+        want: "delete a file",
+        will: "Delete this file in the mission's copy of the project.",
+        ifRefused: "The file stays.",
+      },
+      "git.push": {
+        want: "push the branch",
+        will: "Send the branch to the repository on GitHub, where the people who see the repository can read it.",
+        ifRefused: "The branch stays on this computer.",
+      },
+      "pr.open": {
+        want: "open a pull request",
+        will: "Open a pull request on GitHub. Nothing is merged.",
+        ifRefused: "No pull request is opened; the branch stays.",
+      },
+      "mcp.write": {
+        want: "change something in a connected tool",
+        will: "Change data in a tool your workspace connected, outside TaskForce.",
+        ifRefused: "It continues without this change.",
+      },
+      "mission.start": {
+        want: "start the mission",
+        will: "Start Claude Code on this task, in a copy of the project on this computer.",
+        ifRefused: "The mission doesn't start.",
+      },
+      other: {
+        want: "use",
+        will: "Use this tool, which the rules of this workspace don't allow by themselves.",
+        ifRefused: "It continues without it.",
+      },
+    },
+  },
+
   // Cortex in the conversation.
   cortex: {
     // The issue Cortex prepares as a card (R78): the person checks it, edits it, then creates it.

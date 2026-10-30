@@ -12,12 +12,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.taskforce.tf_api.core.dto.request.RunnerApprovalRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunActivityResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
@@ -174,6 +176,33 @@ class DeliveryActivityServiceTest {
     }
 
     @Test
+    void an_approval_keeps_the_rule_that_asks_and_its_reason() {
+        ArgumentCaptor<DeliveryRunApproval> saved = ArgumentCaptor.forClass(DeliveryRunApproval.class);
+
+        service.openApproval(run, "WebSearch", "electron-updater progress", false, new RunnerApprovalRequest("WebSearch",
+            "electron-updater progress", "agent", "web.search", " search-web ", "A web search sends its query out of the machine."));
+
+        verify(approvalRepository).save(saved.capture());
+        assertThat(saved.getValue().getAction()).isEqualTo("web.search");
+        assertThat(saved.getValue().getRuleId()).isEqualTo("search-web");
+        assertThat(saved.getValue().getRuleReason()).isEqualTo("A web search sends its query out of the machine.");
+        ArgumentCaptor<Map<String, Object>> data = mapCaptor();
+        verify(evidenceService).append(eq(run), eq("action.decided"), eq(MissionEvidenceService.Actor.SERVER), data.capture());
+        assertThat(data.getValue()).containsEntry("action", "web.search").containsEntry("rule", "search-web");
+    }
+
+    @Test
+    void an_older_runner_s_request_has_no_rule() {
+        ArgumentCaptor<DeliveryRunApproval> saved = ArgumentCaptor.forClass(DeliveryRunApproval.class);
+
+        service.openApproval(run, "Bash", "npm install lodash", false, new RunnerApprovalRequest("Bash", "npm install lodash", "agent", " ", " ", null));
+
+        verify(approvalRepository).save(saved.capture());
+        assertThat(saved.getValue().getAction()).isNull();
+        assertThat(saved.getValue().getRuleId()).isNull();
+    }
+
+    @Test
     void a_pending_approval_past_its_deadline_expires_when_read() {
         DeliveryRunApproval approval = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().minusSeconds(1));
         when(approvalRepository.findByIdAndRunId(9L, 100L)).thenReturn(Optional.of(approval));
@@ -210,7 +239,25 @@ class DeliveryActivityServiceTest {
         assertThat(approval.getDecidedAt()).isNotNull();
         ArgumentCaptor<Map<String, Object>> data = mapCaptor();
         verify(evidenceService).append(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), data.capture());
-        assertThat(data.getValue()).containsEntry("decision", "ALLOWED").containsEntry("approval", 9L);
+        assertThat(data.getValue()).containsEntry("decision", "ALLOWED").containsEntry("approval", 9L).containsEntry("scope", "ONCE");
+        assertThat(approval.getScope()).isEqualTo("ONCE");
+    }
+
+    @ParameterizedTest(name = "accord={0}, pour la mission={1} : portée {2}")
+    @CsvSource({
+        "true,  true,  MISSION", // R46 : le runner ne redemande plus ce que la même règle demande
+        "true,  false, ONCE",
+        "false, true,  ONCE",    // un refus vaut une fois
+    })
+    void the_scope_of_an_answer(boolean allow, boolean forMission, String scope) {
+        DeliveryRunApproval approval = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        when(approvalRepository.findByIdAndRunId(9L, 100L)).thenReturn(Optional.of(approval));
+        when(userRepository.getReferenceById(7L)).thenReturn(delegator);
+
+        service.decide("acme", 100L, 9L, allow, forMission, 7L);
+
+        assertThat(approval.getScope()).isEqualTo(scope);
+        assertThat(service.approvalStatus(run, 9L).scope()).isEqualTo(scope);
     }
 
     @Test
@@ -248,6 +295,9 @@ class DeliveryActivityServiceTest {
     @Test
     void activity_lets_only_the_delegator_decide() {
         DeliveryRunApproval pending = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        pending.setAction("web.search");
+        pending.setRuleId("search-web");
+        pending.setRuleReason("A web search leaves the machine.");
         when(eventRepository.findByRunIdAndSeqGreaterThanOrderBySeqAsc(eq(100L), eq(3), any())).thenReturn(List.of(
             DeliveryRunEvent.builder().seq(4).kind("tool").tool("Bash").text("npm test").build()));
         when(approvalRepository.findByRunIdOrderByCreatedAtAsc(100L)).thenReturn(List.of(pending));
@@ -257,6 +307,8 @@ class DeliveryActivityServiceTest {
 
         assertThat(forDelegator.events()).extracting(DeliveryRunActivityResponse.Event::seq).containsExactly(4);
         assertThat(forDelegator.approvals().get(0).canDecide()).isTrue();
+        assertThat(forDelegator.approvals().get(0).action()).isEqualTo("web.search");
+        assertThat(forDelegator.approvals().get(0).reason()).isEqualTo("A web search leaves the machine.");
         assertThat(forTeammate.approvals().get(0).canDecide()).isFalse();
         verify(visibilityGuard).assertCanView(run.getIssue().getProject(), 8L);
     }

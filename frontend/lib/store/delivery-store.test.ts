@@ -172,7 +172,7 @@ describe('delivery-store', () => {
     let ok = false;
     await act(async () => { ok = await useDeliveryStore.getState().decideApproval('acme', 100, 9, true); });
     expect(ok).toBe(true);
-    expect(svc.decideApproval).toHaveBeenCalledWith('acme', 100, 9, true);
+    expect(svc.decideApproval).toHaveBeenCalledWith('acme', 100, 9, true, false);
     expect(useDeliveryStore.getState().activity[100]?.approvals[0]?.status).toBe('ALLOWED');
   });
 

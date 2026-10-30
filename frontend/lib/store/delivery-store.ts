@@ -46,8 +46,8 @@ interface DeliveryState {
   provisionRunner: () => Promise<RunnerProvision | null>;
   /** Lit la suite de la chronologie d'un run (après le dernier événement connu) et ses demandes. */
   fetchActivity: (slug: string, runId: number) => Promise<DeliveryRunActivity | null>;
-  /** Autorise ou refuse une action de l'agent ; `true` si la décision est enregistrée. */
-  decideApproval: (slug: string, runId: number, approvalId: number, allow: boolean) => Promise<boolean>;
+  /** Autorise une fois, ou pour le reste de la mission (`forMission`, R46), ou refuse ; `true` si la décision est enregistrée. */
+  decideApproval: (slug: string, runId: number, approvalId: number, allow: boolean, forMission?: boolean) => Promise<boolean>;
   /** Télécharge le dossier de preuve d'un run ; `false` si le run n'en a pas (run de la v1) ou en cas d'erreur. */
   downloadEvidence: (slug: string, runId: number, format: "json" | "md") => Promise<boolean>;
 }
@@ -151,9 +151,9 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
     }
   },
 
-  decideApproval: async (slug, runId, approvalId, allow) => {
+  decideApproval: async (slug, runId, approvalId, allow, forMission = false) => {
     try {
-      await decideApprovalApi(slug, runId, approvalId, allow);
+      await decideApprovalApi(slug, runId, approvalId, allow, forMission);
       await get().fetchActivity(slug, runId);
       return true;
     } catch {
