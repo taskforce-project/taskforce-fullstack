@@ -10,6 +10,11 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 30/10/2026 (quinquies) - R77 construite : « Undo » sous ce que Cortex vient de créer.** `[backend + frontend]`
+> - **Décision du CEO** : R77 retenue (séance n°13) ; « tu peux continuer ». La durée de « Undo » restait ouverte : par défaut, tant que l'objet n'a pas bougé (un projet sans issue ni page ajoutée, une issue sans commentaire), à confirmer par le CEO.
+> - **Fait** : `CortexUndo` (défait `create_project` avec le dossier et les notes que le Brain OS lui a donnés, ou `create_issue`, depuis la sortie gardée au dossier) ; `CortexRecordService.undo` sous le verrou du dossier (une seule fois, la décision « undo » et ce qui est défait au dossier, rien de gardé si l'outil refuse) ; `POST /api/workspaces/{slug}/assistant/actions/undo` ; dans la conversation, « Undo » sous une création réussie, aussi après « Approve and run ». Durci au passage : l'accord et la banque ne lisent plus une décision « undo » comme un accord.
+> - **Reste** : la confirmation de la durée par le CEO ; la note reste proposée (question ouverte de la séance n°13).
+
 > **▶ MAJ 30/10/2026 (ter) - Séance n°13 retenue, sauf la voix : une entrée d'écriture et de voix sur chaque écran, « Undo », les trois écrans des retours, la banque aux deux moments.** `[conseil + design]`
 > - **Décision du CEO** : R76 modifiée (la voix démarre d'un clic et s'arrête d'un second, sans appui maintenu ; rien ne part tant que la personne n'envoie pas, avec Entrée ou le bouton d'envoi) ; R77 à R79 retenues ; R80 (la voix sur la machine) à préciser : le CEO la veut « comme la webapp » et demande si elle servira à entraîner des modèles ; la réponse du secrétariat est au PV (pas d'entraînement cette année, R61 ; la voix du navigateur ne nous parvient pas).
 > - **Q13 répondue** : le CEO y passe ses journées ; le texte de la séance n°10 vient d'un post d'une personne de Y Combinator, à qui écrire ; le partenaire de conception, plus tard ; les mots de la cible : audit, traçabilité, IQ, OQ, PQ, réglementation, référentiel. La clé PostHog `phx_` et le jeton de la recette 1.3.1 sont révoqués.
