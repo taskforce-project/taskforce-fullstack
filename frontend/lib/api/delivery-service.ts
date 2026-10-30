@@ -106,6 +106,13 @@ export interface DeliveryRunApproval {
   canDecide: boolean;
   /** Qui demande : l'agent, ou TaskForce lui-même avant une sortie, les tests du projet ou un départ (décision J4). */
   askedBy?: "agent" | "runner";
+  /** L'action que les règles ont jugée (`web.search`, `shell`...), pour la dire en mots (R78) ; absente d'un runner plus ancien. */
+  action?: string | null;
+  /** La règle qui demande, et sa raison telle qu'elle s'écrit pour la personne ; absentes quand aucune ne couvre l'action. */
+  rule?: string | null;
+  reason?: string | null;
+  /** Portée d'un accord : `ONCE`, ou `MISSION` pour le reste de la mission (R46). */
+  scope?: "ONCE" | "MISSION" | null;
 }
 
 export interface DeliveryRunActivity {
@@ -120,8 +127,13 @@ export async function getRunActivity(slug: string, runId: number, after: number)
 }
 
 /** Autorise ou refuse une action demandée par l'agent. */
-export async function decideApproval(slug: string, runId: number, approvalId: number, allow: boolean): Promise<void> {
-  await apiClient.post(DELIVERY_ROUTES.DECIDE(slug, runId, approvalId), { decision: allow ? "ALLOW" : "DENY" });
+export async function decideApproval(
+  slug: string, runId: number, approvalId: number, allow: boolean, forMission = false,
+): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.DECIDE(slug, runId, approvalId), {
+    decision: allow ? "ALLOW" : "DENY",
+    ...(allow && forMission ? { scope: "MISSION" } : {}),
+  });
 }
 
 /**

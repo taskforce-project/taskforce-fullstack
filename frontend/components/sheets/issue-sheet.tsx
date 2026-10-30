@@ -1684,6 +1684,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                 workspaceSlug={workspaceSlug}
                 projectId={projectId}
                 issueId={issueId}
+                goal={issue ? `${title} (${issue.identifier})` : undefined}
               />
             )}
 

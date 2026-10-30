@@ -18,7 +18,8 @@ import { useDeliveryStore } from "@/lib/store/delivery-store"
 export function DelegateAgentControl({
   workspaceSlug,
   issueId,
-}: Readonly<{ workspaceSlug: string; projectId: number; issueId: number }>) {
+  goal,
+}: Readonly<{ workspaceSlug: string; projectId: number; issueId: number; goal?: string }>) {
   const run = useDeliveryStore((s) => s.runs[issueId])
   const fetchRun = useDeliveryStore((s) => s.fetchRun)
   const activity = useDeliveryStore((s) => (run ? s.activity[run.id] : undefined))
@@ -83,7 +84,7 @@ export function DelegateAgentControl({
           <TriangleAlert className="size-3.5" /> Agent failed{run.error ? ` - ${run.error}` : ""}
         </span>
       )}
-      <RunActivity slug={workspaceSlug} runId={run.id} activity={activity} live={running} />
+      <RunActivity slug={workspaceSlug} runId={run.id} activity={activity} live={running} goal={goal} />
     </div>
   )
 }

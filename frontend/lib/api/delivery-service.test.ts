@@ -123,6 +123,17 @@ describe('delivery-service', () => {
     expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DECIDE(SLUG, 100, 9), { decision });
   });
 
+  it.each([
+    [true, { decision: 'ALLOW', scope: 'MISSION' }],
+    [false, { decision: 'DENY' }], // un refus vaut toujours une fois
+  ])('POST pour le reste de la mission (autorisé=%s) -> %o', async (allow, body) => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
+
+    await decideApproval(SLUG, 100, 9, allow, true);
+
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DECIDE(SLUG, 100, 9), body);
+  });
+
   it.each([['json'], ['md']] as const)('télécharge le dossier de preuve en %s, comme fichier', async (format) => {
     const blob = new Blob(['{}']);
     vi.mocked(apiClient.get).mockResolvedValue({ data: blob });
