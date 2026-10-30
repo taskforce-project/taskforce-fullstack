@@ -519,6 +519,35 @@ export const CONSTANTS_EN = {
       },
     },
   },
+
+  // Cortex in the conversation.
+  cortex: {
+    // The issue Cortex prepares as a card (R78): the person checks it, edits it, then creates it.
+    issueCardTitle: "New issue, prepared by Cortex",
+    issueCardHint: "Filled from your request and the project",
+    issueProject: "Project",
+    issueChooseProject: "Choose a project",
+    issueChange: "Change",
+    issueTitle: "Title",
+    issueDescription: "Description",
+    issueSubtasks: "Subtasks",
+    issueSubtasksHint: "One per line",
+    issueDue: "Due",
+    issueNoDue: "No due date",
+    issueColumn: "Column",
+    issueVisibleTo: "Visible to",
+    issueVisibleWorkspace: "Workspace",
+    issueVisibleCollaborators: "Collaborators only",
+    issueVisibleHint: "As its project",
+    issueCreate: "Create issue",
+    issueCreating: "Creating…",
+    issueEdit: "Edit",
+    issueEditDone: "Done editing",
+    issueNeedsProject: "Choose the project first.",
+    issueNeedsTitle: "An issue needs a title.",
+    issueDueInPast: "The due date is in the past.",
+    issueUnknownColumn: "This column isn't in the project anymore: choose another one.",
+  },
 } as const
 
 // Type récursif pour transformer les literal types en string

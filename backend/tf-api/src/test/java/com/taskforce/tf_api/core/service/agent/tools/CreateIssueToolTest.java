@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.taskforce.tf_api.core.dto.request.CreateChecklistItemRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.dto.response.IssueStatusResponse;
@@ -31,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -169,6 +172,35 @@ class CreateIssueToolTest {
         String out = tool().execute(Map.of("project", "TF", "title", "Rate limiting"), CTX);
 
         assertThat(out).doesNotContain("in TaskForce:").doesNotContain("(id ");
+    }
+
+    @Test
+    @DisplayName("les sous-tâches deviennent la checklist de l'issue, sans les lignes vides, et la réponse les compte")
+    void subtasks_become_the_checklist() {
+        when(issueService.listStatuses("acme", 3L, 7L)).thenReturn(COLUMNS);
+        created("Backlog", null);
+        Map<String, Object> args = new HashMap<>(Map.of("project", "TF", "title", "Rate limiting"));
+        args.put("subtasks", Arrays.asList("Plan table", " ", null, "  Link from the menu "));
+
+        String out = tool().execute(args, CTX);
+
+        ArgumentCaptor<CreateChecklistItemRequest> items = ArgumentCaptor.forClass(CreateChecklistItemRequest.class);
+        verify(issueService, times(2)).addChecklistItem(eq("acme"), eq(3L), eq(99L), eq(7L), items.capture());
+        assertThat(items.getAllValues()).extracting(CreateChecklistItemRequest::getContent)
+            .containsExactly("Plan table", "Link from the menu");
+        assertThat(out).endsWith(", with 2 subtasks.");
+    }
+
+    @Test
+    @DisplayName("sans liste de sous-tâches, aucune checklist")
+    void no_subtasks_no_checklist() {
+        when(issueService.listStatuses("acme", 3L, 7L)).thenReturn(COLUMNS);
+        created("Backlog", null);
+
+        String out = tool().execute(Map.of("project", "TF", "title", "Rate limiting", "subtasks", "Plan table"), CTX);
+
+        verify(issueService, never()).addChecklistItem(any(), any(), any(), any(), any());
+        assertThat(out).doesNotContain("subtask");
     }
 
     @ParameterizedTest(name = "priority « {0} » : {1}")
