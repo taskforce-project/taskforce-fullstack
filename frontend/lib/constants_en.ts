@@ -470,7 +470,7 @@ export const CONSTANTS_EN = {
       ready: "Ready to review",
       readyAbove: "Ready to review: see the result under the title",
       applied: "Applied: the pull request is merged",
-      discarded: "Discarded: the pull request is closed",
+      discarded: "Discarded",
       responsible: "{who} is responsible",
       delegatedTo: "delegated to {agent}",
       minutes: "{minutes} min",
