@@ -9,6 +9,7 @@ on:
       - 'fix/**'
     paths:
       - 'taskforce-runner/**'
+      - 'contracts/**'
       - '.github/workflows/runner-tests.yml'
   pull_request:
     branches:
@@ -16,6 +17,7 @@ on:
       - dev
     paths:
       - 'taskforce-runner/**'
+      - 'contracts/**'
 
 permissions:
   contents: read
