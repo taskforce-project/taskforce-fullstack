@@ -100,10 +100,9 @@ const pageTransition = { forwards: pageAnimation, backwards: pageAnimation };
     <main id="main" class="pt-16" transition:animate={pageTransition}>
       <slot />
     </main>
-    <Footer />
-    <DownloadNotice />
-    {!noindex && <Composer />}
 
+    {/* Avant le pied de page et le composeur : les scripts de module s'exécutent dans l'ordre du document, et celui
+        du composeur, chargé à part, ferait attendre le titre du héros, caché jusqu'à son découpage par motion.js. */}
     <script>
       import "../scripts/motion.js";
 
@@ -135,5 +134,8 @@ const pageTransition = { forwards: pageAnimation, backwards: pageAnimation };
       reveal();
       document.addEventListener("astro:page-load", reveal);
     </script>
+    <Footer />
+    <DownloadNotice />
+    {!noindex && <Composer />}
   </body>
 </html>
