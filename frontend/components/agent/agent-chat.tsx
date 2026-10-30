@@ -10,7 +10,7 @@ import {
 import { Markdown } from "@/components/ui/lightweight-markdown"
 import { cn } from "@/lib/utils"
 import {
-  sendAgentMessage, approveAction, isApprovable, isUndoable, type AssistantAnswer, type AssistantToolCall,
+  sendAgentMessage, approveAction, isApprovable, isPreparedIssue, isUndoable, type AssistantAnswer, type AssistantToolCall,
 } from "@/lib/api/assistant-service"
 import { getErrorMessage, getErrorStatus } from "@/lib/api/client"
 import {
@@ -24,6 +24,7 @@ import { useSettingsStore } from "@/lib/store/settings-store"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { CortexUsage } from "./cortex-usage"
 import { EvalCaseButton } from "./eval-case-dialog"
+import { IssueDraftCard } from "./issue-draft-card"
 import { UndoAction } from "./undo-action"
 
 interface Turn {
@@ -486,15 +487,20 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
         <Steps steps={answer.steps.map((s) => ({ title: s.label, status: s.status, description: s.description ?? undefined }))} />
       )}
       {answer.reasoning && <Reasoning content={answer.reasoning} />}
-      {answer.toolCalls.map((tc, i) => (
-        <div key={i}>
-          <Tool name={tc.name} status={tc.status as ToolStatus} input={tc.input ?? undefined} output={tc.output ?? undefined} />
-          {/* Action demandée par les règles de l'espace : validation explicite de l'utilisateur. */}
-          {isApprovable(tc) && <PendingAction slug={slug} call={tc} />}
-          {/* Ce que Cortex vient de créer se défait d'un geste (R77). */}
-          {isUndoable(tc) && <UndoAction slug={slug} call={tc} />}
-        </div>
-      ))}
+      {answer.toolCalls.map((tc, i) =>
+        // Une issue que Cortex a préparée : la carte la montre, la personne la modifie et la crée (R78).
+        isPreparedIssue(tc) ? (
+          <IssueDraftCard key={i} slug={slug} call={tc} />
+        ) : (
+          <div key={i}>
+            <Tool name={tc.name} status={tc.status as ToolStatus} input={tc.input ?? undefined} output={tc.output ?? undefined} />
+            {/* Action demandée par les règles de l'espace : validation explicite de l'utilisateur. */}
+            {isApprovable(tc) && <PendingAction slug={slug} call={tc} />}
+            {/* Ce que Cortex vient de créer se défait d'un geste (R77). */}
+            {isUndoable(tc) && <UndoAction slug={slug} call={tc} />}
+          </div>
+        ),
+      )}
       <Markdown content={answer.answer} />
       {answer.sources.length > 0 && (
         <Sources items={answer.sources.map((s) => ({ title: s.title, snippet: s.domain, score: s.score ?? undefined }))} />

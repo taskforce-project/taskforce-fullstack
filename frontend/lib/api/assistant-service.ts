@@ -83,6 +83,14 @@ export function isApprovable(call: AssistantToolCall): boolean {
 }
 
 /**
+ * Une issue que Cortex a préparée en carte (R78, séance n°13) : la personne la relit, la modifie et la crée ; l'accord
+ * part avec le dossier de la réponse, et les champs modifiés.
+ */
+export function isPreparedIssue(call: AssistantToolCall): boolean {
+  return call.name === "create_issue" && call.status === "pending" && Boolean(call.record)
+}
+
+/**
  * Accorde une action proposée par Cortex. Avec le dossier de la réponse, le serveur la rejuge par les règles de l'espace
  * et la garde au dossier (R35) ; sans dossier, une écriture externe passe par la route de la console MCP.
  */
