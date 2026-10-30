@@ -50,6 +50,46 @@ export interface DeliveryRun {
   startedById: number | null;
   createdAt: string | null;
   updatedAt: string | null;
+  /** Le travail commencé (le runner a pris la mission) et fini : la durée de la carte de résultat (R78). */
+  claimedAt?: string | null;
+  endedAt?: string | null;
+  /** La version des règles de la mission. */
+  rulesVersion?: number | null;
+  /** La branche de l'agent et ses commits ; absents sans changement de code. */
+  branch?: string | null;
+  commits?: number | null;
+  /** Les tests du projet tels que le runner les a lancés (R32), jamais ce que l'agent en dit. */
+  tests?: DeliveryRunTests | null;
+  /** Le geste de la personne sur la carte de résultat, et quand ; absents tant qu'elle n'a pas tranché. */
+  outcome?: DeliveryRunOutcome | null;
+  outcomeAt?: string | null;
+}
+
+export type DeliveryRunOutcome = "APPLIED" | "DISCARDED" | "RETRIED";
+
+export interface DeliveryRunTests {
+  command: string;
+  ran: boolean;
+  passed: boolean;
+  /** Combien ont passé, sur combien, quand la sortie des tests le dit. */
+  passedCount: number | null;
+  total: number | null;
+}
+
+/** « Apply » (R78) : la pull request de l'agent est fusionnée sur GitHub, puis l'issue terminée. */
+export async function applyRun(slug: string, runId: number): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.APPLY(slug, runId), {});
+}
+
+/** « Discard » : la pull request est fermée, sa branche supprimée. */
+export async function discardRun(slug: string, runId: number): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.DISCARD(slug, runId), {});
+}
+
+/** « Try again » : le résultat écarté, la remarque postée sur l'issue, une nouvelle mission ; rend cette mission. */
+export async function retryRun(slug: string, runId: number, note: string): Promise<DeliveryRun> {
+  const res = await apiClient.post<{ data: DeliveryRun }>(DELIVERY_ROUTES.RETRY(slug, runId), note.trim() ? { note: note.trim() } : {});
+  return res.data.data;
 }
 
 /** Délègue une issue à un agent (crée un run, exécuté en arrière-plan côté serveur). */

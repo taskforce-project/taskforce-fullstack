@@ -9,6 +9,9 @@ import {
   getRunActivity,
   decideApproval,
   downloadEvidence,
+  applyRun,
+  discardRun,
+  retryRun,
 } from './delivery-service';
 import { apiClient } from './client';
 import { DELIVERY_ROUTES } from '../config/api-routes';
@@ -151,5 +154,32 @@ describe('delivery-service', () => {
 
     expect(apiClient.get).toHaveBeenCalledWith('/api/workspaces/acme/delivery/providers?projectId=12');
     expect(DELIVERY_ROUTES.PROVIDERS(SLUG)).toBe('/api/workspaces/acme/delivery/providers');
+  });
+});
+
+describe('delivery-service : les gestes de la carte de résultat (R78)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('applyRun et discardRun : POST sur la mission', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
+
+    await applyRun(SLUG, 100);
+    await discardRun(SLUG, 100);
+
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.APPLY(SLUG, 100), {});
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DISCARD(SLUG, 100), {});
+    expect(DELIVERY_ROUTES.APPLY(SLUG, 100)).toBe('/api/workspaces/acme/delivery/runs/100/apply');
+  });
+
+  it.each([
+    ['  Keep the Privacy link  ', { note: 'Keep the Privacy link' }],
+    ['   ', {}],
+  ])('retryRun : la remarque %j part sans ses blancs, la nouvelle mission revient', async (note, body) => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope({ id: 101, status: 'QUEUED' }));
+
+    const next = await retryRun(SLUG, 100, note);
+
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.RETRY(SLUG, 100), body);
+    expect(next).toEqual({ id: 101, status: 'QUEUED' });
   });
 });
