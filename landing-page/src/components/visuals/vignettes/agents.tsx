@@ -116,7 +116,7 @@ export function BranchArt({ playing, reduce }: Readonly<VProps>) {
   const commits = [
     { x: 300, t: "theme.css" },
     { x: 395, t: "appearance.tsx" },
-    { x: 490, t: "tests pass" },
+    { x: 490, t: "tests, by TaskForce" },
   ];
   return (
     <>
@@ -309,9 +309,9 @@ export function ApproveArt({ playing, reduce }: Readonly<VProps>) {
                 className="mt-2 border border-black/[0.06] border-l-2 border-l-shape-yellow bg-white p-3.5 shadow-md rounded-lg"
               >
                 <p className="flex items-center gap-2 text-[12.5px] font-medium">
-                  <BrandMark brand="claude-code" className="size-4" /> Claude Code asks to run Bash
+                  <BrandMark brand="claude-code" className="size-4" /> Claude Code asks to search the web
                 </p>
-                <p className="mt-2 bg-muted px-2 py-1 font-mono text-[11px] rounded-md">npm test -- settings</p>
+                <p className="mt-2 bg-muted px-2 py-1 font-mono text-[11px] rounded-md">prefers-color-scheme</p>
                 <div className="mt-3 flex items-center gap-2">
                   <motion.span animate={{ scale: step === 3 ? 0.92 : 1 }} transition={{ duration: 0.12 }} className="inline-flex h-7 items-center bg-primary px-3 text-[11.5px] font-medium text-white shadow-key rounded-lg">
                     Allow
@@ -329,14 +329,14 @@ export function ApproveArt({ playing, reduce }: Readonly<VProps>) {
             <>
               <motion.li {...rise} className="flex h-[32px] items-center gap-2.5">
                 <ShieldCheck className="size-3.5 text-ink-green" />
-                <span className="font-medium">Bash</span>
-                <span className="font-mono text-[11px] text-muted-foreground">npm test -- settings</span>
+                <span className="font-medium">Web search</span>
+                <span className="font-mono text-[11px] text-muted-foreground">prefers-color-scheme</span>
                 <span className="text-muted-foreground">· Allowed by you</span>
               </motion.li>
               <motion.li {...rise} transition={{ ...rise.transition, delay: 0.5 }} className="flex h-[32px] items-center gap-2.5">
                 <Check className="size-3.5 text-ink-green" strokeWidth={2.6} />
-                <span className="font-medium">Tests</span>
-                <span className="text-ink-green">12 passed</span>
+                <span className="font-medium">Edit</span>
+                <span className="font-mono text-[11px] text-muted-foreground">app/settings/theme-toggle.tsx</span>
               </motion.li>
             </>
           )}
