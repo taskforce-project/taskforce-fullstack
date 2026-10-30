@@ -434,6 +434,17 @@ public class AgentService {
     private static final String PROPOSED = "Action proposed to the user, waiting for their approval in the conversation. "
         + "Do not call this tool again; just summarize the action you propose.";
 
+    /**
+     * Les outils dont Cortex prépare l'action au lieu de la faire, même quand les règles l'autorisent : une issue se relit
+     * et se modifie sur une carte, puis la personne la crée (R47, R78, séance n°13). L'accord passe par le dossier de la
+     * réponse, comme pour une action demandée.
+     */
+    static final Set<String> PREPARED = Set.of("create_issue");
+
+    private static final String PREPARED_TEXT = "Issue prepared as a card in the conversation: the person checks it, "
+        + "edits it and creates it. Do not call this tool again; say in one sentence that the card is ready to review, "
+        + "and do not say that the issue exists.";
+
     private static String refusedText(CortexGate.Verdict verdict) {
         return "Not run: the rules of this workspace refuse it. " + verdict.reason()
             + " Do not try again; tell the user why it was not done.";
@@ -562,6 +573,9 @@ public class AgentService {
                         result = PROPOSED;
                         status = "pending";
                     }
+                } else if (PREPARED.contains(name)) {
+                    result = PREPARED_TEXT;
+                    status = "pending";
                 } else {
                     Map<String, Object> args = objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {});
                     result = tool.execute(args, ctx);
@@ -658,10 +672,12 @@ public class AgentService {
           .append("Integrations); when it is not in the catalog, say so plainly and add that a tool with an MCP ")
           .append("server can still be connected there. Never make data up. ")
           .append("Today is ").append(today.format(TODAY)).append(" (UTC). ")
-          .append("When you create an issue, place it in time from its goal: read the project's columns and active ")
-          .append("cycle, keep it in the Backlog unless the work must start now, and set a due date only when the goal ")
-          .append("or the person gives one. When the project or the timing is unclear, ask the person, with the ")
-          .append("choices, before creating anything. Name the project and the column as the result gives them. ");
+          .append("When the person asks for an issue, prepare it with create_issue: it becomes a card the person ")
+          .append("checks, edits and creates. Fill what the request and the project justify: a title, a short ")
+          .append("description, subtasks when the work has steps. Place it in time from its goal: read the project's ")
+          .append("columns and active cycle, keep it in the Backlog unless the work must start now, and set a due date ")
+          .append("only when the goal or the person gives one. When the project is unclear, ask the person, with the ")
+          .append("choices, before preparing anything. ");
         if (!external.isEmpty()) {
             String names = external.stream().map(AgentTool::name).collect(Collectors.joining(", "));
             sb.append("External tools are connected (MCP servers): ").append(names).append(". ")
@@ -725,6 +741,9 @@ public class AgentService {
         boolean wrote = toolCalls.stream()
             .anyMatch(call -> WRITE_TOOLS.contains(call.name()) && "success".equals(call.status()));
         if (wrote || !WRITE_REQUEST.matcher(message).find() || !WRITE_CLAIM.matcher(answer).find()) return answer;
+        if (toolCalls.stream().anyMatch(call -> "pending".equals(call.status()) && PREPARED.contains(call.name()))) {
+            return "Nothing is created yet: check the issue below, then create it.";
+        }
         if (toolCalls.stream().anyMatch(call -> "pending".equals(call.status()))) {
             return "Nothing has changed yet: the action below waits for your approval.";
         }

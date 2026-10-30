@@ -30,6 +30,9 @@ import com.taskforce.tf_api.core.service.agent.AgentTool;
  * <p>Le projet se désigne par sa clé ou son nom, résolu par {@link ProjectResolver}. L'issue se place dans le temps :
  * le Backlog par défaut, une autre colonne et une échéance quand le but les justifie (R48, séance n°8). La réponse dit
  * le projet et la colonne tels que le service les a écrits, pour que Cortex ne les invente pas.</p>
+ *
+ * <p>Dans la conversation, Cortex ne fait que la préparer : {@code AgentService} la met en attente, et la carte la crée
+ * avec ce que la personne y a changé (R47, R78, séance n°13). Les sous-tâches deviennent la checklist de l'issue.</p>
  */
 @Component
 public class CreateIssueTool implements AgentTool {
@@ -56,8 +59,8 @@ public class CreateIssueTool implements AgentTool {
     @Override public String name() { return "create_issue"; }
 
     @Override public String description() {
-        return "Creates an issue in a TaskForce project, placed in time: its column and due date follow its goal "
-            + "(Backlog by default). Ask first when unsure.";
+        return "Prepares an issue as a card the person checks and creates. Column and due date follow its goal "
+            + "(Backlog by default); subtasks become its checklist.";
     }
 
     @Override public Map<String, Object> parametersSchema() {
