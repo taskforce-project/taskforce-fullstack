@@ -24,6 +24,9 @@ public interface KnowledgeEdgeRepository extends JpaRepository<KnowledgeEdge, Lo
     /** Arêtes auto (issues de [[wikilinks]]) sortant d'un node — à re-synchroniser à l'édition. */
     List<KnowledgeEdge> findByFromNodeIdAndAutoTrue(Long fromNodeId);
 
+    /** Une autre note mène-t-elle à ce node ? (Un node ne se lie jamais à lui-même.) */
+    boolean existsByToNodeId(Long toNodeId);
+
     /** Purge toutes les arêtes d'un workspace (re-seed). */
     void deleteByWorkspaceId(Long workspaceId);
 }

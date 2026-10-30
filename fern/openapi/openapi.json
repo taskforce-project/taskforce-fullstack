@@ -4289,6 +4289,46 @@
         }
       }
     },
+    "/api/workspaces/{slug}/assistant/actions/undo": {
+      "post": {
+        "tags": [
+          "AI assistant"
+        ],
+        "operationId": "undo",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantUndoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAssistantActionResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/assistant/actions/execute": {
       "post": {
         "tags": [
@@ -14216,17 +14256,12 @@
           }
         }
       },
-      "AssistantActionRequest": {
+      "AssistantUndoRequest": {
         "type": "object",
         "properties": {
           "tool": {
             "type": "string",
             "maxLength": 128,
-            "minLength": 0
-          },
-          "input": {
-            "type": "string",
-            "maxLength": 20000,
             "minLength": 0
           },
           "record": {
@@ -14271,6 +14306,30 @@
             "type": "string"
           }
         }
+      },
+      "AssistantActionRequest": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "input": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 0
+          },
+          "record": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "record",
+          "tool"
+        ]
       },
       "SaveChartRequest": {
         "type": "object",
