@@ -37,4 +37,6 @@ development stack running:
 ```
 
 The script fetches the description, then `scripts/clean-openapi.mjs` removes the monitoring and internal endpoints,
-names and orders the sections, and describes them. Commit `openapi/openapi.json` with the change that altered the API.
+names and orders the sections, and describes them. It also replaces the address of the backend it read with the ones
+the reference shows: the hosted API, `https://api.taskforce-project.fr`, then a self-hosted instance with the default
+settings. Commit `openapi/openapi.json` with the change that altered the API.

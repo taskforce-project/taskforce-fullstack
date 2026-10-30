@@ -6,7 +6,9 @@
 //   1. retire les endpoints /actuator/** (monitoring, hors API produit) ;
 //   2. renomme les tags « xxx-controller » en noms de ressources lisibles (repli auto sinon) ;
 //   3. reconstruit le tableau `tags` racine, ORDONNÉ + décrit → pilote l'ordre des sections Fern ;
-//   4. pose une info.description si absente.
+//   4. pose une info.description si absente ;
+//   5. remplace l'adresse du backend qui a servi la spec (servers) par celle de l'API hébergée, puis celle d'une
+//      instance auto-hébergée.
 //
 // Lancé automatiquement par generate-openapi.ps1 après la récupération. Rejouable sans risque.
 
@@ -178,6 +180,24 @@ spec.info.title = "TaskForce API";
 spec.info.description ??=
   "REST API of TaskForce. Every path starts with `/api`; a successful response wraps its payload in `data`. " +
   "Authentication with a Bearer access token: see the Authentication and Conventions guides.";
+
+// 5. Adresses affichées par la référence devant chaque opération. springdoc écrit celle du backend qui a servi la spec
+// (« http://localhost:8080 », « Generated server url »), d'où le remplacement complet. D'abord l'API hébergée, celle
+// qu'appelle l'app web https://app.taskforce-project.fr : elle a son propre hôte, l'app ne sert pas /api. Puis une
+// instance auto-hébergée réglée par défaut (`TF_API_URL` dans `.env`), l'adresse que donnent les guides. Les chemins
+// commencent déjà par `/api` : une adresse s'arrête à l'hôte. Sans `x-fern-server-name`, Fern ne garde que la première.
+spec.servers = [
+  {
+    url: "https://api.taskforce-project.fr",
+    description: "The hosted TaskForce, the API of the web app at https://app.taskforce-project.fr.",
+    "x-fern-server-name": "Hosted",
+  },
+  {
+    url: "http://localhost:8080",
+    description: "A self-hosted instance with the default settings: use the instance's TF_API_URL from its .env.",
+    "x-fern-server-name": "Self-hosted",
+  },
+];
 
 writeFileSync(SPEC, JSON.stringify(spec, null, 2) + "\n", { encoding: "utf8" });
 

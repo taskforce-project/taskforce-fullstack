@@ -15,8 +15,14 @@
   },
   "servers": [
     {
+      "url": "https://api.taskforce-project.fr",
+      "description": "The hosted TaskForce, the API of the web app at https://app.taskforce-project.fr.",
+      "x-fern-server-name": "Hosted"
+    },
+    {
       "url": "http://localhost:8080",
-      "description": "Generated server url"
+      "description": "A self-hosted instance with the default settings: use the instance's TF_API_URL from its .env.",
+      "x-fern-server-name": "Self-hosted"
     }
   ],
   "security": [
