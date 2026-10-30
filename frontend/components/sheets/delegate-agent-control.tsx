@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect } from "react"
-import { Ban, Loader2, CircleCheck, TriangleAlert, ExternalLink } from "lucide-react"
+import { Ban, Loader2, CircleCheck, TriangleAlert } from "lucide-react"
 
 import { RunActivity } from "@/components/sheets/run-activity"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 
 /**
  * État d'un run de délégation sur une issue (TF-AGENT-DELIVERY A2).
@@ -20,6 +21,7 @@ export function DelegateAgentControl({
   issueId,
   goal,
 }: Readonly<{ workspaceSlug: string; projectId: number; issueId: number; goal?: string }>) {
+  const r = usePreferencesStore((s) => s.t.missions.result)
   const run = useDeliveryStore((s) => s.runs[issueId])
   const fetchRun = useDeliveryStore((s) => s.fetchRun)
   const activity = useDeliveryStore((s) => (run ? s.activity[run.id] : undefined))
@@ -58,22 +60,11 @@ export function DelegateAgentControl({
           {run.status === "QUEUED" ? "Waiting for your runner to pick it up" : "Agent working on it"} ({run.providerKey})…
         </span>
       ) : run.status === "DONE" ? (
-        <>
-          <span className="flex items-center gap-1.5 font-medium text-ink-green">
-            <CircleCheck className="size-3.5" /> Agent done - ready for your review
-          </span>
-          {run.summary && <p className="text-muted-foreground">{run.summary}</p>}
-          {run.resultUrl && (
-            <a
-              href={run.resultUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex w-fit items-center gap-1 text-primary hover:underline"
-            >
-              <ExternalLink className="size-3" /> View result
-            </a>
-          )}
-        </>
+        // Le résultat se relit sur sa carte, sous le titre de l'issue (R78) ; ici, où il en est.
+        <span className="flex items-center gap-1.5 font-medium text-ink-green">
+          <CircleCheck className="size-3.5" />
+          {run.outcome === "APPLIED" ? r.applied : run.outcome === "DISCARDED" ? r.discarded : r.readyAbove}
+        </span>
       ) : run.refused ? (
         // Une règle a refusé la mission au départ : ce n'est pas une panne, la raison dit quoi faire (R38).
         <span className="flex items-center gap-1.5 text-muted-foreground">

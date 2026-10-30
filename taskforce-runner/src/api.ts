@@ -26,6 +26,17 @@ export interface RunResult {
   error?: string;
   /** Une règle a refusé la mission au départ : ce n'est pas une panne (R38). */
   refused?: boolean;
+  /** La branche de l'agent et ses commits, pour la carte de résultat (R78). */
+  branch?: string;
+  commits?: number;
+  /** Les tests du projet tels que le runner les a lancés (R32) : jamais ce que l'agent en dit. */
+  tests?: {
+    command: string;
+    ran: boolean;
+    passed: boolean;
+    passedCount?: number;
+    total?: number;
+  };
 }
 
 /** Événement de la chronologie d'un run (miroir de `RunnerEventsRequest` côté backend). */

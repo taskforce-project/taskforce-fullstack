@@ -25,6 +25,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.delivery.DeliveryActivityService;
 import com.taskforce.tf_api.core.service.delivery.DeliveryRunner;
 import com.taskforce.tf_api.core.service.delivery.DeliveryService;
+import com.taskforce.tf_api.core.service.delivery.MissionResultService;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -58,6 +59,7 @@ class DeliveryControllerWebMvcTest {
     @MockitoBean private DeliveryService deliveryService;
     @MockitoBean private DeliveryRunner deliveryRunner;
     @MockitoBean private DeliveryActivityService activityService;
+    @MockitoBean private MissionResultService missionResults;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;             // WorkspaceAccessInterceptor
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository; // WorkspaceAccessInterceptor
@@ -244,5 +246,49 @@ class DeliveryControllerWebMvcTest {
             .andExpect(status().isBadRequest());
 
         verify(activityService, never()).decide(any(), any(), any(), anyBoolean(), anyBoolean(), any());
+    }
+
+    // --------------------------------------------------------------------- carte de résultat (R78)
+
+    @Test
+    @DisplayName("POST /runs/{id}/apply : la personne applique le résultat")
+    void apply_200() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/apply").with(auth()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("Applied: the pull request is merged"));
+
+        verify(missionResults).apply("acme", 100L, 7L);
+    }
+
+    @Test
+    @DisplayName("POST /runs/{id}/discard : la personne écarte le résultat")
+    void discard_200() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/discard").with(auth()))
+            .andExpect(status().isOk());
+
+        verify(missionResults).discard("acme", 100L, 7L);
+    }
+
+    @Test
+    @DisplayName("POST /runs/{id}/retry : une nouvelle mission part avec la remarque")
+    void retry_200() throws Exception {
+        var a = auth();
+        when(missionResults.retry("acme", 100L, 7L, "Keep the Privacy link")).thenReturn(run(101L, "QUEUED"));
+
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/retry").with(a)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"Keep the Privacy link\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(101));
+        verify(deliveryRunner).execute(101L);
+    }
+
+    @Test
+    @DisplayName("POST /runs/{id}/retry : une remarque trop longue est refusée (400)")
+    void retry_rejects_a_long_note() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/retry").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"" + "x".repeat(2001) + "\"}"))
+            .andExpect(status().isBadRequest());
+
+        verify(missionResults, never()).retry(any(), any(), any(), any());
     }
 }

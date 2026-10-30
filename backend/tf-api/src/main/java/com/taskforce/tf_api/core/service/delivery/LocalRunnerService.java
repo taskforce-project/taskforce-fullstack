@@ -194,9 +194,25 @@ public class LocalRunnerService {
             : new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, error);
         // Une mission refusée au départ par une règle n'est pas une panne : l'écran la dira « Not started » (R38).
         if (!done && Boolean.TRUE.equals(result.refused())) run.setRefused(true);
+        // Les faits de la carte de résultat (R78) : la fin, et pour un travail rendu la branche, les commits, les tests.
+        run.setEndedAt(LocalDateTime.now());
+        if (done) recordFacts(run, result);
         // Les demandes sans réponse vont au dossier de preuve avant sa clôture, faite par DeliveryRunner.
         activityService.closeApprovals(run);
         deliveryRunner.complete(runId, poll);
+    }
+
+    /** Ce que le runner rapporte d'un travail rendu : la branche, les commits, les tests tels qu'il les a lancés. */
+    private static void recordFacts(DeliveryRun run, RunnerResultRequest result) {
+        if (result.branch() != null && !result.branch().isBlank()) run.setBranch(result.branch().strip());
+        run.setCommits(result.commits());
+        RunnerResultRequest.Tests tests = result.tests();
+        if (tests == null) return;
+        run.setTestsCommand(tests.command().strip());
+        run.setTestsRan(tests.ran());
+        run.setTestsPassed(tests.passed());
+        run.setTestsPassedCount(tests.passedCount());
+        run.setTestsTotal(tests.total());
     }
 
     /** Chronologie en direct (OSS-5.3) : le run est verrouillé, les numéros d'ordre restent continus. */

@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.taskforce.tf_api.core.dto.request.RunnerApprovalRequest;
+import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerReadinessRequest;
 import com.taskforce.tf_api.core.config.DeliverySessionFilterConfig;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
@@ -148,12 +149,30 @@ class DeliveryRunnerControllerWebMvcTest {
         verify(localRunnerService).complete(eq(100L), any(RunnerIdentity.class), any());
     }
 
+    @Test
+    @DisplayName("POST /result : les faits de la carte de résultat (R78) arrivent au service")
+    void result_with_the_facts_of_the_result_card() throws Exception {
+        mockMvc.perform(post("/api/delivery/runner/runs/100/result").with(runner())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"DONE\",\"summary\":\"Fixed 3 links\",\"resultUrl\":\"https://github.com/acme/website/pull/212\","
+                    + "\"branch\":\"tf/web-28\",\"commits\":2,"
+                    + "\"tests\":{\"command\":\"npm test\",\"ran\":true,\"passed\":true,\"passedCount\":12,\"total\":12}}"))
+            .andExpect(status().isOk());
+
+        ArgumentCaptor<RunnerResultRequest> sent = ArgumentCaptor.forClass(RunnerResultRequest.class);
+        verify(localRunnerService).complete(eq(100L), any(RunnerIdentity.class), sent.capture());
+        assertThat(sent.getValue().branch()).isEqualTo("tf/web-28");
+        assertThat(sent.getValue().tests().passedCount()).isEqualTo(12);
+    }
+
     @ParameterizedTest(name = "POST /result : corps invalide refusé (400) : {0}")
     @ValueSource(strings = {
         "{\"status\":\"MERGED\",\"summary\":\"x\"}",
         "{\"summary\":\"x\"}",
         "{\"status\":\"DONE\",\"summary\":\"x\",\"resultUrl\":\"javascript:alert(1)\"}",
         "{\"status\":\"DONE\",\"summary\":\"x\",\"resultUrl\":\"ftp://host/file\"}",
+        "{\"status\":\"DONE\",\"summary\":\"x\",\"commits\":-1}",
+        "{\"status\":\"DONE\",\"summary\":\"x\",\"tests\":{\"command\":\"\",\"ran\":true,\"passed\":true}}",
     })
     void result_rejects_invalid_body(String body) throws Exception {
         mockMvc.perform(post("/api/delivery/runner/runs/100/result").with(runner())

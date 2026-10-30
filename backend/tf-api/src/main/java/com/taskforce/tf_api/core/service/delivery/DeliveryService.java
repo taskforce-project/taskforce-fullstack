@@ -140,7 +140,16 @@ public class DeliveryService {
             r.isRefused(),
             r.getStartedBy() != null ? r.getStartedBy().getId() : null,
             r.getCreatedAt(),
-            r.getUpdatedAt());
+            r.getUpdatedAt(),
+            r.getClaimedAt(),
+            r.getEndedAt(),
+            r.getRulesVersion(),
+            r.getBranch(),
+            r.getCommits(),
+            r.getTestsCommand() == null ? null : new DeliveryRunResponse.Tests(r.getTestsCommand(),
+                Boolean.TRUE.equals(r.getTestsRan()), Boolean.TRUE.equals(r.getTestsPassed()), r.getTestsPassedCount(), r.getTestsTotal()),
+            r.getOutcome() != null ? r.getOutcome().name() : null,
+            r.getOutcomeAt());
     }
 
     /**

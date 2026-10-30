@@ -6,7 +6,10 @@ import {
   delegateIssue,
   getRunnerStatus,
   getRunActivity,
+  applyRun as applyRunApi,
   decideApproval as decideApprovalApi,
+  discardRun as discardRunApi,
+  retryRun as retryRunApi,
   downloadEvidence as downloadEvidenceApi,
   provisionRunner as provisionRunnerApi,
   type DeliveryProvider,
@@ -15,6 +18,7 @@ import {
   type RunnerProvision,
   type RunnerStatus,
 } from "../api/delivery-service";
+import { getErrorMessage } from "../api/client";
 
 // ---------------------------------------------------------------------------
 // Store de délégation à un agent (TF-AGENT-DELIVERY). Un domaine = un store.
@@ -35,6 +39,8 @@ interface DeliveryState {
   runner: RunnerStatus | null;
   /** Activité par runId : chronologie cumulée (dans l'ordre) et demandes de validation du run (lot 5). */
   activity: Record<number, DeliveryRunActivity>;
+  /** Par runId : pourquoi le dernier geste sur la carte de résultat n'a pas abouti (GitHub refuse, conflits...). */
+  resultErrors: Record<number, string>;
 
   fetchProviders: (slug: string) => Promise<DeliveryProvider[]>;
   fetchProjectProviders: (slug: string, projectId: number) => Promise<DeliveryProvider[]>;
@@ -50,6 +56,17 @@ interface DeliveryState {
   decideApproval: (slug: string, runId: number, approvalId: number, allow: boolean, forMission?: boolean) => Promise<boolean>;
   /** Télécharge le dossier de preuve d'un run ; `false` si le run n'en a pas (run de la v1) ou en cas d'erreur. */
   downloadEvidence: (slug: string, runId: number, format: "json" | "md") => Promise<boolean>;
+  /** Les gestes de la carte de résultat (R78) ; `false` (ou `null`) en cas d'échec, la raison dans `resultErrors`. */
+  applyRun: (slug: string, issueId: number, runId: number) => Promise<boolean>;
+  discardRun: (slug: string, issueId: number, runId: number) => Promise<boolean>;
+  retryRun: (slug: string, issueId: number, runId: number, note: string) => Promise<DeliveryRun | null>;
+}
+
+/** Les raisons gardées, sans celle de cette mission. */
+function withoutError(errors: Record<number, string>, runId: number): Record<number, string> {
+  const rest = { ...errors };
+  delete rest[runId];
+  return rest;
 }
 
 export const useDeliveryStore = create<DeliveryState>((set, get) => ({
@@ -60,6 +77,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   workspaceRuns: [],
   runner: null,
   activity: {},
+  resultErrors: {},
 
   fetchProviders: async (slug) => {
     set({ providersLoading: true });
@@ -167,6 +185,41 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
       return true;
     } catch {
       return false;
+    }
+  },
+
+  applyRun: async (slug, issueId, runId) => {
+    try {
+      await applyRunApi(slug, runId);
+      set((state) => ({ resultErrors: withoutError(state.resultErrors, runId) }));
+      await get().fetchRun(slug, issueId);
+      return true;
+    } catch (e) {
+      set((state) => ({ resultErrors: { ...state.resultErrors, [runId]: getErrorMessage(e) } }));
+      return false;
+    }
+  },
+
+  discardRun: async (slug, issueId, runId) => {
+    try {
+      await discardRunApi(slug, runId);
+      set((state) => ({ resultErrors: withoutError(state.resultErrors, runId) }));
+      await get().fetchRun(slug, issueId);
+      return true;
+    } catch (e) {
+      set((state) => ({ resultErrors: { ...state.resultErrors, [runId]: getErrorMessage(e) } }));
+      return false;
+    }
+  },
+
+  retryRun: async (slug, issueId, runId, note) => {
+    try {
+      const next = await retryRunApi(slug, runId, note);
+      set((state) => ({ runs: { ...state.runs, [issueId]: next }, resultErrors: withoutError(state.resultErrors, runId) }));
+      return next;
+    } catch (e) {
+      set((state) => ({ resultErrors: { ...state.resultErrors, [runId]: getErrorMessage(e) } }));
+      return null;
     }
   },
 }));

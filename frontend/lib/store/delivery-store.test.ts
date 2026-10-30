@@ -14,6 +14,9 @@ vi.mock('../api/delivery-service', () => ({
   getRunActivity: vi.fn(),
   decideApproval: vi.fn(),
   downloadEvidence: vi.fn(),
+  applyRun: vi.fn(),
+  discardRun: vi.fn(),
+  retryRun: vi.fn(),
 }));
 
 function makeRun(overrides: Partial<DeliveryRun> = {}): DeliveryRun {
@@ -210,5 +213,68 @@ describe('delivery-store', () => {
     let res = PROVIDERS;
     await act(async () => { res = await useDeliveryStore.getState().fetchProjectProviders('acme', 12); });
     expect(res).toEqual([]);
+  });
+});
+
+describe('delivery-store : les gestes de la carte de résultat (R78)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useDeliveryStore.setState({ runs: {}, resultErrors: {} });
+  });
+
+  it('applyRun : appliqué, la mission est relue', async () => {
+    vi.mocked(svc.applyRun).mockResolvedValue(undefined);
+    vi.mocked(svc.getIssueRun).mockResolvedValue({ id: 100, issueId: 28, status: 'DONE', outcome: 'APPLIED' } as DeliveryRun);
+
+    let ok = false;
+    await act(async () => { ok = await useDeliveryStore.getState().applyRun('acme', 28, 100); });
+
+    expect(ok).toBe(true);
+    expect(svc.applyRun).toHaveBeenCalledWith('acme', 100);
+    expect(useDeliveryStore.getState().runs[28]?.outcome).toBe('APPLIED');
+  });
+
+  it.each([
+    ['applyRun', (s: ReturnType<typeof useDeliveryStore.getState>) => s.applyRun('acme', 28, 100)],
+    ['discardRun', (s: ReturnType<typeof useDeliveryStore.getState>) => s.discardRun('acme', 28, 100)],
+  ])('%s refusé : false, et la raison du serveur reste pour la carte', async (name, call) => {
+    vi.mocked(name === 'applyRun' ? svc.applyRun : svc.discardRun).mockRejectedValue(new Error('GitHub can\'t merge pull request #212'));
+
+    let ok = true;
+    await act(async () => { ok = await call(useDeliveryStore.getState()); });
+
+    expect(ok).toBe(false);
+    expect(useDeliveryStore.getState().resultErrors[100]).toMatch(/GitHub can't merge/);
+  });
+
+  it('discardRun : écarté, l\'erreur précédente disparaît', async () => {
+    useDeliveryStore.setState({ resultErrors: { 100: 'old' } });
+    vi.mocked(svc.discardRun).mockResolvedValue(undefined);
+    vi.mocked(svc.getIssueRun).mockResolvedValue(null);
+
+    await act(async () => { await useDeliveryStore.getState().discardRun('acme', 28, 100); });
+
+    expect(useDeliveryStore.getState().resultErrors[100]).toBeUndefined();
+  });
+
+  it('retryRun : la nouvelle mission remplace l\'ancienne sur l\'issue', async () => {
+    vi.mocked(svc.retryRun).mockResolvedValue({ id: 101, issueId: 28, status: 'QUEUED' } as DeliveryRun);
+
+    let next: DeliveryRun | null = null;
+    await act(async () => { next = await useDeliveryStore.getState().retryRun('acme', 28, 100, 'Keep the Privacy link'); });
+
+    expect(next).not.toBeNull();
+    expect(svc.retryRun).toHaveBeenCalledWith('acme', 100, 'Keep the Privacy link');
+    expect(useDeliveryStore.getState().runs[28]?.id).toBe(101);
+  });
+
+  it('retryRun refusé : null', async () => {
+    vi.mocked(svc.retryRun).mockRejectedValue(new Error('This result was already applied.'));
+
+    let next: DeliveryRun | null = {} as DeliveryRun;
+    await act(async () => { next = await useDeliveryStore.getState().retryRun('acme', 28, 100, ''); });
+
+    expect(next).toBeNull();
+    expect(useDeliveryStore.getState().resultErrors[100]).toMatch(/already applied/);
   });
 });

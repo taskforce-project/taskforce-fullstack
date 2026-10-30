@@ -330,6 +330,39 @@ class LocalRunnerServiceTest {
     }
 
     @Test
+    @DisplayName("complete DONE : les faits de la carte de résultat (R78), la branche, les commits, les tests du runner")
+    void complete_done_keeps_the_facts_of_the_result_card() {
+        DeliveryRun held5 = run(100L, DeliveryRunStatus.RUNNING, "tf-runner-pierre", owner, LocalDateTime.now());
+        when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(held5));
+
+        service.complete(100L, RUNNER, new RunnerResultRequest("DONE", "Fixed 3 links", "https://github.com/acme/website/pull/212",
+            null, null, " tf/web-28 ", 2, new RunnerResultRequest.Tests(" npm test ", true, true, 12, 12)));
+
+        assertThat(held5.getBranch()).isEqualTo("tf/web-28");
+        assertThat(held5.getCommits()).isEqualTo(2);
+        assertThat(held5.getTestsCommand()).isEqualTo("npm test");
+        assertThat(held5.getTestsRan()).isTrue();
+        assertThat(held5.getTestsPassed()).isTrue();
+        assertThat(held5.getTestsPassedCount()).isEqualTo(12);
+        assertThat(held5.getTestsTotal()).isEqualTo(12);
+        assertThat(held5.getEndedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("complete FAILED : la fin est gardée, pas de faits de travail rendu")
+    void complete_failed_keeps_only_the_end() {
+        DeliveryRun held6 = run(100L, DeliveryRunStatus.RUNNING, "tf-runner-pierre", owner, LocalDateTime.now());
+        when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(held6));
+
+        service.complete(100L, RUNNER, new RunnerResultRequest("FAILED", null, null, "Claude Code crashed", null,
+            "tf/web-28", 1, new RunnerResultRequest.Tests("npm test", true, false, 3, 12)));
+
+        assertThat(held6.getEndedAt()).isNotNull();
+        assertThat(held6.getBranch()).isNull();
+        assertThat(held6.getTestsCommand()).isNull();
+    }
+
+    @Test
     @DisplayName("complete FAILED refusé par une règle : le run est marqué, l'écran dira « Not started » (R38)")
     void complete_refused_marks_the_run() {
         DeliveryRun held4 = run(100L, DeliveryRunStatus.RUNNING, "tf-runner-pierre", owner, LocalDateTime.now());
