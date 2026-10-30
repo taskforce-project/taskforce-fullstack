@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
-import { Send, Sparkles, MessageSquare, ChevronDown, Plus, Trash2, Plug, Play, CircleAlert } from "lucide-react"
+import { Sparkles, MessageSquare, ChevronDown, Plus, Trash2, Plug, Play, CircleAlert } from "lucide-react"
 import {
   Message, Steps, Reasoning, Tool, Sources, ThinkingBar, FeedbackBar, PromptSuggestion, TokenMeter,
   type ToolStatus,
@@ -19,6 +19,7 @@ import {
 } from "@/lib/api/ai-conversation-service"
 import { getMcpServers } from "@/lib/api/integration-service"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
+import { useCortexStore } from "@/lib/store/cortex-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { CortexUsage } from "./cortex-usage"
@@ -164,7 +165,6 @@ export function AgentChat() {
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
 
   const [turns, setTurns] = useState<Turn[]>([])
-  const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
 
   // Multi-conversation
@@ -259,12 +259,8 @@ export function AgentChat() {
   const send = async (text: string) => {
     const msg = text.trim()
     if (!msg || loading || !slug) return
-    setInput("")
     setTurns((t) => [...t, { id: `u${Date.now()}`, role: "user", text: msg }])
     setLoading(true)
-    // Le linter croit `send` appelable pendant le rendu, car elle est passée à la prop `onClick` de
-    // PromptSuggestion ; elle ne tourne que sur un clic ou une touche.
-    // eslint-disable-next-line react-hooks/purity
     startRef.current = Date.now()
     setElapsed(0)
     try {
@@ -291,6 +287,24 @@ export function AgentChat() {
       setLastMs(Date.now() - startRef.current)
       setLoading(false)
     }
+  }
+
+  // La barre unique (R76) envoie ici : la conversation prend la demande une seule fois, quand elle ne répond pas déjà.
+  const pending = useCortexStore((s) => s.pending)
+  const take = useCortexStore((s) => s.take)
+  const setDraft = useCortexStore((s) => s.setDraft)
+  const sendRef = useRef(send)
+  useEffect(() => { sendRef.current = send })
+  useEffect(() => {
+    if (!pending || loading || !slug) return
+    const text = take(pending.id)
+    if (text) void sendRef.current(text)
+  }, [pending, loading, slug, take])
+
+  /** Une suggestion remplit la barre ; rien ne part tant que la personne n'envoie pas. */
+  const suggest = (text: string) => {
+    setDraft(text)
+    document.getElementById("command-bar-input")?.focus()
   }
 
   const currentTitle = currentId
@@ -380,7 +394,7 @@ export function AgentChat() {
             {aiStatus && !aiStatus.chatAvailable && <AiUnavailableNotice />}
             <div className="mt-2 flex w-full flex-col gap-1.5">
               {SUGGESTIONS.map((s) => (
-                <PromptSuggestion key={s} onClick={() => send(s)}>{s}</PromptSuggestion>
+                <PromptSuggestion key={s} onClick={() => suggest(s)}>{s}</PromptSuggestion>
               ))}
             </div>
 
@@ -431,29 +445,9 @@ export function AgentChat() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Composer */}
-      <div className="shrink-0 border-t p-2">
-        <div className="flex items-end gap-2 rounded-xl border bg-muted/40 px-3 py-2 focus-within:border-foreground/20">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input) }
-            }}
-            placeholder="Ask your question…"
-            rows={1}
-            className="max-h-24 min-h-[1.5rem] flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
-          />
-          <button
-            onClick={() => send(input)}
-            disabled={!input.trim() || loading}
-            className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-foreground text-background transition-opacity hover:opacity-75 disabled:opacity-30"
-          >
-            <Send className="size-3.5" />
-          </button>
-        </div>
-        {/* Footer façon Claude : chrono/conso en direct (gauche) + modal contexte/consommation (droite) */}
-        <div className="mt-1 flex items-center justify-between gap-2 px-1 text-[10px] text-muted-foreground/50">
+      {/* La saisie est la barre unique, en bas de l'écran (R76) ; ici, le chrono et la consommation. */}
+      <div className="shrink-0 border-t px-2 py-1.5">
+        <div className="flex items-center justify-between gap-2 px-1 text-[10px] text-muted-foreground/50">
           <span className="flex min-w-0 items-center gap-1.5">
             {loading ? (
               <span className="tabular-nums text-primary/70">Cortex is thinking · {elapsed.toFixed(1)} s</span>
@@ -463,7 +457,7 @@ export function AgentChat() {
                 {lastMs != null && <span className="tabular-nums">· {(lastMs / 1000).toFixed(1)} s</span>}
               </>
             ) : (
-              <span>Enter ↵ · Shift+Enter</span>
+              <span>Write in the bar below, then press Enter</span>
             )}
           </span>
           <CortexUsage sessionTokens={convTokens} />

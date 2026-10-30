@@ -9,6 +9,7 @@ import { AppSidebar } from "@/components/layout/sidebar/app-sidebar"
 import { AppTopbar } from "@/components/layout/topbar/app-topbar"
 import { AccountDeletionBanner } from "@/components/account/account-deletion-banner"
 import { PanelDock } from "@/components/layout/panel-dock"
+import { CommandBar } from "@/components/agent/command-bar"
 import { AppFooter } from "@/components/layout/app-footer"
 import { SettingsModal } from "@/components/settings/settings-modal"
 import { CreateProjectModal } from "@/components/dialogs/create-project-modal"
@@ -63,6 +64,8 @@ export function AppShell({ children }: AppShellProps) {
           </AnimatePresence>
           <PanelDock side="right" />
         </div>
+        {/* La barre unique (R76, séance n°13) : écrire ce qu'on veut faire, sur chaque écran. */}
+        <CommandBar />
       </SidebarInset>
 
       {/* Modals globaux - ouvrables depuis n'importe quel CTA */}
