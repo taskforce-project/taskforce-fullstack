@@ -8,13 +8,14 @@ import { Button } from "@/components/ui/button"
 import { fillText, resultCard, resultLine } from "@/lib/delivery/result-card"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { useUserStore } from "@/lib/store/user-store"
 import { cn } from "@/lib/utils"
 
 /**
  * « Relire » (R78, séance n°13 ; J3, R50) : la carte de résultat d'une mission finie, sous le titre de l'issue. Le
  * résultat, les contrôles tirés du dossier (jamais du résumé de l'agent), ce qui changera si l'on applique, les mots de
  * l'agent pour ce qu'ils sont, puis trois gestes : « Discard », « Try again », « Apply ». Seule la personne qui a délégué
- * tranche : le serveur le vérifie, la carte le dit s'il refuse.
+ * tranche : les gestes ne s'affichent que pour elle, le serveur le vérifie, et la carte dit pourquoi il refuse.
  */
 export function MissionResultCard({ slug, issueId, issueKey, issueTitle, responsible }: Readonly<{
   slug: string
@@ -31,6 +32,8 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
   const discardRun = useDeliveryStore((s) => s.discardRun)
   const retryRun = useDeliveryStore((s) => s.retryRun)
   const downloadEvidence = useDeliveryStore((s) => s.downloadEvidence)
+  // `id` est typé `string` mais l'API /users/me le sérialise en `number` : comparer en chaînes.
+  const viewerId = useUserStore((s) => s.user?.id)
   const [busy, setBusy] = useState<"apply" | "discard" | "retry" | null>(null)
   const [retrying, setRetrying] = useState(false)
   const [note, setNote] = useState("")
@@ -38,6 +41,7 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
   if (!run || run.status !== "DONE" || run.outcome) return null
   const r = t.result
   const card = resultCard(run, activity, issueKey, r)
+  const decides = run.startedById !== null && viewerId !== undefined && String(run.startedById) === String(viewerId)
   const who = [
     responsible ? fillText(r.responsible, { who: responsible }) : null,
     fillText(r.delegatedTo, { agent: t.agent }),
@@ -111,7 +115,9 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
       )}
 
       <div className="flex flex-col gap-2 border-b border-border px-3 py-2.5">
-        {retrying ? (
+        {!decides ? (
+          <p className="text-muted-foreground">{r.onlyDelegator}</p>
+        ) : retrying ? (
           <div className="flex flex-col gap-1.5">
             <textarea aria-label={r.tryAgain} placeholder={r.retryNote} rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000}
               className="w-full border border-input bg-transparent px-2 py-1 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />

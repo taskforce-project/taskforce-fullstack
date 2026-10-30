@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MissionResultCard } from "./mission-result-card";
 import type { DeliveryRun } from "@/lib/api/delivery-service";
 import { useDeliveryStore } from "@/lib/store/delivery-store";
+import { useUserStore } from "@/lib/store/user-store";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -15,6 +16,11 @@ const RUN: DeliveryRun = {
   endedAt: "2026-10-30T10:04:30", rulesVersion: 12, branch: "tf/tf-28", commits: 2,
   tests: { command: "npm test", ran: true, passed: true, passedCount: 12, total: 12 }, outcome: null,
 };
+
+/** La personne qui regarde la carte. */
+function viewer(id: number) {
+  useUserStore.setState({ user: { id: String(id), email: "ada@acme.dev", firstName: "Ada", lastName: "L", displayName: "Ada" } });
+}
 
 function show(run: DeliveryRun | null = RUN) {
   render(<MissionResultCard slug="acme" issueId={28} issueKey="TF-28" issueTitle="Fix the footer links" responsible="Pierre" />);
@@ -29,6 +35,7 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
 
   beforeEach(() => {
     vi.clearAllMocks();
+    viewer(7);
     useDeliveryStore.setState({
       runs: { 28: RUN }, activity: {}, resultErrors: {}, applyRun, discardRun, retryRun, downloadEvidence,
     });
@@ -84,6 +91,16 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
 
     expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
     expect(retryRun).not.toHaveBeenCalled();
+  });
+
+  it("a teammate sees the result, not the gestures", () => {
+    viewer(8);
+    show();
+
+    expect(screen.getByText("12 of 12 passed")).toBeInTheDocument();
+    expect(screen.getByText("Only the person who delegated this task can apply, discard or try again.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Apply" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Discard" })).toBeNull();
   });
 
   it("shows why the server refused", () => {

@@ -502,6 +502,7 @@ export const CONSTANTS_EN = {
       retryNote: "What should it do differently? Your note goes on the issue, where the agent reads it.",
       cancel: "Cancel",
       apply: "Apply",
+      onlyDelegator: "Only the person who delegated this task can apply, discard or try again.",
       howItWasDone: "How it was done",
       howItWasDoneValue: "Rules v{version} · {actions} steps · {asked} requests, {answered} answered",
       downloadRecord: "Download the record:",
