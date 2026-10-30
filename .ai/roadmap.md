@@ -10,6 +10,12 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 30/10/2026 (quater) - R76 construite : la barre unique en bas de chaque écran.** `[frontend]`
+> - **Décision du CEO** : « tu peux continuer » (R76 retenue, modifiée : la voix démarre et s'arrête d'un clic, rien ne part sans envoi).
+> - **Fait** : `CommandBar` dans `AppShell` (« What do you want done? », Envoyer, trois suggestions selon l'écran qui remplissent la barre sans envoyer) ; `useCortexStore` (le texte de la barre, la demande prise une seule fois par la conversation) ; la conversation perd sa saisie et ses suggestions remplissent la barre ; le bouton « Ask AI » du haut disparaît ; la visite guidée montre la barre.
+> - **Vérifié en dev** : une suggestion remplit sans envoyer ; Entrée ouvre la conversation et Cortex répond ; plus de seconde saisie ; en largeur téléphone, la barre tient sans défilement. Front : 108 fichiers, 1 204 tests, couverture tenue.
+> - **Reste** : la voix (après la décision sur R80) ; « Undo » (R77) ; les trois écrans (R78) ; la banque au refus et au changement de modèle (R79).
+
 > **▶ MAJ 30/10/2026 (ter) - Séance n°13 retenue, sauf la voix : une entrée d'écriture et de voix sur chaque écran, « Undo », les trois écrans des retours, la banque aux deux moments.** `[conseil + design]`
 > - **Décision du CEO** : R76 modifiée (la voix démarre d'un clic et s'arrête d'un second, sans appui maintenu ; rien ne part tant que la personne n'envoie pas, avec Entrée ou le bouton d'envoi) ; R77 à R79 retenues ; R80 (la voix sur la machine) à préciser : le CEO la veut « comme la webapp » et demande si elle servira à entraîner des modèles ; la réponse du secrétariat est au PV (pas d'entraînement cette année, R61 ; la voix du navigateur ne nous parvient pas).
 > - **Q13 répondue** : le CEO y passe ses journées ; le texte de la séance n°10 vient d'un post d'une personne de Y Combinator, à qui écrire ; le partenaire de conception, plus tard ; les mots de la cible : audit, traçabilité, IQ, OQ, PQ, réglementation, référentiel. La clé PostHog `phx_` et le jeton de la recette 1.3.1 sont révoqués.
