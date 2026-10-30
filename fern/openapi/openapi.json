@@ -3952,6 +3952,93 @@
         }
       }
     },
+    "/api/workspaces/{slug}/delivery/runs/{runId}/retry": {
+      "post": {
+        "tags": [
+          "Coding agents"
+        ],
+        "operationId": "retry",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionRetryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDeliveryRunResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/delivery/runs/{runId}/discard": {
+      "post": {
+        "tags": [
+          "Coding agents"
+        ],
+        "operationId": "discard",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/delivery/runs/{runId}/approvals/{approvalId}": {
       "post": {
         "tags": [
@@ -3996,6 +4083,45 @@
           },
           "required": true
         },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/delivery/runs/{runId}/apply": {
+      "post": {
+        "tags": [
+          "Coding agents"
+        ],
+        "operationId": "apply_1",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -13824,33 +13950,15 @@
           }
         }
       },
-      "ApprovalDecisionRequest": {
+      "MissionRetryRequest": {
         "type": "object",
         "properties": {
-          "decision": {
+          "note": {
             "type": "string",
-            "minLength": 1,
-            "pattern": "ALLOW|DENY"
+            "maxLength": 2000,
+            "minLength": 0
           }
-        },
-        "required": [
-          "decision"
-        ]
-      },
-      "DelegateRequest": {
-        "type": "object",
-        "properties": {
-          "providerKey": {
-            "type": "string",
-            "minLength": 1
-          },
-          "model": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "providerKey"
-        ]
+        }
       },
       "ApiResponseDeliveryRunResponse": {
         "type": "object",
@@ -13926,8 +14034,91 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "claimedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rulesVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "commits": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tests": {
+            "$ref": "#/components/schemas/Tests"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "outcomeAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
+      },
+      "Tests": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "ran": {
+            "type": "boolean"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "passedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ApprovalDecisionRequest": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "ALLOW|DENY"
+          },
+          "scope": {
+            "type": "string",
+            "pattern": "ONCE|MISSION"
+          }
+        },
+        "required": [
+          "decision"
+        ]
+      },
+      "DelegateRequest": {
+        "type": "object",
+        "properties": {
+          "providerKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "providerKey"
+        ]
       },
       "CreateDashboardCardRequest": {
         "type": "object",
@@ -15027,6 +15218,19 @@
           },
           "refused": {
             "type": "boolean"
+          },
+          "branch": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 0
+          },
+          "commits": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "tests": {
+            "$ref": "#/components/schemas/Tests"
           }
         },
         "required": [
@@ -15098,6 +15302,22 @@
           "askedBy": {
             "type": "string",
             "pattern": "agent|runner"
+          },
+          "action": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 0,
+            "pattern": "[a-z]+(\\.[a-z]+)?"
+          },
+          "rule": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
           }
         },
         "required": [
@@ -15136,6 +15356,9 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "scope": {
+            "type": "string"
           }
         }
       },
@@ -17746,6 +17969,18 @@
             "type": "boolean"
           },
           "askedBy": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "scope": {
             "type": "string"
           }
         }
