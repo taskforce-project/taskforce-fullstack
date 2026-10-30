@@ -1,3 +1,4 @@
+import type { Ruling } from "./api.js";
 import { decide, type Facts, type RulesBundle } from "./harness/rules.js";
 
 /**
@@ -16,8 +17,11 @@ export interface ExitVerdict {
   reason?: string;
 }
 
-/** Pose la demande dans TaskForce et rend la décision de la personne (`askInTaskForce`, ou un faux dans les tests). */
-export type AskPerson = (tool: string, summary: string) => Promise<boolean>;
+/**
+ * Pose la demande dans TaskForce et rend la décision de la personne (`askInTaskForce`, ou un faux dans les tests). La
+ * demande porte ce que les règles ont jugé, pour se dire en mots (R78).
+ */
+export type AskPerson = (tool: string, summary: string, ruling?: Ruling) => Promise<boolean>;
 
 export async function judgeExit(rules: RulesBundle, facts: Facts, tool: string, summary: string, ask: AskPerson): Promise<ExitVerdict> {
   const d = decide(rules, facts);
@@ -27,7 +31,10 @@ export async function judgeExit(rules: RulesBundle, facts: Facts, tool: string, 
     const reason = (d.rule?.reason ?? "").replace(/\.\s*$/, "");
     return { go: false, why: `refused by the rule ${d.rule?.id ?? "?"}: ${reason}`, reason, ...rule };
   }
-  const allowed = await ask(tool, summary);
+  const allowed = await ask(tool, summary, {
+    ...(facts.action ? { action: facts.action } : {}),
+    ...(d.rule ? { rule: d.rule.id, reason: d.rule.reason } : {}),
+  });
   const asked = d.rule ? `the rule ${d.rule.id} asks` : "no rule covers it";
   return { go: allowed, why: allowed ? `allowed in TaskForce (${asked})` : `not allowed in TaskForce (${asked})`, ...rule };
 }

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import type { Approval, RunnerEvent } from "../src/api.js";
-import { ApprovalServer, hookDecision, preToolUseDecision, type ApprovalApi } from "../src/approvals.js";
+import { ApprovalServer, hookDecision, missionScope, preToolUseDecision, type ApprovalApi } from "../src/approvals.js";
 import { EventRelay } from "../src/events.js";
 import type { RulesBundle } from "../src/harness/rules.js";
 import { describeToolInput, toEvents, toolLabel } from "../src/stream.js";
@@ -374,4 +374,84 @@ describe("version minimale de Claude Code", () => {
   for (const [line, expected] of cases) {
     it(`${JSON.stringify(line)} -> ${expected}`, () => assert.equal(supportsApprovals(line), expected));
   }
+});
+
+describe("Accorder (R78) : la demande dit sa règle, et un accord peut valoir pour la mission (R46)", () => {
+  /** Faux TaskForce qui garde ce que chaque demande a porté, et répond `status` avec `scope`. */
+  function rulingApi(status: Approval["status"], scope: Approval["scope"]) {
+    const asked: Array<{ tool: string; ruling: unknown }> = [];
+    const api: ApprovalApi = {
+      requestApproval: async (_runId, tool, _summary, _askedBy, ruling) => {
+        asked.push({ tool, ruling });
+        return { approvalId: asked.length, status: "PENDING", expiresAt: "" };
+      },
+      approvalStatus: async (_runId, id) => ({ approvalId: id, status, expiresAt: "", scope }),
+    };
+    return { api, asked };
+  }
+
+  const SEARCH = { hook_event_name: "PermissionRequest", tool_name: "WebSearch", tool_input: { query: "electron-updater progress" } };
+
+  it("la demande porte l'action, la règle qui demande et sa raison", async () => {
+    const { api, asked } = rulingApi("DENIED", "ONCE");
+    const server = new ApprovalServer(api, 42, WORK, { waitMs: 100, pollMs: 5, rules: DEFAULT_RULES });
+    const url = await server.start();
+    try {
+      await askHook(url, server.token, SEARCH);
+      const rule = DEFAULT_RULES.rules.find((r) => r.id === "search-web");
+      assert.deepEqual(asked, [{ tool: "WebSearch", ruling: { action: "web.search", rule: "search-web", reason: rule?.reason } }]);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("autorisée pour la mission : la même règle ne redemande plus, et la trace le dit", async () => {
+    const { api, asked } = rulingApi("ALLOWED", "MISSION");
+    const again: string[] = [];
+    const server = new ApprovalServer(api, 42, WORK, {
+      waitMs: 100, pollMs: 5, rules: DEFAULT_RULES, onMissionAllowed: (tool, scope) => again.push(`${tool} ${scope}`),
+    });
+    const url = await server.start();
+    try {
+      const first = (await askHook(url, server.token, SEARCH)).json as { hookSpecificOutput: { decision: { behavior: string } } };
+      const second = (await askHook(url, server.token, { ...SEARCH, tool_input: { query: "nsis progress bar" } })).json as {
+        hookSpecificOutput: { decision: { behavior: string } };
+      };
+      assert.equal(first.hookSpecificOutput.decision.behavior, "allow");
+      assert.equal(second.hookSpecificOutput.decision.behavior, "allow");
+      assert.equal(asked.length, 1);
+      assert.deepEqual(again, ["WebSearch search-web"]);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("autorisée une fois : la même règle redemande", async () => {
+    const { api, asked } = rulingApi("ALLOWED", "ONCE");
+    const server = new ApprovalServer(api, 42, WORK, { waitMs: 100, pollMs: 5, rules: DEFAULT_RULES });
+    const url = await server.start();
+    try {
+      await askHook(url, server.token, SEARCH);
+      await askHook(url, server.token, SEARCH);
+      assert.equal(asked.length, 2);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  const scopes: Array<[string, string, Record<string, unknown>, string]> = [
+    ["la règle qui demande", "WebSearch", { query: "x" }, "search-web"],
+    ["sans règle, le programme d'une commande", "Bash", { command: "npm install lodash" }, "shell:npm"],
+    ["un programme désigné par son chemin", "Bash", { command: "/usr/bin/curl -s https://example.com" }, "shell:curl"],
+  ];
+  for (const [label, tool, input, scope] of scopes) {
+    it(`portée d'un accord pour la mission : ${label} -> ${scope}`, () => {
+      const server = new ApprovalServer(rulingApi("ALLOWED", "MISSION").api, 42, WORK, { waitMs: 100, rules: DEFAULT_RULES });
+      assert.equal(server.ruling(tool, input).scope, scope);
+    });
+  }
+
+  it("portée sans règles ni action connue : l'outil", () => {
+    assert.equal(missionScope({ effect: "ask", rule: null }, [], "mcp__linear__save_issue"), "mcp__linear__save_issue");
+  });
 });

@@ -3,9 +3,9 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import type { Approval, AskedBy } from "./api.js";
+import type { Approval, AskedBy, Ruling } from "./api.js";
 import { toolFacts } from "./harness/facts.js";
-import { decideAll, type Decision, type RulesBundle } from "./harness/rules.js";
+import { decideAll, type Decision, type Facts, type RulesBundle } from "./harness/rules.js";
 import { log } from "./log.js";
 import { describeToolInput, toolLabel } from "./stream.js";
 
@@ -25,7 +25,7 @@ import { describeToolInput, toolLabel } from "./stream.js";
 
 /** Ce que le serveur attend de l'API TaskForce (le client réel, ou un faux dans les tests). */
 export interface ApprovalApi {
-  requestApproval(runId: number, tool: string, summary: string, askedBy?: AskedBy): Promise<Approval>;
+  requestApproval(runId: number, tool: string, summary: string, askedBy?: AskedBy, ruling?: Ruling): Promise<Approval>;
   approvalStatus(runId: number, approvalId: number): Promise<Approval>;
 }
 
@@ -36,6 +36,8 @@ export interface ApprovalServerOptions {
   onDecision?: (tool: string, decision: Decision, input: unknown) => void;
   /** Avant d'ouvrir une demande dans TaskForce : la trace en attente part d'abord, le dossier garde l'ordre réel. */
   beforeAsk?: () => Promise<void>;
+  /** Une action que la personne a déjà autorisée pour toute la mission (R46) passe sans redemander : la trace le dit. */
+  onMissionAllowed?: (tool: string, rule: string, input: unknown) => void;
   /** Attente maximale d'une décision ; au-delà, refus. */
   waitMs: number;
   /** Intervalle de lecture de la décision. */
@@ -65,6 +67,21 @@ export function preToolUseDecision(decision: Decision): Record<string, unknown> 
   };
 }
 
+/**
+ * Ce qu'un accord « pour cette mission » couvre ensuite (R46) : les actions que la même règle demande ; sans règle, la
+ * même action, et pour une commande le même programme (autoriser `npm install` laisse passer `npm`, pas `curl`).
+ */
+export function missionScope(decision: Decision, facts: Facts[], tool: string): string {
+  if (decision.rule) return decision.rule.id;
+  const known = facts.find((f) => f.action);
+  if (!known?.action) return tool;
+  if (known.action === "shell") {
+    const program = known.command?.trim().split(/\s+/)[0]?.split(/[\\/]/).pop();
+    return program ? `shell:${program}` : "shell";
+  }
+  return known.action;
+}
+
 /** Réponse du hook `PermissionRequest`, au format de Claude Code. */
 export function hookDecision(allow: boolean, message?: string): Record<string, unknown> {
   return {
@@ -81,15 +98,27 @@ export function hookDecision(allow: boolean, message?: string): Record<string, u
  */
 export async function askInTaskForce(
   api: ApprovalApi, runId: number, tool: string, summary: string, waitMs: number, pollMs = 2_000, askedBy: AskedBy = "agent",
+  ruling: Ruling = {},
 ): Promise<boolean> {
+  return (await requestDecision(api, runId, tool, summary, waitMs, pollMs, askedBy, ruling))?.status === "ALLOWED";
+}
+
+/**
+ * Comme {@link askInTaskForce}, mais rend la demande telle qu'elle a fini, avec la portée d'un accord (R46) ; nulle
+ * quand TaskForce n'a pas ouvert la demande. La demande porte ce que les règles ont jugé, pour se dire en mots (R78).
+ */
+export async function requestDecision(
+  api: ApprovalApi, runId: number, tool: string, summary: string, waitMs: number, pollMs = 2_000, askedBy: AskedBy = "agent",
+  ruling: Ruling = {},
+): Promise<Approval | null> {
   const deadline = Date.now() + waitMs;
   let approval: Approval;
   try {
-    approval = await api.requestApproval(runId, tool, summary, askedBy);
+    approval = await api.requestApproval(runId, tool, summary, askedBy, ruling);
     log.info(`Approval requested in TaskForce: ${tool} ${summary.slice(0, 80)}`);
   } catch (e) {
     log.warn(`Approval request refused by TaskForce, action denied: ${(e as Error).message}`);
-    return false;
+    return null;
   }
   while (approval.status === "PENDING" && Date.now() < deadline) {
     await sleep(pollMs);
@@ -99,8 +128,9 @@ export async function askInTaskForce(
       log.warn(`Approval status unavailable: ${(e as Error).message}`);
     }
   }
-  log.info(`Approval ${approval.approvalId}: ${approval.status === "PENDING" ? "no answer in time" : approval.status.toLowerCase()}`);
-  return approval.status === "ALLOWED";
+  log.info(`Approval ${approval.approvalId}: ${approval.status === "PENDING" ? "no answer in time" : approval.status.toLowerCase()}`
+    + (approval.status === "ALLOWED" && approval.scope === "MISSION" ? ", for this mission" : ""));
+  return approval;
 }
 
 const MAX_BODY = 1_000_000;
@@ -110,6 +140,8 @@ export class ApprovalServer {
   private baseUrl = "";
   readonly token = randomBytes(32).toString("hex");
   private readonly pollMs: number;
+  /** Ce que la personne a autorisé pour toute la mission (R46) : la règle qui demandait, ou l'action sans règle. */
+  private readonly allowedForMission = new Set<string>();
 
   constructor(
     private readonly api: ApprovalApi,
@@ -168,8 +200,18 @@ export class ApprovalServer {
     }
     const tool = typeof input.tool_name === "string" ? input.tool_name : "unknown tool";
     const summary = describeToolInput(tool, input.tool_input, this.workDir) || "(no details)";
+    const { scope, ...ruling } = this.ruling(tool, input.tool_input);
+    if (this.allowedForMission.has(scope)) {
+      log.info(`Allowed for this mission earlier: ${tool} (${scope})`);
+      this.options.onMissionAllowed?.(tool, scope, input.tool_input);
+      this.reply(res, 200, hookDecision(true));
+      return;
+    }
     await this.options.beforeAsk?.().catch(() => undefined);
-    const allow = await this.decide(toolLabel(tool), summary);
+    const approval = await requestDecision(this.api, this.runId, toolLabel(tool), summary, this.options.waitMs, this.pollMs,
+      "agent", ruling);
+    const allow = approval?.status === "ALLOWED";
+    if (allow && approval?.scope === "MISSION") this.allowedForMission.add(scope);
     this.reply(res, 200, allow
       ? hookDecision(true)
       : hookDecision(false, "Denied in TaskForce: the person who delegated this task did not allow this action. Do not "
@@ -185,6 +227,22 @@ export class ApprovalServer {
       : { effect: "ask", rule: null };
     this.options.onDecision?.(tool, decision, input.tool_input);
     return decision;
+  }
+
+  /**
+   * Ce que les règles disent d'une action demandée, sans la trace (le hook `PreToolUse` l'a déjà écrite) : l'action, la
+   * règle qui demande et sa raison, et la portée d'un accord pour la mission (la règle, sinon l'action, sinon l'outil).
+   */
+  ruling(tool: string, toolInput: unknown): Ruling & { scope: string } {
+    const facts = toolFacts(tool, toolInput, this.workDir);
+    const rules = this.options.rules;
+    const decision: Decision = rules ? decideAll(rules, facts) : { effect: "ask", rule: null };
+    const action = facts.find((f) => f.action)?.action;
+    return {
+      ...(action ? { action } : {}),
+      ...(decision.rule ? { rule: decision.rule.id, reason: decision.rule.reason } : {}),
+      scope: missionScope(decision, facts, tool),
+    };
   }
 
   /** Ouvre la demande dans TaskForce puis attend la décision ; tout ce qui n'est pas une autorisation est un refus. */

@@ -190,6 +190,13 @@ export async function runAgent(
       }]);
     },
     beforeAsk: () => relay.flush(),
+    // Déjà autorisée pour toute la mission (R46) : la décision de la personne s'applique encore, et le dossier le garde.
+    onMissionAllowed: (tool, scope, input) => {
+      relay.push([{
+        kind: "decision", tool: toolLabel(tool), text: describeToolInput(tool, input, workDir) || "(no details)",
+        effect: "allow", rule: `allowed for this mission (${scope})`,
+      }]);
+    },
   });
   const hookUrl = await approvals.start();
 
