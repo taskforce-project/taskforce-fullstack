@@ -210,7 +210,7 @@ const QUEUE_STEPS = [450, 450, 450, 450, 1600, 1500] as const;
 export function QueueArt({ playing, reduce }: Readonly<VProps>) {
   const step = useSequence(QUEUE_STEPS, playing, reduce);
   const all = [
-    { k: "approve", icon: ShieldQuestion, t: "Approve: npm test -- settings", m: "WEB-42 · Claude Code", tag: "Needs you", tone: "text-ink-yellow bg-tint-yellow" },
+    { k: "approve", icon: ShieldQuestion, t: "Approve: a web search", m: "WEB-42 · Claude Code", tag: "Needs you", tone: "text-ink-yellow bg-tint-yellow" },
     { k: "pr", icon: GitPullRequest, t: "Review pull request #42", m: "WEB-42 · ready for your review", tag: "Review", tone: "text-ink-pink bg-tint-pink" },
     { k: "comment", icon: MessageSquare, t: "Reply to a comment", m: "API-17 · Rate limit the export", tag: "Mention", tone: "text-ink-blue bg-tint-blue" },
     { k: "due", icon: CalendarDays, t: "Due today", m: "WEB-44 · Empty state for search", tag: "Today", tone: "text-ink-red bg-tint-red" },
