@@ -60,6 +60,7 @@
         "git.commit", "git.push", "git.merge",
         "pr.open", "pr.merge", "pr.close",
         "issue.read", "issue.create", "issue.update", "comment.create",
+        "project.create",
         "knowledge.search", "knowledge.write",
         "web.search", "web.fetch",
         "mcp.read", "mcp.write",
