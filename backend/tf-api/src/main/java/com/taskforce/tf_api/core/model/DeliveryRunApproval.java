@@ -55,10 +55,25 @@ public class DeliveryRunApproval extends AuditableEntity {
     @Builder.Default
     private String askedBy = "agent";
 
+    /** L'action jugée par les règles ({@code web.search}, {@code shell}, {@code git.push}...), vide si le runner ne l'a pas dite. */
+    @Column(length = 40)
+    private String action;
+
+    /** La règle qui demande, et sa raison telle qu'elle s'écrit pour la personne (R78) ; vides quand aucune ne couvre l'action. */
+    @Column(name = "rule_id", length = 120)
+    private String ruleId;
+
+    @Column(name = "rule_reason", length = 500)
+    private String ruleReason;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     @Builder.Default
     private DeliveryApprovalStatus status = DeliveryApprovalStatus.PENDING;
+
+    /** Portée d'un accord : {@code ONCE}, ou {@code MISSION} pour le reste de la mission (R46) ; vide tant qu'on n'a pas répondu. */
+    @Column(length = 16)
+    private String scope;
 
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;

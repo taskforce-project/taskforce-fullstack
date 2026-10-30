@@ -9,6 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -19,6 +20,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import com.taskforce.tf_api.core.dto.request.RunnerApprovalRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerReadinessRequest;
 import com.taskforce.tf_api.core.config.DeliverySessionFilterConfig;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
@@ -33,6 +35,7 @@ import com.taskforce.tf_api.core.service.delivery.RunnerIdentity;
 import com.taskforce.tf_api.core.service.delivery.RunnerIdentityResolver;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -198,18 +201,35 @@ class DeliveryRunnerControllerWebMvcTest {
     void approvals_round_trip() throws Exception {
         LocalDateTime expires = LocalDateTime.now().plusMinutes(10);
         when(localRunnerService.requestApproval(eq(100L), any(RunnerIdentity.class), any()))
-            .thenReturn(new RunnerApprovalResponse(9L, "PENDING", expires));
+            .thenReturn(new RunnerApprovalResponse(9L, "PENDING", expires, null));
         when(localRunnerService.approvalStatus(eq(100L), eq(9L), any(RunnerIdentity.class)))
-            .thenReturn(new RunnerApprovalResponse(9L, "ALLOWED", expires));
+            .thenReturn(new RunnerApprovalResponse(9L, "ALLOWED", expires, "MISSION"));
 
         mockMvc.perform(post("/api/delivery/runner/runs/100/approvals").with(runner())
-                .contentType(MediaType.APPLICATION_JSON).content("{\"tool\":\"Bash\",\"summary\":\"npm install lodash\"}"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"tool\":\"WebSearch\",\"summary\":\"electron-updater progress\","
+                    + "\"action\":\"web.search\",\"rule\":\"search-web\",\"reason\":\"A web search leaves the machine.\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.approvalId").value(9))
             .andExpect(jsonPath("$.data.status").value("PENDING"));
         mockMvc.perform(get("/api/delivery/runner/runs/100/approvals/9").with(runner()))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.status").value("ALLOWED"));
+            .andExpect(jsonPath("$.data.status").value("ALLOWED"))
+            .andExpect(jsonPath("$.data.scope").value("MISSION"));
+        ArgumentCaptor<RunnerApprovalRequest> sent = ArgumentCaptor.forClass(RunnerApprovalRequest.class);
+        verify(localRunnerService).requestApproval(eq(100L), any(RunnerIdentity.class), sent.capture());
+        assertThat(sent.getValue().action()).isEqualTo("web.search");
+        assertThat(sent.getValue().rule()).isEqualTo("search-web");
+    }
+
+    @Test
+    @DisplayName("validations : une action qui n'a pas la forme d'une action est refusée (400)")
+    void approvals_refuse_an_odd_action() throws Exception {
+        mockMvc.perform(post("/api/delivery/runner/runs/100/approvals").with(runner())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tool\":\"Bash\",\"summary\":\"x\",\"action\":\"<script>\"}"))
+            .andExpect(status().isBadRequest());
+
+        verify(localRunnerService, never()).requestApproval(any(), any(), any());
     }
 
     @Test

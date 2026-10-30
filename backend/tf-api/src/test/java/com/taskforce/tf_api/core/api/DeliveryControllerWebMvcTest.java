@@ -173,12 +173,15 @@ class DeliveryControllerWebMvcTest {
         var a = auth();
         when(activityService.activity("acme", 100L, 3, 7L)).thenReturn(new DeliveryRunActivityResponse(
             List.of(new DeliveryRunActivityResponse.Event(4, "tool", "Bash", "npm test", null)),
-            List.of(new DeliveryRunActivityResponse.Approval(9L, "Bash", "npm install lodash", "PENDING", null, null, null, null, true, "agent"))));
+            List.of(new DeliveryRunActivityResponse.Approval(9L, "WebSearch", "electron-updater progress", "PENDING", null, null,
+                null, null, true, "agent", "web.search", "search-web", "A web search sends its query out of the machine.", null))));
 
         mockMvc.perform(get("/api/workspaces/acme/delivery/runs/100/activity").param("after", "3").with(a))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.events[0].seq").value(4))
-            .andExpect(jsonPath("$.data.approvals[0].canDecide").value(true));
+            .andExpect(jsonPath("$.data.approvals[0].canDecide").value(true))
+            .andExpect(jsonPath("$.data.approvals[0].action").value("web.search"))
+            .andExpect(jsonPath("$.data.approvals[0].reason").value("A web search sends its query out of the machine."));
     }
 
     @ParameterizedTest(name = "GET /runs/100/evidence?format={0} : {1}, sans enveloppe")
@@ -208,26 +211,38 @@ class DeliveryControllerWebMvcTest {
             .andExpect(status().isNotFound());
     }
 
-    @ParameterizedTest(name = "POST approval : {0} -> autorisé={1}")
-    @CsvSource({"ALLOW, true", "DENY, false"})
-    void decide_200(String decision, boolean allow) throws Exception {
+    @ParameterizedTest(name = "POST approval : {0} {1} -> autorisé={2}, pour la mission={3}")
+    @CsvSource(delimiter = '|', value = {
+        "ALLOW |         | true  | false | Action allowed",
+        "ALLOW | ONCE    | true  | false | Action allowed",
+        "ALLOW | MISSION | true  | true  | Allowed for this mission", // R46 : le reste de la mission
+        "DENY  |         | false | false | Action denied",
+        "DENY  | MISSION | false | false | Action denied",            // un refus vaut une fois
+    })
+    void decide_200(String decision, String scope, boolean allow, boolean forMission, String message) throws Exception {
         var a = auth();
+        String body = scope == null ? "{\"decision\":\"" + decision + "\"}"
+            : "{\"decision\":\"" + decision + "\",\"scope\":\"" + scope + "\"}";
 
         mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/approvals/9").with(a)
-                .contentType(MediaType.APPLICATION_JSON).content("{\"decision\":\"" + decision + "\"}"))
-            .andExpect(status().isOk());
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value(message));
 
-        verify(activityService).decide("acme", 100L, 9L, allow, 7L);
+        verify(activityService).decide("acme", 100L, 9L, allow, forMission, 7L);
     }
 
-    @Test
-    @DisplayName("POST approval : décision inconnue refusée (400)")
-    void decide_rejects_unknown_decision() throws Exception {
+    @ParameterizedTest(name = "POST approval : {0} refusé (400)")
+    @CsvSource(delimiter = '|', value = {
+        "{\"decision\":\"MAYBE\"}",
+        "{\"decision\":\"ALLOW\",\"scope\":\"FOREVER\"}",
+    })
+    void decide_rejects_unknown_decision(String body) throws Exception {
         mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/approvals/9")
                 .with(jwt().jwt(b -> b.claim("email", EMAIL)))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"decision\":\"MAYBE\"}"))
+                .contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isBadRequest());
 
-        verify(activityService, never()).decide(any(), any(), any(), anyBoolean(), any());
+        verify(activityService, never()).decide(any(), any(), any(), anyBoolean(), anyBoolean(), any());
     }
 }

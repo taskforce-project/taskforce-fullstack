@@ -214,7 +214,7 @@ public class LocalRunnerService {
         DeliveryRun run = runRepository.findById(runId)
             .orElseThrow(() -> new ForbiddenException(REFUSED));
         assertHeldBy(run, runner);
-        return activityService.openApproval(run, request.tool(), request.summary(), request.byRunner());
+        return activityService.openApproval(run, request.tool(), request.summary(), request.byRunner(), request);
     }
 
     /** Décision sur une demande, lue par le runner jusqu'à ce qu'elle ne soit plus en attente. */

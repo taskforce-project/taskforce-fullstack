@@ -154,8 +154,9 @@ public class DeliveryController {
         @Valid @RequestBody ApprovalDecisionRequest request
     ) {
         boolean allow = "ALLOW".equals(request.decision());
-        activityService.decide(slug, runId, approvalId, allow, resolveUserId(jwt));
-        return ResponseEntity.ok(ApiResponse.success(allow ? "Action allowed" : "Action denied", null));
+        activityService.decide(slug, runId, approvalId, allow, request.forMission(), resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success(
+            allow ? (request.forMission() ? "Allowed for this mission" : "Action allowed") : "Action denied", null));
     }
 
     /**
