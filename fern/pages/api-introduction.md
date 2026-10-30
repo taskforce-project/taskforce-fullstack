@@ -8,8 +8,9 @@ menu, is generated from that description, and the guides of this section give th
 
 ## Base address
 
-The API of an instance is served at its API address followed by `/api`. On a self-hosted instance with the default
-settings, that is `http://localhost:8080/api` (`TF_API_URL` in `.env`).
+The API of an instance is served at its API address followed by `/api`. On the hosted TaskForce, whose web app is
+`https://app.taskforce-project.fr`, that is `https://api.taskforce-project.fr/api`. On a self-hosted instance with the
+default settings, that is `http://localhost:8080/api` (`TF_API_URL` in `.env`).
 
 Requests and responses are JSON. There is no version in the path: the OpenAPI description of the release you run is
 the contract.

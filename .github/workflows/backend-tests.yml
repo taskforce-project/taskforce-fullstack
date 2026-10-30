@@ -9,6 +9,7 @@ on:
       - 'fix/**'
     paths:
       - 'backend/tf-api/**'
+      - 'contracts/**'
       - '.github/workflows/backend-tests.yml'
   pull_request:
     branches:
@@ -16,6 +17,7 @@ on:
       - dev
     paths:
       - 'backend/tf-api/**'
+      - 'contracts/**'
 
 jobs:
   test:
