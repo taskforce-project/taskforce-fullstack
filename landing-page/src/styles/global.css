@@ -786,8 +786,16 @@
       flex-wrap: wrap;
       justify-content: center;
     }
+    /* Les listes portent des utilitaires (flex, gap-14, pr-14), d'une couche plus forte que celle-ci : !important. */
     .marquee-track > [aria-hidden="true"] {
-      display: none;
+      display: none !important;
+    }
+    .marquee-track > ul {
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 100%;
+      row-gap: 1.25rem !important;
+      padding-right: 0 !important;
     }
   }
 }
