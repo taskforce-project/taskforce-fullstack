@@ -46,7 +46,7 @@ const STAGES: Stage[] = [
   },
   {
     title: "It asks before going further",
-    text: "Anything outside its allowed actions waits for your Allow or Deny on the issue. No answer in 10 minutes means no.",
+    text: "What your rules don't allow, like a web search, waits for your Allow or Deny on the issue. No answer in 10 minutes means no.",
     badge: "bg-shape-yellow text-foreground",
     chip: (
       <span className="inline-flex items-center gap-1.5">
@@ -57,7 +57,7 @@ const STAGES: Stage[] = [
   },
   {
     title: "It hands the work back",
-    text: "A pull request, or a comment when there is no code. The issue moves to “In review by AI”, and merging stays your call.",
+    text: "TaskForce runs your tests, then opens a pull request that lists what it checked, or posts a comment when there is no code. The issue moves to “In review by AI”, and merging stays your call.",
     badge: "bg-shape-red text-white",
     chip: (
       <span className="inline-flex items-center gap-1.5 bg-tint-green px-2 py-1 text-[11.5px] whitespace-nowrap text-ink-green rounded-md">

@@ -27,7 +27,7 @@ const LIMITS: RuleItem[] = [
     icon: Laptop,
     tint: "bg-tint-green text-ink-green",
     title: "Your computer",
-    text: "Reading, editing and committing are allowed. Anything else, like running the tests, waits for your approval. Pushing is always refused.",
+    text: "Reading, editing and committing in its copy are allowed. A web search, or a command your rules don't cover, waits for your approval. The agent never runs the project's scripts or pushes: TaskForce runs your tests once it is done.",
   },
   {
     icon: ListChecks,
@@ -39,7 +39,7 @@ const LIMITS: RuleItem[] = [
     icon: Github,
     tint: "bg-tint-yellow text-ink-yellow",
     title: "GitHub",
-    text: "Nothing directly. TaskForce pushes the branch and opens the pull request once the agent is done.",
+    text: "Nothing directly. Once the agent is done, TaskForce runs your tests, pushes the branch and opens the pull request, under your rules. Missions don't start on public repositories yet.",
   },
 ];
 
@@ -62,7 +62,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "Could someone hijack the agent through an issue?",
-    a: "The text of an issue is handed to the agent as task data, never as instructions. And whatever a planted sentence asks for, the limits above still hold: commands wait for your approval, nothing is deleted in TaskForce, and nothing is merged without you.",
+    a: "The text of an issue is handed to the agent as task data, never as instructions. And whatever a planted sentence asks for, the limits above still hold: what your rules don't allow waits for your approval, no agent changes the rules, nothing is deleted in TaskForce, and nothing is merged without you.",
   },
 ];
 ---

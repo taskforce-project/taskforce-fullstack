@@ -66,7 +66,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "Can an agent break things on my computer?",
-    a: "Each run works on its own branch, with a fixed set of allowed actions. Anything outside that set, like running a command, waits for you to allow or deny it, and is denied if you don't answer. Agents never delete anything in TaskForce, and nothing is merged without you.",
+    a: "Each run works in its own copy, on its own branch, under your rules. What they don't allow, like a web search or an unknown command, waits for you to allow or deny it, and is denied if you don't answer. The agent never runs the project's scripts: TaskForce runs the tests. Agents never delete anything in TaskForce, and nothing is merged without you.",
     link: { label: "How agents work", href: "/agents" },
   },
   {
@@ -194,7 +194,7 @@ const FAQ: FaqItem[] = [
       <div class="mt-14 grid gap-x-6 gap-y-12 sm:mt-16 md:grid-cols-3">
         <BentoCard
           title="Approve or deny"
-          text="Commands outside the agent's allowed actions wait for your answer. No answer in 10 minutes means no."
+          text="What your rules don't allow, like a web search, waits for your answer. No answer in 10 minutes means no."
           art="approve"
           tone="yellow"
         />

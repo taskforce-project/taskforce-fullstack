@@ -56,8 +56,10 @@ const OUTBOUND = [
 
 const AGENT_LIMITS = [
   "Each run works in a separate copy of your repository, on its own branch",
-  "Commands outside reading, editing and committing wait for your Allow or Deny",
+  "What your rules don't allow, like a web search, waits for your Allow or Deny",
+  "The agent never runs the project's scripts: TaskForce runs your tests once it is done",
   "Pushing is always refused: TaskForce opens the pull request itself",
+  "Missions don't start on public repositories yet",
   "A cloned repository can't change how the agent runs: its own agent settings are ignored",
   "Issue text is passed as task data, never as instructions",
   "In TaskForce, the agent can read your workspace and write issues of its project, never delete",
