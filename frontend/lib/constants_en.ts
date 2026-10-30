@@ -418,8 +418,11 @@ export const CONSTANTS_EN = {
     search: "Search…",
     searchAria: "Search",
     openCommandPalette: "Open command palette",
-    askAi: "Ask AI",
-    openAiAssistant: "Open the AI assistant",
+    // The single bar at the bottom of every screen (R76): write, then send; nothing leaves before that.
+    barPlaceholder: "What do you want done?",
+    barSend: "Send",
+    barOpenConversation: "Open the conversation with Cortex",
+    barSuggestions: "Suggestions for this screen",
     // Workspace switcher
     workspaces: "Workspaces",
     yourWorkspaces: "Your workspaces",
