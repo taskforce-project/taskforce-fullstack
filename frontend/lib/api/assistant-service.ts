@@ -98,6 +98,26 @@ export async function approveAction(slug: string, call: AssistantToolCall): Prom
   return { tool: call.name, status: "success", output: await executeMcpAction(slug, call.name, args) }
 }
 
+/** Les créations de Cortex qui se défont d'un geste (R77) : un projet, une issue. */
+const UNDOABLE = new Set(["create_project", "create_issue"])
+
+/** Une création que Cortex vient de faire, et dont le dossier permet de la défaire. */
+export function isUndoable(call: AssistantToolCall): boolean {
+  return call.status === "success" && Boolean(call.record) && UNDOABLE.has(call.name)
+}
+
+/**
+ * Défait ce que Cortex a créé (R77, séance n°13), par le dossier de la réponse : une seule fois, avec les droits de la
+ * personne. Un refus du serveur (le projet a des issues, l'issue des commentaires) remonte comme une erreur.
+ */
+export async function undoAction(slug: string, call: AssistantToolCall): Promise<AssistantActionResult> {
+  const res = await apiClient.post<{ data: AssistantActionResult }>(
+    ASSISTANT_ROUTES.ACTION_UNDO(slug),
+    { tool: call.name, record: call.record },
+  )
+  return res.data.data
+}
+
 /** Variante texte (compat) : renvoie seulement la réponse markdown. */
 export async function sendAssistantMessage(slug: string, message: string): Promise<string> {
   return (await sendAgentMessage(slug, message)).answer.answer
