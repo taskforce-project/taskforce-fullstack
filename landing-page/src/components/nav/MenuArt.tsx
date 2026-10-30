@@ -269,7 +269,8 @@ function RunArt() {
 function LimitsArt() {
   const rows = [
     { t: "Read, edit and commit", s: "Allowed", c: "text-ink-green" },
-    { t: "Run a command", s: "Asks you", c: "text-ink-yellow" },
+    { t: "Search the web", s: "Asks you", c: "text-ink-yellow" },
+    { t: "Run the tests", s: "By TaskForce", c: "text-ink-blue" },
     { t: "Push or delete", s: "Never", c: "text-ink-red" },
   ];
   return (
@@ -281,7 +282,7 @@ function LimitsArt() {
           animate={{ opacity: [0.35, 1, 1, 0.35] }}
           transition={loop(4.5, [0, 0.12 + i * 0.18, 0.85, 1])}
         >
-          {i === 2 ? <Lock className="size-3 text-subtle" /> : <Check className="size-3 text-subtle" />}
+          {i === rows.length - 1 ? <Lock className="size-3 text-subtle" /> : <Check className="size-3 text-subtle" />}
           {r.t}
           <span className={cn("ml-auto text-[8px] font-medium", r.c)}>{r.s}</span>
         </motion.p>
@@ -294,9 +295,9 @@ function ApprovalArt() {
   return (
     <Sheet className="top-[30px] left-[26px] w-[228px] border-l-2 border-shape-yellow p-2.5">
       <p className="flex items-center gap-1.5 text-[10.5px] font-medium">
-        <BrandMark brand="claude-code" className="size-3.5" /> Claude Code asks to run Bash
+        <BrandMark brand="claude-code" className="size-3.5" /> Claude Code asks to search the web
       </p>
-      <p className="mt-1.5 bg-muted px-1.5 py-1 font-mono text-[9px] rounded-md">npm test -- settings</p>
+      <p className="mt-1.5 bg-muted px-1.5 py-1 font-mono text-[9px] rounded-md">prefers-color-scheme</p>
       <div className="mt-2 h-[3px] bg-muted">
         <motion.span
           className="block h-full origin-left bg-shape-yellow"

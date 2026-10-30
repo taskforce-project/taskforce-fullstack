@@ -24,9 +24,10 @@ import { cn } from "@/lib/utils";
 
 /**
  * Le héros : l'app desktop qui travaille toute seule, en boucle (environ 19 s). Le board, un curseur qui ouvre
- * WEB-42 (la caméra plonge dans l'issue), l'assigne à Claude Code, le run s'affiche en direct, l'agent demande à
- * lancer les tests, on clique Allow, la pull request arrive, puis la caméra recule sur le board où la carte passe
- * en revue. Libellés repris de l'app (statut « In review by AI », carte de validation, délai de 10 minutes).
+ * WEB-42 (la caméra plonge dans l'issue), l'assigne à Claude Code, le run s'affiche en direct, l'agent demande une
+ * recherche web, on clique Allow, il commite, TaskForce lance les tests (l'agent ne lance pas les scripts du dépôt :
+ * règle no-agent-scripts), la pull request arrive, puis la caméra recule sur le board où la carte passe en revue.
+ * Libellés repris de l'app (statut « In review by AI », carte de validation, délai de 10 minutes).
  * Données d'exemple. Hors écran ou onglet caché : pause. Mouvement réduit : l'état final, immobile.
  */
 
@@ -51,8 +52,8 @@ const B = {
   TO_ALLOW: 14,
   PRESS_ALLOW: 15,
   ALLOWED: 16,
-  TESTS: 17,
-  COMMIT: 18,
+  COMMIT: 17,
+  TESTS: 18,
   PR: 19,
   REVIEW: 20,
   BACK: 21,
@@ -502,9 +503,9 @@ function IssueView({
                 className="mt-2 mb-1 rounded-lg border border-black/[0.06] border-l-[3px] border-l-shape-yellow bg-white p-3 shadow-md"
               >
                 <p className="flex items-center gap-2 text-[12.5px] font-medium">
-                  <BrandMark brand="claude-code" className="size-4" /> Claude Code asks to run Bash
+                  <BrandMark brand="claude-code" className="size-4" /> Claude Code asks to search the web
                 </p>
-                <p className="mt-2 bg-muted px-2 py-1 font-mono text-[11px] rounded-md">npm test -- settings</p>
+                <p className="mt-2 bg-muted px-2 py-1 font-mono text-[11px] rounded-md">prefers-color-scheme</p>
                 <div className="mt-2.5 flex items-center gap-2">
                   <motion.span
                     ref={refs.allow}
@@ -532,16 +533,9 @@ function IssueView({
           {allowed && (
             <Row done>
               <ShieldCheck className="size-3.5 text-subtle" />
-              <span className="font-medium">Bash</span>
-              <span className="font-mono text-[11px] text-muted-foreground">npm test -- settings</span>
+              <span className="font-medium">Web search</span>
+              <span className="font-mono text-[11px] text-muted-foreground">prefers-color-scheme</span>
               <span className="text-muted-foreground">· Allowed by you</span>
-            </Row>
-          )}
-          {beat >= B.TESTS && (
-            <Row done>
-              <Check className="size-3.5 text-subtle" />
-              <span className="font-medium">Tests</span>
-              <span className="text-ink-green">12 passed</span>
             </Row>
           )}
           {beat >= B.COMMIT && (
@@ -549,6 +543,14 @@ function IssueView({
               <GitCommitHorizontal className="size-3.5 text-subtle" />
               <span className="font-medium">Committed</span>
               <span className="text-muted-foreground">3 files on tf/web-42-dark-mode</span>
+            </Row>
+          )}
+          {beat >= B.TESTS && (
+            <Row done>
+              <Check className="size-3.5 text-subtle" />
+              <span className="font-medium">Tests</span>
+              <span className="text-ink-green">12 passed</span>
+              <span className="text-muted-foreground">· run by TaskForce</span>
             </Row>
           )}
         </ul>
@@ -695,7 +697,7 @@ export default function HeroApp({ className }: Readonly<{ className?: string }>)
 
           {/* le message après « Allow », en bas à droite de la fenêtre */}
           <AnimatePresence>
-            {beat >= B.ALLOWED && beat < B.COMMIT && (
+            {beat >= B.ALLOWED && beat < B.TESTS && (
               <motion.div
                 className="absolute right-5 bottom-5 z-20 flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-[12.5px] text-white shadow-lg"
                 initial={{ opacity: 0, y: 16 }}
@@ -718,7 +720,7 @@ export default function HeroApp({ className }: Readonly<{ className?: string }>)
       className={cn("relative w-full", className)}
       style={{ aspectRatio: `${size.w} / ${size.h}` }}
       role="img"
-      aria-label="The TaskForce desktop app at work: an issue is assigned to Claude Code, the agent's steps appear live, it asks before running the tests, you allow it, and a pull request comes back for your review."
+      aria-label="The TaskForce desktop app at work: an issue is assigned to Claude Code, the agent's steps appear live, it asks before searching the web, you allow it, TaskForce runs the tests, and a pull request comes back for your review."
     >
       <div
         ref={stage}
