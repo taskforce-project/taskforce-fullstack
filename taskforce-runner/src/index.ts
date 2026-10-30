@@ -136,6 +136,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       // Les tests tels que le runner les a lancés : une ligne des faits de la pull request, jamais une phrase de l'agent.
       let testsFact = "No test command is set for this project: no test ran.";
       let testOutput: string | undefined;
+      let testFacts: RunResult["tests"];
       if (commits > 0 && claim.testCommand) {
         const tests = await runProjectTests(claim.testCommand, claim.repoFullName, worktree.path, TEST_TIMEOUT_MS,
           { ask, approved: ApprovedTests.in(config.home) }, signal);
@@ -145,6 +146,10 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
         report = `${outcome.text}\n\n${tests.summary}`;
         testsFact = tests.summary;
         testOutput = tests.tail || undefined;
+        testFacts = {
+          command: tests.command, ran: tests.ran, passed: tests.passed,
+          ...(tests.counts ? { passedCount: tests.counts.passed, total: tests.counts.total } : {}),
+        };
       }
       if (commits === 0) {
         result = { status: "DONE", summary: `No code change was needed.\n\n${outcome.text}`.slice(0, 7900) };
@@ -185,6 +190,8 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
           log.info(url ? `Pull request opened: ${url}` : `Branch pushed: ${worktree.branch}`);
         }
       }
+      // La carte de résultat (R78) lit les faits, pas le résumé : la branche, les commits, les tests du runner.
+      if (commits > 0) result = { ...result, branch: worktree.branch, commits, ...(testFacts ? { tests: testFacts } : {}) };
     } else {
       // Projet sans dépôt (tâche non-code) : l'agent travaille dans un dossier jetable et rend son travail
       // dans TaskForce (commentaire), jamais de pull request, jamais un fichier hors de ce dossier.

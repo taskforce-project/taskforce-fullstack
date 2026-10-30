@@ -21,6 +21,58 @@ export interface TestRun {
   summary: string;
   /** La fin de la sortie, pour la pull request et le dossier. */
   tail: string;
+  /** Combien ont passé, sur combien, quand la sortie le dit (carte de résultat, R78). */
+  counts?: TestCounts;
+}
+
+export interface TestCounts {
+  passed: number;
+  total: number;
+}
+
+const ANSI = /\x1b\[[0-9;]*m/g;
+
+/** La dernière correspondance d'une expression dans le texte : un résumé final suit les résumés intermédiaires. */
+function lastMatch(text: string, pattern: RegExp): RegExpExecArray | null {
+  const global = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`);
+  let last: RegExpExecArray | null = null;
+  for (let m = global.exec(text); m; m = global.exec(text)) last = m;
+  return last;
+}
+
+const count = (text: string, word: RegExp): number => Number(word.exec(text)?.[1] ?? 0);
+
+/**
+ * Combien de tests ont passé, sur combien, lu dans la ligne de résumé des outils courants : Vitest, Jest, Maven
+ * (Surefire), `node:test` et pytest. Null quand la sortie n'en a pas : la carte dit alors seulement s'ils ont passé.
+ */
+export function testCounts(output: string): TestCounts | null {
+  const text = output.replace(ANSI, "");
+  // Vitest : « Tests  2 failed | 1246 passed (1248) »
+  const vitest = lastMatch(text, /^\s*Tests\s+(.*?)\s*\((\d+)\)\s*$/m);
+  const vitestParts = vitest?.[1] ?? "";
+  if (vitest && /\d+ (passed|failed)/.test(vitestParts)) return { passed: count(vitestParts, /(\d+) passed/), total: Number(vitest[2]) };
+  // Jest : « Tests:       1 failed, 11 passed, 12 total »
+  const jest = lastMatch(text, /^Tests:\s+(.*?)(\d+) total/m);
+  if (jest) return { passed: count(jest[1] ?? "", /(\d+) passed/), total: Number(jest[2]) };
+  // Maven : « Tests run: 231, Failures: 0, Errors: 0, Skipped: 0 », le dernier est le total.
+  const maven = lastMatch(text, /Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)/);
+  if (maven) {
+    const [run = 0, failures = 0, errors = 0, skipped = 0] = maven.slice(1, 5).map(Number);
+    return { passed: run - failures - errors - skipped, total: run };
+  }
+  // node:test : « ℹ tests 331 » puis « ℹ pass 331 »
+  const nodeTests = lastMatch(text, /^ℹ tests (\d+)\s*$/m);
+  const nodePass = lastMatch(text, /^ℹ pass (\d+)\s*$/m);
+  if (nodeTests && nodePass) return { passed: Number(nodePass[1]), total: Number(nodeTests[1]) };
+  // pytest : « ==== 12 passed, 1 failed in 0.12s ==== »
+  const pytest = lastMatch(text, /^=+ (.*?\d+ (?:passed|failed).*?) in [\d.]+s/m);
+  if (pytest) {
+    const parts = pytest[1] ?? "";
+    const passed = count(parts, /(\d+) passed/);
+    return { passed, total: passed + count(parts, /(\d+) failed/) + count(parts, /(\d+) errors?/) };
+  }
+  return null;
 }
 
 /** Le dernier morceau de la sortie, borné : la fin dit le plus souvent ce qui a échoué. */
@@ -93,9 +145,11 @@ export async function runProjectTests(
     return { command, ran: true, passed: false, summary: `Tests stopped after ${took}: \`${command}\` took too long.`, tail };
   }
   const passed = result.code === 0;
+  const counts = testCounts(`${result.stdout}\n${result.stderr}`);
   return {
     command, ran: true, passed,
     summary: passed ? `Tests passed: \`${command}\` (${took}).` : `Tests failed: \`${command}\` exited with code ${result.code} (${took}).`,
     tail,
+    ...(counts ? { counts } : {}),
   };
 }
