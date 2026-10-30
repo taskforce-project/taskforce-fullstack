@@ -342,11 +342,13 @@ export const ANALYSIS_ROUTES = {
 /**
  * Route assistant IA (QA2-16)
  * Backend: POST /api/workspaces/{slug}/assistant (variante JSON → ApiResponse<{content}>) ; l'accord d'une action
- * proposée par Cortex : POST /api/workspaces/{slug}/assistant/actions/execute.
+ * proposée par Cortex : POST /api/workspaces/{slug}/assistant/actions/execute ; défaire ce qu'il a créé (R77) :
+ * POST /api/workspaces/{slug}/assistant/actions/undo.
  */
 export const ASSISTANT_ROUTES = {
   CHAT: (slug: string) => `/api/workspaces/${slug}/assistant`,
   ACTION_EXECUTE: (slug: string) => `/api/workspaces/${slug}/assistant/actions/execute`,
+  ACTION_UNDO: (slug: string) => `/api/workspaces/${slug}/assistant/actions/undo`,
 } as const;
 
 /**

@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Search, Sparkles } from "lucide-react"
+import { Search } from "lucide-react"
 
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
@@ -22,9 +22,7 @@ import { CommandPalette } from "@/components/command-palette"
 import { NotificationBell } from "@/components/layout/topbar/notification-bell"
 import { WorkflowsButton } from "@/components/workflows/workflows-button"
 import { useProjectStore } from "@/lib/store/project-store"
-import { usePanelStore } from "@/lib/store/panel-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
-import { AgentChat } from "@/components/agent/agent-chat"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useModKeyLabel } from "@/lib/hooks/use-mod-key"
 import { useDesktopNavigation } from "@/lib/hooks/use-desktop-navigation"
@@ -125,16 +123,6 @@ export function AppTopbar() {
   // Clic sur une notification du système : la coque demande la page de l'événement.
   useDesktopNavigation()
   const [cmdOpen, setCmdOpen] = React.useState(false)
-  const togglePanel = usePanelStore((s) => s.togglePanel)
-  const openAssistant = React.useCallback(() => {
-    togglePanel({
-      id: "assistant",
-      side: "right",
-      title: "Cortex",
-      icon: <Sparkles className="size-4 text-primary" />,
-      content: <AgentChat />,
-    })
-  }, [togglePanel])
 
   // Global Ctrl+K / Cmd+K shortcut
   React.useEffect(() => {
@@ -213,30 +201,7 @@ export function AppTopbar() {
           <Search className="size-4" />
         </Button>
 
-        {/* Ask AI - icône seule sur mobile (le bouton texte ci-dessous est masqué < sm). */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="sm:hidden"
-          onClick={openAssistant}
-          aria-label={t.shell.openAiAssistant}
-        >
-          <Sparkles className="size-4 text-primary" />
-        </Button>
-
-        {/* Ask AI - ouvre l'assistant en panneau latéral (PROD-8.9) */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="hidden gap-1.5 text-xs sm:inline-flex"
-          onClick={openAssistant}
-          aria-label={t.shell.openAiAssistant}
-          data-tour="ask-ai"
-        >
-          <Sparkles className="size-4 text-primary" />
-          <span className="hidden lg:inline">{t.shell.askAi}</span>
-        </Button>
-
+        {/* « Ask AI » est remplacé par la barre unique, en bas de chaque écran (R76, séance n°13). */}
         {/* Workflows IA - dock des analyses en arrière-plan (badge = jobs actifs) */}
         <WorkflowsButton />
 

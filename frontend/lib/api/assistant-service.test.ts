@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  sendAgentMessage, sendAssistantMessage, isApprovable, approveAction, type AssistantToolCall,
+  sendAgentMessage, sendAssistantMessage, isApprovable, approveAction, isUndoable, undoAction, type AssistantToolCall,
 } from './assistant-service';
 import { apiClient } from './client';
 import { executeMcpAction } from './integration-service';
@@ -127,5 +127,36 @@ describe('assistant-service: the approval of a proposed action', () => {
     vi.mocked(apiClient.post).mockRejectedValue(new Error('This action is no longer waiting for your approval.'));
 
     await expect(approveAction(slug, call({ record: RECORD }))).rejects.toThrow('no longer waiting');
+  });
+});
+
+describe('assistant-service: undoing what Cortex created (R77)', () => {
+  const slug = 'acme';
+  const RECORD = '00000000-0000-0000-0000-0000000000aa';
+  const call = (over: Partial<AssistantToolCall>): AssistantToolCall =>
+    ({ name: 'create_project', status: 'success', input: '{"name":"Pricing"}', output: 'Project created', record: RECORD, ...over });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    ['a project Cortex created', call({}), true],
+    ['an issue Cortex created', call({ name: 'create_issue' }), true],
+    ['a note Cortex created', call({ name: 'create_note' }), true],
+    ['an issue Cortex updated, which does not undo', call({ name: 'update_issue' }), false],
+    ['a creation that failed', call({ status: 'error' }), false],
+    ['a proposal still waiting', call({ status: 'pending' }), false],
+    ['an answer without a record', call({ record: null }), false],
+  ])('isUndoable: %s -> %s', (_label, toolCall, expected) => {
+    expect(isUndoable(toolCall)).toBe(expected);
+  });
+
+  it('undoAction: sends the tool and the record of the answer', async () => {
+    const result = { tool: 'create_project', status: 'success' as const, output: 'Removed the project PRICING "Pricing".' };
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(result));
+
+    await expect(undoAction(slug, call({}))).resolves.toEqual(result);
+    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.ACTION_UNDO(slug), { tool: 'create_project', record: RECORD });
   });
 });

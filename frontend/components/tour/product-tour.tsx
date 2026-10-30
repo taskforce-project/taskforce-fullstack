@@ -69,8 +69,8 @@ const STEPS: readonly TourStep[] = [
   },
   {
     title: "Cortex, your copilot",
-    body: "Generate specs, prioritize, assign: the AI assists you everywhere in the app. Open it in one click here.",
-    target: '[data-tour="ask-ai"]',
+    body: "Write what you want done in this bar, on any screen: create a project, ask what is blocked. Nothing is sent until you press Enter.",
+    target: '[data-tour="command-bar"]',
   },
   {
     title: "Your live analytics",

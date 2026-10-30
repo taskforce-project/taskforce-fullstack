@@ -11,4 +11,6 @@ import com.taskforce.tf_api.core.model.IssueComment;
 public interface IssueCommentRepository extends JpaRepository<IssueComment, Long> {
 
     List<IssueComment> findByIssueIdOrderByCreatedAtAsc(Long issueId);
+
+    long countByIssueId(Long issueId);
 }
