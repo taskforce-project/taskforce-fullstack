@@ -10,6 +10,13 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 30/10/2026 - Référence API : l'adresse publique de l'API devant chaque opération, plus celle du backend de dev (#454 vers `dev`, non fusionnée).** `[docs]`
+> - **Constat** : chaque opération de docs.taskforce-project.fr affichait `POST http://localhost:8080/api/...` : springdoc écrit l'adresse du backend qui a servi la spec (celui de dev), et `clean-openapi.mjs` la gardait.
+> - **Vérifié avant d'écrire** : l'app ne sert pas `/api` (`GET https://app.taskforce-project.fr/api/workspaces` = la page 404 de Next.js) ; l'API répond sur `https://api.taskforce-project.fr/api/...` (401 sans jeton, `readyz` 200, CORS ouvert à l'app), l'adresse qu'appelle le bundle de la webapp.
+> - **Fait** : `clean-openapi.mjs` pose `servers` : `https://api.taskforce-project.fr` (`Hosted`, par défaut), puis `http://localhost:8080` (`Self-hosted`, l'adresse que donnent les guides, `TF_API_URL`) ; `x-fern-server-name` les nomme, sans quoi Fern ne garde que la première (`fern write-definition` : deux environnements). Spec passée au script : seul le bloc `servers` change ; README de `fern/` à jour.
+> - **Contrôles** : `npx fern-api@5.101.0 check`, 0 erreur (les 2 avertissements de contraste habituels) ; script idempotent. Pas d'aperçu local : `fern docs dev` exige les chemins longs de Windows.
+> - **Reste** : fusion de #454, puis publication à la main depuis `main` quand le CEO le décide ; les guides ne donnent que l'adresse auto-hébergée, jamais celle de l'instance hébergée.
+
 > **▶ MAJ 30/10/2026 (septies) - Release 1.6.8 EN PROD : la barre unique, « Undo », le projet et la note créés sans accord ; desktop 1.3.8 en construction.** `[release]`
 > - **Décision du CEO** : « go release ».
 > - **En prod** : `chore(desktop)` 1.3.8 (`cf03c8b4`), release #451 vers `main` (`0f21f532`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.6.8 en plomberie). Dedans : Cortex crée tout de suite le projet (#442) et la note (#446) qu'on lui demande ; la barre unique en bas de chaque écran (#444, R76) ; « Undo » sous ce que Cortex vient de créer, tant que rien n'a bougé (#446, R77). La référence API nomme `POST /assistant/actions/undo` (#450). Aucune migration. Vérifié en dev avant la release, sur `qwen3:8b` : Cortex crée un projet (20 s) et une note (6 s) sans accord ; « Undo » retire le projet et ses 6 pages, puis la note ; un second « Undo » est refusé ; rien ne reste en base, le dossier garde les décisions. Desktop 1.3.8 : en construction.
