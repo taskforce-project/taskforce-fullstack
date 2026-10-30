@@ -143,7 +143,8 @@ describe('assistant-service: undoing what Cortex created (R77)', () => {
   it.each([
     ['a project Cortex created', call({}), true],
     ['an issue Cortex created', call({ name: 'create_issue' }), true],
-    ['a note, which does not undo', call({ name: 'create_note' }), false],
+    ['a note Cortex created', call({ name: 'create_note' }), true],
+    ['an issue Cortex updated, which does not undo', call({ name: 'update_issue' }), false],
     ['a creation that failed', call({ status: 'error' }), false],
     ['a proposal still waiting', call({ status: 'pending' }), false],
     ['an answer without a record', call({ record: null }), false],

@@ -98,8 +98,8 @@ export async function approveAction(slug: string, call: AssistantToolCall): Prom
   return { tool: call.name, status: "success", output: await executeMcpAction(slug, call.name, args) }
 }
 
-/** Les créations de Cortex qui se défont d'un geste (R77) : un projet, une issue. */
-const UNDOABLE = new Set(["create_project", "create_issue"])
+/** Les créations de Cortex qui se défont d'un geste (R77) : un projet, une issue, une note. */
+const UNDOABLE = new Set(["create_project", "create_issue", "create_note"])
 
 /** Une création que Cortex vient de faire, et dont le dossier permet de la défaire. */
 export function isUndoable(call: AssistantToolCall): boolean {
