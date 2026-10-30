@@ -49,7 +49,7 @@ marketing (OSS-MKT.1 du plan de release). Spec : `Specification_App_Desktop.md` 
 | Peintures de fond (sources, cadrage, crédits) | `src/lib/backgrounds.ts`, `src/components/site/Backdrop.astro` |
 | Blocs de section | `site/PaintBand.astro`, `DuoCard.astro`, `BentoCard.astro`, `RuleColumns.astro`, `ProductSection.astro` |
 | Mouvement au défilement (titres mot par mot, peintures en parallaxe, fenêtre qui se redresse, manifeste qui s'éclaire) | `src/scripts/motion.js` (attributs `data-words`, `data-parallax`, `data-tilt`, `data-fill`) |
-| Composeur flottant en bas de page (démo locale, sans serveur ni IA) | `src/components/site/Composer.astro` |
+| Composeur flottant en bas de page : la tâche envoyée joue le parcours d'une mission en 8 étapes le long d'un arc, sur un halo, sans fenêtre (démo locale, sans serveur ni IA) | `src/components/site/Composer.astro` (parcours : `SCENES`, géométrie de l'arc : `layout()`), styles « Composeur flottant » de `global.css` |
 | En-tête (menus illustrés, mobile) | `src/components/nav/SiteNav.tsx`, `MenuArt.tsx` (îlot persistant) |
 | App animée du héros (boucle 19 s) | `src/components/visuals/HeroApp.tsx` |
 | Vignettes animées (17) | `src/components/visuals/vignettes/` (registre `index.ts`) |
@@ -77,6 +77,17 @@ marketing (OSS-MKT.1 du plan de release). Spec : `Specification_App_Desktop.md` 
   (ignoré sur un `<p>`), prise dans `innerText`, qui garde l'espace entre deux lignes en bloc.
 - Une image de fond CSS se télécharge dès le rendu, même tout en bas de la page : la peinture du grand mot du pied de
   page n'est posée qu'avec `.is-in` (`[data-reveal]`).
+- `data-fill` appartient à `motion.js` (texte qui s'éclaire) : un autre composant qui s'en servirait verrait ses
+  éléments découpés en mots. Les emplacements du parcours du composeur sont des `data-slot`.
+- Les scripts de module s'exécutent dans l'ordre du document : au-delà de 4 Ko, le script du composeur est chargé à
+  part, et placé avant celui de `BaseLayout` il retardait le titre du héros. Le script de `BaseLayout` (mouvement et
+  reveal) passe donc avant le pied de page et le composeur. Mesurer avec un serveur qui compresse, comme Vercel.
+- En animations réduites, les règles de `@layer components` perdent face aux utilitaires (`flex`, `gap-14`) :
+  `!important` pour cacher la deuxième copie du défilé de logos.
+- Un `backdrop-filter` sur une grande surface (le halo du parcours, trois quarts de l'écran) coûte très cher en rendu
+  logiciel : le contrôle Playwright passait de 1 min 46 à plus de 10 min. Le halo n'est qu'un dégradé blanc.
+- Le composeur couvre tout l'écran en `pointer-events: none` (la barre et les liens du parcours le rétablissent) : la
+  page reste cliquable sous le halo. Ne pas lui donner de `transform` : ses enfants fixes en dépendraient.
 - Unsplash bloque les navigateurs sans tête (BotStopper) : la recherche d'images passe par le navigateur intégré.
 - Le panneau navigateur du Code tab fait 608 px : vérifier en Playwright (`design-assets/node_modules/playwright`).
 

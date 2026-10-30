@@ -1,98 +1,451 @@
 ---
 /**
  * Composeur flottant en bas de l'écran (façon offloop.org) : une invitation à confier une tâche à un agent. Des exemples
- * de tâches s'écrivent seuls dans le champ ; ce que la personne tape devient, une fois envoyé, l'aperçu de l'issue
- * qu'elle créerait dans TaskForce, avec le téléchargement. Aucune IA derrière et rien n'est envoyé : la page le dit.
- * Il apparaît une fois le haut de page passé et s'efface au pied de page.
+ * de tâches s'écrivent seuls dans le champ. Une fois envoyée, la tâche joue le parcours complet d'une mission, tel que
+ * l'app le fait (spec v2), sans fenêtre : un halo flouté monte du bas de l'écran, les huit étapes s'allument le long
+ * d'un arc au-dessus de la barre (les connaissances de l'espace, le modèle de la personne, l'issue écrite au propre,
+ * les règles, l'accord humain, le travail et les tests, le dossier, la connaissance nouvelle), et le texte de l'étape
+ * en cours s'affiche au-dessus de l'arc, jusqu'à la pull request. C'est une illustration jouée dans la page : aucune IA
+ * derrière, rien n'est envoyé, et la barre le dit. Rien n'y dit que le modèle est entraîné : rien ne l'est dans
+ * TaskForce (R61). Le composeur apparaît une fois le haut de page passé et s'efface au pied de page.
  */
+import {
+  BookOpen,
+  Check,
+  Cpu,
+  FilePenLine,
+  FileText,
+  GitBranch,
+  GitPullRequest,
+  Hand,
+  ScrollText,
+  ShieldCheck,
+  Sparkles,
+  SquareTerminal,
+} from "lucide-react";
 import { BrandMark } from "@/components/visuals/brand";
+
+const STEPS = [
+  { key: "knowledge", tone: "green", Icon: BookOpen, label: "Your knowledge", title: "Your knowledge", detail: "It starts from what your team already wrote and decided." },
+  { key: "model", tone: "sky", Icon: Cpu, label: "Your model", title: "Your model", detail: "Your model reads it, on this computer with Ollama or on the API you chose." },
+  { key: "issue", tone: "blue", Icon: FilePenLine, label: "A clear issue", title: "A clear issue", detail: "The assistant writes your request up, in the right project, at the right time." },
+  { key: "rules", tone: "yellow", Icon: ShieldCheck, label: "Your rules", title: "Your rules", detail: "Every action is checked against your rules before it runs." },
+  { key: "decide", tone: "pink", Icon: Hand, label: "You decide", title: "You decide", detail: "What your rules don't allow waits for you." },
+  { key: "work", tone: "blue", Icon: SquareTerminal, label: "The work", title: "The work", detail: "Claude Code works on its own branch, then TaskForce runs your tests." },
+  { key: "record", tone: "lime", Icon: ScrollText, label: "The record", title: "The record", detail: "Each step is written down, in order, before it happens." },
+  { key: "learn", tone: "green", Icon: Sparkles, label: "It learns", title: "It learns, with your OK", detail: "What the run found comes back to your knowledge, once you accept it." },
+];
 ---
 
 <aside class="composer" data-composer aria-label="Hand a task to an agent" inert>
-  <div class="composer-pop" data-pop hidden role="dialog" aria-labelledby="composer-pop-title">
-    <div class="flex items-start justify-between gap-4">
-      <p id="composer-pop-title" class="t-label" tabindex="-1">In TaskForce, this becomes an issue</p>
-      <button type="button" class="composer-close" data-close aria-label="Close">×</button>
+  <div class="flow-stage" data-pop hidden role="region" aria-labelledby="composer-pop-title">
+    <p id="composer-pop-title" class="sr-only" tabindex="-1">What TaskForce does with your task</p>
+    <span class="flow-glow" aria-hidden="true"></span>
+    <svg class="flow-arc" aria-hidden="true">
+      <path class="flow-arc-base" data-arc-base></path>
+      <path class="flow-arc-fill" data-arc-fill></path>
+    </svg>
+
+    <ol class="flow">
+      {
+        STEPS.map((s, i) => (
+          <li class="flow-step" data-step={s.key} data-tone={s.tone} style={`--n: ${i}`}>
+            <span class="flow-node">
+              <span class="flow-dot" aria-hidden="true">
+                <s.Icon className="flow-icon" strokeWidth={1.9} />
+                <Check className="flow-check" strokeWidth={2.4} />
+              </span>
+              <span class="flow-label">
+                <span class="flow-title">{s.label}</span>
+                <span class="flow-result" data-result />
+              </span>
+            </span>
+          </li>
+        ))
+      }
+    </ol>
+
+    <div class="flow-panels" data-panels>
+      {
+        STEPS.map((s, i) => (
+          <section class="flow-panel" data-panel={s.key} data-tone={s.tone}>
+            <p class="flow-kicker">
+              Step {i + 1} of {STEPS.length} · {s.title}
+            </p>
+            <p class="flow-headline">{s.detail}</p>
+            <div class="flow-art">
+              {s.key === "knowledge" && (
+                <div class="flow-chips">
+                  {[0, 1, 2].map((n) => (
+                    <span class="composer-chip flow-pop" style={`--i: ${n}`}>
+                      <FileText className="size-3.5 text-ink-green" aria-hidden="true" />
+                      <span data-slot={`note-${n}`} />
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {s.key === "model" && (
+                <>
+                  <div class="flow-chips">
+                    <span class="composer-chip flow-pop" style="--i: 0">
+                      <span class="flow-led" aria-hidden="true" />
+                      On this computer
+                    </span>
+                    <span class="composer-chip is-off flow-pop" style="--i: 1">
+                      Your API key
+                    </span>
+                  </div>
+                  <p class="flow-note flow-pop" style="--i: 2">Your test bank checks it on your own cases.</p>
+                </>
+              )}
+
+              {s.key === "issue" && (
+                <div class="flow-card">
+                  <p class="flow-card-key">
+                    <span data-slot="key" /> · <span data-slot="project" />
+                  </p>
+                  <p class="flow-card-title flow-write" data-slot="title" />
+                  <p class="flow-card-desc flow-pop" style="--i: 6" data-slot="desc" />
+                  <div class="flow-chips mt-2.5 justify-start!">
+                    <span class="composer-chip flow-pop" style="--i: 8">
+                      <span class="size-2 rounded-full bg-shape-blue" aria-hidden="true" />
+                      <span data-slot="when" />
+                    </span>
+                    <span class="composer-chip flow-pop" style="--i: 9">
+                      <BrandMark brand="claude-code" className="size-3.5" />
+                      Assigned to Claude Code
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {s.key === "rules" && (
+                <ul class="flow-rules">
+                  <li class="flow-pop" style="--i: 0">
+                    <span>Read and edit files in its own copy</span>
+                    <span class="flow-verdict is-allow">Allowed</span>
+                  </li>
+                  <li class="flow-pop" style="--i: 1">
+                    <span data-slot="ask-rule" />
+                    <span class="flow-verdict is-ask">Asks you</span>
+                  </li>
+                  <li class="flow-pop" style="--i: 2">
+                    <span>Merge the pull request</span>
+                    <span class="flow-verdict is-ask">Asks you</span>
+                  </li>
+                </ul>
+              )}
+
+              {s.key === "decide" && (
+                <div class="flow-card">
+                  <p class="flow-ask-line">
+                    <BrandMark brand="claude-code" className="mt-0.5 size-4 flex-none" />
+                    <span>
+                      Claude Code asks to <span data-slot="ask" />
+                    </span>
+                  </p>
+                  <div class="flow-buttons" aria-hidden="true">
+                    <span class="flow-btn">Deny</span>
+                    <span class="flow-btn is-primary flow-press">Allow</span>
+                  </div>
+                  <p class="flow-ok flow-pop" style="--i: 8">
+                    <Check className="size-3.5" strokeWidth={2.4} aria-hidden="true" />
+                    Allowed by you
+                  </p>
+                </div>
+              )}
+
+              {s.key === "work" && (
+                <div class="flow-card">
+                  <p class="flow-mono">
+                    <GitBranch className="size-3.5 text-subtle" aria-hidden="true" />
+                    <span data-slot="branch" />
+                    <span class="text-subtle">·</span>
+                    <span data-slot="files" />
+                  </p>
+                  <span class="flow-bar" aria-hidden="true">
+                    <span />
+                  </span>
+                  <p class="flow-ok flow-pop" style="--i: 9">
+                    <Check className="size-3.5" strokeWidth={2.4} aria-hidden="true" />
+                    <span>
+                      <span data-slot="tests" />, run by TaskForce
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {s.key === "record" && (
+                <div class="flow-card">
+                  <ol class="flow-log">
+                    {[0, 1, 2, 3].map((n) => (
+                      <li class="flow-pop" style={`--i: ${n}`}>
+                        <time data-slot={`time-${n}`} />
+                        <span data-slot={`log-${n}`} />
+                      </li>
+                    ))}
+                  </ol>
+                  <p class="flow-note flow-pop mt-2!" style="--i: 4">
+                    23 entries, in order. You can export the record.
+                  </p>
+                </div>
+              )}
+
+              {s.key === "learn" && (
+                <div class="flow-card">
+                  <p class="flow-ask-line">
+                    <BookOpen className="mt-0.5 size-4 flex-none text-ink-green" aria-hidden="true" />
+                    <span>
+                      Note proposed: “<span data-slot="note" />”, from pull request <span data-slot="pr" />
+                    </span>
+                  </p>
+                  <div class="flow-buttons" aria-hidden="true">
+                    <span class="flow-btn">Dismiss</span>
+                    <span class="flow-btn is-primary flow-press">Accept</span>
+                  </div>
+                  <p class="flow-ok flow-pop" style="--i: 8">
+                    <Check className="size-3.5" strokeWidth={2.4} aria-hidden="true" />
+                    In your knowledge: the next task starts from it
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+        ))
+      }
+
+      <section class="flow-panel" data-panel="outcome" data-tone="blue">
+        <p class="flow-kicker">The outcome</p>
+        <p class="flow-headline">A pull request, ready for your review.</p>
+        <div class="flow-art">
+          <div class="flow-card flow-pop" style="--i: 0">
+            <div class="flex items-start gap-3">
+              <span class="flow-outcome-icon" aria-hidden="true">
+                <GitPullRequest className="size-4" strokeWidth={2} />
+              </span>
+              <div class="min-w-0">
+                <p class="flow-outcome-title">
+                  <span data-slot="pr" /> <span data-slot="title" />
+                </p>
+                <p class="flow-outcome-meta">
+                  <span data-slot="files" /> · <span data-slot="tests" /> · the rules and tests it went through
+                </p>
+              </div>
+            </div>
+          </div>
+          <p class="flow-note flow-pop" style="--i: 1">Nothing merges without you.</p>
+          <div class="mt-4 flex flex-wrap justify-center gap-2.5 flow-pop" style="--i: 2">
+            <a href="/download" class="btn btn-primary btn-sm">Download TaskForce</a>
+            <a href="/agents" class="btn btn-secondary btn-sm">How agents work</a>
+          </div>
+        </div>
+      </section>
     </div>
-    <div class="composer-issue">
-      <p class="font-mono text-[11.5px] text-muted-foreground">Your project · New issue</p>
-      <p class="mt-1.5 text-[17px] font-medium leading-snug tracking-[-0.02em]" data-title></p>
-      <div class="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
-        <span class="composer-chip"><span class="size-2 rounded-full bg-shape-blue"></span>Todo</span>
-        <span class="composer-chip"><BrandMark brand="claude-code" className="size-3.5" />Assigned to Claude Code</span>
-      </div>
-    </div>
-    <p class="t-small mt-4 text-muted-foreground">
-      Hand it to Claude Code or GitHub Copilot, follow the run live and review the pull request. Nothing was sent from
-      this page.
-    </p>
-    <div class="mt-5 flex flex-wrap gap-2.5">
-      <a href="/download" class="btn btn-primary btn-sm">Download TaskForce</a>
-      <a href="/agents" class="btn btn-secondary btn-sm">How agents work</a>
-    </div>
+
+    <p class="sr-only" aria-live="polite" data-live></p>
   </div>
 
-  <form class="composer-box" data-form>
-    <div class="composer-agents" aria-hidden="true">
-      <span class="flex">
-        <span class="composer-avatar"><BrandMark brand="claude-code" className="size-3.5" /></span>
-        <span class="composer-avatar -ml-1.5"><BrandMark brand="github-copilot" className="size-3.5" /></span>
-      </span>
-      Your agents are ready when you are
+  <div class="composer-bar" data-bar>
+    <div class="flow-toolbar">
+      <p class="flow-fine">An illustration: nothing was sent.</p>
+      <div class="flex flex-none items-center gap-1">
+        <button type="button" class="composer-ghost" data-skip>Skip</button>
+        <button type="button" class="composer-close" data-close aria-label="Close">×</button>
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <label for="composer-input" class="sr-only">Describe a task for an agent</label>
-      <input
-        id="composer-input"
-        data-input
-        type="text"
-        autocomplete="off"
-        maxlength="140"
-        placeholder="Describe a task for an agent"
-        class="composer-input"
-      />
-      <button type="submit" class="composer-send" aria-label="Hand it to an agent">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 19V5M5 12l7-7 7 7" />
-        </svg>
-      </button>
-    </div>
-  </form>
+    <form class="composer-box" data-form>
+      <div class="composer-agents" aria-hidden="true">
+        <span class="flex">
+          <span class="composer-avatar"><BrandMark brand="claude-code" className="size-3.5" /></span>
+          <span class="composer-avatar -ml-1.5"><BrandMark brand="github-copilot" className="size-3.5" /></span>
+        </span>
+        Your agents are ready when you are
+      </div>
+      <div class="flex items-center gap-2">
+        <label for="composer-input" class="sr-only">Describe a task for an agent</label>
+        <input
+          id="composer-input"
+          data-input
+          type="text"
+          autocomplete="off"
+          maxlength="140"
+          placeholder="Describe a task for an agent"
+          class="composer-input"
+        />
+        <button type="submit" class="composer-send" aria-label="Hand it to an agent">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 19V5M5 12l7-7 7 7" />
+          </svg>
+        </button>
+      </div>
+    </form>
+  </div>
 </aside>
 
 <script>
   // En JavaScript simple, comme scripts/motion.js (le Vite du conteneur Docker de dev lit les scripts sans TypeScript).
-  const PROMPTS = [
-    "Fix the flaky sign-in test and open a pull request",
-    "Add dark mode to the settings page",
-    "Write the release notes for the next version",
-    "Find out why the nightly sync fails on Mondays",
-    "Draft a spec for exporting the board as CSV",
+
+  // Un parcours par exemple tapé dans le champ ; une tâche écrite par la personne prend le parcours générique, avec
+  // son propre titre. Les noms de notes, de branches et de tests sont ceux d'une démonstration.
+  const SCENES = [
+    {
+      prompt: "Fix the flaky sign-in test and open a pull request",
+      notes: ["Testing conventions", "Sign-in flow", "Known issue: clock skew in CI"],
+      key: "WEB-131",
+      project: "Web app",
+      when: "This cycle",
+      title: "Fix the flaky sign-in test",
+      desc: "It fails about one run in ten in CI. Find the race and fix it without changing the sign-in flow.",
+      askRule: "Search the web",
+      ask: "search the web for “Playwright waitForURL flaky”",
+      askDone: "You allowed the web search",
+      branch: "tf/web-131",
+      files: "2 files changed",
+      tests: "212 tests passed",
+      note: "The sign-in test waits for the session cookie",
+    },
+    {
+      prompt: "Add dark mode to the settings page",
+      notes: ["Design tokens", "Settings page", "Decision: follow the system theme"],
+      key: "WEB-128",
+      project: "Web app",
+      when: "Due Friday",
+      title: "Add dark mode to the settings page",
+      desc: "A dark theme for Settings, built on the design tokens and following the system theme by default.",
+      askRule: "Search the web",
+      ask: "search the web for “prefers-color-scheme”",
+      askDone: "You allowed the web search",
+      branch: "tf/web-128",
+      files: "4 files changed",
+      tests: "48 tests passed",
+      note: "Dark colors come from the tokens, never written by hand",
+    },
+    {
+      prompt: "Write the release notes for the next version",
+      notes: ["Release notes style", "Merged since 1.6", "Decision: plain words"],
+      key: "SITE-140",
+      project: "Website",
+      when: "Due Monday",
+      title: "Write the release notes for 1.7",
+      desc: "Cover every change merged since 1.6, in plain words, with the fixes last.",
+      askRule: "Open a web page",
+      ask: "open the public changelog page",
+      askDone: "You allowed the web page",
+      branch: "tf/site-140",
+      files: "1 file changed",
+      tests: "12 tests passed",
+      note: "Release notes list the fixes last",
+    },
+    {
+      prompt: "Find out why the nightly sync fails on Mondays",
+      notes: ["Nightly sync", "Incident: Monday timeouts", "Decision: three retries at most"],
+      key: "OPS-133",
+      project: "Platform",
+      when: "This cycle",
+      title: "Find why the nightly sync fails on Mondays",
+      desc: "Read the Monday logs, find the cause, then fix it or say what to do next.",
+      askRule: "Search the web",
+      ask: "search the web for “weekly backup table lock”",
+      askDone: "You allowed the web search",
+      branch: "tf/ops-133",
+      files: "1 file changed",
+      tests: "96 tests passed",
+      note: "The weekly backup locks the sync table on Mondays",
+    },
+    {
+      prompt: "Draft a spec for exporting the board as CSV",
+      notes: ["Board columns", "Spec template", "Decision: exports stay local"],
+      key: "WEB-126",
+      project: "Web app",
+      when: "Backlog",
+      title: "Spec: export the board as CSV",
+      desc: "Columns, filters and file format, written with your spec template.",
+      askRule: "Search the web",
+      ask: "search the web for “RFC 4180 quoting”",
+      askDone: "You allowed the web search",
+      branch: "tf/web-126",
+      files: "1 file changed",
+      tests: "48 tests passed",
+      note: "CSV quoting follows RFC 4180",
+    },
   ];
+  const GENERIC = {
+    notes: ["Team conventions", "Past decisions", "A related issue"],
+    key: "TASK-142",
+    project: "Your project",
+    when: "Backlog",
+    desc: "Written up from your request, with the conventions it found.",
+    askRule: "Search the web",
+    ask: "search the web for the docs it needs",
+    askDone: "You allowed the web search",
+    branch: "tf/task-142",
+    files: "3 files changed",
+    tests: "64 tests passed",
+    note: "What this task taught, with its source",
+  };
+  const PROMPTS = SCENES.map((s) => s.prompt);
   const IDLE = "Describe a task for an agent";
+  // L'arc se dessine avant la première étape ; puis la durée de chaque étape, le temps que ses éléments arrivent
+  // (délais de global.css, section Parcours).
+  const INTRO_MS = 900;
+  const STEP_MS = [1200, 1100, 1700, 1300, 1700, 1800, 1300, 1800];
+  const RESULTS = ["3 notes", "On this computer", "", "Checked", "Allowed by you", "Tests passed", "23 entries", "+1 note"];
 
   let cleanup = () => {};
+
+  /** Le titre d'une tâche écrite par la personne : espaces resserrés, sans point final, majuscule au début. */
+  function cleanTitle(text) {
+    const t = text.replace(/\s+/g, " ").trim().replace(/[.!?]+$/, "");
+    const short = t.length > 90 ? `${t.slice(0, 89).trimEnd()}…` : t;
+    return short.charAt(0).toUpperCase() + short.slice(1);
+  }
+
+  /** Le parcours d'une tâche envoyée : celui de l'exemple si c'en est un, sinon le générique avec son titre. */
+  function sceneFor(text) {
+    const known = SCENES.find((s) => s.prompt.toLowerCase() === text.trim().toLowerCase());
+    return known ?? { ...GENERIC, prompt: text, title: cleanTitle(text) };
+  }
+
+  function clock(base, minutes) {
+    const d = new Date(base.getTime() + minutes * 60000);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
 
   function setup() {
     cleanup();
     const root = document.querySelector("[data-composer]");
     if (!root) return;
+    const bar = root.querySelector("[data-bar]");
     const form = root.querySelector("[data-form]");
     const input = root.querySelector("[data-input]");
-    const pop = root.querySelector("[data-pop]");
-    const title = root.querySelector("[data-title]");
+    const stage = root.querySelector("[data-pop]");
+    const arcBase = root.querySelector("[data-arc-base]");
+    const arcFill = root.querySelector("[data-arc-fill]");
+    const steps = [...root.querySelectorAll("[data-step]")];
+    const panels = [...root.querySelectorAll("[data-panel]")];
+    const panelBox = root.querySelector("[data-panels]");
+    const skip = root.querySelector("[data-skip]");
+    const live = root.querySelector("[data-live]");
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     let shown = false;
     let timer = 0;
+    let playTimer = 0;
+    let playing = false;
+    let scene = SCENES[0];
+    let current = -1;
+    let arcLength = 0;
+    const reach = [];
     let prompt = 0;
     let typed = 0;
     let erasing = false;
 
-    // Les exemples s'écrivent puis s'effacent, un à un, tant que le champ est vide et sans le focus.
+    // Les exemples s'écrivent puis s'effacent, un à un, tant que le champ est vide, sans le focus, et que le parcours
+    // n'est pas ouvert.
     function type() {
       window.clearTimeout(timer);
-      if (!shown || input.value || document.activeElement === input) return;
+      if (!shown || input.value || document.activeElement === input || !stage.hidden) return;
       if (still) {
         input.placeholder = PROMPTS[prompt];
         return;
@@ -126,21 +479,145 @@ import { BrandMark } from "@/components/visuals/brand";
       else window.clearTimeout(timer);
     }
 
-    // Visible une fois le haut de page passé, caché quand le pied de page arrive ; laissé ouvert avec l'aperçu ou
+    // Visible une fois le haut de page passé, caché quand le pied de page arrive ; laissé ouvert avec le parcours ou
     // pendant qu'on s'en sert.
     function onScroll() {
       const footer = document.querySelector("footer");
       const nearEnd = footer ? footer.getBoundingClientRect().top < window.innerHeight - 24 : false;
-      setShown((window.scrollY > window.innerHeight * 0.55 && !nearEnd) || !pop.hidden || root.contains(document.activeElement));
+      setShown((window.scrollY > window.innerHeight * 0.55 && !nearEnd) || !stage.hidden || root.contains(document.activeElement));
     }
 
-    // L'aperçu fermé, le focus revient au champ s'il était dans l'aperçu.
+    function fill(name, value) {
+      root.querySelectorAll(`[data-slot="${name}"]`).forEach((el) => (el.textContent = value));
+    }
+
+    function fillScene(s) {
+      const now = new Date();
+      s.notes.forEach((n, i) => fill(`note-${i}`, n));
+      for (const k of ["key", "project", "when", "title", "desc", "ask", "branch", "files", "tests", "note"]) fill(k, s[k]);
+      fill("ask-rule", s.askRule);
+      fill("pr", `#${s.key.replace(/\D/g, "")}`);
+      const log = [`Read 14 files and ${s.notes.length} notes`, s.askDone, `${s.tests}, run by TaskForce`, "Pull request opened, under your rules"];
+      [0, 1, 5, 6].forEach((m, i) => {
+        fill(`time-${i}`, clock(now, m));
+        fill(`log-${i}`, log[i]);
+      });
+      steps.forEach((el, i) => (el.querySelector("[data-result]").textContent = RESULTS[i] || s.key));
+    }
+
+    // L'arc : une demi-ellipse posée au ras du bas de l'écran, de part et d'autre de la barre (grand écran), ou juste
+    // au-dessus d'elle (écran étroit). Les étapes s'y répartissent à distances égales, le texte se pose au-dessus.
+    function layout() {
+      if (stage.hidden) return;
+      const w = stage.clientWidth;
+      const h = stage.clientHeight;
+      const barTop = h - bar.offsetHeight - parseFloat(getComputedStyle(bar).bottom || "16");
+      const wide = w >= 1000;
+      const arcW = wide ? Math.min(1180, w - 120) : w - (w >= 760 ? 60 : 20);
+      const x0 = (w - arcW) / 2;
+      const footY = wide ? h - 24 : barTop - 12;
+      const peakY = wide ? barTop - 132 : footY - (w >= 760 ? 140 : 104);
+      const d = `M ${x0} ${footY} A ${arcW / 2} ${footY - peakY} 0 0 1 ${x0 + arcW} ${footY}`;
+      arcBase.setAttribute("d", d);
+      arcFill.setAttribute("d", d);
+      arcLength = arcBase.getTotalLength();
+      steps.forEach((el, i) => {
+        reach[i] = arcLength * (0.07 + (0.86 * i) / (steps.length - 1));
+        const p = arcBase.getPointAtLength(reach[i]);
+        el.style.left = `${p.x}px`;
+        el.style.top = `${p.y}px`;
+        // Le nom de la première et de la dernière étape part vers l'intérieur de l'arc, sans croiser son trait.
+        el.dataset.align = i === 0 ? "start" : i === steps.length - 1 ? "end" : "center";
+      });
+      panelBox.style.bottom = `${h - peakY + (wide ? 36 : 28)}px`;
+      // Le halo monte jusqu'au-dessus du texte de l'étape, pour qu'il se lise sur n'importe quelle page.
+      const panelTop = h - (h - peakY + (wide ? 36 : 28)) - panelBox.offsetHeight;
+      stage.style.setProperty("--glow-top", `${Math.max(0, panelTop - 220)}px`);
+      setFill(current, true);
+    }
+
+    // Le trait plein suit l'étape en cours ; il couvre tout l'arc une fois le parcours fini.
+    function setFill(index, instant) {
+      const length = index < 0 ? 0 : index >= steps.length ? arcLength : reach[index];
+      arcFill.style.transition = instant ? "none" : "";
+      arcFill.style.strokeDasharray = `${arcLength} ${arcLength}`;
+      arcFill.style.strokeDashoffset = `${arcLength - length}`;
+    }
+
+    // Chaque étape s'allume dans sa couleur, son texte se pose au-dessus de l'arc, puis elle se coche avec son résultat.
+    function setStep(index) {
+      current = index;
+      steps.forEach((el, i) => {
+        el.classList.toggle("is-done", i < index);
+        el.classList.toggle("is-active", i === index);
+      });
+      const key = index >= steps.length ? "outcome" : steps[index]?.dataset.step;
+      panels.forEach((p) => p.classList.toggle("is-active", p.dataset.panel === key));
+      setFill(index, false);
+    }
+
+    // La boucle se ferme : la note acceptée rejoint les connaissances de la première étape.
+    function grow() {
+      const result = steps[0].querySelector("[data-result]");
+      result.textContent = `${scene.notes.length + 1} notes`;
+      result.classList.remove("is-new");
+      void result.offsetWidth;
+      result.classList.add("is-new");
+    }
+
+    function stop() {
+      window.clearTimeout(playTimer);
+      playing = false;
+    }
+
+    function finish() {
+      stop();
+      setStep(steps.length);
+      grow();
+      skip.textContent = "Replay";
+      live.textContent = "Done: a pull request is ready for your review. Nothing merges without you.";
+    }
+
+    function play() {
+      stop();
+      fillScene(scene);
+      steps[0].querySelector("[data-result]").classList.remove("is-new");
+      skip.textContent = "Skip";
+      setStep(-1);
+      layout();
+      if (still) {
+        finish();
+        return;
+      }
+      playing = true;
+      let i = 0;
+      const tick = () => {
+        if (i === steps.length) {
+          finish();
+          return;
+        }
+        setStep(i);
+        const panel = panels[i];
+        live.textContent = `Step ${i + 1} of ${steps.length}: ${panel.querySelector(".flow-headline").textContent}`;
+        playTimer = window.setTimeout(() => {
+          i += 1;
+          tick();
+        }, STEP_MS[i]);
+      };
+      playTimer = window.setTimeout(tick, INTRO_MS);
+    }
+
+    // Le parcours fermé, le focus revient au champ s'il était dans la scène ou la barre d'outils.
     function closePop() {
-      const hadFocus = pop.contains(document.activeElement);
-      pop.hidden = true;
+      stop();
+      const hadFocus = root.contains(document.activeElement) && document.activeElement !== input;
+      stage.hidden = true;
       root.classList.remove("is-open");
       if (hadFocus) input.focus({ preventScroll: true });
       onScroll();
+      typed = 0;
+      erasing = false;
+      type();
     }
 
     const onFocus = () => {
@@ -155,32 +632,42 @@ import { BrandMark } from "@/components/visuals/brand";
     };
     const onSubmit = (event) => {
       event.preventDefault();
-      title.textContent = input.value.trim() || PROMPTS[prompt];
-      pop.hidden = false;
+      scene = sceneFor(input.value.trim() || PROMPTS[prompt]);
+      window.clearTimeout(timer);
+      if (!input.value.trim()) input.placeholder = scene.prompt;
       root.classList.add("is-open");
-      pop.querySelector("[tabindex='-1']")?.focus();
+      stage.hidden = false;
+      play();
+      root.querySelector("#composer-pop-title")?.focus({ preventScroll: true });
     };
+    const onSkip = () => (playing ? finish() : play());
     const onKey = (event) => {
-      if (event.key === "Escape" && !pop.hidden) closePop();
+      if (event.key === "Escape" && !stage.hidden) closePop();
     };
     const onClose = () => closePop();
     const onFocusOut = () => window.setTimeout(onScroll, 0);
+    const onResize = () => {
+      onScroll();
+      layout();
+    };
 
     root.addEventListener("focusout", onFocusOut);
     input.addEventListener("focus", onFocus);
     input.addEventListener("blur", onBlur);
     form.addEventListener("submit", onSubmit);
+    skip.addEventListener("click", onSkip);
     root.querySelector("[data-close]").addEventListener("click", onClose);
     document.addEventListener("keydown", onKey);
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
     onScroll();
 
     cleanup = () => {
       window.clearTimeout(timer);
+      stop();
       document.removeEventListener("keydown", onKey);
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", onResize);
     };
   }
 
