@@ -115,4 +115,34 @@ public class DeliveryRun extends AuditableEntity {
     /** Empreinte du dernier événement du dossier de preuve, posée à la fin de la mission : elle scelle le dossier. */
     @Column(name = "evidence_root", length = 71)
     private String evidenceRoot;
+
+    // --- Ce que le runner rapporte de la mission, pour la carte de résultat (R78) : des faits, pas le résumé de l'agent.
+
+    /** La branche de l'agent, et ses commits. */
+    @Column(length = 255)
+    private String branch;
+
+    private Integer commits;
+
+    /** Les tests du projet, lancés par le runner après l'agent (R32) : la commande, lancés ou non, passés ou non. */
+    @Column(name = "tests_command", length = 500)
+    private String testsCommand;
+
+    @Column(name = "tests_ran")
+    private Boolean testsRan;
+
+    @Column(name = "tests_passed")
+    private Boolean testsPassed;
+
+    /** Combien ont passé, sur combien, quand leur sortie le dit. */
+    @Column(name = "tests_passed_count")
+    private Integer testsPassedCount;
+
+    @Column(name = "tests_total")
+    private Integer testsTotal;
+
+    /** La fin de la mission, réussie ou non. */
+    @Column(name = "ended_at")
+    private LocalDateTime endedAt;
+
 }
