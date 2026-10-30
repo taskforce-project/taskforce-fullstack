@@ -13,6 +13,7 @@ import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.repository.IssueCommentRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
+import com.taskforce.tf_api.core.repository.KnowledgeEdgeRepository;
 import com.taskforce.tf_api.core.repository.KnowledgeNodeRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.service.IssueService;
@@ -24,19 +25,23 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * Défaire d'un geste ce que Cortex a créé (R77, séance n°13) : un projet resté vide, avec les pages que le Brain OS lui
- * a données, ou une issue que personne n'a commentée. Au-delà, la création ne se défait plus d'ici : on la supprime à
- * la main, comme toute autre. La sortie de l'outil, gardée au dossier de la réponse, dit ce qui a été créé.
+ * a données, une issue que personne n'a commentée, ou une note sur laquelle rien ne s'appuie (ni page rangée dessous, ni
+ * lien d'une autre note). Au-delà, la création ne se défait plus d'ici. La sortie de l'outil, gardée au dossier de la
+ * réponse, dit ce qui a été créé.
  */
 @Component
 @RequiredArgsConstructor
 public class CortexUndo {
 
     /** Les outils dont la création se défait. */
-    static final Set<String> TOOLS = Set.of("create_project", "create_issue");
+    static final Set<String> TOOLS = Set.of("create_project", "create_issue", "create_note");
 
     private static final Pattern PROJECT = Pattern.compile("^Project created in TaskForce: (\\S+) \"(.*)\" \\(id (\\d+)\\)\\.$",
         Pattern.DOTALL);
     private static final Pattern ISSUE = Pattern.compile("^Created ([A-Za-z0-9]+)-(\\d+) \"(.*?)\" in the project ",
+        Pattern.DOTALL);
+    /** La sortie de {@code create_note}, que suit parfois la valeur gardée à la place d'un domaine ou d'un type inconnu. */
+    private static final Pattern NOTE = Pattern.compile("^Note created: \"(.*)\" in [A-Z_]+ \\(id (\\d+)\\)\\.",
         Pattern.DOTALL);
 
     private final ProjectService projectService;
@@ -45,6 +50,7 @@ public class CortexUndo {
     private final IssueRepository issues;
     private final IssueCommentRepository comments;
     private final KnowledgeNodeRepository nodes;
+    private final KnowledgeEdgeRepository edges;
     private final KnowledgeService knowledge;
 
     public boolean handles(String tool) {
@@ -57,6 +63,7 @@ public class CortexUndo {
         return switch (tool) {
             case "create_project" -> undoProject(text, ctx);
             case "create_issue" -> undoIssue(text, ctx);
+            case "create_note" -> undoNote(text, ctx);
             default -> throw new BusinessException("This action can't be undone.");
         };
     }
@@ -100,5 +107,22 @@ public class CortexUndo {
         }
         issueService.deleteIssue(ctx.slug(), project.getId(), issue.getId(), ctx.userId());
         return "Removed " + key + " \"" + issue.getTitle() + "\".";
+    }
+
+    private String undoNote(String output, AgentContext ctx) {
+        Matcher created = NOTE.matcher(output);
+        if (!created.find()) throw new BusinessException("This answer created no note to undo.");
+        Long noteId = Long.valueOf(created.group(2));
+        KnowledgeNode note = nodes.findByIdAndWorkspaceId(noteId, ctx.workspaceId())
+            .orElseThrow(() -> new BusinessException("This note no longer exists."));
+        String title = "\"" + note.getTitle() + "\"";
+        if (!nodes.findByWorkspaceIdAndParentNodeId(ctx.workspaceId(), noteId).isEmpty()) {
+            throw new BusinessException(title + " has pages under it now, so Undo would leave them behind.");
+        }
+        if (edges.existsByToNodeId(noteId)) {
+            throw new BusinessException("Other notes link to " + title + " now, so Undo would break their links.");
+        }
+        knowledge.deleteNode(ctx.slug(), noteId, ctx.userId());
+        return "Removed the note " + title + ".";
     }
 }

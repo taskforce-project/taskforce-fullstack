@@ -19,6 +19,7 @@ import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.repository.IssueCommentRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
+import com.taskforce.tf_api.core.repository.KnowledgeEdgeRepository;
 import com.taskforce.tf_api.core.repository.KnowledgeNodeRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.service.IssueService;
@@ -36,8 +37,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * « Undo » sur ce que Cortex a créé (R77, séance n°13) : un projet resté vide, avec ses pages, ou une issue que personne
- * n'a commentée ; au-delà, rien ne se défait d'ici.
+ * « Undo » sur ce que Cortex a créé (R77, séance n°13) : un projet resté vide, avec ses pages, une issue que personne
+ * n'a commentée, ou une note sur laquelle rien ne s'appuie ; au-delà, rien ne se défait d'ici.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Défaire ce que Cortex a créé")
@@ -49,6 +50,7 @@ class CortexUndoTest {
     @Mock private IssueRepository issues;
     @Mock private IssueCommentRepository comments;
     @Mock private KnowledgeNodeRepository nodes;
+    @Mock private KnowledgeEdgeRepository edges;
     @Mock private KnowledgeService knowledge;
 
     private CortexUndo undo;
@@ -56,10 +58,15 @@ class CortexUndoTest {
 
     private static final String PROJECT_CREATED = "Project created in TaskForce: PRICING \"Pricing\" (id 27).";
     private static final String ISSUE_CREATED = "Created PRICING-3 \"Plan table\" in the project Pricing, in the column Backlog.";
+    private static final String NOTE_CREATED = "Note created: \"Pricing ideas\" in PRODUIT (id 9).";
 
     @BeforeEach
     void setUp() {
-        undo = new CortexUndo(projectService, projects, issueService, issues, comments, nodes, knowledge);
+        undo = new CortexUndo(projectService, projects, issueService, issues, comments, nodes, edges, knowledge);
+    }
+
+    private void note() {
+        when(nodes.findByIdAndWorkspaceId(9L, 1L)).thenReturn(Optional.of(KnowledgeNode.builder().id(9L).title("Pricing ideas").build()));
     }
 
     private void project() {
@@ -146,11 +153,58 @@ class CortexUndoTest {
         verify(issueService, never()).deleteIssue(any(), any(), any(), any());
     }
 
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+        "Note created: \"Pricing ideas\" in PRODUIT (id 9).",
+        "Note created: \"Pricing ideas\" in PROJET (id 9). Its type is NOTE: TEST is not a note type.",
+    })
+    @DisplayName("une note sur laquelle rien ne s'appuie part, même quand une valeur inconnue a été remplacée")
+    void a_note_nothing_builds_on_goes(String output) {
+        note();
+        when(nodes.findByWorkspaceIdAndParentNodeId(1L, 9L)).thenReturn(List.of());
+
+        assertThat(undo.undo("create_note", output, ctx)).isEqualTo("Removed the note \"Pricing ideas\".");
+        verify(knowledge).deleteNode("acme", 9L, 7L);
+    }
+
+    @Test
+    @DisplayName("une note qui a une page rangée dessous ne se défait plus d'ici")
+    void a_note_with_a_page_under_it_stays() {
+        note();
+        when(nodes.findByWorkspaceIdAndParentNodeId(1L, 9L)).thenReturn(List.of(page(12, null)));
+
+        assertThatThrownBy(() -> undo.undo("create_note", NOTE_CREATED, ctx))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("\"Pricing ideas\" has pages under it now");
+        verify(knowledge, never()).deleteNode(any(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("une note vers laquelle une autre mène ne se défait plus d'ici")
+    void a_note_another_links_to_stays() {
+        note();
+        when(nodes.findByWorkspaceIdAndParentNodeId(1L, 9L)).thenReturn(List.of());
+        when(edges.existsByToNodeId(9L)).thenReturn(true);
+
+        assertThatThrownBy(() -> undo.undo("create_note", NOTE_CREATED, ctx))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("Other notes link to \"Pricing ideas\" now");
+        verify(knowledge, never()).deleteNode(any(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("une note déjà supprimée n'a plus rien à défaire")
+    void a_deleted_note() {
+        when(nodes.findByIdAndWorkspaceId(9L, 1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> undo.undo("create_note", NOTE_CREATED, ctx))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("This note no longer exists");
+    }
+
     @ParameterizedTest(name = "{0} : {1}")
     @CsvSource(delimiter = '|', value = {
         "create_project | Proposed                                    | created no project",
         "create_issue   | name is missing: a project needs a name.   | created no issue",
-        "create_note    | Note created: \"T\" in PROJET (id 9).        | be undone",
+        "create_note    | Proposed                                    | created no note",
+        "update_issue   | Updated PRICING-3.                          | be undone",
     })
     void nothing_to_undo_in_this_output(String tool, String output, String message) {
         assertThatThrownBy(() -> undo.undo(tool, output, ctx))
@@ -158,10 +212,11 @@ class CortexUndoTest {
     }
 
     @Test
-    @DisplayName("seules la création d'un projet et celle d'une issue se défont")
-    void only_projects_and_issues() {
+    @DisplayName("seules la création d'un projet, celle d'une issue et celle d'une note se défont")
+    void only_projects_issues_and_notes() {
         assertThat(undo.handles("create_project")).isTrue();
         assertThat(undo.handles("create_issue")).isTrue();
-        assertThat(undo.handles("create_note")).isFalse();
+        assertThat(undo.handles("create_note")).isTrue();
+        assertThat(undo.handles("update_issue")).isFalse();
     }
 }
