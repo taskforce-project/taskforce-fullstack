@@ -823,20 +823,27 @@
 
 /* ─────────────────────────────  Composeur flottant (Composer.astro)  ───────────────────────────── */
 
+/* Le composeur couvre l'écran sans rien bloquer (pointer-events: none) : la barre en bas et, une fois une tâche
+   envoyée, la scène du parcours, sans fenêtre : un halo flouté, l'arc des étapes et le texte de l'étape en cours. */
 .composer {
   position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+}
+.composer-bar {
+  position: absolute;
+  z-index: 2;
   left: 50%;
   bottom: max(16px, env(safe-area-inset-bottom));
-  z-index: 45;
   width: min(640px, calc(100vw - 24px));
   transform: translate3d(-50%, 150%, 0);
   opacity: 0;
-  pointer-events: none;
   transition:
     transform 650ms var(--ease-out),
     opacity 450ms var(--ease-out);
 }
-.composer.is-shown {
+.composer.is-shown .composer-bar {
   transform: translate3d(-50%, 0, 0);
   opacity: 1;
   pointer-events: auto;
@@ -903,29 +910,10 @@
   transform: translateY(-1px);
 }
 .composer-send:focus-visible,
-.composer-close:focus-visible {
+.composer-close:focus-visible,
+.composer-ghost:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
-}
-.composer-pop {
-  margin-bottom: 10px;
-  border-radius: 16px;
-  background: #fff;
-  padding: 18px;
-  box-shadow:
-    0 0 0 1px rgb(25 23 21 / 0.07),
-    0 24px 56px -24px rgb(25 23 21 / 0.35);
-  animation: tf-pop 420ms var(--ease-out) both;
-}
-.composer-pop:focus-within [tabindex="-1"]:focus {
-  outline: none;
-}
-.composer-issue {
-  margin-top: 12px;
-  border-radius: 12px;
-  padding: 14px 16px;
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px rgb(25 23 21 / 0.06);
 }
 .composer-chip {
   display: inline-flex;
@@ -936,6 +924,11 @@
   border-radius: 999px;
   background: #fff;
   box-shadow: inset 0 0 0 1px rgb(25 23 21 / 0.08);
+}
+.composer-chip.is-off {
+  background: transparent;
+  color: var(--subtle);
+  box-shadow: inset 0 0 0 1px rgb(25 23 21 / 0.06);
 }
 .composer-close {
   display: inline-flex;
@@ -948,13 +941,614 @@
   line-height: 1;
   color: var(--muted-foreground);
 }
-.composer-close:hover {
-  background: rgb(25 23 21 / 0.05);
+.composer-close:hover,
+.composer-ghost:hover {
+  background: rgb(25 23 21 / 0.06);
   color: var(--foreground);
+}
+.composer-ghost {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  transition:
+    background-color 160ms var(--ease-out),
+    color 160ms var(--ease-out);
+}
+/* Au-dessus de la barre, le temps du parcours : ce que c'est (une illustration) et de quoi le passer ou le fermer. */
+.flow-toolbar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px 8px 8px;
+}
+.composer.is-open .flow-toolbar {
+  display: flex;
+}
+.flow-fine {
+  font-size: 12px;
+  color: var(--muted-foreground);
 }
 @media (max-width: 639px) {
   .composer-agents {
     display: none;
+  }
+}
+
+/* La scène du parcours. Le halo monte du bas de l'écran jusqu'au-dessus du texte de l'étape (--glow-top, posé par le
+   script) : blanc presque plein au centre, il s'efface vers les bords en ellipse. Pas de backdrop-filter : flouter les
+   trois quarts de l'écran coûte cher aux petites machines, et le blanc suffit à la lecture. */
+.flow-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.flow-stage [tabindex="-1"]:focus {
+  outline: none;
+}
+.flow-glow {
+  --glow-rx: 72%;
+  position: absolute;
+  inset: var(--glow-top, 30%) 0 0 0;
+  background: radial-gradient(
+    ellipse var(--glow-rx) 100% at 50% 100%,
+    rgb(255 255 255 / 0.97) 0%,
+    rgb(255 255 255 / 0.95) 66%,
+    rgb(255 255 255 / 0.78) 84%,
+    rgb(255 255 255 / 0) 100%
+  );
+  animation: tf-fade-in 600ms var(--ease-out) both;
+}
+@media (max-width: 759px) {
+  .flow-glow {
+    --glow-rx: 130%;
+  }
+}
+.flow-glow::after {
+  content: "";
+  position: absolute;
+  inset: 45% 26% -35% 26%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--tint-blue) 90%, transparent), transparent);
+}
+@keyframes tf-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* L'arc : pointillés de base, trait plein qui avance d'étape en étape. Il s'ouvre du centre vers les bords. */
+.flow-arc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  animation: tf-arc-in 900ms var(--ease-out) 150ms both;
+}
+@keyframes tf-arc-in {
+  from {
+    clip-path: inset(0 50% 0 50%);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.flow-arc-base {
+  fill: none;
+  stroke: rgb(25 23 21 / 0.28);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 8;
+  stroke-linecap: round;
+}
+.flow-arc-fill {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 700ms var(--ease-out);
+}
+
+/* Les étapes, posées sur l'arc par le script (left, top) ; chacune dans sa couleur. */
+.flow-stage [data-tone] {
+  --tone-tint: var(--tint-blue);
+  --tone-ink: var(--ink-blue);
+  --tone-shape: var(--shape-blue);
+}
+.flow-stage [data-tone="green"] {
+  --tone-tint: var(--tint-green);
+  --tone-ink: var(--ink-green);
+  --tone-shape: var(--shape-green);
+}
+.flow-stage [data-tone="sky"] {
+  --tone-tint: var(--tint-sky);
+  --tone-ink: var(--ink-sky);
+  --tone-shape: var(--shape-sky);
+}
+.flow-stage [data-tone="yellow"] {
+  --tone-tint: var(--tint-yellow);
+  --tone-ink: var(--ink-yellow);
+  --tone-shape: var(--shape-yellow);
+}
+.flow-stage [data-tone="pink"] {
+  --tone-tint: var(--tint-pink);
+  --tone-ink: var(--ink-pink);
+  --tone-shape: var(--shape-pink);
+}
+.flow-stage [data-tone="lime"] {
+  --tone-tint: var(--tint-lime);
+  --tone-ink: var(--ink-lime);
+  --tone-shape: var(--shape-lime);
+}
+.flow {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.flow-step {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+}
+.flow-node {
+  position: absolute;
+  top: 0;
+  left: 0;
+  animation: tf-node-in 450ms var(--ease-out) both;
+  animation-delay: calc(300ms + var(--n, 0) * 70ms);
+}
+@keyframes tf-node-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+.flow-dot {
+  position: absolute;
+  top: -16px;
+  left: -16px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--subtle);
+  box-shadow:
+    0 0 0 1px rgb(25 23 21 / 0.1),
+    0 8px 18px -10px rgb(25 23 21 / 0.4);
+  transition:
+    background-color 300ms var(--ease-out),
+    color 300ms var(--ease-out),
+    transform 300ms var(--ease-out);
+}
+.flow-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.flow-dot svg {
+  grid-area: 1 / 1;
+  width: 15px;
+  height: 15px;
+  transition:
+    opacity 220ms var(--ease-out),
+    transform 320ms var(--ease-out);
+}
+.flow-check {
+  opacity: 0;
+  transform: scale(0.5);
+}
+.flow-step.is-active .flow-dot {
+  background: var(--tone-tint);
+  color: var(--tone-ink);
+  transform: scale(1.15);
+}
+.flow-step.is-active .flow-dot::after {
+  animation: tf-halo 1.4s ease-out infinite;
+}
+@keyframes tf-halo {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--tone-shape) 60%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 12px color-mix(in srgb, var(--tone-shape) 0%, transparent);
+  }
+}
+.flow-step.is-done .flow-dot {
+  background: var(--primary);
+  color: #fff;
+}
+.flow-step.is-done .flow-icon {
+  opacity: 0;
+  transform: scale(0.5);
+}
+.flow-step.is-done .flow-check {
+  opacity: 1;
+  transform: none;
+}
+.flow-label {
+  position: absolute;
+  top: 24px;
+  left: -70px;
+  display: grid;
+  justify-items: center;
+  width: 140px;
+  line-height: 1.25;
+  text-align: center;
+}
+.flow-step[data-align="start"] .flow-label {
+  left: -16px;
+  justify-items: start;
+  text-align: left;
+}
+.flow-step[data-align="end"] .flow-label {
+  left: -124px;
+  justify-items: end;
+  text-align: right;
+}
+.flow-title {
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  opacity: 0.55;
+  transition: opacity 300ms var(--ease-out);
+}
+.flow-step.is-active .flow-title,
+.flow-step.is-done .flow-title {
+  opacity: 1;
+}
+.flow-result {
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+  opacity: 0;
+  transform: translateY(-3px);
+  transition:
+    opacity 300ms var(--ease-out),
+    transform 300ms var(--ease-out);
+}
+.flow-step.is-done .flow-result {
+  opacity: 1;
+  transform: none;
+}
+/* La note acceptée rejoint la première étape : la boucle se ferme. */
+.flow-result.is-new {
+  color: var(--ink-green);
+  font-weight: 500;
+  animation: tf-new 900ms var(--ease-out);
+}
+@keyframes tf-new {
+  30% {
+    transform: scale(1.18);
+  }
+}
+/* Les noms des étapes ne tiennent côte à côte qu'à partir de 1200 px ; en dessous, le texte de l'étape dit son nom. */
+@media (max-width: 1199px) {
+  .flow-label {
+    display: none;
+  }
+}
+@media (max-width: 759px) {
+  .flow-dot {
+    top: -14px;
+    left: -14px;
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* Le texte de l'étape en cours, au-dessus de l'arc, sans fond : les textes sont empilés dans la même case, si bien
+   que la place ne bouge pas d'une étape à l'autre ; seul celui de l'étape en cours se voit. */
+.flow-panels {
+  position: absolute;
+  left: 50%;
+  display: grid;
+  width: min(560px, calc(100vw - 32px));
+  transform: translateX(-50%);
+}
+.flow-panels::before {
+  content: "";
+  position: absolute;
+  inset: -72px -84px -10px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(255 255 255 / 0.96) 55%, rgb(255 255 255 / 0.7) 80%, transparent);
+}
+.flow-panel {
+  grid-area: 1 / 1;
+  align-self: end;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(12px);
+  transition:
+    opacity 300ms var(--ease-out),
+    transform 450ms var(--ease-out),
+    visibility 0s linear 300ms;
+}
+.flow-panel.is-active {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+.flow-panel.is-active a {
+  pointer-events: auto;
+}
+.flow-kicker,
+.flow-headline {
+  text-shadow:
+    0 0 2px #fff,
+    0 0 14px #fff;
+}
+.flow-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--tone-ink);
+}
+.flow-kicker::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--tone-shape);
+}
+.flow-headline {
+  margin-top: 6px;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+.flow-art {
+  display: grid;
+  justify-items: center;
+  width: 100%;
+  margin-top: 14px;
+}
+.flow-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.flow-chips .composer-chip {
+  font-size: 12.5px;
+}
+.flow-note {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+}
+.flow-led {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--shape-green);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--shape-green) 30%, transparent);
+}
+.flow-card {
+  width: min(440px, 100%);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #fff;
+  text-align: left;
+  box-shadow:
+    0 0 0 1px rgb(25 23 21 / 0.07),
+    0 14px 30px -20px rgb(25 23 21 / 0.4);
+}
+.flow-card-key,
+.flow-mono,
+.flow-log time {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+.flow-card-key {
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+}
+.flow-card-title {
+  margin-top: 4px;
+  font-size: 15.5px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+}
+.flow-card-desc {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted-foreground);
+}
+.flow-rules {
+  display: grid;
+  gap: 6px;
+  width: min(420px, 100%);
+}
+.flow-rules li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 10px;
+  padding: 7px 10px;
+  background: #fff;
+  font-size: 13px;
+  text-align: left;
+  box-shadow: 0 0 0 1px rgb(25 23 21 / 0.07);
+}
+.flow-verdict {
+  flex: none;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.flow-verdict.is-allow {
+  background: var(--tint-green);
+  color: var(--ink-green);
+}
+.flow-verdict.is-ask {
+  background: var(--tint-yellow);
+  color: var(--ink-yellow);
+}
+.flow-ask-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.flow-buttons {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.flow-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  box-shadow: inset 0 0 0 1px rgb(25 23 21 / 0.1);
+}
+.flow-btn.is-primary {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: none;
+}
+.flow-ok {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--ink-green);
+}
+.flow-mono {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.flow-bar {
+  display: block;
+  height: 4px;
+  margin: 10px 0 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(25 23 21 / 0.08);
+}
+.flow-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  transform-origin: left;
+}
+.flow-log {
+  display: grid;
+  gap: 5px;
+  font-size: 12.5px;
+}
+.flow-log li {
+  display: flex;
+  gap: 10px;
+}
+.flow-log time {
+  flex: none;
+  padding-top: 1px;
+  font-size: 11.5px;
+  color: var(--subtle);
+}
+.flow-outcome-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+}
+.flow-outcome-title {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+}
+.flow-outcome-meta {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+}
+
+/* Les éléments d'un texte arrivent l'un après l'autre (--i) quand son étape s'allume ; le titre de l'issue s'écrit, le
+   bouton se presse, la barre se remplit. */
+.flow-panel.is-active .flow-pop {
+  animation: tf-flow-in 380ms var(--ease-out) both;
+  animation-delay: calc(200ms + var(--i, 0) * 110ms);
+}
+@keyframes tf-flow-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.flow-panel.is-active .flow-write {
+  animation: tf-write 700ms steps(28, end) 200ms both;
+}
+@keyframes tf-write {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.flow-panel.is-active .flow-press {
+  animation: tf-press 420ms var(--ease-out) 800ms both;
+}
+@keyframes tf-press {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 45%, transparent);
+  }
+  35% {
+    transform: scale(0.92);
+  }
+  to {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--primary) 0%, transparent);
+  }
+}
+.flow-panel.is-active .flow-bar > span {
+  animation: tf-fill 1100ms var(--ease-out) 200ms both;
+}
+@keyframes tf-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flow-glow,
+  .flow-arc,
+  .flow-node,
+  .flow-step.is-active .flow-dot::after {
+    animation: none;
   }
 }
 
