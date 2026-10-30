@@ -149,4 +149,30 @@ class AssistantControllerWebMvcTest {
             .andExpect(status().isBadRequest());
         verify(agentService, never()).runApproved(any(), any(), any(), any(), any());
     }
+
+    @Test
+    @DisplayName("POST actions/undo → 200 : défait ce que Cortex a créé, par le dossier de la réponse (R77)")
+    void undo_200() throws Exception {
+        String record = "00000000-0000-0000-0000-0000000000aa";
+        when(agentService.undo("acme", 7L, "create_project", record))
+            .thenReturn(new AssistantActionResult("create_project", "success", "Removed the project PRICING \"Pricing\"."));
+
+        mockMvc.perform(post(URL + "/actions/undo").with(auth())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tool\":\"create_project\",\"record\":\"" + record + "\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.output").value("Removed the project PRICING \"Pricing\"."));
+    }
+
+    @ParameterizedTest(name = "undo {0} → 400")
+    @ValueSource(strings = {
+        "{\"tool\":\"create_project\"}",       // sans dossier
+        "{\"tool\":\"\",\"record\":\"r\"}", // sans outil
+    })
+    void undo_without_tool_or_record_400(String body) throws Exception {
+        mockMvc.perform(post(URL + "/actions/undo").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isBadRequest());
+        verify(agentService, never()).undo(any(), any(), any(), any());
+    }
 }

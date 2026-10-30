@@ -33,6 +33,8 @@ public interface KnowledgeNodeRepository extends JpaRepository<KnowledgeNode, Lo
     Optional<KnowledgeNode> findFirstByWorkspaceIdAndRefTypeAndRefId(
         Long workspaceId, NodeRefType refType, Long refId);
 
+    List<KnowledgeNode> findByWorkspaceIdAndParentNodeId(Long workspaceId, Long parentNodeId);
+
     long countByWorkspaceId(Long workspaceId);
 
     /** Purge tous les nodes d'un workspace (re-seed). Les arêtes tombent par cascade FK. */

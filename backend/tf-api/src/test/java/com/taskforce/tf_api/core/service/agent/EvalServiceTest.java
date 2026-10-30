@@ -166,6 +166,21 @@ class EvalServiceTest {
     }
 
     @Test
+    @DisplayName("une décision « undo » n'est pas un accord : la proposition reste proposée (R77)")
+    void an_undo_is_not_an_approval() throws Exception {
+        stubRecord(List.of(
+            event(1, "mission.started", "person", "user-7", "{\"agent\":\"internal\",\"question\":\"Write a note\"}"),
+            event(2, "action.requested", "agent", "cortex", "{\"tool\":\"create_note\",\"arguments\":\"{}\"}"),
+            event(3, "action.decided", "rule", "propose-knowledge", "{\"effect\":\"ask\",\"facts\":{\"action\":\"knowledge.write\"}}"),
+            event(4, "action.result", "server", "taskforce", "{\"tool\":\"create_note\",\"status\":\"pending\",\"output\":\"Proposed\"}"),
+            event(5, "human.decision", "person", "user-7", "{\"tool\":\"create_note\",\"decision\":\"undo\"}")));
+
+        EvalBankResponse.Draft draft = service.draft("acme", 7L, RECORD.toString());
+
+        assertThat(draft.calls()).singleElement().satisfies(call -> assertThat(call.status()).isEqualTo("pending"));
+    }
+
+    @Test
     @DisplayName("une réponse sans outil propose qu'aucun outil ne parte")
     void an_answer_without_tool_proposes_none() throws Exception {
         stubRecord(List.of(event(1, "mission.started", "person", "user-7", "{\"agent\":\"internal\",\"question\":\"Hi?\"}")));

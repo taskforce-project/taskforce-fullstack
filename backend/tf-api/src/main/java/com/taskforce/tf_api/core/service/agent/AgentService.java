@@ -77,6 +77,7 @@ public class AgentService {
     private final AuthorizationService authorization;
     private final CortexGate          gate;
     private final CortexRecordService records;
+    private final CortexUndo          undo;
 
     // Tier des tours avec outils externes MCP. Défaut "fast" ; "standard" pour plus de fiabilité
     // multi-outils si le matériel suit.
@@ -149,6 +150,26 @@ public class AgentService {
         }
         traceAfter(record, toolName, status, output);
         return new AssistantActionResult(toolName, status, output);
+    }
+
+    /**
+     * Défait d'un geste ce que Cortex vient de créer (R77, séance n°13) : la dernière création réussie de cet outil, dans
+     * le dossier de la réponse, une seule fois et avec les droits de la personne. L'outil dit ce qu'il a défait, ou
+     * pourquoi ce n'est plus possible (une exception métier).
+     */
+    public AssistantActionResult undo(String slug, Long userId, String toolName, String recordRef) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        AgentContext ctx = new AgentContext(slug, ws.getId(), userId);
+        UUID record = recordId(recordRef);
+        if (!records.owns(record, ctx)) {
+            throw new ResourceNotFoundException("This conversation's record was not found.");
+        }
+        if (!undo.handles(toolName)) {
+            throw new BusinessException("This action can't be undone.");
+        }
+        String undone = records.undo(record, toolName, userId, created -> undo.undo(toolName, created, ctx))
+            .orElseThrow(() -> new BusinessException("There is nothing left to undo here."));
+        return new AssistantActionResult(toolName, "success", undone);
     }
 
     /** Tracer avant d'agir : un événement que le dossier ne prend plus (il est plein) arrête l'action. */

@@ -23,6 +23,7 @@ import com.taskforce.tf_api.core.model.CortexRecordEvent;
 import com.taskforce.tf_api.core.repository.CortexRecordEventRepository;
 import com.taskforce.tf_api.core.repository.CortexRecordRepository;
 import com.taskforce.tf_api.core.service.agent.CortexRecordService.Actor;
+import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -199,5 +200,58 @@ class CortexRecordServiceTest {
 
         assertThat(stored.getFirst().getData()).isEqualTo("{\"agent\":\"internal\",\"model\":\"qwen3:8b\","
             + "\"notes\":[{\"id\":12,\"title\":\"Release plan\"}],\"question\":\"Write the release notes\",\"tier\":\"fast\"}");
+    }
+
+    // -------------------------------------------------------------------------
+    // « Undo » (R77, séance n°13)
+    // -------------------------------------------------------------------------
+
+    private UUID createdProject() {
+        UUID id = service.open(ctx, "Create a project Pricing", Map.of());
+        service.append(id, "action.result", Actor.SERVER,
+            Map.of("tool", "create_project", "status", "success", "output", "Project created in TaskForce: PRICING \"Pricing\" (id 27)."));
+        return id;
+    }
+
+    @Test
+    @DisplayName("undo défait la dernière création réussie, une seule fois, et le garde au dossier")
+    void undo_runs_once_and_is_kept() {
+        UUID id = createdProject();
+
+        assertThat(service.undo(id, "create_project", 7L, created -> "Removed from: " + created))
+            .contains("Removed from: Project created in TaskForce: PRICING \"Pricing\" (id 27).");
+        assertThat(service.undo(id, "create_project", 7L, created -> "again")).isEmpty(); // un deuxième clic
+        assertThat(stored).extracting(CortexRecordEvent::getType).endsWith("human.decision", "action.result");
+        assertThat(stored.getLast().getData()).contains("\"status\":\"undone\"");
+    }
+
+    @Test
+    @DisplayName("undo sans création réussie de cet outil : rien à défaire")
+    void nothing_to_undo() {
+        UUID id = proposedNote();
+
+        assertThat(service.undo(id, "create_note", 7L, created -> "never")).isEmpty();
+        assertThat(service.undo(id, "create_project", 7L, created -> "never")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("un undo refusé par l'outil ne laisse rien au dossier, et redit pourquoi")
+    void a_refused_undo_keeps_nothing() {
+        UUID id = createdProject();
+        int before = stored.size();
+
+        assertThatThrownBy(() -> service.undo(id, "create_project", 7L, created -> {
+            throw new BusinessException("PRICING has issues now");
+        })).isInstanceOf(BusinessException.class).hasMessage("PRICING has issues now");
+        assertThat(stored).hasSize(before);
+    }
+
+    @Test
+    @DisplayName("une décision « undo » ne compte pas comme un accord")
+    void an_undo_is_not_an_approval() {
+        UUID id = proposedNote();
+        service.append(id, "human.decision", Actor.person(7L), Map.of("tool", "create_note", "decision", "undo"));
+
+        assertThat(service.approve(id, "create_note", 7L, "{}")).isTrue();
     }
 }
