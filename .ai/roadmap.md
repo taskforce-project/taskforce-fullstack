@@ -14,8 +14,9 @@
 > - **Constat** : chaque opération de docs.taskforce-project.fr affichait `POST http://localhost:8080/api/...` : springdoc écrit l'adresse du backend qui a servi la spec (celui de dev), et `clean-openapi.mjs` la gardait.
 > - **Vérifié avant d'écrire** : l'app ne sert pas `/api` (`GET https://app.taskforce-project.fr/api/workspaces` = la page 404 de Next.js) ; l'API répond sur `https://api.taskforce-project.fr/api/...` (401 sans jeton, `readyz` 200, CORS ouvert à l'app), l'adresse qu'appelle le bundle de la webapp.
 > - **Fait** : `clean-openapi.mjs` pose `servers` : `https://api.taskforce-project.fr` (`Hosted`, par défaut), puis `http://localhost:8080` (`Self-hosted`, l'adresse que donnent les guides, `TF_API_URL`) ; `x-fern-server-name` les nomme, sans quoi Fern ne garde que la première (`fern write-definition` : deux environnements). Spec passée au script : seul le bloc `servers` change ; README de `fern/` à jour.
+> - **Décision du CEO** (« Oui, dans #454 ») : le guide Introduction donne aussi, dans « Base address », l'adresse de l'instance hébergée (`https://api.taskforce-project.fr/api`), avant celle d'une instance auto-hébergée ; les guides ne donnaient que la seconde.
 > - **Contrôles** : `npx fern-api@5.101.0 check`, 0 erreur (les 2 avertissements de contraste habituels) ; script idempotent. Pas d'aperçu local : `fern docs dev` exige les chemins longs de Windows.
-> - **Reste** : fusion de #454, puis publication à la main depuis `main` quand le CEO le décide ; les guides ne donnent que l'adresse auto-hébergée, jamais celle de l'instance hébergée.
+> - **Reste** : fusion de #454, puis publication à la main depuis `main` quand le CEO le décide.
 
 > **▶ MAJ 30/10/2026 (septies) - Release 1.6.8 EN PROD : la barre unique, « Undo », le projet et la note créés sans accord ; desktop 1.3.8 publiée.** `[release]`
 > - **Décision du CEO** : « go release ».
