@@ -23,6 +23,8 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     /** Vérifier l'existence d'un identifiant dans un workspace */
     boolean existsByWorkspaceIdAndIdentifier(Long workspaceId, String identifier);
 
+    Optional<Project> findByWorkspaceIdAndIdentifier(Long workspaceId, String identifier);
+
     /** Projets dont l'utilisateur est membre (via project_members) */
     @Query("""
         SELECT pm.project FROM ProjectMember pm

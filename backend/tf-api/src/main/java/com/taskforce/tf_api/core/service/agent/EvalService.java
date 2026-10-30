@@ -291,7 +291,9 @@ public class EvalService {
                         open = null;
                     }
                 }
-                case "human.decision" -> approve(calls, data.path("tool").asText());
+                case "human.decision" -> {
+                    if ("approved".equals(data.path("decision").asText())) approve(calls, data.path("tool").asText());
+                }
                 default -> { /* les autres événements ne figent rien */ }
             }
         }

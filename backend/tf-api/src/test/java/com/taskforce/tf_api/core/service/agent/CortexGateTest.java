@@ -80,7 +80,7 @@ class CortexGateTest {
         "list_issues,      allow, read-issues",
         "find_integration, allow, read-company-tools",
         "create_issue,     allow, create-issue",      // se défait : une issue se ferme d'un geste
-        "create_note,      ask,   propose-knowledge", // une personne décide de ce qui entre au Brain OS
+        "create_note,      allow, create-note",       // la Présidence, 30/10/2026 : la note comme un projet, avec « Undo »
         "create_project,   allow, create-project",    // la Présidence, 30/10/2026 : Cortex crée le projet demandé
         "make_coffee,      ask,",                     // un outil inconnu n'a pas d'action : demandé
     })

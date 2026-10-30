@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -119,10 +120,34 @@ public class CortexRecordService {
             JsonNode data = parse(event.getData());
             if (!tool.equals(data.path("tool").asText())) continue;
             if ("action.result".equals(event.getType()) && "pending".equals(data.path("status").asText())) waiting++;
-            if ("human.decision".equals(event.getType())) waiting--;
+            if ("human.decision".equals(event.getType()) && "approved".equals(data.path("decision").asText())) waiting--;
         }
         return waiting > 0 && append(recordId, "human.decision", Actor.person(userId),
             Map.of("tool", tool, "decision", "approved", "arguments", shorten(arguments))).isPresent();
+    }
+
+    /**
+     * Défait la dernière création réussie de cet outil, une seule fois (R77) : l'action tourne sous le verrou du dossier,
+     * qui sépare deux clics, puis la décision et ce qui est défait entrent au dossier. Vide s'il n'y a rien à défaire ;
+     * une exception de l'action remonte telle quelle, et rien n'est gardé.
+     */
+    @Transactional
+    public Optional<String> undo(UUID recordId, String tool, Long userId, UnaryOperator<String> action) {
+        records.findByIdForUpdate(recordId).orElseThrow(() -> new ResourceNotFoundException("Cortex record not found"));
+        String created = null;
+        for (CortexRecordEvent event : eventRepository.findByRecordIdOrderBySeqAsc(recordId)) {
+            JsonNode data = parse(event.getData());
+            if (!tool.equals(data.path("tool").asText())) continue;
+            if ("action.result".equals(event.getType()) && "success".equals(data.path("status").asText())) {
+                created = data.path("output").asText("");
+            }
+            if ("human.decision".equals(event.getType()) && "undo".equals(data.path("decision").asText())) created = null;
+        }
+        if (created == null) return Optional.empty();
+        String undone = action.apply(created);
+        append(recordId, "human.decision", Actor.person(userId), Map.of("tool", tool, "decision", "undo"));
+        append(recordId, "action.result", Actor.SERVER, Map.of("tool", tool, "status", "undone", "output", shorten(undone)));
+        return Optional.of(undone);
     }
 
     /** Vrai si le dossier est celui de cette personne, dans cet espace : un autre ne se prolonge pas. */

@@ -76,6 +76,7 @@ class AgentServiceTest {
     @Mock private WorkspaceMcpService workspaceMcp;
     @Mock private AuthorizationService authorization;
     @Mock private CortexRecordService records;
+    @Mock private CortexUndo undo;
     @Mock private HarnessRuleSetRepository ruleSets;
     @Mock private WorkspaceRepository workspaces;
 
@@ -455,7 +456,7 @@ class AgentServiceTest {
     @CsvSource({
         "search_brain,   success", // knowledge.search : autorisée
         "create_issue,   success", // issue.create : autorisée, se défait
-        "create_note,    pending", // knowledge.write : demandée, proposée à la personne
+        "create_note,    success", // knowledge.create : autorisée (30/10/2026), une note se supprime d'un geste
         "create_project, success", // project.create : autorisée (30/10/2026), un projet s'archive d'un geste
     })
     void the_rules_decide_whether_a_tool_runs(String name, String status) throws Exception {
@@ -579,7 +580,7 @@ class AgentServiceTest {
         assertThat(result.output()).isEqualTo("Note created");
         InOrder order = Mockito.inOrder(records, tool);
         order.verify(records).approve(RECORD, "create_note", 7L, "{\"title\":\"T\"}");
-        order.verify(records).append(eq(RECORD), eq("action.decided"), eq(CortexRecordService.Actor.rule("propose-knowledge")), any());
+        order.verify(records).append(eq(RECORD), eq("action.decided"), eq(CortexRecordService.Actor.rule("create-note")), any());
         order.verify(tool).execute(eq(Map.of("title", "T")), any());
         order.verify(records).append(eq(RECORD), eq("action.result"), eq(CortexRecordService.Actor.SERVER), any());
     }
@@ -829,5 +830,43 @@ class AgentServiceTest {
             assertThat(call.status()).isEqualTo("refused");
             assertThat(call.effect()).isEqualTo("deny");
         });
+    }
+
+    // -------------------------------------------------------------------------
+    // « Undo » (R77, séance n°13)
+    // -------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("undo défait par le dossier de la personne, et dit ce qui est défait")
+    @SuppressWarnings("unchecked")
+    void undo_goes_through_the_record() {
+        stubWorkspace();
+        when(records.owns(eq(RECORD), any())).thenReturn(true);
+        when(undo.handles("create_project")).thenReturn(true);
+        when(records.undo(eq(RECORD), eq("create_project"), eq(7L), any())).thenAnswer(inv ->
+            Optional.of(((java.util.function.UnaryOperator<String>) inv.getArgument(3)).apply("Project created in TaskForce: X")));
+        when(undo.undo(eq("create_project"), eq("Project created in TaskForce: X"), any())).thenReturn("Removed the project X.");
+
+        AssistantActionResult result = service.undo("acme", 7L, "create_project", RECORD.toString());
+
+        assertThat(result.status()).isEqualTo("success");
+        assertThat(result.output()).isEqualTo("Removed the project X.");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+        "le dossier d'une autre personne, false, true,  true",
+        "un outil qui ne se défait pas,   true,  false, true",
+        "rien à défaire,                  true,  true,  false",
+    })
+    void undo_refuses(String label, boolean owns, boolean handles, boolean somethingToUndo) {
+        stubWorkspace();
+        lenient().when(records.owns(eq(RECORD), any())).thenReturn(owns);
+        lenient().when(undo.handles("create_issue")).thenReturn(handles);
+        lenient().when(records.undo(eq(RECORD), eq("create_issue"), eq(7L), any()))
+            .thenReturn(somethingToUndo ? Optional.of("done") : Optional.empty());
+
+        assertThatThrownBy(() -> service.undo("acme", 7L, "create_issue", RECORD.toString()))
+            .isInstanceOf(owns ? BusinessException.class : ResourceNotFoundException.class);
     }
 }

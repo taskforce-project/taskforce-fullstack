@@ -103,6 +103,17 @@ public class AssistantController {
             agentService.runApproved(slug, userId, body.tool(), body.input(), body.record())));
     }
 
+    /** Défait d'un geste ce que Cortex vient de créer, depuis le dossier de la réponse (R77). */
+    @PostMapping(value = "/actions/undo", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<AssistantActionResult>> undo(
+        @PathVariable String slug,
+        @Valid @RequestBody AssistantUndoRequest body,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success(agentService.undo(slug, userId, body.tool(), body.record())));
+    }
+
     // -------------------------------------------------------------------------
     // DTOs internes
     // -------------------------------------------------------------------------
@@ -116,6 +127,11 @@ public class AssistantController {
     public record AssistantActionRequest(
         @NotBlank @Size(max = 128) String tool,
         @Size(max = 20000) String input,
+        @NotBlank @Size(max = 64) String record
+    ) {}
+
+    public record AssistantUndoRequest(
+        @NotBlank @Size(max = 128) String tool,
         @NotBlank @Size(max = 64) String record
     ) {}
 }
