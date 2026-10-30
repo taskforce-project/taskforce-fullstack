@@ -38,7 +38,7 @@ public class CortexGate {
         "find_integration", "mcp.read",
         "create_issue", "issue.create",
         "create_project", "project.create",
-        "create_note", "knowledge.write");
+        "create_note", "knowledge.create");
 
     /** Les actions qui lisent sans rien changer : au rejeu d'un cas, la cassette les sert. */
     static final Set<String> READS = Set.of("knowledge.search", "issue.read", "mcp.read");

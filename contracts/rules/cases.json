@@ -251,6 +251,16 @@
       }
     },
     {
+      "name": "creating a note is allowed",
+      "facts": {
+        "action": "knowledge.create"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "create-note"
+      }
+    },
+    {
       "name": "a knowledge update is proposed, a person decides",
       "facts": {
         "action": "knowledge.write"
@@ -635,6 +645,6 @@
   ],
   "digest": {
     "description": "The digest of default.rules.json as it is, with or without null members and its own digest field.",
-    "expected": "sha256:00ce3ad11d34d48c3440dfaebb218553ff2e25d39cd8b291d0476a9c0e973c28"
+    "expected": "sha256:ef50bed9fc158d3593d569dba01f88bcbc78cd779dd3ae271e2b73b4b88b16f5"
   }
 }

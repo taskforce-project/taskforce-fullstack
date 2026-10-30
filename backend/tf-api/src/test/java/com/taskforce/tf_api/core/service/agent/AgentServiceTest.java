@@ -456,7 +456,7 @@ class AgentServiceTest {
     @CsvSource({
         "search_brain,   success", // knowledge.search : autorisée
         "create_issue,   success", // issue.create : autorisée, se défait
-        "create_note,    pending", // knowledge.write : demandée, proposée à la personne
+        "create_note,    success", // knowledge.create : autorisée (30/10/2026), une note se supprime d'un geste
         "create_project, success", // project.create : autorisée (30/10/2026), un projet s'archive d'un geste
     })
     void the_rules_decide_whether_a_tool_runs(String name, String status) throws Exception {
@@ -580,7 +580,7 @@ class AgentServiceTest {
         assertThat(result.output()).isEqualTo("Note created");
         InOrder order = Mockito.inOrder(records, tool);
         order.verify(records).approve(RECORD, "create_note", 7L, "{\"title\":\"T\"}");
-        order.verify(records).append(eq(RECORD), eq("action.decided"), eq(CortexRecordService.Actor.rule("propose-knowledge")), any());
+        order.verify(records).append(eq(RECORD), eq("action.decided"), eq(CortexRecordService.Actor.rule("create-note")), any());
         order.verify(tool).execute(eq(Map.of("title", "T")), any());
         order.verify(records).append(eq(RECORD), eq("action.result"), eq(CortexRecordService.Actor.SERVER), any());
     }
