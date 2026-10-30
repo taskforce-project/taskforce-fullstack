@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  sendAgentMessage, sendAssistantMessage, isApprovable, approveAction, isUndoable, undoAction, type AssistantToolCall,
+  sendAgentMessage, sendAssistantMessage, isApprovable, isPreparedIssue, approveAction, isUndoable, undoAction,
+  type AssistantToolCall,
 } from './assistant-service';
 import { apiClient } from './client';
 import { executeMcpAction } from './integration-service';
@@ -150,6 +151,15 @@ describe('assistant-service: undoing what Cortex created (R77)', () => {
     ['an answer without a record', call({ record: null }), false],
   ])('isUndoable: %s -> %s', (_label, toolCall, expected) => {
     expect(isUndoable(toolCall)).toBe(expected);
+  });
+
+  it.each([
+    ['an issue Cortex prepared', call({ name: 'create_issue', status: 'pending' }), true],
+    ['an issue already created', call({ name: 'create_issue' }), false],
+    ['a prepared issue without a record', call({ name: 'create_issue', status: 'pending', record: null }), false],
+    ['another proposal', call({ name: 'create_note', status: 'pending' }), false],
+  ])('isPreparedIssue: %s -> %s', (_label, toolCall, expected) => {
+    expect(isPreparedIssue(toolCall)).toBe(expected);
   });
 
   it('undoAction: sends the tool and the record of the answer', async () => {

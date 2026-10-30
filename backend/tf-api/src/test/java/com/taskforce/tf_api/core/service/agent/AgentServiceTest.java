@@ -254,16 +254,16 @@ class AgentServiceTest {
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
-            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"create_issue\",\"arguments\":\"{}\"}}]}"),
-            json.readTree("{\"content\":\"Issue created: TF-31 Cortex test.\"}"));
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"create_project\",\"arguments\":\"{}\"}}]}"),
+            json.readTree("{\"content\":\"Project created: CORTEX Cortex test.\"}"));
         AgentTool tool = Mockito.mock(AgentTool.class);
-        when(tool.name()).thenReturn("create_issue");
-        when(tools.get(eq("create_issue"), anyList())).thenReturn(tool);
-        when(tool.execute(any(), any())).thenReturn("Created TF-31");
+        when(tool.name()).thenReturn("create_project");
+        when(tools.get(eq("create_project"), anyList())).thenReturn(tool);
+        when(tool.execute(any(), any())).thenReturn("Project created in TaskForce: CORTEX \"Cortex test\" (id 31).");
 
-        AssistantAnswer answer = service.run("acme", 7L, "Create an issue \"Cortex test\" in TaskForce");
+        AssistantAnswer answer = service.run("acme", 7L, "Create a project \"Cortex test\" in TaskForce");
 
-        assertThat(answer.answer()).isEqualTo("Issue created: TF-31 Cortex test.");
+        assertThat(answer.answer()).isEqualTo("Project created: CORTEX Cortex test.");
         assertThat(answer.steps()).noneMatch(s -> "error".equals(s.status()));
     }
 
@@ -291,17 +291,17 @@ class AgentServiceTest {
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString()))
-            .thenReturn(json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"create_issue\",\"arguments\":\"{}\"}}]}"))
+            .thenReturn(json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"create_project\",\"arguments\":\"{}\"}}]}"))
             .thenThrow(new LlmToolsRefusedException("The AI provider refused the tools", null));
         AgentTool tool = Mockito.mock(AgentTool.class);
-        when(tool.name()).thenReturn("create_issue");
-        when(tools.get(eq("create_issue"), anyList())).thenReturn(tool);
-        when(tool.execute(any(), any())).thenReturn("Created TF-31");
+        when(tool.name()).thenReturn("create_project");
+        when(tools.get(eq("create_project"), anyList())).thenReturn(tool);
+        when(tool.execute(any(), any())).thenReturn("Project created in TaskForce: CORTEX \"Cortex test\" (id 31).");
 
-        AssistantAnswer answer = service.run("acme", 7L, "Create an issue \"Cortex test\" in TaskForce");
+        AssistantAnswer answer = service.run("acme", 7L, "Create a project \"Cortex test\" in TaskForce");
 
         assertThat(answer.answer()).contains("Cortex stopped before the end").doesNotContain("nothing was created");
-        assertThat(answer.toolCalls()).anyMatch(c -> "create_issue".equals(c.name()) && "success".equals(c.status()));
+        assertThat(answer.toolCalls()).anyMatch(c -> "create_project".equals(c.name()) && "success".equals(c.status()));
         assertThat(answer.mode()).isEqualTo("deep");
     }
 
@@ -313,6 +313,16 @@ class AgentServiceTest {
         String answer = AgentService.honestAnswer("Create an issue in Linear", "Issue created in Linear.", calls);
 
         assertThat(answer).isEqualTo("Nothing has changed yet: the action below waits for your approval.");
+    }
+
+    @Test
+    @DisplayName("une issue préparée en carte n'existe pas encore : la réponse renvoie à la carte")
+    void prepared_issue_is_not_announced_as_done() {
+        List<AssistantToolCall> calls = List.of(new AssistantToolCall("create_issue", "pending", "{}", "prepared", null));
+
+        String answer = AgentService.honestAnswer("Create an issue for the pricing page", "Issue created: Pricing page.", calls);
+
+        assertThat(answer).isEqualTo("Nothing is created yet: check the issue below, then create it.");
     }
 
     @ParameterizedTest(name = "« {0} » conversationnel : {1}")
@@ -455,7 +465,7 @@ class AgentServiceTest {
     @ParameterizedTest(name = "{0} : {1}, par les règles par défaut")
     @CsvSource({
         "search_brain,   success", // knowledge.search : autorisée
-        "create_issue,   success", // issue.create : autorisée, se défait
+        "create_issue,   pending", // issue.create : autorisée, mais préparée en carte que la personne crée (R47, R78)
         "create_note,    success", // knowledge.create : autorisée (30/10/2026), une note se supprime d'un geste
         "create_project, success", // project.create : autorisée (30/10/2026), un projet s'archive d'un geste
     })
@@ -475,15 +485,15 @@ class AgentServiceTest {
     @Test
     @DisplayName("tracer avant d'agir : la demande puis la décision au dossier avant l'outil, le résultat après")
     void every_tool_is_recorded_before_it_runs() throws Exception {
-        AgentTool tool = stubInternalCall("create_issue");
-        when(tool.execute(any(), any())).thenReturn("Created TF-31");
+        AgentTool tool = stubInternalCall("create_project");
+        when(tool.execute(any(), any())).thenReturn("Project created in TaskForce: NOTES \"Release notes\" (id 31).");
 
-        service.run("acme", 7L, "Create an issue \"Release notes\"");
+        service.run("acme", 7L, "Create a project \"Release notes\"");
 
         InOrder order = Mockito.inOrder(records, tool);
-        order.verify(records).open(any(), eq("Create an issue \"Release notes\""), any());
+        order.verify(records).open(any(), eq("Create a project \"Release notes\""), any());
         order.verify(records).append(eq(RECORD), eq("action.requested"), eq(CortexRecordService.Actor.CORTEX), any());
-        order.verify(records).append(eq(RECORD), eq("action.decided"), eq(CortexRecordService.Actor.rule("create-issue")), any());
+        order.verify(records).append(eq(RECORD), eq("action.decided"), eq(CortexRecordService.Actor.rule("create-project")), any());
         order.verify(tool).execute(any(), any());
         order.verify(records).append(eq(RECORD), eq("action.result"), eq(CortexRecordService.Actor.SERVER), any());
     }
@@ -743,14 +753,14 @@ class AgentServiceTest {
     @DisplayName("le dossier garde ce qui a répondu : le modèle, le tier, les notes servies")
     @SuppressWarnings({"unchecked", "rawtypes"})
     void the_record_keeps_what_answered() throws Exception {
-        AgentTool tool = stubInternalCall("create_issue");
-        when(tool.execute(any(), any())).thenReturn("Created TF-31");
+        AgentTool tool = stubInternalCall("create_project");
+        when(tool.execute(any(), any())).thenReturn("Project created in TaskForce: NOTES \"Release notes\" (id 31).");
         when(llm.currentModel()).thenReturn("qwen3:8b");
 
-        service.run("acme", 7L, "Create an issue \"Release notes\"");
+        service.run("acme", 7L, "Create a project \"Release notes\"");
 
         ArgumentCaptor<Map<String, Object>> origin = (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
-        verify(records).open(any(), eq("Create an issue \"Release notes\""), origin.capture());
+        verify(records).open(any(), eq("Create a project \"Release notes\""), origin.capture());
         assertThat(origin.getValue()).containsEntry("model", "qwen3:8b").containsEntry("tier", "fast")
             .containsEntry("notes", List.of());
     }

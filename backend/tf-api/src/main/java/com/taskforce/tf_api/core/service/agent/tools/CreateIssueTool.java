@@ -5,11 +5,13 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.taskforce.tf_api.core.dto.request.CreateChecklistItemRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.dto.response.IssueStatusResponse;
@@ -28,9 +30,16 @@ import com.taskforce.tf_api.core.service.agent.AgentTool;
  * <p>Le projet se désigne par sa clé ou son nom, résolu par {@link ProjectResolver}. L'issue se place dans le temps :
  * le Backlog par défaut, une autre colonne et une échéance quand le but les justifie (R48, séance n°8). La réponse dit
  * le projet et la colonne tels que le service les a écrits, pour que Cortex ne les invente pas.</p>
+ *
+ * <p>Dans la conversation, Cortex ne fait que la préparer : {@code AgentService} la met en attente, et la carte la crée
+ * avec ce que la personne y a changé (R47, R78, séance n°13). Les sous-tâches deviennent la checklist de l'issue.</p>
  */
 @Component
 public class CreateIssueTool implements AgentTool {
+
+    /** Ce qu'une ligne de checklist accepte (CreateChecklistItemRequest), et combien Cortex en ajoute au plus. */
+    private static final int MAX_SUBTASK = 500;
+    private static final int MAX_SUBTASKS = 20;
 
     private final IssueService issueService;
     private final ProjectResolver projects;
@@ -50,8 +59,8 @@ public class CreateIssueTool implements AgentTool {
     @Override public String name() { return "create_issue"; }
 
     @Override public String description() {
-        return "Creates an issue in a TaskForce project, placed in time: its column and due date follow its goal "
-            + "(Backlog by default). Ask first when unsure.";
+        return "Prepares an issue as a card the person checks and creates. Column and due date follow its goal "
+            + "(Backlog by default); subtasks become its checklist.";
     }
 
     @Override public Map<String, Object> parametersSchema() {
@@ -66,7 +75,9 @@ public class CreateIssueTool implements AgentTool {
                 "status",      Map.of("type", "string", "description",
                     "The column (optional). Default: the project's Backlog. Another one only when the goal and timing call for it."),
                 "dueDate",     Map.of("type", "string", "description",
-                    "Due date YYYY-MM-DD (optional), only when the goal or the person sets a time.")
+                    "Due date YYYY-MM-DD (optional), only when the goal or the person sets a time."),
+                "subtasks",    Map.of("type", "array", "items", Map.of("type", "string"), "description",
+                    "Subtasks, one short line each (optional), when the work has steps: they become the issue's checklist.")
             ),
             "required", List.of("project", "title")
         );
@@ -108,11 +119,30 @@ public class CreateIssueTool implements AgentTool {
         if (due != null) req.setDueDate(due.toString());
 
         IssueResponse issue = issueService.createIssue(ctx.slug(), project.getId(), req, ctx.userId());
+        List<String> subtasks = subtasks(args.get("subtasks"));
+        for (String subtask : subtasks) {
+            CreateChecklistItemRequest item = new CreateChecklistItemRequest();
+            item.setContent(subtask);
+            issueService.addChecklistItem(ctx.slug(), project.getId(), issue.getId(), ctx.userId(), item);
+        }
         String projectName = issue.getProjectName() != null ? issue.getProjectName() : project.getName();
         String placed = issue.getStatus() != null ? ", in the column " + issue.getStatus().getName() : "";
         String dueText = issue.getDueDate() != null ? ", due " + issue.getDueDate() : "";
+        String steps = subtasks.isEmpty() ? "" : ", with " + subtasks.size() + (subtasks.size() == 1 ? " subtask" : " subtasks");
         return "Created " + issue.getIdentifier() + " \"" + issue.getTitle() + "\" in the project " + projectName
-            + placed + dueText + ".";
+            + placed + dueText + steps + ".";
+    }
+
+    /** Les sous-tâches deviennent la checklist de l'issue : une ligne chacune, sans les vides, vingt au plus. */
+    private static List<String> subtasks(Object raw) {
+        if (!(raw instanceof List<?> items)) return List.of();
+        return items.stream()
+            .filter(Objects::nonNull)
+            .map(item -> item.toString().strip())
+            .filter(item -> !item.isEmpty())
+            .map(item -> item.length() > MAX_SUBTASK ? item.substring(0, MAX_SUBTASK) : item)
+            .limit(MAX_SUBTASKS)
+            .toList();
     }
 
     /** La première colonne de la catégorie Backlog ; sans elle, null : le service prend la colonne par défaut. */
