@@ -8,6 +8,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -36,6 +39,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -260,12 +264,42 @@ class StompAuthInterceptorTest {
                 .isInstanceOf(MessageDeliveryException.class);
         }
 
-        @Test
-        @DisplayName("🔒 analysis.{ws} : non-membre du workspace → REFUSÉ (fix H2)")
-        void analysis_subscribe_rejected_when_not_member() {
-            when(realtimeAuth.canSubscribeWorkspace(7L, 9L)).thenReturn(false);
-            assertThatThrownBy(() -> interceptor.preSend(subscribe("/topic/analysis.9", "7"), channel))
-                .isInstanceOf(MessageDeliveryException.class);
+        @ParameterizedTest(name = "{0}, voit le projet 3 = {1} → autorisé = {1}")
+        @CsvSource({
+            "/topic/projects.3.analysis, true",
+            "/topic/projects.3.analysis, false",
+        })
+        @DisplayName("🔒 projects.{id}.analysis : les analyses IA d'un projet suivent sa visibilité, comme son board")
+        void project_analysis_stream_follows_project_visibility(String destination, boolean canView) {
+            when(realtimeAuth.canSubscribeProject(7L, 3L)).thenReturn(canView);
+            Message<byte[]> msg = subscribe(destination, "7");
+
+            if (canView) {
+                assertThat(interceptor.preSend(msg, channel)).isSameAs(msg);
+            } else {
+                assertThatThrownBy(() -> interceptor.preSend(msg, channel)).isInstanceOf(MessageDeliveryException.class);
+            }
+        }
+
+        @ParameterizedTest(name = "{0} → REFUSÉ")
+        @ValueSource(strings = {"/topic/analysis.9", "/topic/analysis.anything"})
+        @DisplayName("🔒 analysis.{ws} : canal retiré, refusé même à un membre (il montrait les projets privés à tout l'espace)")
+        void retired_workspace_analysis_channel_is_rejected(String destination) {
+            assertThatThrownBy(() -> interceptor.preSend(subscribe(destination, "7"), channel))
+                .isInstanceOf(MessageDeliveryException.class)
+                .hasMessage("This channel no longer exists");
+            verifyNoInteractions(realtimeAuth);
+        }
+
+        @ParameterizedTest(name = "{0} → REFUSÉ, sans lire les droits")
+        @ValueSource(strings = {"/topic/projects.3.board", "/topic/projects.abc.analysis", "/topic/projects..analysis",
+            "/topic/projects.3.analysis.analysis"})
+        @DisplayName("🔒 projects.* malformé → REFUSÉ")
+        void malformed_project_channels_are_rejected(String destination) {
+            assertThatThrownBy(() -> interceptor.preSend(subscribe(destination, "7"), channel))
+                .isInstanceOf(MessageDeliveryException.class)
+                .hasMessage("Invalid channel");
+            verifyNoInteractions(realtimeAuth);
         }
     }
 }

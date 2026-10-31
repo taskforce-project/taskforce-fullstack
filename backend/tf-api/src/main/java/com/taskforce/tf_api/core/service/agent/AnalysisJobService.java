@@ -342,11 +342,20 @@ public class AnalysisJobService {
         job.setPlanJson(mutation.apply(plan).toJson());
     }
 
-    /** Sauvegarde, diffuse l'état sur le topic du workspace, et rend le DTO. */
+    /**
+     * Flux temps réel des workflows d'un projet, ouvert à qui voit le projet, la règle du flux de son board
+     * ({@code StompAuthInterceptor}). Un flux par espace montrait le nom d'un projet privé et la question du modèle à
+     * tous les membres de l'espace.
+     */
+    static String analysisTopic(Long projectId) {
+        return "/topic/projects." + projectId + ".analysis";
+    }
+
+    /** Sauvegarde, diffuse l'état sur le flux d'analyse du projet, et rend le DTO. */
     private AnalysisJobResponse publish(AnalysisJob job) {
         AnalysisJobResponse response = toResponse(jobRepository.save(job));
         try {
-            messagingTemplate.convertAndSend("/topic/analysis." + job.getWorkspace().getId(), response);
+            messagingTemplate.convertAndSend(analysisTopic(job.getProject().getId()), response);
         } catch (Exception ex) {
             // Best-effort : le dock retombe sur son polling. Ne jamais faire échouer le workflow ici.
             log.warn("Publication temps réel du workflow {} échouée : {}", job.getId(), ex.getMessage());
