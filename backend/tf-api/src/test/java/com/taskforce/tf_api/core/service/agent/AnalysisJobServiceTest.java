@@ -6,6 +6,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -46,9 +49,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -114,6 +120,27 @@ class AnalysisJobServiceTest {
 
         assertThatThrownBy(() -> service.launch("acme", 1L, 9L, AnalysisDepth.DEEP))
             .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @ParameterizedTest(name = "voit le projet = {0} → workflow lancé = {0}")
+    @ValueSource(booleans = {true, false})
+    @DisplayName("launch : un projet que la personne ne voit pas répond 404, sans créer ni publier de workflow")
+    void launch_requires_seeing_the_project(boolean canView) {
+        when(projectRepository.findByIdAndWorkspaceId(1L, 5L)).thenReturn(Optional.of(project));
+        when(userRepository.findById(9L)).thenReturn(Optional.of(user));
+        if (!canView) {
+            doThrow(new ResourceNotFoundException("Project not found")).when(visibilityGuard).assertCanView(project, 9L);
+        }
+
+        if (canView) {
+            assertThat(service.launch("acme", 1L, 9L, null).status()).isEqualTo(AnalysisJobStatus.QUEUED.name());
+        } else {
+            assertThatThrownBy(() -> service.launch("acme", 1L, 9L, null))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Project not found");
+            verify(jobRepository, never()).save(any(AnalysisJob.class));
+            verifyNoInteractions(messagingTemplate);
+        }
     }
 
     @Test

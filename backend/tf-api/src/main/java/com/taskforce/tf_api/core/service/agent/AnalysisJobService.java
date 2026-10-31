@@ -87,6 +87,8 @@ public class AnalysisJobService {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         Project project = projectRepository.findByIdAndWorkspaceId(projectId, ws.getId())
             .orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
+        // L'analyse lit les issues et les notes du projet : un projet privé qu'on ne voit pas répond 404, comme ailleurs.
+        visibilityGuard.assertCanView(project, userId);
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
