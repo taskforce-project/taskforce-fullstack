@@ -62,6 +62,11 @@ class BrainSearchServiceIntegrationTest extends AbstractIntegrationTest {
         when(embeddingClient.currentModel()).thenReturn(null); // sans IA par défaut
     }
 
+    /** Un propriétaire de l'espace : il lit toutes les notes (le filtre des projets privés a son propre test). */
+    private BrainViewer reader() {
+        return BrainViewer.seeingAll(ws.getId());
+    }
+
     private KnowledgeNode node(String title, String content, NodeStatus status) {
         return nodeRepository.save(KnowledgeNode.builder()
             .workspace(ws).type(NodeType.NOTE).domain(NodeDomain.ENGINEERING)
@@ -89,7 +94,7 @@ class BrainSearchServiceIntegrationTest extends AbstractIntegrationTest {
     })
     @DisplayName("sans IA : recherche plein texte (préfixes, casse ignorée), notes archivées exclues")
     void full_text_without_ai(String query, String expectedTitle) {
-        List<KnowledgeNode> hits = service.retrieveRelevant(ws.getId(), query, 5);
+        List<KnowledgeNode> hits = service.retrieveRelevant(reader(), query, 5);
 
         assertThat(hits).extracting(KnowledgeNode::getTitle).first().isEqualTo(expectedTitle);
         assertThat(hits).extracting(KnowledgeNode::getId).doesNotContain(archived.getId());
@@ -98,13 +103,13 @@ class BrainSearchServiceIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("sans IA : requête sans mot exploitable → aucun résultat, pas d'erreur SQL")
     void full_text_ignores_symbols() {
-        assertThat(service.retrieveRelevant(ws.getId(), "!!! ' : & |", 5)).isEmpty();
+        assertThat(service.retrieveRelevant(reader(), "!!! ' : & |", 5)).isEmpty();
     }
 
     @Test
     @DisplayName("score plein texte normalisé dans [0, 1)")
     void full_text_scores_are_normalized() {
-        assertThat(service.retrieveRelevantScored(ws.getId(), "postgresql", 5))
+        assertThat(service.retrieveRelevantScored(reader(), "postgresql", 5))
             .allSatisfy(s -> assertThat(s.score()).isBetween(0.0, 1.0));
     }
 
@@ -116,7 +121,7 @@ class BrainSearchServiceIntegrationTest extends AbstractIntegrationTest {
         when(embeddingClient.currentModel()).thenReturn("bge-m3");
         when(embeddingClient.embed(anyString())).thenReturn(vector(1.0f));
 
-        List<KnowledgeNode> hits = service.retrieveRelevant(ws.getId(), "anything", 5);
+        List<KnowledgeNode> hits = service.retrieveRelevant(reader(), "anything", 5);
 
         assertThat(hits).extracting(KnowledgeNode::getId).containsExactly(deploy.getId());
     }
@@ -128,7 +133,7 @@ class BrainSearchServiceIntegrationTest extends AbstractIntegrationTest {
         when(embeddingClient.currentModel()).thenReturn("bge-m3");
         when(embeddingClient.embed(anyString())).thenReturn(vector(1.0f));
 
-        List<KnowledgeNode> hits = service.retrieveRelevant(ws.getId(), "runbook", 5);
+        List<KnowledgeNode> hits = service.retrieveRelevant(reader(), "runbook", 5);
 
         assertThat(hits).extracting(KnowledgeNode::getTitle).containsExactly("Deployment runbook");
     }

@@ -18,6 +18,7 @@ import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.service.LlmClient;
+import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ import lombok.extern.slf4j.Slf4j;
 public class DecisionService {
 
     private final BrainSearchService search;
+    private final BrainAccessGuard   access;
     private final IssueRepository    issueRepository;
     private final LlmClient          llm;
     private final ObjectMapper       objectMapper;
@@ -59,10 +61,14 @@ public class DecisionService {
         }
     }
 
-    /** Contexte Brain OS pertinent pour le projet (RAG). Sans transaction : la recherche appelle le modèle d'embeddings. */
-    public List<KnowledgeNode> retrieveContext(Long workspaceId, String projectName) {
-        return search.retrieveRelevant(workspaceId,
-            projectName + " vision goals roadmap risks priorities", RAG_TOPK);
+    /**
+     * Contexte Brain OS pertinent pour le projet (RAG), pris dans ce que lit tout le public du projet : le brief se
+     * montre à tous ceux qui voient le projet, il ne cite donc aucune note d'un autre projet privé. Sans transaction :
+     * la recherche appelle le modèle d'embeddings.
+     */
+    public List<KnowledgeNode> retrieveContext(Long workspaceId, Project project) {
+        return search.retrieveRelevant(access.projectAudience(workspaceId, project.getId()),
+            project.getName() + " vision goals roadmap risks priorities", RAG_TOPK);
     }
 
     /**
