@@ -615,17 +615,24 @@ public class IssueService {
         return ChecklistItemResponse.from(checklistRepository.save(item));
     }
 
+    /**
+     * Met à jour une ligne de la checklist. La cocher ou la décocher entre à l'activité de l'issue, avec son texte : par
+     * la personne, ou par l'agent d'une mission qui coche ce qu'il a fait, en son nom.
+     */
     @Transactional
     public ChecklistItemResponse updateChecklistItem(String slug, Long projectId, Long issueId, Long itemId,
                                                      Long userId, UpdateChecklistItemRequest request) {
-        assertWritableChecklistScope(slug, projectId, issueId, userId);
+        Issue issue = assertWritableChecklistScope(slug, projectId, issueId, userId);
         IssueChecklistItem item = checklistRepository.findByIdAndIssueId(itemId, issueId)
             .orElseThrow(() -> new ResourceNotFoundException("Checklist item not found"));
         if (request.getContent() != null && !request.getContent().isBlank()) {
             item.setContent(request.getContent().trim());
         }
-        if (request.getDone() != null) {
+        if (request.getDone() != null && request.getDone() != item.isDone()) {
             item.setDone(request.getDone());
+            logActivity(issue, resolveUser(userId),
+                request.getDone() ? IssueActivityType.CHECKLIST_CHECKED : IssueActivityType.CHECKLIST_UNCHECKED,
+                null, item.getContent());
         }
         if (request.getPosition() != null) {
             item.setPosition(request.getPosition());
@@ -1118,12 +1125,12 @@ public class IssueService {
         return project;
     }
 
-    /** Idem {@link #resolveChecklistScope} + <b>droit d'écriture</b> (VIEWER exclu ; privé invisible → 404). */
-    private void assertWritableChecklistScope(String slug, Long projectId, Long issueId, Long userId) {
+    /** Idem {@link #resolveChecklistScope} + <b>droit d'écriture</b> (VIEWER exclu ; privé invisible → 404) ; rend l'issue. */
+    private Issue assertWritableChecklistScope(String slug, Long projectId, Long issueId, Long userId) {
         Project project = resolveProject(slug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
         visibilityGuard.assertCanWrite(project, userId);
-        resolveIssue(issueId, project.getId());
+        return resolveIssue(issueId, project.getId());
     }
 
     @Transactional

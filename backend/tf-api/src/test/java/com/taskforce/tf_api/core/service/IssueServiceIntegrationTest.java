@@ -433,6 +433,35 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
+        @DisplayName("cocher puis décocher une ligne entre à l'activité, avec son texte ; recocher une ligne cochée, non (V112)")
+        void checking_an_item_shows_in_the_activity() {
+            Long id = newIssueId("Checklist activity");
+            var add = new com.taskforce.tf_api.core.dto.request.CreateChecklistItemRequest();
+            add.setContent("Update the README");
+            var item = issueService.addChecklistItem(SLUG, project.getId(), id, owner.getId(), add);
+            var check = new com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest();
+            check.setDone(true);
+            var uncheck = new com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest();
+            uncheck.setDone(false);
+
+            issueService.updateChecklistItem(SLUG, project.getId(), id, item.getId(), owner.getId(), check);
+            issueService.updateChecklistItem(SLUG, project.getId(), id, item.getId(), owner.getId(), check);
+            issueService.updateChecklistItem(SLUG, project.getId(), id, item.getId(), owner.getId(), uncheck);
+
+            var checklist = issueService.listActivity(SLUG, project.getId(), id, owner.getId()).stream()
+                .filter(a -> a.getAction() != com.taskforce.tf_api.core.enums.IssueActivityType.CREATED)
+                .toList();
+            // Une seule ligne par changement : le second « cocher » ne change rien, il n'entre pas à l'activité.
+            assertThat(checklist).extracting(a -> a.getAction()).containsExactlyInAnyOrder(
+                com.taskforce.tf_api.core.enums.IssueActivityType.CHECKLIST_CHECKED,
+                com.taskforce.tf_api.core.enums.IssueActivityType.CHECKLIST_UNCHECKED);
+            assertThat(checklist).allSatisfy(a -> {
+                assertThat(a.getNewValue()).isEqualTo("Update the README");
+                assertThat(a.getVia()).isNull(); // la personne elle-même, pas l'agent d'une mission
+            });
+        }
+
+        @Test
         @DisplayName("addWorklog + listWorklogs (minutes)")
         void should_log_work() {
             Long id = newIssueId("Timed");
