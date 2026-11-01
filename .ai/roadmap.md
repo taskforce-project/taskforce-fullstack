@@ -10,6 +10,14 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 01/11/2026 (ter) - J0, R82 : les pages disent vrai : la webapp reste, l'hébergement réel, l'assistant chez Groq.** `[frontend + landing]`
+> - **Décision du CEO** : « nan on ferme pas la webapp » (R91 modifiée) ; R82 retenue.
+> - **Fait** (branche `fix/pages-say-true`) :
+>   - le site : `/migrate` ne dit plus que la webapp ferme (description, accroche, bandeau « The web app stays online: move when you are ready. », foire aux questions ; `WEB_APP_CLOSES` retirée) ; la confidentialité et les mentions légales ne disent plus les comptes hébergés chez OVH : ils tournent, avec la webapp, sur des machines prêtées par Metz Numeric School, à Metz, jusqu'au serveur d'OVH ;
+>   - la politique de confidentialité de la webapp hébergée nomme Brevo (pas Mailtrap), Groq (les questions à l'assistant partent hors de l'Union européenne) et l'hébergement, et dit le chiffrement au repos pour ce qu'il couvre : les jetons d'intégration et les secrets.
+> - **Contrôles** : front, `tsc` et lint propres ; site, lint et build (12 pages), les textes vérifiés dans le HTML produit.
+> - **Reste** : l'adresse complète de l'hébergeur, à confirmer par le CEO (ou le VPS d'OVH) ; le brouillon de l'e-mail de lancement (`marketing/emails/2026-10-desktop-launch`) annonce encore la fermeture, à réécrire avant l'envoi ; la release du site.
+
 > **▶ MAJ 01/11/2026 (bis) - J0, R87 : « Apply » s'éteint quand les tests ont échoué ; passer outre demande une raison.** `[backend + frontend]`
 > - **Constat** (séance n°14 du Conseil, Norman et Bengio) : « Apply » fusionnait la pull request même quand les tests que le runner avait lancés échouaient.
 > - **Fait** (branche `feat/apply-respects-tests`) : `MissionResultService.apply` refuse sans raison quand `tests_ran` est vrai et `tests_passed` faux (400 : rien ne se fusionne, rien n'est posté). Avec une raison, il fusionne, la garde sur la mission (`outcome_reason`, V111) et la poste sur l'issue (« Applied although the tests failed: … »). `POST /runs/{id}/apply` prend `{reason}`, 2 000 caractères au plus. La carte éteint « Apply », dit pourquoi (« The tests failed, so Apply is off. ») et propose « Apply anyway », qui ouvre une raison obligatoire. Des tests non lancés ou réussis ne changent rien.
