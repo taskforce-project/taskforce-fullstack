@@ -4122,6 +4122,15 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionApplyRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -14104,6 +14113,16 @@
         "required": [
           "decision"
         ]
+      },
+      "MissionApplyRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0
+          }
+        }
       },
       "DelegateRequest": {
         "type": "object",
