@@ -242,10 +242,11 @@ describe("agent : frontière de sécurité de l'exécution locale", () => {
     assert.deepEqual(server?.headers, { Authorization: "Bearer session-token", "X-TaskForce-Delivery-Run": "42" });
   });
 
-  // Les deux hooks de la porte : les règles avant chaque action, puis la décision humaine pour ce qu'elles demandent.
+  // Les deux hooks de la porte : les règles avant chaque action, avec la décision humaine pour ce qu'elles demandent,
+  // puis, en secours, ce que Claude Code demande encore. Chacun attend au-delà de l'attente du serveur.
   const hooks: Array<["PreToolUse" | "PermissionRequest", string, number]> = [
-    ["PreToolUse", "http://127.0.0.1:5000/pre-tool-use", 30],
-    ["PermissionRequest", "http://127.0.0.1:5000/permission", 5 * 60 + 60], // au-delà de l'attente du serveur
+    ["PreToolUse", "http://127.0.0.1:5000/pre-tool-use", 5 * 60 + 60],
+    ["PermissionRequest", "http://127.0.0.1:5000/permission", 5 * 60 + 60],
   ];
   for (const [event, url, timeout] of hooks) {
     it(`réglages de session : hook ${event} HTTP authentifié, sur toute action, garde fermée`, () => {

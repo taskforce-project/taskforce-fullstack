@@ -10,6 +10,17 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 01/11/2026 (sexies) - J0 : la porte demande elle-même ce que les règles demandent ; un accord pour la mission couvre chaque morceau ; lire dans la copie a sa règle.** `[runner + contrats]`
+> - **Constat** (la boucle rejouée par le CEO sur l'app desktop 1.4.0) : une action que la table demande n'arrivait pas toujours à la personne, et la seule demande de la mission portait sur une commande que la table aurait dû laisser passer.
+> - **Fait** (branche `fix/ask-gate`) :
+>   - la porte (hook `PreToolUse`) demande elle-même, dans TaskForce, ce que les règles demandent, attend la décision de la personne qui a délégué, puis répond autoriser ou refuser : aucune action ne repart sans décision, quelles que soient les permissions propres de Claude Code. Le délai du hook passe à celui des demandes (10 min, plus 1) ; `PermissionRequest` reste servi, en secours ;
+>   - un accord « pour cette mission » (R46) couvre chaque morceau d'une commande qui demandait, et une commande ne passe ensuite sans demande que si chacun de ses morceaux qui demandent l'est déjà ;
+>   - la règle `run-reads` (classe `read`, R7') : `cd`, `pwd`, `ls`, `cat`, `head`, `tail`, `wc`, `grep`, `stat` et `diff` passent sans demande dans la copie. Ne se bornent pas, donc restent demandés : un chemin hors de la copie ou dans `.git`, une variable ou un autre dépliage du shell, un lien du dépôt vers l'extérieur, une valeur collée à une option courte (`-fFICHIER`) qui sort de la copie. `cd` change le dossier des morceaux qui suivent ;
+>   - les outils autorisés d'avance sur le poste (`agent.extraAllowedTools`) gardent leur sens : pour eux, ce que les règles demandent revient aux permissions de Claude Code, et un refus des règles tient.
+> - **Contrat** : la table par défaut passe à 36 règles (les deux copies, identiques) ; 4 motifs et 9 décisions ajoutés aux cas partagés ; empreinte `sha256:c0d557fc…` ; `contracts/agent/adapter.md` et le README du runner à jour.
+> - **Contrôles** : runner, `npm test` 387 sur 387 et `tsc` propre ; l'agent de substitution passé une fois par la porte réelle (faux TaskForce, faux serveur MCP), toutes ses vérifications au vert ; Java, `HarnessContractTest` (96), `HarnessRulesServiceTest` (3), `AgentServiceTest` (64), `CortexGateTest` (16) et `LocalRunnerServiceTest` (30), 0 échec.
+> - **Reste** : la release (le backend porte la table, l'app desktop embarque le runner) sur « go release » ; le §7.1 de la spécification v2 (`taskforce-docs`) à mettre à jour ; la boucle rejouée sur la desktop suivante.
+
 > **▶ MAJ 01/11/2026 (quater) - Release 1.7.0 EN PROD : J0 et R78 (Créer, Accorder, Relire) ; desktop 1.4.0 publiée.** `[release]`
 > - **Décision du CEO** : « go release ».
 > - **En prod** : #462 fusionnée dans `dev` ; `chore(desktop)` 1.4.0 (`ac6b3964`) ; release #463 vers `main` (`4225f353`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.7.0 en plomberie ; étiquettes `minor` pour le backend et le front, car une mission gagne trois écrans, `patch` pour le site). Tags `taskforce-v1.7.0`, `backend-v1.9.20`, `frontend-v1.10.14`, `landing-v2.3.2`.
