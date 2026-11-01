@@ -31,8 +31,8 @@ import lombok.extern.slf4j.Slf4j;
  * écartées dans la requête SQL, avant le classement et la limite, et jamais après.</p>
  *
  * <p><b>Aucune transaction n'englobe l'appel au modèle.</b> Le calcul du vecteur de la requête (HTTP vers
- * l'ai-service, jusqu'à 60 s sur un modèle local) se fait avant ; seules la lecture et la mise en forme des
- * notes trouvées se font dans une transaction courte. Les vecteurs des notes sont calculés en tâche de fond
+ * le fournisseur des vecteurs, jusqu'à 60 s sur un modèle local) se fait avant ; seules la lecture et la mise en
+ * forme des notes trouvées se font dans une transaction courte. Les vecteurs des notes sont calculés en tâche de fond
  * par {@link BrainEmbeddingIndexer}, jamais pendant une requête de l'utilisateur.</p>
  */
 @Service

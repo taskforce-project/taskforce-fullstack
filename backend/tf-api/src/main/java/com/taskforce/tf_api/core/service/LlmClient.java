@@ -6,9 +6,9 @@ import java.util.Map;
 import com.fasterxml.jackson.databind.JsonNode;
 
 /**
- * Accès au modèle de langage. Seule implémentation : {@link AiGatewayClient} (ai-service, qui parle au
- * fournisseur configuré). Les appelants ne choisissent pas un modèle mais un <b>tier</b> :
- * {@code fast} (petit modèle, réponses courtes), {@code standard} (modèle principal, défaut) ou
+ * Accès au modèle de langage. Seule implémentation : {@link AiGatewayClient}, par la passerelle de modèles du
+ * backend (Ollama, toute API compatible OpenAI, l'API d'Anthropic). Les appelants ne choisissent pas un modèle
+ * mais un <b>tier</b> : {@code fast} (petit modèle, réponses courtes), {@code standard} (modèle principal, défaut) ou
  * {@code deep} (modèle principal qui raisonne). Les tests mockent cette interface, jamais une classe concrète.
  */
 public interface LlmClient {

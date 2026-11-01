@@ -1,99 +1,110 @@
 package com.taskforce.tf_api.core.service;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+import java.util.List;
+import java.util.Optional;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.stereotype.Service;
+
+import com.taskforce.tf_api.core.service.ai.AiProviderConfig;
+import com.taskforce.tf_api.core.service.ai.AiProviderSettings;
+import com.taskforce.tf_api.core.service.ai.ModelChoice;
+import com.taskforce.tf_api.core.service.ai.ModelGateway;
 
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * État de l'IA de l'instance, lu sur {@code GET /v1/status} de l'ai-service et gardé en cache 30 s.
+ * État de l'IA de l'instance : le fournisseur répond-il, quels modèles servent, gardé en cache 30 s. La passerelle de
+ * modèles ({@link ModelGateway}) lit la liste des modèles du fournisseur ; les modèles que les réglages ne nomment pas
+ * y sont choisis ({@link ModelChoice}).
  *
- * <p>Sert à échouer tout de suite quand l'IA n'est pas disponible (aucun fournisseur, fournisseur
- * injoignable, secret manquant) au lieu d'attendre le délai d'expiration à chaque appel, et à afficher
- * l'état « IA non configurée » dans l'interface ({@code GET /api/ai/status}).</p>
+ * <p>Sert à échouer tout de suite quand l'IA n'est pas disponible (IA coupée, fournisseur injoignable, modèle absent)
+ * au lieu d'attendre le délai d'expiration à chaque appel, et à afficher l'état « IA non configurée » dans l'interface
+ * ({@code GET /api/ai/status}). Un changement de fournisseur dans l'app desktop rend le cache caduc.</p>
  */
 @Service
 @Slf4j
 public class AiStatusService {
 
-    /** État de l'IA. Les noms de modèles sont {@code null} quand l'ai-service ne répond pas. */
+    /** État de l'IA. Les noms de modèles sont {@code null} quand on ne sait pas lesquels serviraient. */
     public record AiStatus(boolean configured, boolean chatAvailable, String chatModel, String fastModel,
                            boolean embeddingsAvailable, String embeddingModel) {
         public static final AiStatus UNREACHABLE = new AiStatus(false, false, null, null, false, null);
     }
 
+    /**
+     * Ce que la passerelle voit chez les fournisseurs, avec les réglages qui l'ont produit : les appels s'y tiennent,
+     * pour qu'un modèle choisi pour un fournisseur ne parte pas chez un autre. Jamais rendu tel quel par une API : les
+     * réglages portent les clés.
+     *
+     * @param reachable   la conversation répond
+     * @param models      les modèles qu'elle annonce
+     * @param embedModels les modèles qu'annonce le fournisseur des vecteurs
+     */
+    public record Snapshot(AiProviderSettings settings, AiStatus status, boolean reachable, List<String> models,
+                           List<String> embedModels) {
+    }
+
     private static final long TTL_MS = 30_000;
 
-    private final RestTemplate http;
-    private final ObjectMapper objectMapper;
-    private final String statusUrl;
-    private final String token;
+    private final ModelGateway gateway;
+    private final AiProviderConfig config;
 
-    private volatile AiStatus cached;
-    private volatile long cachedAt;
-
-    public AiStatusService(ObjectMapper objectMapper,
-                           @Value("${ai.service.url:http://ai-service:8000}") String serviceUrl,
-                           @Value("${ai.service.token:}") String token) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(2_000);
-        factory.setReadTimeout(8_000); // l'ai-service sonde le fournisseur (3 s chacun, chat puis embeddings)
-        this.http = new RestTemplate(factory);
-        this.objectMapper = objectMapper;
-        this.statusUrl = serviceUrl.replaceAll("/+$", "") + "/v1/status";
-        this.token = token;
+    private record Cached(Snapshot snapshot, long at, long version) {
     }
 
-    /** État courant, relu au plus toutes les 30 s. */
+    private volatile Cached cached;
+
+    public AiStatusService(ModelGateway gateway, AiProviderConfig config) {
+        this.gateway = gateway;
+        this.config = config;
+    }
+
+    /** État courant, relu au plus toutes les 30 s, et tout de suite après un changement de réglages. */
     public AiStatus current() {
-        AiStatus snapshot = cached;
-        if (snapshot != null && System.currentTimeMillis() - cachedAt < TTL_MS) {
-            return snapshot;
+        return snapshot().status();
+    }
+
+    /** L'état et les réglages qui l'ont produit. */
+    public Snapshot snapshot() {
+        Cached entry = cached;
+        if (fresh(entry)) {
+            return entry.snapshot();
         }
         synchronized (this) {
-            if (cached == null || System.currentTimeMillis() - cachedAt >= TTL_MS) {
-                cached = fetch();
-                cachedAt = System.currentTimeMillis();
+            entry = cached;
+            if (!fresh(entry)) {
+                long version = config.version();
+                entry = new Cached(compute(config.current()), System.currentTimeMillis(), version);
+                cached = entry;
             }
-            return cached;
+            return entry.snapshot();
         }
     }
 
-    /** Oublie l'état en cache : le prochain appel relit l'ai-service (après un échec d'appel au modèle). */
+    /** Oublie l'état en cache : le prochain appel relit le fournisseur (après un échec d'appel au modèle). */
     public void invalidate() {
-        cachedAt = 0;
+        cached = null;
     }
 
-    private AiStatus fetch() {
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setBearerAuth(token == null ? "" : token);
-            String raw = http.exchange(statusUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class).getBody();
-            JsonNode root = objectMapper.readTree(raw == null ? "{}" : raw);
-            JsonNode chat = root.path("chat");
-            JsonNode embeddings = root.path("embeddings");
-            return new AiStatus(
-                root.path("configured").asBoolean(false),
-                chat.path("available").asBoolean(false),
-                chat.path("model").asText(null),
-                chat.path("model_fast").asText(null),
-                embeddings.path("available").asBoolean(false),
-                embeddings.path("model").asText(null));
-        } catch (Exception ex) {
-            if (token == null || token.isBlank()) {
-                log.warn("AI is off: AI_SERVICE_TOKEN is not set on the backend");
-            } else {
-                log.warn("AI service status unavailable: {}", ex.getMessage());
-            }
-            return AiStatus.UNREACHABLE;
+    private boolean fresh(Cached entry) {
+        return entry != null && entry.version() == config.version() && System.currentTimeMillis() - entry.at() < TTL_MS;
+    }
+
+    private Snapshot compute(AiProviderSettings settings) {
+        if (!settings.enabled()) {
+            return new Snapshot(settings, new AiStatus(false, false, null, null, false, null), false, List.of(), List.of());
         }
+        Optional<List<String>> chat = gateway.chatModels(settings);
+        Optional<List<String>> embed = settings.sameEmbedEndpoint() ? chat : gateway.embedModels(settings);
+        ModelChoice.Models models = ModelChoice.resolve(settings, chat.orElse(null), embed.orElse(null));
+        // Un modèle choisi mais absent de la liste ne répondrait pas : on le dit au lieu d'échouer à chaque appel.
+        boolean chatAvailable = chat.isPresent()
+            && ModelChoice.listed(chat.get(), models.chat()) && ModelChoice.listed(chat.get(), models.fast());
+        boolean embedAvailable = embed.isPresent() && ModelChoice.listed(embed.get(), models.embed());
+        if (chat.isEmpty()) {
+            log.warn("AI provider unreachable ({})", settings.describe());
+        }
+        AiStatus status = new AiStatus(true, chatAvailable, models.chat(), models.fast(), embedAvailable, models.embed());
+        return new Snapshot(settings, status, chat.isPresent(), chat.orElse(List.of()), embed.orElse(List.of()));
     }
 }
