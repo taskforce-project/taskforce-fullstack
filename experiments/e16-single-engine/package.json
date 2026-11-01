@@ -1,0 +1,13 @@
+{
+  "name": "e16-single-engine",
+  "private": true,
+  "description": "Experiment E16 (R90 on trial): the rules decision asked to the local Java backend, or the Java engine compiled to JavaScript. Not merged; uses the runner's dev dependencies (npm ci in taskforce-runner first).",
+  "type": "module",
+  "scripts": {
+    "check": "../../taskforce-runner/node_modules/.bin/tsc -p .",
+    "ts": "../../taskforce-runner/node_modules/.bin/tsx bench/ts-inprocess.ts",
+    "a:native": "../../taskforce-runner/node_modules/.bin/tsx bench/run-a.ts --mode native",
+    "a:container": "../../taskforce-runner/node_modules/.bin/tsx bench/run-a.ts --mode container",
+    "b": "../../taskforce-runner/node_modules/.bin/tsx bench/run-b.ts"
+  }
+}
