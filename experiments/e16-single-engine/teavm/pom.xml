@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Expérience E16, voie (b) : le moteur de règles du backend compilé en JavaScript par TeaVM, sans copie de ses sources.
+  Les fichiers du moteur sont lus dans backend/tf-api (build-helper) ; ici vivent l'adaptateur JavaScript (src/main) et
+  les classes du JDK qui manquent à TeaVM (src/emul).
+
+    mvn clean process-classes -Dteavm.stopOnErrors=false   (dans ce dossier, avec Java 21)
+      -> target/js/decisions.js (décisions seules) ; rules-engine.js reste vide : TeaVM 0.16 n'a ni MessageDigest ni
+         HexFormat, que l'empreinte utilise.
+    mvn clean process-classes -Pemul
+      -> target/js-emul/decisions.js et rules-engine.js, avec ces deux classes fournies par src/emul.
+  Des modules ES2015 que bench/run-b.ts rejoue sur contracts/rules/cases.json.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.taskforce.experiments</groupId>
+  <artifactId>e16-teavm</artifactId>
+  <version>0.1.0</version>
+  <packaging>jar</packaging>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <teavm.version>0.16.0</teavm.version>
+    <!-- La version de Jackson 2 du backend (BOOT-INF/lib du JAR de la branche). -->
+    <jackson.version>2.21.4</jackson.version>
+    <backend.sources>${project.basedir}/../../../backend/tf-api/src/main/java</backend.sources>
+    <teavm.stopOnErrors>true</teavm.stopOnErrors>
+    <teavm.outputDir>${project.build.directory}/js</teavm.outputDir>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-classlib</artifactId>
+      <version>${teavm.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-jso</artifactId>
+      <version>${teavm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>3.6.1</version>
+        <executions>
+          <execution>
+            <id>backend-engine</id>
+            <phase>generate-sources</phase>
+            <goals><goal>add-source</goal></goals>
+            <configuration>
+              <sources><source>${backend.sources}</source></sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.14.1</version>
+        <configuration>
+          <!-- Du backend, seulement le moteur : les règles et l'empreinte, avec le JSON canonique qu'elle utilise. -->
+          <includes>
+            <include>com/taskforce/e16/**</include>
+            <include>com/taskforce/tf_api/core/harness/rules/RulesEngine.java</include>
+            <include>com/taskforce/tf_api/core/harness/rules/RulesBundle.java</include>
+            <include>com/taskforce/tf_api/core/harness/rules/Glob.java</include>
+            <include>com/taskforce/tf_api/core/harness/rules/RulesDigest.java</include>
+            <include>com/taskforce/tf_api/core/harness/evidence/CanonicalJson.java</include>
+            <include>com/taskforce/tf_api/core/harness/evidence/EvidenceChain.java</include>
+          </includes>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.teavm</groupId>
+        <artifactId>teavm-maven-plugin</artifactId>
+        <version>${teavm.version}</version>
+        <configuration>
+          <targetType>JAVASCRIPT</targetType>
+          <targetDirectory>${teavm.outputDir}</targetDirectory>
+          <jsModuleType>ES2015</jsModuleType>
+          <optimizationLevel>ADVANCED</optimizationLevel>
+          <minifying>true</minifying>
+          <!-- false : une sortie en erreur n'arrête pas la suivante (les décisions seules se compilent toujours). -->
+          <stopOnErrors>${teavm.stopOnErrors}</stopOnErrors>
+        </configuration>
+        <executions>
+          <!-- Les décisions seules : RulesEngine et Glob. -->
+          <execution>
+            <id>decisions</id>
+            <phase>process-classes</phase>
+            <goals><goal>compile</goal></goals>
+            <configuration>
+              <mainClass>com.taskforce.e16.DecisionsJs</mainClass>
+              <targetFileName>decisions.js</targetFileName>
+            </configuration>
+          </execution>
+          <!-- Le moteur entier : les décisions et l'empreinte (RulesDigest, CanonicalJson, EvidenceChain). -->
+          <execution>
+            <id>engine</id>
+            <phase>process-classes</phase>
+            <goals><goal>compile</goal></goals>
+            <configuration>
+              <mainClass>com.taskforce.e16.RulesEngineJs</mainClass>
+              <targetFileName>rules-engine.js</targetFileName>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <!--
+      -Pemul : les classes du JDK qui manquent à TeaVM sur le chemin de l'empreinte, fournies par src/emul (substitution
+      de TeaVM 0.16). Le moteur reste celui de backend/tf-api, sans changement. Sortie dans target/js-emul.
+    -->
+    <profile>
+      <id>emul</id>
+      <properties>
+        <teavm.outputDir>${project.build.directory}/js-emul</teavm.outputDir>
+      </properties>
+      <dependencies>
+        <dependency>
+          <groupId>org.teavm</groupId>
+          <artifactId>teavm-extension-spi</artifactId>
+          <version>${teavm.version}</version>
+          <scope>provided</scope>
+        </dependency>
+      </dependencies>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>emulation</id>
+                <phase>generate-sources</phase>
+                <goals><goal>add-source</goal><goal>add-resource</goal></goals>
+                <configuration>
+                  <sources><source>${project.basedir}/src/emul/java</source></sources>
+                  <resources><resource><directory>${project.basedir}/src/emul/resources</directory></resource></resources>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>
