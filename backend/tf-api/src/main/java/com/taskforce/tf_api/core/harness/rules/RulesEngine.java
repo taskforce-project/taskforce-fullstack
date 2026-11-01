@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.harness.rules;
 
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -48,6 +49,21 @@ public final class RulesEngine {
             }
         }
         return winner == null ? new Decision(ASK, null) : new Decision(winner.effect(), winner);
+    }
+
+    /**
+     * Plusieurs faits pour un seul appel (une commande composée) : le plus strict l'emporte. Aucun fait (outil interne
+     * de l'agent, sans effet hors de la session) : autorisé, sans règle. Même définition que {@code decideAll} du runner.
+     */
+    public static Decision decideAll(RulesBundle bundle, List<Map<String, String>> factsList) {
+        Decision strictest = null;
+        for (Map<String, String> facts : factsList) {
+            Decision decision = decide(bundle, facts);
+            if (strictest == null || rank(decision.effect()) > rank(strictest.effect())) {
+                strictest = decision;
+            }
+        }
+        return strictest == null ? new Decision(ALLOW, null) : strictest;
     }
 
     static boolean matches(Condition when, Map<String, String> facts) {
