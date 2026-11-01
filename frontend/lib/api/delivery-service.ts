@@ -50,6 +50,49 @@ export interface DeliveryRun {
   startedById: number | null;
   createdAt: string | null;
   updatedAt: string | null;
+  /** Le travail commencé (le runner a pris la mission) et fini : la durée de la carte de résultat (R78). */
+  claimedAt?: string | null;
+  endedAt?: string | null;
+  /** La version des règles de la mission. */
+  rulesVersion?: number | null;
+  /** La branche de l'agent et ses commits ; absents sans changement de code. */
+  branch?: string | null;
+  commits?: number | null;
+  /** Les tests du projet tels que le runner les a lancés (R32), jamais ce que l'agent en dit. */
+  tests?: DeliveryRunTests | null;
+  /** Le geste de la personne sur la carte de résultat, et quand ; absents tant qu'elle n'a pas tranché. */
+  outcome?: DeliveryRunOutcome | null;
+  outcomeAt?: string | null;
+}
+
+export type DeliveryRunOutcome = "APPLIED" | "DISCARDED" | "RETRIED";
+
+export interface DeliveryRunTests {
+  command: string;
+  ran: boolean;
+  passed: boolean;
+  /** Combien ont passé, sur combien, quand la sortie des tests le dit. */
+  passedCount: number | null;
+  total: number | null;
+}
+
+/**
+ * « Apply » (R78) : la pull request de l'agent est fusionnée sur GitHub, puis l'issue terminée. Si les tests ont échoué,
+ * le serveur demande la raison de passer outre (R87) : elle part sans ses blancs.
+ */
+export async function applyRun(slug: string, runId: number, reason = ""): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.APPLY(slug, runId), reason.trim() ? { reason: reason.trim() } : {});
+}
+
+/** « Discard » : la pull request est fermée, sa branche supprimée. */
+export async function discardRun(slug: string, runId: number): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.DISCARD(slug, runId), {});
+}
+
+/** « Try again » : le résultat écarté, la remarque postée sur l'issue, une nouvelle mission ; rend cette mission. */
+export async function retryRun(slug: string, runId: number, note: string): Promise<DeliveryRun> {
+  const res = await apiClient.post<{ data: DeliveryRun }>(DELIVERY_ROUTES.RETRY(slug, runId), note.trim() ? { note: note.trim() } : {});
+  return res.data.data;
 }
 
 /** Délègue une issue à un agent (crée un run, exécuté en arrière-plan côté serveur). */
@@ -106,6 +149,13 @@ export interface DeliveryRunApproval {
   canDecide: boolean;
   /** Qui demande : l'agent, ou TaskForce lui-même avant une sortie, les tests du projet ou un départ (décision J4). */
   askedBy?: "agent" | "runner";
+  /** L'action que les règles ont jugée (`web.search`, `shell`...), pour la dire en mots (R78) ; absente d'un runner plus ancien. */
+  action?: string | null;
+  /** La règle qui demande, et sa raison telle qu'elle s'écrit pour la personne ; absentes quand aucune ne couvre l'action. */
+  rule?: string | null;
+  reason?: string | null;
+  /** Portée d'un accord : `ONCE`, ou `MISSION` pour le reste de la mission (R46). */
+  scope?: "ONCE" | "MISSION" | null;
 }
 
 export interface DeliveryRunActivity {
@@ -120,8 +170,13 @@ export async function getRunActivity(slug: string, runId: number, after: number)
 }
 
 /** Autorise ou refuse une action demandée par l'agent. */
-export async function decideApproval(slug: string, runId: number, approvalId: number, allow: boolean): Promise<void> {
-  await apiClient.post(DELIVERY_ROUTES.DECIDE(slug, runId, approvalId), { decision: allow ? "ALLOW" : "DENY" });
+export async function decideApproval(
+  slug: string, runId: number, approvalId: number, allow: boolean, forMission = false,
+): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.DECIDE(slug, runId, approvalId), {
+    decision: allow ? "ALLOW" : "DENY",
+    ...(allow && forMission ? { scope: "MISSION" } : {}),
+  });
 }
 
 /**

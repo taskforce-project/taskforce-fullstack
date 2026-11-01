@@ -12,6 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.taskforce.tf_api.core.dto.request.RunnerApprovalRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunActivityResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
@@ -67,6 +68,10 @@ public class DeliveryActivityService {
         "decision", "action.decided", "exit", "exit.result", "limit", "limit.reached", "test", "test.result");
     /** Les décisions des règles vont au dossier, pas à la chronologie affichée : une ligne par action la noierait. */
     private static final Set<String> EVIDENCE_ONLY = Set.of("decision");
+
+    /** La portée d'un accord : une fois, ou pour le reste de la mission (R46). */
+    static final String SCOPE_ONCE = "ONCE";
+    static final String SCOPE_MISSION = "MISSION";
 
     // --------------------------------------------------------------------- runner (autorité déjà vérifiée)
 
@@ -128,11 +133,24 @@ public class DeliveryActivityService {
      */
     @Transactional
     public RunnerApprovalResponse openApproval(DeliveryRun run, String tool, String summary, boolean byRunner) {
+        return openApproval(run, tool, summary, byRunner, null);
+    }
+
+    /**
+     * Ouvre une demande avec ce que les règles ont jugé : l'action, la règle qui demande et sa raison, pour que la
+     * demande se dise en mots (R78, séance n°13). {@code ruling} est nul pour un runner plus ancien.
+     */
+    @Transactional
+    public RunnerApprovalResponse openApproval(DeliveryRun run, String tool, String summary, boolean byRunner,
+                                               RunnerApprovalRequest ruling) {
         DeliveryRunApproval approval = approvalRepository.save(DeliveryRunApproval.builder()
             .run(run)
             .tool(tool.strip())
             .summary(clip(summary))
             .askedBy(byRunner ? "runner" : "agent")
+            .action(ruling == null ? null : blankToNull(ruling.action()))
+            .ruleId(ruling == null ? null : blankToNull(ruling.rule()))
+            .ruleReason(ruling == null ? null : blankToNull(ruling.reason()))
             .expiresAt(LocalDateTime.now().plus(settings.approvalTimeout()))
             .build());
         notificationService.notifyAgentApproval(run.getIssue(), run.getStartedBy(), approval.getTool(), approval.getSummary(), byRunner);
@@ -183,7 +201,8 @@ public class DeliveryActivityService {
             .peek(a -> expireIfDue(a, now))
             .map(a -> new DeliveryRunActivityResponse.Approval(a.getId(), a.getTool(), a.getSummary(), a.getStatus().name(),
                 a.getCreatedAt(), a.getExpiresAt(), a.getDecidedAt(), displayName(a.getDecidedBy()),
-                delegator && a.getStatus() == DeliveryApprovalStatus.PENDING, a.getAskedBy()))
+                delegator && a.getStatus() == DeliveryApprovalStatus.PENDING, a.getAskedBy(),
+                a.getAction(), a.getRuleId(), a.getRuleReason(), a.getScope()))
             .toList();
         return new DeliveryRunActivityResponse(events, approvals);
     }
@@ -196,9 +215,18 @@ public class DeliveryActivityService {
         return markdown ? evidenceService.dossierMarkdown(run) : evidenceService.dossierJson(run);
     }
 
-    /** Autorise ou refuse une action de l'agent. Réservé à la personne qui a délégué, tant que la demande attend. */
+    /** Autorise une fois, ou refuse, une action de l'agent. */
     @Transactional
     public void decide(String slug, Long runId, Long approvalId, boolean allow, Long userId) {
+        decide(slug, runId, approvalId, allow, false, userId);
+    }
+
+    /**
+     * Autorise ou refuse une action de l'agent. Réservé à la personne qui a délégué, tant que la demande attend. Un accord
+     * {@code forMission} vaut pour le reste de la mission (R46) : le runner ne redemande plus ce que la même règle demande.
+     */
+    @Transactional
+    public void decide(String slug, Long runId, Long approvalId, boolean allow, boolean forMission, Long userId) {
         DeliveryRun run = scopedRun(slug, runId);
         visibilityGuard.assertCanView(run.getIssue().getProject(), userId);
         if (run.getStartedBy() == null || !Objects.equals(run.getStartedBy().getId(), userId)) {
@@ -215,11 +243,13 @@ public class DeliveryActivityService {
             throw new BusinessException("This request was already answered.");
         }
         approval.setStatus(allow ? DeliveryApprovalStatus.ALLOWED : DeliveryApprovalStatus.DENIED);
+        approval.setScope(allow && forMission ? SCOPE_MISSION : SCOPE_ONCE);
         approval.setDecidedAt(now);
         approval.setDecidedBy(userRepository.getReferenceById(userId));
         approvalRepository.save(approval);
         Map<String, Object> decided = approvalData(approval);
         decided.put("decision", approval.getStatus().name());
+        decided.put("scope", approval.getScope());
         evidenceService.append(run, "human.decision", new MissionEvidenceService.Actor("person", run.getStartedBy().getEmail()), decided);
         log.info("Run {} : validation {} {} par {}", runId, approvalId, approval.getStatus(), userId);
     }
@@ -247,6 +277,8 @@ public class DeliveryActivityService {
         data.put("approval", approval.getId());
         data.put("tool", approval.getTool());
         data.put("summary", approval.getSummary());
+        if (approval.getAction() != null) data.put("action", approval.getAction());
+        if (approval.getRuleId() != null) data.put("rule", approval.getRuleId());
         return data;
     }
 
@@ -262,7 +294,7 @@ public class DeliveryActivityService {
     }
 
     private static RunnerApprovalResponse toRunnerResponse(DeliveryRunApproval approval) {
-        return new RunnerApprovalResponse(approval.getId(), approval.getStatus().name(), approval.getExpiresAt());
+        return new RunnerApprovalResponse(approval.getId(), approval.getStatus().name(), approval.getExpiresAt(), approval.getScope());
     }
 
     private static String displayName(User user) {

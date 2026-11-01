@@ -26,6 +26,17 @@ export interface RunResult {
   error?: string;
   /** Une règle a refusé la mission au départ : ce n'est pas une panne (R38). */
   refused?: boolean;
+  /** La branche de l'agent et ses commits, pour la carte de résultat (R78). */
+  branch?: string;
+  commits?: number;
+  /** Les tests du projet tels que le runner les a lancés (R32) : jamais ce que l'agent en dit. */
+  tests?: {
+    command: string;
+    ran: boolean;
+    passed: boolean;
+    passedCount?: number;
+    total?: number;
+  };
 }
 
 /** Événement de la chronologie d'un run (miroir de `RunnerEventsRequest` côté backend). */
@@ -47,6 +58,17 @@ export interface Approval {
   approvalId: number;
   status: "PENDING" | "ALLOWED" | "DENIED" | "EXPIRED";
   expiresAt: string;
+  /** Portée d'un accord : `ONCE`, ou `MISSION` pour le reste de la mission (R46) ; absente tant qu'on n'a pas répondu. */
+  scope?: "ONCE" | "MISSION" | null;
+}
+
+/** Ce que les règles ont jugé d'une action demandée, pour que TaskForce la dise en mots (R78, séance n°13). */
+export interface Ruling {
+  /** L'action jugée : `web.search`, `shell`, `git.push`... */
+  action?: string;
+  /** La règle qui demande, et sa raison telle qu'elle s'écrit pour la personne. */
+  rule?: string;
+  reason?: string;
 }
 
 export class ApiError extends Error {
@@ -106,8 +128,8 @@ export class TaskforceApi {
    * Ouvre une demande de validation : la personne qui a délégué autorise ou refuse dans l'app. `askedBy` dit qui
    * demande, l'agent ou le runner lui-même (décision J4).
    */
-  requestApproval(runId: number, tool: string, summary: string, askedBy: AskedBy = "agent"): Promise<Approval> {
-    return this.send<Approval>("POST", `/delivery/runner/runs/${runId}/approvals`, { tool, summary, askedBy });
+  requestApproval(runId: number, tool: string, summary: string, askedBy: AskedBy = "agent", ruling: Ruling = {}): Promise<Approval> {
+    return this.send<Approval>("POST", `/delivery/runner/runs/${runId}/approvals`, { tool, summary, askedBy, ...ruling });
   }
 
   approvalStatus(runId: number, approvalId: number): Promise<Approval> {

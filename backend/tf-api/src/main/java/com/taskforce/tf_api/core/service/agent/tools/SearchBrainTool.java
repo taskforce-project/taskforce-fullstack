@@ -8,16 +8,18 @@ import org.springframework.stereotype.Component;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
+import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 
 import lombok.RequiredArgsConstructor;
 
-/** Outil : recherche sémantique dans la mémoire (Brain OS) du workspace. */
+/** Outil : recherche sémantique dans la mémoire (Brain OS) du workspace, parmi les notes que la personne lit. */
 @Component
 @RequiredArgsConstructor
 public class SearchBrainTool implements AgentTool {
 
     private final BrainSearchService search;
+    private final BrainAccessGuard   access;
 
     @Override public String name() { return "search_brain"; }
 
@@ -40,7 +42,7 @@ public class SearchBrainTool implements AgentTool {
     @Override public String execute(Map<String, Object> args, AgentContext ctx) {
         String query = String.valueOf(args.getOrDefault("query", ""));
         int topK = args.get("topK") instanceof Number n ? n.intValue() : 5;
-        List<KnowledgeNode> hits = search.retrieveRelevant(ctx.workspaceId(), query, topK);
+        List<KnowledgeNode> hits = search.retrieveRelevant(access.viewer(ctx.workspaceId(), ctx.userId()), query, topK);
         if (hits.isEmpty()) return "No relevant note found.";
         StringBuilder sb = new StringBuilder("Relevant notes:\n");
         for (KnowledgeNode n : hits) {

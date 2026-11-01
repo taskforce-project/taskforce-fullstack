@@ -6,7 +6,9 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import type { DeliveryRunActivity, DeliveryRunApproval, DeliveryRunEvent } from "@/lib/api/delivery-service"
+import { approvalOutcome, approvalWords, deadlineText } from "@/lib/delivery/approval-words"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { cn } from "@/lib/utils"
 import { parseServerDate } from "@/lib/utils/server-date"
 
@@ -27,68 +29,100 @@ const EVENT_ICON: Record<DeliveryRunEvent["kind"], React.ElementType> = {
   test: FlaskConical,
 }
 
-function minutesLeft(expiresAt: string | null): string {
-  if (!expiresAt) return ""
-  const minutes = Math.max(0, Math.ceil((parseServerDate(expiresAt).getTime() - Date.now()) / 60_000))
-  return minutes <= 1 ? "less than a minute left" : `${minutes} min left`
+/** Minutes entières avant l'échéance d'une demande (0 si elle est passée). */
+function minutesLeft(expiresAt: string | null): number {
+  if (!expiresAt) return 0
+  return Math.max(0, Math.ceil((parseServerDate(expiresAt).getTime() - Date.now()) / 60_000))
 }
 
-function PendingApproval({ slug, runId, approval }: Readonly<{ slug: string; runId: number; approval: DeliveryRunApproval }>) {
-  const decide = useDeliveryStore((s) => s.decideApproval)
-  const [busy, setBusy] = useState<"allow" | "deny" | null>(null)
-
-  async function onDecide(allow: boolean) {
-    setBusy(allow ? "allow" : "deny")
-    const ok = await decide(slug, runId, approval.id, allow)
-    setBusy(null)
-    if (ok) toast.success(allow ? "Allowed: the agent goes on" : "Denied: the agent goes on without it")
-  }
-
+function Said({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
-    <div className="flex flex-col gap-1.5 rounded border border-shape-yellow/40 bg-shape-yellow/5 p-2" role="group"
-      aria-label={`Approval request: ${approval.tool}`}>
-      <span className="flex items-center gap-1.5 font-medium text-foreground">
-        <ShieldQuestion className="size-3.5 text-ink-yellow" />
-        {approval.askedBy === "runner" ? `TaskForce asks: ${approval.tool}` : `Claude Code asks to run ${approval.tool}`}
-      </span>
-      <code className="block overflow-x-auto whitespace-pre-wrap break-all rounded bg-muted px-1.5 py-1 font-mono text-[11px]">
-        {approval.summary}
-      </code>
-      {approval.canDecide ? (
-        <div className="flex items-center gap-2">
-          <Button size="sm" className="h-6 px-2 text-[11px]" disabled={busy !== null} onClick={() => onDecide(true)}>
-            {busy === "allow" ? <Loader2 className="size-3 animate-spin" /> : "Allow"}
-          </Button>
-          <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" disabled={busy !== null} onClick={() => onDecide(false)}>
-            {busy === "deny" ? <Loader2 className="size-3 animate-spin" /> : "Deny"}
-          </Button>
-          <span className="text-[10px] text-muted-foreground">{minutesLeft(approval.expiresAt)}, then it is denied</span>
-        </div>
-      ) : (
-        <span className="text-[10px] text-muted-foreground">
-          Waiting for the person who delegated this task to allow or deny it ({minutesLeft(approval.expiresAt)}).
-        </span>
-      )}
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="break-words text-foreground">{children}</dd>
     </div>
   )
 }
 
-function approvalLine(approval: DeliveryRunApproval): string | null {
-  switch (approval.status) {
-    case "ALLOWED": return `Allowed by ${approval.decidedBy ?? "the delegator"}`
-    case "DENIED": return `Denied by ${approval.decidedBy ?? "the delegator"}`
-    case "EXPIRED": return "No answer in time: denied"
-    default: return null
+/**
+ * « Accorder » (R78, séance n°13) : la demande dite en mots, ce que l'agent veut faire, pourquoi on la pose (la raison
+ * de la règle), sa tâche, ce qui se passe si l'on refuse ; la commande reste repliée (R49). Un accord de l'agent vaut
+ * pour le reste de la mission (R46) ; une demande de TaskForce lui-même (une sortie, un départ) vaut une fois. Sans
+ * réponse, c'est non, et la chronologie le dit ensuite.
+ */
+function PendingApproval({ slug, runId, approval, goal }: Readonly<{
+  slug: string
+  runId: number
+  approval: DeliveryRunApproval
+  goal?: string
+}>) {
+  const t = usePreferencesStore((s) => s.t.missions)
+  const decide = useDeliveryStore((s) => s.decideApproval)
+  const [busy, setBusy] = useState<"allow" | "deny" | null>(null)
+  const words = approvalWords(approval, t)
+  const forMission = approval.askedBy !== "runner"
+  const deadline = deadlineText(minutesLeft(approval.expiresAt), t)
+
+  async function onDecide(allow: boolean) {
+    setBusy(allow ? "allow" : "deny")
+    const ok = await decide(slug, runId, approval.id, allow, allow && forMission)
+    setBusy(null)
+    if (ok) toast.success(allow ? (forMission ? t.allowedForMission : t.allowed) : t.refused)
   }
+
+  return (
+    <div className="flex flex-col border border-shape-yellow/50 bg-background text-xs" role="group" aria-label={words.title}>
+      <div className="flex flex-col gap-0.5 border-b border-shape-yellow/40 bg-tint-yellow px-2.5 py-2">
+        <span className="flex items-center gap-1.5 font-semibold text-foreground">
+          <ShieldQuestion className="size-3.5 shrink-0 text-ink-yellow" />
+          {words.title}
+        </span>
+        <span className="break-all font-mono text-[11px] text-muted-foreground">{approval.summary}</span>
+      </div>
+      <dl className="flex flex-col gap-1.5 px-2.5 py-2">
+        <Said label={t.willDo}>{words.will}</Said>
+        <Said label={t.whyWeAsk}>{words.why}</Said>
+        {goal && <Said label={t.understood}>{goal}</Said>}
+        <Said label={t.ifRefused}>{words.ifRefused}</Said>
+      </dl>
+      <div className="flex flex-col gap-1.5 px-2.5 pb-2.5">
+        {approval.canDecide ? (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" className="h-7 px-2.5 text-[11px]" disabled={busy !== null} onClick={() => onDecide(false)}>
+                {busy === "deny" ? <Loader2 className="size-3 animate-spin" /> : t.refuse}
+              </Button>
+              <Button size="sm" className="h-7 px-2.5 text-[11px]" disabled={busy !== null} onClick={() => onDecide(true)}>
+                {busy === "allow" ? <Loader2 className="size-3 animate-spin" /> : forMission ? t.allowForMission : t.allowOnce}
+              </Button>
+            </div>
+            <span className="text-[10px] text-muted-foreground">{deadline}</span>
+            {forMission && <span className="text-[10px] text-muted-foreground">{t.forMissionHint}</span>}
+          </>
+        ) : (
+          <span className="text-[10px] text-muted-foreground">{t.waitingFor} {deadline}</span>
+        )}
+        <details className="text-[11px]">
+          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">{t.showCommand}</summary>
+          <code className="mt-1 block overflow-x-auto whitespace-pre-wrap break-all rounded bg-muted px-1.5 py-1 font-mono text-[11px]">
+            {approval.tool} {approval.summary}
+          </code>
+        </details>
+      </div>
+    </div>
+  )
 }
 
-export function RunActivity({ slug, runId, activity, live }: Readonly<{
+export function RunActivity({ slug, runId, activity, live, goal }: Readonly<{
   slug: string
   runId: number
   activity: DeliveryRunActivity | undefined
   /** Le run tourne encore : les demandes en attente peuvent être décidées. */
   live: boolean
+  /** La tâche de la mission (le titre de l'issue et sa clé), que la demande d'accord rappelle. */
+  goal?: string
 }>) {
+  const t = usePreferencesStore((s) => s.t.missions)
   const [expanded, setExpanded] = useState(live)
   const downloadEvidence = useDeliveryStore((s) => s.downloadEvidence)
   const events = activity?.events ?? []
@@ -106,7 +140,7 @@ export function RunActivity({ slug, runId, activity, live }: Readonly<{
 
   return (
     <div className="flex flex-col gap-1.5">
-      {pending.map((approval) => <PendingApproval key={approval.id} slug={slug} runId={runId} approval={approval} />)}
+      {pending.map((approval) => <PendingApproval key={approval.id} slug={slug} runId={runId} approval={approval} goal={goal} />)}
 
       <button type="button" className="w-fit text-[11px] text-muted-foreground hover:text-foreground hover:underline"
         aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
@@ -134,7 +168,7 @@ export function RunActivity({ slug, runId, activity, live }: Readonly<{
               <span className="min-w-0 break-words text-foreground">
                 <span className="font-medium">{approval.tool} </span>
                 <span className="font-mono text-[10px] text-muted-foreground">{approval.summary}</span>
-                <span className="text-muted-foreground">: {approvalLine(approval)}</span>
+                <span className="text-muted-foreground">: {approvalOutcome(approval, t)}</span>
               </span>
             </li>
           ))}

@@ -9,6 +9,9 @@ import {
   getRunActivity,
   decideApproval,
   downloadEvidence,
+  applyRun,
+  discardRun,
+  retryRun,
 } from './delivery-service';
 import { apiClient } from './client';
 import { DELIVERY_ROUTES } from '../config/api-routes';
@@ -123,6 +126,17 @@ describe('delivery-service', () => {
     expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DECIDE(SLUG, 100, 9), { decision });
   });
 
+  it.each([
+    [true, { decision: 'ALLOW', scope: 'MISSION' }],
+    [false, { decision: 'DENY' }], // un refus vaut toujours une fois
+  ])('POST pour le reste de la mission (autorisé=%s) -> %o', async (allow, body) => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
+
+    await decideApproval(SLUG, 100, 9, allow, true);
+
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DECIDE(SLUG, 100, 9), body);
+  });
+
   it.each([['json'], ['md']] as const)('télécharge le dossier de preuve en %s, comme fichier', async (format) => {
     const blob = new Blob(['{}']);
     vi.mocked(apiClient.get).mockResolvedValue({ data: blob });
@@ -140,5 +154,43 @@ describe('delivery-service', () => {
 
     expect(apiClient.get).toHaveBeenCalledWith('/api/workspaces/acme/delivery/providers?projectId=12');
     expect(DELIVERY_ROUTES.PROVIDERS(SLUG)).toBe('/api/workspaces/acme/delivery/providers');
+  });
+});
+
+describe('delivery-service : les gestes de la carte de résultat (R78)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it.each([
+    ['  The date test is flaky  ', { reason: 'The date test is flaky' }],
+    ['   ', {}],
+  ])('applyRun : la raison de passer outre des tests en échec %j part sans ses blancs (R87)', async (reason, body) => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
+
+    await applyRun(SLUG, 100, reason);
+
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.APPLY(SLUG, 100), body);
+  });
+
+  it('applyRun et discardRun : POST sur la mission', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
+
+    await applyRun(SLUG, 100);
+    await discardRun(SLUG, 100);
+
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.APPLY(SLUG, 100), {});
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DISCARD(SLUG, 100), {});
+    expect(DELIVERY_ROUTES.APPLY(SLUG, 100)).toBe('/api/workspaces/acme/delivery/runs/100/apply');
+  });
+
+  it.each([
+    ['  Keep the Privacy link  ', { note: 'Keep the Privacy link' }],
+    ['   ', {}],
+  ])('retryRun : la remarque %j part sans ses blancs, la nouvelle mission revient', async (note, body) => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope({ id: 101, status: 'QUEUED' }));
+
+    const next = await retryRun(SLUG, 100, note);
+
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.RETRY(SLUG, 100), body);
+    expect(next).toEqual({ id: 101, status: 'QUEUED' });
   });
 });

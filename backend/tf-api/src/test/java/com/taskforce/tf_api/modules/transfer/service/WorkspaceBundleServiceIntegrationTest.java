@@ -36,6 +36,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.core.service.WorkspaceService;
+import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.modules.ged.service.ObjectStorage;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -46,7 +47,8 @@ import com.taskforce.tf_api.util.AbstractIntegrationTest;
  * exporté par un membre, puis recréé dans un nouvel espace, avec chaque référence des pages renumérotée.
  */
 @DisplayName("WorkspaceBundleService (intégration Postgres)")
-@Import({WorkspaceBundleService.class, ProjectBundleService.class, ServerImportedPeople.class, ProjectVisibilityGuard.class})
+@Import({WorkspaceBundleService.class, ProjectBundleService.class, ServerImportedPeople.class, ProjectVisibilityGuard.class,
+    BrainAccessGuard.class})
 class WorkspaceBundleServiceIntegrationTest extends AbstractIntegrationTest {
 
     private static final byte[] PHOTO = {(byte) 0x89, 'P', 'N', 'G', 1, 2, 3};
@@ -113,7 +115,11 @@ class WorkspaceBundleServiceIntegrationTest extends AbstractIntegrationTest {
         child = node(brain, "Onboarding", "First week", null, null, "{}", root);
         node(brain, "Fix login notes", "Context", "ISSUE", issue, "{}", null);
         node(brain, "Secret notes", "Hidden", "ISSUE", privateIssue, "{}", null);
-        node(brain, "Secret project", "Hidden", "PROJECT", privateProject, "{}", null);
+        long secretFolder = node(brain, "Secret project", "Hidden", "PROJECT", privateProject, "{}", null);
+        // Les deux formes que le filtre de l'export laissait passer : une page rangée sous le dossier du projet, sans
+        // référence, et une page d'ingestion rattachée par son seul refId.
+        node(brain, "Secret runbook", "Hidden", null, null, "{}", secretFolder);
+        node(brain, "Secret architecture", "Hidden", null, privateProject, "{}", null);
         jdbc.update("INSERT INTO knowledge_edges (workspace_id, from_node_id, to_node_id, relation_type, created_by) "
             + "VALUES (:w, :f, :t, 'LINKS_TO', :u)", Map.of("w", acme.getId(), "f", root, "t", child, "u", String.valueOf(mate.getId())));
         stored.put("brain/" + acme.getId() + "/" + FILE, PHOTO);

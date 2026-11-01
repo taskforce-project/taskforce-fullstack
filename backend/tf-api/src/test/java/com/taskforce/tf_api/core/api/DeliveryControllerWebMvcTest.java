@@ -25,6 +25,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.delivery.DeliveryActivityService;
 import com.taskforce.tf_api.core.service.delivery.DeliveryRunner;
 import com.taskforce.tf_api.core.service.delivery.DeliveryService;
+import com.taskforce.tf_api.core.service.delivery.MissionResultService;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -58,6 +59,7 @@ class DeliveryControllerWebMvcTest {
     @MockitoBean private DeliveryService deliveryService;
     @MockitoBean private DeliveryRunner deliveryRunner;
     @MockitoBean private DeliveryActivityService activityService;
+    @MockitoBean private MissionResultService missionResults;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;             // WorkspaceAccessInterceptor
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository; // WorkspaceAccessInterceptor
@@ -173,12 +175,15 @@ class DeliveryControllerWebMvcTest {
         var a = auth();
         when(activityService.activity("acme", 100L, 3, 7L)).thenReturn(new DeliveryRunActivityResponse(
             List.of(new DeliveryRunActivityResponse.Event(4, "tool", "Bash", "npm test", null)),
-            List.of(new DeliveryRunActivityResponse.Approval(9L, "Bash", "npm install lodash", "PENDING", null, null, null, null, true, "agent"))));
+            List.of(new DeliveryRunActivityResponse.Approval(9L, "WebSearch", "electron-updater progress", "PENDING", null, null,
+                null, null, true, "agent", "web.search", "search-web", "A web search sends its query out of the machine.", null))));
 
         mockMvc.perform(get("/api/workspaces/acme/delivery/runs/100/activity").param("after", "3").with(a))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.events[0].seq").value(4))
-            .andExpect(jsonPath("$.data.approvals[0].canDecide").value(true));
+            .andExpect(jsonPath("$.data.approvals[0].canDecide").value(true))
+            .andExpect(jsonPath("$.data.approvals[0].action").value("web.search"))
+            .andExpect(jsonPath("$.data.approvals[0].reason").value("A web search sends its query out of the machine."));
     }
 
     @ParameterizedTest(name = "GET /runs/100/evidence?format={0} : {1}, sans enveloppe")
@@ -208,26 +213,102 @@ class DeliveryControllerWebMvcTest {
             .andExpect(status().isNotFound());
     }
 
-    @ParameterizedTest(name = "POST approval : {0} -> autorisé={1}")
-    @CsvSource({"ALLOW, true", "DENY, false"})
-    void decide_200(String decision, boolean allow) throws Exception {
+    @ParameterizedTest(name = "POST approval : {0} {1} -> autorisé={2}, pour la mission={3}")
+    @CsvSource(delimiter = '|', value = {
+        "ALLOW |         | true  | false | Action allowed",
+        "ALLOW | ONCE    | true  | false | Action allowed",
+        "ALLOW | MISSION | true  | true  | Allowed for this mission", // R46 : le reste de la mission
+        "DENY  |         | false | false | Action denied",
+        "DENY  | MISSION | false | false | Action denied",            // un refus vaut une fois
+    })
+    void decide_200(String decision, String scope, boolean allow, boolean forMission, String message) throws Exception {
         var a = auth();
+        String body = scope == null ? "{\"decision\":\"" + decision + "\"}"
+            : "{\"decision\":\"" + decision + "\",\"scope\":\"" + scope + "\"}";
 
         mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/approvals/9").with(a)
-                .contentType(MediaType.APPLICATION_JSON).content("{\"decision\":\"" + decision + "\"}"))
-            .andExpect(status().isOk());
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value(message));
 
-        verify(activityService).decide("acme", 100L, 9L, allow, 7L);
+        verify(activityService).decide("acme", 100L, 9L, allow, forMission, 7L);
+    }
+
+    @ParameterizedTest(name = "POST approval : {0} refusé (400)")
+    @CsvSource(delimiter = '|', value = {
+        "{\"decision\":\"MAYBE\"}",
+        "{\"decision\":\"ALLOW\",\"scope\":\"FOREVER\"}",
+    })
+    void decide_rejects_unknown_decision(String body) throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/approvals/9")
+                .with(jwt().jwt(b -> b.claim("email", EMAIL)))
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isBadRequest());
+
+        verify(activityService, never()).decide(any(), any(), any(), anyBoolean(), anyBoolean(), any());
+    }
+
+    // --------------------------------------------------------------------- carte de résultat (R78)
+
+    @Test
+    @DisplayName("POST /runs/{id}/apply : la personne applique le résultat")
+    void apply_200() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/apply").with(auth()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("Applied: the pull request is merged"));
+
+        verify(missionResults).apply("acme", 100L, 7L, null);
     }
 
     @Test
-    @DisplayName("POST approval : décision inconnue refusée (400)")
-    void decide_rejects_unknown_decision() throws Exception {
-        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/approvals/9")
-                .with(jwt().jwt(b -> b.claim("email", EMAIL)))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"decision\":\"MAYBE\"}"))
+    @DisplayName("POST /runs/{id}/apply : la raison de passer outre des tests en échec va au service (R87)")
+    void apply_with_a_reason_200() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/apply").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"The date test is flaky\"}"))
+            .andExpect(status().isOk());
+
+        verify(missionResults).apply("acme", 100L, 7L, "The date test is flaky");
+    }
+
+    @Test
+    @DisplayName("POST /runs/{id}/apply : une raison trop longue est refusée (400)")
+    void apply_rejects_a_long_reason() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/apply").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"" + "x".repeat(2001) + "\"}"))
             .andExpect(status().isBadRequest());
 
-        verify(activityService, never()).decide(any(), any(), any(), anyBoolean(), any());
+        verify(missionResults, never()).apply(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("POST /runs/{id}/discard : la personne écarte le résultat")
+    void discard_200() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/discard").with(auth()))
+            .andExpect(status().isOk());
+
+        verify(missionResults).discard("acme", 100L, 7L);
+    }
+
+    @Test
+    @DisplayName("POST /runs/{id}/retry : une nouvelle mission part avec la remarque")
+    void retry_200() throws Exception {
+        var a = auth();
+        when(missionResults.retry("acme", 100L, 7L, "Keep the Privacy link")).thenReturn(run(101L, "QUEUED"));
+
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/retry").with(a)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"Keep the Privacy link\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(101));
+        verify(deliveryRunner).execute(101L);
+    }
+
+    @Test
+    @DisplayName("POST /runs/{id}/retry : une remarque trop longue est refusée (400)")
+    void retry_rejects_a_long_note() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/retry").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"" + "x".repeat(2001) + "\"}"))
+            .andExpect(status().isBadRequest());
+
+        verify(missionResults, never()).retry(any(), any(), any(), any());
     }
 }

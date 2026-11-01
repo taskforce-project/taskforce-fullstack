@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
 import { runShell, type ProcResult } from "../src/proc.js";
-import { ApprovedTests, outputTail, runProjectTests, seconds } from "../src/tests.js";
+import { ApprovedTests, outputTail, runProjectTests, seconds, testCounts } from "../src/tests.js";
 
 const home = mkdtempSync(join(tmpdir(), "tf-tests-"));
 after(() => rmSync(home, { recursive: true, force: true }));
@@ -82,5 +82,33 @@ describe("S1 : les tests du projet, lancés par le runner après l'agent (R32)",
     const ko = await runShell("node -e \"process.exit(3)\"", { cwd: home, timeoutMs: 20_000 });
     assert.equal(ok.stdout.trim(), "from the shell");
     assert.equal(ko.code, 3);
+  });
+});
+
+describe("Relire (R78) : combien de tests ont passé, lu dans la sortie", () => {
+  const cases: Array<[string, string, { passed: number; total: number } | null]> = [
+    ["Vitest, tout passe", " Test Files  110 passed (110)\n      Tests  1248 passed (1248)\n   Duration  20.95s", { passed: 1248, total: 1248 }],
+    ["Vitest, avec des échecs", "      Tests  2 failed | 1246 passed (1248)", { passed: 1246, total: 1248 }],
+    ["Vitest, en couleurs", "\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m12 passed\u001b[39m\u001b[22m\u001b[90m (12)\u001b[39m", { passed: 12, total: 12 }],
+    ["Jest", "Tests:       1 failed, 11 passed, 12 total\nSnapshots:   0 total", { passed: 11, total: 12 }],
+    ["Maven, le dernier résumé fait foi",
+      "[INFO] Tests run: 16, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.9 s -- in A\n[INFO] Tests run: 232, Failures: 1, Errors: 0, Skipped: 2",
+      { passed: 229, total: 232 }],
+    ["node:test", "ℹ tests 331\nℹ suites 32\nℹ pass 331\nℹ fail 0", { passed: 331, total: 331 }],
+    ["pytest", "======= 12 passed, 1 failed in 0.42s =======", { passed: 12, total: 13 }],
+    ["une sortie sans résumé", "build ok\ndone", null],
+  ];
+  for (const [label, output, expected] of cases) {
+    it(`${label} -> ${expected ? `${expected.passed}/${expected.total}` : "rien"}`, () => {
+      assert.deepEqual(testCounts(output), expected);
+    });
+  }
+
+  it("le compte suit le résultat des tests lancés", async () => {
+    const shell = async (): Promise<ProcResult> => ({ code: 0, stdout: "      Tests  12 passed (12)", stderr: "", timedOut: false, aborted: false });
+    const approved = ApprovedTests.in(home);
+    approved.add("acme/web", "npm test");
+    const run = await runProjectTests("npm test", "acme/web", home, 1_000, { ask: async () => true, approved, shell });
+    assert.deepEqual(run.counts, { passed: 12, total: 12 });
   });
 });

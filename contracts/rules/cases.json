@@ -645,6 +645,6 @@
   ],
   "digest": {
     "description": "The digest of default.rules.json as it is, with or without null members and its own digest field.",
-    "expected": "sha256:ef50bed9fc158d3593d569dba01f88bcbc78cd779dd3ae271e2b73b4b88b16f5"
+    "expected": "sha256:96423074a5d1f108bd150bee2ef11ea894cb4e9ad84764344d0c8443112ad80e"
   }
 }
