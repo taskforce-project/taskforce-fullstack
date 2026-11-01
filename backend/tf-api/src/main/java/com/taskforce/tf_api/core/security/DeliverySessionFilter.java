@@ -63,6 +63,8 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
     public static final String RUNNER_CLAIM = "tf_delivery_runner";
     public static final String WORKSPACE_CLAIM = "tf_delivery_workspace";
     public static final String PROJECT_CLAIM = "tf_delivery_project";
+    /** Le nom de l'agent du run, que l'activité d'une issue garde avec l'action faite au nom du délégant. */
+    public static final String AGENT_CLAIM = "tf_delivery_agent";
 
     /** Endpoints machine du runner : authentifiés par son identité propre, sans délégation. */
     public static final String RUNNER_API_PREFIX = "/api/delivery/runner/";
@@ -127,6 +129,9 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
             .claim(RUNNER_CLAIM, session.runnerClientId())
             .claim(WORKSPACE_CLAIM, session.workspaceSlug())
             .claim(PROJECT_CLAIM, session.projectId());
+        if (session.agentName() != null) {
+            builder.claim(AGENT_CLAIM, session.agentName());
+        }
         if (machine.getIssuedAt() != null) {
             builder.issuedAt(machine.getIssuedAt());
         }

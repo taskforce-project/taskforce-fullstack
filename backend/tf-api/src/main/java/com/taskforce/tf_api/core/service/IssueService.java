@@ -75,6 +75,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.security.DelegatedAgent;
 import com.taskforce.tf_api.shared.dto.PageResponse;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
@@ -1149,15 +1150,38 @@ public class IssueService {
         issueRepository.save(issue);
     }
 
+    /**
+     * Garde une action sur l'issue. Faite par l'agent d'une mission, au nom de la personne qui l'a déléguée (session
+     * déléguée, ADR-013), elle garde aussi le nom de l'agent : l'activité dit qui a fait quoi.
+     */
     private void logActivity(Issue issue, User actor, IssueActivityType action, String oldValue, String newValue) {
+        logActivity(issue, actor, action, oldValue, newValue, DelegatedAgent.current().orElse(null));
+    }
+
+    /**
+     * Garde une action sur l'issue, avec l'agent par qui elle est passée ({@code via}, null quand la personne a agi
+     * seule) : Cortex pour une issue créée depuis sa carte, l'agent d'une mission pour ce qu'il fait au nom de la personne
+     * qui l'a déléguée (la pull request qu'il ouvre). Les valeurs sont coupées à la taille de leur colonne.
+     */
+    @Transactional
+    public void logActivity(Issue issue, User actor, IssueActivityType action, String oldValue, String newValue, String via) {
         IssueActivity activity = IssueActivity.builder()
             .issue(issue)
             .actor(actor)
             .action(action)
-            .oldValue(oldValue)
-            .newValue(newValue)
+            .oldValue(clip(oldValue, ACTIVITY_VALUE_MAX))
+            .newValue(clip(newValue, ACTIVITY_VALUE_MAX))
+            .via(clip(via, ACTIVITY_VIA_MAX))
             .build();
         activityRepository.save(activity);
+    }
+
+    /** Tailles des colonnes {@code old_value}/{@code new_value} et {@code via} d'{@code issue_activity}. */
+    private static final int ACTIVITY_VALUE_MAX = 500;
+    private static final int ACTIVITY_VIA_MAX = 60;
+
+    private static String clip(String value, int max) {
+        return value == null || value.length() <= max ? value : value.substring(0, max);
     }
 
     // =========================================================================
@@ -1250,6 +1274,7 @@ public class IssueService {
             .action(a.getAction())
             .oldValue(a.getOldValue())
             .newValue(a.getNewValue())
+            .via(a.getVia())
             .createdAt(a.getCreatedAt())
             .build();
     }

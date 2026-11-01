@@ -96,7 +96,7 @@ class DeliverySessionFilterTest {
 
     private void sessionOpen() {
         when(localRunnerService.openSession(eq(100L), any(RunnerIdentity.class)))
-            .thenReturn(new DeliverySession(100L, "acme", 12L, OWNER, "kc-7", "tf-runner-pierre"));
+            .thenReturn(new DeliverySession(100L, "acme", 12L, OWNER, "kc-7", "tf-runner-pierre", "Claude Code"));
     }
 
     @Test
@@ -142,6 +142,8 @@ class DeliverySessionFilterTest {
         // Portée du run, que le serveur MCP de l'instance rejuge outil par outil (OSS-5.2).
         assertThat(delegated.getClaimAsString(DeliverySessionFilter.WORKSPACE_CLAIM)).isEqualTo("acme");
         assertThat(delegated.<Long>getClaim(DeliverySessionFilter.PROJECT_CLAIM)).isEqualTo(12L);
+        // L'agent du run, que l'activité de l'issue garde avec ce qu'il y fait au nom du délégant.
+        assertThat(delegated.getClaimAsString(DeliverySessionFilter.AGENT_CLAIM)).isEqualTo("Claude Code");
         // Aucun claim du jeton machine n'est repris : ni rôle, ni propriétaire.
         assertThat(delegated.hasClaim("realm_access")).isFalse();
         assertThat(delegated.hasClaim("tf_runner_owner")).isFalse();
@@ -164,7 +166,7 @@ class DeliverySessionFilterTest {
     void runner_out_of_session_is_denied(String method, String path, String header) throws Exception {
         authenticate(runnerJwt());
         org.mockito.Mockito.lenient().when(localRunnerService.openSession(eq(100L), any(RunnerIdentity.class)))
-            .thenReturn(new DeliverySession(100L, "acme", 12L, OWNER, "kc-7", "tf-runner-pierre"));
+            .thenReturn(new DeliverySession(100L, "acme", 12L, OWNER, "kc-7", "tf-runner-pierre", "Claude Code"));
 
         MockHttpServletResponse response = run(method, path, header);
 
