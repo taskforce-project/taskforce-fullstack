@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.taskforce.tf_api.core.dto.response.IntegrationCatalogResponse;
+import com.taskforce.tf_api.core.dto.response.IntegrationCatalogResponse.CategoryGroup;
 import com.taskforce.tf_api.core.dto.response.IntegrationCatalogResponse.ConnectorView;
 import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.Integration;
@@ -27,7 +28,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.when;
 
-/** Tests unitaires de {@link IntegrationCatalogService} : état de connexion réel des natives et des préréglages. */
+/**
+ * Tests unitaires de {@link IntegrationCatalogService} : état de connexion réel des natives et des préréglages, et
+ * préréglages jamais essayés retirés du catalogue sauf pour l'espace qui les a connectés (TF-J1-3).
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("IntegrationCatalogService")
 class IntegrationCatalogServiceTest {
@@ -73,7 +77,46 @@ class IntegrationCatalogServiceTest {
         assertThat(tools).filteredOn(ConnectorView::connected).extracting(ConnectorView::key)
             .containsExactlyInAnyOrder("github", "linear");
         assertThat(catalog.connected()).isEqualTo(2);
-        assertThat(catalog.total()).isEqualTo(28).isEqualTo(tools.size());
+        assertThat(catalog.total()).isEqualTo(4).isEqualTo(tools.size());
+    }
+
+    @Test
+    @DisplayName("rien de connecté : les trois natives et Linear, le seul préréglage essayé ; aucun des 24 autres")
+    void shows_only_the_tried_presets() {
+        when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(1L, 7L)).thenReturn(true);
+        when(integrationRepository.findByWorkspaceId(1L)).thenReturn(List.of());
+        when(workspaceMcp.connectedServers(1L)).thenReturn(List.of());
+
+        IntegrationCatalogResponse catalog = service.getCatalog("acme", 7L);
+
+        List<ConnectorView> tools = catalog.categories().stream().flatMap(g -> g.tools().stream()).toList();
+        assertThat(tools).extracting(ConnectorView::key).containsExactly("plane", "linear", "github", "slack");
+        assertThat(catalog.categories()).extracting(CategoryGroup::category)
+            .containsExactly("PROJECT_MANAGEMENT", "DEV_CICD", "COMMUNICATION");
+        assertThat(catalog.total()).isEqualTo(4);
+        assertThat(catalog.connected()).isZero();
+    }
+
+    @Test
+    @DisplayName("un préréglage jamais essayé reste visible, connecté et déconnectable pour l'espace qui l'a connecté")
+    void keeps_an_untried_preset_this_workspace_connected() {
+        when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(1L, 7L)).thenReturn(true);
+        when(integrationRepository.findByWorkspaceId(1L)).thenReturn(List.of());
+        when(workspaceMcp.connectedServers(1L)).thenReturn(List.of(
+            new ConnectedServer("cloudflare", null, "https://mcp.cloudflare.com/mcp")));
+
+        IntegrationCatalogResponse catalog = service.getCatalog("acme", 7L);
+
+        List<ConnectorView> tools = catalog.categories().stream().flatMap(g -> g.tools().stream()).toList();
+        assertThat(tools).extracting(ConnectorView::key)
+            .containsExactly("plane", "linear", "github", "cloudflare", "slack")
+            .doesNotContain("jira", "vercel");
+        ConnectorView cloudflare = tools.stream().filter(t -> t.key().equals("cloudflare")).findFirst().orElseThrow();
+        assertThat(cloudflare.connected()).isTrue();
+        assertThat(cloudflare.category()).isEqualTo("HOSTING_INFRA");
+        assertThat(cloudflare.mcpSuggestedUrl()).isEqualTo("https://mcp.cloudflare.com/mcp");
+        assertThat(catalog.total()).isEqualTo(5);
+        assertThat(catalog.connected()).isEqualTo(1);
     }
 
     @Test
@@ -100,7 +143,7 @@ class IntegrationCatalogServiceTest {
             assertThat(t.authType()).isEqualTo("MCP");
             assertThat(t.mcpSuggestedUrl()).isNull();
         });
-        assertThat(catalog.total()).isEqualTo(30);
+        assertThat(catalog.total()).isEqualTo(6);
         assertThat(catalog.connected()).isEqualTo(2);
     }
 
