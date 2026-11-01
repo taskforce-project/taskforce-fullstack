@@ -39,13 +39,13 @@ a token that is random for each run (`taskforce-runner/src/approvals.ts`):
 
 | Hook | When | What the runner answers |
 | --- | --- | --- |
-| `PreToolUse` | Before every tool call | The rules' decision: `allow` or `deny`, naming the rule and its reason. For `ask` it gives no decision |
-| `PermissionRequest` | An action with no decision, not allowed in advance | The person's decision in TaskForce, or `deny` when the wait runs out |
+| `PreToolUse` | Before every tool call | The rules' decision: `allow` or `deny`, naming the rule and its reason. For `ask`, the person's decision in TaskForce, asked before answering, or `deny` when the wait runs out |
+| `PermissionRequest` | What Claude Code still asks for (a tool the person allowed in advance) | The person's decision in TaskForce, or `deny` when the wait runs out |
 
-- Nothing is allowed in advance (no `--allowedTools`), so every `ask` reaches `PermissionRequest`: in headless mode, an
-  `ask` from `PreToolUse` would end as a refusal, and an action allowed in advance would skip a rule that asks. A
-  person can still allow tools in advance on their own computer (`agent.extraAllowedTools`); a rule that denies blocks
-  those tools anyway.
+- The gate never leaves an action without a decision: what the rules ask for, the person decides before the action
+  runs, whatever Claude Code's own permissions say. In headless mode, an `ask` returned to Claude Code would end as a
+  refusal. A person can still allow tools in advance on their own computer (`agent.extraAllowedTools`): for those
+  tools, what the rules ask for goes to Claude Code's own permissions; a rule that denies blocks them anyway.
 - An approval for the mission (R46) covers each part of the command that asked: a later command passes without asking
   only when every part of it that asks is already covered.
 - Both hooks use `onFailure: "block"`: if the runner does not answer, the action is blocked instead of let through.
