@@ -1,5 +1,5 @@
 # --- Perimetre du SAST (Semgrep) ---
-# Le gate ERROR ne bloque que sur le CODE APPLICATIF (frontend/, backend/, ai-service/).
+# Le gate ERROR ne bloque que sur le CODE APPLICATIF (frontend/, backend/).
 # Les chemins ci-dessous sont exclus volontairement : non applicables au produit, ou couverts par un
 # autre outil. Le rapport (etape non bloquante) continue de tout scanner ; seule la decision de casser
 # le build est restreinte. Findings ecartes (audit du 24/08, ruleset `auto` drifte) :
