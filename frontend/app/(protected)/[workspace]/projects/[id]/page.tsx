@@ -182,11 +182,16 @@ function IssueCard({
   statuses,
   onStatusChange,
   onOpen,
+  arrived = false,
+  onArrived,
 }: {
   readonly issue: Issue
   readonly statuses: IssueStatus[]
   readonly onStatusChange: (issueId: number, statusId: number) => void
   readonly onOpen: (issue: Issue) => void
+  /** L'issue vient d'arriver sur le board : la carte s'allume une fois. */
+  readonly arrived?: boolean
+  readonly onArrived?: () => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `card-${issue.id}`,
@@ -202,10 +207,12 @@ function IssueCard({
       tabIndex={0}
       onClick={() => onOpen(issue)}
       onKeyDown={(e) => e.key === "Enter" && onOpen(issue)}
+      onAnimationEnd={arrived ? onArrived : undefined}
       className={cn(
         "group/card rounded-lg border border-border bg-card p-3 shadow-xs transition-all cursor-grab active:cursor-grabbing",
         // Le clone suit le curseur via <DragOverlay> ; on laisse un placeholder estompe en place
-        isDragging ? "opacity-40" : "hover:border-primary/30 hover:shadow-md"
+        isDragging ? "opacity-40" : "hover:border-primary/30 hover:shadow-md",
+        arrived && "card-arrive"
       )}
     >
       {/* Priorite + labels */}
@@ -354,6 +361,8 @@ function BoardColumn({
   onChangeColor,
   onOpenIssue,
   isOver,
+  arrivedId,
+  onArrived,
   t,
 }: {
   readonly status: IssueStatus
@@ -367,6 +376,8 @@ function BoardColumn({
   readonly onChangeColor: (statusId: number, color: string) => void
   readonly onOpenIssue: (issue: Issue) => void
   readonly isOver: boolean
+  readonly arrivedId: number | null
+  readonly onArrived: () => void
   readonly t: (k: string) => string
 }) {
   const [editing, setEditing] = useState(false)
@@ -471,6 +482,8 @@ function BoardColumn({
             statuses={statuses}
             onStatusChange={onStatusChange}
             onOpen={onOpenIssue}
+            arrived={issue.id === arrivedId}
+            onArrived={onArrived}
           />
         ))}
 
@@ -603,6 +616,17 @@ export default function ProjectBoardPage() {
 
   // Temps réel : le board se met à jour en direct sur les events d'issues (PROD-1.6)
   useProjectRealtime(projectId || null)
+
+  // Une issue qui arrive sur le board déjà chargé (créée ici, par un coéquipier, ou par Cortex depuis la barre) allume
+  // sa carte une fois : on voit où l'action a eu lieu, sous la conversation dépliée (revue UX du 01/11/2026). Le
+  // premier chargement n'allume rien.
+  const [arrivedId, setArrivedId] = useState<number | null>(null)
+  useEffect(() => useIssueStore.subscribe((state, prev) => {
+    if (prev.loadedProjectId !== projectId || state.issues.length <= prev.issues.length) return
+    const before = new Set(prev.issues.map((i) => i.id))
+    const added = state.issues.find((i) => !before.has(i.id))
+    if (added) setArrivedId(added.id)
+  }), [projectId])
 
   const [initializing, setInitializing] = useState(true)
   const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
@@ -855,6 +879,8 @@ export default function ProjectBoardPage() {
                 onChangeColor={handleChangeColor}
                 onOpenIssue={(issue) => setSelectedIssue(toSheetIssue(issue))}
                 isOver={overColumnId === status.id}
+                arrivedId={arrivedId}
+                onArrived={() => setArrivedId(null)}
                 t={t}
               />
             ))}
