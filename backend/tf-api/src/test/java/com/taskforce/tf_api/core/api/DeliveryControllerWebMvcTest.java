@@ -257,7 +257,27 @@ class DeliveryControllerWebMvcTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.message").value("Applied: the pull request is merged"));
 
-        verify(missionResults).apply("acme", 100L, 7L);
+        verify(missionResults).apply("acme", 100L, 7L, null);
+    }
+
+    @Test
+    @DisplayName("POST /runs/{id}/apply : la raison de passer outre des tests en échec va au service (R87)")
+    void apply_with_a_reason_200() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/apply").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"The date test is flaky\"}"))
+            .andExpect(status().isOk());
+
+        verify(missionResults).apply("acme", 100L, 7L, "The date test is flaky");
+    }
+
+    @Test
+    @DisplayName("POST /runs/{id}/apply : une raison trop longue est refusée (400)")
+    void apply_rejects_a_long_reason() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/apply").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"" + "x".repeat(2001) + "\"}"))
+            .andExpect(status().isBadRequest());
+
+        verify(missionResults, never()).apply(any(), any(), any(), any());
     }
 
     @Test

@@ -157,4 +157,8 @@ public class DeliveryRun extends AuditableEntity {
 
     @Column(name = "outcome_at")
     private LocalDateTime outcomeAt;
+
+    /** Pourquoi la personne a appliqué malgré des tests en échec (R87) ; vide sinon. */
+    @Column(name = "outcome_reason", length = 2000)
+    private String outcomeReason;
 }
