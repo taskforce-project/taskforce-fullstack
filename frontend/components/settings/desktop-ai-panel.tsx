@@ -154,7 +154,12 @@ export function DesktopAiPanel() {
                 setApiKey(e.target.value)
               }}
               placeholder={
-                view.hasApiKey ? "Saved. Type a new key to replace it." : draft.provider === "anthropic" ? "sk-ant-..." : "sk-..."
+                // Chaque fournisseur a sa clé : celle qui est gardée ne vaut que pour le fournisseur enregistré.
+                view.hasApiKey && draft.provider === view.settings.provider
+                  ? "Saved. Type a new key to replace it."
+                  : draft.provider === "anthropic"
+                    ? "sk-ant-..."
+                    : "sk-..."
               }
               autoComplete="off"
               spellCheck={false}

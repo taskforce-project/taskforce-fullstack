@@ -63,6 +63,7 @@ export async function startStack(account: Account, onStep: (step: string) => voi
   const runnerSecret = randomToken("tfs_");
   const shellSecret = randomToken("tfsh_");
   const ai = new BackendAi(() => backend.port, launchToken, shellSecret);
+  const aiChoice = settings.aiSettings(account.subject);
   const github = new GitHubRelay();
 
   // Le runner d'abord : il rend au backend le résultat d'un run interrompu avant que celui-ci s'arrête. Chaque étape a un
@@ -109,7 +110,7 @@ export async function startStack(account: Account, onStep: (step: string) => voi
         launchToken,
         uiOrigin: origin,
         // Le fournisseur d'IA de la personne, clé du trousseau comprise : en mémoire du backend seulement.
-        ai: aiEnvironment(settings.aiSettings(account.subject), settings.secret(account.subject, "aiApiKey")),
+        ai: aiEnvironment(aiChoice, settings.aiKey(account.subject, aiChoice.provider)),
         shellSecret,
         github: { url: github.url(), token: github.token },
         runnerSecret,

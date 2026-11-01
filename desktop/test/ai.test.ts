@@ -6,6 +6,7 @@ import {
   aiEnvironment,
   BackendAi,
   DEFAULT_AI_SETTINGS,
+  keySlot,
   OLLAMA_URL,
   parseAiInput,
   SHELL_HEADER,
@@ -75,6 +76,20 @@ describe("aiEnvironment", () => {
   it("sends an empty key when none is saved, so the previous one does not stay", () => {
     assert.equal(aiEnvironment({ ...DEFAULT_AI_SETTINGS, provider: "anthropic" }, undefined).AI_API_KEY, "");
   });
+});
+
+describe("keySlot", () => {
+  const slots: [AiSettings["provider"], string | null][] = [
+    ["custom", "aiApiKey"],
+    ["anthropic", "aiAnthropicKey"],
+    ["ollama", null],
+    ["off", null],
+  ];
+  for (const [provider, slot] of slots) {
+    it(`keeps the key of ${provider} in ${slot ?? "no slot"}, so a key never goes to another provider`, () => {
+      assert.equal(keySlot(provider), slot);
+    });
+  }
 });
 
 const STATE: AiState = {

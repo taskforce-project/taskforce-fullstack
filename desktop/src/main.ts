@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { ACCOUNT_SERVER, accountPageUrl, refresh, revoke, SessionEndedError, signIn, signInError } from "./account";
-import { aiEnvironment, parseAiInput, type AiState } from "./ai";
+import { aiEnvironment, keySlot, parseAiInput, type AiState } from "./ai";
 import { BACKUPS } from "./backup";
 import { connectMcp, disconnectMcp, isPersonalToken, isWorkspaceSlug, mcpConnection } from "./claude";
 import { createRepo, DEVICE_PAGE, findRepo, GitHubSignIn, isNewRepoName, isRepoFullName, listRepos } from "./github";
@@ -324,8 +324,10 @@ function registerIpc(): void {
     try {
       const { settings: next, apiKey } = parseAiInput(input);
       settings.setAiSettings(subject, next);
-      if (apiKey !== undefined) settings.setSecret(subject, "aiApiKey", apiKey || undefined);
-      const state = await stack.ai.apply(aiEnvironment(next, settings.secret(subject, "aiApiKey")));
+      // Une clé par fournisseur : celle qu'on tape va au fournisseur choisi, jamais à un autre.
+      const slot = keySlot(next.provider);
+      if (apiKey !== undefined && slot) settings.setSecret(subject, slot, apiKey || undefined);
+      const state = await stack.ai.apply(aiEnvironment(next, settings.aiKey(subject, next.provider)));
       return { ok: true, view: await aiView(state) };
     } catch (error) {
       return { ok: false, error: (error as Error).message };
@@ -460,9 +462,10 @@ async function settle<T>(promise: Promise<T>): Promise<{ ok: true; value: T } | 
 async function aiView(state?: AiState) {
   if (!stack) throw new Error("TaskForce is still starting");
   const subject = stack.account.subject;
+  const chosen = settings.aiSettings(subject);
   return {
-    settings: settings.aiSettings(subject),
-    hasApiKey: Boolean(settings.secret(subject, "aiApiKey")),
+    settings: chosen,
+    hasApiKey: Boolean(settings.aiKey(subject, chosen.provider)),
     state: state ?? (await stack.ai.state(true)),
   };
 }

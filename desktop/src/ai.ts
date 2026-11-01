@@ -72,6 +72,16 @@ export function parseAiInput(input: unknown): { settings: AiSettings; apiKey: st
 }
 
 /**
+ * Où la clé d'un fournisseur est gardée dans le trousseau : une par fournisseur, pour qu'une clé ne parte jamais chez
+ * un autre que le sien quand la personne change de fournisseur. `null` pour un fournisseur sans clé.
+ */
+export function keySlot(provider: AiSettings["provider"]): "aiApiKey" | "aiAnthropicKey" | null {
+  if (provider === "custom") return "aiApiKey";
+  if (provider === "anthropic") return "aiAnthropicKey";
+  return null;
+}
+
+/**
  * Le choix de la personne en variables d'un serveur (cf. AiProviderSettings du backend). Toutes sont posées, vides au
  * besoin : un changement remplace le fournisseur précédent en entier. Les vecteurs viennent d'Ollama sur l'ordinateur,
  * sauf avec une API compatible OpenAI, qui sert aussi les siens.
