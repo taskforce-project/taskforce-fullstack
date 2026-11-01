@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.service.delivery;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -13,8 +14,10 @@ import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunOutcome;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkStatus;
+import com.taskforce.tf_api.core.enums.IssueActivityType;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.IssueGitHubLinkRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -143,12 +146,24 @@ public class MissionResultService {
         issueService.addComment(slug, issue.getProject().getId(), issue.getId(), comment, userId);
     }
 
+    /**
+     * Le geste se garde sur la mission, et entre à l'activité de l'issue au nom de la personne : « Pierre applied the
+     * result », après ce que l'agent y a fait en son nom.
+     */
     private void decided(DeliveryRun run, DeliveryRunOutcome outcome, Long userId) {
+        User person = userRepository.getReferenceById(userId);
         run.setOutcome(outcome);
-        run.setOutcomeBy(userRepository.getReferenceById(userId));
+        run.setOutcomeBy(person);
         run.setOutcomeAt(LocalDateTime.now());
         runRepository.save(run);
+        issueService.logActivity(run.getIssue(), person, ACTIVITY.get(outcome), null, null, null);
     }
+
+    /** Ce que l'activité de l'issue garde de chaque geste. */
+    private static final Map<DeliveryRunOutcome, IssueActivityType> ACTIVITY = Map.of(
+        DeliveryRunOutcome.APPLIED, IssueActivityType.MISSION_APPLIED,
+        DeliveryRunOutcome.DISCARDED, IssueActivityType.MISSION_DISCARDED,
+        DeliveryRunOutcome.RETRIED, IssueActivityType.MISSION_RETRIED);
 
     /** Le lien de l'issue vers cette pull request suit son nouveau statut, sans attendre la prochaine relecture. */
     private void markLink(DeliveryRun run, PullRequest pr, GitHubLinkStatus status) {
