@@ -420,6 +420,45 @@ class CreateIssueToolTest {
         assertThat(CreateIssueTool.points(null).value()).isNull();
     }
 
+    // ── avant la carte : une question sur ce qui compte, jamais sur le reste (R102) ──────────────────────────────────
+
+    @ParameterizedTest(name = "projet « {0} » : {1}")
+    @CsvSource(delimiter = '|', value = {
+        "''     | The project is missing. The projects are: TF (TaskForce), API (API Platform).",
+        "Mobile | No project matches \"Mobile\".",
+    })
+    void prepare_asks_which_project(String project, String question) {
+        String asked = tool().prepare(Map.of("project", project, "title", "Rate limiting"), CTX);
+
+        assertThat(asked).startsWith(question).contains("ask the person");
+        nothingCreated();
+    }
+
+    @ParameterizedTest(name = "assignee « {0} » : une question")
+    @CsvSource({"Marie", "Bob"})
+    void prepare_asks_who_when_the_person_is_unclear(String assignee) {
+        when(projectService.listMembers("acme", 3L, 7L)).thenReturn(MEMBERS);
+
+        String asked = tool().prepare(Map.of("project", "TF", "title", "Rate limiting", "assignee", assignee), CTX);
+
+        assertThat(asked).contains("\"" + assignee + "\"").contains("Ask the person");
+        nothingCreated();
+    }
+
+    @Test
+    @DisplayName("ce qui compte est dit : aucune question, et rien n'est demandé sur les champs facultatifs")
+    void prepare_never_asks_about_optional_fields() {
+        when(projectService.listMembers("acme", 3L, 7L)).thenReturn(MEMBERS);
+
+        String asked = tool().prepare(Map.of("project", "TF", "title", "Rate limiting", "assignee", "Marie Curie",
+            "labels", List.of("does-not-exist"), "cycle", "Sprint 99", "points", "lots"), CTX);
+
+        assertThat(asked).isNull();
+        verify(projectService, never()).listLabels(any(), any(), any());
+        verify(cycleService, never()).listCycles(any(), any(), any());
+        nothingCreated();
+    }
+
     @Test
     @DisplayName("sans assigné, labels, points ni cycle : rien n'est lu ni rempli au hasard")
     void optional_fields_stay_empty() {

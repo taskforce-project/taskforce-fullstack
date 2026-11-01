@@ -12,7 +12,7 @@ import {
 import { Markdown } from "@/components/ui/lightweight-markdown"
 import { cn } from "@/lib/utils"
 import {
-  approveAction, isApprovable, isPreparedIssue, isUndoable, type AssistantAnswer, type AssistantToolCall,
+  approveAction, isApprovable, isPreparedIssue, isQuestion, isUndoable, type AssistantAnswer, type AssistantToolCall,
 } from "@/lib/api/assistant-service"
 import { getErrorMessage } from "@/lib/api/client"
 import { getMcpServers } from "@/lib/api/integration-service"
@@ -437,6 +437,8 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
       {answer.reasoning && <Reasoning content={answer.reasoning} />}
       <Markdown content={answer.answer} />
       {answer.toolCalls.map((tc, i) =>
+        // Cortex demande d'abord ce qui compte (R102) : rien n'est préparé, sa question est la réponse.
+        isQuestion(tc) ? null :
         // Une issue que Cortex a préparée : la carte la montre, la personne la modifie et la crée (R78).
         isPreparedIssue(tc) ? (
           <IssueDraftCard key={i} slug={slug} call={tc} />

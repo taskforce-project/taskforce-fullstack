@@ -91,8 +91,8 @@ public class CreateIssueTool implements AgentTool {
     @Override public String name() { return "create_issue"; }
 
     @Override public String description() {
-        return "Prepares an issue as a card the person checks and creates. Column and due date follow its goal "
-            + "(Backlog by default); a checklist when the work has steps.";
+        return "Prepares an issue card the person checks and creates, with a checklist if the work has steps. "
+            + "Ask first only when the project or the person is unclear.";
     }
 
     @Override public Map<String, Object> parametersSchema() {
@@ -110,7 +110,7 @@ public class CreateIssueTool implements AgentTool {
         properties.put("checklist", Map.of("type", "array", "items", Map.of("type", "string"), "description",
             "The issue's checklist, one short line per item (optional), when the work has steps."));
         properties.put("assignee", Map.of("type", "string", "description",
-            "A member of the project, by name or email (optional), only when the request names who takes it."));
+            "A member of the project, by name or email (optional), only when the request names who takes it. Several match: ask which one."));
         properties.put("labels", Map.of("type", "array", "items", Map.of("type", "string"), "description",
             "Labels of the project, by name (optional), only existing ones that the request or the project calls for."));
         properties.put("points", Map.of("type", "integer", "description",
@@ -187,6 +187,19 @@ public class CreateIssueTool implements AgentTool {
             : ", with a checklist of " + checklist.size() + (checklist.size() == 1 ? " item" : " items");
         return "Created " + issue.getIdentifier() + " \"" + issue.getTitle() + "\" in the project " + projectName
             + placed + dueText + who + when + steps + ".";
+    }
+
+    /**
+     * Avant la carte, ce qui compte et que seule la personne peut dire (R102 : « pas chiant à remplir ») : le projet,
+     * quand la demande ne le dit pas, et la personne nommée, quand elle désigne plusieurs membres ou aucun. Cortex pose
+     * alors une seule question courte au lieu de deviner. Le reste (priorité, labels, points, cycle) ne se demande
+     * jamais : il reste à remplir sur la carte.
+     */
+    @Override public String prepare(Map<String, Object> args, AgentContext ctx) {
+        ProjectResolver.Resolution where = projects.resolve(args.get("project"), ctx);
+        if (!where.found()) return where.problem();
+        Found<ProjectMemberResponse> assignee = assignee(where.project(), text(args.get("assignee")), ctx);
+        return assignee.ok() ? null : assignee.problem();
     }
 
     /** Une valeur nommée par Cortex, résolue parmi ce qui existe : la valeur, ou ce qu'il faut dire au modèle. */
