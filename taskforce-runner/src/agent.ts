@@ -53,7 +53,7 @@ export function agentArgs(config: RunnerConfig, claim: Claim, mcpConfigPath: str
     "--output-format", "stream-json",
     "--verbose",
     // Les règles de la mission jugent chaque action (hook PreToolUse du fichier --settings). Une action qu'elles
-    // demandent attend une décision humaine (hook PermissionRequest) ; personne d'autre ne répond : sans décision, refus.
+    // demandent attend, dans ce même hook, la décision de la personne qui a délégué ; sans décision, refus.
     "--permission-mode", "manual",
     "--permission-prompts", "none",
     "--disallowedTools", DENIED_TOOLS.join(","),
@@ -114,17 +114,18 @@ export function mcpConfig(config: RunnerConfig, claim: Claim, sessionToken: stri
 
 /**
  * Réglages imposés à la session : pas d'attribution (sauf choix contraire), et deux hooks vers le serveur local du
- * runner : les règles avant chaque action, la décision humaine pour ce qu'elles demandent. Le délai du second dépasse
- * l'attente du serveur : c'est le serveur qui répond « refusé ».
+ * runner : les règles avant chaque action, avec la décision humaine pour ce qu'elles demandent, puis, en secours, ce
+ * que Claude Code demande encore. Le délai de chacun dépasse l'attente du serveur : c'est le serveur qui répond
+ * « refusé ».
  */
 export function agentSettings(config: RunnerConfig, hookUrl: string, preToolUseUrl: string): Record<string, unknown> {
   return {
     // Les deux clés, l'ancienne et la nouvelle, pour couvrir les versions de Claude Code.
     ...(config.agent.attribution ? {} : { includeCoAuthoredBy: false, attribution: { commit: "", pr: "" } }),
     hooks: {
-      // Avant CHAQUE action, autorisée d'avance ou non : les règles de la mission, jugées sur place. Garde fermée : un
-      // serveur local injoignable bloque l'action au lieu de la laisser passer (onFailure, Claude Code 2.1.295,
-      // d'après son journal des versions).
+      // Avant CHAQUE action, autorisée d'avance ou non : les règles de la mission, jugées sur place, et la personne pour
+      // ce qu'elles demandent. Garde fermée : un serveur local injoignable bloque l'action au lieu de la laisser passer
+      // (onFailure, Claude Code 2.1.295, d'après son journal des versions).
       PreToolUse: [{
         matcher: ".*",
         hooks: [{
@@ -132,7 +133,7 @@ export function agentSettings(config: RunnerConfig, hookUrl: string, preToolUseU
           url: preToolUseUrl,
           headers: { Authorization: `Bearer $${HOOK_TOKEN_ENV}` },
           allowedEnvVars: [HOOK_TOKEN_ENV],
-          timeout: 30,
+          timeout: config.agent.approvalTimeoutMinutes * 60 + 60,
           onFailure: "block",
         }],
       }],
@@ -181,6 +182,7 @@ export async function runAgent(
   const approvals = new ApprovalServer(api, claim.runId, workDir, {
     waitMs: config.agent.approvalTimeoutMinutes * 60_000,
     rules: opts.rules,
+    allowedInAdvance: config.agent.extraAllowedTools,
     // Chaque décision des règles va au dossier de preuve de la mission (le serveur ne l'affiche pas dans la chronologie).
     onDecision: (tool, d, input) => {
       log.info(`Rule decision: ${tool} ${d.effect}${d.rule ? ` (${d.rule.id})` : ""}`);
