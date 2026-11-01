@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { ACCOUNT_SERVER, accountPageUrl, refresh, revoke, SessionEndedError, signIn, signInError } from "./account";
-import { parseAiInput } from "./ai";
+import { aiEnvironment, parseAiInput, type AiState } from "./ai";
 import { BACKUPS } from "./backup";
 import { connectMcp, disconnectMcp, isPersonalToken, isWorkspaceSlug, mcpConnection } from "./claude";
 import { createRepo, DEVICE_PAGE, findRepo, GitHubSignIn, isNewRepoName, isRepoFullName, listRepos } from "./github";
@@ -316,15 +316,17 @@ function registerIpc(): void {
     shown.show();
   });
   // Réglages d'IA du compte : fournisseur et modèles dans les réglages, clé dans le trousseau, jamais renvoyée à la page.
+  // Le backend les reçoit tout de suite (sans redémarrer) et rend l'état lu chez le nouveau fournisseur.
   ipcMain.handle("desktop:ai-get", () => aiView());
   ipcMain.handle("desktop:ai-save", async (_event, input: unknown) => {
     if (!stack) return { ok: false, error: "TaskForce is still starting" };
+    const subject = stack.account.subject;
     try {
       const { settings: next, apiKey } = parseAiInput(input);
-      settings.setAiSettings(stack.account.subject, next);
-      if (apiKey !== undefined) settings.setSecret(stack.account.subject, "aiApiKey", apiKey || undefined);
-      stack.ai.invalidate();
-      return { ok: true, view: await aiView() };
+      settings.setAiSettings(subject, next);
+      if (apiKey !== undefined) settings.setSecret(subject, "aiApiKey", apiKey || undefined);
+      const state = await stack.ai.apply(aiEnvironment(next, settings.secret(subject, "aiApiKey")));
+      return { ok: true, view: await aiView(state) };
     } catch (error) {
       return { ok: false, error: (error as Error).message };
     }
@@ -451,14 +453,17 @@ async function settle<T>(promise: Promise<T>): Promise<{ ok: true; value: T } | 
   }
 }
 
-/** Réglages d'IA tels que l'écran les montre, avec l'état lu à l'instant chez le fournisseur. */
-async function aiView() {
+/**
+ * Réglages d'IA tels que l'écran les montre, avec l'état que le backend lit à l'instant chez le fournisseur ; `state`
+ * quand il vient d'être lu (après un changement de fournisseur).
+ */
+async function aiView(state?: AiState) {
   if (!stack) throw new Error("TaskForce is still starting");
   const subject = stack.account.subject;
   return {
     settings: settings.aiSettings(subject),
     hasApiKey: Boolean(settings.secret(subject, "aiApiKey")),
-    state: await stack.ai.state(true),
+    state: state ?? (await stack.ai.state(true)),
   };
 }
 

@@ -16,8 +16,10 @@ export interface BackendOptions {
   launchToken: string;
   /** Origine de la fenêtre (relais local), seule origine admise par l'API. */
   uiOrigin: string;
-  /** Relais d'IA de la coque, joint comme l'ai-service de la webapp (cf. ai.ts). */
-  ai: { url: string; token: string };
+  /** Fournisseur d'IA de la personne, en variables d'un serveur, clé comprise (cf. ai.ts, `aiEnvironment`). */
+  ai: Record<string, string>;
+  /** Secret de la coque seule, pour changer de fournisseur d'IA sans redémarrer le backend (cf. ai.ts, `BackendAi`). */
+  shellSecret: string;
   /** Relais du jeton GitHub de la personne (cf. github-relay.ts). */
   github: { url: string; token: string };
   /** Secret du runner de Claude Code que l'app lance (cf. runner.ts). */
@@ -50,8 +52,9 @@ export class Backend {
       TF_DESKTOP_ACCOUNT_PROFILE: options.account.profile ? JSON.stringify(options.account.profile) : "",
       TF_ENCRYPTION_KEY: options.encryptionKey,
       CORS_ALLOWED_ORIGINS: options.uiOrigin,
-      AI_SERVICE_URL: options.ai.url,
-      AI_SERVICE_TOKEN: options.ai.token,
+      // La passerelle de modèles du backend lit les mêmes variables que sur un serveur.
+      ...options.ai,
+      TF_DESKTOP_SHELL_SECRET: options.shellSecret,
       TF_DESKTOP_GITHUB_URL: options.github.url,
       TF_DESKTOP_GITHUB_TOKEN: options.github.token,
       TF_DESKTOP_RUNNER_SECRET: options.runnerSecret,
