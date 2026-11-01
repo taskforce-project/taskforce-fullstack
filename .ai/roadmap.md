@@ -10,6 +10,14 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 01/11/2026 (quater) - Release 1.7.0 EN PROD : J0 et R78 (Créer, Accorder, Relire) ; desktop 1.4.0 publiée.** `[release]`
+> - **Décision du CEO** : « go release ».
+> - **En prod** : #462 fusionnée dans `dev` ; `chore(desktop)` 1.4.0 (`ac6b3964`) ; release #463 vers `main` (`4225f353`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.7.0 en plomberie ; étiquettes `minor` pour le backend et le front, car une mission gagne trois écrans, `patch` pour le site). Tags `taskforce-v1.7.0`, `backend-v1.9.20`, `frontend-v1.10.14`, `landing-v2.3.2`.
+> - **Dedans** : les trois écrans de R78, « Créer » (#456), « Accorder » (#457) et « Relire » (#458) ; J0 : les notes, la recherche et l'analyse d'un projet privé gardées à ses membres (#459, #460), « Apply » éteint quand les tests ont échoué, avec une raison pour passer outre (#461), les pages qui disent vrai (#462) ; les tests du contrat partagé en CI (#453) ; l'adresse publique dans la référence API (#454). Migrations V109 à V111 : des colonnes ajoutées, toutes nullables.
+> - **Vérifié** : l'API a redémarré à 13:36 UTC, 3 min 30 après la fusion (34 s de coupure, puis `readyz` 200 : Flyway a passé V109 à V111, sinon elle ne démarrait pas) ; la webapp affiche 1.7.0 sur `/auth/login` 4 min 30 après la fusion, et sa politique de confidentialité nomme Groq, Brevo et Metz Numeric School ; le site affiche 1.7.0 en pied, `/migrate` dit « The web app stays online: move when you are ready. » et sa page de confidentialité donne l'hébergement réel. Sans SSH (Tailscale demande la validation du CEO), la base de prod n'a pas été lue.
+> - **Desktop 1.4.0 publiée** : run 41312135716 depuis `main`, vert, VirusTotal compris ; `desktop-v1.4.0` (préversion, comme les précédentes) et `desktop-latest`, dont `latest.yml` annonce 1.4.0 aux apps installées ; le site est reconstruit pour la proposer.
+> - **Suite** : la boucle (Créer, Accorder, Relire) rejouée sur l'app desktop ; la séance restreinte du Conseil sur J0, puis le feu vert de J1.
+
 > **▶ MAJ 01/11/2026 (ter) - J0, R82 : les pages disent vrai : la webapp reste, l'hébergement réel, l'assistant chez Groq.** `[frontend + landing]`
 > - **Décision du CEO** : « nan on ferme pas la webapp » (R91 modifiée) ; R82 retenue.
 > - **Fait** (branche `fix/pages-say-true`) :
