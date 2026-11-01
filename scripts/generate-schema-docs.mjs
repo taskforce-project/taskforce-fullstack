@@ -136,6 +136,15 @@ for (const k of contraintes) {
   }
 }
 
+// L'ordre dans lequel PostgreSQL rend les contraintes d'une même table n'est pas garanti : la requête
+// ne trie que par table. Il a changé entre le 20/10 et le 01/11/2026, et la régénération a déplacé
+// des relations sans rien changer au schéma, ce qui noyait les vrais écarts dans le diff. Les clés
+// étrangères suivent donc l'ordre des colonnes de leur table, comme au dictionnaire.
+for (const t of parTable.values()) {
+  const rang = new Map(t.colonnes.map((c) => [c.column_name, c.ordinal_position]));
+  t.fk.sort((a, b) => rang.get(a.colonne) - rang.get(b.colonne) || a.refTable.localeCompare(b.refTable));
+}
+
 const metier = tablesReelles.filter((t) => !HORS_METIER.includes(t));
 const nbColonnes = colonnes.filter((c) => !HORS_METIER.includes(c.table_name)).length;
 const nbFk = contraintes.filter((k) => k.constraint_type === "FOREIGN KEY" && k.ref_table).length;
