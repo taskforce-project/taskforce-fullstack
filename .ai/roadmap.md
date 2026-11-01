@@ -10,6 +10,30 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 01/11/2026 (bis) - J0, R87 : « Apply » s'éteint quand les tests ont échoué ; passer outre demande une raison.** `[backend + frontend]`
+> - **Constat** (séance n°14 du Conseil, Norman et Bengio) : « Apply » fusionnait la pull request même quand les tests que le runner avait lancés échouaient.
+> - **Fait** (branche `feat/apply-respects-tests`) : `MissionResultService.apply` refuse sans raison quand `tests_ran` est vrai et `tests_passed` faux (400 : rien ne se fusionne, rien n'est posté). Avec une raison, il fusionne, la garde sur la mission (`outcome_reason`, V111) et la poste sur l'issue (« Applied although the tests failed: … »). `POST /runs/{id}/apply` prend `{reason}`, 2 000 caractères au plus. La carte éteint « Apply », dit pourquoi (« The tests failed, so Apply is off. ») et propose « Apply anyway », qui ouvre une raison obligatoire. Des tests non lancés ou réussis ne changent rien.
+> - **Contrôles** : backend ciblé, `MissionResultServiceTest` (22) et `DeliveryControllerWebMvcTest` (26), 0 échec ; front : `tsc` et lint propres, `vitest run --coverage` 113 fichiers et 1 309 tests ; la suite backend complète tourne dans la CI.
+> - **Reste** : l'export du dossier ne porte pas encore le geste ni sa raison (le dossier est scellé à la fin de la mission).
+
+> **▶ MAJ 01/11/2026 - Séances n°14 et n°15 du Conseil : la feuille de route jusqu'à la démo complète, J0 à J9.** `[produit]`
+> - **Décision du CEO** : « Tu peux y aller a fond, mets a jour la doc et vas y fonce ».
+>   - R90 à l'essai : le double moteur de règles (Java pour Cortex, TypeScript dans le runner) reste, protégé par les 51 cas partagés, tant qu'une source unique sans aller-retour vers Java n'est pas trouvée (E16).
+>   - R91 modifiée : la webapp reste en ligne et reçoit chaque release, mais on n'y teste rien ; le banc d'essai est l'app desktop, avec Claude Code et Ollama.
+>   - R92 élargie : chacun branche ses modèles, quels qu'ils soient ; TaskForce ne gère pas les modèles, sauf l'entraînement.
+>   - R102 et R103 précisées : l'arrivée se vit comme un jeu ; la démo montre trois natures de travail, pas tous les métiers. Tout le reste est retenu.
+> - **La feuille de route** (`taskforce-docs` : le PV `recherche/conseil/seances/2026-11-01-feuille-de-route.md`, les tâches au §0 de `v1/13-roadmap/Roadmap_Backlog.md`) :
+>   - J0 dire vrai, fermer les failles ; J1 aucun modèle imposé, et l'essai du moteur unique ; J2 la boucle complète, mince (deux packs) ;
+>   - J3 le métier construit son outil ; J4 le contexte ; J5 des agents robustes ; J6 les données souveraines ;
+>   - J7 l'amélioration continue ; J8 le parcours d'arrivée et la démo complète ; J9 la mise sur le marché.
+>   - Chaque jalon se valide : critères écrits avant, boucle de démo rejouée, tests verts, liste de lancement, trois personnes extérieures dès J2, indice de confiance (E17), séance du Conseil, go du CEO.
+> - **J0, où on en est** :
+>   - #459 et #460 fusionnées dans `dev` : les droits des projets privés dans le Brain OS et dans l'analyse ;
+>   - « Apply » qui respecte les tests : le bloc au-dessus ;
+>   - le refus par délai se dit déjà (« No answer in time: refused », #457) ;
+>   - les pages qui disent vrai : l'architecture et l'ancien modèle de prix corrigés dans `taskforce-docs` ; la confidentialité de la webapp et les pages légales du site restent à faire ;
+>   - la release de R78 attend « go release ».
+
 > **▶ MAJ 31/10/2026 (bis) - Sécurité : l'analyse d'un projet privé ne se lance et ne se suit qu'en le voyant.** `[backend]`
 > - **Constat** (vu en corrigeant la visibilité du Brain OS, `fix/brain-private-project-visibility`) : `AnalysisJobService.launch` ne vérifiait pas que la personne voit le projet, donc tout membre de l'espace pouvait lancer une analyse sur un projet privé ; et `/topic/analysis.{workspaceId}`, ouvert à tout membre, diffusait chaque transition avec le nom du projet et la question du modèle. Les autres routes de l'analyse vérifiaient déjà la visibilité.
 > - **Fait** (branche `fix/analysis-private-projects`) : `launch` répond 404 sur un projet invisible, sans rien créer ni publier ; chaque transition part sur `/topic/projects.{projectId}.analysis`, que `StompAuthInterceptor` ouvre avec la règle du board du projet (`canSubscribeProject`) ; l'ancien canal de l'espace est refusé à l'abonnement, `canSubscribeWorkspace` supprimé. Aucun client ne s'y abonnait (le dock interroge `GET /analysis` toutes les 5 s) : rien à changer côté front.

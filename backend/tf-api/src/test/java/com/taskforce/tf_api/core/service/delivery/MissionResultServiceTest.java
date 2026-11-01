@@ -90,7 +90,7 @@ class MissionResultServiceTest {
     @Test
     @DisplayName("Apply : la pull request est fusionnée, son lien suit, l'issue est terminée, le geste est gardé")
     void apply_merges_and_completes_the_issue() {
-        service.apply("acme", 100L, 7L);
+        service.apply("acme", 100L, 7L, null);
 
         verify(pullRequests).merge(1L, "acme/website", 212);
         assertThat(link.getStatus()).isEqualTo(GitHubLinkStatus.MERGED);
@@ -105,7 +105,7 @@ class MissionResultServiceTest {
     void apply_without_a_pull_request() {
         run.setResultUrl(null);
 
-        assertThatThrownBy(() -> service.apply("acme", 100L, 7L))
+        assertThatThrownBy(() -> service.apply("acme", 100L, 7L, null))
             .isInstanceOf(BusinessException.class).hasMessageContaining("no pull request to apply");
         verify(pullRequests, never()).merge(anyLong(), any(), anyInt());
         assertThat(run.getOutcome()).isNull();
@@ -116,9 +116,53 @@ class MissionResultServiceTest {
     void a_refused_merge_keeps_nothing() {
         doThrow(new BusinessException("GitHub can't merge pull request #212")).when(pullRequests).merge(1L, "acme/website", 212);
 
-        assertThatThrownBy(() -> service.apply("acme", 100L, 7L)).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.apply("acme", 100L, 7L, null)).isInstanceOf(BusinessException.class);
         assertThat(run.getOutcome()).isNull();
         verify(mergedPullRequests, never()).completeIssue(any(), any());
+    }
+
+    @ParameterizedTest(name = "tests lancés {0}, passés {1}, raison [{2}] : refusé")
+    @CsvSource({
+        "true, false, ",
+        "true, false, '   '",
+    })
+    @DisplayName("des tests en échec ferment Apply sans raison : rien ne se fusionne, rien n'est posté (R87)")
+    void failed_tests_close_apply_without_a_reason(Boolean ran, Boolean passed, String reason) {
+        run.setTestsRan(ran);
+        run.setTestsPassed(passed);
+
+        assertThatThrownBy(() -> service.apply("acme", 100L, 7L, reason))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("tests failed");
+        verify(pullRequests, never()).merge(anyLong(), any(), anyInt());
+        verify(issueService, never()).addComment(any(), any(), any(), any(), any());
+        assertThat(run.getOutcome()).isNull();
+    }
+
+    @ParameterizedTest(name = "tests lancés {0}, passés {1}, raison [{2}] : appliqué, raison gardée [{3}]")
+    @CsvSource({
+        "true,  false, '  The date test is flaky  ', The date test is flaky",
+        "true,  true,  ,                              ",
+        "true,  true,  A reason nobody asked for,     ",
+        "false, false, ,                              ",
+        ",      ,      ,                              ",
+    })
+    @DisplayName("Apply suit les tests : en échec, la raison se garde sur la mission et sur l'issue ; sinon rien de plus")
+    void apply_follows_the_tests(Boolean ran, Boolean passed, String reason, String kept) {
+        run.setTestsRan(ran);
+        run.setTestsPassed(passed);
+
+        service.apply("acme", 100L, 7L, reason);
+
+        verify(pullRequests).merge(1L, "acme/website", 212);
+        assertThat(run.getOutcome()).isEqualTo(DeliveryRunOutcome.APPLIED);
+        assertThat(run.getOutcomeReason()).isEqualTo(kept);
+        if (kept == null) {
+            verify(issueService, never()).addComment(any(), any(), any(), any(), any());
+        } else {
+            ArgumentCaptor<CreateIssueCommentRequest> comment = ArgumentCaptor.forClass(CreateIssueCommentRequest.class);
+            verify(issueService).addComment(eq("acme"), eq(12L), eq(55L), comment.capture(), eq(7L));
+            assertThat(comment.getValue().getContent()).isEqualTo("Applied although the tests failed: " + kept);
+        }
     }
 
     @Test
@@ -183,7 +227,7 @@ class MissionResultServiceTest {
     @Test
     @DisplayName("un coéquipier ne tranche pas pour la personne qui a délégué")
     void only_the_delegator_decides() {
-        assertThatThrownBy(() -> service.apply("acme", 100L, 8L)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> service.apply("acme", 100L, 8L, null)).isInstanceOf(ForbiddenException.class);
         verify(pullRequests, never()).merge(anyLong(), any(), anyInt());
     }
 
@@ -205,7 +249,7 @@ class MissionResultServiceTest {
     @Test
     @DisplayName("une mission d'un autre espace n'existe pas d'ici")
     void a_run_of_another_workspace_is_not_found() {
-        assertThatThrownBy(() -> service.apply("other", 100L, 7L)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> service.apply("other", 100L, 7L, null)).isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
@@ -213,7 +257,7 @@ class MissionResultServiceTest {
     void writing_the_project_is_required() {
         doThrow(new ForbiddenException("read only")).when(visibilityGuard).assertCanWrite(run.getIssue().getProject(), 7L);
 
-        assertThatThrownBy(() -> service.apply("acme", 100L, 7L)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> service.apply("acme", 100L, 7L, null)).isInstanceOf(ForbiddenException.class);
         verify(pullRequests, never()).merge(anyLong(), any(), anyInt());
     }
 }
