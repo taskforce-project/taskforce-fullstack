@@ -159,6 +159,7 @@ describe("faits d'une action de Claude Code, jugés par la table par défaut", (
     ["recherche web", "WebSearch", { query: "x" }, "ask", "search-web"],
     ["lire l'issue", "mcp__taskforce__get_issue", { projectId: 1, issueId: 2 }, "allow", "read-issues"],
     ["commenter l'issue", "mcp__taskforce__add_comment", { projectId: 1, issueId: 2, content: "x" }, "allow", "comment"],
+    ["cocher une ligne de la checklist", "mcp__taskforce__check_checklist_item", { projectId: 1, issueId: 2, itemId: 3, done: true }, "allow", "update-issue"],
     ["Cortex, hors de la mission", "mcp__taskforce__ask_cortex", { message: "x" }, "ask", null],
     ["outil interne de l'agent", "TodoWrite", { todos: [] }, "allow", null],
     ["sous-agent, dont chaque action passe par la porte", "Task", { prompt: "x" }, "allow", null],

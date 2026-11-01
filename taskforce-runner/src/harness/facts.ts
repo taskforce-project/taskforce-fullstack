@@ -26,6 +26,8 @@ export const TASKFORCE_TOOLS: Readonly<Record<string, string>> = {
   add_comment: "comment.create",
   create_issue: "issue.create",
   update_issue: "issue.update",
+  // Cocher une ligne de la checklist change l'issue, et se défait d'un geste : la règle update-issue le permet (R77).
+  check_checklist_item: "issue.update",
 };
 
 const FILE_TOOLS: Record<string, string> = {
