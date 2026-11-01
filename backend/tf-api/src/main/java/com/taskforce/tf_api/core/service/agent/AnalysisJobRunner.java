@@ -54,7 +54,7 @@ public class AnalysisJobRunner {
 
             // Contexte — Brain OS (RAG).
             jobService.step(jobId, AnalysisPlan.CONTEXT, AnalysisPlan.IN_PROGRESS);
-            List<KnowledgeNode> hits = decisionService.retrieveContext(ctx.workspaceId(), ctx.project().getName());
+            List<KnowledgeNode> hits = decisionService.retrieveContext(ctx.workspaceId(), ctx.project());
             jobService.step(jobId, AnalysisPlan.CONTEXT, AnalysisPlan.COMPLETED);
 
             // Analyse — le modèle décide, ou demande une clarification (DEEP, premier tour seulement).

@@ -24,12 +24,14 @@ import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.delivery.DeliveryActivityService;
+import com.taskforce.tf_api.core.service.delivery.MissionResultService;
 import com.taskforce.tf_api.core.service.delivery.DeliveryRunner;
 import com.taskforce.tf_api.core.service.delivery.DeliveryService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -50,6 +52,7 @@ public class DeliveryController {
     private final DeliveryService deliveryService;
     private final DeliveryRunner deliveryRunner;
     private final DeliveryActivityService activityService;
+    private final MissionResultService missionResults;
     private final UserRepository userRepository;
 
     /**
@@ -154,8 +157,9 @@ public class DeliveryController {
         @Valid @RequestBody ApprovalDecisionRequest request
     ) {
         boolean allow = "ALLOW".equals(request.decision());
-        activityService.decide(slug, runId, approvalId, allow, resolveUserId(jwt));
-        return ResponseEntity.ok(ApiResponse.success(allow ? "Action allowed" : "Action denied", null));
+        activityService.decide(slug, runId, approvalId, allow, request.forMission(), resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success(
+            allow ? (request.forMission() ? "Allowed for this mission" : "Action allowed") : "Action denied", null));
     }
 
     /**
@@ -179,6 +183,50 @@ public class DeliveryController {
             .contentType(markdown ? MediaType.parseMediaType("text/markdown; charset=UTF-8") : MediaType.APPLICATION_JSON)
             .body(file);
     }
+
+    /**
+     * POST /api/workspaces/{slug}/delivery/runs/{runId}/apply : « Apply » sur la carte de résultat (R78) : la pull
+     * request de l'agent est fusionnée sur GitHub, puis l'issue terminée. Seule la personne qui a délégué tranche. Si
+     * les tests du projet ont échoué, elle ne passe outre qu'avec une raison (R87).
+     */
+    @PostMapping("/runs/{runId}/apply")
+    public ResponseEntity<ApiResponse<Void>> apply(
+        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId,
+        @Valid @RequestBody(required = false) MissionApplyRequest request
+    ) {
+        missionResults.apply(slug, runId, resolveUserId(jwt), request == null ? null : request.reason());
+        return ResponseEntity.ok(ApiResponse.success("Applied: the pull request is merged", null));
+    }
+
+    /** Pourquoi appliquer malgré des tests en échec ; demandé seulement dans ce cas, posté sur l'issue. */
+    public record MissionApplyRequest(@Size(max = 2000) String reason) {}
+
+    /** POST .../runs/{runId}/discard : « Discard » : la pull request est fermée, sa branche supprimée. */
+    @PostMapping("/runs/{runId}/discard")
+    public ResponseEntity<ApiResponse<Void>> discard(
+        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId
+    ) {
+        missionResults.discard(slug, runId, resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Discarded", null));
+    }
+
+    /**
+     * POST .../runs/{runId}/retry : « Try again » : le résultat est écarté, la remarque postée sur l'issue, et une
+     * nouvelle mission part avec le même agent ; la réponse est cette nouvelle mission.
+     */
+    @PostMapping("/runs/{runId}/retry")
+    public ResponseEntity<ApiResponse<DeliveryRunResponse>> retry(
+        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId,
+        @Valid @RequestBody(required = false) MissionRetryRequest request
+    ) {
+        String note = request == null ? null : request.note();
+        DeliveryRunResponse run = missionResults.retry(slug, runId, resolveUserId(jwt), note);
+        deliveryRunner.execute(run.id()); // async, une fois le run committé, comme une délégation
+        return ResponseEntity.ok(ApiResponse.success("Delegated again", run));
+    }
+
+    /** La remarque de la personne pour la nouvelle mission ; elle va sur l'issue, où l'agent la lit. */
+    public record MissionRetryRequest(@Size(max = 2000) String note) {}
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");

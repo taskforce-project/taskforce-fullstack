@@ -50,10 +50,14 @@ public class StompAuthInterceptor implements ChannelInterceptor {
 
     /** Topic dont la clé EST l'identité de l'abonné : {@code /topic/notifications.{userId}}. */
     private static final String USER_TOPIC_PREFIX     = "/topic/notifications.";
-    /** Flux temps réel d'un projet (board) : {@code /topic/projects.{projectId}} — autorisé par visibilité projet. */
+    /**
+     * Flux temps réel d'un projet, autorisés par visibilité projet : {@code /topic/projects.{projectId}} (le board) et
+     * {@code /topic/projects.{projectId}.analysis} (ses workflows d'analyse IA).
+     */
     private static final String PROJECT_TOPIC_PREFIX  = "/topic/projects.";
-    /** Flux d'analyse IA d'un workspace : {@code /topic/analysis.{workspaceId}} — autorisé par appartenance. */
-    private static final String ANALYSIS_TOPIC_PREFIX = "/topic/analysis.";
+    private static final String ANALYSIS_SUFFIX       = ".analysis";
+    /** Ancien flux d'analyse IA par espace, {@code /topic/analysis.{workspaceId}} : retiré, tout abonnement est refusé. */
+    private static final String RETIRED_ANALYSIS_PREFIX = "/topic/analysis.";
 
     private final JwtDecoder                   jwtDecoder;
     private final UserRepository               userRepository;
@@ -135,13 +139,17 @@ public class StompAuthInterceptor implements ChannelInterceptor {
      * souscription exige une session authentifiée ; en plus, les canaux porteurs de données sont vérifiés :
      * <ul>
      *   <li>{@code /topic/notifications.{userId}} — l'abonné doit être ce {@code userId} ;</li>
-     *   <li>{@code /topic/projects.{projectId}} — l'abonné doit <b>voir</b> le projet (public / membre / OWNER-ADMIN) ;</li>
-     *   <li>{@code /topic/analysis.{workspaceId}} — l'abonné doit être <b>membre</b> du workspace.</li>
+     *   <li>{@code /topic/projects.{projectId}} et {@code /topic/projects.{projectId}.analysis} : l'abonné doit
+     *       <b>voir</b> le projet (public / membre / OWNER-ADMIN).</li>
      * </ul>
      * Avant, seul le topic notifications était contrôlé : {@code projects.*} / {@code analysis.*} n'exigeaient
      * qu'une session authentifiée → n'importe qui pouvait streamer l'activité d'un autre compte par simple
      * énumération d'id. La lecture de la base vit dans {@link RealtimeAuthorizationService} (côté {@code core}) ;
      * l'intercepteur reste mince.
+     *
+     * <p>Les workflows d'analyse IA passaient par {@code /topic/analysis.{workspaceId}}, ouvert à tout membre de
+     * l'espace : le nom d'un projet privé et la question du modèle y sortaient du cercle du projet. Ils ont rejoint
+     * les flux du projet (31/10/2026) ; plus rien n'est publié sur l'ancien canal, et tout abonnement y est refusé.</p>
      */
     private void authorizeSubscribe(StompHeaderAccessor accessor) {
         String destination = accessor.getDestination();
@@ -166,23 +174,26 @@ public class StompAuthInterceptor implements ChannelInterceptor {
                 throw new MessageDeliveryException("Access to this channel is denied");
             }
         } else if (destination.startsWith(PROJECT_TOPIC_PREFIX)) {
-            if (!realtimeAuth.canSubscribeProject(userId, parseId(destination, PROJECT_TOPIC_PREFIX))) {
+            String channel = destination.substring(PROJECT_TOPIC_PREFIX.length());
+            String projectId = channel.endsWith(ANALYSIS_SUFFIX)
+                ? channel.substring(0, channel.length() - ANALYSIS_SUFFIX.length())
+                : channel;
+            if (!realtimeAuth.canSubscribeProject(userId, parseId(projectId))) {
                 log.warn("STOMP SUBSCRIBE refusé : user {} sans accès au canal {}", userId, destination);
                 throw new MessageDeliveryException("Access to this channel is denied");
             }
-        } else if (destination.startsWith(ANALYSIS_TOPIC_PREFIX)) {
-            if (!realtimeAuth.canSubscribeWorkspace(userId, parseId(destination, ANALYSIS_TOPIC_PREFIX))) {
-                log.warn("STOMP SUBSCRIBE refusé : user {} sans accès au canal {}", userId, destination);
-                throw new MessageDeliveryException("Access to this channel is denied");
-            }
+        } else if (destination.startsWith(RETIRED_ANALYSIS_PREFIX)) {
+            // Rien n'y est plus publié ; le refuser empêche de le rouvrir par mégarde à tout l'espace.
+            log.warn("STOMP SUBSCRIBE refusé : user {} sur le canal retiré {}", userId, destination);
+            throw new MessageDeliveryException("This channel no longer exists");
         }
-        // Autres canaux : la session authentifiée suffit (aucun flux cross-tenant connu au-delà de ces 3).
+        // Autres canaux : la session authentifiée suffit (aucun flux cross-tenant connu au-delà de ceux-ci).
     }
 
-    /** Id numérique en fin de destination ({@code prefix + id}) ; refuse une destination malformée. */
-    private static long parseId(String destination, String prefix) {
+    /** Id numérique d'un canal ; refuse une destination malformée. */
+    private static long parseId(String id) {
         try {
-            return Long.parseLong(destination.substring(prefix.length()));
+            return Long.parseLong(id);
         } catch (NumberFormatException ex) {
             throw new MessageDeliveryException("Invalid channel");
         }

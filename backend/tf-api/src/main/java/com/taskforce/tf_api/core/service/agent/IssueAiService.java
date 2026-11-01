@@ -96,7 +96,7 @@ public class IssueAiService {
                 issueTypeRepository.findByProjectIdOrderByName(projectId).stream().map(IssueType::getName).toList());
         });
 
-        List<ScoredNode> scored = search.retrieveRelevantScored(ws.getId(), facts.text(), RAG_TOPK);
+        List<ScoredNode> scored = search.retrieveRelevantScored(access.viewer(ws.getId(), userId), facts.text(), RAG_TOPK);
         List<KnowledgeNode> hits = scored.stream().map(ScoredNode::node).toList();
         List<SimilarNode> similar = scored.stream()
             .map(s -> new SimilarNode(s.node().getId(), s.node().getTitle(),

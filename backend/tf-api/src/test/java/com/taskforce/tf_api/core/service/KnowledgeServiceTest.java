@@ -27,10 +27,12 @@ import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainLinkService;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.core.service.brain.BrainSeedingService;
+import com.taskforce.tf_api.core.service.brain.BrainViewer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -58,11 +60,14 @@ class KnowledgeServiceTest {
     private static final String SLUG = "taskforce-demo";
     private static final Long USER = 1L;
     private static final Long WS = 7L;
+    /** Ce que la personne lit : le garde dit quelles pages elle voit, le service s'y tient. */
+    private static final BrainViewer VIEWER = BrainViewer.seeing(WS, java.util.List.of(3L));
 
     private Workspace workspace() {
         Workspace ws = mock(Workspace.class);
         when(ws.getId()).thenReturn(WS);
         when(access.resolveAndAuthorize(SLUG, USER)).thenReturn(ws);
+        lenient().when(access.viewer(WS, USER)).thenReturn(VIEWER);
         return ws;
     }
 
@@ -84,7 +89,7 @@ class KnowledgeServiceTest {
     void create_with_parent_nests_under_it() {
         workspace();
         when(brainWorkspaceRepository.findByWorkspaceId(WS)).thenReturn(Optional.empty());
-        when(access.requireNode(50L, WS)).thenReturn(node(50L, null));
+        when(access.requireNode(50L, VIEWER)).thenReturn(node(50L, null));
         when(nodeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         KnowledgeNodeResponse res = service.createNode(SLUG, USER, CreateKnowledgeNodeRequest.builder()
@@ -92,7 +97,7 @@ class KnowledgeServiceTest {
 
         assertThat(captureSaved().getParentNodeId()).isEqualTo(50L);
         assertThat(res.getParentNodeId()).isEqualTo(50L);
-        verify(access).requireNode(50L, WS); // garde meme-workspace
+        verify(access).requireNode(50L, VIEWER); // garde meme-workspace, page lue par la personne
     }
 
     @Test
@@ -113,8 +118,8 @@ class KnowledgeServiceTest {
     void update_moves_page_under_another() {
         workspace();
         KnowledgeNode target = node(10L, null);
-        when(access.requireNode(10L, WS)).thenReturn(target);
-        when(access.requireNode(20L, WS)).thenReturn(node(20L, null)); // nouveau parent = racine
+        when(access.requireNode(10L, VIEWER)).thenReturn(target);
+        when(access.requireNode(20L, VIEWER)).thenReturn(node(20L, null)); // nouveau parent = racine
         when(nodeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         service.updateNode(SLUG, 10L, USER, UpdateKnowledgeNodeRequest.builder().parentNodeId(20L).build());
@@ -126,7 +131,7 @@ class KnowledgeServiceTest {
     @DisplayName("updateNode : une page ne peut pas etre sa propre parente")
     void update_rejects_self_parent() {
         workspace();
-        when(access.requireNode(10L, WS)).thenReturn(node(10L, null));
+        when(access.requireNode(10L, VIEWER)).thenReturn(node(10L, null));
 
         assertThatThrownBy(() -> service.updateNode(SLUG, 10L, USER,
             UpdateKnowledgeNodeRequest.builder().parentNodeId(10L).build()))
@@ -140,8 +145,8 @@ class KnowledgeServiceTest {
     void move_under_page_sets_parent_and_domain() {
         workspace();
         KnowledgeNode target = node(10L, null);
-        when(access.requireNode(10L, WS)).thenReturn(target);
-        when(access.requireNode(20L, WS)).thenReturn(node(20L, null));
+        when(access.requireNode(10L, VIEWER)).thenReturn(target);
+        when(access.requireNode(20L, VIEWER)).thenReturn(node(20L, null));
         when(nodeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         service.moveNode(SLUG, 10L, USER, MoveNodeRequest.builder().parentNodeId(20L).domain("ENGINEERING").build());
@@ -155,7 +160,7 @@ class KnowledgeServiceTest {
     void move_to_root_clears_parent() {
         workspace();
         KnowledgeNode target = node(10L, 99L); // avait un parent
-        when(access.requireNode(10L, WS)).thenReturn(target);
+        when(access.requireNode(10L, VIEWER)).thenReturn(target);
         when(nodeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         service.moveNode(SLUG, 10L, USER, MoveNodeRequest.builder().parentNodeId(null).build());
@@ -168,9 +173,9 @@ class KnowledgeServiceTest {
     @DisplayName("updateNode : reparenter sous un descendant est refuse (anti-cycle)")
     void update_rejects_cycle() {
         workspace();
-        when(access.requireNode(10L, WS)).thenReturn(node(10L, null));
+        when(access.requireNode(10L, VIEWER)).thenReturn(node(10L, null));
         // 20 a pour parent 10 -> mettre 10 sous 20 boucle
-        when(access.requireNode(20L, WS)).thenReturn(node(20L, 10L));
+        when(access.requireNode(20L, VIEWER)).thenReturn(node(20L, 10L));
 
         assertThatThrownBy(() -> service.updateNode(SLUG, 10L, USER,
             UpdateKnowledgeNodeRequest.builder().parentNodeId(20L).build()))

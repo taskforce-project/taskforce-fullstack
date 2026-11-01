@@ -66,6 +66,10 @@ export const DELIVERY_ROUTES = {
     `/api/workspaces/${slug}/delivery/runs/${runId}/approvals/${approvalId}`,
   /** Dossier de preuve d'un run, `?format=json|md` (GET, fichier sans enveloppe ; 404 pour un run de la v1). */
   EVIDENCE: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/evidence`,
+  /** Les gestes de la carte de résultat (POST, R78) : fusionner la PR, l'écarter, ou relancer la mission. */
+  APPLY: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/apply`,
+  DISCARD: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/discard`,
+  RETRY: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/retry`,
   /** Serveur MCP de l'instance pour ce workspace (adresse à donner à Claude Code, pas appelée par le front). */
   MCP_SERVER: (slug: string) => `/api/workspaces/${slug}/mcp`,
   /**

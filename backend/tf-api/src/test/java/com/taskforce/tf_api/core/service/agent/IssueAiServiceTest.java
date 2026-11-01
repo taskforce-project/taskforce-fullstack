@@ -76,7 +76,7 @@ class IssueAiServiceTest {
     void setup() throws Exception {
         when(access.resolveAndAuthorize("acme", 9L)).thenReturn(ws);
         when(issueRepository.findById(10L)).thenReturn(Optional.of(issue));
-        when(search.retrieveRelevantScored(anyLong(), any(), anyInt())).thenReturn(List.of());
+        when(search.retrieveRelevantScored(any(), any(), anyInt())).thenReturn(List.of());
         when(projectLabelRepository.findByProjectIdOrderByNameAsc(1L)).thenReturn(List.of());
         when(issueTypeRepository.findByProjectIdOrderByName(1L)).thenReturn(List.of());
         // metered() = simple pass-through du quota : on invoque l'appel IA fourni.

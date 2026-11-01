@@ -35,6 +35,7 @@ import {
 import { cn } from "@/lib/utils"
 import { PRIORITY_DOT } from "@/lib/palette"
 import { AssigneeMenu } from "@/components/smart-assign/assignee-menu"
+import { MissionResultCard } from "@/components/sheets/mission-result-card"
 import { DelegateAgentControl } from "@/components/sheets/delegate-agent-control"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
@@ -1531,6 +1532,12 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </button>
             )}
 
+            {/* La carte de résultat d'une mission finie (R78, « Relire ») : sous le titre, avant la description. */}
+            {workspaceSlug && (
+              <MissionResultCard slug={workspaceSlug} issueId={issueId} issueKey={issue.identifier}
+                issueTitle={title || issue.title} responsible={assignee?.name ?? null} />
+            )}
+
             {/* Description - rendu markdown interactif (cases à cocher) + petit éditeur */}
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Description</p>
@@ -1684,6 +1691,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                 workspaceSlug={workspaceSlug}
                 projectId={projectId}
                 issueId={issueId}
+                goal={issue ? `${title} (${issue.identifier})` : undefined}
               />
             )}
 
