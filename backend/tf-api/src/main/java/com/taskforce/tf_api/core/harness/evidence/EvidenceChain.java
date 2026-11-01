@@ -10,7 +10,7 @@ import java.util.HexFormat;
 import java.util.List;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
@@ -26,8 +26,6 @@ public final class EvidenceChain {
     public static final DateTimeFormatter AT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
         .withZone(ZoneOffset.UTC);
 
-    private static final ObjectMapper JSON = new ObjectMapper();
-
     private EvidenceChain() {
     }
 
@@ -36,7 +34,8 @@ public final class EvidenceChain {
      * pour celui d'une réponse de Cortex, l'agent interne.
      */
     public static ObjectNode event(int seq, String at, String type, String actorKind, String actorId, JsonNode data) {
-        ObjectNode event = JSON.createObjectNode();
+        // La fabrique de nœuds, pas un ObjectMapper : la classe se charge sans construire Jackson entier (E16, TeaVM).
+        ObjectNode event = JsonNodeFactory.instance.objectNode();
         event.put("seq", seq);
         event.put("at", at);
         event.put("type", type);
