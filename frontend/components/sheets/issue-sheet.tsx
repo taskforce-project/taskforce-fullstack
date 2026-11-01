@@ -38,7 +38,9 @@ import { AssigneeMenu } from "@/components/smart-assign/assignee-menu"
 import { MissionResultCard } from "@/components/sheets/mission-result-card"
 import { DelegateAgentControl } from "@/components/sheets/delegate-agent-control"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
+import { describeActivity } from "@/lib/issue-activity"
 import { IssueAiSpecPanel } from "@/components/issues/issue-ai-spec"
 import { IssueDescription } from "@/components/issues/issue-description"
 import { BrandLogo } from "@/components/ui/brand-logo"
@@ -436,6 +438,7 @@ const ACTIVITY_STEP = 10
  */
 function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, onDelete }: Readonly<ActivityFeedProps>) {
   const currentUser = useUserStore((s) => s.user)
+  const activityText = usePreferencesStore((s) => s.t.issueActivity)
   // Combien d'entrées afficher (pagination « charger plus ») - départ court pour garder l'issue lisible.
   const [visible, setVisible] = useState(ACTIVITY_INITIAL)
   const entries: FeedEntry[] = [
@@ -503,17 +506,20 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
               )
             }
             const a = entry.data
-            const actorName = a.actor ? (a.actor.displayName ?? a.actor.email) : "System"
+            // Qui a fait quoi : la personne, ou l'agent qui a agi pour elle (« Claude Code … for Pierre »).
+            const line = describeActivity(a, activityText)
             return (
               <div key={`e-${a.id}`} className="flex items-center gap-3">
                 <div className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border bg-muted">
-                  <div className="size-1.5 rounded-full bg-muted-foreground/40" />
+                  <div className={cn("size-1.5 rounded-full", a.via ? "bg-primary/60" : "bg-muted-foreground/40")} />
                 </div>
                 <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                  <span className="text-xs font-medium text-foreground">{actorName}</span>
+                  <span className="shrink-0 text-xs font-medium text-foreground">{line.who}</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    {a.action.replaceAll("_", " ").toLowerCase()}
-                    {a.oldValue && a.newValue && <> : <span className="text-muted-foreground/80">{a.oldValue}</span> → <span className="text-foreground">{a.newValue}</span></>}
+                    {line.what}
+                    {line.link && <> <a href={line.link.href} target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline">{line.link.label}</a></>}
+                    {line.change && <> : <span className="text-muted-foreground/80">{line.change.from}</span> → <span className="text-foreground">{line.change.to}</span></>}
+                    {line.forWhom && <span className="text-muted-foreground/70"> {line.forWhom}</span>}
                   </span>
                   <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/60">{formatCommentTime(a.createdAt)}</span>
                 </div>

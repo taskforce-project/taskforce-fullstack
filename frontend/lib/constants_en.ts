@@ -583,6 +583,21 @@ export const CONSTANTS_EN = {
     },
   },
 
+  // An issue's activity: who did what, and through which agent.
+  issueActivity: {
+    system: "System",
+    created: "created",
+    createdVia: "created, prepared by {via}",
+    checked: "checked \"{item}\"",
+    unchecked: "unchecked \"{item}\"",
+    openedPullRequest: "opened pull request",
+    openedAPullRequest: "opened a pull request",
+    applied: "applied the result",
+    discarded: "discarded the result",
+    retried: "tried again",
+    forWhom: "for {who}",
+  },
+
   // Cortex in the conversation.
   cortex: {
     // The issue Cortex prepares as a card (R78): the person checks it, edits it, then creates it.
