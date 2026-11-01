@@ -27,7 +27,7 @@ export default function PrivacyPolicyPage() {
         </Link>
 
         <h1 className="text-3xl font-bold text-foreground mb-2">Privacy Policy</h1>
-        <p className="text-sm text-muted-foreground mb-10">Last updated: June 10, 2026</p>
+        <p className="text-sm text-muted-foreground mb-10">Last updated: November 1, 2026</p>
 
         <div className="max-w-none space-y-8 text-muted-foreground text-sm leading-relaxed">
 
@@ -73,7 +73,9 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-lg font-semibold text-foreground mb-3">5. Data sharing</h2>
             <p>We do not sell your personal data. We share data only with the following sub-processors:</p>
             <ul className="list-disc pl-5 space-y-1.5 mt-2">
-              <li><strong className="text-foreground">Mailtrap / transactional email provider</strong> - sending account and notification emails.</li>
+              <li><strong className="text-foreground">Brevo</strong> - sending account and notification emails.</li>
+              <li><strong className="text-foreground">Groq, Inc.</strong> (United States) - runs the AI assistant: the questions you ask it, and the workspace content sent with them, are processed by Groq&apos;s models, outside the European Union. Using the assistant is optional.</li>
+              <li><strong className="text-foreground">Metz Numeric School</strong> (France) - hosts the servers of this web app, on machines lent for the project, until they move to OVH.</li>
               <li><strong className="text-foreground">MinIO</strong> - file attachment storage (self-hosted or configured cloud region).</li>
               <li><strong className="text-foreground">PostHog</strong> (EU Cloud) - product analytics, only after you consent (hosted in the EU, no data leaves the EU).</li>
             </ul>
@@ -111,7 +113,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">8. Data security</h2>
             <p>
-              We apply industry-standard security measures: HTTPS/TLS in transit, AES-256 encryption at rest, HTTP security headers (HSTS, CSP, X-Frame-Options), rate limiting on all authentication endpoints, and regular dependency vulnerability scanning.
+              We apply industry-standard security measures: HTTPS/TLS in transit, AES-256 encryption at rest for integration tokens and other secrets, HTTP security headers (HSTS, CSP, X-Frame-Options), rate limiting on all authentication endpoints, and regular dependency vulnerability scanning.
             </p>
           </section>
 
