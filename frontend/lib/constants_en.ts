@@ -459,6 +459,9 @@ export const CONSTANTS_EN = {
   // Delegated missions: what an agent asks while it works (R78, the Allow screen).
   missions: {
     agent: "Claude Code",
+    // The issue's Assignee while a mission works on it, in the delegator's name; the stored assignee doesn't change.
+    workingFor: "{agent}, for {who}",
+    workingHint: "Works on this issue until you review its result",
     taskforce: "TaskForce",
     wantsTo: "wants to",
     willDo: "What it will do",
