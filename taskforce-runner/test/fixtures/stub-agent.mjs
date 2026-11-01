@@ -5,9 +5,9 @@
  * Se lance à la place de `claude` (mêmes arguments, prompt sur stdin, sortie `stream-json` sur stdout) et fait ce
  * qu'un agent ferait, en vrai : il fait juger des actions par le hook `PreToolUse` du fichier `--settings` (les règles
  * de la mission), parle au serveur MCP de l'instance décrit par `--mcp-config` (HTTP, session déléguée), lit l'issue,
- * la commente, SONDE les limites de la session (ce qui doit être refusé l'est-il ?), demande une validation par le
- * hook `PermissionRequest` pour une action que les règles demandent (comme Claude Code le ferait pour
- * `npm install`), puis laisse un commit dans le worktree.
+ * la commente, SONDE les limites de la session (ce qui doit être refusé l'est-il ?), fait demander par la porte (le même
+ * hook `PreToolUse`, qui attend la décision de la personne) une action que les règles demandent (`npm install`), puis
+ * laisse un commit dans le worktree.
  *
  * Usage : dans runner.config.json, `"agent": { "command": ".../test/fixtures/stub-agent" }`
  * (`stub-agent.cmd` sous Windows). Jamais en production.
@@ -87,22 +87,21 @@ async function callHook(event, body) {
   return res.json();
 }
 
-/** La décision des règles sur une action : allow, deny, ou ask (pas de décision : place au hook PermissionRequest). */
+/** La réponse de la porte à une action : allow ou deny, jamais sans décision. */
 async function judge(toolName, toolInput) {
   const output = (await callHook("PreToolUse", { tool_name: toolName, tool_input: toolInput })).hookSpecificOutput;
-  return output?.permissionDecision ?? "ask";
+  return output?.permissionDecision ?? "none";
 }
 
-// ---------------------------------------------------------------- validation par le hook PermissionRequest
+// ---------------------------------------------------------------- validation par la porte : la personne décide
 async function askApproval(command) {
   emit({ type: "assistant", message: { content: [{ type: "tool_use", id: "toolu_stub_bash", name: "Bash", input: { command } }] } });
-  const output = (await callHook("PermissionRequest", { tool_name: "Bash", tool_input: { command } })).hookSpecificOutput;
-  const decision = output?.decision ?? { behavior: "deny", message: "no decision" };
-  if (decision.behavior === "allow") {
-    emit({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_stub_bash", is_error: false, content: "(simulated) tests passed" }] } });
+  const output = (await callHook("PreToolUse", { tool_name: "Bash", tool_input: { command } })).hookSpecificOutput;
+  if (output?.permissionDecision === "allow") {
+    emit({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_stub_bash", is_error: false, content: "(simulated) install done" }] } });
     return true;
   }
-  emit({ type: "system", subtype: "permission_denied", tool_name: "Bash", message: decision.message ?? "Denied" });
+  emit({ type: "system", subtype: "permission_denied", tool_name: "Bash", message: output?.permissionDecisionReason ?? "Denied" });
   return false;
 }
 
@@ -120,7 +119,7 @@ for (const [label, tool, input, expected] of [
   ["push from the agent", "Bash", { command: "git push origin HEAD" }, "deny"],
   // R32 : les scripts du dépôt ne sont pas pour l'agent ; le runner lance les tests du projet après lui (S1).
   ["run the repository's tests", "Bash", { command: "npm test" }, "deny"],
-  ["install a package", "Bash", { command: "npm install left-pad" }, "ask"],
+  ["list the copy", "Bash", { command: "ls -la" }, "allow"],
 ]) {
   const verdict = await judge(tool, input);
   lines.push(`- ${verdict === expected ? "PASS" : "FAIL"} rules: ${label}: ${verdict}`);
