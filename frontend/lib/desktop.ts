@@ -17,18 +17,20 @@ export const DESKTOP_HIDDEN_CONNECTORS: ReadonlySet<string> = new Set(["github",
 
 /** Fournisseur d'IA choisi sur cet ordinateur (cf. `desktop/src/ai.ts`). Un modèle vide est choisi automatiquement. */
 export interface DesktopAiSettings {
-  provider: "ollama" | "custom" | "off";
+  provider: "ollama" | "custom" | "anthropic" | "off";
   baseUrl: string;
   model: string;
   modelFast: string;
   embedModel: string;
 }
 
-/** État lu chez le fournisseur : joignable ou non, modèles installés, modèles retenus. */
+/** État lu chez le fournisseur par le backend : joignable ou non, modèles installés, modèles retenus. */
 export interface DesktopAiState {
   configured: boolean;
   reachable: boolean;
   models: string[];
+  /** Modèles du fournisseur des vecteurs (Ollama sur l'ordinateur quand la conversation passe par Anthropic). */
+  embedModels?: string[];
   chat: { model: string | null; model_fast: string | null; available: boolean };
   embeddings: { model: string | null; dimensions: number; available: boolean };
 }
