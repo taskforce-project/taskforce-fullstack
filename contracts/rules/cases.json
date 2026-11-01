@@ -90,6 +90,26 @@
       "pattern": "{npm,yarn,pnpm} {test,run}**",
       "value": "npm install",
       "match": false
+    },
+    {
+      "pattern": "{cd,ls}{, **}",
+      "value": "ls",
+      "match": true
+    },
+    {
+      "pattern": "{cd,ls}{, **}",
+      "value": "ls -la src",
+      "match": true
+    },
+    {
+      "pattern": "{cd,ls}{, **}",
+      "value": "cd \"/work/run-6\"",
+      "match": true
+    },
+    {
+      "pattern": "{cd,ls}{, **}",
+      "value": "lsof -i",
+      "match": false
     }
   ],
   "decisions": [
@@ -641,10 +661,87 @@
         "effect": "ask",
         "rule": null
       }
+    },
+    {
+      "name": "listing the copy from the shell is allowed: reading changes nothing",
+      "facts": {
+        "action": "shell",
+        "command": "ls -la"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-reads"
+      }
+    },
+    {
+      "name": "printing a file of the copy is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "cat README.md"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-reads"
+      }
+    },
+    {
+      "name": "going into the copy with cd is allowed (the runner bounds its target)",
+      "facts": {
+        "action": "shell",
+        "command": "cd \"/work/run-6\""
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-reads"
+      }
+    },
+    {
+      "name": "a program that only starts like a read is not one",
+      "facts": {
+        "action": "shell",
+        "command": "lsof -i"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "find can delete files or run a program, so it asks",
+      "facts": {
+        "action": "shell",
+        "command": "find . -name *.tmp -delete"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "sed can rewrite a file, so it asks",
+      "facts": {
+        "action": "shell",
+        "command": "sed -i s/a/b/ README.md"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "a read the runner cannot bound has no action, so it asks",
+      "facts": {
+        "tool": "Bash",
+        "command": "cat /etc/passwd"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
     }
   ],
   "digest": {
     "description": "The digest of default.rules.json as it is, with or without null members and its own digest field.",
-    "expected": "sha256:96423074a5d1f108bd150bee2ef11ea894cb4e9ad84764344d0c8443112ad80e"
+    "expected": "sha256:c0d557fcff6f0b00d3907a5f75e805c883aa8af40a6cfb5f16637680b2ecfeb8"
   }
 }

@@ -52,14 +52,16 @@ a token that is random for each run (`taskforce-runner/src/approvals.ts`):
 - The facts come from the tool call (`taskforce-runner/src/harness/facts.ts`):
   - files: `file.read`, `file.search`, `file.write`, with the path relative to the copy, links followed;
   - commands: split on `&&`, `||`, `;`, `|`, `&` and new lines outside quotes, each part judged alone, the strictest
-    decision wins; `git commit` is `git.commit`, any other command is `shell`;
+    decision wins; `git commit` is `git.commit`, any other command is `shell`; `cd` changes the folder the next parts
+    are read from, and after a `cd` that cannot be bounded no part is bounded;
   - TaskForce MCP tools: one action each (`issue.read`, `comment.create`...);
   - web: `web.search` and `web.fetch`;
   - internal tools of the agent (`TodoWrite`, `Task`, `ToolSearch`...): no facts, allowed. The actions of a subagent
     go through the hook themselves.
 - What cannot be bounded can be denied or asked by a rule, never allowed. That covers a path outside the copy or
   inside `.git` (a hook written there would run at the next commit), a search pattern that leaves the copy, and a
-  command with a substitution, a redirection to a file, `--output`, or an argument naming a path outside the copy
+  command with a substitution, a variable or another expansion of the shell, a redirection to a file, `--output`, or an
+  argument naming a path outside the copy (a link of the repository included)
   (`npm test --prefix ../elsewhere`, `--outDir=../../x`: an allowed name doing its work elsewhere). The commit message form that Claude Code uses
   (`"$(cat <<'EOF' ... EOF)"`, quoted delimiter) is plain text and is read as such.
 - Not described yet, so always asked: the `PowerShell` tool, and any tool this list does not name.
