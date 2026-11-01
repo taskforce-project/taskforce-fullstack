@@ -26,7 +26,7 @@ const draft = (over: Partial<IssueDraft> = {}): IssueDraft => ({
   project: "WEB",
   title: "Pricing page",
   description: "",
-  subtasks: [],
+  checklist: [],
   dueDate: "",
   status: "",
   ...over,
@@ -38,7 +38,7 @@ describe("readIssueDraft", () => {
       project: "WEB",
       title: " Pricing page ",
       description: "Show the plans.",
-      subtasks: ["Plan table", " ", 42, "Link from the menu"],
+      checklist: ["Plan table", " ", 42, "Link from the menu"],
       dueDate: "2026-11-06",
       status: "Backlog",
     });
@@ -47,10 +47,14 @@ describe("readIssueDraft", () => {
       project: "WEB",
       title: "Pricing page",
       description: "Show the plans.",
-      subtasks: ["Plan table", "Link from the menu"],
+      checklist: ["Plan table", "Link from the menu"],
       dueDate: "2026-11-06",
       status: "Backlog",
     });
+  });
+
+  it("still reads the checklist of a card prepared under its former name", () => {
+    expect(readIssueDraft(JSON.stringify({ subtasks: ["Plan table"] })).checklist).toEqual(["Plan table"]);
   });
 
   it.each([
@@ -68,7 +72,7 @@ describe("readIssueDraft", () => {
 
 describe("issueDraftInput", () => {
   it("sends only what is filled", () => {
-    expect(JSON.parse(issueDraftInput(draft({ description: "  ", subtasks: [" ", ""] })))).toEqual({
+    expect(JSON.parse(issueDraftInput(draft({ description: "  ", checklist: [" ", ""] })))).toEqual({
       project: "WEB",
       title: "Pricing page",
     });
@@ -77,7 +81,7 @@ describe("issueDraftInput", () => {
   it("sends the edited fields as the tool's arguments", () => {
     const sent = JSON.parse(issueDraftInput(draft({
       description: " Show the plans. ",
-      subtasks: [" Plan table", "Link from the menu "],
+      checklist: [" Plan table", "Link from the menu "],
       dueDate: "2026-11-06",
       status: " In progress ",
     })));
@@ -86,7 +90,7 @@ describe("issueDraftInput", () => {
       project: "WEB",
       title: "Pricing page",
       description: "Show the plans.",
-      subtasks: ["Plan table", "Link from the menu"],
+      checklist: ["Plan table", "Link from the menu"],
       dueDate: "2026-11-06",
       status: "In progress",
     });

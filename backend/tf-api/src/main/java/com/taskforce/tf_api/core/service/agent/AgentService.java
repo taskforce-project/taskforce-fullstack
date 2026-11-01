@@ -674,7 +674,7 @@ public class AgentService {
           .append("Today is ").append(today.format(TODAY)).append(" (UTC). ")
           .append("When the person asks for an issue, prepare it with create_issue: it becomes a card the person ")
           .append("checks, edits and creates. Fill what the request and the project justify: a title, a short ")
-          .append("description, subtasks when the work has steps. Place it in time from its goal: read the project's ")
+          .append("description, a checklist when the work has steps. Place it in time from its goal: read the project's ")
           .append("columns and active cycle, keep it in the Backlog unless the work must start now, and set a due date ")
           .append("only when the goal or the person gives one. When the project is unclear, ask the person, with the ")
           .append("choices, before preparing anything. ");

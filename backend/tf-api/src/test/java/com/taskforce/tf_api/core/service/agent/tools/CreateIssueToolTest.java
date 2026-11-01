@@ -174,13 +174,17 @@ class CreateIssueToolTest {
         assertThat(out).doesNotContain("in TaskForce:").doesNotContain("(id ");
     }
 
-    @Test
-    @DisplayName("les sous-tâches deviennent la checklist de l'issue, sans les lignes vides, et la réponse les compte")
-    void subtasks_become_the_checklist() {
+    @ParameterizedTest(name = "paramètre « {0} » : une checklist, et la réponse la nomme ainsi")
+    @CsvSource({
+        "checklist",
+        "subtasks", // l'ancien nom : une carte préparée avant se crée toujours
+    })
+    @DisplayName("les étapes forment la checklist de l'issue, sans les lignes vides, et la réponse dit « a checklist »")
+    void the_steps_become_the_checklist(String parameter) {
         when(issueService.listStatuses("acme", 3L, 7L)).thenReturn(COLUMNS);
         created("Backlog", null);
         Map<String, Object> args = new HashMap<>(Map.of("project", "TF", "title", "Rate limiting"));
-        args.put("subtasks", Arrays.asList("Plan table", " ", null, "  Link from the menu "));
+        args.put(parameter, Arrays.asList("Plan table", " ", null, "  Link from the menu "));
 
         String out = tool().execute(args, CTX);
 
@@ -188,19 +192,42 @@ class CreateIssueToolTest {
         verify(issueService, times(2)).addChecklistItem(eq("acme"), eq(3L), eq(99L), eq(7L), items.capture());
         assertThat(items.getAllValues()).extracting(CreateChecklistItemRequest::getContent)
             .containsExactly("Plan table", "Link from the menu");
-        assertThat(out).endsWith(", with 2 subtasks.");
+        assertThat(out).endsWith(", with a checklist of 2 items.").doesNotContain("subtask");
     }
 
     @Test
-    @DisplayName("sans liste de sous-tâches, aucune checklist")
-    void no_subtasks_no_checklist() {
+    @DisplayName("une checklist d'une ligne : « a checklist of 1 item »")
+    void a_checklist_of_one_item() {
         when(issueService.listStatuses("acme", 3L, 7L)).thenReturn(COLUMNS);
         created("Backlog", null);
 
-        String out = tool().execute(Map.of("project", "TF", "title", "Rate limiting", "subtasks", "Plan table"), CTX);
+        String out = tool().execute(Map.of("project", "TF", "title", "Rate limiting", "checklist", List.of("Plan table")), CTX);
+
+        assertThat(out).endsWith(", with a checklist of 1 item.");
+    }
+
+    @Test
+    @DisplayName("sans liste, aucune checklist")
+    void no_list_no_checklist() {
+        when(issueService.listStatuses("acme", 3L, 7L)).thenReturn(COLUMNS);
+        created("Backlog", null);
+
+        String out = tool().execute(Map.of("project", "TF", "title", "Rate limiting", "checklist", "Plan table"), CTX);
 
         verify(issueService, never()).addChecklistItem(any(), any(), any(), any(), any());
-        assertThat(out).doesNotContain("subtask");
+        assertThat(out).doesNotContain("checklist");
+    }
+
+    @Test
+    @DisplayName("le schéma dit « checklist », jamais « subtasks » : le modèle n'annonce plus de sous-tâches")
+    void the_schema_says_checklist() {
+        CreateIssueTool t = new CreateIssueTool(issueService, new ProjectResolver(projectService), CLOCK);
+        @SuppressWarnings("unchecked")
+        Map<String, Map<String, Object>> properties = (Map<String, Map<String, Object>>) t.parametersSchema().get("properties");
+
+        assertThat(properties).containsKey("checklist").doesNotContainKey("subtasks");
+        assertThat(t.description()).contains("checklist").doesNotContainIgnoringCase("subtask");
+        properties.values().forEach(p -> assertThat((String) p.get("description")).doesNotContainIgnoringCase("subtask"));
     }
 
     @ParameterizedTest(name = "priority « {0} » : {1}")

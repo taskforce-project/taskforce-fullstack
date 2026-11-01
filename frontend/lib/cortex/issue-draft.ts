@@ -9,7 +9,8 @@ export interface IssueDraft {
   project: string;
   title: string;
   description: string;
-  subtasks: string[];
+  /** Les lignes de la checklist de l'issue (pas des sous-issues). */
+  checklist: string[];
   /** AAAA-MM-JJ, ou vide. */
   dueDate: string;
   /** Le nom de la colonne, ou vide : le Backlog du projet. */
@@ -34,7 +35,13 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const text = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 
-/** Lit les arguments que Cortex a donnés à create_issue ; un champ absent ou illisible reste vide. */
+/** Une liste de textes, sans les vides ni ce qui n'est pas du texte. */
+const texts = (value: unknown): string[] => (Array.isArray(value) ? value.map(text).filter(Boolean) : []);
+
+/**
+ * Lit les arguments que Cortex a donnés à create_issue ; un champ absent ou illisible reste vide. `subtasks`, l'ancien
+ * nom de la checklist, se lit encore : une carte préparée avant se crée toujours.
+ */
 export function readIssueDraft(input: string | null): IssueDraft {
   let args: Record<string, unknown> = {};
   try {
@@ -48,7 +55,7 @@ export function readIssueDraft(input: string | null): IssueDraft {
     project: text(args.project),
     title: text(args.title),
     description: text(args.description),
-    subtasks: Array.isArray(args.subtasks) ? args.subtasks.map(text).filter(Boolean) : [],
+    checklist: texts(args.checklist ?? args.subtasks),
     dueDate: DAY.test(due) ? due : "",
     status: text(args.status),
   };
@@ -59,8 +66,8 @@ export function issueDraftInput(draft: IssueDraft): string {
   const args: Record<string, unknown> = { project: draft.project.trim(), title: draft.title.trim() };
   const description = draft.description.trim();
   if (description) args.description = description;
-  const subtasks = draft.subtasks.map((s) => s.trim()).filter(Boolean);
-  if (subtasks.length > 0) args.subtasks = subtasks;
+  const checklist = draft.checklist.map((s) => s.trim()).filter(Boolean);
+  if (checklist.length > 0) args.checklist = checklist;
   if (draft.dueDate) args.dueDate = draft.dueDate;
   const status = draft.status.trim();
   if (status) args.status = status;

@@ -32,14 +32,17 @@ import com.taskforce.tf_api.core.service.agent.AgentTool;
  * le projet et la colonne tels que le service les a écrits, pour que Cortex ne les invente pas.</p>
  *
  * <p>Dans la conversation, Cortex ne fait que la préparer : {@code AgentService} la met en attente, et la carte la crée
- * avec ce que la personne y a changé (R47, R78, séance n°13). Les sous-tâches deviennent la checklist de l'issue.</p>
+ * avec ce que la personne y a changé (R47, R78, séance n°13). Les étapes du travail forment la checklist de l'issue, et
+ * se disent ainsi partout : la carte disait « Subtasks » et la confirmation « 2 subtasks » pour une checklist, sans
+ * sous-issue (recette du 01/11/2026). {@code subtasks}, l'ancien nom du paramètre, se lit encore : une carte préparée
+ * avant se crée toujours.</p>
  */
 @Component
 public class CreateIssueTool implements AgentTool {
 
     /** Ce qu'une ligne de checklist accepte (CreateChecklistItemRequest), et combien Cortex en ajoute au plus. */
-    private static final int MAX_SUBTASK = 500;
-    private static final int MAX_SUBTASKS = 20;
+    private static final int MAX_ITEM = 500;
+    private static final int MAX_ITEMS = 20;
 
     private final IssueService issueService;
     private final ProjectResolver projects;
@@ -60,7 +63,7 @@ public class CreateIssueTool implements AgentTool {
 
     @Override public String description() {
         return "Prepares an issue as a card the person checks and creates. Column and due date follow its goal "
-            + "(Backlog by default); subtasks become its checklist.";
+            + "(Backlog by default); a checklist when the work has steps.";
     }
 
     @Override public Map<String, Object> parametersSchema() {
@@ -76,8 +79,8 @@ public class CreateIssueTool implements AgentTool {
                     "The column (optional). Default: the project's Backlog. Another one only when the goal and timing call for it."),
                 "dueDate",     Map.of("type", "string", "description",
                     "Due date YYYY-MM-DD (optional), only when the goal or the person sets a time."),
-                "subtasks",    Map.of("type", "array", "items", Map.of("type", "string"), "description",
-                    "Subtasks, one short line each (optional), when the work has steps: they become the issue's checklist.")
+                "checklist",   Map.of("type", "array", "items", Map.of("type", "string"), "description",
+                    "The issue's checklist, one short line per item (optional), when the work has steps.")
             ),
             "required", List.of("project", "title")
         );
@@ -119,29 +122,30 @@ public class CreateIssueTool implements AgentTool {
         if (due != null) req.setDueDate(due.toString());
 
         IssueResponse issue = issueService.createIssue(ctx.slug(), project.getId(), req, ctx.userId());
-        List<String> subtasks = subtasks(args.get("subtasks"));
-        for (String subtask : subtasks) {
+        List<String> checklist = checklist(args.containsKey("checklist") ? args.get("checklist") : args.get("subtasks"));
+        for (String line : checklist) {
             CreateChecklistItemRequest item = new CreateChecklistItemRequest();
-            item.setContent(subtask);
+            item.setContent(line);
             issueService.addChecklistItem(ctx.slug(), project.getId(), issue.getId(), ctx.userId(), item);
         }
         String projectName = issue.getProjectName() != null ? issue.getProjectName() : project.getName();
         String placed = issue.getStatus() != null ? ", in the column " + issue.getStatus().getName() : "";
         String dueText = issue.getDueDate() != null ? ", due " + issue.getDueDate() : "";
-        String steps = subtasks.isEmpty() ? "" : ", with " + subtasks.size() + (subtasks.size() == 1 ? " subtask" : " subtasks");
+        String steps = checklist.isEmpty() ? ""
+            : ", with a checklist of " + checklist.size() + (checklist.size() == 1 ? " item" : " items");
         return "Created " + issue.getIdentifier() + " \"" + issue.getTitle() + "\" in the project " + projectName
             + placed + dueText + steps + ".";
     }
 
-    /** Les sous-tâches deviennent la checklist de l'issue : une ligne chacune, sans les vides, vingt au plus. */
-    private static List<String> subtasks(Object raw) {
+    /** La checklist de l'issue : une ligne par étape, sans les vides, vingt au plus. */
+    private static List<String> checklist(Object raw) {
         if (!(raw instanceof List<?> items)) return List.of();
         return items.stream()
             .filter(Objects::nonNull)
             .map(item -> item.toString().strip())
             .filter(item -> !item.isEmpty())
-            .map(item -> item.length() > MAX_SUBTASK ? item.substring(0, MAX_SUBTASK) : item)
-            .limit(MAX_SUBTASKS)
+            .map(item -> item.length() > MAX_ITEM ? item.substring(0, MAX_ITEM) : item)
+            .limit(MAX_ITEMS)
             .toList();
     }
 

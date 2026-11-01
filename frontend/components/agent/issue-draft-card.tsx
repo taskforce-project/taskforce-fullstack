@@ -78,7 +78,7 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
     )
   }
 
-  const subtasks = draft.subtasks.map((s) => s.trim()).filter(Boolean)
+  const checklist = draft.checklist.map((s) => s.trim()).filter(Boolean)
   const visibility = project ? (project.isPublic ? t.issueVisibleWorkspace : t.issueVisibleCollaborators) : null
   const message: Record<DraftProblem, string> = {
     project: t.issueNeedsProject,
@@ -147,21 +147,28 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
             </>
           )}
 
-          {(editing || subtasks.length > 0) && (
+          {(editing || checklist.length > 0) && (
             <>
-              <dt className="text-muted-foreground">{t.issueSubtasks}</dt>
+              <dt className="text-muted-foreground">{t.issueChecklist}</dt>
               <dd className="min-w-0 break-words">
                 {editing ? (
                   <textarea
-                    aria-label={t.issueSubtasks}
-                    placeholder={t.issueSubtasksHint}
+                    aria-label={t.issueChecklist}
+                    placeholder={t.issueChecklistHint}
                     rows={3}
-                    value={draft.subtasks.join("\n")}
-                    onChange={(e) => change({ subtasks: e.target.value.split("\n") })}
+                    value={draft.checklist.join("\n")}
+                    onChange={(e) => change({ checklist: e.target.value.split("\n") })}
                     className={cn(FIELD, "py-1")}
                   />
                 ) : (
-                  subtasks.join(" · ")
+                  <ul className="flex flex-col gap-0.5">
+                    {checklist.map((line, i) => (
+                      <li key={i} className="flex items-baseline gap-1.5">
+                        <span aria-hidden="true" className="inline-block size-2.5 shrink-0 translate-y-px border border-muted-foreground/60" />
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </dd>
             </>

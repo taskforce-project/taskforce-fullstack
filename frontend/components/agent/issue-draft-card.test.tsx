@@ -34,13 +34,17 @@ describe("IssueDraftCard : l'issue que Cortex prépare (R78)", () => {
   it("shows what Cortex prepared, without creating anything", async () => {
     render(<IssueDraftCard slug="acme" call={call({
       project: "WEB", title: "Pricing page", description: "Show the plans.",
-      subtasks: ["Plan table", "Link from the menu"], dueDate: "2099-11-06",
+      checklist: ["Plan table", "Link from the menu"], dueDate: "2099-11-06",
     })} />);
 
     expect(screen.getByText("New issue, prepared by Cortex")).toBeTruthy();
     expect(screen.getByText("Website (WEB)")).toBeTruthy();
     expect(screen.getByText("Pricing page")).toBeTruthy();
-    expect(screen.getByText("Plan table · Link from the menu")).toBeTruthy();
+    // Une checklist, dite ainsi : la carte ne parle plus de sous-tâches qu'elle ne crée pas.
+    expect(screen.getByText("Checklist")).toBeTruthy();
+    expect(screen.queryByText(/subtask/i)).toBeNull();
+    expect(screen.getByText("Plan table")).toBeTruthy();
+    expect(screen.getByText("Link from the menu")).toBeTruthy();
     expect(screen.getByText("Workspace")).toBeTruthy();
     await waitFor(() => expect(screen.getByText("Backlog")).toBeTruthy());
     expect(listStatuses).toHaveBeenCalledWith("acme", 3);
@@ -57,13 +61,13 @@ describe("IssueDraftCard : l'issue que Cortex prépare (R78)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Pricing plans" } });
-    fireEvent.change(screen.getByLabelText("Subtasks"), { target: { value: "Plan table\n\nFAQ" } });
+    fireEvent.change(screen.getByLabelText("Checklist"), { target: { value: "Plan table\n\nFAQ" } });
     fireEvent.click(screen.getByRole("button", { name: "Create issue" }));
 
     await waitFor(() => expect(screen.getByText(/Created WEB-14/)).toBeTruthy());
     const sent = vi.mocked(approveAction).mock.calls[0][1];
     expect(sent.record).toBe(RECORD);
-    expect(JSON.parse(sent.input ?? "{}")).toEqual({ project: "WEB", title: "Pricing plans", subtasks: ["Plan table", "FAQ"] });
+    expect(JSON.parse(sent.input ?? "{}")).toEqual({ project: "WEB", title: "Pricing plans", checklist: ["Plan table", "FAQ"] });
 
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     await waitFor(() => expect(screen.getByText(/Undone\. Removed WEB-14/)).toBeTruthy());
