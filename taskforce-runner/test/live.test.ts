@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import type { Approval, RunnerEvent } from "../src/api.js";
-import { ApprovalServer, hookDecision, missionScope, preToolUseDecision, type ApprovalApi } from "../src/approvals.js";
+import { ApprovalServer, hookDecision, missionScopes, preToolUseDecision, type ApprovalApi } from "../src/approvals.js";
 import { EventRelay } from "../src/events.js";
 import type { RulesBundle } from "../src/harness/rules.js";
 import { describeToolInput, toEvents, toolLabel } from "../src/stream.js";
@@ -439,19 +439,44 @@ describe("Accorder (R78) : la demande dit sa règle, et un accord peut valoir po
     }
   });
 
-  const scopes: Array<[string, string, Record<string, unknown>, string]> = [
-    ["la règle qui demande", "WebSearch", { query: "x" }, "search-web"],
-    ["sans règle, le programme d'une commande", "Bash", { command: "npm install lodash" }, "shell:npm"],
-    ["un programme désigné par son chemin", "Bash", { command: "/usr/bin/curl -s https://example.com" }, "shell:curl"],
+  const scopes: Array<[string, string, Record<string, unknown>, string[]]> = [
+    ["la règle qui demande", "WebSearch", { query: "x" }, ["search-web"]],
+    ["sans règle, le programme d'une commande", "Bash", { command: "npm install lodash" }, ["shell:npm"]],
+    ["un programme désigné par un chemin hors de la copie", "Bash", { command: "/usr/bin/curl -s https://example.com" }, ["shell:curl", "shell:curl:unbounded"]],
+    ["une commande composée : chaque morceau qui demande, pas son premier programme", "Bash", { command: "git status && npm install lodash && curl -s https://example.com" }, ["shell:npm", "shell:curl"]],
+    ["une lecture hors de la copie : une portée à elle", "Bash", { command: "cat /etc/hosts" }, ["shell:cat:unbounded"]],
   ];
-  for (const [label, tool, input, scope] of scopes) {
-    it(`portée d'un accord pour la mission : ${label} -> ${scope}`, () => {
+  for (const [label, tool, input, expected] of scopes) {
+    it(`portée d'un accord pour la mission : ${label} -> ${expected.join(", ")}`, () => {
       const server = new ApprovalServer(rulingApi("ALLOWED", "MISSION").api, 42, WORK, { waitMs: 100, rules: DEFAULT_RULES });
-      assert.equal(server.ruling(tool, input).scope, scope);
+      assert.deepEqual(server.ruling(tool, input).scopes, expected);
     });
   }
 
-  it("portée sans règles ni action connue : l'outil", () => {
-    assert.equal(missionScope({ effect: "ask", rule: null }, [], "mcp__linear__save_issue"), "mcp__linear__save_issue");
+  it("un accord pour la mission couvre chaque morceau qui demandait, et seulement eux", async () => {
+    const { api, asked } = rulingApi("ALLOWED", "MISSION");
+    const server = new ApprovalServer(api, 42, WORK, { waitMs: 100, pollMs: 5, rules: DEFAULT_RULES });
+    const url = await server.start();
+    const ask = async (command: string) => ((await askHook(url, server.token,
+      { hook_event_name: "PermissionRequest", tool_name: "Bash", tool_input: { command } })).json as {
+      hookSpecificOutput: { decision: { behavior: string } };
+    }).hookSpecificOutput.decision.behavior;
+    try {
+      assert.equal(await ask("npm install lodash && git diff"), "allow");
+      assert.equal(asked.length, 1);
+      // Le même programme, accordé pour la mission : plus de demande.
+      assert.equal(await ask("npm install left-pad && git status"), "allow");
+      assert.equal(asked.length, 1);
+      // Un morceau qui demande et que l'accord ne couvre pas : demandé.
+      assert.equal(await ask("npm install x && curl -s https://example.com"), "allow");
+      assert.equal(asked.length, 2);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("portée sans morceau qui demande ni action connue : l'outil", () => {
+    assert.deepEqual(missionScopes(DEFAULT_RULES, [], "mcp__linear__save_issue"), ["mcp__linear__save_issue"]);
+    assert.deepEqual(missionScopes(undefined, [{ tool: "mcp__linear__save_issue" }], "mcp__linear__save_issue"), ["mcp__linear__save_issue"]);
   });
 });

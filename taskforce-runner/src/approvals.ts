@@ -5,7 +5,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import type { Approval, AskedBy, Ruling } from "./api.js";
 import { toolFacts } from "./harness/facts.js";
-import { decideAll, type Decision, type Facts, type RulesBundle } from "./harness/rules.js";
+import { decide, decideAll, type Decision, type Facts, type RulesBundle } from "./harness/rules.js";
 import { log } from "./log.js";
 import { describeToolInput, toolLabel } from "./stream.js";
 
@@ -67,19 +67,41 @@ export function preToolUseDecision(decision: Decision): Record<string, unknown> 
   };
 }
 
+/** Le programme d'une commande simple, sans son chemin. */
+function program(command: string | undefined): string | null {
+  return command?.trim().split(/\s+/)[0]?.split(/[\\/]/).pop() || null;
+}
+
 /**
- * Ce qu'un accord « pour cette mission » couvre ensuite (R46) : les actions que la même règle demande ; sans règle, la
- * même action, et pour une commande le même programme (autoriser `npm install` laisse passer `npm`, pas `curl`).
+ * La portée d'un morceau qui demande : la règle qui demande ; sans règle, l'action, et pour une commande son programme.
+ * Un morceau qu'on ne sait pas borner (hors de la copie, ou que le shell change) a perdu son action (facts.ts) : il
+ * garde une portée à lui, qui ne couvre pas le même programme dans la copie.
  */
-export function missionScope(decision: Decision, facts: Facts[], tool: string): string {
+function partScope(decision: Decision, facts: Facts, tool: string): string {
   if (decision.rule) return decision.rule.id;
-  const known = facts.find((f) => f.action);
-  if (!known?.action) return tool;
-  if (known.action === "shell") {
-    const program = known.command?.trim().split(/\s+/)[0]?.split(/[\\/]/).pop();
-    return program ? `shell:${program}` : "shell";
+  const name = program(facts.command);
+  if (facts.action === "shell") return name ? `shell:${name}` : "shell";
+  if (facts.action) return facts.action;
+  if (facts.command !== undefined) return name ? `shell:${name}:unbounded` : "shell:unbounded";
+  if (facts.path !== undefined) return `${facts.tool ?? tool}:unbounded`;
+  return facts.tool ?? tool;
+}
+
+/**
+ * Ce qu'un accord « pour cette mission » couvre ensuite (R46), morceau par morceau : pour chaque morceau qui demande, la
+ * règle qui demande ; sans règle, la même action, et pour une commande le même programme (autoriser `npm install`
+ * laisse passer `npm`, pas `curl`). Une commande composée porte la portée de chacun des morceaux qui demandent : un
+ * accord pour la mission couvre chacun d'eux, et une commande ne passe ensuite sans demande que si chacun de ses
+ * morceaux qui demandent l'est déjà. Sans morceau qui demande (Claude Code demande une action que les règles
+ * autorisent) : l'outil.
+ */
+export function missionScopes(rules: RulesBundle | undefined, factsList: Facts[], tool: string): string[] {
+  const scopes = new Set<string>();
+  for (const facts of factsList) {
+    const decision: Decision = rules ? decide(rules, facts) : { effect: "ask", rule: null };
+    if (decision.effect === "ask") scopes.add(partScope(decision, facts, tool));
   }
-  return known.action;
+  return scopes.size > 0 ? [...scopes] : [tool];
 }
 
 /** Réponse du hook `PermissionRequest`, au format de Claude Code. */
@@ -140,7 +162,7 @@ export class ApprovalServer {
   private baseUrl = "";
   readonly token = randomBytes(32).toString("hex");
   private readonly pollMs: number;
-  /** Ce que la personne a autorisé pour toute la mission (R46) : la règle qui demandait, ou l'action sans règle. */
+  /** Ce que la personne a autorisé pour toute la mission (R46) : la portée de chaque morceau qui demandait. */
   private readonly allowedForMission = new Set<string>();
 
   constructor(
@@ -200,8 +222,9 @@ export class ApprovalServer {
     }
     const tool = typeof input.tool_name === "string" ? input.tool_name : "unknown tool";
     const summary = describeToolInput(tool, input.tool_input, this.workDir) || "(no details)";
-    const { scope, ...ruling } = this.ruling(tool, input.tool_input);
-    if (this.allowedForMission.has(scope)) {
+    const { scopes, ...ruling } = this.ruling(tool, input.tool_input);
+    if (scopes.every((s) => this.allowedForMission.has(s))) {
+      const scope = scopes.join(", ");
       log.info(`Allowed for this mission earlier: ${tool} (${scope})`);
       this.options.onMissionAllowed?.(tool, scope, input.tool_input);
       this.reply(res, 200, hookDecision(true));
@@ -211,7 +234,7 @@ export class ApprovalServer {
     const approval = await requestDecision(this.api, this.runId, toolLabel(tool), summary, this.options.waitMs, this.pollMs,
       "agent", ruling);
     const allow = approval?.status === "ALLOWED";
-    if (allow && approval?.scope === "MISSION") this.allowedForMission.add(scope);
+    if (allow && approval?.scope === "MISSION") for (const s of scopes) this.allowedForMission.add(s);
     this.reply(res, 200, allow
       ? hookDecision(true)
       : hookDecision(false, "Denied in TaskForce: the person who delegated this task did not allow this action. Do not "
@@ -231,9 +254,9 @@ export class ApprovalServer {
 
   /**
    * Ce que les règles disent d'une action demandée, sans la trace (le hook `PreToolUse` l'a déjà écrite) : l'action, la
-   * règle qui demande et sa raison, et la portée d'un accord pour la mission (la règle, sinon l'action, sinon l'outil).
+   * règle qui demande et sa raison, et les portées d'un accord pour la mission ({@link missionScopes}).
    */
-  ruling(tool: string, toolInput: unknown): Ruling & { scope: string } {
+  ruling(tool: string, toolInput: unknown): Ruling & { scopes: string[] } {
     const facts = toolFacts(tool, toolInput, this.workDir);
     const rules = this.options.rules;
     const decision: Decision = rules ? decideAll(rules, facts) : { effect: "ask", rule: null };
@@ -241,7 +264,7 @@ export class ApprovalServer {
     return {
       ...(action ? { action } : {}),
       ...(decision.rule ? { rule: decision.rule.id, reason: decision.rule.reason } : {}),
-      scope: missionScope(decision, facts, tool),
+      scopes: missionScopes(rules, facts, tool),
     };
   }
 

@@ -46,6 +46,8 @@ a token that is random for each run (`taskforce-runner/src/approvals.ts`):
   `ask` from `PreToolUse` would end as a refusal, and an action allowed in advance would skip a rule that asks. A
   person can still allow tools in advance on their own computer (`agent.extraAllowedTools`); a rule that denies blocks
   those tools anyway.
+- An approval for the mission (R46) covers each part of the command that asked: a later command passes without asking
+  only when every part of it that asks is already covered.
 - Both hooks use `onFailure: "block"`: if the runner does not answer, the action is blocked instead of let through.
   Claude Code 2.1.295 is the first version with it, according to its changelog, and the runner checks the version
   before each mission.
