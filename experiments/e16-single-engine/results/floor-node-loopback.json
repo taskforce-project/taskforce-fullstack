@@ -1,0 +1,28 @@
+{
+  "experiment": "E16",
+  "label": "floor-node-loopback",
+  "machine": {
+    "node": "v24.18.0",
+    "platform": "win32 x64"
+  },
+  "keepAlive": {
+    "n": 8600,
+    "min": 0.041,
+    "p50": 0.047,
+    "p90": 0.087,
+    "p95": 0.135,
+    "p99": 0.279,
+    "max": 1.093,
+    "mean": 0.061
+  },
+  "newConnection": {
+    "n": 860,
+    "min": 0.384,
+    "p50": 0.501,
+    "p90": 0.725,
+    "p95": 0.97,
+    "p99": 1.743,
+    "max": 4.137,
+    "mean": 0.563
+  }
+}

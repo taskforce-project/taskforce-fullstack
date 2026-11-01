@@ -1,0 +1,54 @@
+{
+  "experiment": "E16",
+  "way": "b",
+  "label": "b-teavm-engine",
+  "machine": {
+    "node": "v24.18.0",
+    "platform": "win32 x64",
+    "cpu": "Intel(R) Core(TM) 7 240H",
+    "threads": "16"
+  },
+  "code": {
+    "file": "rules-engine.js",
+    "bytes": 391527,
+    "gzip": 126215,
+    "brotli": 101098
+  },
+  "cases": {
+    "globs": 18,
+    "decisions": 51,
+    "digest": 2,
+    "passed": 71,
+    "failures": []
+  },
+  "sequence": {
+    "calls": 43,
+    "mismatches": 0
+  },
+  "timing": {
+    "importMs": 229.8498,
+    "loadMs": 0.326,
+    "firstDigestMs": 9.8065,
+    "cold": {
+      "n": 43,
+      "min": 0.001,
+      "p50": 0.019,
+      "p90": 0.079,
+      "p95": 0.245,
+      "p99": 3.426,
+      "max": 3.426,
+      "mean": 0.117
+    },
+    "firstDecisionMs": 0.2452,
+    "warm": {
+      "n": 8600,
+      "min": 0,
+      "p50": 0.002,
+      "p90": 0.003,
+      "p95": 0.003,
+      "p99": 0.004,
+      "max": 0.351,
+      "mean": 0.002
+    }
+  }
+}

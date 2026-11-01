@@ -1,0 +1,57 @@
+{
+  "experiment": "E16",
+  "way": "b",
+  "label": "b-teavm-decisions",
+  "machine": {
+    "node": "v24.18.0",
+    "platform": "win32 x64",
+    "cpu": "Intel(R) Core(TM) 7 240H",
+    "threads": "16"
+  },
+  "code": {
+    "file": "decisions.js",
+    "bytes": 135655,
+    "gzip": 43131,
+    "brotli": 35727
+  },
+  "cases": {
+    "globs": 18,
+    "decisions": 51,
+    "digest": 2,
+    "passed": 69,
+    "failures": [
+      "digest: not in this module (decisions only)",
+      "digest with nulls: not in this module (decisions only)"
+    ]
+  },
+  "sequence": {
+    "calls": 43,
+    "mismatches": 0
+  },
+  "timing": {
+    "importMs": 109.6718,
+    "loadMs": 0.4745,
+    "firstDigestMs": null,
+    "cold": {
+      "n": 43,
+      "min": 0.001,
+      "p50": 0.016,
+      "p90": 0.072,
+      "p95": 0.294,
+      "p99": 3.264,
+      "max": 3.264,
+      "mean": 0.111
+    },
+    "firstDecisionMs": 0.2939,
+    "warm": {
+      "n": 8600,
+      "min": 0,
+      "p50": 0.002,
+      "p90": 0.003,
+      "p95": 0.003,
+      "p99": 0.004,
+      "max": 0.142,
+      "mean": 0.002
+    }
+  }
+}
