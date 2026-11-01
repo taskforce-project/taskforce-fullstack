@@ -76,9 +76,12 @@ export interface DeliveryRunTests {
   total: number | null;
 }
 
-/** « Apply » (R78) : la pull request de l'agent est fusionnée sur GitHub, puis l'issue terminée. */
-export async function applyRun(slug: string, runId: number): Promise<void> {
-  await apiClient.post(DELIVERY_ROUTES.APPLY(slug, runId), {});
+/**
+ * « Apply » (R78) : la pull request de l'agent est fusionnée sur GitHub, puis l'issue terminée. Si les tests ont échoué,
+ * le serveur demande la raison de passer outre (R87) : elle part sans ses blancs.
+ */
+export async function applyRun(slug: string, runId: number, reason = ""): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.APPLY(slug, runId), reason.trim() ? { reason: reason.trim() } : {});
 }
 
 /** « Discard » : la pull request est fermée, sa branche supprimée. */

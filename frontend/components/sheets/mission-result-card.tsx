@@ -15,7 +15,8 @@ import { cn } from "@/lib/utils"
  * « Relire » (R78, séance n°13 ; J3, R50) : la carte de résultat d'une mission finie, sous le titre de l'issue. Le
  * résultat, les contrôles tirés du dossier (jamais du résumé de l'agent), ce qui changera si l'on applique, les mots de
  * l'agent pour ce qu'ils sont, puis trois gestes : « Discard », « Try again », « Apply ». Seule la personne qui a délégué
- * tranche : les gestes ne s'affichent que pour elle, le serveur le vérifie, et la carte dit pourquoi il refuse.
+ * tranche : les gestes ne s'affichent que pour elle, le serveur le vérifie, et la carte dit pourquoi il refuse. Des tests
+ * en échec éteignent « Apply » (R87, séance n°14) : on ne passe outre que par « Apply anyway », en écrivant pourquoi.
  */
 export function MissionResultCard({ slug, issueId, issueKey, issueTitle, responsible }: Readonly<{
   slug: string
@@ -37,11 +38,15 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
   const [busy, setBusy] = useState<"apply" | "discard" | "retry" | null>(null)
   const [retrying, setRetrying] = useState(false)
   const [note, setNote] = useState("")
+  const [overriding, setOverriding] = useState(false)
+  const [reason, setReason] = useState("")
 
   if (!run || run.status !== "DONE" || run.outcome) return null
   const r = t.result
   const card = resultCard(run, activity, issueKey, r)
   const decides = run.startedById !== null && viewerId !== undefined && String(run.startedById) === String(viewerId)
+  // Des tests lancés par le runner et en échec : « Apply » s'éteint, le serveur exige une raison pour passer outre.
+  const testsFailed = run.tests?.ran === true && !run.tests.passed
   const who = [
     responsible ? fillText(r.responsible, { who: responsible }) : null,
     fillText(r.delegatedTo, { agent: t.agent }),
@@ -51,7 +56,7 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
   async function act(kind: "apply" | "discard" | "retry") {
     if (!run) return
     setBusy(kind)
-    const ok = kind === "apply" ? await applyRun(slug, issueId, run.id)
+    const ok = kind === "apply" ? await applyRun(slug, issueId, run.id, overriding ? reason : undefined)
       : kind === "discard" ? await discardRun(slug, issueId, run.id)
       : (await retryRun(slug, issueId, run.id, note)) !== null
     setBusy(null)
@@ -130,18 +135,42 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
               </Button>
             </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-2">
-            <Button variant="outline" size="sm" className="h-8 text-xs" disabled={busy !== null} onClick={() => void act("discard")}>
-              {busy === "discard" ? <Loader2 className="size-3 animate-spin" /> : r.discard}
-            </Button>
-            <Button variant="outline" size="sm" className="h-8 text-xs" disabled={busy !== null} onClick={() => setRetrying(true)}>
-              {r.tryAgain}
-            </Button>
-            <Button size="sm" className="h-8 text-xs" disabled={busy !== null || !card.pr} onClick={() => void act("apply")}>
-              {busy === "apply" ? <Loader2 className="size-3 animate-spin" /> : r.apply}
-            </Button>
+        ) : overriding ? (
+          <div className="flex flex-col gap-1.5">
+            <textarea aria-label={r.applyAnyway} placeholder={r.applyAnywayReason} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={2000}
+              className="w-full border border-input bg-transparent px-2 py-1 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
+            <div className="flex gap-2">
+              <Button variant="destructive" size="sm" className="h-7 px-2.5 text-xs" disabled={busy !== null || !reason.trim()} onClick={() => void act("apply")}>
+                {busy === "apply" ? <Loader2 className="size-3 animate-spin" /> : r.applyAnyway}
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" disabled={busy !== null} onClick={() => setOverriding(false)}>
+                {r.cancel}
+              </Button>
+            </div>
           </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-2">
+              <Button variant="outline" size="sm" className="h-8 text-xs" disabled={busy !== null} onClick={() => void act("discard")}>
+                {busy === "discard" ? <Loader2 className="size-3 animate-spin" /> : r.discard}
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 text-xs" disabled={busy !== null} onClick={() => setRetrying(true)}>
+                {r.tryAgain}
+              </Button>
+              <Button size="sm" className="h-8 text-xs" disabled={busy !== null || !card.pr || testsFailed} onClick={() => void act("apply")}>
+                {busy === "apply" ? <Loader2 className="size-3 animate-spin" /> : r.apply}
+              </Button>
+            </div>
+            {testsFailed && card.pr && (
+              <p className="flex flex-wrap items-baseline gap-x-2 text-muted-foreground">
+                {r.testsFailedApplyOff}
+                <button type="button" className="text-foreground underline underline-offset-2 hover:text-ink-red disabled:opacity-50"
+                  disabled={busy !== null} onClick={() => setOverriding(true)}>
+                  {r.applyAnyway}
+                </button>
+              </p>
+            )}
+          </>
         )}
         {error && <p className="whitespace-pre-wrap break-words text-destructive">{error}</p>}
       </div>

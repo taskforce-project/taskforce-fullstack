@@ -230,8 +230,17 @@ describe('delivery-store : les gestes de la carte de résultat (R78)', () => {
     await act(async () => { ok = await useDeliveryStore.getState().applyRun('acme', 28, 100); });
 
     expect(ok).toBe(true);
-    expect(svc.applyRun).toHaveBeenCalledWith('acme', 100);
+    expect(svc.applyRun).toHaveBeenCalledWith('acme', 100, undefined);
     expect(useDeliveryStore.getState().runs[28]?.outcome).toBe('APPLIED');
+  });
+
+  it('applyRun : la raison de passer outre des tests en échec part au service (R87)', async () => {
+    vi.mocked(svc.applyRun).mockResolvedValue(undefined);
+    vi.mocked(svc.getIssueRun).mockResolvedValue({ id: 100, issueId: 28, status: 'DONE', outcome: 'APPLIED' } as DeliveryRun);
+
+    await act(async () => { await useDeliveryStore.getState().applyRun('acme', 28, 100, 'The date test is flaky'); });
+
+    expect(svc.applyRun).toHaveBeenCalledWith('acme', 100, 'The date test is flaky');
   });
 
   it.each([
