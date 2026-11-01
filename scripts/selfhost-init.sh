@@ -15,7 +15,7 @@ secret() {
 
 tr -d '\r' < .env.selfhost.example > .env.tmp
 for key in DB_PASSWORD KEYCLOAK_ADMIN_PASSWORD KEYCLOAK_CLIENT_SECRET MINIO_ROOT_PASSWORD TF_ENCRYPTION_KEY \
-           AI_SERVICE_TOKEN TF_HUMAN_CHALLENGE_SECRET; do
+           TF_HUMAN_CHALLENGE_SECRET; do
   value=$(secret)
   sed "s|^$key=.*|$key=$value|" .env.tmp > .env.next
   mv .env.next .env.tmp
