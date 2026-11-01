@@ -73,8 +73,11 @@ describe("CommandBar : la conversation se déplie depuis la barre", () => {
     await waitFor(() => expect(conversation).toHaveTextContent("Two issues are blocked."));
     expect(sendAgentMessage).toHaveBeenCalledWith("acme", "Which issues are blocked?", null);
     expect(input).toHaveAttribute("placeholder", "Reply to Cortex…");
-    // Dépliée, la conversation est le contexte : plus de suggestions sous la barre.
+    // Dépliée, la conversation est le contexte : plus de suggestions sous la barre, et les sources restent repliées.
     expect(screen.queryByRole("button", { name: "Create an issue" })).toBeNull();
+    expect(screen.queryByText("Runbook")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Sources \(1\)/ }));
+    expect(screen.getByText("Runbook")).toBeTruthy();
   });
 
   it("folds with Escape and unfolds the same conversation again", async () => {

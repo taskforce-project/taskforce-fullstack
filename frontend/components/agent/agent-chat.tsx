@@ -419,18 +419,23 @@ export function AgentChat({ place, onSwitchPlace, onFold }: Readonly<{
   )
 }
 
-/** Rend la réponse structurée : étapes → raisonnement → outils → texte → sources → feedback. */
+/**
+ * Rend la réponse structurée : étapes, raisonnement, la réponse, puis ce qu'elle propose ou a fait (les cartes), puis
+ * les sources repliées. Les cartes viennent après le texte, au plus près de la barre : le serveur écrit « the action
+ * below » ou « check the issue below », et c'est la dernière chose à décider.
+ */
 function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: string }) {
   const hasBreakdown = answer.usage && (answer.usage.promptTokens > 0 || answer.usage.completionTokens > 0)
   // Le dossier de la réponse, que porte chacun de ses appels d'outil : il fait d'elle un cas de la banque (R61,
   // séance n°10).
   const record = answer.toolCalls.find((tc) => tc.record)?.record
   return (
-    <div className="space-y-1">
+    <div className="group/answer space-y-1">
       {answer.steps.length > 0 && (
         <Steps steps={answer.steps.map((s) => ({ title: s.label, status: s.status, description: s.description ?? undefined }))} />
       )}
       {answer.reasoning && <Reasoning content={answer.reasoning} />}
+      <Markdown content={answer.answer} />
       {answer.toolCalls.map((tc, i) =>
         // Une issue que Cortex a préparée : la carte la montre, la personne la modifie et la crée (R78).
         isPreparedIssue(tc) ? (
@@ -445,7 +450,6 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
           </div>
         ),
       )}
-      <Markdown content={answer.answer} />
       {answer.sources.length > 0 && (
         <Sources items={answer.sources.map((s) => ({ title: s.title, snippet: s.domain, score: s.score ?? undefined }))} />
       )}
@@ -454,9 +458,10 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
           <FeedbackBar onCopy={() => navigator.clipboard?.writeText(answer.answer)} />
           {record && <EvalCaseButton slug={slug} record={record} />}
         </div>
+        {/* Le mode et les tokens de la réponse : au survol, pour qui les cherche, sans peser sur la lecture. */}
         {answer.usage && answer.usage.totalTokens > 0 && (
-          <span className="flex shrink-0 items-center gap-1.5 text-[10px] tabular-nums text-muted-foreground/60">
-            <span className="rounded bg-muted px-1 py-px font-medium uppercase tracking-wide">{answer.mode}</span>
+          <span className="flex shrink-0 items-center gap-1.5 text-[10px] tabular-nums text-muted-foreground/60 opacity-0 transition-opacity group-hover/answer:opacity-100 group-focus-within/answer:opacity-100">
+            <span className="bg-muted px-1 py-px font-medium uppercase tracking-wide">{answer.mode}</span>
             {answer.usage.totalTokens.toLocaleString("en-US")} tokens
             {hasBreakdown && <span className="opacity-70">({answer.usage.promptTokens}↑ {answer.usage.completionTokens}↓)</span>}
           </span>
