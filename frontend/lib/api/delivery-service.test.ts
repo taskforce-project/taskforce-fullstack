@@ -160,6 +160,17 @@ describe('delivery-service', () => {
 describe('delivery-service : les gestes de la carte de résultat (R78)', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it.each([
+    ['  The date test is flaky  ', { reason: 'The date test is flaky' }],
+    ['   ', {}],
+  ])('applyRun : la raison de passer outre des tests en échec %j part sans ses blancs (R87)', async (reason, body) => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
+
+    await applyRun(SLUG, 100, reason);
+
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.APPLY(SLUG, 100), body);
+  });
+
   it('applyRun et discardRun : POST sur la mission', async () => {
     vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
 

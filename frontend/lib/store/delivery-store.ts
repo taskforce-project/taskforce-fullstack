@@ -57,7 +57,7 @@ interface DeliveryState {
   /** Télécharge le dossier de preuve d'un run ; `false` si le run n'en a pas (run de la v1) ou en cas d'erreur. */
   downloadEvidence: (slug: string, runId: number, format: "json" | "md") => Promise<boolean>;
   /** Les gestes de la carte de résultat (R78) ; `false` (ou `null`) en cas d'échec, la raison dans `resultErrors`. */
-  applyRun: (slug: string, issueId: number, runId: number) => Promise<boolean>;
+  applyRun: (slug: string, issueId: number, runId: number, reason?: string) => Promise<boolean>;
   discardRun: (slug: string, issueId: number, runId: number) => Promise<boolean>;
   retryRun: (slug: string, issueId: number, runId: number, note: string) => Promise<DeliveryRun | null>;
 }
@@ -188,9 +188,9 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
     }
   },
 
-  applyRun: async (slug, issueId, runId) => {
+  applyRun: async (slug, issueId, runId, reason) => {
     try {
-      await applyRunApi(slug, runId);
+      await applyRunApi(slug, runId, reason);
       set((state) => ({ resultErrors: withoutError(state.resultErrors, runId) }));
       await get().fetchRun(slug, issueId);
       return true;

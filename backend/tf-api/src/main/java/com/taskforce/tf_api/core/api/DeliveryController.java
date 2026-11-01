@@ -186,15 +186,20 @@ public class DeliveryController {
 
     /**
      * POST /api/workspaces/{slug}/delivery/runs/{runId}/apply : « Apply » sur la carte de résultat (R78) : la pull
-     * request de l'agent est fusionnée sur GitHub, puis l'issue terminée. Seule la personne qui a délégué tranche.
+     * request de l'agent est fusionnée sur GitHub, puis l'issue terminée. Seule la personne qui a délégué tranche. Si
+     * les tests du projet ont échoué, elle ne passe outre qu'avec une raison (R87).
      */
     @PostMapping("/runs/{runId}/apply")
     public ResponseEntity<ApiResponse<Void>> apply(
-        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId
+        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId,
+        @Valid @RequestBody(required = false) MissionApplyRequest request
     ) {
-        missionResults.apply(slug, runId, resolveUserId(jwt));
+        missionResults.apply(slug, runId, resolveUserId(jwt), request == null ? null : request.reason());
         return ResponseEntity.ok(ApiResponse.success("Applied: the pull request is merged", null));
     }
+
+    /** Pourquoi appliquer malgré des tests en échec ; demandé seulement dans ce cas, posté sur l'issue. */
+    public record MissionApplyRequest(@Size(max = 2000) String reason) {}
 
     /** POST .../runs/{runId}/discard : « Discard » : la pull request est fermée, sa branche supprimée. */
     @PostMapping("/runs/{runId}/discard")

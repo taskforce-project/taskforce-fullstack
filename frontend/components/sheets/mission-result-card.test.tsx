@@ -60,7 +60,41 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
 
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
-    await waitFor(() => expect(applyRun).toHaveBeenCalledWith("acme", 28, 100));
+    await waitFor(() => expect(applyRun).toHaveBeenCalledWith("acme", 28, 100, undefined));
+  });
+
+  const FAILED: DeliveryRun = { ...RUN, tests: { command: "npm test", ran: true, passed: false, passedCount: 10, total: 12 } };
+
+  it("with failed tests, Apply is off and says why", () => {
+    useDeliveryStore.setState({ runs: { 28: FAILED } });
+    show();
+
+    expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+    expect(screen.getByText("The tests failed, so Apply is off.")).toBeInTheDocument();
+  });
+
+  it("Apply anyway asks why, then sends the reason", async () => {
+    applyRun.mockResolvedValue(true);
+    useDeliveryStore.setState({ runs: { 28: FAILED } });
+    show();
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply anyway" }));
+    expect(screen.getByRole("button", { name: "Apply anyway" })).toBeDisabled();
+    fireEvent.change(screen.getByRole("textbox", { name: "Apply anyway" }), { target: { value: "The date test is flaky" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply anyway" }));
+
+    await waitFor(() => expect(applyRun).toHaveBeenCalledWith("acme", 28, 100, "The date test is flaky"));
+  });
+
+  it("Cancel leaves Apply anyway without applying", () => {
+    useDeliveryStore.setState({ runs: { 28: FAILED } });
+    show();
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply anyway" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByText("The tests failed, so Apply is off.")).toBeInTheDocument();
+    expect(applyRun).not.toHaveBeenCalled();
   });
 
   it("Discard goes through the store", async () => {

@@ -54,17 +54,30 @@ public class MissionResultService {
 
     private record PullRequest(String repo, int number) {}
 
-    /** Fusionne la pull request de l'agent sur GitHub, puis termine l'issue. */
+    /**
+     * Fusionne la pull request de l'agent sur GitHub, puis termine l'issue. Des tests du projet en échec ferment le geste
+     * (R87) : la personne ne passe outre qu'en disant pourquoi, et sa raison se garde sur la mission et sur l'issue.
+     */
     @Transactional
-    public void apply(String slug, Long runId, Long userId) {
+    public void apply(String slug, Long runId, Long userId, String reason) {
         DeliveryRun run = decidable(slug, runId, userId);
+        String why = reason == null ? "" : reason.strip();
+        boolean testsFailed = Boolean.TRUE.equals(run.getTestsRan()) && Boolean.FALSE.equals(run.getTestsPassed());
+        if (testsFailed && why.isEmpty()) {
+            throw new BusinessException("The project's tests failed: say why you apply anyway.");
+        }
         PullRequest pr = pullRequest(run).orElseThrow(() ->
             new BusinessException("This result has no pull request to apply: open its branch on GitHub."));
         pullRequests.merge(workspaceId(run), pr.repo(), pr.number());
         markLink(run, pr, GitHubLinkStatus.MERGED);
+        if (testsFailed) {
+            run.setOutcomeReason(why);
+            comment(slug, run.getIssue(), "Applied although the tests failed: " + why, userId);
+        }
         decided(run, DeliveryRunOutcome.APPLIED, userId);
         mergedPullRequests.completeIssue(run.getIssue().getId(), userId);
-        log.info("Run {} : résultat appliqué ({}#{}) par {}", runId, pr.repo(), pr.number(), userId);
+        log.info("Run {} : résultat appliqué ({}#{}) par {}{}", runId, pr.repo(), pr.number(), userId,
+            testsFailed ? ", malgré les tests" : "");
     }
 
     /** Ferme la pull request de l'agent et supprime sa branche ; sans pull request, le résultat est seulement écarté. */
@@ -88,11 +101,7 @@ public class MissionResultService {
         DeliveryRunResponse next = deliveryService.delegate(slug, issue.getId(), run.getProviderKey(), run.getModel(), userId);
         withdraw(run);
         decided(run, DeliveryRunOutcome.RETRIED, userId);
-        if (note != null && !note.isBlank()) {
-            CreateIssueCommentRequest comment = new CreateIssueCommentRequest();
-            comment.setContent("Try again: " + note.strip());
-            issueService.addComment(slug, issue.getProject().getId(), issue.getId(), comment, userId);
-        }
+        if (note != null && !note.isBlank()) comment(slug, issue, "Try again: " + note.strip(), userId);
         log.info("Run {} : relancé par {}", runId, userId);
         return next;
     }
@@ -125,6 +134,13 @@ public class MissionResultService {
             pullRequests.deleteBranch(workspaceId(run), pr.repo(), run.getBranch());
             markLink(run, pr, GitHubLinkStatus.CLOSED);
         });
+    }
+
+    /** Un mot de la personne sur l'issue, au nom de la personne : l'équipe le lit, l'agent aussi ({@code get_issue}). */
+    private void comment(String slug, Issue issue, String text, Long userId) {
+        CreateIssueCommentRequest comment = new CreateIssueCommentRequest();
+        comment.setContent(text);
+        issueService.addComment(slug, issue.getProject().getId(), issue.getId(), comment, userId);
     }
 
     private void decided(DeliveryRun run, DeliveryRunOutcome outcome, Long userId) {
