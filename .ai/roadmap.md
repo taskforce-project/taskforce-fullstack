@@ -10,6 +10,18 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 01/11/2026 (octies) - Revue UX : la conversation se déplie depuis la barre ; la fiche d'issue desktop sous les boutons de la fenêtre.** `[frontend]`
+> - **Demande du CEO** (essai de l'app desktop) : « Ca fait bizarre d'ecrire en bas et que ce soit le panel qui s'ouvre apres envoi » ; l'agent doit avoir la main sur l'app (R77) ; l'expérience est à reprendre, « meme le layout surement ».
+> - **La revue** : `taskforce-docs/v1/14-design/Revue_UX_2026-11-01.md`, 20 constats classés (1 bloquant, 9 majeurs, 10 mineurs), chacun avec ce qu'on voit, pourquoi ça gêne, le correctif, son coût et sa gravité, puis ce qui est fait et ce qui attend.
+> - **Fait** (branche `feat/ux-review-bar`, PR #469 vers `dev`, étiquette `frontend:release:minor`, pas fusionnée) :
+>   - la conversation se déplie juste au-dessus de la barre, qui devient sa saisie ; dépliée, elle pousse l'écran au lieu de le recouvrir, se replie (Échap), se règle par son bord haut et s'épingle à droite en option ; elle vit dans `useCortexStore` et ne se perd plus en fermant le panneau. R76 tient, sauf « la conversation s'ouvre à droite », devenu une option ;
+>   - dans une réponse, le texte avant les cartes (le serveur écrit « below »), les sources repliées sur une ligne, le mode et les tokens au survol ;
+>   - app desktop : la fiche d'une issue commence sous les boutons de la fenêtre (`env(titlebar-area-height)`) ; ses propres boutons passaient dessous ;
+>   - le tableau : plus de cadres « No issues in this column », « Add issue » après la dernière carte, une phrase pour un projet sans issue, la carte qui arrive s'allume une fois ;
+>   - le pied de site quitte l'app : la version, les textes légaux et le choix des cookies dans le menu du compte.
+> - **Contrôles** : `tsc` propre, lint sans erreur, `vitest run --coverage` 115 fichiers et 1 332 tests ; le rendu vérifié sur une page locale temporaire, la connexion à l'app n'étant pas possible dans cette session.
+> - **Reste** (le détail dans la revue) : Cortex qui fait l'issue au lieu de la préparer (R77 contre R78, décision du CEO) ; la demande d'accord et le résultat appliqué sous le titre de l'issue ; la fiche d'issue qui cache la barre et ne donne pas l'issue ouverte à Cortex ; l'ordre et la densité de la fiche ; le vocabulaire. L'attribution de l'activité, l'assigné pendant une mission et le Markdown des mots de l'agent sont sur une autre branche.
+
 > **▶ MAJ 01/11/2026 (quater) - Release 1.7.0 EN PROD : J0 et R78 (Créer, Accorder, Relire) ; desktop 1.4.0 publiée.** `[release]`
 > - **Décision du CEO** : « go release ».
 > - **En prod** : #462 fusionnée dans `dev` ; `chore(desktop)` 1.4.0 (`ac6b3964`) ; release #463 vers `main` (`4225f353`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.7.0 en plomberie ; étiquettes `minor` pour le backend et le front, car une mission gagne trois écrans, `patch` pour le site). Tags `taskforce-v1.7.0`, `backend-v1.9.20`, `frontend-v1.10.14`, `landing-v2.3.2`.
