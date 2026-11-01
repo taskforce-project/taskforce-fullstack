@@ -69,7 +69,7 @@ const STEPS: readonly TourStep[] = [
   },
   {
     title: "Cortex, your copilot",
-    body: "Write what you want done in this bar, on any screen: create a project, ask what is blocked. Nothing is sent until you press Enter.",
+    body: "Write what you want done in this bar, on any screen: create a project, ask what is blocked. Nothing is sent until you press Enter, and the answer opens right above the bar.",
     target: '[data-tour="command-bar"]',
   },
   {
