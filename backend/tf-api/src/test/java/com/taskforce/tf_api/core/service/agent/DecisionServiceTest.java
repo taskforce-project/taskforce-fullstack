@@ -26,7 +26,9 @@ import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.service.LlmClient;
+import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
+import com.taskforce.tf_api.core.service.brain.BrainViewer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,6 +47,7 @@ import static org.mockito.Mockito.when;
 class DecisionServiceTest {
 
     @Mock private BrainSearchService search;
+    @Mock private BrainAccessGuard access;
     @Mock private IssueRepository issueRepository;
     @Mock private LlmClient llm;
     @Spy  private ObjectMapper objectMapper = new ObjectMapper();
@@ -197,12 +200,14 @@ class DecisionServiceTest {
     }
 
     @Test
-    @DisplayName("retrieveContext() délègue la recherche sémantique au Brain OS")
-    void retrieve_context_delegates() {
+    @DisplayName("retrieveContext() cherche dans ce que lit tout le public du projet : le brief se montre à chacun")
+    void retrieve_context_reads_what_the_project_audience_reads() {
         KnowledgeNode node = KnowledgeNode.builder().id(9L).title("Vision").build();
-        when(search.retrieveRelevant(eq(7L), any(), anyInt())).thenReturn(List.of(node));
+        BrainViewer audience = BrainViewer.seeing(7L, List.of(1L));
+        when(access.projectAudience(7L, 1L)).thenReturn(audience);
+        when(search.retrieveRelevant(eq(audience), any(), anyInt())).thenReturn(List.of(node));
 
-        assertThat(service.retrieveContext(7L, "Web")).containsExactly(node);
+        assertThat(service.retrieveContext(7L, project)).containsExactly(node);
     }
 
     @Test

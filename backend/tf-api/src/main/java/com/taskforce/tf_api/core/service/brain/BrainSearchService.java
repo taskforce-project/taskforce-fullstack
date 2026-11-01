@@ -27,6 +27,9 @@ import lombok.extern.slf4j.Slf4j;
  * Recherche dans le Brain OS : sémantique (pgvector) quand un modèle d'embeddings est disponible, plein
  * texte (PostgreSQL) sinon. L'IA est un plus, pas une condition : sans fournisseur, la recherche marche.
  *
+ * <p><b>Chaque recherche dit qui lit</b> ({@link BrainViewer}) : les notes d'un projet que la personne ne voit pas sont
+ * écartées dans la requête SQL, avant le classement et la limite, et jamais après.</p>
+ *
  * <p><b>Aucune transaction n'englobe l'appel au modèle.</b> Le calcul du vecteur de la requête (HTTP vers
  * l'ai-service, jusqu'à 60 s sur un modèle local) se fait avant ; seules la lecture et la mise en forme des
  * notes trouvées se font dans une transaction courte. Les vecteurs des notes sont calculés en tâche de fond
@@ -58,10 +61,11 @@ public class BrainSearchService {
 
     public List<KnowledgeSearchHit> search(String slug, Long userId, String query, Integer topK, String domain) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
+        BrainViewer viewer = access.viewer(ws.getId(), userId);
         int limit = Math.max(1, Math.min(topK != null ? topK : 8, 50));
         String domainFilter = (domain != null && !domain.isBlank()) ? BrainEnums.domain(domain).name() : null;
 
-        List<Hit> hits = rank(ws.getId(), query, limit, domainFilter);
+        List<Hit> hits = rank(viewer, query, limit, domainFilter);
         if (hits.isEmpty()) return List.of();
 
         return transactionTemplate.execute(status -> {
@@ -77,18 +81,16 @@ public class BrainSearchService {
     }
 
     /**
-     * Notes pertinentes pour l'assistant IA (sans contrôle d'accès : l'appelant a déjà autorisé le workspace).
+     * Notes pertinentes pour l'assistant IA, parmi celles que {@code viewer} lit. L'appelant a déjà autorisé le
+     * workspace et dit qui lit ({@link BrainAccessGuard#viewer} ou {@link BrainAccessGuard#projectAudience}).
      */
-    public List<KnowledgeNode> retrieveRelevant(Long workspaceId, String query, int topK) {
-        return retrieveRelevantScored(workspaceId, query, topK).stream().map(ScoredNode::node).toList();
+    public List<KnowledgeNode> retrieveRelevant(BrainViewer viewer, String query, int topK) {
+        return retrieveRelevantScored(viewer, query, topK).stream().map(ScoredNode::node).toList();
     }
 
-    /**
-     * Comme {@link #retrieveRelevant} mais expose le score (pour l'affichage « déjà vu ? »).
-     * Sans contrôle d'accès : l'appelant a déjà autorisé le workspace.
-     */
-    public List<ScoredNode> retrieveRelevantScored(Long workspaceId, String query, int topK) {
-        List<Hit> hits = rank(workspaceId, query, Math.max(1, Math.min(topK, 20)), null);
+    /** Comme {@link #retrieveRelevant} mais expose le score (pour l'affichage « déjà vu ? »). */
+    public List<ScoredNode> retrieveRelevantScored(BrainViewer viewer, String query, int topK) {
+        List<Hit> hits = rank(viewer, query, Math.max(1, Math.min(topK, 20)), null);
         if (hits.isEmpty()) return List.of();
         Map<Long, KnowledgeNode> byId = transactionTemplate.execute(status -> loadNodes(hits));
         List<ScoredNode> out = new ArrayList<>();
@@ -117,31 +119,37 @@ public class BrainSearchService {
     // Classement
     // =========================================================================
 
-    /** Sémantique si un modèle d'embeddings répond et a déjà indexé des notes de ce workspace, sinon plein texte. */
-    private List<Hit> rank(Long workspaceId, String query, int limit, String domain) {
+    /** Sémantique si un modèle d'embeddings répond et a déjà indexé des notes que la personne lit, sinon plein texte. */
+    private List<Hit> rank(BrainViewer viewer, String query, int limit, String domain) {
         String model = embeddingClient.currentModel();
         if (model != null) {
             float[] qvec = embeddingClient.embed(query);
             if (qvec != null) {
-                List<Hit> semantic = semanticHits(workspaceId, model, qvec, limit, domain);
+                List<Hit> semantic = semanticHits(viewer, model, qvec, limit, domain);
                 if (!semantic.isEmpty()) return semantic;
             }
         }
-        return textHits(workspaceId, query, limit, domain);
+        return textHits(viewer, query, limit, domain);
     }
 
-    private List<Hit> semanticHits(Long workspaceId, String model, float[] qvec, int limit, String domain) {
-        String qLit = EmbeddingClient.toVectorLiteral(qvec);
+    /**
+     * Les notes les plus proches du vecteur de la requête, calculées sur toutes les notes que la personne lit. Les
+     * distances sont posées dans un CTE matérialisé : sans cette barrière, PostgreSQL peut passer par l'index HNSW,
+     * qui ne rend que ses meilleurs candidats approchés ({@code hnsw.ef_search}, 40 par défaut) avant les filtres de
+     * l'espace et des droits, et la personne recevrait moins de notes qu'elle n'en demande, voire aucune.
+     */
+    private List<Hit> semanticHits(BrainViewer viewer, String model, float[] qvec, int limit, String domain) {
         StringBuilder sql = new StringBuilder(
-            "SELECT id, 1 - (embedding <=> CAST(? AS vector)) AS score FROM knowledge_nodes "
+            "WITH candidates AS MATERIALIZED (SELECT id, embedding <=> CAST(? AS vector) AS distance FROM knowledge_nodes "
             + "WHERE workspace_id = ? AND status = 'ACTIVE' AND embedding IS NOT NULL AND embedding_model = ? ");
-        List<Object> args = new ArrayList<>(List.of(qLit, workspaceId, model));
+        List<Object> args = new ArrayList<>(List.of(EmbeddingClient.toVectorLiteral(qvec), viewer.workspaceId(), model));
         if (domain != null) {
             sql.append("AND domain = ? ");
             args.add(domain);
         }
-        sql.append("ORDER BY embedding <=> CAST(? AS vector) ASC LIMIT ?");
-        args.add(qLit);
+        sql.append(viewer.sqlFilter("id"));
+        args.addAll(viewer.sqlArgs());
+        sql.append(") SELECT id, 1 - distance AS score FROM candidates ORDER BY distance ASC LIMIT ?");
         args.add(limit);
         return toHits(jdbcTemplate.queryForList(sql.toString(), args.toArray()));
     }
@@ -152,7 +160,7 @@ public class BrainSearchService {
      * [0, 1) ({@code ts_rank} option 32). Les mots ne gardent que lettres et chiffres : rien ne peut casser
      * la syntaxe de {@code to_tsquery}.
      */
-    private List<Hit> textHits(Long workspaceId, String query, int limit, String domain) {
+    private List<Hit> textHits(BrainViewer viewer, String query, int limit, String domain) {
         List<String> terms = terms(query);
         if (terms.isEmpty()) return List.of();
         String tsquery = String.join(" | ", terms.stream().map(t -> t + ":*").toList());
@@ -161,11 +169,13 @@ public class BrainSearchService {
         StringBuilder sql = new StringBuilder(
             "SELECT id, ts_rank(" + document + ", to_tsquery('simple', ?), 32) AS score FROM knowledge_nodes "
             + "WHERE workspace_id = ? AND status = 'ACTIVE' AND " + document + " @@ to_tsquery('simple', ?) ");
-        List<Object> args = new ArrayList<>(List.of(tsquery, workspaceId, tsquery));
+        List<Object> args = new ArrayList<>(List.of(tsquery, viewer.workspaceId(), tsquery));
         if (domain != null) {
             sql.append("AND domain = ? ");
             args.add(domain);
         }
+        sql.append(viewer.sqlFilter("id"));
+        args.addAll(viewer.sqlArgs());
         sql.append("ORDER BY score DESC, id DESC LIMIT ?");
         args.add(limit);
         return toHits(jdbcTemplate.queryForList(sql.toString(), args.toArray()));

@@ -48,6 +48,8 @@ import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.core.service.WorkspaceService;
+import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
+import com.taskforce.tf_api.core.service.brain.BrainViewer;
 import com.taskforce.tf_api.modules.ged.service.ObjectStorage;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -99,6 +101,7 @@ public class WorkspaceBundleService {
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final ProjectRepository projectRepository;
     private final ProjectVisibilityGuard visibilityGuard;
+    private final BrainAccessGuard brainAccess;
     private final ProjectBundleService projects;
     private final WorkspaceService workspaceService;
     private final UserRepository userRepository;
@@ -134,18 +137,20 @@ public class WorkspaceBundleService {
 
         Map<String, Object> params = new HashMap<>();
         params.put("workspace", workspace.getId());
-        // Liste jamais vide pour IN (...) : -1 n'est l'identifiant d'aucun projet.
-        params.put("visible", exports.isEmpty() ? List.of(-1L) : new ArrayList<>(exports.keySet()));
         ObjectNode tables = JSON.createObjectNode();
         tables.set("workspaces", rows("SELECT row_to_json(t)::text FROM workspaces t WHERE id = :workspace", params, Set.of()));
         tables.set("brain_workspaces", rows(
             "SELECT row_to_json(t)::text FROM brain_workspaces t WHERE workspace_id = :workspace ORDER BY id", params, Set.of()));
-        ArrayNode nodes = rows("SELECT row_to_json(n)::text FROM knowledge_nodes n WHERE n.workspace_id = :workspace AND ("
-            + "n.ref_type IS NULL OR n.ref_type NOT IN ('PROJECT', 'ISSUE', 'CYCLE') "
-            + "OR (n.ref_type = 'PROJECT' AND n.ref_id IN (:visible)) "
-            + "OR (n.ref_type = 'ISSUE' AND n.ref_id IN (SELECT id FROM issues WHERE project_id IN (:visible))) "
-            + "OR (n.ref_type = 'CYCLE' AND n.ref_id IN (SELECT id FROM cycles WHERE project_id IN (:visible)))) "
-            + "ORDER BY n.id", params, Set.of("embedding", "embedding_model"));
+        // Les pages des projets non exportés restent de côté, avec les pages rangées dessous : la règle du Brain OS.
+        Set<Long> hidden = brainAccess.hiddenNodeIds(BrainViewer.seeing(workspace.getId(), exports.keySet()));
+        ArrayNode nodes = JSON.createArrayNode();
+        rows("SELECT row_to_json(n)::text FROM knowledge_nodes n WHERE n.workspace_id = :workspace ORDER BY n.id",
+            params, Set.of("embedding", "embedding_model"))
+            .forEach(node -> {
+                if (!hidden.contains(node.path("id").asLong())) {
+                    nodes.add(node);
+                }
+            });
         tables.set("knowledge_nodes", nodes);
         Set<Long> nodeIds = new HashSet<>();
         nodes.forEach(node -> nodeIds.add(node.path("id").asLong()));

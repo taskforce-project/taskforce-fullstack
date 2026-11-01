@@ -13,11 +13,13 @@ import com.taskforce.tf_api.core.enums.NodeDomain;
 import com.taskforce.tf_api.core.enums.NodeType;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
+import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
+import com.taskforce.tf_api.core.service.brain.BrainViewer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -32,8 +34,12 @@ import static org.mockito.Mockito.when;
 class SearchBrainToolTest {
 
     @Mock private BrainSearchService search;
+    @Mock private BrainAccessGuard access;
 
-    private SearchBrainTool tool() { return new SearchBrainTool(search); }
+    /** Ce que lit la personne de la conversation (espace 1, personne 7) : la recherche passe par elle. */
+    private final BrainViewer viewer = BrainViewer.seeing(1L, List.of(3L));
+
+    private SearchBrainTool tool() { return new SearchBrainTool(search, access); }
 
     private KnowledgeNode node(String title, String content) {
         return KnowledgeNode.builder()
@@ -52,7 +58,7 @@ class SearchBrainToolTest {
     @Test
     @DisplayName("aucun résultat → message 'Aucune note pertinente trouvée.'")
     void no_result() {
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         assertThat(tool().execute(Map.of("query", "x"), new AgentContext("acme", 1L, 7L)))
             .isEqualTo("No relevant note found.");
     }
@@ -61,21 +67,23 @@ class SearchBrainToolTest {
     @DisplayName("résultats formatés avec domaine, titre et extrait tronqué (>200 car)")
     void formats_hits_with_truncation() {
         String longContent = "a".repeat(250);
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt()))
+        when(access.viewer(1L, 7L)).thenReturn(viewer);
+        when(search.retrieveRelevant(any(), anyString(), anyInt()))
             .thenReturn(List.of(node("Choix techno", longContent), node("Sans contenu", null)));
 
         String out = tool().execute(Map.of("query", "techno", "topK", 3), new AgentContext("acme", 1L, 7L));
 
         assertThat(out).contains("Relevant notes").contains("Choix techno").contains("Sans contenu");
         assertThat(out).contains("…"); // contenu long tronqué
-        verify(search).retrieveRelevant(eq(1L), eq("techno"), eq(3));
+        verify(search).retrieveRelevant(eq(viewer), eq("techno"), eq(3));
     }
 
     @Test
     @DisplayName("topK absent → défaut 5")
     void default_topk() {
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(access.viewer(1L, 7L)).thenReturn(viewer);
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         tool().execute(Map.of("query", "q"), new AgentContext("acme", 1L, 7L));
-        verify(search).retrieveRelevant(eq(1L), eq("q"), eq(5));
+        verify(search).retrieveRelevant(eq(viewer), eq("q"), eq(5));
     }
 }

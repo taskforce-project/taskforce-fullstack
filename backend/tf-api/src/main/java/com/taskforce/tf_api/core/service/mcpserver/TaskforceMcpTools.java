@@ -37,8 +37,9 @@ import com.taskforce.tf_api.core.service.brain.BrainSearchService;
  * Les outils du serveur MCP de l'instance (OSS-5.2) : lire le workspace (projets, issues, Brain OS, indicateurs),
  * commenter et faire avancer une issue, demander une recommandation d'assignation ou une réponse à Cortex.
  *
- * <p>Chaque outil appelle le même service que la route REST correspondante, avec la même personne : les droits
- * (projet privé, rôle en écriture) sont donc ceux de l'API, sans rien de propre au MCP.</p>
+ * <p>Chaque outil appelle le même service que la route REST correspondante, avec la personne du jeton (le sien, ou
+ * celui de la personne qui a délégué) : les droits (projet privé, rôle en écriture) sont donc ceux de l'API, sans rien
+ * de propre au MCP. {@code brain_search} ne rend ainsi aucune note d'un projet privé que cette personne ne voit pas.</p>
  */
 @Component
 public class TaskforceMcpTools {
