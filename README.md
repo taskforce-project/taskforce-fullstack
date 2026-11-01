@@ -113,8 +113,9 @@ and can use the tools you connect. Analytics are computed from your own board, w
 sends notifications per channel and event. Any MCP server connects with one-click OAuth or a token, with 25 official
 servers listed (Linear, Jira, Notion, Sentry and more). Outgoing webhooks are signed with HMAC-SHA256 and retried.
 
-**Use the AI you choose.** A local model through Ollama, free and private, or any OpenAI-compatible API with your own
-key: OpenAI, Groq, Mistral, OpenRouter, LM Studio. Without AI, the board, Brain OS and analytics keep working.
+**Use the AI you choose.** A local model through Ollama, free and private, any OpenAI-compatible API with your own key
+(OpenAI, Groq, Mistral, OpenRouter, LM Studio) or Anthropic's API. Without AI, the board, Brain OS and analytics keep
+working.
 
 ## Private by design
 
@@ -183,16 +184,17 @@ flowchart TB
         subgraph WORK["Agents and AI"]
             direction LR
             RUN["Runner"] --> CC["Claude Code<br/>your install, your login"]
-            AIR["AI relay"] --> OLL["Ollama<br/>optional"]
+            OLL["Ollama<br/>optional"]
         end
         SHELL --> STACK
         SHELL --> WORK
+        API --> OLL
     end
 
     subgraph OUT["Outside, when you use it"]
         direction LR
         ACC["TaskForce account<br/>sign-in, once"]
-        LLM["OpenAI-compatible API<br/>your own key"]
+        LLM["OpenAI-compatible or Anthropic API<br/>your own key"]
         EXT["GitHub, Copilot, MCP servers<br/>what you connect"]
         ACC ~~~ LLM ~~~ EXT
     end
@@ -202,7 +204,7 @@ flowchart TB
     classDef tf fill:#eef3ff,stroke:#2f6bf6,color:#191715
     classDef plain fill:#ffffff,stroke:#a8a29b,color:#191715
     classDef ext fill:#ffffff,stroke:#a8a29b,color:#191715,stroke-dasharray:4 3
-    class SHELL,UI,API,DB,RUN,AIR tf
+    class SHELL,UI,API,DB,RUN tf
     class CC,OLL plain
     class ACC,LLM,EXT ext
     style PC fill:#fbfaf9,stroke:#d6d3ce,color:#57534d
@@ -216,8 +218,9 @@ flowchart TB
 - **One database per account.** PostgreSQL 18 with pgvector ships inside the app, with a cluster for each account.
 - **Sign-in without passwords in the app.** The app opens the sign-in page in your browser and receives a one-time
   code on 127.0.0.1 (PKCE). Its session is encrypted by the system keychain.
-- **AI through the shell.** The backend speaks the AI service protocol to the shell, which relays it to Ollama or to
-  the OpenAI-compatible API chosen in Settings.
+- **AI from the API.** The API talks to the provider chosen in Settings itself: Ollama, an OpenAI-compatible API or
+  Anthropic's API. The shell hands it that choice with the key from the keychain, and a change applies without a
+  restart.
 - **Claude Code through the runner.** The shell starts the runner with a secret drawn at each start; the runner claims
   delegated issues and drives your own Claude Code.
 
@@ -240,7 +243,7 @@ flowchart TB
 | Interface | Next.js 16, React 19, TypeScript, Tailwind CSS, Zustand |
 | API | Java 21, Spring Boot 4, Flyway (97 migrations) |
 | Data | PostgreSQL 18 with pgvector, embedded in the desktop app |
-| AI | Ollama or any OpenAI-compatible API; a FastAPI gateway in the server edition |
+| AI | Ollama, any OpenAI-compatible API or Anthropic's API, through the model gateway in the API |
 | Coding agents | Local runner (Node.js) for Claude Code; GitHub Copilot coding agent |
 | Accounts | Keycloak, on our account server in France |
 | Website and docs | Astro, Fern |
@@ -250,7 +253,6 @@ flowchart TB
 | [`desktop`](./desktop) | The desktop app shell (Electron) |
 | [`backend/tf-api`](./backend/tf-api) | The API |
 | [`frontend`](./frontend) | The interface, shared by the desktop app and the web app |
-| [`ai-service`](./ai-service) | The AI gateway of the server edition |
 | [`taskforce-runner`](./taskforce-runner) | The local runner for Claude Code |
 | [`taskforce-plugin`](./taskforce-plugin) | The Claude Code plugin (`/taskforce`) |
 | [`keycloak`](./keycloak) | Sign-in realms |

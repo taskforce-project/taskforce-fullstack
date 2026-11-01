@@ -18,8 +18,8 @@ release notes.
 
 ## Scope
 
-In scope: the code in this repository (backend, frontend, AI service, MCP server, local runner, Claude Code plugin,
-landing page) and the default configuration it ships with.
+In scope: the code in this repository (backend and its model gateway, frontend, desktop shell, MCP server, local
+runner, Claude Code plugin, landing page) and the default configuration it ships with.
 
 Out of scope: vulnerabilities in third-party services or dependencies themselves (please report them upstream), and
 attacks that need an already compromised server or administrator account.
