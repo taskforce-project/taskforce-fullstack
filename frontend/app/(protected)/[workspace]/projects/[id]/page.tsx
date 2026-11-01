@@ -474,23 +474,19 @@ function BoardColumn({
           />
         ))}
 
-        {issues.length === 0 && (
-          <div className="flex items-center justify-center rounded-lg border border-dashed border-border/60 p-5">
-            <p className="text-xs text-muted-foreground/60">{t("projects.detail.noIssues")}</p>
-          </div>
-        )}
+        {/* Ajouter une issue dans la colonne (statut pré-rempli), juste après sa dernière carte : une colonne vide
+            montre le geste sous son titre, au lieu d'un cadre « vide » et d'un bouton tout en bas (revue UX du
+            01/11/2026). Le compteur de l'en-tête dit déjà qu'elle est vide. */}
+        <CreateIssueDialog projectId={projectId} workspaceSlug={workspaceSlug} defaultStatusId={status.id}>
+          <button
+            type="button"
+            className="flex h-control-sm w-full shrink-0 items-center gap-1.5 px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-black/[0.03] hover:text-foreground dark:hover:bg-white/[0.05]"
+          >
+            <Plus className="size-3.5" aria-hidden />
+            {t("projects.detail.addIssue")}
+          </button>
+        </CreateIssueDialog>
       </div>
-
-      {/* Ajouter une tache dans la colonne (statut pre-rempli) */}
-      <CreateIssueDialog projectId={projectId} workspaceSlug={workspaceSlug} defaultStatusId={status.id}>
-        <button
-          type="button"
-          className="mt-2 flex w-full shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-black/[0.03] hover:text-foreground dark:hover:bg-white/[0.05]"
-        >
-          <Plus className="size-3.5" aria-hidden />
-          Add task
-        </button>
-      </CreateIssueDialog>
     </div>
   )
 }
@@ -817,6 +813,11 @@ export default function ProjectBoardPage() {
             Retry
           </button>
         </div>
+      )}
+
+      {/* Un projet sans issue le dit une fois, avec les deux façons d'en créer une, au lieu de quatre colonnes vides. */}
+      {!initializing && !error && issues.length === 0 && (
+        <p className="mb-3 shrink-0 text-xs text-muted-foreground">{t("projects.detail.emptyBoard")}</p>
       )}
 
       {initializing ? (

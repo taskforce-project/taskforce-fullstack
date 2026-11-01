@@ -385,7 +385,7 @@ export const CONSTANTS_EN = {
       teams: "Teams",
       settings: "Settings",
       newIssue: "New Issue",
-      noIssues: "No issues in this column",
+      emptyBoard: "No issues yet. Add one to a column, or write what you want done in the bar below.",
       addIssue: "Add issue",
     },
   },
