@@ -211,8 +211,8 @@ public class AgentService {
             return runConversational(ws.getId(), message, hist);
         }
 
-        // ── Recherche (RAG), réelle avec ou sans IA ──────────────────────────
-        List<KnowledgeNode> hits = search.retrieveRelevant(ws.getId(), message, 5);
+        // ── Recherche (RAG), réelle avec ou sans IA, dans les notes que la personne lit ──
+        List<KnowledgeNode> hits = search.retrieveRelevant(access.viewer(ws.getId(), userId), message, 5);
         List<AssistantSource> sources = hits.stream()
             .map(n -> new AssistantSource(n.getTitle(), n.getDomain().name(), null))
             .toList();

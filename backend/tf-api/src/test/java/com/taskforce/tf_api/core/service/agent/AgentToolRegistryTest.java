@@ -37,7 +37,7 @@ class AgentToolRegistryTest {
     static Stream<Arguments> internalTools() {
         return Stream.<AgentTool>of(new CreateIssueTool(null, null), new CreateNoteTool(null), new CreateProjectTool(null),
                 new FindIntegrationTool(null), new ListIssuesTool(null, null, null), new ListProjectsTool(null, null, null),
-                new SearchBrainTool(null))
+                new SearchBrainTool(null, null))
             .map(tool -> Arguments.of(tool.name(), tool));
     }
 

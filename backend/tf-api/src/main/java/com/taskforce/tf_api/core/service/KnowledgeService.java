@@ -30,6 +30,7 @@ import com.taskforce.tf_api.core.service.brain.BrainLinkService;
 import com.taskforce.tf_api.core.service.brain.BrainMapper;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.core.service.brain.BrainSeedingService;
+import com.taskforce.tf_api.core.service.brain.BrainViewer;
 
 import lombok.RequiredArgsConstructor;
 
@@ -74,9 +75,15 @@ public class KnowledgeService {
         }
         BrainWorkspace brain = brainWorkspaceRepository.findByWorkspaceId(ws.getId()).orElse(null);
 
+        // Les pages d'un projet que la personne ne voit pas, et les liens qui y mènent, restent de côté.
+        Set<Long> hidden = access.hiddenNodeIds(access.viewer(ws.getId(), userId));
         List<KnowledgeNode> allNodes =
-            nodeRepository.findByWorkspaceIdAndStatusOrderByDomainAscTitleAsc(ws.getId(), NodeStatus.ACTIVE);
-        List<KnowledgeEdge> allEdges = edgeRepository.findByWorkspaceId(ws.getId());
+            nodeRepository.findByWorkspaceIdAndStatusOrderByDomainAscTitleAsc(ws.getId(), NodeStatus.ACTIVE).stream()
+                .filter(node -> !hidden.contains(node.getId()))
+                .toList();
+        List<KnowledgeEdge> allEdges = edgeRepository.findByWorkspaceId(ws.getId()).stream()
+            .filter(edge -> !hidden.contains(edge.getFromNode().getId()) && !hidden.contains(edge.getToNode().getId()))
+            .toList();
 
         Map<String, Long> byDomain = new LinkedHashMap<>();
         for (KnowledgeNode node : allNodes) {
@@ -131,9 +138,9 @@ public class KnowledgeService {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         BrainWorkspace brain = brainWorkspaceRepository.findByWorkspaceId(ws.getId()).orElse(null);
 
-        // Page parente (arbre facon Notion) : validee dans le MEME workspace (requireNode leve sinon).
+        // Page parente (arbre facon Notion) : validee dans le MEME workspace et lue par la personne (requireNode leve sinon).
         Long parentId = req.getParentNodeId() != null
-            ? access.requireNode(req.getParentNodeId(), ws.getId()).getId()
+            ? access.requireNode(req.getParentNodeId(), access.viewer(ws.getId(), userId)).getId()
             : null;
 
         KnowledgeNode node = KnowledgeNode.builder()
@@ -163,7 +170,8 @@ public class KnowledgeService {
     @Transactional
     public KnowledgeNodeResponse updateNode(String slug, Long nodeId, Long userId, UpdateKnowledgeNodeRequest req) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
-        KnowledgeNode node = access.requireNode(nodeId, ws.getId());
+        BrainViewer viewer = access.viewer(ws.getId(), userId);
+        KnowledgeNode node = access.requireNode(nodeId, viewer);
 
         if (req.getTitle() != null)        node.setTitle(req.getTitle());
         if (req.getContent() != null)      node.setContent(req.getContent());
@@ -173,7 +181,7 @@ public class KnowledgeService {
         if (req.getVersionLabel() != null) node.setVersionLabel(req.getVersionLabel());
         // Reparentage (deplacer une page sous une autre) : garde meme-workspace + anti-cycle.
         if (req.getParentNodeId() != null) {
-            node.setParentNodeId(resolveParentForMove(nodeId, req.getParentNodeId(), ws.getId()));
+            node.setParentNodeId(resolveParentForMove(nodeId, req.getParentNodeId(), viewer));
         }
         if (req.getMetadata() != null) node.setMetadata(copyOf(req.getMetadata()));
         node.setUpdatedBy(String.valueOf(userId));
@@ -185,15 +193,16 @@ public class KnowledgeService {
     }
 
     /**
-     * Valide un nouveau parent pour le deplacement d'une page : meme workspace ({@code requireNode}
-     * leve sinon), pas soi-meme, et <b>aucun cycle</b> (le nouveau parent ne doit pas etre un
-     * descendant de la page deplacee). Retourne l'id du parent valide.
+     * Valide un nouveau parent pour le deplacement d'une page : meme workspace et lu par la personne
+     * ({@code requireNode} leve sinon), pas soi-meme, et <b>aucun cycle</b> (le nouveau parent ne doit pas
+     * etre un descendant de la page deplacee). Retourne l'id du parent valide.
      */
-    private Long resolveParentForMove(Long nodeId, Long newParentId, Long workspaceId) {
+    private Long resolveParentForMove(Long nodeId, Long newParentId, BrainViewer viewer) {
         if (newParentId.equals(nodeId)) {
             throw new IllegalArgumentException("A page can't be its own parent");
         }
-        KnowledgeNode parent = access.requireNode(newParentId, workspaceId);
+        Long workspaceId = viewer.workspaceId();
+        KnowledgeNode parent = access.requireNode(newParentId, viewer);
         // Remonte la chaine des ancetres du nouveau parent : si on retombe sur la page, c'est un cycle.
         Long cursor = parent.getParentNodeId();
         int guard = 0;
@@ -215,9 +224,10 @@ public class KnowledgeService {
     @Transactional
     public KnowledgeNodeResponse moveNode(String slug, Long nodeId, Long userId, MoveNodeRequest req) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
-        KnowledgeNode node = access.requireNode(nodeId, ws.getId());
+        BrainViewer viewer = access.viewer(ws.getId(), userId);
+        KnowledgeNode node = access.requireNode(nodeId, viewer);
         node.setParentNodeId(req.getParentNodeId() != null
-            ? resolveParentForMove(nodeId, req.getParentNodeId(), ws.getId())
+            ? resolveParentForMove(nodeId, req.getParentNodeId(), viewer)
             : null);
         if (req.getDomain() != null) {
             node.setDomain(BrainEnums.domain(req.getDomain()));
@@ -229,7 +239,7 @@ public class KnowledgeService {
     @Transactional
     public void deleteNode(String slug, Long nodeId, Long userId) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
-        KnowledgeNode node = access.requireNode(nodeId, ws.getId());
+        KnowledgeNode node = access.requireNode(nodeId, access.viewer(ws.getId(), userId));
         nodeRepository.delete(node); // arêtes supprimées en cascade (FK ON DELETE CASCADE)
     }
 }

@@ -40,6 +40,7 @@ import com.taskforce.tf_api.core.service.LlmToolsRefusedException;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
+import com.taskforce.tf_api.core.service.brain.BrainViewer;
 import com.taskforce.tf_api.core.service.mcp.ExternalMcpTool;
 import com.taskforce.tf_api.core.service.mcp.McpClient;
 import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
@@ -108,17 +109,19 @@ class AgentServiceTest {
     }
 
     @Test
-    @DisplayName("sans IA disponible → réponse de repli, avec la recherche réelle")
+    @DisplayName("sans IA disponible → réponse de repli, avec la recherche réelle dans ce que la personne lit")
     void fallback_without_ai() {
         stubWorkspace();
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        BrainViewer viewer = BrainViewer.seeing(1L, List.of(3L));
+        when(access.viewer(1L, 7L)).thenReturn(viewer);
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(false);
 
         AssistantAnswer answer = service.run("acme", 7L, "What is the status of the project?");
 
         assertThat(answer.mode()).isEqualTo("fallback");
         assertThat(answer.answer()).contains("AI unavailable");
-        verify(search).retrieveRelevant(eq(1L), anyString(), anyInt());
+        verify(search).retrieveRelevant(eq(viewer), anyString(), anyInt());
     }
 
     @Test
@@ -126,7 +129,7 @@ class AgentServiceTest {
     void model_answers_directly() throws Exception {
         stubWorkspace();
         stubToolLoop();
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Direct answer\"}"));
         when(llm.currentUsage()).thenReturn(new LlmUsage(12, 34, 46));
@@ -145,7 +148,7 @@ class AgentServiceTest {
     void every_message_gets_the_tools() throws Exception {
         stubWorkspace();
         stubToolLoop();
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"ok\"}"));
 
@@ -163,7 +166,7 @@ class AgentServiceTest {
         stubToolLoop();
         KnowledgeNode node = KnowledgeNode.builder()
             .type(NodeType.DECISION).domain(NodeDomain.PROJET).title("Note").content("content").build();
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of(node));
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of(node));
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
             json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"search_brain\",\"arguments\":\"{}\"}}]}"),
@@ -186,7 +189,7 @@ class AgentServiceTest {
     void unknown_tool() throws Exception {
         stubWorkspace();
         stubToolLoop();
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
             json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"ghost\",\"arguments\":\"{}\"}}]}"),
@@ -203,7 +206,7 @@ class AgentServiceTest {
     void model_failure_falls_back() {
         stubWorkspace();
         stubToolLoop();
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString())).thenThrow(new RuntimeException("model down"));
 
@@ -218,7 +221,7 @@ class AgentServiceTest {
     void tools_refused_says_nothing_was_done() {
         stubWorkspace();
         stubToolLoop();
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString()))
             .thenThrow(new LlmToolsRefusedException("The AI provider refused the tools", null));
@@ -235,7 +238,7 @@ class AgentServiceTest {
     void claimed_write_without_tool_is_replaced() throws Exception {
         stubWorkspace();
         stubToolLoop();
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(
             "{\"content\":\"**Issue created**: Project TaskForce (TF), Title Cortex test. Use list_issues to verify.\"}"));
@@ -251,7 +254,7 @@ class AgentServiceTest {
     void real_write_keeps_the_answer() throws Exception {
         stubWorkspace();
         stubToolLoop();
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
             json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"create_project\",\"arguments\":\"{}\"}}]}"),
@@ -288,7 +291,7 @@ class AgentServiceTest {
     void stop_after_a_write_keeps_what_was_done() throws Exception {
         stubWorkspace();
         stubToolLoop();
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString()))
             .thenReturn(json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"create_project\",\"arguments\":\"{}\"}}]}"))
@@ -355,7 +358,7 @@ class AgentServiceTest {
         assertThat(answer.answer()).isEqualTo("Hello! All good, thanks.");
         assertThat(answer.sources()).isEmpty();
         assertThat(answer.steps()).noneMatch(s -> s.label().contains("Brain OS"));
-        verify(search, never()).retrieveRelevant(anyLong(), anyString(), anyInt());
+        verify(search, never()).retrieveRelevant(any(), anyString(), anyInt());
     }
 
     @Test
@@ -376,7 +379,7 @@ class AgentServiceTest {
     void history_is_injected() throws Exception {
         stubWorkspace();
         stubToolLoop();
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Your project is Zephyr.\"}"));
 
@@ -444,7 +447,7 @@ class AgentServiceTest {
     private AgentTool stubInternalCall(String name) throws Exception {
         stubWorkspace();
         stubToolLoop();
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
             json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"" + name + "\",\"arguments\":\"{}\"}}]}"),
@@ -503,7 +506,7 @@ class AgentServiceTest {
     void no_tool_no_record() throws Exception {
         stubWorkspace();
         stubToolLoop();
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Direct answer\"}"));
 
@@ -704,7 +707,7 @@ class AgentServiceTest {
     private void stubExternalWrite() throws Exception {
         ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
         ReflectionTestUtils.setField(service, "maxExternalTools", 20);
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
 
         var writeDef = new McpClient.ToolDef("do_write", "writes something", json.readTree("{\"type\":\"object\"}"), false);
@@ -723,7 +726,7 @@ class AgentServiceTest {
         stubWorkspace();
         ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
         ReflectionTestUtils.setField(service, "maxExternalTools", 20);
-        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
         var readDef = new McpClient.ToolDef("list_things", "lists things", json.readTree("{\"type\":\"object\"}"), true);
         var extTool = new ExternalMcpTool(Mockito.mock(McpClient.class),
@@ -804,7 +807,7 @@ class AgentServiceTest {
         assertThat(messages.getValue()).anyMatch(m -> "TF-4 Deploy [Blocked], blocked by TF-3".equals(m.get("content")));
         verify(tool, never()).execute(any(), any());
         verify(records, never()).open(any(), any(), any());
-        verify(search, never()).retrieveRelevant(anyLong(), anyString(), anyInt());
+        verify(search, never()).retrieveRelevant(any(), anyString(), anyInt());
     }
 
     @ParameterizedTest(name = "{0} au rejeu : {1}, jamais lancé")
