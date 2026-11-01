@@ -294,6 +294,17 @@ public class IssueService {
     @Transactional
     public IssueResponse createIssue(String workspaceSlug, Long projectId,
                                      CreateIssueRequest request, Long reporterId) {
+        return createIssue(workspaceSlug, projectId, request, reporterId, null);
+    }
+
+    /**
+     * Crée une nouvelle issue dans le projet, en gardant à l'activité l'agent par qui la création passe : Cortex, pour
+     * une issue créée depuis la carte qu'il a préparée (« Pierre created, prepared by Cortex »). Sans {@code via}, celui
+     * de la session déléguée s'il y en a une.
+     */
+    @Transactional
+    public IssueResponse createIssue(String workspaceSlug, Long projectId,
+                                     CreateIssueRequest request, Long reporterId, String via) {
         Project project = resolveWritableProject(workspaceSlug, projectId, reporterId);
 
         User reporter = resolveUser(reporterId);
@@ -349,18 +360,23 @@ public class IssueService {
             .position(issuePosition)
             .startDate(request.getStartDate() != null ? LocalDate.parse(request.getStartDate()) : null)
             .dueDate(request.getDueDate() != null ? LocalDate.parse(request.getDueDate()) : null)
+            .storyPoints(request.getStoryPoints() != null && request.getStoryPoints() > 0 ? request.getStoryPoints() : null)
             .build();
 
         issue = issueRepository.save(issue);
 
         // Labels à la création (après le save : l'id de l'issue est requis pour la table
-        // de jointure issue_label_assignments). Miroir de updateIssue — cf. ISS-01.
+        // de jointure issue_label_assignments). Miroir de updateIssue, cf. ISS-01. Seuls ceux du
+        // projet : un label d'un autre projet ne s'attache pas.
         if (request.getLabelIds() != null && !request.getLabelIds().isEmpty()) {
-            issue.getLabels().addAll(projectLabelRepository.findAllById(request.getLabelIds()));
+            issue.getLabels().addAll(projectLabelRepository.findAllById(request.getLabelIds()).stream()
+                .filter(label -> label.getProject() != null && project.getId().equals(label.getProject().getId()))
+                .toList());
             issue = issueRepository.save(issue);
         }
 
-        logActivity(issue, reporter, IssueActivityType.CREATED, null, issue.getTitle());
+        logActivity(issue, reporter, IssueActivityType.CREATED, null, issue.getTitle(),
+            via != null ? via : DelegatedAgent.current().orElse(null));
 
         // Assignation à la création : statut + notif. Self-assign = accepté d'office (pas de validation).
         if (assignee != null) {

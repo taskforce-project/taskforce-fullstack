@@ -4,10 +4,14 @@ import { useEffect, useMemo, useState } from "react"
 
 import { approveAction, type AssistantToolCall } from "@/lib/api/assistant-service"
 import { getErrorMessage } from "@/lib/api/client"
+import { listCycles, type Cycle } from "@/lib/api/cycle-service"
 import { listStatuses, type IssueStatus } from "@/lib/api/issue-service"
+import { listLabels, type ProjectLabel } from "@/lib/api/label-service"
+import { listProjectMembers, type ProjectMember } from "@/lib/api/project-service"
 import {
-  draftColumn, draftProblem, findDraftProject, formatDraftDay, issueDraftInput, localDay, readIssueDraft,
-  type DraftProblem, type IssueDraft,
+  DRAFT_PRIORITIES, draftColumn, draftCycle, draftLabels, draftProblem, findDraftMember, findDraftProject, formatDraftDay,
+  issueDraftInput, localDay, memberName, openCycles, readIssueDraft,
+  type DraftPriority, type DraftProblem, type IssueDraft,
 } from "@/lib/cortex/issue-draft"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useProjectStore } from "@/lib/store/project-store"
@@ -18,11 +22,27 @@ type CardState = "draft" | "creating" | "created" | "failed"
 
 const FIELD = "w-full border border-input bg-transparent px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
 
+/** Les estimations proposées, comme sur la fiche d'une issue. */
+const POINT_PRESETS = ["1", "2", "3", "5", "8", "13"]
+
+/** Ce qui existe dans le projet : la carte n'y prend que ça. Null : pas encore là, ou illisible, et le serveur tranche. */
+interface ProjectOptions {
+  projectId: number
+  members: ProjectMember[] | null
+  labels: ProjectLabel[] | null
+  cycles: Cycle[] | null
+}
+
+const settled = <T,>(result: PromiseSettledResult<T>): T | null => (result.status === "fulfilled" ? result.value : null)
+
 /**
  * « Créer » (R78, séance n°13) : l'issue que Cortex a préparée, en carte. La personne la relit, change ce qu'il faut et
  * la crée ; l'accord part avec le dossier de la réponse et les champs modifiés, le serveur rejuge et crée l'issue avec
  * ses droits, puis « Undo » la reprend tant que rien n'a bougé (R77). La visibilité est celle du projet : une issue n'a
  * pas la sienne.
+ *
+ * La priorité, l'assigné, les labels, les points et le cycle ne prennent que ce qui existe dans le projet (recette du
+ * 01/11/2026) : ce que Cortex a nommé et qui ne s'y trouve pas reste vide, à remplir ici.
  */
 export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantToolCall }) {
   const t = usePreferencesStore((s) => s.t.cortex)
@@ -31,6 +51,7 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
   const [draft, setDraft] = useState<IssueDraft>(() => readIssueDraft(call.input))
   const [editing, setEditing] = useState(false)
   const [columns, setColumns] = useState<IssueStatus[]>([])
+  const [loaded, setLoaded] = useState<ProjectOptions | null>(null)
   const [state, setState] = useState<CardState>("draft")
   const [output, setOutput] = useState<string | null>(null)
 
@@ -47,10 +68,18 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
     listStatuses(slug, projectId)
       .then((list) => { if (live) setColumns(list) })
       .catch(() => { if (live) setColumns([]) })
+    void Promise.allSettled([listProjectMembers(slug, projectId), listLabels(slug, projectId), listCycles(slug, projectId)])
+      .then(([members, labels, cycles]) => {
+        if (live) setLoaded({ projectId, members: settled(members), labels: settled(labels), cycles: settled(cycles) })
+      })
     return () => { live = false }
   }, [slug, projectId])
 
+  const options = loaded && loaded.projectId === projectId ? loaded : null
   const column = draftColumn(columns, draft.status)
+  const member = options?.members ? findDraftMember(options.members, draft.assignee) : null
+  const labels = options?.labels ? draftLabels(options.labels, draft.labels) : []
+  const cycle = options?.cycles ? draftCycle(options.cycles, draft.cycle) : null
   // Sans les colonnes (pas encore là, ou illisibles), le serveur tranche.
   const problem = draftProblem(draft, project, columns.length === 0 || column !== null, localDay(new Date(), -1))
   const change = (fields: Partial<IssueDraft>) => setDraft((current) => ({ ...current, ...fields }))
@@ -58,8 +87,17 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
   const create = async () => {
     if (problem || !project) return
     setState("creating")
+    // Ce que la carte montre, résolu parmi ce qui existe : l'e-mail du membre, les noms exacts. Sans les options du
+    // projet, ce que Cortex a écrit part tel quel et le serveur le rejuge.
+    const sent: IssueDraft = {
+      ...draft,
+      project: project.identifier,
+      assignee: options?.members ? (member?.email ?? "") : draft.assignee,
+      labels: options?.labels ? labels.map((l) => l.name) : draft.labels,
+      cycle: options?.cycles ? (cycle?.name ?? "") : draft.cycle,
+    }
     try {
-      const result = await approveAction(slug, { ...call, input: issueDraftInput({ ...draft, project: project.identifier }) })
+      const result = await approveAction(slug, { ...call, input: issueDraftInput(sent) })
       setOutput(result.output)
       // L'outil dit ce qui l'arrête dans sa sortie : seule « Created … » est une issue créée.
       setState(result.status === "success" && result.output.startsWith("Created ") ? "created" : "failed")
@@ -85,6 +123,15 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
     title: t.issueNeedsTitle,
     past: t.issueDueInPast,
     column: t.issueUnknownColumn,
+  }
+  const projectLabels = options?.labels ?? []
+  const cycles = openCycles(options?.cycles ?? [])
+  const points = draft.points
+  const pointChoices = points && !POINT_PRESETS.includes(points) ? [...POINT_PRESETS, points] : POINT_PRESETS
+  const empty = (text: string) => <span className="text-muted-foreground">{text}</span>
+  const toggleLabel = (name: string) => {
+    const names = labels.map((l) => l.name)
+    change({ labels: names.includes(name) ? names.filter((n) => n !== name) : [...names, name] })
   }
 
   return (
@@ -187,7 +234,7 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
             ) : draft.dueDate ? (
               formatDraftDay(draft.dueDate)
             ) : (
-              <span className="text-muted-foreground">{t.issueNoDue}</span>
+              empty(t.issueNoDue)
             )}
           </dd>
 
@@ -207,6 +254,126 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
               </select>
             ) : (
               column?.name ?? draft.status
+            )}
+          </dd>
+
+          <dt className="text-muted-foreground">{t.issuePriority}</dt>
+          <dd className="min-w-0">
+            {editing ? (
+              <select
+                aria-label={t.issuePriority}
+                value={draft.priority === "NONE" ? "" : draft.priority}
+                onChange={(e) => change({ priority: e.target.value as DraftPriority | "" })}
+                className={cn(FIELD, "h-7 w-auto")}
+              >
+                <option value="">{t.issuePriorities.NONE}</option>
+                {DRAFT_PRIORITIES.filter((p) => p !== "NONE").map((p) => (
+                  <option key={p} value={p}>{t.issuePriorities[p]}</option>
+                ))}
+              </select>
+            ) : draft.priority && draft.priority !== "NONE" ? (
+              t.issuePriorities[draft.priority]
+            ) : (
+              empty(t.issuePriorities.NONE)
+            )}
+          </dd>
+
+          <dt className="text-muted-foreground">{t.issueAssignee}</dt>
+          <dd className="min-w-0 break-words">
+            {editing ? (
+              <select
+                aria-label={t.issueAssignee}
+                value={member?.email ?? ""}
+                onChange={(e) => change({ assignee: e.target.value })}
+                className={cn(FIELD, "h-7")}
+              >
+                <option value="">{t.issueUnassigned}</option>
+                {(options?.members ?? []).map((m) => (
+                  <option key={m.userId} value={m.email}>{memberName(m)}</option>
+                ))}
+              </select>
+            ) : member ? (
+              memberName(member)
+            ) : (
+              empty(t.issueUnassigned)
+            )}
+          </dd>
+
+          <dt className="text-muted-foreground">{t.issueLabels}</dt>
+          <dd className="min-w-0 break-words">
+            {editing ? (
+              projectLabels.length > 0 ? (
+                <span className="flex flex-wrap gap-1">
+                  {projectLabels.map((l) => {
+                    const on = labels.includes(l)
+                    return (
+                      <button
+                        key={l.id}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => toggleLabel(l.name)}
+                        className={cn(
+                          "border px-1.5 py-0.5 transition-colors",
+                          on ? "border-primary/60 bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:bg-muted",
+                        )}
+                      >
+                        {l.name}
+                      </button>
+                    )
+                  })}
+                </span>
+              ) : (
+                empty(t.issueProjectHasNoLabels)
+              )
+            ) : labels.length > 0 ? (
+              labels.map((l) => l.name).join(", ")
+            ) : (
+              empty(t.issueNoLabels)
+            )}
+          </dd>
+
+          <dt className="text-muted-foreground">{t.issuePoints}</dt>
+          <dd className="min-w-0">
+            {editing ? (
+              <select
+                aria-label={t.issuePoints}
+                value={points}
+                onChange={(e) => change({ points: e.target.value })}
+                className={cn(FIELD, "h-7 w-auto")}
+              >
+                <option value="">{t.issueNoPoints}</option>
+                {pointChoices.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            ) : points ? (
+              (points === "1" ? t.issueOnePoint : t.issuePointsValue).replace("{points}", points)
+            ) : (
+              empty(t.issueNoPoints)
+            )}
+          </dd>
+
+          <dt className="text-muted-foreground">{t.issueCycle}</dt>
+          <dd className="min-w-0 break-words">
+            {editing ? (
+              <select
+                aria-label={t.issueCycle}
+                value={cycle?.name ?? ""}
+                onChange={(e) => change({ cycle: e.target.value })}
+                className={cn(FIELD, "h-7")}
+              >
+                <option value="">{t.issueNoCycle}</option>
+                {cycles.map((c) => (
+                  <option key={c.id} value={c.name}>{c.status === "ACTIVE" ? `${c.name} ${t.issueActiveCycle}` : c.name}</option>
+                ))}
+              </select>
+            ) : cycle ? (
+              <>
+                {cycle.name}
+                {cycle.status === "ACTIVE" && <span className="text-muted-foreground"> {t.issueActiveCycle}</span>}
+              </>
+            ) : (
+              empty(t.issueNoCycle)
             )}
           </dd>
 

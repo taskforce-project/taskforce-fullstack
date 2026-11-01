@@ -161,6 +161,30 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
+        @DisplayName("depuis la carte de Cortex : l'activité dit « prepared by Cortex », les points et les labels du projet seuls (V112)")
+        void created_from_cortex_card_keeps_its_agent_points_and_own_labels() {
+            Project other = projectRepository.save(Project.builder()
+                .workspace(workspace).name("Other").identifier("OTH").createdBy(owner).build());
+            ProjectLabel bug = projectLabelRepository.save(ProjectLabel.builder()
+                .project(project).name("Bug").color("#123456").build());
+            ProjectLabel foreign = projectLabelRepository.save(ProjectLabel.builder()
+                .project(other).name("Foreign").color("#123456").build());
+            CreateIssueRequest req = createRequest("From the card", null);
+            req.setStoryPoints(3);
+            req.setLabelIds(List.of(bug.getId(), foreign.getId()));
+
+            IssueResponse res = issueService.createIssue(SLUG, project.getId(), req, owner.getId(), "Cortex");
+
+            assertThat(res.getStoryPoints()).isEqualTo(3);
+            // Un label d'un autre projet ne s'attache pas.
+            assertThat(res.getLabels()).extracting(l -> l.getName()).containsExactly("Bug");
+            var created = issueService.listActivity(SLUG, project.getId(), res.getId(), owner.getId()).get(0);
+            assertThat(created.getAction()).isEqualTo(com.taskforce.tf_api.core.enums.IssueActivityType.CREATED);
+            assertThat(created.getVia()).isEqualTo("Cortex");
+            assertThat(created.getActor().getId()).isEqualTo(owner.getId());
+        }
+
+        @Test
         @DisplayName("attribue des numéros de séquence atomiques croissants")
         void should_increment_sequence() {
             IssueResponse first = issueService.createIssue(SLUG, project.getId(), createRequest("A", null), owner.getId());
