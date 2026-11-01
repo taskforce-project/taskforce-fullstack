@@ -187,6 +187,13 @@ describe("faits d'une action de Claude Code, jugés par la table par défaut", (
     ["après un cd qu'on ne borne pas, plus rien ne se borne", "Bash", { command: "cd $HOME && cat notes.txt" }, "ask", null],
     ["un chemin lu depuis le dossier du cd", "Bash", { command: "cd src && cat ../README.md" }, "allow", "run-reads"],
     ["un chemin qui sort depuis le dossier du cd", "Bash", { command: "cd src && cat ../../elsewhere.txt" }, "ask", null],
+    // Une option courte avec sa valeur collée : chaque valeur possible se lit comme un chemin.
+    ["une valeur collée, absolue", "Bash", { command: "grep -f/etc/hosts x" }, "ask", null],
+    ["une valeur collée, dans le dossier personnel", "Bash", { command: "grep -f~/notes.txt x" }, "ask", null],
+    ["une valeur collée qui remonte", "Bash", { command: "grep -f../elsewhere.txt x" }, "ask", null],
+    ["une valeur collée après d'autres options", "Bash", { command: "grep -rf/etc/hosts x" }, "ask", null],
+    ["une valeur collée dans la copie", "Bash", { command: "grep -fpatterns.txt src" }, "allow", "run-reads"],
+    ["un nombre collé", "Bash", { command: "head -n5 README.md" }, "allow", "run-reads"],
   ];
   for (const [label, tool, input, effect, rule] of cases) {
     it(`${label} -> ${effect}${rule ? ` (${rule})` : ""}`, () => {
@@ -206,6 +213,10 @@ describe("faits d'une action de Claude Code, jugés par la table par défaut", (
         return;
       }
       assert.equal(decideAll(defaults, toolFacts("Read", { file_path: join(work, "linked", "id_rsa") }, work)).effect, "ask");
+      // Le lien nommé tout seul, comme dossier d'un `cd`, ou collé à une option courte.
+      for (const command of ["ls linked", "cd linked && ls", "grep -flinked x"]) {
+        assert.equal(decideAll(defaults, toolFacts("Bash", { command }, work)).effect, "ask", command);
+      }
     } finally {
       rmSync(outside, { recursive: true, force: true });
     }

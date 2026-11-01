@@ -738,6 +738,28 @@
         "effect": "ask",
         "rule": null
       }
+    },
+    {
+      "name": "a short option with its value attached inside the copy stays allowed",
+      "facts": {
+        "action": "shell",
+        "command": "grep -fpatterns.txt src"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-reads"
+      }
+    },
+    {
+      "name": "a short option whose attached value leaves the copy is not bounded: no action, so it asks",
+      "facts": {
+        "tool": "Bash",
+        "command": "grep -f/etc/hosts x"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
     }
   ],
   "digest": {

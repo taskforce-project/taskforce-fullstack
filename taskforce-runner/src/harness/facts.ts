@@ -152,6 +152,17 @@ function pointsOutside(word: string, workDir: string, base: string): boolean {
   return word.startsWith("~") || !locate(workDir, word, base).bounded;
 }
 
+/**
+ * Une option courte peut porter sa valeur collée (`-fFICHIER`) : sans les options du programme, on ne sait pas où la
+ * valeur commence. Chaque suite possible après la première lettre se lit donc comme un chemin, comme la valeur d'une
+ * option `--clé=valeur` ; une seule qui sort de la copie suffit.
+ */
+function attachedOutside(word: string, workDir: string, base: string): boolean {
+  if (!/^-[^-]/.test(word)) return false;
+  for (let i = 2; i < word.length; i++) if (pointsOutside(word.slice(i), workDir, base)) return true;
+  return false;
+}
+
 /** Le dossier où mène `cd`, écrit en toutes lettres ; null sans cible unique (`cd` seul va au dossier personnel, `cd -` au précédent). */
 function cdTarget(args: string[]): string | null {
   const targets = args.slice(1).filter((w) => !/^-[LPe@]+$/.test(w));
@@ -168,7 +179,8 @@ function commandFacts(command: string, workDir: string, base: string | null): Fa
   const facts: Facts = { action: /^git commit( |$)/.test(command) ? "git.commit" : "shell", tool: "Bash", command };
   const args = words(command);
   const bounded = base !== null && !OPAQUE.test(command) && !expands(command)
-    && !(args[0] === "cd" && cdTarget(args) === null) && !args.some((w) => pointsOutside(w, workDir, base));
+    && !(args[0] === "cd" && cdTarget(args) === null)
+    && !args.some((w) => pointsOutside(w, workDir, base) || attachedOutside(w, workDir, base));
   return bounded ? [facts] : unbounded(facts);
 }
 
