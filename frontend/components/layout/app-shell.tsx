@@ -10,7 +10,6 @@ import { AppTopbar } from "@/components/layout/topbar/app-topbar"
 import { AccountDeletionBanner } from "@/components/account/account-deletion-banner"
 import { PanelDock } from "@/components/layout/panel-dock"
 import { CommandBar } from "@/components/agent/command-bar"
-import { AppFooter } from "@/components/layout/app-footer"
 import { SettingsModal } from "@/components/settings/settings-modal"
 import { CreateProjectModal } from "@/components/dialogs/create-project-modal"
 import { ProductTour } from "@/components/tour/product-tour"
@@ -58,13 +57,13 @@ export function AppShell({ children }: AppShellProps) {
               transition={{ duration: 0.20, ease: [0.16, 1, 0.3, 1] }}
             >
               {children}
-              {/* Footer dans le flux de scroll : révélé seulement quand on atteint le bas. */}
-              <AppFooter />
             </motion.main>
           </AnimatePresence>
           <PanelDock side="right" />
         </div>
-        {/* La barre unique (R76, séance n°13) : écrire ce qu'on veut faire, sur chaque écran. */}
+        {/* La barre unique (R76, séance n°13) : écrire ce qu'on veut faire, sur chaque écran. La conversation s'en
+            déplie et pousse l'écran vers le haut, sans le recouvrir (revue UX du 01/11/2026). Pas de pied de site
+            entre les deux : la version et les liens légaux sont dans le menu du compte. */}
         <CommandBar />
       </SidebarInset>
 

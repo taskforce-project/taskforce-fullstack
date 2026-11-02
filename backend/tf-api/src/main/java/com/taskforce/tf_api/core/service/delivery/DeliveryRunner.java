@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkType;
+import com.taskforce.tf_api.core.enums.IssueActivityType;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Issue;
@@ -26,6 +27,7 @@ import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.IssueGitHubLinkRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.IssueStatusRepository;
+import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.NotificationService;
 
 import lombok.RequiredArgsConstructor;
@@ -60,6 +62,7 @@ public class DeliveryRunner {
     private final NotificationService notificationService;
     private final IssueGitHubLinkRepository linkRepository;
     private final MissionEvidenceService evidenceService;
+    private final IssueService issueService;
 
     /** Adresse d'une pull request sur GitHub : le dépôt et le numéro. */
     private static final Pattern PULL_REQUEST =
@@ -246,7 +249,9 @@ public class DeliveryRunner {
 
     /**
      * La pull request ouverte par l'agent est liée à son ticket : elle apparaît dans l'onglet GitHub avec son statut, et
-     * sa fusion terminera le ticket. Une adresse qui n'est pas celle d'une PR de GitHub ne lie rien. Best-effort.
+     * sa fusion terminera le ticket. L'activité du ticket le dit, au nom de la personne qui a délégué, passé par son
+     * agent (« Claude Code opened pull request #1 »). Une adresse qui n'est pas celle d'une PR de GitHub ne lie rien.
+     * Best-effort.
      */
     private void linkPullRequest(DeliveryRun run) {
         try {
@@ -260,18 +265,27 @@ public class DeliveryRunner {
             if (linkRepository.existsByIssueIdAndRepoFullNameAndPrNumber(issue.getId(), repo, number)) {
                 return;
             }
+            String url = "https://github.com/" + repo + "/pull/" + number;
             linkRepository.save(IssueGitHubLink.builder()
                 .issue(issue)
                 .linkType(GitHubLinkType.PR)
                 .repoFullName(repo)
                 .prNumber(number)
-                .prUrl("https://github.com/" + repo + "/pull/" + number)
+                .prUrl(url)
                 .status(GitHubLinkStatus.OPEN)
                 .linkedBy(run.getStartedBy())
                 .build());
+            issueService.logActivity(issue, run.getStartedBy(), IssueActivityType.PULL_REQUEST_OPENED, null, url,
+                agentName(run));
         } catch (Exception e) {
             log.warn("Delivery run {} : pull request non liée à son ticket : {}", run.getId(), e.getMessage());
         }
+    }
+
+    /** Le nom affiché de l'agent du run (« Claude Code »), ou sa clé quand le registre ne le connaît plus. */
+    private String agentName(DeliveryRun run) {
+        DeliveryAgentProvider provider = registry.get(run.getProviderKey());
+        return provider != null ? provider.displayName() : run.getProviderKey();
     }
 
     private void failRun(DeliveryRun run, String error) {

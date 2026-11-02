@@ -94,9 +94,13 @@ class DeliverySessionFilterTest {
         return response;
     }
 
+    /** Session du run 100 : workspace acme, projet 12, issue 5. */
+    private static DeliverySession session() {
+        return new DeliverySession(100L, "acme", 12L, 5L, OWNER, "kc-7", "tf-runner-pierre", "Claude Code");
+    }
+
     private void sessionOpen() {
-        when(localRunnerService.openSession(eq(100L), any(RunnerIdentity.class)))
-            .thenReturn(new DeliverySession(100L, "acme", 12L, OWNER, "kc-7", "tf-runner-pierre"));
+        when(localRunnerService.openSession(eq(100L), any(RunnerIdentity.class))).thenReturn(session());
     }
 
     @Test
@@ -142,6 +146,9 @@ class DeliverySessionFilterTest {
         // Portée du run, que le serveur MCP de l'instance rejuge outil par outil (OSS-5.2).
         assertThat(delegated.getClaimAsString(DeliverySessionFilter.WORKSPACE_CLAIM)).isEqualTo("acme");
         assertThat(delegated.<Long>getClaim(DeliverySessionFilter.PROJECT_CLAIM)).isEqualTo(12L);
+        assertThat(delegated.<Long>getClaim(DeliverySessionFilter.ISSUE_CLAIM)).isEqualTo(5L);
+        // L'agent du run, que l'activité de l'issue garde avec ce qu'il y fait au nom du délégant.
+        assertThat(delegated.getClaimAsString(DeliverySessionFilter.AGENT_CLAIM)).isEqualTo("Claude Code");
         // Aucun claim du jeton machine n'est repris : ni rôle, ni propriétaire.
         assertThat(delegated.hasClaim("realm_access")).isFalse();
         assertThat(delegated.hasClaim("tf_runner_owner")).isFalse();
@@ -164,13 +171,39 @@ class DeliverySessionFilterTest {
     void runner_out_of_session_is_denied(String method, String path, String header) throws Exception {
         authenticate(runnerJwt());
         org.mockito.Mockito.lenient().when(localRunnerService.openSession(eq(100L), any(RunnerIdentity.class)))
-            .thenReturn(new DeliverySession(100L, "acme", 12L, OWNER, "kc-7", "tf-runner-pierre"));
+            .thenReturn(session());
 
         MockHttpServletResponse response = run(method, path, header);
 
         assertThat(response.getStatus()).isEqualTo(403);
         assertThat(proceeded).isFalse(); // la chaîne n'a pas été poursuivie
         assertThat(response.getContentAsString()).contains("\"success\":false");
+    }
+
+    /** R110 (séance n°16) : le runner écrit sur l'issue du run, ou crée une issue dans son projet ; rien d'autre. */
+    @ParameterizedTest(name = "écriture du runner : {0} {1} -> {2}")
+    @CsvSource({
+        "PATCH, /api/workspaces/acme/projects/12/issues/5,              200",   // l'issue du run : ses champs
+        "POST,  /api/workspaces/acme/projects/12/issues/5/comments,     200",   // ses commentaires
+        "PATCH, /api/workspaces/acme/projects/12/issues/5/checklist/31, 200",   // sa checklist
+        "POST,  /api/workspaces/acme/projects/12/issues,                200",   // une issue créée dans le projet du run
+        "PATCH, /api/workspaces/acme/projects/12/issues/6,              403",   // une autre issue du même projet
+        "POST,  /api/workspaces/acme/projects/12/issues/6/comments,     403",
+        "PATCH, /api/workspaces/acme/projects/12/issues/6/checklist/31, 403",
+        "POST,  /api/workspaces/acme/projects/99/issues,                403",   // un autre projet
+        "PATCH, /api/workspaces/acme/projects/99/issues/5,              403",
+    })
+    void runner_writes_only_to_the_issue_of_the_run(String method, String path, int status) throws Exception {
+        authenticate(runnerJwt());
+        sessionOpen();
+
+        MockHttpServletResponse response = run(method, path, "100");
+
+        assertThat(response.getStatus()).isEqualTo(status);
+        assertThat(proceeded.get()).isEqualTo(status == 200);
+        if (status == 200) {
+            assertThat(((Jwt) seenDownstream.get().getPrincipal()).getClaimAsString("email")).isEqualTo(OWNER);
+        }
     }
 
     @Test

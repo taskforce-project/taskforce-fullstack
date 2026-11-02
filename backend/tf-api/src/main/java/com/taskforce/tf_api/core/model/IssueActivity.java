@@ -69,6 +69,13 @@ public class IssueActivity {
     @Column(name = "new_value", length = 500)
     private String newValue;
 
+    /**
+     * L'agent par qui l'action est passée, ou null quand la personne a agi seule : {@code Cortex} quand elle a créé
+     * l'issue depuis la carte qu'il a préparée, {@code Claude Code} quand l'agent d'une mission a agi en son nom (V112).
+     */
+    @Column(length = 60)
+    private String via;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

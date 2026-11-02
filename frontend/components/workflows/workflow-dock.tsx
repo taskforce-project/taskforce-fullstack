@@ -10,13 +10,12 @@ import {
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
-import { AgentPlan } from "@/components/ui/agent-plan"
 import { BrandLogo } from "@/components/ui/brand-logo"
-import { ShimmerLoader } from "@/components/ui/shimmer-loader"
 import { Button } from "@/components/ui/button"
 import { WorkflowCanvasDialog } from "@/components/workflows/workflow-canvas-dialog"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePanelStore } from "@/lib/store/panel-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useWorkflowStore } from "@/lib/store/workflow-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import type { AnalysisJob, JobStatus } from "@/lib/api/analysis-service"
@@ -24,14 +23,6 @@ import type { DeliveryProvider, DeliveryRun, DeliveryRunStatus } from "@/lib/api
 import { parseServerDate } from "@/lib/utils/server-date"
 
 export const WORKFLOW_PANEL_ID = "workflows"
-
-/** Messages du loader pendant que le plan du workflow se génère (bouclés). */
-const WORKFLOW_PHASES = [
-  "Spinning up the agent…",
-  "Planning the steps…",
-  "Gathering context…",
-  "Almost ready…",
-]
 
 export const isActiveJob = (s: JobStatus) => s === "QUEUED" || s === "RUNNING" || s === "WAITING_FOR_INPUT"
 export const isActiveRun = (s: DeliveryRunStatus) => s === "QUEUED" || s === "RUNNING"
@@ -47,8 +38,14 @@ const STATUS: Record<JobStatus, { label: string; pill: string; Icon: typeof Load
 /** Une délégation refusée au départ par une règle : ce n'est pas une panne (R38). */
 const NOT_STARTED = { label: "Not started", pill: "text-muted-foreground bg-muted", Icon: Ban, spin: false }
 
+/**
+ * Une analyse de projet : son statut, la question du modèle quand il attend la personne, puis le résultat ou
+ * l'erreur. Le plan d'étapes figé qu'elle montrait est retiré (TF-J1-3) : le même pour toutes, personne ne
+ * pouvait le modifier.
+ */
 function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
   const router = useRouter()
+  const t = usePreferencesStore((s) => s.t.workflows)
   const { answer, dismissJob, launch } = useWorkflowStore()
   const [expanded, setExpanded] = useState(isActiveJob(job.status))
   const [reply, setReply] = useState("")
@@ -78,15 +75,12 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
       </button>
 
       {expanded && (
-        <div className="border-t border-border px-3 py-3">
-          {job.plan.length > 0 ? (
-            <AgentPlan tasks={job.plan} />
-          ) : (
-            <ShimmerLoader phrases={WORKFLOW_PHASES} className="px-1 py-2 text-xs" />
-          )}
+        <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
+          {job.status === "QUEUED" && <p className="text-xs text-muted-foreground">{t.analysisQueued}</p>}
+          {job.status === "RUNNING" && <p className="text-xs text-muted-foreground">{t.analysisRunning}</p>}
 
           {job.status === "WAITING_FOR_INPUT" && job.question && (
-            <div className="mt-2 rounded-lg border border-shape-yellow/35 bg-shape-yellow/[0.08] p-2.5">
+            <div className="rounded-lg border border-shape-yellow/35 bg-shape-yellow/[0.08] p-2.5">
               <p className="text-xs leading-relaxed text-foreground">🤖 {job.question}</p>
               <div className="mt-2 flex gap-1.5">
                 <input
@@ -104,24 +98,25 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
           )}
 
           {job.status === "FAILED" && job.error && (
-            <p className="mt-2 rounded-lg bg-destructive/[0.08] px-2.5 py-2 text-xs text-destructive">{job.error}</p>
+            <p className="rounded-lg bg-destructive/[0.08] px-2.5 py-2 text-xs text-destructive">{job.error}</p>
           )}
 
-          <div className="mt-3 flex items-center gap-1.5">
-            {job.status === "DONE" && (
-              <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={() => router.push(`/${slug}/analytics`)}>
-                View result
-              </Button>
-            )}
-            {job.status === "FAILED" && (
-              <Button
-                size="sm" variant="outline" className="h-7 gap-1.5 text-xs"
-                onClick={async () => { const j = await launch(slug, job.projectId, job.depth); if (!j) toast.error("Relaunch failed") }}
-              >
-                <RefreshCw className="size-3" /> Relaunch
-              </Button>
-            )}
-            {!isActiveJob(job.status) && (
+          {/* Un workflow actif n'a ni résultat ni bouton : il se suit par son statut. */}
+          {!isActiveJob(job.status) && (
+            <div className="flex items-center gap-1.5">
+              {job.status === "DONE" && (
+                <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={() => router.push(`/${slug}/analytics`)}>
+                  View result
+                </Button>
+              )}
+              {job.status === "FAILED" && (
+                <Button
+                  size="sm" variant="outline" className="h-7 gap-1.5 text-xs"
+                  onClick={async () => { const j = await launch(slug, job.projectId, job.depth); if (!j) toast.error("Relaunch failed") }}
+                >
+                  <RefreshCw className="size-3" /> Relaunch
+                </Button>
+              )}
               <button
                 type="button"
                 onClick={async () => {
@@ -133,8 +128,8 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
               >
                 <Trash2 className="size-3" /> Archive
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -228,7 +223,7 @@ function SectionLabel({ children, count }: Readonly<{ children: ReactNode; count
  * Contenu du panneau « Workflows IA » (le header/resize/close sont fournis par PanelDock).
  * Deux familles de travail IA, dans l'ordre où on les cherche : les <b>délégations</b> à un agent (une
  * issue confiée à Claude Code), historique compris, puis les <b>analyses</b> de projet, qui
- * tournent en arrière-plan (statut en direct, détail via {@link AgentPlan}, et le HITL).
+ * tournent en arrière-plan (statut en direct et le HITL ; sans plan d'étapes figé depuis TF-J1-3).
  * Les données sont chargées et rafraîchies par {@link WorkflowsButton}, monté en permanence.
  */
 export function WorkflowPanelContent() {

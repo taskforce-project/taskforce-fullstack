@@ -110,8 +110,8 @@ summary.
 and can use the tools you connect. Analytics are computed from your own board, without a spreadsheet.
 
 **Connect your tools.** GitHub links pull requests and commits to issues and keeps their status up to date. Slack
-sends notifications per channel and event. Any MCP server connects with one-click OAuth or a token, with 25 official
-servers listed (Linear, Jira, Notion, Sentry and more). Outgoing webhooks are signed with HMAC-SHA256 and retried.
+sends notifications per channel and event. Any MCP server connects with one-click OAuth or a token; the catalog lists
+the official servers tried end to end, Linear for now. Outgoing webhooks are signed with HMAC-SHA256 and retried.
 
 **Use the AI you choose.** A local model through Ollama, free and private, or any OpenAI-compatible API with your own
 key: OpenAI, Groq, Mistral, OpenRouter, LM Studio. Without AI, the board, Brain OS and analytics keep working.

@@ -21,6 +21,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkType;
+import com.taskforce.tf_api.core.enums.IssueActivityType;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueGitHubLink;
@@ -31,6 +32,7 @@ import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.IssueGitHubLinkRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.IssueStatusRepository;
+import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.NotificationService;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,6 +63,7 @@ class DeliveryRunnerTest {
     @Mock private NotificationService notificationService;
     @Mock private IssueGitHubLinkRepository linkRepository;
     @Mock private MissionEvidenceService evidenceService;
+    @Mock private IssueService issueService;
 
     @InjectMocks private DeliveryRunner runner;
 
@@ -246,22 +249,30 @@ class DeliveryRunnerTest {
     @DisplayName("la pull request d'un run terminé est liée à son ticket, au nom de la personne qui a délégué")
     void links_the_pull_request_to_its_issue(String url, String repo, Integer number) {
         User delegator = User.builder().id(9L).build();
-        finishedRun(delegator);
+        DeliveryRun run = finishedRun(delegator);
+        DeliveryAgentProvider claudeCode = mock(DeliveryAgentProvider.class);
+        when(claudeCode.displayName()).thenReturn("Claude Code");
+        when(registry.get("claude-code")).thenReturn(claudeCode);
 
         runner.complete(41L, new DeliveryPoll(DeliveryRunStatus.DONE, "PR opened", url, null));
 
         if (repo == null) {
             verify(linkRepository, never()).save(any());
+            verify(issueService, never()).logActivity(any(), any(), any(), any(), any(), any());
             return;
         }
+        String prUrl = "https://github.com/" + repo + "/pull/" + number;
         ArgumentCaptor<IssueGitHubLink> link = ArgumentCaptor.forClass(IssueGitHubLink.class);
         verify(linkRepository).save(link.capture());
         assertThat(link.getValue().getLinkType()).isEqualTo(GitHubLinkType.PR);
         assertThat(link.getValue().getRepoFullName()).isEqualTo(repo);
         assertThat(link.getValue().getPrNumber()).isEqualTo(number);
-        assertThat(link.getValue().getPrUrl()).isEqualTo("https://github.com/" + repo + "/pull/" + number);
+        assertThat(link.getValue().getPrUrl()).isEqualTo(prUrl);
         assertThat(link.getValue().getStatus()).isEqualTo(GitHubLinkStatus.OPEN);
         assertThat(link.getValue().getLinkedBy()).isEqualTo(delegator);
+        // L'activité du ticket le dit : « Claude Code opened pull request #12 », au nom de la personne qui a délégué.
+        verify(issueService).logActivity(run.getIssue(), delegator, IssueActivityType.PULL_REQUEST_OPENED, null, prUrl,
+            "Claude Code");
     }
 
     @Test
@@ -273,6 +284,19 @@ class DeliveryRunnerTest {
         runner.complete(41L, new DeliveryPoll(DeliveryRunStatus.DONE, "PR opened", "https://github.com/acme/web/pull/12", null));
 
         verify(linkRepository, never()).save(any());
+        verify(issueService, never()).logActivity(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("un agent que le registre ne connaît plus signe l'activité de sa clé")
+    void an_unknown_agent_signs_with_its_key() {
+        User delegator = User.builder().id(9L).build();
+        DeliveryRun run = finishedRun(delegator);
+
+        runner.complete(41L, new DeliveryPoll(DeliveryRunStatus.DONE, "PR opened", "https://github.com/acme/web/pull/12", null));
+
+        verify(issueService).logActivity(run.getIssue(), delegator, IssueActivityType.PULL_REQUEST_OPENED, null,
+            "https://github.com/acme/web/pull/12", "claude-code");
     }
 
     /** (libellé, provider « pull » ?, délai de réclamation en min, âge du run en min, lignes closes par l'UPDATE, clos ?) */
