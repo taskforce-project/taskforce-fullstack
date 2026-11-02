@@ -65,7 +65,7 @@ import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 /**
  * Les gestes sur une issue du MCP TaskForce (ADR-024, TF-J1-5) : changer ses champs, la déplacer, l'assigner, la
- * commenter, la confier à un agent, et lire où en est sa mission. Ils s'ajoutent une fois, ici, et servent à Cortex dans
+ * commenter, la confier à un agent, lire où en est sa mission, la supprimer. Ils s'ajoutent une fois, ici, et servent à Cortex dans
  * la conversation comme à un agent extérieur par le serveur MCP, avec les droits de la personne : chaque geste passe par
  * le même service que la route REST correspondante.
  *
@@ -527,6 +527,75 @@ public class IssueGestures {
         if (!there) throw new BusinessException("This comment on " + key + " no longer exists.");
         issueService.deleteComment(slug, projectId, issueId, commentId, userId);
         return "Removed the comment on " + key + ".";
+    }
+
+    // ------------------------------------------------------------------ supprimer
+
+    /**
+     * Ce qu'un geste qui se demande montre avant que la personne décide (rien n'est changé) ; null quand il n'a rien de
+     * plus à montrer que sa demande.
+     */
+    public Gesture preview(String tool, String slug, Long userId, JsonNode args) {
+        return "delete_issue".equals(tool) ? deletion(slug, userId, args) : null;
+    }
+
+    /**
+     * Ce qu'emporterait la suppression, dit avant qu'elle parte : ses commentaires, sa checklist, sa mission et le dossier
+     * de celle-ci. La carte de la conversation le montre, avec « Archive » d'abord, qui se défait, puis « Delete », qui ne
+     * se défait pas (TF-J1-5, test du CEO du 02/11/2026 : « supprime testta 2 » préparait une issue « Supprimer
+     * l'issue TESTTA-2 »). Ne change rien.
+     */
+    public Gesture deletion(String slug, Long userId, JsonNode args) {
+        Doomed doomed = doomed(slug, userId, args);
+        return new Gesture("Deleting " + named(doomed.issue()) + " removes it for good" + doomed.goesWith()
+            + ". Archiving hides it from the board and can be undone.", doomed.target(), List.of(), Map.of(), null);
+    }
+
+    /**
+     * Supprime l'issue, comme le menu de la fiche : ses commentaires, sa checklist et sa mission partent avec elle. Une
+     * mission au travail la garde : son agent écrit encore dessus.
+     */
+    public Gesture delete(String slug, Long userId, JsonNode args) {
+        Doomed doomed = doomed(slug, userId, args);
+        if (doomed.run() != null && ("QUEUED".equals(doomed.run().status()) || "RUNNING".equals(doomed.run().status()))) {
+            throw new BusinessException(doomed.issue().getIdentifier() + " has a mission at work: wait for its result, "
+                + "or discard it, before deleting the issue.");
+        }
+        issueService.deleteIssue(slug, requiredLong(args, "projectId"), doomed.issue().getId(), userId);
+        return new Gesture("Deleted " + named(doomed.issue()) + doomed.goesWith() + ".", doomed.target(), List.of(),
+            Map.of(), null);
+    }
+
+    /** L'issue qu'on supprimerait, et ce qui partirait avec elle. */
+    private record Doomed(IssueResponse issue, long projectId, int comments, int checklist, DeliveryRunResponse run) {
+
+        /** Ce qui part avec l'issue : « , with its 3 comments, its checklist of 2 items and its mission ». */
+        String goesWith() {
+            List<String> parts = new ArrayList<>();
+            if (comments > 0) parts.add(comments == 1 ? "its comment" : "its " + comments + " comments");
+            if (checklist > 0) parts.add("its checklist of " + checklist + (checklist == 1 ? " item" : " items"));
+            if (run != null) parts.add("its mission and the mission's record");
+            return parts.isEmpty() ? "" : ", with " + joined(parts);
+        }
+
+        /** L'issue telle que la carte la montre, avec ce qui partirait. */
+        Map<String, Object> target() {
+            Map<String, Object> target = ref(issue, projectId, run == null ? null : run.id());
+            target.put("comments", comments);
+            target.put("checklist", checklist);
+            if (run != null) target.put("mission", run.status());
+            target.put("archived", issue.isArchived());
+            return target;
+        }
+    }
+
+    private Doomed doomed(String slug, Long userId, JsonNode args) {
+        long projectId = requiredLong(args, "projectId");
+        long issueId = requiredLong(args, "issueId");
+        IssueResponse issue = issueService.getIssue(slug, projectId, issueId, userId);
+        return new Doomed(issue, projectId, issueService.listComments(slug, projectId, issueId, userId).size(),
+            issueService.listChecklist(slug, projectId, issueId, userId).size(),
+            deliveryService.latestRun(slug, issueId, userId).orElse(null));
     }
 
     // ------------------------------------------------------------------ confier à un agent, lire sa mission

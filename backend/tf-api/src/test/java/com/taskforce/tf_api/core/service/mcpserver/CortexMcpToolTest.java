@@ -61,9 +61,9 @@ class CortexMcpToolTest {
     @DisplayName("Cortex reçoit les gestes, chacun avec l'action que la table de règles juge")
     void cortex_gets_the_gestures_with_their_action() {
         assertThat(mcp.forCortex()).extracting(AgentTool::name)
-            .containsExactly("update_issue", "add_comment", "delegate_issue", "get_mission");
+            .containsExactly("update_issue", "add_comment", "delegate_issue", "delete_issue", "get_mission");
         assertThat(mcp.forCortex()).extracting(AgentTool::action)
-            .containsExactly("issue.update", "comment.create", "mission.start", "issue.read");
+            .containsExactly("issue.update", "comment.create", "mission.start", "issue.delete", "issue.read");
         assertThat(mcp.forCortex()).allMatch(CortexGesture.class::isInstance);
     }
 
@@ -104,6 +104,20 @@ class CortexMcpToolTest {
     }
 
     @Test
+    @DisplayName("la carte d'une suppression dit ce qui partirait, sans rien supprimer")
+    void the_card_of_a_deletion_says_what_goes() {
+        when(gestures.preview(eq("delete_issue"), eq("acme"), eq(7L), any())).thenReturn(new IssueGestures.Gesture(
+            "Deleting TF-12 removes it for good.", Map.of("issueId", 5, "comments", 2), List.of(), Map.of(), null));
+
+        CortexGesture.Done card = ((CortexGesture) tool("delete_issue")).preview(Map.of("issue", "TF-12"), ctx);
+
+        assertThat(card.text()).isEqualTo("Deleting TF-12 removes it for good.");
+        assertThat(card.target()).containsEntry("comments", 2);
+        assertThat(card.undo()).isNull();
+        org.mockito.Mockito.verify(gestures, org.mockito.Mockito.never()).delete(any(), any(), any());
+    }
+
+    @Test
     @DisplayName("le registre de Cortex ajoute les gestes à ses outils, qui gardent la priorité sur un nom partagé")
     void the_registry_adds_the_gestures_after_cortex_tools() {
         AgentTool own = mock(AgentTool.class);
@@ -113,6 +127,6 @@ class CortexMcpToolTest {
 
         assertThat(registry.get("update_issue")).isSameAs(own);
         assertThat(registry.get("delegate_issue")).isInstanceOf(CortexGesture.class);
-        assertThat(registry.all()).hasSize(4);
+        assertThat(registry.all()).hasSize(5);
     }
 }

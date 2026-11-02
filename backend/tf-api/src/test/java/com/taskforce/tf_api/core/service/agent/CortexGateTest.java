@@ -99,6 +99,7 @@ class CortexGateTest {
         "add_comment,    comment.create, allow, comment",
         "delegate_issue, mission.start,  allow, start-mission",
         "get_mission,    issue.read,     allow, read-issues",
+        "delete_issue,   issue.delete,   ask,   delete-issue",   // ne se défait pas : la personne confirme (R1)
     })
     void a_gesture_is_judged_on_the_action_it_carries(String name, String action, String effect, String ruleId) {
         AgentTool tool = internal(name);

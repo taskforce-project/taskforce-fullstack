@@ -18,6 +18,14 @@ public interface CortexGesture extends AgentTool {
     }
 
     /**
+     * Ce que montre la carte d'un geste qui se demande, avant que la personne décide (l'issue qu'on supprimerait, ce qui
+     * partirait avec elle) : une lecture, rien n'est changé. Null par défaut : la demande suffit.
+     */
+    default Done preview(Map<String, Object> args, AgentContext ctx) {
+        return null;
+    }
+
+    /**
      * @param text   ce que lit le modèle, et que la carte de l'outil montre
      * @param target l'issue que touche le geste ({@code issueId}, {@code projectId}, {@code key}, {@code title}, et
      *               {@code runId} de sa mission), que la conversation montre ; null sinon

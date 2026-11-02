@@ -31,6 +31,8 @@ export const TASKFORCE_TOOLS: Readonly<Record<string, string>> = {
   // Les gestes de la conversation (ADR-024) : confier une issue lance une mission, lire la sienne ne change rien.
   delegate_issue: "mission.start",
   get_mission: "issue.read",
+  // Supprimer une issue ne se défait pas : la règle delete-issue la demande.
+  delete_issue: "issue.delete",
 };
 
 /**

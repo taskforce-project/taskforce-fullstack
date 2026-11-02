@@ -39,7 +39,7 @@ import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 /**
  * Les outils du serveur MCP de l'instance (OSS-5.2) : lire le workspace (projets, issues, Brain OS, indicateurs),
  * changer une issue, la déplacer, l'assigner, la commenter, en cocher la checklist au fil du travail, la confier à un
- * agent et lire où en est sa mission, demander une recommandation d'assignation ou une réponse à Cortex.
+ * agent et lire où en est sa mission, la supprimer, demander une recommandation d'assignation ou une réponse à Cortex.
  *
  * <p>Chaque outil appelle le même service que la route REST correspondante, avec la personne du jeton (le sien, ou
  * celui de la personne qui a délégué) : les droits (projet privé, rôle en écriture) sont donc ceux de l'API, sans rien
@@ -64,7 +64,7 @@ public class TaskforceMcpTools {
      * Les gestes que Cortex fait dans la conversation (TF-J1-5). Ses lectures et la carte de l'issue qu'il prépare ont
      * encore leurs outils à lui, qui passeront ici à leur tour (ADR-024).
      */
-    static final List<String> CORTEX = List.of("update_issue", "add_comment", "delegate_issue", "get_mission");
+    static final List<String> CORTEX = List.of("update_issue", "add_comment", "delegate_issue", "get_mission", "delete_issue");
 
     private final ObjectMapper mapper;
     private final IssueGestures gestures;
@@ -239,6 +239,13 @@ public class TaskforceMcpTools {
                 false, "mission.start", "POST", args -> "delivery/issues/" + requiredLong(args, "issueId") + "/delegate",
                 (slug, userId, args) -> gestures.delegate(slug, userId, args)),
 
+            new McpTool("delete_issue", "Delete an issue",
+                "Delete an issue for good, with its comments, its checklist and its mission: it cannot be undone. To only "
+                    + "hide it from the board, archive it instead, which can be undone.",
+                issue(schema()).build(),
+                false, "issue.delete", "DELETE", args -> issuePath(args),
+                (slug, userId, args) -> gestures.delete(slug, userId, args)),
+
             new McpTool("get_mission", "Get the mission of an issue",
                 "Where the mission of an issue stands: waiting for the runner, at work, asking the person something, or done "
                     + "with a result to review. It decides nothing: the person answers on the cards.",
@@ -297,9 +304,14 @@ public class TaskforceMcpTools {
             .toList();
     }
 
-    /** L'issue d'un outil : sa clé, ou le couple projectId et issueId qu'un agent délégué connaît déjà. */
+    /**
+     * L'issue d'un outil : sa clé, ou le couple projectId et issueId qu'un agent délégué connaît déjà. Une issue nommée
+     * par sa colonne ou son titre (« celle qui est dans In review by AI ») se trouve d'abord par list_issues, qui filtre
+     * par colonne.
+     */
     private static SchemaBuilder issue(SchemaBuilder schema) {
-        return schema.string("issue", "The issue's key, like TF-12 (or pass projectId and issueId)", false)
+        return schema.string("issue", "The issue's key, like TF-12 (or pass projectId and issueId). For an issue named by "
+                + "its column or title, find its key with list_issues, which gives each issue's column", false)
             .integer("projectId", "Project id, with issueId, instead of issue", false)
             .integer("issueId", "Issue id, with projectId, instead of issue", false);
     }

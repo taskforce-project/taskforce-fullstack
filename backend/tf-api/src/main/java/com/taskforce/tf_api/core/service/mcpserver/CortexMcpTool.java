@@ -71,6 +71,12 @@ final class CortexMcpTool implements CortexGesture {
         return new Done(write(value), null, null);
     }
 
+    @Override public Done preview(Map<String, Object> args, AgentContext ctx) {
+        JsonNode resolved = gestures.withIds(ctx.slug(), ctx.userId(), mapper.valueToTree(args == null ? Map.of() : args));
+        IssueGestures.Gesture gesture = gestures.preview(tool.name(), ctx.slug(), ctx.userId(), resolved);
+        return gesture == null ? null : new Done(gesture.summary(), gesture.issue(), null);
+    }
+
     private String write(Object value) {
         try {
             return mapper.writeValueAsString(value);

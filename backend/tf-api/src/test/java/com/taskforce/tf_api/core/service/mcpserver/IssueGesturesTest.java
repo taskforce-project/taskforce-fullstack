@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -466,5 +467,57 @@ class IssueGesturesTest {
         assertThat(gesture.summary()).isEqualTo("TF-12 \"Fix login\" has no mission: nobody has delegated it to an agent yet.");
         assertThat(gesture.issue()).doesNotContainKey("runId");
         assertThat(gesture.forClient()).doesNotContainKey("mission");
+    }
+
+    // ------------------------------------------------------------------ supprimer (test du CEO du 02/11/2026)
+
+    private void doomed(String missionStatus) {
+        stubIssue(issue());
+        lenient().when(issueService.listComments("acme", 12L, 5L, ME)).thenReturn(List.of(
+            IssueCommentResponse.builder().id(1L).build(), IssueCommentResponse.builder().id(2L).build(),
+            IssueCommentResponse.builder().id(3L).build()));
+        lenient().when(issueService.listChecklist("acme", 12L, 5L, ME)).thenReturn(List.of(
+            com.taskforce.tf_api.core.dto.response.ChecklistItemResponse.builder().id(31L).build(),
+            com.taskforce.tf_api.core.dto.response.ChecklistItemResponse.builder().id(32L).build()));
+        lenient().when(deliveryService.latestRun("acme", 5L, ME))
+            .thenReturn(missionStatus == null ? Optional.empty() : Optional.of(run(missionStatus, null, false, null)));
+    }
+
+    @Test
+    @DisplayName("avant de supprimer, la carte dit ce qui partirait : les commentaires, la checklist, la mission")
+    void a_deletion_says_what_goes_with_the_issue() throws Exception {
+        doomed("DONE");
+
+        IssueGestures.Gesture preview = gestures.preview("delete_issue", "acme", ME, args("{\"projectId\": 12, \"issueId\": 5}"));
+
+        assertThat(preview.summary()).isEqualTo("Deleting TF-12 \"Fix login\" removes it for good, with its 3 comments, its "
+            + "checklist of 2 items and its mission and the mission's record. Archiving hides it from the board and can be "
+            + "undone.");
+        assertThat(preview.issue()).containsEntry("comments", 3).containsEntry("checklist", 2)
+            .containsEntry("mission", "DONE").containsEntry("archived", false).containsEntry("runId", 100L);
+        verify(issueService, never()).deleteIssue(any(), any(), any(), any());
+        // Les autres gestes n'ont rien de plus à montrer que leur demande.
+        assertThat(gestures.preview("delegate_issue", "acme", ME, args("{\"projectId\": 12, \"issueId\": 5}"))).isNull();
+    }
+
+    @Test
+    void the_person_s_click_deletes_and_the_answer_says_what_went() throws Exception {
+        doomed(null);
+
+        IssueGestures.Gesture gesture = gestures.delete("acme", ME, args("{\"projectId\": 12, \"issueId\": 5}"));
+
+        verify(issueService).deleteIssue("acme", 12L, 5L, ME);
+        assertThat(gesture.summary()).isEqualTo("Deleted TF-12 \"Fix login\", with its 3 comments and its checklist of 2 items.");
+        assertThat(gesture.undo()).isNull(); // ne se défait pas : c'est pourquoi la personne l'accorde d'abord
+    }
+
+    @ParameterizedTest(name = "mission {0} : l'issue reste")
+    @ValueSource(strings = {"QUEUED", "RUNNING"})
+    void an_issue_whose_mission_is_at_work_stays(String status) throws Exception {
+        doomed(status);
+
+        assertThatThrownBy(() -> gestures.delete("acme", ME, args("{\"projectId\": 12, \"issueId\": 5}")))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("TF-12 has a mission at work");
+        verify(issueService, never()).deleteIssue(any(), any(), any(), any());
     }
 }

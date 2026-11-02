@@ -1015,6 +1015,25 @@ class AgentServiceTest {
     }
 
     @Test
+    @DisplayName("« supprime TF-12 » : la règle delete-issue demande, et la carte dit ce qui partirait, sans rien supprimer")
+    void a_deletion_asks_and_shows_what_goes_with_the_issue() throws Exception {
+        modelCalls("delete_issue", "{\"issue\":\"TF-12\"}", "Check the card to delete TF-12.");
+        CortexGesture tool = gesture("delete_issue", "issue.delete");
+        Map<String, Object> target = Map.of("issueId", 5, "key", "TF-12", "title", "Fix login", "comments", 3);
+        when(tool.preview(any(), any())).thenReturn(new CortexGesture.Done("Deleting TF-12 \"Fix login\" removes it for "
+            + "good, with its 3 comments.", target, null));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Supprime TF-12");
+
+        AssistantToolCall call = answer.toolCalls().get(0);
+        assertThat(call.status()).isEqualTo("pending");
+        assertThat(call.target()).isEqualTo(target);
+        assertThat(call.output()).startsWith("Deleting TF-12 \"Fix login\" removes it for good").contains("waiting for their approval");
+        assertThat(call.ref()).isNull();
+        verify(tool, never()).perform(any(), any());
+    }
+
+    @Test
     @DisplayName("lire une mission se fait d'emblée : la réponse rend l'issue et sa mission, sans rien décider")
     void reading_a_mission_is_done_at_once() throws Exception {
         modelCalls("get_mission", "{\"issue\":\"TF-12\"}", "Claude Code asks to fetch nodejs.org.");

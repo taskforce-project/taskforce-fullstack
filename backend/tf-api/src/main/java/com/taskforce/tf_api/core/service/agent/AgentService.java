@@ -619,7 +619,9 @@ public class AgentService {
                             + "tool. Tell the user that an owner or admin has to make this change.";
                         status = "error";
                     } else {
-                        result = PROPOSED;
+                        // La carte dit ce que la personne accorde : l'issue qu'on supprimerait, ce qui partirait avec elle.
+                        done = preview(tool, argsJson);
+                        result = done == null ? PROPOSED : done.text() + " " + PROPOSED;
                         status = "pending";
                     }
                 } else if (PREPARED.contains(name)) {
@@ -655,6 +657,12 @@ public class AgentService {
             String ref = result(name, status, result, done == null ? null : done.undo());
             return new ToolOutcome(status, result, shown, "success".equals(status) ? ref : null,
                 done == null ? null : done.target());
+        }
+
+        /** Ce que montre la carte d'un geste demandé ; null pour un autre outil, ou un geste sans rien de plus à montrer. */
+        private CortexGesture.Done preview(AgentTool tool, String argsJson) throws JsonProcessingException {
+            if (!(tool instanceof CortexGesture gesture)) return null;
+            return gesture.preview(objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {}), ctx);
         }
 
         /** La demande, puis la décision des règles, au dossier avant tout effet : sans dossier, l'action ne part pas. */
@@ -755,7 +763,11 @@ public class AgentService {
           // décisions restent aux boutons des cartes, jamais à un « oui » écrit (R1).
           .append("To change an existing issue (its title, description, priority, column, assignee, labels, points, cycle ")
           .append("or due date), call update_issue with its key (like TF-12) and only the fields to change: it is done ")
-          .append("at once and the person can undo it. To comment on an issue, call add_comment. To hand an issue to ")
+          .append("at once and the person can undo it. When the person names an issue by its column or its title rather ")
+          .append("than its key, find its key first with list_issues, which filters by column. To comment on an issue, ")
+          .append("call add_comment. To delete or archive an issue, call delete_issue: it never deletes on its own, its ")
+          .append("card lets the person archive it (which can be undone) or delete it. Never prepare an issue to ask for ")
+          .append("a deletion. To hand an issue to ")
           .append("Claude Code, call delegate_issue: the person approves it on its card. When the person asks where a ")
           .append("mission stands, what an agent asks or what it produced, call get_mission: its cards let the person ")
           .append("answer a request or decide on the result. Never decide for the person, and never say that a request ")

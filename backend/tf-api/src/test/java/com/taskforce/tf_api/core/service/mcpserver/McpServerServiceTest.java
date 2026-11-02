@@ -154,14 +154,14 @@ class McpServerServiceTest {
     void tools_list_describes_every_tool() {
         JsonNode tools = call(user(), "tools/list", Map.of()).path("result").path("tools");
 
-        assertThat(tools).hasSize(15);
+        assertThat(tools).hasSize(16);
         for (JsonNode tool : tools) {
             assertThat(tool.path("inputSchema").path("type").asText()).isEqualTo("object");
             assertThat(tool.path("description").asText()).isNotBlank();
         }
         assertThat(tools.findValuesAsText("name"))
             .contains("get_issue", "add_comment", "brain_search", "ask_cortex", "check_checklist_item", "update_issue",
-                "delegate_issue", "get_mission");
+                "delegate_issue", "get_mission", "delete_issue");
     }
 
     @Test
@@ -172,7 +172,7 @@ class McpServerServiceTest {
         assertThat(tools.findValuesAsText("name")).doesNotContain("ask_cortex")
             .contains("get_issue", "add_comment", "check_checklist_item", "update_issue", "create_issue");
         // Confier une issue, lire une mission : jamais depuis la session d'une autre mission.
-        assertThat(tools.findValuesAsText("name")).doesNotContain("delegate_issue", "get_mission");
+        assertThat(tools.findValuesAsText("name")).doesNotContain("delegate_issue", "get_mission", "delete_issue");
     }
 
     @Test
