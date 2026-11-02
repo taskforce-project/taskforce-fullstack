@@ -390,6 +390,15 @@ export const CONSTANTS_EN = {
     },
   },
 
+  // AI Workflows panel: an analysis is followed by its status alone, without the fixed plan of steps (TF-J1-3).
+  workflows: {
+    analysisQueued: "Waiting to start.",
+    analysisRunning: "The analysis is running. Its result will show on the Intelligence page.",
+    // Banner of the decision board while an analysis of its project is under way.
+    analysisFollow: "Analysis running: follow it in AI Workflows",
+    analysisNeedsAnswer: "The AI needs a clarification from you: open AI Workflows",
+  },
+
   // My Work page
   settings: {
     title: "Settings",
