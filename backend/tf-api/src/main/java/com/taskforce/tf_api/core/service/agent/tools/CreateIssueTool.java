@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.service.agent.tools;
 
+import java.text.Normalizer;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -110,7 +112,8 @@ public class CreateIssueTool implements AgentTool {
         properties.put("checklist", Map.of("type", "array", "items", Map.of("type", "string"), "description",
             "The issue's checklist, one short line per item (optional), when the work has steps."));
         properties.put("assignee", Map.of("type", "string", "description",
-            "A member of the project, by name or email (optional), only when the request names who takes it. Several match: ask which one."));
+            "A project member by name or email (optional), only when the request names who takes it; \"me\" or \"moi\" "
+                + "is the person asking. Several match: ask which one."));
         properties.put("labels", Map.of("type", "array", "items", Map.of("type", "string"), "description",
             "Labels of the project, by name (optional), only existing ones that the request or the project calls for."));
         properties.put("points", Map.of("type", "integer", "description",
@@ -194,12 +197,20 @@ public class CreateIssueTool implements AgentTool {
      * quand la demande ne le dit pas, et la personne nommée, quand elle désigne plusieurs membres ou aucun. Cortex pose
      * alors une seule question courte au lieu de deviner. Le reste (priorité, labels, points, cycle) ne se demande
      * jamais : il reste à remplir sur la carte.
+     *
+     * <p>La carte montre le projet et l'assigné tels que le serveur les a résolus : la clé du projet, l'e-mail du
+     * membre. Elle relit ces valeurs parmi les projets et les membres ; « moi » ou une partie d'un nom n'y désignaient
+     * personne, et l'issue partait sans assigné (rejeu de la 1.8.0, 02/11/2026).</p>
      */
-    @Override public String prepare(Map<String, Object> args, AgentContext ctx) {
+    @Override public Prepared prepare(Map<String, Object> args, AgentContext ctx) {
         ProjectResolver.Resolution where = projects.resolve(args.get("project"), ctx);
-        if (!where.found()) return where.problem();
+        if (!where.found()) return Prepared.ask(where.problem());
         Found<ProjectMemberResponse> assignee = assignee(where.project(), text(args.get("assignee")), ctx);
-        return assignee.ok() ? null : assignee.problem();
+        if (!assignee.ok()) return Prepared.ask(assignee.problem());
+        Map<String, Object> shown = new LinkedHashMap<>(args);
+        if (where.project().getIdentifier() != null) shown.put("project", where.project().getIdentifier());
+        if (assignee.value() != null && assignee.value().getEmail() != null) shown.put("assignee", assignee.value().getEmail());
+        return Prepared.card(shown);
     }
 
     /** Une valeur nommée par Cortex, résolue parmi ce qui existe : la valeur, ou ce qu'il faut dire au modèle. */
@@ -218,12 +229,23 @@ public class CreateIssueTool implements AgentTool {
     }
 
     /**
-     * L'assigné, parmi les membres du projet : l'e-mail exact, puis le nom exact, puis une partie du nom ou le début de
-     * l'e-mail s'ils ne désignent qu'une personne. Plusieurs : la personne choisit ; aucun : les membres. Jamais inventé.
+     * L'assigné, parmi les membres du projet. D'abord la personne qui demande, quand Cortex la désigne : « moi », « me »,
+     * « je »… ou son propre nom (son nom, son prénom, son e-mail), sans question (rejeu de la 1.8.0, 02/11/2026). Puis
+     * l'e-mail exact, le nom exact, une partie du nom ou le début de l'e-mail s'ils ne désignent qu'une personne.
+     * Plusieurs : la personne choisit ; aucun : les membres. Jamais inventé.
      */
     Found<ProjectMemberResponse> assignee(ProjectResponse project, String asked, AgentContext ctx) {
         if (asked.isEmpty()) return Found.of(null);
         List<ProjectMemberResponse> members = projectService.listMembers(ctx.slug(), project.getId(), ctx.userId());
+        ProjectMemberResponse me = members.stream().filter(m -> Objects.equals(ctx.userId(), m.getUserId())).findFirst()
+            .orElse(null);
+        if (me != null && (SELF.contains(key(asked)) || ownName(me, asked))) return Found.of(me);
+        if (SELF.contains(key(asked))) {
+            return Found.problem("The person asking is not a member of " + project.getName() + ", so the issue can't be "
+                + "assigned to them. " + (members.isEmpty() ? "The project has no member yet."
+                    : "Its members are: " + listed(members, this::name) + ".")
+                + " Ask the person who should take it, or leave the assignee empty.");
+        }
         String wanted = asked.toLowerCase(Locale.ROOT);
         List<ProjectMemberResponse> byEmail = members.stream().filter(m -> wanted.equals(lower(m.getEmail()))).toList();
         if (byEmail.size() == 1) return Found.of(byEmail.get(0));
@@ -328,6 +350,34 @@ public class CreateIssueTool implements AgentTool {
 
     private static String lower(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Les mots de la personne qui demande, lus par {@link #key} : « moi-même » et « moi même » donnent « moimeme ». Cortex
+     * les recopie de la demande (« assignée à moi ») au lieu du nom de la personne.
+     */
+    private static final Set<String> SELF = Set.of("me", "myself", "moi", "moimeme", "i", "je");
+
+    /**
+     * Un nom sans la casse, les accents, les espaces ni la ponctuation : « To Do » et « todo », « Moi-même » et
+     * « moimeme » se valent.
+     */
+    static String key(String value) {
+        if (value == null) return "";
+        return Normalizer.normalize(value, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT)
+            .replaceAll("[^\\p{L}\\p{N}]", "");
+    }
+
+    /** La personne nommée par son nom, son prénom, son e-mail ou ce qui le précède : c'est elle qui demande. */
+    private static boolean ownName(ProjectMemberResponse me, String asked) {
+        String wanted = key(asked);
+        if (wanted.isEmpty()) return false;
+        String email = lower(me.getEmail());
+        String local = email.contains("@") ? email.substring(0, email.indexOf('@')) : email;
+        String full = me.getDisplayName() == null ? "" : me.getDisplayName().strip();
+        String first = full.isEmpty() ? "" : full.split("\\s+")[0];
+        return asked.strip().equalsIgnoreCase(email) || wanted.equals(key(local)) || wanted.equals(key(full))
+            || wanted.equals(key(first));
     }
 
     /** La première colonne de la catégorie Backlog ; sans elle, null : le service prend la colonne par défaut. */

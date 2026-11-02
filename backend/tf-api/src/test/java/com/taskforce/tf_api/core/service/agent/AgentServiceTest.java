@@ -489,8 +489,8 @@ class AgentServiceTest {
     @DisplayName("ce qui compte manque (une personne qui désigne plusieurs membres) : une question, pas de carte (R102)")
     void a_prepared_issue_that_lacks_what_matters_asks_first() throws Exception {
         AgentTool tool = stubInternalCall("create_issue");
-        when(tool.prepare(any(), any())).thenReturn("Several members of Website match \"Marie\": Marie Curie (marie@acme.dev), "
-            + "Marie Dupont (mdupont@acme.dev). Ask the person which one; do not pick one yourself.");
+        when(tool.prepare(any(), any())).thenReturn(AgentTool.Prepared.ask("Several members of Website match \"Marie\": "
+            + "Marie Curie (marie@acme.dev), Marie Dupont (mdupont@acme.dev). Ask the person which one; do not pick one yourself."));
 
         AssistantAnswer answer = service.run("acme", 7L, "Create an issue for Marie: fix the footer");
 
@@ -516,6 +516,21 @@ class AgentServiceTest {
         assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
             assertThat(call.status()).isEqualTo("pending");
             assertThat(call.output()).startsWith("Issue prepared as a card");
+            assertThat(call.input()).isEqualTo("{}"); // rien de résolu : les arguments de Cortex
+        });
+    }
+
+    @Test
+    @DisplayName("la carte montre ce que le serveur a résolu : « moi » devient l'e-mail de la personne (rejeu de la 1.8.0)")
+    void the_card_shows_the_arguments_the_server_resolved() throws Exception {
+        AgentTool tool = stubInternalCall("create_issue");
+        when(tool.prepare(any(), any())).thenReturn(AgentTool.Prepared.card(Map.of("assignee", "pierre@acme.dev")));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Create an issue in Website, assigned to me: fix the footer");
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
+            assertThat(call.status()).isEqualTo("pending");
+            assertThat(call.input()).isEqualTo("{\"assignee\":\"pierre@acme.dev\"}");
         });
     }
 

@@ -34,6 +34,7 @@ import com.taskforce.tf_api.core.service.CycleService;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
+import com.taskforce.tf_api.core.service.agent.AgentTool;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -329,6 +330,82 @@ class CreateIssueToolTest {
         assertThat(sent().getLabelIds()).containsExactly(41L, 42L);
     }
 
+    /** Les membres, avec un second Pierre : le prénom de la personne qui demande désignerait sinon deux membres. */
+    private static final List<ProjectMemberResponse> WITH_ANOTHER_PIERRE = List.of(
+        MEMBERS.get(0), MEMBERS.get(1), member(11L, "Pierre Dupont", "pdupont@acme.dev"));
+
+    @ParameterizedTest(name = "assignee « {0} » : la personne qui demande")
+    @CsvSource({
+        "moi", "Moi", "moi-même", "moi même", "me", "myself", "I", "je", // les mots de la personne (rejeu de la 1.8.0)
+        "Pierre",           // son prénom, même quand un autre membre le porte
+        "pierre michel",    // son nom
+        "pierre@acme.dev",  // son e-mail
+    })
+    void the_person_asking_is_me(String asked) {
+        when(issueService.listStatuses("acme", 3L, 7L)).thenReturn(COLUMNS);
+        when(projectService.listMembers("acme", 3L, 7L)).thenReturn(WITH_ANOTHER_PIERRE);
+        created("Backlog", null);
+
+        String out = tool().execute(Map.of("project", "TF", "title", "Rate limiting", "assignee", asked), CTX);
+
+        assertThat(sent().getAssigneeId()).isEqualTo(7L);
+        assertThat(out).contains(", assigned to Pierre Michel");
+    }
+
+    @ParameterizedTest(name = "assignee « {0} » : aucune question, la carte montre la personne qui demande")
+    @CsvSource({"moi", "me", "Pierre"})
+    void prepare_never_asks_who_i_am(String asked) {
+        when(projectService.listMembers("acme", 3L, 7L)).thenReturn(WITH_ANOTHER_PIERRE);
+
+        AgentTool.Prepared prepared = tool().prepare(Map.of("project", "TF", "title", "Rate limiting", "assignee", asked), CTX);
+
+        assertThat(prepared.asks()).isFalse();
+        // La carte relit l'assigné parmi les membres : l'e-mail du membre, jamais « moi ».
+        assertThat(prepared.args()).containsEntry("assignee", "pierre@acme.dev");
+        nothingCreated();
+    }
+
+    @ParameterizedTest(name = "projet « {0} », assignee « {1} » : la carte montre {2} et {3}")
+    @CsvSource(delimiter = '|', value = {
+        "taskforce | Curie          | TF | marie@acme.dev", // le nom du projet devient sa clé, une partie du nom l'e-mail
+        "TF        | linus          | TF | linus@acme.dev",
+        "API Plat  | marie@acme.dev | API | marie@acme.dev",
+    })
+    void prepare_shows_what_the_server_resolved(String project, String asked, String key, String email) {
+        when(projectService.listMembers(eq("acme"), any(), eq(7L))).thenReturn(MEMBERS);
+
+        AgentTool.Prepared prepared = tool().prepare(new HashMap<>(Map.of("project", project, "title", "Rate limiting",
+            "assignee", asked, "priority", "HIGH")), CTX);
+
+        assertThat(prepared.asks()).isFalse();
+        assertThat(prepared.args()).containsEntry("project", key).containsEntry("assignee", email)
+            .containsEntry("title", "Rate limiting").containsEntry("priority", "HIGH");
+    }
+
+    @Test
+    @DisplayName("« moi », sans être membre du projet : une question, les membres, rien d'assigné au hasard")
+    void me_outside_the_project_asks() {
+        when(issueService.listStatuses("acme", 3L, 7L)).thenReturn(COLUMNS);
+        when(projectService.listMembers("acme", 3L, 7L)).thenReturn(List.of(MEMBERS.get(1)));
+
+        String out = tool().execute(Map.of("project", "TF", "title", "Rate limiting", "assignee", "moi"), CTX);
+
+        assertThat(out).isEqualTo("The person asking is not a member of TaskForce, so the issue can't be assigned to "
+            + "them. Its members are: Marie Curie. Ask the person who should take it, or leave the assignee empty.");
+        nothingCreated();
+    }
+
+    @ParameterizedTest(name = "« {0} » se lit « {1} »")
+    @CsvSource({
+        "To Do,       todo",
+        "Moi-Même,    moimeme",
+        "'  In-Progress! ', inprogress",
+        "Élodie,      elodie",
+    })
+    void key_ignores_case_accents_spaces_and_punctuation(String value, String key) {
+        assertThat(CreateIssueTool.key(value)).isEqualTo(key);
+    }
+
     @Test
     @DisplayName("un label qui n'existe pas n'est jamais créé : rien de créé, les labels du projet")
     void an_unknown_label_is_never_invented() {
@@ -428,9 +505,10 @@ class CreateIssueToolTest {
         "Mobile | No project matches \"Mobile\".",
     })
     void prepare_asks_which_project(String project, String question) {
-        String asked = tool().prepare(Map.of("project", project, "title", "Rate limiting"), CTX);
+        AgentTool.Prepared asked = tool().prepare(Map.of("project", project, "title", "Rate limiting"), CTX);
 
-        assertThat(asked).startsWith(question).contains("ask the person");
+        assertThat(asked.asks()).isTrue();
+        assertThat(asked.question()).startsWith(question).contains("ask the person");
         nothingCreated();
     }
 
@@ -439,9 +517,9 @@ class CreateIssueToolTest {
     void prepare_asks_who_when_the_person_is_unclear(String assignee) {
         when(projectService.listMembers("acme", 3L, 7L)).thenReturn(MEMBERS);
 
-        String asked = tool().prepare(Map.of("project", "TF", "title", "Rate limiting", "assignee", assignee), CTX);
+        AgentTool.Prepared asked = tool().prepare(Map.of("project", "TF", "title", "Rate limiting", "assignee", assignee), CTX);
 
-        assertThat(asked).contains("\"" + assignee + "\"").contains("Ask the person");
+        assertThat(asked.question()).contains("\"" + assignee + "\"").contains("Ask the person");
         nothingCreated();
     }
 
@@ -450,10 +528,12 @@ class CreateIssueToolTest {
     void prepare_never_asks_about_optional_fields() {
         when(projectService.listMembers("acme", 3L, 7L)).thenReturn(MEMBERS);
 
-        String asked = tool().prepare(Map.of("project", "TF", "title", "Rate limiting", "assignee", "Marie Curie",
+        AgentTool.Prepared asked = tool().prepare(Map.of("project", "TF", "title", "Rate limiting", "assignee", "Marie Curie",
             "labels", List.of("does-not-exist"), "cycle", "Sprint 99", "points", "lots"), CTX);
 
-        assertThat(asked).isNull();
+        assertThat(asked.asks()).isFalse();
+        // Les champs facultatifs restent tels que Cortex les a écrits : la carte les relit parmi ce qui existe.
+        assertThat(asked.args()).containsEntry("labels", List.of("does-not-exist")).containsEntry("cycle", "Sprint 99");
         verify(projectService, never()).listLabels(any(), any(), any());
         verify(cycleService, never()).listCycles(any(), any(), any());
         nothingCreated();

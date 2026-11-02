@@ -73,6 +73,12 @@ describe("IssueDraftCard : l'issue que Cortex prépare (R78)", () => {
     expect(listProjectMembers).toHaveBeenCalledWith("acme", 3);
   });
 
+  it("shows the person asking when the server resolved \"me\" to their e-mail (replay of 1.8.0)", async () => {
+    render(<IssueDraftCard slug="acme" call={call({ project: "WEB", title: "T", assignee: "pierre@acme.dev" })} />);
+
+    await waitFor(() => expect(screen.getByText("Pierre Michel")).toBeTruthy());
+  });
+
   it("leaves empty, and editable, what the request does not say", async () => {
     render(<IssueDraftCard slug="acme" call={call({ project: "WEB", title: "Pricing page", assignee: "Marie" })} />);
 
