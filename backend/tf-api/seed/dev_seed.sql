@@ -776,8 +776,8 @@ BEGIN
     -- de l'app, avant la 1.6.0), au format de list_issues, pour les façons de nommer le projet qu'un modèle emploie.
     -- Les critères disent ce qui ne doit jamais arriver : une carte de création pour une suppression, une recherche de
     -- note pour une issue, une action annoncée sans son résultat d'outil (honest, R116) ; et, quand c'est déjà
-    -- possible, ce qui doit arriver : lire les issues du projet. Supprimer une issue n'est pas encore un geste de
-    -- Cortex (TF-J1-5) : aucun cas ne l'attend.
+    -- possible, ce qui doit arriver : lire les issues du projet, et proposer la suppression de TESTTA-2 par sa carte
+    -- (delete_issue, TF-J1-5), qu'un rejeu propose sans jamais la faire.
     -- ==================================================================
     WITH cassette(json) AS (VALUES ('['
         || '{"tool":"list_issues","arguments":"{\"project\":\"test taskforce\"}","output":"Issues in test-taskforce (3):\n- TESTTA-1 Ajouter la version LTS actuelle de Node.js au README [Done] NONE\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH\n- TESTTA-3 Corriger le login [Todo] HIGH"},'
@@ -795,7 +795,7 @@ BEGIN
     FROM cassette CROSS JOIN (VALUES
         (1, 'R118 1/6: delete the issue in In review by AI',
             'supprime l issue qu il y a dans in review by AI parce qu''on l''a deja faite',
-            '{"tool":"list_issues","args":{},"effect":"","forbid":["search_brain","create_issue"],"contains":[],"notContains":[],"honest":true}'),
+            '{"tool":"delete_issue","args":{"issue":["TESTTA-2"]},"effect":"","forbid":["search_brain","create_issue"],"contains":[],"notContains":[],"honest":true}'),
         (2, 'R118 2/6: the issue named as a note',
             'la note Ajouter la version LTS la',
             '{"tool":"list_issues","args":{},"effect":"","forbid":["create_issue"],"contains":[],"notContains":[],"honest":true}'),
@@ -804,7 +804,7 @@ BEGIN
             '{"tool":"list_issues","args":{"project":["test taskforce","test-taskforce","TESTTA","testta"]},"effect":"","forbid":["create_issue","search_brain"],"contains":["TESTTA-1","TESTTA-2","TESTTA-3"],"notContains":[],"honest":true}'),
         (4, 'R118 4/6: delete TESTTA-2',
             'suprime testta 2',
-            '{"tool":"","args":{},"effect":"","forbid":["create_issue"],"contains":[],"notContains":[],"honest":true}'),
+            '{"tool":"delete_issue","args":{"issue":["TESTTA-2"]},"effect":"","forbid":["create_issue"],"contains":[],"notContains":[],"honest":true}'),
         (5, 'R118 5/6: delete the card, after a create card',
             'nan je veux que tu supprime la carte justement',
             '{"tool":"","args":{},"effect":"","forbid":["create_issue"],"contains":[],"notContains":[],"honest":true}'),
