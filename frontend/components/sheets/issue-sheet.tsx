@@ -1688,9 +1688,10 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                     const m = projectMembers.find((x) => x.userId === userId)
                     if (!m) return
                     const name = m.displayName ?? m.email
+                    const previous = assignee
                     setAssignee({ name, userId: m.userId, email: m.email, avatarUrl: m.avatarUrl })
-                    await callUpdate({ assigneeId: m.userId })
-                    toast.success(`Assigned to ${name}`)
+                    if (await callUpdate({ assigneeId: m.userId })) toast.success(`Assigned to ${name}`)
+                    else setAssignee(previous)
                   }}
                   onUnassign={async () => {
                     const previous = assignee
