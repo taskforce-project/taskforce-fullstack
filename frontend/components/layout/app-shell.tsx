@@ -41,7 +41,7 @@ export function AppShell({ children }: AppShellProps) {
         {/* Bandeau de restauration en HAUT, dans le flux (sous la topbar) : il POUSSE le contenu au
             lieu de le masquer (l'ancienne barre fixe basse recouvrait les cartes). Nul hors suppression. */}
         {!IS_DESKTOP && <AccountDeletionBanner />}
-        {/* `relative` : les panneaux (workflows / chat IA) se positionnent en OVERLAY par-dessus le
+        {/* `relative` : les panneaux (AI Workflows) se positionnent en OVERLAY par-dessus le
             contenu (absolute). `overflow-hidden` : pendant le slide d'ouverture le panneau part hors
             écran à droite - sans clip ici, ça crée une barre de scroll horizontale transitoire qui
             « repousse » le contenu vers la gauche puis revient. On clippe donc à la source. */}
@@ -62,8 +62,9 @@ export function AppShell({ children }: AppShellProps) {
           <PanelDock side="right" />
         </div>
         {/* La barre unique (R76, séance n°13) : écrire ce qu'on veut faire, sur chaque écran. Elle flotte dans sa
-            propre bande, sans rien recouvrir ; la conversation s'ouvre au-dessus, en bulle, par-dessus l'écran
-            (02/11/2026). Pas de pied de site : la version et les liens légaux sont dans le menu du compte. */}
+            propre bande, sans rien recouvrir ; la conversation s'ouvre au-dessus, sans carte, son texte sur un
+            dégradé par-dessus l'écran, et ne va jamais sur le côté (02/11/2026). Pas de pied de site : la version et
+            les liens légaux sont dans le menu du compte. */}
         <CommandBar />
       </SidebarInset>
 

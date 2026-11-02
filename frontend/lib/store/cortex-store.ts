@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
 
 import { sendAgentMessage, type AssistantAnswer } from "@/lib/api/assistant-service";
 import {
@@ -10,8 +9,9 @@ import { getErrorMessage, getErrorStatus } from "@/lib/api/client";
 
 // ---------------------------------------------------------------------------
 // Store de la barre unique (R76, séance n°13) et de la conversation qu'elle ouvre. La conversation vit ici, pas dans
-// un composant : elle se déplie au-dessus de la barre, se replie, passe sur le côté et revient sans rien perdre
-// (revue UX du 01/11/2026). Un domaine = un store ; rien ne part tant que la personne n'envoie pas.
+// un composant : elle se déplie au-dessus de la barre et s'y replie sans rien perdre, d'un écran à l'autre (revue UX
+// du 01/11/2026). Depuis le 02/11/2026, elle est toujours en bas, jamais sur le côté : rien d'autre à retenir dans le
+// navigateur. Un domaine = un store ; rien ne part tant que la personne n'envoie pas.
 // ---------------------------------------------------------------------------
 
 export interface CortexTurn {
@@ -22,12 +22,6 @@ export interface CortexTurn {
   /** Tour spécial : plafond de tokens IA atteint, une carte d'information au lieu d'une réponse. */
   kind?: "quota";
 }
-
-/** Où se montre la conversation : dépliée depuis la barre (par défaut), ou épinglée dans le panneau de droite. */
-export type CortexPlace = "bar" | "side";
-
-/** Hauteur de la conversation dépliée, en pixels : par défaut, et ses bornes. */
-export const CORTEX_HEIGHT = { initial: 320, min: 200, max: 720 } as const;
 
 interface CortexState {
   /** Le texte de la barre, que la personne écrit ou qu'une suggestion remplit. */
@@ -43,13 +37,10 @@ interface CortexState {
   sentAt: number | null;
   /** Durée de la dernière réponse, en ms. */
   lastMs: number | null;
-  /** La conversation est montrée (dépliée au-dessus de la barre, ou dans le panneau de droite). */
+  /** La conversation est dépliée au-dessus de la barre. */
   open: boolean;
   /** Une réponse est arrivée pendant que la conversation était repliée. */
   unread: boolean;
-  place: CortexPlace;
-  /** Hauteur de la conversation dépliée au-dessus de la barre, en pixels. */
-  height: number;
 
   setDraft: (text: string) => void;
   /** L'espace affiché : en changer repart d'une conversation neuve, celle de l'autre espace reste dans son historique. */
@@ -64,8 +55,6 @@ interface CortexState {
   /** Supprime une conversation ; false en cas d'échec. */
   removeConversation: (slug: string, id: number) => Promise<boolean>;
   setOpen: (open: boolean) => void;
-  setPlace: (place: CortexPlace) => void;
-  setHeight: (height: number) => void;
 }
 
 let lastId = 0;
@@ -95,112 +84,93 @@ export function messagesToTurns(messages: ConversationMessage[]): CortexTurn[] {
   );
 }
 
-export function clampHeight(height: number): number {
-  return Math.round(Math.min(CORTEX_HEIGHT.max, Math.max(CORTEX_HEIGHT.min, height)));
-}
-
 const EMPTY_CONVERSATION = { turns: [], conversationId: null, tokens: 0, lastMs: null, unread: false };
 
-export const useCortexStore = create<CortexState>()(
-  persist(
-    (set, get) => ({
-      draft: "",
-      workspace: null,
-      ...EMPTY_CONVERSATION,
-      conversations: [],
-      sentAt: null,
-      open: false,
-      place: "bar",
-      height: CORTEX_HEIGHT.initial,
+export const useCortexStore = create<CortexState>()((set, get) => ({
+  draft: "",
+  workspace: null,
+  ...EMPTY_CONVERSATION,
+  conversations: [],
+  sentAt: null,
+  open: false,
 
-      setDraft: (text) => set({ draft: text }),
+  setDraft: (text) => set({ draft: text }),
 
-      enterWorkspace: (slug) => {
-        if (!slug || get().workspace === slug) return;
-        set({ ...EMPTY_CONVERSATION, conversations: [], workspace: slug });
-      },
+  enterWorkspace: (slug) => {
+    if (!slug || get().workspace === slug) return;
+    set({ ...EMPTY_CONVERSATION, conversations: [], workspace: slug });
+  },
 
-      send: async (slug) => {
-        const text = get().draft.trim();
-        if (!text || !slug || get().sentAt !== null) return false;
-        // Une conversation appartient à son espace : une demande d'un autre espace en ouvre une neuve.
-        get().enterWorkspace(slug);
-        const sentAt = Date.now();
-        set((s) => ({ draft: "", sentAt, open: true, unread: false, turns: [...s.turns, { id: nextId("u"), role: "user", text }] }));
-        try {
-          const res = await sendAgentMessage(slug, text, get().conversationId);
-          set((s) => ({
-            conversationId: res.conversationId,
-            tokens: s.tokens + (res.answer.usage?.totalTokens ?? 0),
-            turns: [...s.turns, { id: nextId("a"), role: "assistant", answer: res.answer }],
-          }));
-          void get().loadConversations(slug);
-          return true;
-        } catch (e) {
-          // 409 : le plafond de tokens de l'instance, une carte d'information plutôt qu'un « réessayez » trompeur.
-          // 429 : le frein de débit, avec sa limite et la vraie attente (R52). Le reste : un repli générique.
-          const status = getErrorStatus(e);
-          const turn: CortexTurn = status === 409
-            ? { id: nextId("a"), role: "assistant", kind: "quota" }
-            : {
-                id: nextId("a"), role: "assistant",
-                answer: fallbackAnswer(status === 429 ? getErrorMessage(e) : "Sorry, I couldn't answer. Please try again."),
-              };
-          set((s) => ({ turns: [...s.turns, turn] }));
-          return false;
-        } finally {
-          // Repliée pendant l'attente : la barre signale qu'une réponse attend d'être lue.
-          set((s) => ({ sentAt: null, lastMs: Date.now() - sentAt, unread: !s.open }));
-        }
-      },
+  send: async (slug) => {
+    const text = get().draft.trim();
+    if (!text || !slug || get().sentAt !== null) return false;
+    // Une conversation appartient à son espace : une demande d'un autre espace en ouvre une neuve.
+    get().enterWorkspace(slug);
+    const sentAt = Date.now();
+    set((s) => ({ draft: "", sentAt, open: true, unread: false, turns: [...s.turns, { id: nextId("u"), role: "user", text }] }));
+    try {
+      const res = await sendAgentMessage(slug, text, get().conversationId);
+      set((s) => ({
+        conversationId: res.conversationId,
+        tokens: s.tokens + (res.answer.usage?.totalTokens ?? 0),
+        turns: [...s.turns, { id: nextId("a"), role: "assistant", answer: res.answer }],
+      }));
+      void get().loadConversations(slug);
+      return true;
+    } catch (e) {
+      // 409 : le plafond de tokens de l'instance, une carte d'information plutôt qu'un « réessayez » trompeur.
+      // 429 : le frein de débit, avec sa limite et la vraie attente (R52). Le reste : un repli générique.
+      const status = getErrorStatus(e);
+      const turn: CortexTurn = status === 409
+        ? { id: nextId("a"), role: "assistant", kind: "quota" }
+        : {
+            id: nextId("a"), role: "assistant",
+            answer: fallbackAnswer(status === 429 ? getErrorMessage(e) : "Sorry, I couldn't answer. Please try again."),
+          };
+      set((s) => ({ turns: [...s.turns, turn] }));
+      return false;
+    } finally {
+      // Repliée pendant l'attente : la barre signale qu'une réponse attend d'être lue.
+      set((s) => ({ sentAt: null, lastMs: Date.now() - sentAt, unread: !s.open }));
+    }
+  },
 
-      loadConversations: async (slug) => {
-        if (!slug) return false;
-        try {
-          const conversations = await listConversations(slug);
-          set({ conversations });
-          return true;
-        } catch {
-          return false;
-        }
-      },
+  loadConversations: async (slug) => {
+    if (!slug) return false;
+    try {
+      const conversations = await listConversations(slug);
+      set({ conversations });
+      return true;
+    } catch {
+      return false;
+    }
+  },
 
-      openConversation: async (slug, id) => {
-        try {
-          const detail = await getConversation(slug, id);
-          set({
-            workspace: slug, turns: messagesToTurns(detail.messages), conversationId: detail.id,
-            tokens: detail.totalTokens, lastMs: null, unread: false,
-          });
-          return true;
-        } catch {
-          return false;
-        }
-      },
+  openConversation: async (slug, id) => {
+    try {
+      const detail = await getConversation(slug, id);
+      set({
+        workspace: slug, turns: messagesToTurns(detail.messages), conversationId: detail.id,
+        tokens: detail.totalTokens, lastMs: null, unread: false,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  },
 
-      newConversation: () => set({ ...EMPTY_CONVERSATION }),
+  newConversation: () => set({ ...EMPTY_CONVERSATION }),
 
-      removeConversation: async (slug, id) => {
-        try {
-          await deleteConversation(slug, id);
-        } catch {
-          return false;
-        }
-        if (get().conversationId === id) set({ ...EMPTY_CONVERSATION });
-        set((s) => ({ conversations: s.conversations.filter((c) => c.id !== id) }));
-        return true;
-      },
+  removeConversation: async (slug, id) => {
+    try {
+      await deleteConversation(slug, id);
+    } catch {
+      return false;
+    }
+    if (get().conversationId === id) set({ ...EMPTY_CONVERSATION });
+    set((s) => ({ conversations: s.conversations.filter((c) => c.id !== id) }));
+    return true;
+  },
 
-      setOpen: (open) => set(open ? { open, unread: false } : { open }),
-      setPlace: (place) => set({ place }),
-      setHeight: (height) => set({ height: clampHeight(height) }),
-    }),
-    {
-      // Seuls l'endroit et la hauteur choisis survivent au rechargement : une commodité de cette personne, sur ce
-      // navigateur. La conversation se relit depuis son historique, sur le serveur.
-      name: "tf-cortex-dock",
-      storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ place: state.place, height: state.height }),
-    },
-  ),
-);
+  setOpen: (open) => set(open ? { open, unread: false } : { open }),
+}));
