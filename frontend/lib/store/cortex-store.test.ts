@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 
-import { CORTEX_HEIGHT, clampHeight, messagesToTurns, useCortexStore } from "./cortex-store";
+import { messagesToTurns, useCortexStore } from "./cortex-store";
 import { sendAgentMessage, type AssistantAnswer } from "@/lib/api/assistant-service";
 import {
   deleteConversation, getConversation, listConversations, type ConversationSummary,
@@ -33,7 +33,7 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    useCortexStore.setState({ ...initial, draft: "", workspace: null, turns: [], conversations: [], open: false, place: "bar" });
+    useCortexStore.setState({ ...initial, draft: "", workspace: null, turns: [], conversations: [], open: false });
     vi.mocked(listConversations).mockResolvedValue([]);
   });
 
@@ -196,22 +196,13 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
     expect(useCortexStore.getState()).toMatchObject({ conversationId: null, tokens: 0, turns: [] });
   });
 
-  it("remembers where the conversation shows and how tall it is, and nothing else", () => {
-    useCortexStore.getState().setPlace("side");
-    useCortexStore.getState().setHeight(10_000);
+  it("keeps nothing in the browser, not even the draft", () => {
     useCortexStore.getState().setDraft("secret draft");
+    useCortexStore.getState().setOpen(true);
+    useCortexStore.getState().setOpen(false);
 
-    expect(useCortexStore.getState().height).toBe(CORTEX_HEIGHT.max);
-    // localStorage est simulé par la configuration des tests : on lit ce que le store y a écrit en dernier.
-    const writes = vi.mocked(localStorage.setItem).mock.calls.filter(([key]) => key === "tf-cortex-dock");
-    const saved = JSON.parse(writes.at(-1)?.[1] ?? "{}") as { state?: Record<string, unknown> };
-    expect(saved.state).toEqual({ place: "side", height: CORTEX_HEIGHT.max });
-  });
-
-  it("keeps the height between its bounds", () => {
-    expect(clampHeight(10)).toBe(CORTEX_HEIGHT.min);
-    expect(clampHeight(412.6)).toBe(413);
-    expect(clampHeight(5000)).toBe(CORTEX_HEIGHT.max);
+    // localStorage est simulé par la configuration des tests : la conversation, toujours en bas, n'y écrit plus rien.
+    expect(localStorage.setItem).not.toHaveBeenCalled();
   });
 
   it("reads an answer without a mode as a fast one", () => {
