@@ -248,6 +248,8 @@ describe("faits d'une action de Claude Code, jugés par la table par défaut", (
     ["mcp__taskforce__list_issues", false],
     ["mcp__taskforce__brain_search", false],
     ["mcp__taskforce__ask_cortex", false],
+    ["mcp__taskforce__get_mission", false],
+    ["mcp__taskforce__delegate_issue", false],
     ["mcp__taskforce__constructor", false],
     ["mcp__linear__save_issue", false],
     ["Edit", false],
