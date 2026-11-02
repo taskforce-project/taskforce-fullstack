@@ -54,4 +54,5 @@ The tools act with your rights: a project you cannot see stays invisible, and a 
 refused.
 
 When you delegate an issue to Claude Code through the [local runner](/guides/coding-agents), the agent uses this same
-server, with a session limited to the run.
+server, with a session limited to the run: it reads the workspace, creates issues in the delegated issue's project, and
+changes only the delegated issue. Any other change is refused.

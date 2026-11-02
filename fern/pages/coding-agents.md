@@ -51,6 +51,9 @@ the first time it needs it.
   the issue keeps its assignee.
 - The agent checks each item of the issue's checklist once it has done its work, and only those. The issue's activity
   keeps what it did in your name ("Claude Code checked …", "Claude Code opened pull request #1"), then your decision.
+- In TaskForce, the agent changes only the issue you delegated (its fields, its column, its checklist, its comments),
+  and may create issues in the same project. After 30 changes in a run, each further change waits for your **Allow**;
+  **Allow for this mission** stops asking until the run ends. The runner's `agent.maxTaskForceChanges` sets the number.
 - When the agent is done, the runner pushes the branch and opens the pull request, then posts the summary on the
   issue.
 - A project without a repository works too: Claude Code then delivers its work as a comment on the issue.
