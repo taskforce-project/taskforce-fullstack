@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  sendAgentMessage, sendAssistantMessage, isApprovable, isMission, isPreparedIssue, isQuestion, approveAction, isUndoable, undoAction,
+  sendAgentMessage, sendAssistantMessage, isApprovable, isDeletion, isMission, isPreparedIssue, isQuestion, approveAction, isUndoable,
+  undoAction,
   type AssistantToolCall,
 } from './assistant-service';
 import { apiClient } from './client';
@@ -212,5 +213,15 @@ describe('assistant-service: the mission of an issue in the conversation (TF-J1-
     ['an answer from before the gestures', call({ target: undefined }), false],
   ])('isMission: %s -> %s', (_label, toolCall, expected) => {
     expect(isMission(toolCall)).toBe(expected);
+  });
+
+  it.each([
+    ['a deletion Cortex asks for, with what goes with the issue', call({ name: 'delete_issue', status: 'pending', record: 'r' }), true],
+    ['a deletion without the record of its answer', call({ name: 'delete_issue', status: 'pending', record: null }), false],
+    ['a deletion already done', call({ name: 'delete_issue', status: 'success', record: 'r' }), false],
+    ['another proposal', call({ name: 'delegate_issue', status: 'pending', record: 'r' }), false],
+    ['a deletion whose issue the server did not find', call({ name: 'delete_issue', status: 'pending', record: 'r', target: null }), false],
+  ])('isDeletion: %s -> %s', (_label, toolCall, expected) => {
+    expect(isDeletion(toolCall)).toBe(expected);
   });
 });

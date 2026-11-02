@@ -42,6 +42,11 @@ export interface AssistantTarget {
   key: string | null
   title: string
   runId?: number | null
+  /** Pour une suppression demandée : ce qui partirait avec l'issue, et si elle est déjà archivée. */
+  comments?: number
+  checklist?: number
+  mission?: string | null
+  archived?: boolean
 }
 /** Ce que devient une action accordée : faite, refusée par les règles de l'espace (elles ont pu changer), ou en échec. */
 export interface AssistantActionResult {
@@ -167,6 +172,15 @@ const MISSION_TOOLS = new Set(["delegate_issue", "get_mission"])
  */
 export function isMission(call: AssistantToolCall): call is AssistantToolCall & { target: AssistantTarget } {
   return call.status === "success" && MISSION_TOOLS.has(call.name) && typeof call.target?.issueId === "number"
+}
+
+/**
+ * Une suppression que Cortex demande (TF-J1-5, test du CEO du 02/11/2026) : la règle delete-issue la demande, et sa carte
+ * propose d'abord d'archiver, qui se défait, puis de supprimer. Seul le clic de la personne supprime (R1).
+ */
+export function isDeletion(call: AssistantToolCall): call is AssistantToolCall & { target: AssistantTarget } {
+  return call.name === "delete_issue" && call.status === "pending" && Boolean(call.record)
+    && typeof call.target?.issueId === "number"
 }
 
 /** Variante texte (compat) : renvoie seulement la réponse markdown. */

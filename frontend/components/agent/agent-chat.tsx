@@ -12,8 +12,8 @@ import {
 import { Markdown } from "@/components/ui/lightweight-markdown"
 import { cn } from "@/lib/utils"
 import {
-  approveAction, isApprovable, isMission, isPreparedIssue, isQuestion, isUndoable, type AssistantActionResult, type AssistantAnswer,
-  type AssistantToolCall,
+  approveAction, isApprovable, isDeletion, isMission, isPreparedIssue, isQuestion, isUndoable, type AssistantActionResult,
+  type AssistantAnswer, type AssistantToolCall,
 } from "@/lib/api/assistant-service"
 import { getErrorMessage } from "@/lib/api/client"
 import { getMcpServers } from "@/lib/api/integration-service"
@@ -24,6 +24,7 @@ import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { CortexUsage } from "./cortex-usage"
+import { DeleteIssueCard } from "./delete-issue-card"
 import { EvalCaseButton } from "./eval-case-dialog"
 import { IssueDraftCard } from "./issue-draft-card"
 import { MissionInChat } from "./mission-in-chat"
@@ -458,6 +459,10 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
         // Une issue que Cortex a préparée : la carte la montre, la personne la modifie et la crée (R78).
         isPreparedIssue(tc) ? (
           <IssueDraftCard key={i} slug={slug} call={tc} />
+        ) :
+        // Une suppression demandée : archiver d'abord, qui se défait, ou supprimer, d'un clic de la personne (R1).
+        isDeletion(tc) ? (
+          <DeleteIssueCard key={i} slug={slug} call={tc} target={tc.target} />
         ) : (
           <div key={i}>
             <Tool name={tc.name} status={tc.status as ToolStatus} input={tc.input ?? undefined} output={tc.output ?? undefined} />
