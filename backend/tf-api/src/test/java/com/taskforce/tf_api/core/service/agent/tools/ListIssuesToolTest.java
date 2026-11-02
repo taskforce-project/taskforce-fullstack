@@ -1,5 +1,7 @@
 package com.taskforce.tf_api.core.service.agent.tools;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -186,5 +188,49 @@ class ListIssuesToolTest {
     void empty_message() {
         when(issueService.listMyIssues("acme", 7L)).thenReturn(List.of());
         assertThat(tool().execute(Map.of(), CTX)).isEqualTo("No issue assigned to you.");
+    }
+
+    // ------------------------------------------------------------------ « qu'est-ce qui a changé » (R117)
+
+    private static IssueResponse dated(Long id, String key, String status, int createdDaysAgo, Integer changedDaysAgo) {
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        IssueResponse issue = issue(id, key, "Issue " + key, status, IssueStatusCategory.COMPLETED, 3L, "TaskForce", null);
+        issue.setCreatedAt(now.minusDays(createdDaysAgo).minusHours(1));
+        issue.setUpdatedAt(changedDaysAgo == null ? null : now.minusDays(changedDaysAgo).minusHours(1));
+        return issue;
+    }
+
+    @Test
+    @DisplayName("changedInDays : les issues créées ou changées depuis, les dernières d'abord, avec ce qui a changé")
+    void what_changed_in_the_last_days() {
+        when(issueService.listIssues("acme", 3L, 7L)).thenReturn(List.of(
+            dated(1L, "TF-1", "Done", 30, 20),     // changé il y a trois semaines : hors de la semaine
+            dated(2L, "TF-2", "Done", 30, 2),      // déplacée cette semaine
+            dated(3L, "TF-3", "Todo", 1, null),    // créée hier
+            dated(4L, "TF-4", "Todo", 40, null))); // ni créée ni changée cette semaine
+
+        String out = tool().execute(Map.of("project", "TF", "changedInDays", 7), CTX);
+
+        assertThat(out).startsWith("Issues in TaskForce created or changed in the last 7 days (2):")
+            .containsPattern("TF-3 Issue TF-3 \\[Todo\\] HIGH, created \\d{4}-\\d{2}-\\d{2}")
+            .containsPattern("TF-2 Issue TF-2 \\[Done\\] HIGH, changed \\d{4}-\\d{2}-\\d{2}")
+            .doesNotContain("TF-1 ", "TF-4 ");
+        assertThat(out.indexOf("TF-3")).isLessThan(out.indexOf("TF-2")); // la plus récente d'abord
+    }
+
+    @ParameterizedTest(name = "changedInDays {0} : refusé")
+    @CsvSource({"0", "91", "-3", "soon"})
+    void a_bad_number_of_days_is_refused(String days) {
+        assertThat(tool().execute(Map.of("project", "TF", "changedInDays", days), CTX))
+            .isEqualTo("changedInDays must be a whole number of days, from 1 to 90.");
+        verify(issueService, never()).listIssues(any(), any(), any());
+    }
+
+    @Test
+    void nothing_changed_says_so() {
+        when(issueService.listIssues("acme", 3L, 7L)).thenReturn(List.of(dated(4L, "TF-4", "Todo", 40, null)));
+
+        assertThat(tool().execute(Map.of("project", "TF", "changedInDays", 1), CTX))
+            .isEqualTo("No issue in TaskForce created or changed in the last day.");
     }
 }
