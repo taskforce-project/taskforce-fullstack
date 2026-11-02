@@ -1001,6 +1001,20 @@ class AgentServiceTest {
     }
 
     @Test
+    @DisplayName("un geste qui n'a rien changé n'a pas d'Undo : la carte n'en montre pas un qui échouerait")
+    void a_gesture_that_changed_nothing_has_no_undo() throws Exception {
+        modelCalls("update_issue", "{\"issue\":\"TF-12\",\"assignee\":\"moi\"}", "TF-12 is already yours.");
+        CortexGesture tool = gesture("update_issue", "issue.update");
+        when(tool.perform(any(), any())).thenReturn(new CortexGesture.Done("TF-12 \"Fix login\" already has these values: "
+            + "nothing changed.", Map.of("issueId", 5), null));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Assigne TF-12 a moi");
+
+        assertThat(answer.toolCalls().get(0).status()).isEqualTo("success");
+        assertThat(answer.toolCalls().get(0).ref()).isNull();
+    }
+
+    @Test
     @DisplayName("confier l'issue à un agent ne se défait pas d'ici : Cortex le demande, même quand les règles le permettent")
     void a_gesture_that_cannot_be_undone_asks() throws Exception {
         modelCalls("delegate_issue", "{\"issue\":\"TF-12\"}", "I propose to hand TF-12 to Claude Code.");
@@ -1085,6 +1099,6 @@ class AgentServiceTest {
 
         assertThat(result.status()).isEqualTo("success");
         assertThat(result.target()).containsEntry("runId", 100);
-        assertThat(result.ref()).isEqualTo("hash");
+        assertThat(result.ref()).isNull(); // une mission lancée ne se défait pas : aucun Undo à nommer
     }
 }

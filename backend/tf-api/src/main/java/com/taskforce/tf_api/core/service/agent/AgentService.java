@@ -155,8 +155,18 @@ public class AgentService {
             throw e;
         }
         String ref = traceAfter(record, toolName, status, output, done == null ? null : done.undo());
-        return new AssistantActionResult(toolName, status, output, "success".equals(status) ? ref : null,
+        return new AssistantActionResult(toolName, status, output, undoable(tool, status, done) ? ref : null,
             done == null ? null : done.target());
+    }
+
+    /**
+     * Un résultat que « Undo » peut nommer : une création réussie, ou un geste qui a gardé de quoi se défaire. Un geste qui
+     * n'a rien changé (« already has these values ») ou une lecture n'en a pas : la carte ne montre pas d'Undo qui
+     * échouerait (vérification du 02/11/2026).
+     */
+    private static boolean undoable(AgentTool tool, String status, CortexGesture.Done done) {
+        if (!"success".equals(status)) return false;
+        return !(tool instanceof CortexGesture) || (done != null && done.undo() != null);
     }
 
     /**
@@ -656,7 +666,7 @@ public class AgentService {
                 done = null;
             }
             String ref = result(name, status, result, done == null ? null : done.undo());
-            return new ToolOutcome(status, result, shown, "success".equals(status) ? ref : null,
+            return new ToolOutcome(status, result, shown, undoable(tool, status, done) ? ref : null,
                 done == null ? null : done.target());
         }
 

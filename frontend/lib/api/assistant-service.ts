@@ -145,9 +145,14 @@ export async function approveAction(slug: string, call: AssistantToolCall): Prom
  */
 const UNDOABLE = new Set(["create_project", "create_issue", "create_note", "update_issue", "add_comment"])
 
+/** Les gestes sur une issue : le serveur ne leur donne une empreinte que s'ils ont changé quelque chose à défaire. */
+const GESTURES = new Set(["update_issue", "add_comment"])
+
 /** Ce que Cortex vient de faire, et dont le dossier permet de le défaire. */
 export function isUndoable(call: AssistantToolCall): boolean {
-  return call.status === "success" && Boolean(call.record) && UNDOABLE.has(call.name)
+  if (call.status !== "success" || !call.record || !UNDOABLE.has(call.name)) return false
+  // « TF-12 already has these values » n'a rien à défaire : pas d'Undo qui échouerait.
+  return !GESTURES.has(call.name) || Boolean(call.ref)
 }
 
 /**
