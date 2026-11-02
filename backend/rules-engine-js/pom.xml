@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Le moteur de règles de backend/tf-api, compilé en JavaScript pour le runner (R90, voie b ; ADR-025 ; TF-J1-1).
+
+  Les sources du moteur sont lues en place dans backend/tf-api, jamais copiées : RulesEngine, RulesBundle, Glob et
+  RulesDigest (les décisions, les motifs, l'empreinte d'un paquet), CanonicalJson et EvidenceChain (le JSON canonique et
+  la chaîne du dossier de preuve). Ce module n'ajoute que l'adaptateur JavaScript (RulesEngineJs, JsValues) et les deux
+  classes du JDK que la bibliothèque de TeaVM n'a pas (MessageDigest, HexFormat), fournies par substitution.
+
+    mvn -B process-classes     (dans ce dossier, avec Java 21 ; sans JDK, dans maven:3.9-eclipse-temurin-21)
+      -> taskforce-runner/src/harness/engine/rules-engine.js, un module ES2015, et rules-engine.d.ts, ses déclarations.
+
+  Les deux fichiers sont versionnés avec le runner, qui se construit et tourne sans JDK. La CI les régénère et refuse
+  un écart (.github/workflows/rules-engine.yml).
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.taskforce</groupId>
+  <artifactId>rules-engine-js</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+  <name>rules-engine-js</name>
+  <description>The rules engine of tf-api, compiled to JavaScript by TeaVM for the runner</description>
+
+  <licenses>
+    <license>
+      <name>GNU Affero General Public License v3.0</name>
+      <url>https://www.gnu.org/licenses/agpl-3.0.html</url>
+    </license>
+  </licenses>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <teavm.version>0.16.0</teavm.version>
+    <!-- Le Jackson 2 du backend (jackson-bom de backend/tf-api/pom.xml) : la CI vérifie que les deux sont égaux. -->
+    <jackson2.version>2.21.4</jackson2.version>
+    <backend.sources>${project.basedir}/../tf-api/src/main/java</backend.sources>
+    <runner.engine>${project.basedir}/../../taskforce-runner/src/harness/engine</runner.engine>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.fasterxml.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>${jackson2.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-classlib</artifactId>
+      <version>${teavm.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-extension-spi</artifactId>
+      <version>${teavm.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-jso</artifactId>
+      <version>${teavm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>3.6.1</version>
+        <executions>
+          <execution>
+            <id>backend-engine</id>
+            <phase>generate-sources</phase>
+            <goals><goal>add-source</goal></goals>
+            <configuration>
+              <sources><source>${backend.sources}</source></sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.14.1</version>
+        <configuration>
+          <!-- Du backend, seulement le moteur ; le reste de ses sources n'est pas compilé ici. -->
+          <includes>
+            <include>com/taskforce/rules_engine_js/**</include>
+            <include>com/taskforce/tf_api/core/harness/rules/RulesEngine.java</include>
+            <include>com/taskforce/tf_api/core/harness/rules/RulesBundle.java</include>
+            <include>com/taskforce/tf_api/core/harness/rules/Glob.java</include>
+            <include>com/taskforce/tf_api/core/harness/rules/RulesDigest.java</include>
+            <include>com/taskforce/tf_api/core/harness/evidence/CanonicalJson.java</include>
+            <include>com/taskforce/tf_api/core/harness/evidence/EvidenceChain.java</include>
+          </includes>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.teavm</groupId>
+        <artifactId>teavm-maven-plugin</artifactId>
+        <version>${teavm.version}</version>
+        <executions>
+          <execution>
+            <id>rules-engine</id>
+            <phase>process-classes</phase>
+            <goals><goal>compile</goal></goals>
+            <configuration>
+              <mainClass>com.taskforce.rules_engine_js.RulesEngineJs</mainClass>
+              <targetType>JAVASCRIPT</targetType>
+              <targetDirectory>${runner.engine}</targetDirectory>
+              <targetFileName>rules-engine.js</targetFileName>
+              <jsModuleType>ES2015</jsModuleType>
+              <optimizationLevel>ADVANCED</optimizationLevel>
+              <minifying>true</minifying>
+              <stopOnErrors>true</stopOnErrors>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>3.3.1</version>
+        <executions>
+          <!-- Les déclarations TypeScript du module, à côté de lui dans le runner. -->
+          <execution>
+            <id>rules-engine-declarations</id>
+            <phase>process-classes</phase>
+            <goals><goal>copy-resources</goal></goals>
+            <configuration>
+              <outputDirectory>${runner.engine}</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/src/main/typescript</directory>
+                  <includes><include>rules-engine.d.ts</include></includes>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

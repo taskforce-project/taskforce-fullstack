@@ -4,8 +4,8 @@ import type { AddressInfo } from "node:net";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import type { Approval, AskedBy, Ruling } from "./api.js";
+import { decide, decideAll, type Decision, type Facts, type Rule, type RulesBundle } from "./harness/engine/rules-engine.js";
 import { changesTaskForce, toolFacts } from "./harness/facts.js";
-import { decide, decideAll, type Decision, type Facts, type Rule, type RulesBundle } from "./harness/rules.js";
 import { log } from "./log.js";
 import { describeToolInput, toolLabel } from "./stream.js";
 

@@ -22,7 +22,7 @@ import { askInTaskForce } from "./approvals.js";
 import { loadConfig, type RepoConfig, type RunnerConfig } from "./config.js";
 import { exitFacts, judgeExit, type ExitVerdict } from "./exits.js";
 import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWorktree, repoVisibility, resolveRepo, runSetup, type Worktree } from "./git.js";
-import { verifiedBundle } from "./harness/rules.js";
+import { verifiedBundle } from "./harness/verify.js";
 import { log } from "./log.js";
 import { resolveCommand, run } from "./proc.js";
 import { agentProblem, PROBLEM_TEXT, Readiness, signedIn, type AgentProblem } from "./readiness.js";
