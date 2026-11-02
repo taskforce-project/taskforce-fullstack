@@ -36,6 +36,8 @@ class DeliverySessionScopeTest {
         "POST,  /api/workspaces/acme/projects/12/issues/5/comments",
         "PUT,   /api/workspaces/acme/projects/12/issues/5",
         "post,  /api/workspaces/acme/projects/12/issues/5/comments",
+        // Cocher une ligne de la checklist (check_checklist_item), ce que l'agent a fait
+        "PATCH, /api/workspaces/acme/projects/12/issues/5/checklist/31",
         // Serveur MCP de l'instance : chaque outil y est rejugé sur son équivalent REST
         "POST,  /api/workspaces/acme/mcp",
         "GET,   /api/workspaces/acme/mcp",
@@ -67,6 +69,7 @@ class DeliverySessionScopeTest {
         // Écriture hors des issues du projet du run
         "POST,  /api/workspaces/acme/projects/99/issues",
         "PATCH, /api/workspaces/acme/projects/99/issues/5",
+        "PATCH, /api/workspaces/acme/projects/99/issues/5/checklist/31",
         "POST,  /api/workspaces/acme/projects/123/issues",
         "POST,  /api/workspaces/acme/projects/12/issues-bulk",
         "PATCH, /api/workspaces/acme/projects/12",

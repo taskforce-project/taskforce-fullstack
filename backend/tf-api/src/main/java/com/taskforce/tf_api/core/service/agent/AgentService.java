@@ -445,6 +445,17 @@ public class AgentService {
         + "edits it and creates it. Do not call this tool again; say in one sentence that the card is ready to review, "
         + "and do not say that the issue exists.";
 
+    /**
+     * Ce qui manque pour préparer la carte, que seule la personne peut dire (le projet, la personne nommée) : rien ne se
+     * montre, Cortex pose une seule question courte (R102 : « pas chiant à remplir »). Statut du résultat : la carte
+     * n'attend rien, la question suit dans la réponse.
+     */
+    static final String QUESTION = "question";
+
+    private static final String QUESTION_TEXT = " No card is shown yet. Ask the person one short question with the "
+        + "choices, then prepare the card with the answer. Do not ask about anything else: the other fields stay editable "
+        + "on the card.";
+
     private static String refusedText(CortexGate.Verdict verdict) {
         return "Not run: the rules of this workspace refuse it. " + verdict.reason()
             + " Do not try again; tell the user why it was not done.";
@@ -574,8 +585,11 @@ public class AgentService {
                         status = "pending";
                     }
                 } else if (PREPARED.contains(name)) {
-                    result = PREPARED_TEXT;
-                    status = "pending";
+                    // Avant la carte, ce que seule la personne peut dire : sinon une question, et aucune carte.
+                    String missing = tool.prepare(objectMapper.readValue(argsJson,
+                        new TypeReference<Map<String, Object>>() {}), ctx);
+                    result = missing == null ? PREPARED_TEXT : missing + QUESTION_TEXT;
+                    status = missing == null ? "pending" : QUESTION;
                 } else {
                     Map<String, Object> args = objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {});
                     result = tool.execute(args, ctx);
@@ -673,11 +687,15 @@ public class AgentService {
           .append("server can still be connected there. Never make data up. ")
           .append("Today is ").append(today.format(TODAY)).append(" (UTC). ")
           .append("When the person asks for an issue, prepare it with create_issue: it becomes a card the person ")
-          .append("checks, edits and creates. Fill what the request and the project justify: a title, a short ")
-          .append("description, subtasks when the work has steps. Place it in time from its goal: read the project's ")
-          .append("columns and active cycle, keep it in the Backlog unless the work must start now, and set a due date ")
-          .append("only when the goal or the person gives one. When the project is unclear, ask the person, with the ")
-          .append("choices, before preparing anything. ");
+          .append("checks, edits and creates. Fill only what the request or the project says: a title, a short ")
+          .append("description, a checklist when the work has steps; a priority, an assignee (a member of the project), ")
+          .append("labels (existing ones), points or a cycle (an existing one) only when the request or the project ")
+          .append("gives them. Leave the rest empty: the person fills it on the card. Place it in time from its goal: ")
+          .append("read the project's columns, active cycle, labels and members with list_projects, keep it in the ")
+          .append("Backlog unless the work must start now, and set a due date only when the goal or the person gives ")
+          .append("one. Ask one short question, with the choices, before preparing the card only when what matters is ")
+          .append("unclear: the request does not say which project and there are several, or it names a person who ")
+          .append("matches several members. Never ask about the other fields: they stay editable on the card. ");
         if (!external.isEmpty()) {
             String names = external.stream().map(AgentTool::name).collect(Collectors.joining(", "));
             sb.append("External tools are connected (MCP servers): ").append(names).append(". ")

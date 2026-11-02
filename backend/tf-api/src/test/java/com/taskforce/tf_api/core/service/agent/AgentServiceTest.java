@@ -486,6 +486,60 @@ class AgentServiceTest {
     }
 
     @Test
+    @DisplayName("ce qui compte manque (une personne qui désigne plusieurs membres) : une question, pas de carte (R102)")
+    void a_prepared_issue_that_lacks_what_matters_asks_first() throws Exception {
+        AgentTool tool = stubInternalCall("create_issue");
+        when(tool.prepare(any(), any())).thenReturn("Several members of Website match \"Marie\": Marie Curie (marie@acme.dev), "
+            + "Marie Dupont (mdupont@acme.dev). Ask the person which one; do not pick one yourself.");
+
+        AssistantAnswer answer = service.run("acme", 7L, "Create an issue for Marie: fix the footer");
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
+            // Ni « pending » (la carte), ni une erreur : la question suit dans la réponse.
+            assertThat(call.status()).isEqualTo(AgentService.QUESTION);
+            assertThat(call.output()).startsWith("Several members of Website match \"Marie\"")
+                .contains("Ask the person one short question with the choices")
+                .contains("the other fields stay editable on the card");
+            assertThat(call.record()).isEqualTo(RECORD.toString());
+        });
+        verify(tool, never()).execute(any(), any());
+    }
+
+    @Test
+    @DisplayName("rien ne manque : la carte, sans question")
+    void a_prepared_issue_with_what_matters_shows_the_card() throws Exception {
+        AgentTool tool = stubInternalCall("create_issue");
+        when(tool.prepare(any(), any())).thenReturn(null);
+
+        AssistantAnswer answer = service.run("acme", 7L, "Create an issue in Website: fix the footer");
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
+            assertThat(call.status()).isEqualTo("pending");
+            assertThat(call.output()).startsWith("Issue prepared as a card");
+        });
+    }
+
+    @Test
+    @DisplayName("les consignes de Cortex : ne remplir que ce qui est dit, une seule question sur ce qui compte")
+    void the_instructions_ask_only_about_what_matters() throws Exception {
+        stubInternalCall("create_issue");
+
+        service.run("acme", 7L, "Create an issue: fix the footer");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Map<String, Object>>> messages = ArgumentCaptor.forClass(List.class);
+        verify(llm, Mockito.atLeastOnce()).rawChat(messages.capture(), anyList(), anyString());
+        String system = String.valueOf(messages.getAllValues().get(0).get(0).get("content"));
+        assertThat(system)
+            .contains("Fill only what the request or the project says")
+            .contains("an assignee (a member of the project)")
+            .contains("Ask one short question, with the choices, before preparing the card only when what matters is unclear")
+            .contains("matches several members")
+            .contains("Never ask about the other fields")
+            .doesNotContainIgnoringCase("subtask");
+    }
+
+    @Test
     @DisplayName("tracer avant d'agir : la demande puis la décision au dossier avant l'outil, le résultat après")
     void every_tool_is_recorded_before_it_runs() throws Exception {
         AgentTool tool = stubInternalCall("create_project");

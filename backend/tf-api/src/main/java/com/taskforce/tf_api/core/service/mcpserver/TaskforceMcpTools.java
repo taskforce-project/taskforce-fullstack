@@ -5,6 +5,7 @@ import static com.taskforce.tf_api.core.service.mcpserver.McpArgs.optionalEnum;
 import static com.taskforce.tf_api.core.service.mcpserver.McpArgs.optionalInt;
 import static com.taskforce.tf_api.core.service.mcpserver.McpArgs.optionalLong;
 import static com.taskforce.tf_api.core.service.mcpserver.McpArgs.optionalString;
+import static com.taskforce.tf_api.core.service.mcpserver.McpArgs.requiredBoolean;
 import static com.taskforce.tf_api.core.service.mcpserver.McpArgs.requiredLong;
 import static com.taskforce.tf_api.core.service.mcpserver.McpArgs.requiredString;
 
@@ -23,6 +24,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
+import com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueRequest;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
 import com.taskforce.tf_api.core.enums.IssuePriority;
@@ -35,7 +37,8 @@ import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 
 /**
  * Les outils du serveur MCP de l'instance (OSS-5.2) : lire le workspace (projets, issues, Brain OS, indicateurs),
- * commenter et faire avancer une issue, demander une recommandation d'assignation ou une réponse à Cortex.
+ * commenter et faire avancer une issue, en cocher la checklist au fil du travail, demander une recommandation
+ * d'assignation ou une réponse à Cortex.
  *
  * <p>Chaque outil appelle le même service que la route REST correspondante, avec la personne du jeton (le sien, ou
  * celui de la personne qui a délégué) : les droits (projet privé, rôle en écriture) sont donc ceux de l'API, sans rien
@@ -80,17 +83,23 @@ public class TaskforceMcpTools {
                     () -> issueService.listIssues(slug, requiredLong(args, "projectId"), userId))),
 
             new McpTool("get_issue", "Get issue with context",
-                "Read one issue with its context: title, full description, status, priority, assignee, due date, and the "
-                    + "comment thread from oldest to newest. Call it first when you work on a task: it is the specification "
-                    + "and the discussion around it.",
+                "Read one issue with its context: title, full description, status, priority, assignee, due date, its "
+                    + "checklist (each item with its id and whether it is done), and the comment thread from oldest to newest. "
+                    + "Call it first when you work on a task: it is the specification and the discussion around it.",
                 schema().integer("projectId", "Project id", true).integer("issueId", "Issue id", true).build(),
                 true, "GET", args -> issuePath(args),
                 (slug, userId, args) -> {
                     long projectId = requiredLong(args, "projectId");
                     long issueId = requiredLong(args, "issueId");
                     var issue = issueService.getIssue(slug, projectId, issueId, userId);
+                    var checklist = issueService.listChecklist(slug, projectId, issueId, userId);
                     var comments = issueService.listComments(slug, projectId, issueId, userId);
-                    return Map.of("issue", issue, "commentCount", comments.size(), "comments", comments);
+                    Map<String, Object> out = new LinkedHashMap<>();
+                    out.put("issue", issue);
+                    out.put("checklist", checklist);
+                    out.put("commentCount", comments.size());
+                    out.put("comments", comments);
+                    return out;
                 }),
 
             new McpTool("list_issue_statuses", "List issue statuses",
@@ -178,6 +187,22 @@ public class TaskforceMcpTools {
                     }
                     return issueService.updateIssue(slug, requiredLong(args, "projectId"), requiredLong(args, "issueId"),
                         request, userId);
+                }),
+
+            new McpTool("check_checklist_item", "Check a checklist item",
+                "Check or uncheck one item of the issue's checklist, by its id from get_issue. Check an item when you have "
+                    + "done its work, and only then: the person reads the checklist to see where the task stands.",
+                schema().integer("projectId", "Project id", true)
+                    .integer("issueId", "Issue id", true)
+                    .integer("itemId", "Checklist item id, from get_issue", true)
+                    .bool("done", "true to check the item, false to uncheck it", true)
+                    .build(),
+                false, "PATCH", args -> issuePath(args) + "/checklist/" + requiredLong(args, "itemId"),
+                (slug, userId, args) -> {
+                    UpdateChecklistItemRequest request = new UpdateChecklistItemRequest();
+                    request.setDone(requiredBoolean(args, "done"));
+                    return issueService.updateChecklistItem(slug, requiredLong(args, "projectId"),
+                        requiredLong(args, "issueId"), requiredLong(args, "itemId"), userId, request);
                 }),
 
             new McpTool("add_comment", "Add comment",
@@ -269,6 +294,10 @@ public class TaskforceMcpTools {
 
         SchemaBuilder string(String name, String description, boolean mandatory) {
             return property(name, "string", description, mandatory);
+        }
+
+        SchemaBuilder bool(String name, String description, boolean mandatory) {
+            return property(name, "boolean", description, mandatory);
         }
 
         SchemaBuilder priority() {

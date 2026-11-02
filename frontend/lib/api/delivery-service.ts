@@ -48,6 +48,8 @@ export interface DeliveryRun {
   /** Refusée au départ par une règle (FAILED pour la file) : l'écran dit « Not started », pas une panne (R38). */
   refused?: boolean;
   startedById: number | null;
+  /** Le nom de la personne qui a délégué (son e-mail sans nom) : l'issue montre l'agent qui travaille pour elle. */
+  startedByName?: string | null;
   createdAt: string | null;
   updatedAt: string | null;
   /** Le travail commencé (le runner a pris la mission) et fini : la durée de la carte de résultat (R78). */

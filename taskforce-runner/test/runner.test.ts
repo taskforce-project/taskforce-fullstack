@@ -317,6 +317,13 @@ describe("textes produits", () => {
     assert.match(buildPrompt({ ...claim, description: null }, "b"), /rely on get_issue/);
   });
 
+  it("le brief demande de cocher chaque ligne de la checklist faite, et seulement celles-là", () => {
+    for (const prompt of [buildPrompt(claim, "b"), buildReplyPrompt(claim)]) {
+      assert.match(prompt, /check it with check_checklist_item/);
+      assert.match(prompt, /Check only the items you completed/);
+    }
+  });
+
   it("corps de PR : les faits du runner, puis le résumé de l'agent sous son nom (R49)", () => {
     const body = pullRequestBody(claim, {
       facts: ["Pushed the branch `tf/web-12-fix-r42` (1 commit): allowed by the rule push-agent-branch-private.",

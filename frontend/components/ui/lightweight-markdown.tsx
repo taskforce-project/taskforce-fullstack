@@ -15,6 +15,8 @@ import {
 export interface MarkdownProps {
   content: string
   className?: string
+  /** Titres à la taille du texte, pour un rendu dans une petite carte (les mots de l'agent sur la carte de résultat). */
+  compact?: boolean
   onWikiLink?: (title: string) => void
   onTag?: (tag: string) => void
   /**
@@ -261,9 +263,11 @@ function parseBlocks(content: string): Block[] {
 }
 
 const H_CLS = ["text-xl font-bold", "text-lg font-semibold", "text-base font-semibold", "text-sm font-semibold"]
+const H_CLS_COMPACT = ["font-semibold text-foreground", "font-semibold text-foreground", "font-medium text-foreground", "font-medium text-foreground"]
 
 export function Markdown(props: MarkdownProps) {
   const { content, className } = props
+  const headings = props.compact ? H_CLS_COMPACT : H_CLS
   const blocks = parseBlocks(content)
   const inl = (s: string, k: string) => renderInline(s, k, props)
   return (
@@ -292,7 +296,7 @@ export function Markdown(props: MarkdownProps) {
             </blockquote>
           )
         }
-        if (b.type === "h") return <p key={i} className={H_CLS[Math.min(b.level, 4) - 1]}>{inl(b.text, `h${i}`)}</p>
+        if (b.type === "h") return <p key={i} className={headings[Math.min(b.level, 4) - 1]}>{inl(b.text, `h${i}`)}</p>
         if (b.type === "tasks") {
           const boxCls = (checked: boolean) =>
             `mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border transition-colors ${checked ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40"}`

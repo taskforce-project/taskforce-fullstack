@@ -182,11 +182,16 @@ function IssueCard({
   statuses,
   onStatusChange,
   onOpen,
+  arrived = false,
+  onArrived,
 }: {
   readonly issue: Issue
   readonly statuses: IssueStatus[]
   readonly onStatusChange: (issueId: number, statusId: number) => void
   readonly onOpen: (issue: Issue) => void
+  /** L'issue vient d'arriver sur le board : la carte s'allume une fois. */
+  readonly arrived?: boolean
+  readonly onArrived?: () => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `card-${issue.id}`,
@@ -202,10 +207,12 @@ function IssueCard({
       tabIndex={0}
       onClick={() => onOpen(issue)}
       onKeyDown={(e) => e.key === "Enter" && onOpen(issue)}
+      onAnimationEnd={arrived ? onArrived : undefined}
       className={cn(
         "group/card rounded-lg border border-border bg-card p-3 shadow-xs transition-all cursor-grab active:cursor-grabbing",
         // Le clone suit le curseur via <DragOverlay> ; on laisse un placeholder estompe en place
-        isDragging ? "opacity-40" : "hover:border-primary/30 hover:shadow-md"
+        isDragging ? "opacity-40" : "hover:border-primary/30 hover:shadow-md",
+        arrived && "card-arrive"
       )}
     >
       {/* Priorite + labels */}
@@ -354,6 +361,8 @@ function BoardColumn({
   onChangeColor,
   onOpenIssue,
   isOver,
+  arrivedId,
+  onArrived,
   t,
 }: {
   readonly status: IssueStatus
@@ -367,6 +376,8 @@ function BoardColumn({
   readonly onChangeColor: (statusId: number, color: string) => void
   readonly onOpenIssue: (issue: Issue) => void
   readonly isOver: boolean
+  readonly arrivedId: number | null
+  readonly onArrived: () => void
   readonly t: (k: string) => string
 }) {
   const [editing, setEditing] = useState(false)
@@ -471,26 +482,24 @@ function BoardColumn({
             statuses={statuses}
             onStatusChange={onStatusChange}
             onOpen={onOpenIssue}
+            arrived={issue.id === arrivedId}
+            onArrived={onArrived}
           />
         ))}
 
-        {issues.length === 0 && (
-          <div className="flex items-center justify-center rounded-lg border border-dashed border-border/60 p-5">
-            <p className="text-xs text-muted-foreground/60">{t("projects.detail.noIssues")}</p>
-          </div>
-        )}
+        {/* Ajouter une issue dans la colonne (statut pré-rempli), juste après sa dernière carte : une colonne vide
+            montre le geste sous son titre, au lieu d'un cadre « vide » et d'un bouton tout en bas (revue UX du
+            01/11/2026). Le compteur de l'en-tête dit déjà qu'elle est vide. */}
+        <CreateIssueDialog projectId={projectId} workspaceSlug={workspaceSlug} defaultStatusId={status.id}>
+          <button
+            type="button"
+            className="flex h-control-sm w-full shrink-0 items-center gap-1.5 px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-black/[0.03] hover:text-foreground dark:hover:bg-white/[0.05]"
+          >
+            <Plus className="size-3.5" aria-hidden />
+            {t("projects.detail.addIssue")}
+          </button>
+        </CreateIssueDialog>
       </div>
-
-      {/* Ajouter une tache dans la colonne (statut pre-rempli) */}
-      <CreateIssueDialog projectId={projectId} workspaceSlug={workspaceSlug} defaultStatusId={status.id}>
-        <button
-          type="button"
-          className="mt-2 flex w-full shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-black/[0.03] hover:text-foreground dark:hover:bg-white/[0.05]"
-        >
-          <Plus className="size-3.5" aria-hidden />
-          Add task
-        </button>
-      </CreateIssueDialog>
     </div>
   )
 }
@@ -607,6 +616,17 @@ export default function ProjectBoardPage() {
 
   // Temps réel : le board se met à jour en direct sur les events d'issues (PROD-1.6)
   useProjectRealtime(projectId || null)
+
+  // Une issue qui arrive sur le board déjà chargé (créée ici, par un coéquipier, ou par Cortex depuis la barre) allume
+  // sa carte une fois : on voit où l'action a eu lieu, sous la conversation dépliée (revue UX du 01/11/2026). Le
+  // premier chargement n'allume rien.
+  const [arrivedId, setArrivedId] = useState<number | null>(null)
+  useEffect(() => useIssueStore.subscribe((state, prev) => {
+    if (prev.loadedProjectId !== projectId || state.issues.length <= prev.issues.length) return
+    const before = new Set(prev.issues.map((i) => i.id))
+    const added = state.issues.find((i) => !before.has(i.id))
+    if (added) setArrivedId(added.id)
+  }), [projectId])
 
   const [initializing, setInitializing] = useState(true)
   const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
@@ -819,6 +839,11 @@ export default function ProjectBoardPage() {
         </div>
       )}
 
+      {/* Un projet sans issue le dit une fois, avec les deux façons d'en créer une, au lieu de quatre colonnes vides. */}
+      {!initializing && !error && issues.length === 0 && (
+        <p className="mb-3 shrink-0 text-xs text-muted-foreground">{t("projects.detail.emptyBoard")}</p>
+      )}
+
       {initializing ? (
         <div className="flex min-h-0 flex-1 gap-5 overflow-hidden">
           {Array.from({ length: 4 }).map((_, c) => (
@@ -854,6 +879,8 @@ export default function ProjectBoardPage() {
                 onChangeColor={handleChangeColor}
                 onOpenIssue={(issue) => setSelectedIssue(toSheetIssue(issue))}
                 isOver={overColumnId === status.id}
+                arrivedId={arrivedId}
+                onArrived={() => setArrivedId(null)}
                 t={t}
               />
             ))}

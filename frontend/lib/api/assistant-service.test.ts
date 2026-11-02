@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  sendAgentMessage, sendAssistantMessage, isApprovable, isPreparedIssue, approveAction, isUndoable, undoAction,
+  sendAgentMessage, sendAssistantMessage, isApprovable, isPreparedIssue, isQuestion, approveAction, isUndoable, undoAction,
   type AssistantToolCall,
 } from './assistant-service';
 import { apiClient } from './client';
@@ -160,6 +160,20 @@ describe('assistant-service: undoing what Cortex created (R77)', () => {
     ['another proposal', call({ name: 'create_note', status: 'pending' }), false],
   ])('isPreparedIssue: %s -> %s', (_label, toolCall, expected) => {
     expect(isPreparedIssue(toolCall)).toBe(expected);
+  });
+
+  it.each([
+    ['an issue Cortex asks about first', call({ name: 'create_issue', status: 'question' }), true],
+    ['an issue Cortex prepared', call({ name: 'create_issue', status: 'pending' }), false],
+    ['a creation', call({}), false],
+  ])('isQuestion: %s -> %s', (_label, toolCall, expected) => {
+    expect(isQuestion(toolCall)).toBe(expected);
+    // Une question n'est ni une carte, ni une action à accorder, ni une création à défaire.
+    if (expected) {
+      expect(isPreparedIssue(toolCall)).toBe(false);
+      expect(isApprovable(toolCall)).toBe(false);
+      expect(isUndoable(toolCall)).toBe(false);
+    }
   });
 
   it('undoAction: sends the tool and the record of the answer', async () => {

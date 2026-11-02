@@ -5,6 +5,7 @@ import { ExternalLink, FileCheck2, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { Markdown } from "@/components/ui/lightweight-markdown"
 import { fillText, resultCard, resultLine } from "@/lib/delivery/result-card"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
@@ -115,7 +116,10 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
 
       {run.summary && (
         <Zone label={r.inItsWords}>
-          <p className="line-clamp-6 whitespace-pre-wrap break-words text-muted-foreground">{run.summary}</p>
+          {/* L'agent écrit en Markdown (titres, gras, listes) : rendu comme une description, sans balise brute ni HTML. */}
+          <div className="max-h-64 overflow-y-auto pr-1">
+            <Markdown content={run.summary} compact className="space-y-1.5 break-words leading-relaxed text-muted-foreground" />
+          </div>
         </Zone>
       )}
 

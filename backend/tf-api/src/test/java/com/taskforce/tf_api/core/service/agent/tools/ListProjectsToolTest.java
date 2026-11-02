@@ -12,6 +12,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.taskforce.tf_api.core.dto.response.CycleResponse;
 import com.taskforce.tf_api.core.dto.response.IssueStatusResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectMemberResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.enums.CycleStatus;
 import com.taskforce.tf_api.core.service.CycleService;
@@ -37,7 +39,7 @@ class ListProjectsToolTest {
     @Mock private CycleService cycleService;
 
     private ListProjectsTool tool() {
-        return new ListProjectsTool(new ProjectResolver(projectService), issueService, cycleService);
+        return new ListProjectsTool(new ProjectResolver(projectService), issueService, cycleService, projectService);
     }
 
     private static IssueStatusResponse column(String name) {
@@ -78,6 +80,39 @@ class ListProjectsToolTest {
                 + "active cycle: Cycle 12 (2026-10-27 to 2026-11-09); goal: Ship the new checkout before Black Friday.")
             .contains("- API API: 1/2 open; columns: Todo")
             .doesNotContain("id 3").doesNotContain("Cycle 11");
+    }
+
+    @Test
+    @DisplayName("execute : les labels et les membres du projet, par leur nom, quinze au plus")
+    void execute_lists_labels_and_members() {
+        when(projectService.listProjects("acme", 7L)).thenReturn(List.of(
+            ProjectResponse.builder().id(3L).identifier("WEB").name("Web App").openIssues(4).totalIssues(9).build()));
+        when(issueService.listStatuses("acme", 3L, 7L)).thenReturn(List.of(column("Backlog")));
+        when(cycleService.listCycles("acme", 3L, 7L)).thenReturn(List.of());
+        when(projectService.listLabels("acme", 3L, 7L)).thenReturn(List.of(
+            ProjectLabelResponse.builder().name("Bug").build(), ProjectLabelResponse.builder().name("Frontend").build()));
+        List<ProjectMemberResponse> members = new java.util.ArrayList<>(List.of(
+            ProjectMemberResponse.builder().displayName("Marie Curie").email("marie@acme.dev").build(),
+            ProjectMemberResponse.builder().email("linus@acme.dev").build()));
+        for (int i = 0; i < 15; i++) members.add(ProjectMemberResponse.builder().displayName("Member " + i).build());
+        when(projectService.listMembers("acme", 3L, 7L)).thenReturn(members);
+
+        String out = tool().execute(Map.of(), CTX);
+
+        assertThat(out).contains("; labels: Bug, Frontend; members: Marie Curie, linus@acme.dev, Member 0")
+            .contains("Member 12 and 2 more");
+    }
+
+    @Test
+    @DisplayName("des labels ou des membres illisibles ne retirent pas le projet de la liste")
+    void unreadable_people_keep_the_project_listed() {
+        when(projectService.listProjects("acme", 7L)).thenReturn(List.of(
+            ProjectResponse.builder().id(3L).identifier("WEB").name("Web App").openIssues(4).totalIssues(9).build()));
+        when(projectService.listLabels("acme", 3L, 7L)).thenThrow(new IllegalStateException("boom"));
+
+        String out = tool().execute(Map.of(), CTX);
+
+        assertThat(out).contains("- WEB Web App: 4/9 open").doesNotContain("labels").doesNotContain("boom");
     }
 
     @Test

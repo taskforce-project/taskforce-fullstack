@@ -11574,6 +11574,12 @@
               "type": "integer",
               "format": "int64"
             }
+          },
+          "storyPoints": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 0
           }
         },
         "required": [
@@ -14035,6 +14041,9 @@
           "startedById": {
             "type": "integer",
             "format": "int64"
+          },
+          "startedByName": {
+            "type": "string"
           },
           "createdAt": {
             "type": "string",
@@ -16902,13 +16911,22 @@
               "COMMENT_ADDED",
               "COMMENT_DELETED",
               "COMPLETED",
-              "REOPENED"
+              "REOPENED",
+              "CHECKLIST_CHECKED",
+              "CHECKLIST_UNCHECKED",
+              "PULL_REQUEST_OPENED",
+              "MISSION_APPLIED",
+              "MISSION_DISCARDED",
+              "MISSION_RETRIED"
             ]
           },
           "oldValue": {
             "type": "string"
           },
           "newValue": {
+            "type": "string"
+          },
+          "via": {
             "type": "string"
           },
           "createdAt": {
