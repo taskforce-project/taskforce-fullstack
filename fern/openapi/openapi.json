@@ -4000,6 +4000,45 @@
         }
       }
     },
+    "/api/workspaces/{slug}/delivery/runs/{runId}/done": {
+      "post": {
+        "tags": [
+          "Coding agents"
+        ],
+        "operationId": "markDone",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/delivery/runs/{runId}/discard": {
       "post": {
         "tags": [
@@ -16917,7 +16956,8 @@
               "PULL_REQUEST_OPENED",
               "MISSION_APPLIED",
               "MISSION_DISCARDED",
-              "MISSION_RETRIED"
+              "MISSION_RETRIED",
+              "MISSION_MARKED_DONE"
             ]
           },
           "oldValue": {

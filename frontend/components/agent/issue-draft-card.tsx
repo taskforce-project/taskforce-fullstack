@@ -10,7 +10,7 @@ import { listLabels, type ProjectLabel } from "@/lib/api/label-service"
 import { listProjectMembers, type ProjectMember } from "@/lib/api/project-service"
 import {
   DRAFT_PRIORITIES, draftColumn, draftCycle, draftLabels, draftProblem, findDraftMember, findDraftProject, formatDraftDay,
-  issueDraftInput, localDay, memberName, openCycles, readIssueDraft,
+  issueDraftInput, localDay, memberName, namedColumn, openCycles, readIssueDraft,
   type DraftPriority, type DraftProblem, type IssueDraft,
 } from "@/lib/cortex/issue-draft"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
@@ -77,6 +77,9 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
 
   const options = loaded && loaded.projectId === projectId ? loaded : null
   const column = draftColumn(columns, draft.status)
+  // Cortex a nommé une colonne que le projet n'a pas : l'issue part dans sa colonne par défaut, et la carte le dit au
+  // lieu de bloquer la création (rejeu de la 1.8.0).
+  const columnByDefault = column !== null && draft.status.trim() !== "" && namedColumn(columns, draft.status) === null
   const member = options?.members ? findDraftMember(options.members, draft.assignee) : null
   const labels = options?.labels ? draftLabels(options.labels, draft.labels) : []
   const cycle = options?.cycles ? draftCycle(options.cycles, draft.cycle) : null
@@ -92,6 +95,8 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
     const sent: IssueDraft = {
       ...draft,
       project: project.identifier,
+      // La colonne que la carte montre, par son nom exact : celle que Cortex a nommée, ou celle par défaut.
+      status: draft.status.trim() && column ? column.name : draft.status,
       assignee: options?.members ? (member?.email ?? "") : draft.assignee,
       labels: options?.labels ? labels.map((l) => l.name) : draft.labels,
       cycle: options?.cycles ? (cycle?.name ?? "") : draft.cycle,
@@ -254,6 +259,11 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
               </select>
             ) : (
               column?.name ?? draft.status
+            )}
+            {columnByDefault && column && (
+              <p className="mt-0.5 text-muted-foreground">
+                {t.issueColumnByDefault.replace("{asked}", draft.status.trim()).replace("{column}", column.name)}
+              </p>
             )}
           </dd>
 

@@ -17,6 +17,8 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueRelationRequest;
@@ -1197,7 +1199,33 @@ public class IssueService {
             .via(clip(via, ACTIVITY_VIA_MAX))
             .build();
         activityRepository.save(activity);
+        announceActivity(issue);
     }
+
+    /**
+     * L'activité de l'issue a bougé : la fiche ouverte de l'issue se relit ({@code activity} sur le topic du projet). Le
+     * commentaire qu'un agent laisse pendant sa mission n'apparaissait qu'en rouvrant l'issue (rejeu de la 1.8.0,
+     * 02/11/2026). Publié après le commit, pour que la relecture trouve ce qui vient d'être écrit ; hors transaction,
+     * tout de suite.
+     */
+    private void announceActivity(Issue issue) {
+        if (issue.getId() == null || issue.getProject() == null || issue.getProject().getId() == null) return;
+        Long projectId = issue.getProject().getId();
+        Long issueId = issue.getId();
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    publishIssueEvent(ACTIVITY_EVENT, projectId, issueId, null);
+                }
+            });
+        } else {
+            publishIssueEvent(ACTIVITY_EVENT, projectId, issueId, null);
+        }
+    }
+
+    /** L'événement temps réel d'une activité de l'issue : sans l'issue, que la fiche ouverte relit. */
+    static final String ACTIVITY_EVENT = "activity";
 
     /** Tailles des colonnes {@code old_value}/{@code new_value} et {@code via} d'{@code issue_activity}. */
     private static final int ACTIVITY_VALUE_MAX = 500;

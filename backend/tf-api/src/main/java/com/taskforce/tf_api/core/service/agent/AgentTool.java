@@ -26,10 +26,29 @@ public interface AgentTool {
 
     /**
      * Pour un outil dont Cortex prépare l'action au lieu de la faire (une carte que la personne relit) : ce qui manque
-     * pour la préparer et que seule la personne peut dire, à lui demander d'abord, ou {@code null} si la carte peut se
-     * montrer. Rien n'est écrit. Défaut : rien ne manque.
+     * pour la préparer et que seule la personne peut dire, à lui demander d'abord, ou la carte, avec les arguments tels
+     * que le serveur les entend. Rien n'est écrit. Défaut : rien ne manque, la carte montre ce que Cortex a écrit.
      */
-    default String prepare(Map<String, Object> args, AgentContext ctx) {
-        return null;
+    default Prepared prepare(Map<String, Object> args, AgentContext ctx) {
+        return Prepared.card(args);
+    }
+
+    /**
+     * Une action préparée, avant la carte : la question à poser d'abord, ou les arguments que la carte montre. La carte
+     * reprend ce que le serveur a résolu, pas les mots de Cortex : « moi » y devient la personne qui demande (rejeu de la
+     * 1.8.0, 02/11/2026), sinon la carte lisait « moi » parmi les membres et laissait l'issue sans assigné.
+     */
+    record Prepared(String question, Map<String, Object> args) {
+        public static Prepared card(Map<String, Object> args) {
+            return new Prepared(null, args);
+        }
+
+        public static Prepared ask(String question) {
+            return new Prepared(question, null);
+        }
+
+        public boolean asks() {
+            return question != null;
+        }
     }
 }

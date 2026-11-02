@@ -195,6 +195,20 @@ class ConnectorCatalogTest {
         });
     }
 
+    @ParameterizedTest(name = "{0} : « {1} »")
+    @CsvSource(delimiter = '|', value = {
+        "plane  | Syncs your Plane projects and work items into the workspace's knowledge.",
+        "github | Links pull requests and commits to your issues; a merged pull request completes its issue.",
+        "slack  | Posts issue notifications to your channels and brings their history into the workspace's knowledge.",
+    })
+    @DisplayName("chaque native dit en une phrase ce qu'elle fait, à côté des préréglages (rejeu de la 1.8.0)")
+    void chaqueNativeDitCeQuElleFait(String cle, String ligne) {
+        ConnectorDescriptor d = catalogue.byKey(cle).orElseThrow();
+
+        assertThat(d.description()).isEqualTo(ligne);
+        assertThat(catalogue.isShown(cle, false)).isTrue();
+    }
+
     @ParameterizedTest(name = "{0}")
     @ValueSource(strings = {"github", "slack"})
     @DisplayName("GitHub et Slack se connectent en un clic (OAuth), sans champ, et savent agir")

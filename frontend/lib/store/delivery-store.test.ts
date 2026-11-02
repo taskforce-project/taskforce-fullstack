@@ -16,6 +16,7 @@ vi.mock('../api/delivery-service', () => ({
   downloadEvidence: vi.fn(),
   applyRun: vi.fn(),
   discardRun: vi.fn(),
+  markRunDone: vi.fn(),
   retryRun: vi.fn(),
 }));
 
@@ -243,11 +244,27 @@ describe('delivery-store : les gestes de la carte de résultat (R78)', () => {
     expect(svc.applyRun).toHaveBeenCalledWith('acme', 100, 'The date test is flaky');
   });
 
+  it('markRunDone : l\'issue terminée sans changement, la mission est relue (rejeu de la 1.8.0)', async () => {
+    useDeliveryStore.setState({ resultErrors: { 100: 'old' } });
+    vi.mocked(svc.markRunDone).mockResolvedValue(undefined);
+    vi.mocked(svc.getIssueRun).mockResolvedValue({ id: 100, issueId: 28, status: 'DONE', outcome: 'MARKED_DONE' } as DeliveryRun);
+
+    let ok = false;
+    await act(async () => { ok = await useDeliveryStore.getState().markRunDone('acme', 28, 100); });
+
+    expect(ok).toBe(true);
+    expect(svc.markRunDone).toHaveBeenCalledWith('acme', 100);
+    expect(useDeliveryStore.getState().runs[28]?.outcome).toBe('MARKED_DONE');
+    expect(useDeliveryStore.getState().resultErrors[100]).toBeUndefined();
+  });
+
   it.each([
     ['applyRun', (s: ReturnType<typeof useDeliveryStore.getState>) => s.applyRun('acme', 28, 100)],
     ['discardRun', (s: ReturnType<typeof useDeliveryStore.getState>) => s.discardRun('acme', 28, 100)],
+    ['markRunDone', (s: ReturnType<typeof useDeliveryStore.getState>) => s.markRunDone('acme', 28, 100)],
   ])('%s refusé : false, et la raison du serveur reste pour la carte', async (name, call) => {
-    vi.mocked(name === 'applyRun' ? svc.applyRun : svc.discardRun).mockRejectedValue(new Error('GitHub can\'t merge pull request #212'));
+    const api = { applyRun: svc.applyRun, discardRun: svc.discardRun, markRunDone: svc.markRunDone }[name] ?? svc.applyRun;
+    vi.mocked(api).mockRejectedValue(new Error('GitHub can\'t merge pull request #212'));
 
     let ok = true;
     await act(async () => { ok = await call(useDeliveryStore.getState()); });

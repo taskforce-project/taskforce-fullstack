@@ -11,6 +11,8 @@ import {
   issueDraftInput,
   localDay,
   memberName,
+  nameKey,
+  namedColumn,
   openCycles,
   readIssueDraft,
   type IssueDraft,
@@ -224,14 +226,41 @@ describe("findDraftProject", () => {
 describe("draftColumn", () => {
   it.each([
     ["the named column, whatever the case", "in PROGRESS", 3],
+    ["the named column, whatever the spaces (Cortex wrote \"To Do\")", "To Do", 1],
+    ["the named column, whatever the punctuation", "in-progress!", 3],
     ["the Backlog when none is named", "", 2],
-    ["nothing for an unknown column", "Done", null],
+    ["the default column for a column the project doesn't have", "Done", 1],
   ])("gives %s", (_label, status, id) => {
     expect(draftColumn(COLUMNS, status)?.id ?? null).toBe(id);
   });
 
   it("falls back to the default column without a Backlog", () => {
     expect(draftColumn(COLUMNS.filter((c) => c.category !== "BACKLOG"), "")?.id).toBe(1);
+  });
+
+  it("gives nothing for an unknown column when the project has no default", () => {
+    expect(draftColumn(COLUMNS.filter((c) => !c.isDefault), "Done")).toBeNull();
+  });
+});
+
+describe("namedColumn", () => {
+  it.each([
+    ["To Do", 1],
+    ["TODO", 1],
+    ["In progress", 3],
+    ["Done", null],
+    ["  ", null],
+  ])("reads %s as column %s, never another one", (status, id) => {
+    expect(namedColumn(COLUMNS, status)?.id ?? null).toBe(id);
+  });
+
+  it.each([
+    ["To Do", "todo"],
+    ["Moi-Même", "moimeme"],
+    ["  In-Progress! ", "inprogress"],
+    ["Élodie", "elodie"],
+  ])("keys %s as %s", (name, key) => {
+    expect(nameKey(name)).toBe(key);
   });
 });
 

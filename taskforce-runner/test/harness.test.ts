@@ -171,6 +171,15 @@ describe("faits d'une action de Claude Code, jugés par la table par défaut", (
     ["lister la copie", "Bash", { command: "ls -la" }, "allow", "run-reads"],
     ["lister la copie par son chemin", "Bash", { command: `ls -la "${slash(work)}"` }, "allow", "run-reads"],
     ["lire un fichier de la copie", "Bash", { command: "head -20 src/app.ts" }, "allow", "run-reads"],
+    // Rejeu de la 1.8.0 (02/11/2026) : deux commandes sans effet étaient demandées, à cause d'`echo` et de `git branch`.
+    ["lister, afficher un séparateur, lire le journal", "Bash", { command: "ls -la && echo \"---\" && git log --oneline -5" }, "allow", "run-reads"],
+    ["la branche courante, puis l'état de la copie", "Bash", { command: "git branch --show-current && git status --short --branch" }, "allow", "run-git-info"],
+    ["les branches et les dépôts distants", "Bash", { command: "git branch -a; git remote -v" }, "allow", "run-git-info"],
+    ["echo vers un fichier l'écrit", "Bash", { command: "echo done > notes.txt" }, "ask", null],
+    ["echo d'une variable ne se borne pas", "Bash", { command: "echo $HOME" }, "ask", null],
+    ["créer une branche reste demandé", "Bash", { command: "git branch new-feature" }, "ask", null],
+    ["supprimer une branche reste demandé", "Bash", { command: "git status && git branch -D main" }, "ask", null],
+    ["git difftool n'est pas git diff", "Bash", { command: "git difftool" }, "ask", null],
     // Un commit comme Claude Code l'écrit, précédé d'un `cd` dans la copie : aucun morceau ne demande.
     ["aller dans la copie puis commiter", "Bash", { command: `cd "${slash(work)}" && git diff && git add README.md && git commit -m "docs: add Node.js 26.13.0 (LTS \\"Lithium\\")" && git log --oneline -1` }, "allow", "run-reads"],
     ["un programme qui commence comme une lecture n'en est pas une", "Bash", { command: "lsof -i" }, "ask", null],

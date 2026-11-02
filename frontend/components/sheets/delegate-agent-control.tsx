@@ -63,7 +63,10 @@ export function DelegateAgentControl({
         // Le résultat se relit sur sa carte, sous le titre de l'issue (R78) ; ici, où il en est.
         <span className="flex items-center gap-1.5 font-medium text-ink-green">
           <CircleCheck className="size-3.5" />
-          {run.outcome === "APPLIED" ? r.applied : run.outcome === "DISCARDED" ? r.discarded : r.readyAbove}
+          {run.outcome === "APPLIED" ? r.applied
+            : run.outcome === "DISCARDED" ? r.discarded
+            : run.outcome === "MARKED_DONE" ? r.markedDone
+            : r.readyAbove}
         </span>
       ) : run.refused ? (
         // Une règle a refusé la mission au départ : ce n'est pas une panne, la raison dit quoi faire (R38).

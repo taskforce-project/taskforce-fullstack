@@ -110,6 +110,51 @@
       "pattern": "{cd,ls}{, **}",
       "value": "lsof -i",
       "match": false
+    },
+    {
+      "pattern": "git {status,diff}{, **}",
+      "value": "git status",
+      "match": true
+    },
+    {
+      "pattern": "git {status,diff}{, **}",
+      "value": "git status --short --branch",
+      "match": true
+    },
+    {
+      "pattern": "git {status,diff}{, **}",
+      "value": "git difftool",
+      "match": false
+    },
+    {
+      "pattern": "git {branch,branch -v,branch --list **}",
+      "value": "git branch",
+      "match": true
+    },
+    {
+      "pattern": "git {branch,branch -v,branch --list **}",
+      "value": "git branch -v",
+      "match": true
+    },
+    {
+      "pattern": "git {branch,branch -v,branch --list **}",
+      "value": "git branch --list 'tf/*'",
+      "match": true
+    },
+    {
+      "pattern": "git {branch,branch -v,branch --list **}",
+      "value": "git branch -v new-feature",
+      "match": false
+    },
+    {
+      "pattern": "git {branch,branch -v,branch --list **}",
+      "value": "git branch -D main",
+      "match": false
+    },
+    {
+      "pattern": "git {branch,branch -v,branch --list **}",
+      "value": "git branches",
+      "match": false
     }
   ],
   "decisions": [
@@ -760,10 +805,186 @@
         "effect": "ask",
         "rule": null
       }
+    },
+    {
+      "name": "echo prints a line in the copy and changes nothing, so it is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "echo \"---\""
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-reads"
+      }
+    },
+    {
+      "name": "echo redirected to a file writes it: the runner cannot bound it, no action, so it asks",
+      "facts": {
+        "tool": "Bash",
+        "command": "echo done > notes.txt"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "git status with its options is a local read",
+      "facts": {
+        "action": "shell",
+        "command": "git status --short --branch"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-reads"
+      }
+    },
+    {
+      "name": "git difftool only starts like git diff: it runs another program, so it asks",
+      "facts": {
+        "action": "shell",
+        "command": "git difftool"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "reading the current branch is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "git branch --show-current"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-info"
+      }
+    },
+    {
+      "name": "listing the branches with their upstream is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "git branch -vv"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-info"
+      }
+    },
+    {
+      "name": "listing the branches that match a pattern is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "git branch --list 'tf/*'"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-info"
+      }
+    },
+    {
+      "name": "creating a branch still asks",
+      "facts": {
+        "action": "shell",
+        "command": "git branch new-feature"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "a listing option followed by a name creates a branch, so it asks",
+      "facts": {
+        "action": "shell",
+        "command": "git branch -v new-feature"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "deleting a branch still asks",
+      "facts": {
+        "action": "shell",
+        "command": "git branch -D main"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "renaming a branch still asks",
+      "facts": {
+        "action": "shell",
+        "command": "git branch -m main trunk"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "git rev-parse reads where the copy stands",
+      "facts": {
+        "action": "shell",
+        "command": "git rev-parse --abbrev-ref HEAD"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-info"
+      }
+    },
+    {
+      "name": "git ls-files lists the tracked files",
+      "facts": {
+        "action": "shell",
+        "command": "git ls-files src"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-info"
+      }
+    },
+    {
+      "name": "git blame reads a file's history",
+      "facts": {
+        "action": "shell",
+        "command": "git blame src/app.ts"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-info"
+      }
+    },
+    {
+      "name": "listing the remotes is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "git remote -v"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-info"
+      }
+    },
+    {
+      "name": "adding a remote still asks",
+      "facts": {
+        "action": "shell",
+        "command": "git remote add mirror https://example.com/x.git"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
     }
   ],
   "digest": {
     "description": "The digest of default.rules.json as it is, with or without null members and its own digest field.",
-    "expected": "sha256:c0d557fcff6f0b00d3907a5f75e805c883aa8af40a6cfb5f16637680b2ecfeb8"
+    "expected": "sha256:07211ed3bc134fd8f6557da0ca9c253f7e84b1834a2c838bf1d1bab958a41dca"
   }
 }

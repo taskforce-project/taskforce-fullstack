@@ -428,7 +428,11 @@ public class AgentService {
         String recordRef();
     }
 
-    private record ToolOutcome(String status, String result) {
+    /** {@code input} : les arguments que la carte montre, quand le serveur les a résolus ; null, ceux de Cortex. */
+    private record ToolOutcome(String status, String result, String input) {
+        ToolOutcome(String status, String result) {
+            this(status, result, null);
+        }
     }
 
     private static final String PROPOSED = "Action proposed to the user, waiting for their approval in the conversation. "
@@ -479,7 +483,8 @@ public class AgentService {
                 ToolOutcome outcome = tool == null
                     ? new ToolOutcome("error", "Unknown tool: " + name)
                     : step.apply(tool, name, argsJson);
-                toolCalls.add(new AssistantToolCall(name, outcome.status(), argsJson, outcome.result(), step.recordRef()));
+                String shown = outcome.input() != null ? outcome.input() : argsJson;
+                toolCalls.add(new AssistantToolCall(name, outcome.status(), shown, outcome.result(), step.recordRef()));
                 messages.add(Map.of("role", "tool", "tool_call_id", id, "content", outcome.result()));
             }
         }
@@ -568,6 +573,7 @@ public class AgentService {
         public ToolOutcome apply(AgentTool tool, String name, String argsJson) {
             String result;
             String status = "success";
+            String shown = null;
             try {
                 CortexGate.Verdict verdict = judge(tool, argsJson);
                 if (verdict.denied()) {
@@ -585,11 +591,18 @@ public class AgentService {
                         status = "pending";
                     }
                 } else if (PREPARED.contains(name)) {
-                    // Avant la carte, ce que seule la personne peut dire : sinon une question, et aucune carte.
-                    String missing = tool.prepare(objectMapper.readValue(argsJson,
+                    // Avant la carte, ce que seule la personne peut dire : sinon une question, et aucune carte. La carte
+                    // montre les arguments tels que le serveur les entend (« moi » : la personne qui demande).
+                    AgentTool.Prepared prepared = tool.prepare(objectMapper.readValue(argsJson,
                         new TypeReference<Map<String, Object>>() {}), ctx);
-                    result = missing == null ? PREPARED_TEXT : missing + QUESTION_TEXT;
-                    status = missing == null ? "pending" : QUESTION;
+                    if (prepared != null && prepared.asks()) {
+                        result = prepared.question() + QUESTION_TEXT;
+                        status = QUESTION;
+                    } else {
+                        result = PREPARED_TEXT;
+                        status = "pending";
+                        if (prepared != null && prepared.args() != null) shown = objectMapper.writeValueAsString(prepared.args());
+                    }
                 } else {
                     Map<String, Object> args = objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {});
                     result = tool.execute(args, ctx);
@@ -599,7 +612,7 @@ public class AgentService {
                 status = "error";
             }
             result(name, status, result);
-            return new ToolOutcome(status, result);
+            return new ToolOutcome(status, result, shown);
         }
 
         /** La demande, puis la décision des règles, au dossier avant tout effet : sans dossier, l'action ne part pas. */
