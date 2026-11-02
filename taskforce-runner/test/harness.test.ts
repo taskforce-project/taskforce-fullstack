@@ -7,7 +7,9 @@ import { after, describe, it } from "node:test";
 import { exitFacts, judgeExit } from "../src/exits.js";
 import { visibilityOf } from "../src/git.js";
 import { canonicalJson, chain, firstBrokenLink, ZERO_HASH, type EventInput, type Json } from "../src/harness/evidence.js";
-import { INTERNAL_TOOLS, splitCommand, TASKFORCE_TOOLS, toolFacts } from "../src/harness/facts.js";
+import {
+  changesTaskForce, INTERNAL_TOOLS, splitCommand, TASKFORCE_CHANGES, TASKFORCE_TOOLS, toolFacts,
+} from "../src/harness/facts.js";
 import { globMatch } from "../src/harness/glob.js";
 import { bundleDigest, decide, decideAll, verifiedBundle, type Effect, type Facts, type RulesBundle } from "../src/harness/rules.js";
 import { verifyEvidence } from "../src/harness/verify.js";
@@ -113,6 +115,9 @@ describe("commande composée : découpée hors des guillemets", () => {
   }
 });
 
+/** Un chemin écrit comme Claude Code l'écrit dans une commande : barres obliques, même sous Windows. */
+const slash = (path: string): string => path.split("\\").join("/");
+
 describe("faits d'une action de Claude Code, jugés par la table par défaut", () => {
   const work = mkdtempSync(join(tmpdir(), "tf-facts-"));
   after(() => rmSync(work, { recursive: true, force: true }));
@@ -156,11 +161,42 @@ describe("faits d'une action de Claude Code, jugés par la table par défaut", (
     ["recherche web", "WebSearch", { query: "x" }, "ask", "search-web"],
     ["lire l'issue", "mcp__taskforce__get_issue", { projectId: 1, issueId: 2 }, "allow", "read-issues"],
     ["commenter l'issue", "mcp__taskforce__add_comment", { projectId: 1, issueId: 2, content: "x" }, "allow", "comment"],
+    ["cocher une ligne de la checklist", "mcp__taskforce__check_checklist_item", { projectId: 1, issueId: 2, itemId: 3, done: true }, "allow", "update-issue"],
     ["Cortex, hors de la mission", "mcp__taskforce__ask_cortex", { message: "x" }, "ask", null],
     ["outil interne de l'agent", "TodoWrite", { todos: [] }, "allow", null],
     ["sous-agent, dont chaque action passe par la porte", "Task", { prompt: "x" }, "allow", null],
     ["PowerShell, pas encore décrit", "PowerShell", { command: "npm test" }, "ask", null],
     ["outil d'un autre serveur", "mcp__other__send", {}, "ask", null],
+    // Lire dans la copie depuis le shell ne change rien (R7'), dans les limites de la copie.
+    ["lister la copie", "Bash", { command: "ls -la" }, "allow", "run-reads"],
+    ["lister la copie par son chemin", "Bash", { command: `ls -la "${slash(work)}"` }, "allow", "run-reads"],
+    ["lire un fichier de la copie", "Bash", { command: "head -20 src/app.ts" }, "allow", "run-reads"],
+    // Un commit comme Claude Code l'écrit, précédé d'un `cd` dans la copie : aucun morceau ne demande.
+    ["aller dans la copie puis commiter", "Bash", { command: `cd "${slash(work)}" && git diff && git add README.md && git commit -m "docs: add Node.js 26.13.0 (LTS \\"Lithium\\")" && git log --oneline -1` }, "allow", "run-reads"],
+    ["un programme qui commence comme une lecture n'en est pas une", "Bash", { command: "lsof -i" }, "ask", null],
+    ["find peut effacer ou lancer un programme", "Bash", { command: "find . -name '*.tmp' -delete" }, "ask", null],
+    ["lire hors de la copie", "Bash", { command: "cat /etc/passwd" }, "ask", null],
+    ["lire .git", "Bash", { command: "ls .git" }, "ask", null],
+    // Ce que le shell change avant d'exécuter ne se borne pas.
+    ["une variable dans un chemin", "Bash", { command: "cat $HOME/.ssh/id_rsa" }, "ask", null],
+    ["une variable entre guillemets doubles", "Bash", { command: "cat \"$HOME/.ssh/id_rsa\"" }, "ask", null],
+    ["un dollar entre guillemets simples reste du texte", "Bash", { command: "cat '$HOME'" }, "allow", "run-reads"],
+    ["une accolade qui se déplie", "Bash", { command: "cat {README.md,/etc/passwd}" }, "ask", null],
+    ["un antislash hors guillemets", "Bash", { command: "cat \\/etc\\/passwd" }, "ask", null],
+    // `cd` change le dossier des morceaux qui suivent.
+    ["cd seul va au dossier personnel", "Bash", { command: "cd && cat .ssh/id_rsa" }, "ask", null],
+    ["cd - revient au dossier précédent", "Bash", { command: "cd - && ls" }, "ask", null],
+    ["cd qui sort de la copie", "Bash", { command: "cd .. && ls" }, "ask", null],
+    ["après un cd qu'on ne borne pas, plus rien ne se borne", "Bash", { command: "cd $HOME && cat notes.txt" }, "ask", null],
+    ["un chemin lu depuis le dossier du cd", "Bash", { command: "cd src && cat ../README.md" }, "allow", "run-reads"],
+    ["un chemin qui sort depuis le dossier du cd", "Bash", { command: "cd src && cat ../../elsewhere.txt" }, "ask", null],
+    // Une option courte avec sa valeur collée : chaque valeur possible se lit comme un chemin.
+    ["une valeur collée, absolue", "Bash", { command: "grep -f/etc/hosts x" }, "ask", null],
+    ["une valeur collée, dans le dossier personnel", "Bash", { command: "grep -f~/notes.txt x" }, "ask", null],
+    ["une valeur collée qui remonte", "Bash", { command: "grep -f../elsewhere.txt x" }, "ask", null],
+    ["une valeur collée après d'autres options", "Bash", { command: "grep -rf/etc/hosts x" }, "ask", null],
+    ["une valeur collée dans la copie", "Bash", { command: "grep -fpatterns.txt src" }, "allow", "run-reads"],
+    ["un nombre collé", "Bash", { command: "head -n5 README.md" }, "allow", "run-reads"],
   ];
   for (const [label, tool, input, effect, rule] of cases) {
     it(`${label} -> ${effect}${rule ? ` (${rule})` : ""}`, () => {
@@ -180,6 +216,10 @@ describe("faits d'une action de Claude Code, jugés par la table par défaut", (
         return;
       }
       assert.equal(decideAll(defaults, toolFacts("Read", { file_path: join(work, "linked", "id_rsa") }, work)).effect, "ask");
+      // Le lien nommé tout seul, comme dossier d'un `cd`, ou collé à une option courte.
+      for (const command of ["ls linked", "cd linked && ls", "grep -flinked x"]) {
+        assert.equal(decideAll(defaults, toolFacts("Bash", { command }, work)).effect, "ask", command);
+      }
     } finally {
       rmSync(outside, { recursive: true, force: true });
     }
@@ -187,6 +227,30 @@ describe("faits d'une action de Claude Code, jugés par la table par défaut", (
 
   it("chaque outil MCP de TaskForce a sa règle dans la table par défaut", () => {
     for (const [tool, action] of Object.entries(TASKFORCE_TOOLS)) assert.notEqual(decide(defaults, { action }).rule, null, tool);
+  });
+
+  // R110 (séance n°16) : la porte compte les changements dans TaskForce, et demande au-delà d'un plafond par mission.
+  const changes: Array<[string, boolean]> = [
+    ["mcp__taskforce__update_issue", true],
+    ["mcp__taskforce__check_checklist_item", true],
+    ["mcp__taskforce__add_comment", true],
+    ["mcp__taskforce__create_issue", true],
+    ["mcp__taskforce__get_issue", false],
+    ["mcp__taskforce__list_issues", false],
+    ["mcp__taskforce__brain_search", false],
+    ["mcp__taskforce__ask_cortex", false],
+    ["mcp__taskforce__constructor", false],
+    ["mcp__linear__save_issue", false],
+    ["Edit", false],
+    ["Bash", false],
+  ];
+  for (const [tool, expected] of changes) {
+    it(`change TaskForce : ${tool} -> ${expected}`, () => assert.equal(changesTaskForce(tool), expected));
+  }
+
+  it("chaque action qui change TaskForce est celle d'un outil MCP de TaskForce", () => {
+    const actions = new Set(Object.values(TASKFORCE_TOOLS));
+    for (const action of TASKFORCE_CHANGES) assert.ok(actions.has(action), action);
   });
 
   it("un outil interne n'a aucun fait", () => {

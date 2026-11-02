@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.stereotype.Component;
 
@@ -28,9 +29,26 @@ import jakarta.annotation.PostConstruct;
  *
  * <p>Jusqu'au lot 6 du plan open source, le catalogue affichait 138 tuiles : 104 ne demandaient que l'URL d'un
  * serveur MCP sans en proposer aucune, et 6 étaient « bientôt ». Il ne montre plus que ce qui fonctionne.</p>
+ *
+ * <p>Depuis TF-J1-3 (01/11/2026), il ne montre plus que les préréglages essayés de bout en bout ({@code TRIED}).
+ * Les autres restent déclarés : ils se connectent toujours par l'API, et l'espace qui en a connecté un le voit
+ * encore ({@link #isShown}).</p>
  */
 @Component
 public class ConnectorCatalog {
+
+    /**
+     * Préréglages essayés de bout en bout, les seuls que le catalogue montre à tous (séance n°15 du Conseil, R99,
+     * point 4 : « les préréglages jamais essayés quittent le catalogue visible jusqu'à leur essai »). Une clé n'entre
+     * ici qu'avec la date et la preuve de son essai, écrites à côté.
+     */
+    private static final Set<String> TRIED = Set.of(
+        // Linear. Le 02/09/2026 : OAuth en un clic joué contre le vrai serveur (découverte, enregistrement du client,
+        // URL d'autorisation ; TF-MCP-02). Le 03/09/2026 : connecté en prod, sonde initialize avec le jeton, réponse
+        // 200 et serverInfo « Linear MCP » (TF-MCP-02b). Le 05/09/2026 : ses outils servis à Cortex en prod, le
+        // journal passe de 60 à 25 outils avec `linear__list_issues` en tête. Les 18 et 19/10/2026 : préréglage
+        // rejoué dans le navigateur au lot 6. Sources : `.ai/roadmap.md`, MAJ des 02, 03, 05/09 et 18-19/10/2026.
+        "linear");
 
     private final Map<String, ConnectorDescriptor> byKey = new LinkedHashMap<>();
 
@@ -113,6 +131,21 @@ public class ConnectorCatalog {
     /** Préréglage de serveur MCP ? (faux pour une intégration native et pour une clé inconnue) */
     public boolean isMcpPreset(String key) {
         return byKey(key).map(d -> d.authType() == ConnectorAuthType.MCP).orElse(false);
+    }
+
+    /** Préréglage essayé de bout en bout ? (faux pour une native, une clé inconnue et un préréglage jamais essayé) */
+    public boolean isTriedPreset(String key) {
+        return isMcpPreset(key) && TRIED.contains(key);
+    }
+
+    /**
+     * Le catalogue montre-t-il cet outil à un espace ? Une native et un préréglage essayé, toujours. Un préréglage
+     * jamais essayé, seulement à l'espace qui l'a déjà connecté : sa connexion continue de marcher, et il garde de
+     * quoi la voir et la déconnecter. Une clé inconnue, jamais.
+     */
+    public boolean isShown(String key, boolean connectedHere) {
+        return byKey(key).map(d -> d.authType() != ConnectorAuthType.MCP || TRIED.contains(key) || connectedHere)
+            .orElse(false);
     }
 
     // -------------------------------------------------------------------------

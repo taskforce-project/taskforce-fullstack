@@ -18,6 +18,7 @@ import com.taskforce.tf_api.core.enums.DeliveryRunOutcome;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkType;
+import com.taskforce.tf_api.core.enums.IssueActivityType;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueGitHubLink;
@@ -109,6 +110,24 @@ class MissionResultServiceTest {
             .isInstanceOf(BusinessException.class).hasMessageContaining("no pull request to apply");
         verify(pullRequests, never()).merge(anyLong(), any(), anyInt());
         assertThat(run.getOutcome()).isNull();
+        verify(issueService, never()).logActivity(any(), any(), any(), any(), any(), any());
+    }
+
+    @ParameterizedTest(name = "{0} : {1} à l'activité de l'issue, au nom de la personne")
+    @CsvSource({
+        "apply,   MISSION_APPLIED",
+        "discard, MISSION_DISCARDED",
+        "retry,   MISSION_RETRIED",
+    })
+    @DisplayName("chaque geste entre à l'activité de l'issue : « Pierre applied the result »")
+    void each_gesture_enters_the_activity(String gesture, IssueActivityType expected) {
+        switch (gesture) {
+            case "apply" -> service.apply("acme", 100L, 7L, null);
+            case "discard" -> service.discard("acme", 100L, 7L);
+            default -> service.retry("acme", 100L, 7L, null);
+        }
+
+        verify(issueService).logActivity(run.getIssue(), delegator, expected, null, null, null);
     }
 
     @Test

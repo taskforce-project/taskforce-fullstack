@@ -385,9 +385,18 @@ export const CONSTANTS_EN = {
       teams: "Teams",
       settings: "Settings",
       newIssue: "New Issue",
-      noIssues: "No issues in this column",
+      emptyBoard: "No issues yet. Add one to a column, or write what you want done in the bar below.",
       addIssue: "Add issue",
     },
+  },
+
+  // AI Workflows panel: an analysis is followed by its status alone, without the fixed plan of steps (TF-J1-3).
+  workflows: {
+    analysisQueued: "Waiting to start.",
+    analysisRunning: "The analysis is running. Its result will show on the Intelligence page.",
+    // Banner of the decision board while an analysis of its project is under way.
+    analysisFollow: "Analysis running: follow it in AI Workflows",
+    analysisNeedsAnswer: "The AI needs a clarification from you: open AI Workflows",
   },
 
   // My Work page
@@ -420,9 +429,27 @@ export const CONSTANTS_EN = {
     openCommandPalette: "Open command palette",
     // The single bar at the bottom of every screen (R76): write, then send; nothing leaves before that.
     barPlaceholder: "What do you want done?",
+    barReply: "Reply to Cortex…",
     barSend: "Send",
-    barOpenConversation: "Open the conversation with Cortex",
+    barAnswering: "Cortex is answering…",
+    barShowConversation: "Show the conversation with Cortex",
+    barHideConversation: "Fold the conversation",
+    barNewAnswer: "A new answer from Cortex is waiting",
     barSuggestions: "Suggestions for this screen",
+    // The conversation unfolds from the bar (UX review, 01/11/2026), or sits in the right panel when pinned there.
+    chatLabel: "Conversation with Cortex",
+    chatNew: "New conversation",
+    chatNone: "No conversations yet.",
+    chatDelete: "Delete this conversation",
+    chatRecent: "Recent conversations",
+    chatPinSide: "Pin to the side",
+    chatBackToBar: "Back to the bar",
+    chatFold: "Fold (Esc)",
+    chatResize: "Resize the conversation",
+    chatThinking: "Cortex is thinking",
+    chatIntro: "TaskForce's AI agent, built on your workspace's knowledge. It cites its sources.",
+    chatHint: "Write in the bar below, then press Enter.",
+    chatTools: "It can also act on your connected tools",
     // Workspace switcher
     workspaces: "Workspaces",
     yourWorkspaces: "Your workspaces",
@@ -441,6 +468,9 @@ export const CONSTANTS_EN = {
   // Delegated missions: what an agent asks while it works (R78, the Allow screen).
   missions: {
     agent: "Claude Code",
+    // The issue's Assignee while a mission works on it, in the delegator's name; the stored assignee doesn't change.
+    workingFor: "{agent}, for {who}",
+    workingHint: "Works on this issue until you review its result",
     taskforce: "TaskForce",
     wantsTo: "wants to",
     willDo: "What it will do",
@@ -552,6 +582,21 @@ export const CONSTANTS_EN = {
         will: "Change data in a tool your workspace connected, outside TaskForce.",
         ifRefused: "It continues without this change.",
       },
+      "issue.update": {
+        want: "change this issue",
+        will: "Change this issue in TaskForce: a field, its column or a checklist item. The activity shows the change under its name, for you.",
+        ifRefused: "It continues without this change.",
+      },
+      "issue.create": {
+        want: "create an issue",
+        will: "Create an issue in this project. The activity shows it under its name, for you.",
+        ifRefused: "It continues without creating it.",
+      },
+      "comment.create": {
+        want: "comment on this issue",
+        will: "Post a comment on this issue, under its name, for you.",
+        ifRefused: "It continues without commenting.",
+      },
       "mission.start": {
         want: "start the mission",
         will: "Start Claude Code on this task, in a copy of the project on this computer.",
@@ -565,6 +610,21 @@ export const CONSTANTS_EN = {
     },
   },
 
+  // An issue's activity: who did what, and through which agent.
+  issueActivity: {
+    system: "System",
+    created: "created",
+    createdVia: "created, prepared by {via}",
+    checked: "checked \"{item}\"",
+    unchecked: "unchecked \"{item}\"",
+    openedPullRequest: "opened pull request",
+    openedAPullRequest: "opened a pull request",
+    applied: "applied the result",
+    discarded: "discarded the result",
+    retried: "tried again",
+    forWhom: "for {who}",
+  },
+
   // Cortex in the conversation.
   cortex: {
     // The issue Cortex prepares as a card (R78): the person checks it, edits it, then creates it.
@@ -575,11 +635,26 @@ export const CONSTANTS_EN = {
     issueChange: "Change",
     issueTitle: "Title",
     issueDescription: "Description",
-    issueSubtasks: "Subtasks",
-    issueSubtasksHint: "One per line",
+    issueChecklist: "Checklist",
+    issueChecklistHint: "One item per line",
     issueDue: "Due",
     issueNoDue: "No due date",
     issueColumn: "Column",
+    // Filled only from what the request or the project says; the person fills the rest here.
+    issuePriority: "Priority",
+    issuePriorities: { NONE: "No priority", LOW: "Low", MEDIUM: "Medium", HIGH: "High", URGENT: "Urgent" },
+    issueAssignee: "Assignee",
+    issueUnassigned: "Unassigned",
+    issueLabels: "Labels",
+    issueNoLabels: "No labels",
+    issueProjectHasNoLabels: "This project has no labels yet",
+    issuePoints: "Points",
+    issueNoPoints: "No estimate",
+    issueOnePoint: "1 point",
+    issuePointsValue: "{points} points",
+    issueCycle: "Cycle",
+    issueNoCycle: "No cycle",
+    issueActiveCycle: "(active)",
     issueVisibleTo: "Visible to",
     issueVisibleWorkspace: "Workspace",
     issueVisibleCollaborators: "Collaborators only",

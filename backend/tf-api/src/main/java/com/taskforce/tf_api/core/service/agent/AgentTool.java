@@ -23,4 +23,13 @@ public interface AgentTool {
      * (réinjecté dans la conversation). Doit rester sûr : l'autorisation workspace est déjà faite.
      */
     String execute(Map<String, Object> args, AgentContext ctx);
+
+    /**
+     * Pour un outil dont Cortex prépare l'action au lieu de la faire (une carte que la personne relit) : ce qui manque
+     * pour la préparer et que seule la personne peut dire, à lui demander d'abord, ou {@code null} si la carte peut se
+     * montrer. Rien n'est écrit. Défaut : rien ne manque.
+     */
+    default String prepare(Map<String, Object> args, AgentContext ctx) {
+        return null;
+    }
 }

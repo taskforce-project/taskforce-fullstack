@@ -30,6 +30,17 @@ final class McpArgs {
         return value.asLong();
     }
 
+    static boolean requiredBoolean(JsonNode args, String name) {
+        JsonNode value = args.get(name);
+        if (value == null || value.isNull()) {
+            throw new InvalidArgumentException("Missing argument: " + name);
+        }
+        if (!value.isBoolean()) {
+            throw new InvalidArgumentException(name + " must be true or false");
+        }
+        return value.asBoolean();
+    }
+
     static Long optionalLong(JsonNode args, String name) {
         JsonNode value = args.get(name);
         return value == null || value.isNull() ? null : requiredLong(args, name);

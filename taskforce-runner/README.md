@@ -18,8 +18,8 @@ merges anything: the decision stays human.
 | Where | Rights |
 |---|---|
 | Repository | An **isolated worktree** on a new branch `tf/<key>-<title>-r<run>`. Your checkout and your current branch are never touched. |
-| Machine | Each action is judged before it runs by the **rules of the task**, which TaskForce sends with it (default table in [`contracts/rules`](../contracts/rules/default.rules.json)). By default: reading and editing the copy, local commits and `git status/diff/log/show/add` run freely; the web, publishing, messages, payments and **anything the table does not know** wait for **your approval in TaskForce**, on the issue: Allow or Deny. No answer within 10 minutes means denied. The agent does not run the repository's scripts (`npm`, `yarn` or `pnpm` test and run): while your computer is not isolated, they would run whatever the agent wrote, so the **runner runs the project's test command itself, after the agent** (below). A path outside the copy or in `.git`, a command substitution, a redirection to a file, or an argument naming a path outside the copy is never allowed by a rule: it is asked or denied. `git push` and `gh` are always refused: the runner pushes and opens the pull request itself, after the agent. A mission on a public repository does not start for now (decided on 28/10/2026, until the runner's tests have been tried). The settings of the cloned repository (`.claude/settings*.json`: hooks, API URL) are ignored (`--setting-sources user`): only yours and the runner's apply. |
-| TaskForce | Through the MCP server of the instance, **as the person who delegated**, with their rights as a ceiling, narrowed to: the run's workspace for reading, the issues of the run's project for writing, never a deletion. |
+| Machine | Each action is judged before it runs by the **rules of the task**, which TaskForce sends with it (default table in [`contracts/rules`](../contracts/rules/default.rules.json)). By default: reading and editing the copy, reading commands in the copy (`cd`, `pwd`, `ls`, `cat`, `head`, `tail`, `wc`, `grep`, `stat`, `diff`), local commits and `git status/diff/log/show/add` run freely; the web, publishing, messages, payments and **anything the table does not know** wait for **your approval in TaskForce**, on the issue: Allow or Deny. The runner asks you itself, before the action runs, whatever Claude Code's own permissions say. No answer within 10 minutes means denied. The agent does not run the repository's scripts (`npm`, `yarn` or `pnpm` test and run): while your computer is not isolated, they would run whatever the agent wrote, so the **runner runs the project's test command itself, after the agent** (below). A path outside the copy or in `.git`, a command substitution, a variable or another expansion of the shell, a redirection to a file, or an argument naming a path outside the copy (a value attached to a short option included) is never allowed by a rule: it is asked or denied. `git push` and `gh` are always refused: the runner pushes and opens the pull request itself, after the agent. A mission on a public repository does not start for now (decided on 28/10/2026, until the runner's tests have been tried). The settings of the cloned repository (`.claude/settings*.json`: hooks, API URL) are ignored (`--setting-sources user`): only yours and the runner's apply. |
+| TaskForce | Through the MCP server of the instance, **as the person who delegated**, with their rights as a ceiling, narrowed to: the run's workspace for reading; for writing, the issue it was given (its fields, column, checklist and comments) and new issues in the run's project; never a deletion. Past `agent.maxTaskForceChanges` changes in a mission (30 by default), each further change waits for **your approval in TaskForce**. |
 | GitHub | Nothing. The **runner** pushes the branch and opens the pull request, after the agent, each by the rules of the task. By default the agent's branch goes to a private repository without asking; a public repository, or a visibility `gh` cannot tell, waits for your approval in TaskForce. Refused or not approved, the commits stay on the local branch. |
 
 The text of an issue or a note is written by other people. The brief presents it to the agent as task data, never
@@ -81,8 +81,9 @@ local runner enabled (`DELIVERY_LOCAL_RUNNER_ENABLED=true`, the default in dev).
 | `agent.model` | `null` | `null` = the model chosen when delegating. |
 | `agent.maxTurns` / `agent.timeoutMinutes` | 60 / 45 | Agent bounds. The duration is also capped by the lifetime of the session token. |
 | `agent.approvalTimeoutMinutes` | 10 | How long an action waits for your answer in TaskForce (60 at most). Then it is denied. |
+| `agent.maxTaskForceChanges` | 30 | How many changes Claude Code makes to TaskForce in one mission without asking: the issue's fields and column, checklist items, comments, new issues. Past that, each change waits for your **Allow** or **Deny** on the issue; **Allow for this mission** stops asking until the mission ends. Reads do not count, nor changes the rules already ask you about. 30 is a first value, to be measured on real missions. |
 | `agent.attribution` | `false` | `false` = no "Co-Authored-By: Claude" in the agent's commits. |
-| `agent.extraAllowedTools` | `[]` | Tools you allow in advance on this computer, e.g. `["Bash(mvn test *)"]`: they skip the rules that ask, never one that denies. |
+| `agent.extraAllowedTools` | `[]` | Tools you allow in advance on this computer, e.g. `["Bash(mvn test *)"]`: for these tools, what the rules ask for goes to Claude Code's own permissions (allowed in advance, it runs; otherwise you are asked), and a rule that denies still blocks them. |
 
 ## Subscription or API key
 
@@ -110,10 +111,10 @@ The details are in ADR-013.
 
 ## Test the chain without using Claude
 
-`test/fixtures/stub-agent` (`.cmd` on Windows) runs instead of `claude`: it has three actions judged by the rules
+`test/fixtures/stub-agent` (`.cmd` on Windows) runs instead of `claude`: it has four actions judged by the rules
 through the real `PreToolUse` hook, goes through the **real** MCP server of the instance in a delegated session, reads
-and comments the issue, checks that what must be refused is refused, asks for one approval through the real
-`PermissionRequest` hook, then leaves a commit. Point `agent.command` to it. Never in production.
+and comments the issue, checks that what must be refused is refused, has one action asked to you through the same
+hook, then leaves a commit. Point `agent.command` to it. Never in production.
 
 ```bash
 npm test          # unit tests: rules and facts, branch names, config, tool boundary, live timeline, approvals, result parsing

@@ -302,9 +302,11 @@ class BrainVisibilityIntegrationTest extends AbstractIntegrationTest {
         Jwt.Builder jwt = Jwt.withTokenValue("t").header("alg", "none").claim("email", people.get(reader).getEmail());
         return switch (token) {
             case PERSONAL -> jwt.claim(PersonalTokenAuthenticator.TOKEN_CLAIM, 3L).build();
+            // Run et issue fictifs : la recherche est une lecture, que la portée admet quelle que soit l'issue du run.
             case DELEGATED -> jwt.claim(DeliverySessionFilter.RUN_CLAIM, 100L)
                 .claim(DeliverySessionFilter.WORKSPACE_CLAIM, SLUG)
                 .claim(DeliverySessionFilter.PROJECT_CLAIM, publicProject)
+                .claim(DeliverySessionFilter.ISSUE_CLAIM, 1L)
                 .build();
         };
     }
