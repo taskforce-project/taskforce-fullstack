@@ -611,6 +611,12 @@ public class IssueGestures {
         long issueId = requiredLong(args, "issueId");
         DeliveryAgentProvider provider = provider(optionalString(args, "agent", 60));
         IssueResponse issue = issueService.getIssue(slug, projectId, issueId, userId);
+        // Une mission déjà au travail sur l'issue : une deuxième partirait à côté (vérification du 02/11/2026).
+        DeliveryRunResponse current = deliveryService.latestRun(slug, issueId, userId).orElse(null);
+        if (current != null && ("QUEUED".equals(current.status()) || "RUNNING".equals(current.status()))) {
+            throw new BusinessException(named(issue) + " already has a mission at work: follow it with get_mission, or "
+                + "wait for its result before delegating again.");
+        }
         DeliveryRunResponse run = deliveryService.delegate(slug, issueId, provider.key(), null, userId);
         deliveryRunner.execute(run.id());
         return new Gesture("Delegated " + named(issue) + " to " + provider.displayName() + ". It starts when the runner "

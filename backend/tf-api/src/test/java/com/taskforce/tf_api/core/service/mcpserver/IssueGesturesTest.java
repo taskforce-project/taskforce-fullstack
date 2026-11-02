@@ -401,6 +401,19 @@ class IssueGesturesTest {
         assertThat(gesture.undo()).isNull(); // une mission lancée ne se défait pas d'ici : Cortex la demande d'abord
     }
 
+    @ParameterizedTest(name = "mission {0} : pas de deuxième mission à côté")
+    @ValueSource(strings = {"QUEUED", "RUNNING"})
+    void an_issue_with_a_mission_at_work_is_not_delegated_again(String status) throws Exception {
+        stubIssue(issue());
+        DeliveryAgentProvider claude = claude();
+        when(providers.all()).thenReturn(List.of(claude));
+        when(deliveryService.latestRun("acme", 5L, ME)).thenReturn(Optional.of(run(status, null, false, null)));
+
+        assertThatThrownBy(() -> gestures.delegate("acme", ME, args("{\"projectId\": 12, \"issueId\": 5}")))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("already has a mission at work");
+        verify(deliveryService, never()).delegate(any(), any(), any(), any(), any());
+    }
+
     @Test
     void an_unknown_agent_lists_the_agents() {
         DeliveryAgentProvider claude = claude();
