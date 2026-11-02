@@ -27,6 +27,11 @@ public record DeliveryRunResponse(
     /** Refusée au départ par une règle : l'écran dit « Not started », pas « Agent failed » (R38). */
     boolean refused,
     Long startedById,
+    /**
+     * Le nom de la personne qui a délégué (son e-mail sans nom) : pendant la mission, l'issue montre l'agent qui y
+     * travaille en son nom (« Claude Code, for Pierre »), sans changer son assigné.
+     */
+    String startedByName,
     LocalDateTime createdAt,
     LocalDateTime updatedAt,
     /** Le travail commencé (le runner a pris la mission) et fini, pour la durée de la carte de résultat (R78). */
@@ -49,7 +54,7 @@ public record DeliveryRunResponse(
                                String providerKey, String model, String status, String summary, String resultUrl, String error,
                                boolean refused, Long startedById, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this(id, issueId, issueKey, issueTitle, projectId, projectName, providerKey, model, status, summary, resultUrl, error,
-            refused, startedById, createdAt, updatedAt, null, null, null, null, null, null, null, null);
+            refused, startedById, null, createdAt, updatedAt, null, null, null, null, null, null, null, null);
     }
 
     /** {@code passedCount} sur {@code total}, quand la sortie des tests le dit. */

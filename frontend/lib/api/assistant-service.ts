@@ -21,7 +21,10 @@ export interface AssistantStep {
 }
 export interface AssistantToolCall {
   name: string
-  /** success, error, pending (proposé, il attend l'accord de la personne) ou refused (les règles de l'espace le refusent). */
+  /**
+   * success, error, pending (proposé, il attend l'accord de la personne), refused (les règles de l'espace le refusent) ou
+   * question (Cortex demande d'abord ce qui compte, rien n'est préparé).
+   */
   status: string
   input: string | null
   output: string | null
@@ -88,6 +91,14 @@ export function isApprovable(call: AssistantToolCall): boolean {
  */
 export function isPreparedIssue(call: AssistantToolCall): boolean {
   return call.name === "create_issue" && call.status === "pending" && Boolean(call.record)
+}
+
+/**
+ * Un appel que Cortex arrête pour demander d'abord ce qui compte (le projet, la personne nommée ; R102) : rien n'est
+ * préparé, et sa question suit dans la réponse. Rien à montrer pour l'appel lui-même.
+ */
+export function isQuestion(call: AssistantToolCall): boolean {
+  return call.status === "question"
 }
 
 /**

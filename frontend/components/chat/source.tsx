@@ -1,6 +1,7 @@
 "use client"
 
-import { ExternalLink, FileText } from "lucide-react"
+import { useState } from "react"
+import { ChevronRight, ExternalLink, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 /**
@@ -42,14 +43,25 @@ export function Source({ title, url, snippet, score, index }: SourceItem & { ind
   )
 }
 
-export function Sources({ items, className }: { items: SourceItem[]; className?: string }) {
+/**
+ * Les sources d'une réponse, repliées par défaut sur une ligne qui dit leur nombre : la réponse et ce qu'elle propose
+ * passent avant (revue UX du 01/11/2026), les notes se déplient pour qui veut vérifier.
+ */
+export function Sources({ items, className, defaultOpen = false }: { items: SourceItem[]; className?: string; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen)
   if (items.length === 0) return null
   return (
     <div className={cn("my-2 space-y-1.5", className)}>
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ChevronRight className={cn("size-3 transition-transform", open && "rotate-90")} />
         Sources ({items.length})
-      </div>
-      {items.map((it, i) => <Source key={i} index={i + 1} {...it} />)}
+      </button>
+      {open && items.map((it, i) => <Source key={i} index={i + 1} {...it} />)}
     </div>
   )
 }

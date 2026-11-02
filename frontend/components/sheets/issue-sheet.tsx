@@ -38,7 +38,10 @@ import { AssigneeMenu } from "@/components/smart-assign/assignee-menu"
 import { MissionResultCard } from "@/components/sheets/mission-result-card"
 import { DelegateAgentControl } from "@/components/sheets/delegate-agent-control"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
+import { describeActivity } from "@/lib/issue-activity"
+import { agentAtWork } from "@/lib/delivery/agent-at-work"
 import { IssueAiSpecPanel } from "@/components/issues/issue-ai-spec"
 import { IssueDescription } from "@/components/issues/issue-description"
 import { BrandLogo } from "@/components/ui/brand-logo"
@@ -436,6 +439,7 @@ const ACTIVITY_STEP = 10
  */
 function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, onDelete }: Readonly<ActivityFeedProps>) {
   const currentUser = useUserStore((s) => s.user)
+  const activityText = usePreferencesStore((s) => s.t.issueActivity)
   // Combien d'entrées afficher (pagination « charger plus ») - départ court pour garder l'issue lisible.
   const [visible, setVisible] = useState(ACTIVITY_INITIAL)
   const entries: FeedEntry[] = [
@@ -503,17 +507,20 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
               )
             }
             const a = entry.data
-            const actorName = a.actor ? (a.actor.displayName ?? a.actor.email) : "System"
+            // Qui a fait quoi : la personne, ou l'agent qui a agi pour elle (« Claude Code … for Pierre »).
+            const line = describeActivity(a, activityText)
             return (
               <div key={`e-${a.id}`} className="flex items-center gap-3">
                 <div className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border bg-muted">
-                  <div className="size-1.5 rounded-full bg-muted-foreground/40" />
+                  <div className={cn("size-1.5 rounded-full", a.via ? "bg-primary/60" : "bg-muted-foreground/40")} />
                 </div>
                 <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                  <span className="text-xs font-medium text-foreground">{actorName}</span>
+                  <span className="shrink-0 text-xs font-medium text-foreground">{line.who}</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    {a.action.replaceAll("_", " ").toLowerCase()}
-                    {a.oldValue && a.newValue && <> : <span className="text-muted-foreground/80">{a.oldValue}</span> → <span className="text-foreground">{a.newValue}</span></>}
+                    {line.what}
+                    {line.link && <> <a href={line.link.href} target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline">{line.link.label}</a></>}
+                    {line.change && <> : <span className="text-muted-foreground/80">{line.change.from}</span> → <span className="text-foreground">{line.change.to}</span></>}
+                    {line.forWhom && <span className="text-muted-foreground/70"> {line.forWhom}</span>}
                   </span>
                   <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/60">{formatCommentTime(a.createdAt)}</span>
                 </div>
@@ -1177,6 +1184,9 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const fetchDeliveryProviders = useDeliveryStore((s) => s.fetchProjectProviders)
   const delegateToAgent = useDeliveryStore((s) => s.delegate)
   const fetchDeliveryRun = useDeliveryStore((s) => s.fetchRun)
+  // La mission de l'issue : tant qu'elle court ou attend sa relecture, l'Assignee montre l'agent, au nom du délégant.
+  const deliveryRun = useDeliveryStore((s) => (issue ? s.runs[Number(issue.id)] : undefined))
+  const missionsText = usePreferencesStore((s) => s.t.missions)
   // Les agents de l'instance sont tous montrés ; celui qui ne peut pas partir pour la personne ou pour ce projet (runner
   // à créer, Claude Code déconnecté, dépôt à lier...) l'est grisé, avec ce qui manque (R37) : il ne disparaît plus.
   const availableAgents = useMemo(() => (deliveryProviders ?? []).filter((p) => p.available), [deliveryProviders])
@@ -1261,6 +1271,9 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const dueIso      = dueDate && /^\d{4}-\d{2}-\d{2}/.test(dueDate) ? dueDate.slice(0, 10) : ""
   const isOverdue   = dueDate === "Overdue" || (dueIso !== "" && dueIso < new Date().toISOString().slice(0, 10))
   const issueId     = Number(issue.id)
+  // « Claude Code, for Pierre » pendant la mission, sans changer l'assigné gardé (recette du 01/11/2026).
+  const agentWorking = agentAtWork(deliveryRun, deliveryProviders ?? [], missionsText.workingFor,
+    (key) => (key === "claude-code" ? missionsText.agent : key))
 
   // Use real statuses from store if loaded, fallback to category-based config
   const displayStatuses: ApiIssueStatus[] = storeStatuses
@@ -1651,6 +1664,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                   projectId={projectId}
                   issueId={issueId}
                   assignee={assignee}
+                  working={agentWorking ? { label: agentWorking, hint: missionsText.workingHint } : null}
                   members={projectMembers}
                   agents={availableAgents}
                   onAssign={async (userId) => {
@@ -1673,6 +1687,15 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                     if (res) {
                       toast.success(`Delegated to ${name}`)
                       fetchDeliveryRun(workspaceSlug, issueId).catch(() => { /* silent */ })
+                      // Une issue sans assigné prend pour assigné qui délègue (J4) : la fiche reprend l'assigné gardé,
+                      // qu'elle montre de nouveau une fois le résultat tranché.
+                      const stored = await fetchIssue(workspaceSlug, projectId, issueId)
+                      if (stored) {
+                        setAssignee(stored.assignee ? {
+                          name: stored.assignee.displayName ?? stored.assignee.email, userId: stored.assignee.id,
+                          email: stored.assignee.email, avatarUrl: stored.assignee.avatarUrl,
+                        } : null)
+                      }
                     } else {
                       toast.error("Couldn't delegate to the agent.", {
                         action: { label: "Open settings", onClick: () => openSettings("agents") },
@@ -1681,7 +1704,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                   }}
                 />
               ) : (
-                <span className="text-sm text-muted-foreground">{assignee?.name ?? "Unassigned"}</span>
+                <span className="text-sm text-muted-foreground">{agentWorking ?? assignee?.name ?? "Unassigned"}</span>
               )}
             </MetaRow>
 

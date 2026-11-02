@@ -287,6 +287,7 @@ async function check(config: RunnerConfig, api: TaskforceApi): Promise<boolean> 
   console.log(`  Leaving the machine: ${config.push ? (config.openPullRequest ? "push + pull request" : "push only") : "nothing (local branch)"}`);
   console.log(`  Repo-less tasks (non-code): ${config.acceptRepoless ? "accepted, result posted as a comment" : "refused (code only)"}`);
   console.log(`  Rules: each action is judged by the rules TaskForce sends with the task; those they ask for wait up to ${config.agent.approvalTimeoutMinutes} min for your answer in TaskForce, then are denied`);
+  console.log(`  Changes to TaskForce: ${config.agent.maxTaskForceChanges} per mission without asking, then each one waits for your answer`);
   return ok;
 }
 

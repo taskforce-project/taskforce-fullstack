@@ -96,7 +96,7 @@ const TAG_DESC = {
   "Notifications": "In-app notifications (Signals) and their state.",
   "AI assistant": "Cortex: conversations and AI help.",
   "Test bank": "Test cases drawn from Cortex answers, replayed on a named model without touching the workspace, and graded by code.",
-  "AI analysis (workflows)": "AI analysis jobs: plan, run and resume.",
+  "AI analysis (workflows)": "AI analysis jobs: launch, follow and resume.",
   "Brain OS": "The workspace's knowledge base: Markdown pages, links, tags, search and ingestion.",
   "Coding agents": "Delegating an issue to a coding agent (Claude Code, GitHub Copilot) and following the run.",
   "Coding agent runners": "Each person's local runner identity, created once, its secret shown once.",

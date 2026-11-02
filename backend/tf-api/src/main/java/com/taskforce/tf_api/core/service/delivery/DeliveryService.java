@@ -139,6 +139,7 @@ public class DeliveryService {
             r.getError(),
             r.isRefused(),
             r.getStartedBy() != null ? r.getStartedBy().getId() : null,
+            delegatorName(r),
             r.getCreatedAt(),
             r.getUpdatedAt(),
             r.getClaimedAt(),
@@ -150,6 +151,13 @@ public class DeliveryService {
                 Boolean.TRUE.equals(r.getTestsRan()), Boolean.TRUE.equals(r.getTestsPassed()), r.getTestsPassedCount(), r.getTestsTotal()),
             r.getOutcome() != null ? r.getOutcome().name() : null,
             r.getOutcomeAt());
+    }
+
+    /** Le nom de la personne qui a délégué, ou son e-mail quand elle n'en a pas ; null sans délégant connu. */
+    private static String delegatorName(DeliveryRun r) {
+        if (r.getStartedBy() == null) return null;
+        String name = r.getStartedBy().getDisplayName();
+        return name != null && !name.isBlank() ? name : r.getStartedBy().getEmail();
     }
 
     /**

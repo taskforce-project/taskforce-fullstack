@@ -1,4 +1,4 @@
-import { realpathSync } from "node:fs";
+import { lstatSync, realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 import type { Facts } from "./rules.js";
@@ -26,7 +26,22 @@ export const TASKFORCE_TOOLS: Readonly<Record<string, string>> = {
   add_comment: "comment.create",
   create_issue: "issue.create",
   update_issue: "issue.update",
+  // Cocher une ligne de la checklist change l'issue, et se défait d'un geste : la règle update-issue le permet (R77).
+  check_checklist_item: "issue.update",
 };
+
+/**
+ * Les actions de TaskForce qui y changent quelque chose : la porte en compte le nombre sur une mission, et demande
+ * au-delà d'un plafond (R110, séance n°16 ; approvals.ts).
+ */
+export const TASKFORCE_CHANGES: ReadonlySet<string> = new Set(["issue.update", "issue.create", "comment.create"]);
+
+/** Un outil MCP de TaskForce qui y change quelque chose (une issue, sa checklist, un commentaire, une issue créée). */
+export function changesTaskForce(toolName: string): boolean {
+  const name = /^mcp__taskforce__([a-z_]+)$/.exec(toolName)?.[1];
+  return name !== undefined && Object.hasOwn(TASKFORCE_TOOLS, name)
+    && TASKFORCE_CHANGES.has(TASKFORCE_TOOLS[name] ?? "");
+}
 
 const FILE_TOOLS: Record<string, string> = {
   Read: "file.read",
@@ -50,6 +65,34 @@ const QUOTED_HEREDOC = /\$\(cat <<-?(['"])(\w+)\1[ \t]*\n(?:(?![ \t]*\2[ \t]*\n)
  * fichier par redirection, écrire là où une option le dit (`--output`). `2>&1` ne touche aucun fichier et reste permis.
  */
 const OPAQUE = /\$\(|`|<|>(?!&[\d-])|--output/;
+
+/**
+ * Ce que le shell change avant d'exécuter : une variable (`$HOME`), un calcul, une accolade qui se déplie (`{a,/etc/x}`,
+ * `{1..3}`), un antislash hors guillemets (bash le retire, le module des chemins y voit un séparateur). Le mot qu'on lit
+ * n'est alors pas celui qui s'exécute. Entre guillemets simples rien ne change ; entre guillemets doubles, seul `$`.
+ */
+function expands(command: string): boolean {
+  let quote: "'" | "\"" | null = null;
+  for (let i = 0; i < command.length; i++) {
+    const c = command.charAt(i);
+    if (quote === "'") {
+      if (c === "'") quote = null;
+    } else if (c === "$") {
+      return true;
+    } else if (quote === "\"") {
+      if (c === "\\") i++;
+      else if (c === "\"") quote = null;
+    } else if (c === "\\") {
+      return true;
+    } else if (c === "'" || c === "\"") {
+      quote = c;
+    } else if (c === "{") {
+      const end = command.indexOf("}", i);
+      if (end > i && /,|\.\./.test(command.slice(i + 1, end))) return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Une action qu'on ne sait pas borner (commande opaque, chemin hors de la copie) : les règles qui refusent s'y
@@ -106,21 +149,72 @@ function words(command: string): string[] {
   return out;
 }
 
-/** Un mot qui désigne un chemin hors de la copie : absolu, `~`, qui remonte par `..`, ou dans `.git`. */
-function pointsOutside(word: string, workDir: string): boolean {
-  if (!/[\\/~]/.test(word) && !word.startsWith("..")) return false;
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(word)) return false; // une adresse, pas un chemin
-  return word.startsWith("~") || !locate(workDir, word).bounded;
+function isLink(path: string): boolean {
+  try {
+    return lstatSync(path).isSymbolicLink();
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Une commande simple. Elle se borne à son nom et à ses arguments : `npm test --prefix ../ailleurs` ou
- * `npm run build -- --outDir ../../x` portent le nom d'une commande permise mais travaillent hors de la copie.
+ * Un mot qui désigne un chemin hors de la copie, lu depuis `base` : absolu, `~`, qui remonte par `..`, dans `.git`, ou
+ * un nom nu qui est un lien du dépôt vers l'extérieur.
  */
-function commandFacts(command: string, workDir: string): Facts[] {
+function pointsOutside(word: string, workDir: string, base: string): boolean {
+  if (!/[\\/~]/.test(word) && !word.startsWith("..") && word !== ".git" && !isLink(join(base, word))) return false;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(word)) return false; // une adresse, pas un chemin
+  return word.startsWith("~") || !locate(workDir, word, base).bounded;
+}
+
+/**
+ * Une option courte peut porter sa valeur collée (`-fFICHIER`) : sans les options du programme, on ne sait pas où la
+ * valeur commence. Chaque suite possible après la première lettre se lit donc comme un chemin, comme la valeur d'une
+ * option `--clé=valeur` ; une seule qui sort de la copie suffit.
+ */
+function attachedOutside(word: string, workDir: string, base: string): boolean {
+  if (!/^-[^-]/.test(word)) return false;
+  for (let i = 2; i < word.length; i++) if (pointsOutside(word.slice(i), workDir, base)) return true;
+  return false;
+}
+
+/** Le dossier où mène `cd`, écrit en toutes lettres ; null sans cible unique (`cd` seul va au dossier personnel, `cd -` au précédent). */
+function cdTarget(args: string[]): string | null {
+  const targets = args.slice(1).filter((w) => !/^-[LPe@]+$/.test(w));
+  return targets.length === 1 && targets[0] !== "-" ? (targets[0] ?? null) : null;
+}
+
+/**
+ * Une commande simple, lue depuis `base` (le dossier où l'ont menée les `cd` qui la précèdent ; null quand on ne le sait
+ * plus). Elle se borne à son nom et à ses arguments : `npm test --prefix ../ailleurs` ou `npm run build -- --outDir
+ * ../../x` portent le nom d'une commande permise mais travaillent hors de la copie.
+ */
+function commandFacts(command: string, workDir: string, base: string | null): Facts[] {
   // `git commit` reste dans la copie : action à part entière, couverte par sa règle.
   const facts: Facts = { action: /^git commit( |$)/.test(command) ? "git.commit" : "shell", tool: "Bash", command };
-  return OPAQUE.test(command) || words(command).some((w) => pointsOutside(w, workDir)) ? unbounded(facts) : [facts];
+  const args = words(command);
+  const bounded = base !== null && !OPAQUE.test(command) && !expands(command)
+    && !(args[0] === "cd" && cdTarget(args) === null)
+    && !args.some((w) => pointsOutside(w, workDir, base) || attachedOutside(w, workDir, base));
+  return bounded ? [facts] : unbounded(facts);
+}
+
+/**
+ * Les faits d'une commande, morceau par morceau. `cd` change le dossier des morceaux qui suivent : leurs chemins se
+ * lisent depuis là. Après un `cd` qu'on ne sait pas borner, plus aucun morceau ne se borne.
+ */
+function shellFacts(parts: string[], workDir: string): Facts[] {
+  const facts: Facts[] = [];
+  let base: string | null = workDir;
+  for (const part of parts) {
+    const partFacts = commandFacts(part, workDir, base);
+    facts.push(...partFacts);
+    const args = words(part);
+    if (args[0] !== "cd") continue;
+    const target = cdTarget(args);
+    base = base !== null && target !== null && partFacts.length === 1 ? realPath(resolve(base, target)) : null;
+  }
+  return facts;
 }
 
 /** Le chemin réel, liens suivis ; pour un fichier à créer, celui de son dossier. */
@@ -134,11 +228,12 @@ function realPath(path: string): string {
 }
 
 /**
- * Où tombe un chemin, liens suivis : relatif à la copie quand il y est, absolu sinon. `.git` est dans la copie mais
- * n'est pas le travail de l'agent : un hook ou un `core.fsmonitor` écrit là s'exécuterait au prochain commit.
+ * Où tombe un chemin lu depuis `base` (la copie par défaut), liens suivis : relatif à la copie quand il y est, absolu
+ * sinon. `.git` est dans la copie mais n'est pas le travail de l'agent : un hook ou un `core.fsmonitor` écrit là
+ * s'exécuterait au prochain commit.
  */
-function locate(workDir: string, path: string): { path: string; bounded: boolean } {
-  const target = realPath(resolve(workDir, path));
+function locate(workDir: string, path: string, base: string = workDir): { path: string; bounded: boolean } {
+  const target = realPath(resolve(base, path));
   const rel = relative(realPath(resolve(workDir)), target).split("\\").join("/");
   if (rel === ".." || rel.startsWith("../") || isAbsolute(rel)) return { path: target.split("\\").join("/"), bounded: false };
   return { path: rel || ".", bounded: rel !== ".git" && !rel.startsWith(".git/") };
@@ -173,7 +268,7 @@ export function toolFacts(toolName: string, toolInput: unknown, workDir: string)
   if (toolName === "Bash") {
     const command = (typeof input.command === "string" ? input.command : "").replace(/\r\n/g, "\n");
     const parts = splitCommand(command.replace(QUOTED_HEREDOC, "…"));
-    return parts.length > 0 ? parts.flatMap((part) => commandFacts(part, workDir)) : [{ tool: "Bash", command }];
+    return parts.length > 0 ? shellFacts(parts, workDir) : [{ tool: "Bash", command }];
   }
 
   if (toolName === "WebFetch") return [{ action: "web.fetch", tool: toolName }];

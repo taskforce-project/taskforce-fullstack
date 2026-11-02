@@ -58,11 +58,14 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
     /** En-tête qui désigne le run dont la requête emprunte la session. */
     public static final String RUN_HEADER = "X-TaskForce-Delivery-Run";
 
-    /** Claims du principal délégué : run, runner, et la portée (workspace, projet) que le serveur MCP rejuge. */
+    /** Claims du principal délégué : run, runner, et la portée (workspace, projet, issue) que le serveur MCP rejuge. */
     public static final String RUN_CLAIM = "tf_delivery_run";
     public static final String RUNNER_CLAIM = "tf_delivery_runner";
     public static final String WORKSPACE_CLAIM = "tf_delivery_workspace";
     public static final String PROJECT_CLAIM = "tf_delivery_project";
+    public static final String ISSUE_CLAIM = "tf_delivery_issue";
+    /** Le nom de l'agent du run, que l'activité d'une issue garde avec l'action faite au nom du délégant. */
+    public static final String AGENT_CLAIM = "tf_delivery_agent";
 
     /** Endpoints machine du runner : authentifiés par son identité propre, sans délégation. */
     public static final String RUNNER_API_PREFIX = "/api/delivery/runner/";
@@ -100,7 +103,8 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
             deny(response, path, "session refused");
             return;
         }
-        if (!DeliverySessionScope.allows(request.getMethod(), path, session.workspaceSlug(), session.projectId())) {
+        if (!DeliverySessionScope.allows(request.getMethod(), path, session.workspaceSlug(), session.projectId(),
+            session.issueId())) {
             deny(response, path, "out of scope (run " + session.runId() + ")");
             return;
         }
@@ -126,7 +130,11 @@ public class DeliverySessionFilter extends OncePerRequestFilter implements PostA
             .claim(RUN_CLAIM, session.runId())
             .claim(RUNNER_CLAIM, session.runnerClientId())
             .claim(WORKSPACE_CLAIM, session.workspaceSlug())
-            .claim(PROJECT_CLAIM, session.projectId());
+            .claim(PROJECT_CLAIM, session.projectId())
+            .claim(ISSUE_CLAIM, session.issueId());
+        if (session.agentName() != null) {
+            builder.claim(AGENT_CLAIM, session.agentName());
+        }
         if (machine.getIssuedAt() != null) {
             builder.issuedAt(machine.getIssuedAt());
         }

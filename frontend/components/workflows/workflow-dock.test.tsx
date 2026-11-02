@@ -132,14 +132,71 @@ describe("WorkflowPanelContent : historique des délégations", () => {
   });
 
   it("délégations et analyses cohabitent, les délégations d'abord", () => {
-    const job = {
-      id: 3, projectId: 17, projectName: "Web Application", depth: "QUICK", status: "DONE", plan: [], question: null, error: null,
-    } as unknown as AnalysisJob;
-    seed([makeRun()], [job]);
+    seed([makeRun()], [makeJob()]);
     const { container } = render(<WorkflowPanelContent />);
 
     const labels = [...container.querySelectorAll("p")].map((p) => p.textContent ?? "").filter((t) => /^(Delegations|Analyses)/.test(t));
     expect(labels.map((t) => t.replace(/\s*\d+$/, ""))).toEqual(["Delegations", "Analyses"]);
     expect(within(container).getByText("Web Application")).toBeInTheDocument();
+  });
+});
+
+function makeJob(overrides: Partial<AnalysisJob> = {}): AnalysisJob {
+  return {
+    id: 3, projectId: 17, projectName: "Web Application", depth: "QUICK", status: "DONE", question: null, error: null,
+    briefId: 12, createdAt: "2026-11-01T09:00:00", updatedAt: "2026-11-01T09:00:20",
+    ...overrides,
+  };
+}
+
+describe("WorkflowPanelContent : une analyse se suit par son statut, sans plan d'étapes figé (TF-J1-3)", () => {
+  beforeEach(() => {
+    push.mockClear();
+    useWorkspaceStore.setState({ activeWorkspace: { slug: "acme" } as never });
+  });
+
+  it.each([
+    ["QUEUED", "Queued", "Waiting to start."],
+    ["RUNNING", "Running", "The analysis is running. Its result will show on the Intelligence page."],
+  ] as const)("analyse %s : dépliée d'office, son statut et une phrase, aucune étape ni bouton", (status, pill, sentence) => {
+    seed([], [makeJob({ status, briefId: null })]);
+    render(<WorkflowPanelContent />);
+
+    expect(screen.getByText(pill)).toBeInTheDocument();
+    expect(screen.getByText(sentence)).toBeInTheDocument();
+    for (const step of ["Observe the project", "Gather the context", "Analyze and decide", "Save the decision"]) {
+      expect(screen.queryByText(step)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByRole("button", { name: /View result|Relaunch|Archive/ })).not.toBeInTheDocument();
+  });
+
+  it("analyse en attente de la personne : la question du modèle et la réponse, sans étape « Clarify »", () => {
+    seed([], [makeJob({ depth: "DEEP", status: "WAITING_FOR_INPUT", question: "Which deadline matters most?", briefId: null })]);
+    render(<WorkflowPanelContent />);
+
+    expect(screen.getByText("Waiting for input")).toBeInTheDocument();
+    expect(screen.getByText(/Which deadline matters most\?/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Your reply…")).toBeInTheDocument();
+    expect(screen.queryByText("Clarify with the person")).not.toBeInTheDocument();
+  });
+
+  it("analyse terminée : « View result » ouvre la page Intelligence", () => {
+    seed([], [makeJob()]);
+    render(<WorkflowPanelContent />);
+    fireEvent.click(screen.getByText("Web Application"));
+
+    fireEvent.click(screen.getByRole("button", { name: /View result/ }));
+    expect(push).toHaveBeenCalledWith("/acme/analytics");
+    expect(screen.getByRole("button", { name: /Archive/ })).toBeInTheDocument();
+  });
+
+  it("analyse en échec : l'erreur, « Relaunch » et « Archive »", () => {
+    seed([], [makeJob({ status: "FAILED", error: "The model is unavailable.", briefId: null })]);
+    render(<WorkflowPanelContent />);
+    fireEvent.click(screen.getByText("Web Application"));
+
+    expect(screen.getByText("The model is unavailable.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Relaunch/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Archive/ })).toBeInTheDocument();
   });
 });
