@@ -7,7 +7,9 @@ import { after, describe, it } from "node:test";
 import { exitFacts, judgeExit } from "../src/exits.js";
 import { visibilityOf } from "../src/git.js";
 import { canonicalJson, chain, firstBrokenLink, ZERO_HASH, type EventInput, type Json } from "../src/harness/evidence.js";
-import { INTERNAL_TOOLS, splitCommand, TASKFORCE_TOOLS, toolFacts } from "../src/harness/facts.js";
+import {
+  changesTaskForce, INTERNAL_TOOLS, splitCommand, TASKFORCE_CHANGES, TASKFORCE_TOOLS, toolFacts,
+} from "../src/harness/facts.js";
 import { globMatch } from "../src/harness/glob.js";
 import { bundleDigest, decide, decideAll, verifiedBundle, type Effect, type Facts, type RulesBundle } from "../src/harness/rules.js";
 import { verifyEvidence } from "../src/harness/verify.js";
@@ -225,6 +227,30 @@ describe("faits d'une action de Claude Code, jugés par la table par défaut", (
 
   it("chaque outil MCP de TaskForce a sa règle dans la table par défaut", () => {
     for (const [tool, action] of Object.entries(TASKFORCE_TOOLS)) assert.notEqual(decide(defaults, { action }).rule, null, tool);
+  });
+
+  // R110 (séance n°16) : la porte compte les changements dans TaskForce, et demande au-delà d'un plafond par mission.
+  const changes: Array<[string, boolean]> = [
+    ["mcp__taskforce__update_issue", true],
+    ["mcp__taskforce__check_checklist_item", true],
+    ["mcp__taskforce__add_comment", true],
+    ["mcp__taskforce__create_issue", true],
+    ["mcp__taskforce__get_issue", false],
+    ["mcp__taskforce__list_issues", false],
+    ["mcp__taskforce__brain_search", false],
+    ["mcp__taskforce__ask_cortex", false],
+    ["mcp__taskforce__constructor", false],
+    ["mcp__linear__save_issue", false],
+    ["Edit", false],
+    ["Bash", false],
+  ];
+  for (const [tool, expected] of changes) {
+    it(`change TaskForce : ${tool} -> ${expected}`, () => assert.equal(changesTaskForce(tool), expected));
+  }
+
+  it("chaque action qui change TaskForce est celle d'un outil MCP de TaskForce", () => {
+    const actions = new Set(Object.values(TASKFORCE_TOOLS));
+    for (const action of TASKFORCE_CHANGES) assert.ok(actions.has(action), action);
   });
 
   it("un outil interne n'a aucun fait", () => {

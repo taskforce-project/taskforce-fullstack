@@ -183,6 +183,8 @@ export async function runAgent(
     waitMs: config.agent.approvalTimeoutMinutes * 60_000,
     rules: opts.rules,
     allowedInAdvance: config.agent.extraAllowedTools,
+    // Au-delà de ce nombre de changements dans TaskForce sur la mission, chacun se demande (R110).
+    maxTaskForceChanges: config.agent.maxTaskForceChanges,
     // Chaque décision des règles va au dossier de preuve de la mission (le serveur ne l'affiche pas dans la chronologie).
     onDecision: (tool, d, input) => {
       log.info(`Rule decision: ${tool} ${d.effect}${d.rule ? ` (${d.rule.id})` : ""}`);

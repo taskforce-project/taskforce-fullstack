@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import type { Approval, AskedBy, Ruling } from "./api.js";
-import { toolFacts } from "./harness/facts.js";
+import { changesTaskForce, toolFacts } from "./harness/facts.js";
 import { decide, decideAll, type Decision, type Facts, type Rule, type RulesBundle } from "./harness/rules.js";
 import { log } from "./log.js";
 import { describeToolInput, toolLabel } from "./stream.js";
@@ -15,7 +15,8 @@ import { describeToolInput, toolLabel } from "./stream.js";
  *   se tranche aussitôt ; ce qu'elles demandent est demandé ici même : le serveur ouvre la demande dans TaskForce, attend
  *   la décision de la personne qui a délégué, puis répond autoriser ou refuser. Aucune action ne repart sans décision :
  *   ce que les règles demandent, la personne le décide avant que l'action parte, quelles que soient les permissions
- *   propres de Claude Code ;
+ *   propres de Claude Code. Au-delà d'un plafond par mission, un changement dans TaskForce que les règles autorisent se
+ *   demande de la même façon (R110) ;
  * - `PermissionRequest` (OSS-5.4), en secours : ce que Claude Code demande encore (un outil que la personne a autorisé
  *   d'avance sur son poste, `allowedInAdvance`, dont les demandes lui reviennent) est demandé de la même façon.
  *
@@ -47,6 +48,12 @@ export interface ApprovalServerOptions {
    * d'avance, l'appel passe ; sinon il arrive au hook `PermissionRequest`. Un refus des règles tient toujours.
    */
   allowedInAdvance?: string[];
+  /**
+   * Plafond par mission des changements de l'agent dans TaskForce (R110, séance n°16) : ceux que les règles autorisent
+   * passent sans demander jusqu'à ce nombre ; au-delà, chacun se demande comme une règle qui demande, et un accord pour
+   * la mission lève le plafond pour le reste de la mission. Absent : pas de plafond.
+   */
+  maxTaskForceChanges?: number;
   /** Attente maximale d'une décision ; au-delà, refus. */
   waitMs: number;
   /** Intervalle de lecture de la décision. */
@@ -55,6 +62,22 @@ export interface ApprovalServerOptions {
 
 const DENIED_BY_PERSON = "Denied in TaskForce: the person who delegated this task did not allow this action. Do not retry "
   + "it; find another way or explain in your summary what you needed.";
+
+/**
+ * Le plafond des changements dans TaskForce (R110) : son nom dans la trace, et la portée d'un accord pour la mission
+ * qui le lève. Les deux-points le distinguent de toute règle du paquet (`^[a-z0-9][a-z0-9-]+$`) : un accord donné à
+ * une règle ne lève pas le plafond.
+ */
+export const CHANGES_CAP = "cap:taskforce-changes";
+
+/** Le plafond atteint, demandé comme par une règle, avec une raison que la personne lit. */
+function changesCap(made: number, cap: number): Rule {
+  return {
+    id: CHANGES_CAP, when: {}, class: "reversible-exit", effect: "ask", inverse: null, owner: "runner", review: "",
+    reason: `Claude Code has already made ${made} changes to TaskForce in this mission. `
+      + `Past ${cap}, it asks before each one.`,
+  };
+}
 
 /**
  * Réponse du hook `PreToolUse` à une décision des règles qui autorise ou refuse. Ce qu'elles demandent ne passe pas
@@ -186,6 +209,8 @@ export class ApprovalServer {
   private readonly pollMs: number;
   /** Ce que la personne a autorisé pour toute la mission (R46) : la portée de chaque morceau qui demandait. */
   private readonly allowedForMission = new Set<string>();
+  /** Les changements dans TaskForce que les règles autorisent et que la porte a laissés passer (R110). */
+  private changes = 0;
 
   constructor(
     private readonly api: ApprovalApi,
@@ -244,9 +269,12 @@ export class ApprovalServer {
       if (decision.effect !== "ask") {
         this.reply(res, 200, preToolUseDecision({ effect: decision.effect, rule: decision.rule }));
       } else if (this.inAdvance(tool)) {
+        this.passed(decision);
         this.reply(res, 200, {}); // aux permissions de Claude Code : autorisé d'avance, ou le hook PermissionRequest
       } else {
-        this.reply(res, 200, preToolUseAnswer(await this.askPerson(tool, input.tool_input)));
+        const allow = await this.askPerson(tool, input.tool_input, decision);
+        if (allow) this.passed(decision);
+        this.reply(res, 200, preToolUseAnswer(allow));
       }
       return;
     }
@@ -262,11 +290,12 @@ export class ApprovalServer {
 
   /**
    * Demande à la personne qui a délégué, sauf si elle a déjà autorisé pour toute la mission chacun des morceaux qui
-   * demandent (R46) ; vrai seulement si elle autorise.
+   * demandent (R46) ; vrai seulement si elle autorise. `decision` : ce que la porte a jugé, quand la demande vient du
+   * hook `PreToolUse` (le plafond y demande à la place d'une règle).
    */
-  private async askPerson(tool: string, toolInput: unknown): Promise<boolean> {
+  private async askPerson(tool: string, toolInput: unknown, decision?: Decision): Promise<boolean> {
     const summary = describeToolInput(tool, toolInput, this.workDir) || "(no details)";
-    const { scopes, ...ruling } = this.ruling(tool, toolInput);
+    const { scopes, ...ruling } = this.ruling(tool, toolInput, decision);
     if (scopes.every((s) => this.allowedForMission.has(s))) {
       const scope = scopes.join(", ");
       log.info(`Allowed for this mission earlier: ${tool} (${scope})`);
@@ -281,26 +310,55 @@ export class ApprovalServer {
     return allow;
   }
 
-  /** Juge une action avec les règles de la mission ; sans règles, on demande (rien n'est autorisé d'office). */
+  /**
+   * Juge une action avec les règles de la mission, puis le plafond des changements dans TaskForce ; sans règles, on
+   * demande (rien n'est autorisé d'office). La trace reçoit la décision qui s'applique.
+   */
   judge(input: Record<string, unknown>): Decision {
     const tool = typeof input.tool_name === "string" ? input.tool_name : "unknown tool";
     const rules = this.options.rules;
-    const decision: Decision = rules
+    const ruled: Decision = rules
       ? decideAll(rules, toolFacts(tool, input.tool_input, this.workDir))
       : { effect: "ask", rule: null };
+    const decision = this.capped(tool, ruled);
     this.options.onDecision?.(tool, decision, input.tool_input);
     return decision;
   }
 
   /**
-   * Ce que les règles disent d'une action demandée, sans la trace (le hook `PreToolUse` l'a déjà écrite) : l'action, la
-   * règle qui demande et sa raison, et les portées d'un accord pour la mission ({@link missionScopes}).
+   * Le plafond par mission des changements dans TaskForce (R110, séance n°16). Un changement que les règles autorisent
+   * passe tant que la mission en compte moins que le plafond ; au-delà, il se demande comme une règle qui demande, avec
+   * le nombre de changements déjà faits pour raison. Ce que les règles demandent ou refusent ne compte pas : la
+   * personne en décide déjà, ou rien ne passe.
    */
-  ruling(tool: string, toolInput: unknown): Ruling & { scopes: string[] } {
+  private capped(tool: string, decision: Decision): Decision {
+    const cap = this.options.maxTaskForceChanges;
+    if (cap === undefined || decision.effect !== "allow" || !changesTaskForce(tool)) return decision;
+    if (this.changes < cap) {
+      this.changes++;
+      return decision;
+    }
+    return { effect: "ask", rule: changesCap(this.changes, cap) };
+  }
+
+  /** Au-delà du plafond, un changement que la personne laisse passer compte aussi. */
+  private passed(decision: Decision): void {
+    if (decision.rule?.id === CHANGES_CAP) this.changes++;
+  }
+
+  /**
+   * Ce que les règles disent d'une action demandée, sans la trace (le hook `PreToolUse` l'a déjà écrite) : l'action, la
+   * règle qui demande et sa raison, et les portées d'un accord pour la mission ({@link missionScopes}). Au-delà du
+   * plafond, c'est lui qui demande, et un accord pour la mission le lève ({@link CHANGES_CAP}).
+   */
+  ruling(tool: string, toolInput: unknown, judged?: Decision): Ruling & { scopes: string[] } {
     const facts = toolFacts(tool, toolInput, this.workDir);
+    const action = facts.find((f) => f.action)?.action;
+    if (judged?.rule?.id === CHANGES_CAP) {
+      return { ...(action ? { action } : {}), rule: CHANGES_CAP, reason: judged.rule.reason, scopes: [CHANGES_CAP] };
+    }
     const rules = this.options.rules;
     const decision: Decision = rules ? decideAll(rules, facts) : { effect: "ask", rule: null };
-    const action = facts.find((f) => f.action)?.action;
     return {
       ...(action ? { action } : {}),
       ...(decision.rule ? { rule: decision.rule.id, reason: decision.rule.reason } : {}),
