@@ -73,6 +73,11 @@ public class CortexUndo {
         return switch (tool) {
             case "update_issue" -> gestures.restore(ctx.slug(), ctx.userId(), result.get("undo"));
             case "add_comment" -> gestures.removeComment(ctx.slug(), ctx.userId(), result.get("undo"));
+            // Le geste du MCP (R115) garde le projet créé ; un dossier d'avant ne garde que la phrase de l'outil.
+            case "create_project" -> result.path("undo").hasNonNull("projectId")
+                ? removeProject(result.path("undo").path("projectId").asLong(),
+                    result.path("undo").path("createdRepository").asText(null), ctx)
+                : undo(tool, result.path("output").asText(""), ctx);
             default -> undo(tool, result.path("output").asText(""), ctx);
         };
     }
@@ -91,7 +96,14 @@ public class CortexUndo {
     private String undoProject(String output, AgentContext ctx) {
         Matcher created = PROJECT.matcher(output);
         if (!created.matches()) throw new BusinessException("This answer created no project to undo.");
-        Long projectId = Long.valueOf(created.group(3));
+        return removeProject(Long.valueOf(created.group(3)), null, ctx);
+    }
+
+    /**
+     * Retire le projet resté vide. Un dépôt GitHub créé avec lui ne se défait pas d'ici : il reste, et la phrase le dit
+     * (R115 : c'est pourquoi sa création se demande).
+     */
+    private String removeProject(Long projectId, String createdRepository, AgentContext ctx) {
         Project project = projects.findByIdAndWorkspaceId(projectId, ctx.workspaceId())
             .orElseThrow(() -> new BusinessException("This project no longer exists."));
         if (issues.countByProjectId(projectId) > 0) {
@@ -111,7 +123,9 @@ public class CortexUndo {
         if (folder != null) knowledge.deleteNode(ctx.slug(), folder.getId(), ctx.userId());
         projectService.deleteProject(ctx.slug(), projectId, ctx.userId());
         return "Removed the project " + project.getIdentifier() + " \"" + project.getName() + "\""
-            + (pages.isEmpty() ? "." : " and its " + pages.size() + " knowledge pages.");
+            + (pages.isEmpty() ? "." : " and its " + pages.size() + " knowledge pages.")
+            + (createdRepository == null || createdRepository.isBlank() ? ""
+                : " Its repository " + createdRepository + " stays on GitHub: delete it there if you want it gone.");
     }
 
     private String undoIssue(String output, AgentContext ctx) {

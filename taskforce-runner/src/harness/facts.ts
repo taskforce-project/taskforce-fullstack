@@ -33,13 +33,15 @@ export const TASKFORCE_TOOLS: Readonly<Record<string, string>> = {
   get_mission: "issue.read",
   // Supprimer une issue ne se défait pas : la règle delete-issue la demande.
   delete_issue: "issue.delete",
+  // Créer un projet, geste du MCP depuis R115 (séance n°17) : hors de la portée d'une mission, jamais proposé à l'agent.
+  create_project: "project.create",
 };
 
 /**
  * Les actions de TaskForce qui y changent quelque chose : la porte en compte le nombre sur une mission, et demande
  * au-delà d'un plafond (R110, séance n°16 ; approvals.ts).
  */
-export const TASKFORCE_CHANGES: ReadonlySet<string> = new Set(["issue.update", "issue.create", "comment.create"]);
+export const TASKFORCE_CHANGES: ReadonlySet<string> = new Set(["issue.update", "issue.create", "comment.create", "project.create"]);
 
 /** Un outil MCP de TaskForce qui y change quelque chose (une issue, sa checklist, un commentaire, une issue créée). */
 export function changesTaskForce(toolName: string): boolean {

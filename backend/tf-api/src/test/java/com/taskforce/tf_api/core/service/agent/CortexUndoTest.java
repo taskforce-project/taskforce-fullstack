@@ -259,4 +259,23 @@ class CortexUndoTest {
 
         assertThat(undo.undo("create_project", kept, ctx)).startsWith("Removed the project PRICING");
     }
+
+    /**
+     * Le geste du MCP (R115) garde le projet créé : sa phrase peut dire aussi son dépôt. Un dépôt créé avec lui reste
+     * sur GitHub, et la phrase le dit.
+     */
+    @ParameterizedTest(name = "dépôt créé {0}")
+    @CsvSource(nullValues = "-", value = {
+        "-,          Removed the project PRICING \"Pricing\".",
+        "acme/pricing, Removed the project PRICING \"Pricing\". Its repository acme/pricing stays on GitHub: delete it there if you want it gone.",
+    })
+    void a_project_of_the_gesture_is_undone_by_what_it_kept(String repository, String said) throws Exception {
+        project();
+        String kept = "{\"tool\": \"create_project\", \"status\": \"success\", \"output\": \"Project created in TaskForce: "
+            + "PRICING \\\"Pricing\\\" (id 27). Its new private repository x/y is linked.\", \"undo\": {\"projectId\": 27"
+            + (repository == null ? "" : ", \"createdRepository\": \"" + repository + "\"") + "}}";
+
+        assertThat(undo.undo("create_project", new ObjectMapper().readTree(kept), ctx)).isEqualTo(said);
+        verify(projectService).deleteProject("acme", 27L, 7L);
+    }
 }

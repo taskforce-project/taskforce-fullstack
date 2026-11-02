@@ -35,6 +35,7 @@ import com.taskforce.tf_api.core.service.agent.AgentService;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.core.service.agent.tools.IssueFields;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
+import com.taskforce.tf_api.core.service.mcpserver.McpTool.Need;
 
 /**
  * Les outils du serveur MCP de l'instance (OSS-5.2) : lire le workspace (projets, issues, Brain OS, indicateurs),
@@ -59,12 +60,15 @@ public class TaskforceMcpTools {
     /** Les actions du contrat des règles que font les outils : lire une issue, la changer. */
     private static final String READ = "issue.read";
     private static final String UPDATE = "issue.update";
+    /** L'argument qui nomme l'issue d'un geste, que TaskForce demande quand la demande ne la désigne pas (R115). */
+    private static final String ISSUE = "issue";
 
     /**
-     * Les gestes que Cortex fait dans la conversation (TF-J1-5). Ses lectures et la carte de l'issue qu'il prépare ont
-     * encore leurs outils à lui, qui passeront ici à leur tour (ADR-024).
+     * Les gestes que Cortex fait dans la conversation (TF-J1-5), et créer un projet (R115, TF-J1-8). Ses lectures et la
+     * carte de l'issue qu'il prépare ont encore leurs outils à lui, qui passeront ici à leur tour (ADR-024).
      */
-    static final List<String> CORTEX = List.of("update_issue", "add_comment", "delegate_issue", "get_mission", "delete_issue");
+    static final List<String> CORTEX = List.of("update_issue", "add_comment", "delegate_issue", "get_mission", "delete_issue",
+        "create_project");
 
     private final ObjectMapper mapper;
     private final IssueGestures gestures;
@@ -82,7 +86,8 @@ public class TaskforceMcpTools {
         BrainSearchService brainSearchService,
         AnalyticsService analyticsService,
         @Lazy AgentService agentService,
-        IssueGestures gestures
+        IssueGestures gestures,
+        ProjectGestures projectGestures
     ) {
         this.mapper = mapper;
         this.gestures = gestures;
@@ -203,7 +208,8 @@ public class TaskforceMcpTools {
                     .string("dueDate", "Due date as YYYY-MM-DD; \"none\" removes it", false)
                     .build(),
                 false, UPDATE, "PATCH", args -> issuePath(args),
-                (slug, userId, args) -> gestures.update(slug, userId, args)),
+                (slug, userId, args) -> gestures.update(slug, userId, args))
+                .needing(Need.asked(ISSUE, "Which issue should change?")),
 
             new McpTool("check_checklist_item", "Check a checklist item",
                 "Check or uncheck one item of the issue's checklist, by its id from get_issue. Check an item when you have "
@@ -228,7 +234,9 @@ public class TaskforceMcpTools {
                     .string("content", "The comment, in markdown (10,000 characters at most)", true)
                     .build(),
                 false, "comment.create", "POST", args -> issuePath(args) + "/comments",
-                (slug, userId, args) -> gestures.comment(slug, userId, args)),
+                (slug, userId, args) -> gestures.comment(slug, userId, args))
+                .needing(Need.asked(ISSUE, "Which issue should get the comment?"),
+                    Need.asked("content", "What should the comment say?")),
 
             new McpTool("delegate_issue", "Delegate an issue to an agent",
                 "Hand an issue to a coding agent (Claude Code unless you name another): a mission starts on the person's "
@@ -237,21 +245,48 @@ public class TaskforceMcpTools {
                     .string("agent", "The agent, by name (default: Claude Code)", false)
                     .build(),
                 false, "mission.start", "POST", args -> "delivery/issues/" + requiredLong(args, "issueId") + "/delegate",
-                (slug, userId, args) -> gestures.delegate(slug, userId, args)),
+                (slug, userId, args) -> gestures.delegate(slug, userId, args))
+                .needing(Need.asked(ISSUE, "Which issue should Claude Code work on?"),
+                    Need.byDefault("agent", "Claude Code")),
 
             new McpTool("delete_issue", "Delete an issue",
                 "Delete an issue for good, with its comments, its checklist and its mission: it cannot be undone. To only "
                     + "hide it from the board, archive it instead, which can be undone.",
                 issue(schema()).build(),
                 false, "issue.delete", "DELETE", args -> issuePath(args),
-                (slug, userId, args) -> gestures.delete(slug, userId, args)),
+                (slug, userId, args) -> gestures.delete(slug, userId, args))
+                .needing(Need.asked(ISSUE, "Which issue should be deleted?")),
 
             new McpTool("get_mission", "Get the mission of an issue",
                 "Where the mission of an issue stands: waiting for the runner, at work, asking the person something, or done "
                     + "with a result to review. It decides nothing: the person answers on the cards.",
                 issue(schema()).build(),
                 true, READ, "GET", args -> "delivery/issues/" + requiredLong(args, "issueId") + "/run",
-                (slug, userId, args) -> gestures.mission(slug, userId, args)),
+                (slug, userId, args) -> gestures.mission(slug, userId, args))
+                .needing(Need.asked(ISSUE, "Which issue's mission do you mean?")),
+
+            new McpTool("create_project", "Create a project",
+                "Create a TaskForce project. Pass name only if the person gave one, and stack if they say what it is built "
+                    + "with: TaskForce asks the rest.",
+                schema().string("name", "The project's name, as the person gave it; leave it out when they gave none", false)
+                    .string("stack", "What it is built with, when the person says it: Next.js, Spring, a mobile app", false)
+                    .string("description", "A short description, from the request", false)
+                    .string("identifier", "Issue prefix, 2 to 10 capitals or digits (default: from the name)", false)
+                    .string("repository", "Where its code lives: \"new\" for a new GitHub repository, \"none\", or an "
+                        + "existing repository as owner/name", false)
+                    .string("repositoryVisibility", "For a new repository: \"private\" or \"public\"", false)
+                    .build(),
+                false, "project.create", "POST", args -> "projects",
+                (slug, userId, args) -> projectGestures.create(slug, userId, args))
+                .needing(
+                    Need.askedWhen("name", "What should the project be called?", null,
+                        "the request gives no name, or only what it is built with"),
+                    Need.askedWhen("repository", "Where does its code live?", null,
+                        "a code project (a stack is named), where TaskForce can create or link a repository"),
+                    Need.askedWhen("repositoryVisibility", "Who can see the new repository?", "private",
+                        "a new repository: it can't be undone from TaskForce, so its visibility is asked with it"),
+                    Need.byDefault("identifier", "from the name"),
+                    Need.byDefault("visibility", "the project's members only")),
 
             new McpTool("smart_assign", "Recommend an assignee",
                 "Recommend the best assignee for an issue (workload, skills, history), with the reasons. It does not assign: "
@@ -306,12 +341,12 @@ public class TaskforceMcpTools {
 
     /**
      * L'issue d'un outil : sa clé, ou le couple projectId et issueId qu'un agent délégué connaît déjà. Une issue nommée
-     * par sa colonne ou son titre (« celle qui est dans In review by AI ») se trouve d'abord par list_issues, qui filtre
-     * par colonne.
+     * par sa colonne ou son titre (« celle qui est dans In review by AI ») se lit à l'écran ou par list_issues, qui
+     * filtre par colonne ; sans issue sûre, TaskForce demande laquelle à la personne (R115).
      */
     private static SchemaBuilder issue(SchemaBuilder schema) {
-        return schema.string("issue", "The issue's key, like TF-12 (or pass projectId and issueId). For an issue named by "
-                + "its column or title, find its key with list_issues, which gives each issue's column", false)
+        return schema.string(ISSUE, "The issue's key, like TF-12 (or projectId and issueId). By column or title: its key "
+                + "is on screen or in list_issues. Unsure: leave it out, TaskForce asks", false)
             .integer("projectId", "Project id, with issueId, instead of issue", false)
             .integer("issueId", "Issue id, with projectId, instead of issue", false);
     }

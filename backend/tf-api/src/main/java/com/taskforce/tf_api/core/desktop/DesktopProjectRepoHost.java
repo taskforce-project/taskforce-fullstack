@@ -32,4 +32,10 @@ public class DesktopProjectRepoHost implements ProjectRepoHost {
     public void assertRepoAccessible(String workspaceSlug, String repoFullName) {
         // L'accès se vérifie avec le `gh` de la personne : par la coque avant de lier, par le runner au clonage.
     }
+
+    /** Le backend local ne crée pas de dépôt : la coque le fait, depuis la page du projet. */
+    @Override
+    public boolean createsRepos(String workspaceSlug) {
+        return false;
+    }
 }
