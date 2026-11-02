@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useParams, usePathname } from "next/navigation"
+import { useReducedMotion } from "framer-motion"
 import {
-  Sparkles, MessageSquare, ChevronDown, Plus, Trash2, Plug, Play, CircleAlert, PanelRight, PanelBottom,
+  Sparkles, MessageSquare, ChevronDown, ChevronUp, Plus, Trash2, Plug, Play, CircleAlert,
 } from "lucide-react"
 import {
   Message, Steps, Reasoning, Tool, Sources, ThinkingBar, FeedbackBar, PromptSuggestion, TokenMeter,
@@ -19,7 +20,7 @@ import { getErrorMessage } from "@/lib/api/client"
 import { getMcpServers } from "@/lib/api/integration-service"
 import { suggestionsFor } from "@/lib/cortex/suggestions"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
-import { useCortexStore, type CortexPlace } from "@/lib/store/cortex-store"
+import { useCortexStore } from "@/lib/store/cortex-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { IS_DESKTOP } from "@/lib/desktop"
@@ -140,26 +141,25 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
 }
 
 const HEADER_BUTTON =
-  "flex size-7 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+  "flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 
 /**
- * La conversation avec Cortex : son en-tête (les conversations, une nouvelle, l'endroit), ses tours, et l'état vide qui
- * dit ce qu'on peut demander. Elle se lit dans `useCortexStore`, donc la même conversation s'ouvre en bulle au-dessus
- * de la barre (`place="bar"`) ou s'épingle dans le panneau de droite (`place="side"`) sans rien perdre ; la saisie
- * reste la barre unique, en bas de l'écran (R76). Dans la bulle, les contrôles sont ronds, comme ceux du composeur du
- * site ; le panneau garde les angles droits de l'app.
+ * La conversation avec Cortex, toujours au-dessus de la barre : pas de carte, ses tours se lisent sur le dégradé qui
+ * monte de la barre (`.cortex-wash`). La dernière réponse est en grand ; les tours d'avant, plus petits, s'effacent vers
+ * le haut. Juste au-dessus de la barre, comme la ligne d'outils du composeur du site : les conversations, une nouvelle,
+ * la jauge et le chevron qui la réduit. L'état vide dit ce qu'on peut demander. Elle se lit dans `useCortexStore` ; la
+ * saisie reste la barre unique (R76). Les cartes qu'elle porte (l'issue préparée, Undo, l'accord, la mission) gardent
+ * leur allure.
  */
-export function AgentChat({ place, onSwitchPlace, onFold }: Readonly<{
-  place: CortexPlace
-  /** Passe la conversation de la barre au panneau de droite, ou l'inverse. */
-  onSwitchPlace: () => void
-  /** Replie la conversation dans la barre (seulement dépliée depuis la barre : le panneau a sa propre croix). */
-  onFold?: () => void
+export function AgentChat({ onFold }: Readonly<{
+  /** Réduit la conversation dans la barre. */
+  onFold: () => void
 }>) {
   const params = useParams()
   const pathname = usePathname()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const t = usePreferencesStore((s) => s.t.shell)
+  const reduceMotion = useReducedMotion()
 
   const turns = useCortexStore((s) => s.turns)
   const conversations = useCortexStore((s) => s.conversations)
@@ -180,8 +180,13 @@ export function AgentChat({ place, onSwitchPlace, onFold }: Readonly<{
   // serveur MCP joignable, la liste reste vide et rien ne s'affiche.
   const [mcpTools, setMcpTools] = useState<{ connector: string; name: string }[]>([])
   const threadRef = useRef<HTMLDivElement>(null)
+  const askRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const thinking = sentAt !== null
+  // L'échange en cours : la dernière demande de la personne et la réponse qui la suit, en grand une fois arrivée. Ce
+  // qui précède la demande est plus petit.
+  const lastAsk = turns.findLastIndex((turn) => turn.role === "user")
+  const latest = !thinking && turns.at(-1)?.role === "assistant" ? turns.at(-1)?.id : undefined
 
   const aiStatus = useAiStatusStore((s) => s.status)
   const fetchAiStatus = useAiStatusStore((s) => s.fetchStatus)
@@ -205,11 +210,17 @@ export function AgentChat({ place, onSwitchPlace, onFold }: Readonly<{
     return () => { cancelled = true }
   }, [slug])
 
-  // Le dernier tour reste en vue, juste au-dessus de la barre où la personne vient d'écrire.
+  // L'échange en cours reste en vue, juste au-dessus de la barre où la personne vient d'écrire. Plus haut que ce qui se
+  // lit sous le fondu du haut (le retrait du fil), il se lit depuis son début : sa demande, juste sous le fondu.
   useEffect(() => {
     const el = threadRef.current
-    if (el) el.scrollTo?.({ top: el.scrollHeight, behavior: "smooth" })
-  }, [turns, thinking])
+    if (!el) return
+    const ask = askRef.current
+    const askTop = ask ? ask.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop : 0
+    const fade = Number.parseFloat(getComputedStyle(el).paddingTop) || 0
+    const top = ask && el.scrollHeight - askTop > el.clientHeight - fade ? askTop - fade : el.scrollHeight
+    el.scrollTo?.({ top, behavior: reduceMotion ? "auto" : "smooth" })
+  }, [turns, thinking, reduceMotion])
 
   useEffect(() => {
     if (sentAt === null) return
@@ -246,128 +257,24 @@ export function AgentChat({ place, onSwitchPlace, onFold }: Readonly<{
     ? (conversations.find((c) => c.id === conversationId)?.title ?? "Conversation")
     : t.chatNew
   const recent = conversations.filter((c) => c.id !== conversationId).slice(0, 3)
-  const inBubble = place === "bar"
-  const headerButton = cn(HEADER_BUTTON, inBubble && "rounded-full")
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className={cn(
-        "flex shrink-0 items-center gap-1 border-b",
-        inBubble ? "h-11 border-border/60 px-2" : "h-10 border-border/70 px-2 md:px-4",
-      )}>
-        {inBubble && (
-          <span className="mr-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary" aria-hidden="true">
-            <Sparkles className="size-3.5" />
-          </span>
-        )}
-        <div
-          ref={listRef}
-          className="relative min-w-0"
-          onKeyDown={(e) => {
-            // Échap ferme d'abord la liste, puis seulement la conversation.
-            if (e.key === "Escape" && showList) { e.preventDefault(); setShowList(false) }
-          }}
-        >
-          <button
-            type="button"
-            aria-expanded={showList}
-            onClick={() => { setShowList((v) => !v); if (!showList) void loadConversations(slug) }}
-            className={cn("flex max-w-full items-center gap-1.5 py-1 text-xs transition-colors hover:bg-muted", inBubble ? "rounded-full px-2" : "px-1.5")}
-          >
-            {!inBubble && <MessageSquare className="size-3.5 shrink-0 text-muted-foreground" />}
-            <span className="truncate font-medium">{currentTitle}</span>
-            <ChevronDown className={cn("size-3 shrink-0 transition-transform", showList && "rotate-180")} />
-          </button>
-
-          {showList && (
-            <div className="absolute left-0 top-full z-50 mt-1 w-64 border border-border bg-popover p-1 shadow-lg">
-              <button
-                type="button"
-                onClick={startNew}
-                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-muted"
-              >
-                <Plus className="size-3.5" /> {t.chatNew}
-              </button>
-              <div className="my-1 h-px bg-border" />
-              <div className="max-h-64 overflow-y-auto">
-                {conversations.length === 0 ? (
-                  <p className="px-2 py-3 text-center text-xs text-muted-foreground">{t.chatNone}</p>
-                ) : (
-                  conversations.map((c) => (
-                    <div
-                      key={c.id}
-                      className={cn("group flex items-center gap-1 px-2 py-1.5 transition-colors hover:bg-muted", c.id === conversationId && "bg-muted")}
-                    >
-                      <button type="button" onClick={() => void pick(c.id)} className="min-w-0 flex-1 text-left">
-                        <span className="block truncate text-xs">{c.title}</span>
-                        <span className="text-[10px] text-muted-foreground">{c.messageCount} message{c.messageCount > 1 ? "s" : ""}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void removeConversation(slug, c.id)}
-                        className="shrink-0 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
-                        aria-label={t.chatDelete}
-                        title={t.chatDelete}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <button type="button" onClick={startNew} aria-label={t.chatNew} title={t.chatNew} className={headerButton}>
-          <Plus className="size-4" />
-        </button>
-
-        <div className="ml-auto flex min-w-0 items-center gap-2 pl-2 text-[10px] text-muted-foreground/70">
-          {thinking ? (
-            <span className="hidden tabular-nums text-primary/80 sm:inline">{t.chatThinking} · {elapsed.toFixed(1)} s</span>
-          ) : tokens > 0 ? (
-            <span className="hidden items-center gap-1.5 sm:flex">
-              <TokenMeter value={tokens} className="text-muted-foreground/70" />
-              {lastMs != null && <span className="tabular-nums">· {(lastMs / 1000).toFixed(1)} s</span>}
-            </span>
-          ) : null}
-          <CortexUsage sessionTokens={tokens} />
-        </div>
-
-        <button
-          type="button"
-          onClick={onSwitchPlace}
-          aria-label={inBubble ? t.chatPinSide : t.chatBackToBar}
-          title={inBubble ? t.chatPinSide : t.chatBackToBar}
-          className={headerButton}
-        >
-          {inBubble ? <PanelRight className="size-4" /> : <PanelBottom className="size-4" />}
-        </button>
-        {onFold && (
-          <button type="button" onClick={onFold} aria-label={t.chatFold} title={t.chatFold} className={headerButton}>
-            <ChevronDown className="size-4" />
-          </button>
-        )}
-      </div>
-
-      <div ref={threadRef} className={cn("min-h-0 flex-1 overflow-y-auto", inBubble ? "px-3 py-3 md:px-4" : "px-3 py-4 md:px-6")}>
+    <div className="flex min-h-0 flex-col">
+      <div ref={threadRef} className="cortex-thread min-h-0 overflow-y-auto px-3 md:px-4">
         <div className="flex flex-col">
           {turns.length === 0 && !thinking ? (
-            <div className="flex flex-col gap-3 py-1">
-              <div className="flex items-start gap-2.5">
-                <div className={cn("flex size-7 shrink-0 items-center justify-center bg-primary/10 text-primary", inBubble && "rounded-full")}>
-                  <Sparkles className="size-4" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Cortex</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{t.chatIntro} {t.chatHint}</p>
-                </div>
+            <div className="flex flex-col gap-3 pb-2">
+              <div>
+                <p className="flex items-center gap-2 text-xs font-medium text-ink-blue">
+                  <span className="size-1.5 rounded-full bg-shape-blue" aria-hidden="true" /> Cortex
+                </p>
+                <p className="cortex-say mt-1.5 text-balance text-lg font-medium leading-snug tracking-tight">{t.chatIntro}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t.chatHint}</p>
               </div>
               {aiStatus && !aiStatus.chatAvailable && <AiUnavailableNotice />}
               <div className="flex flex-wrap gap-1.5" aria-label={t.barSuggestions}>
                 {suggestionsFor(pathname).map((s) => (
-                  <PromptSuggestion key={s.label} onClick={() => suggest(s.text)} className={cn(inBubble && "rounded-full")}>{s.label}</PromptSuggestion>
+                  <PromptSuggestion key={s.label} onClick={() => suggest(s.text)} className="rounded-full">{s.label}</PromptSuggestion>
                 ))}
               </div>
               {recent.length > 0 && (
@@ -411,19 +318,25 @@ export function AgentChat({ place, onSwitchPlace, onFold }: Readonly<{
               )}
             </div>
           ) : (
-            turns.map((turn) =>
-              turn.role === "user" ? (
-                <Message key={turn.id} role="user" content={turn.text} />
-              ) : turn.kind === "quota" ? (
-                <Message key={turn.id} role="assistant">
-                  <QuotaNotice />
-                </Message>
-              ) : (
-                <Message key={turn.id} role="assistant">
-                  {turn.answer && <AgentAnswerView answer={turn.answer} slug={slug} />}
-                </Message>
-              ),
-            )
+            turns.map((turn, i) => (
+              <div
+                key={turn.id}
+                ref={i === lastAsk ? askRef : undefined}
+                className={cn(i < lastAsk && "cortex-earlier", turn.id === latest && "cortex-latest")}
+              >
+                {turn.role === "user" ? (
+                  <Message role="user" content={turn.text} />
+                ) : turn.kind === "quota" ? (
+                  <Message role="assistant">
+                    <QuotaNotice />
+                  </Message>
+                ) : (
+                  <Message role="assistant">
+                    {turn.answer && <AgentAnswerView answer={turn.answer} slug={slug} />}
+                  </Message>
+                )}
+              </div>
+            ))
           )}
           {thinking && (
             <Message role="assistant">
@@ -431,6 +344,89 @@ export function AgentChat({ place, onSwitchPlace, onFold }: Readonly<{
             </Message>
           )}
         </div>
+      </div>
+
+      {/* Les contrôles de la conversation, juste au-dessus de la barre, sans cadre : la ligne d'outils du composeur. */}
+      <div className="flex h-9 shrink-0 items-center gap-1 px-1">
+        <div
+          ref={listRef}
+          className="relative min-w-0"
+          onKeyDown={(e) => {
+            // Échap ferme d'abord la liste, puis seulement la conversation.
+            if (e.key === "Escape" && showList) { e.preventDefault(); setShowList(false) }
+          }}
+        >
+          <button
+            type="button"
+            aria-expanded={showList}
+            onClick={() => { setShowList((v) => !v); if (!showList) void loadConversations(slug) }}
+            className="flex max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-xs transition-colors hover:bg-muted"
+          >
+            <Sparkles className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+            <span className="truncate font-medium">{currentTitle}</span>
+            <ChevronUp className={cn("size-3 shrink-0 transition-transform", showList && "rotate-180")} />
+          </button>
+
+          {/* La liste s'ouvre vers le haut, au-dessus de la conversation : en dessous, il y a la barre. */}
+          {showList && (
+            <div className="absolute bottom-full left-0 z-50 mb-1 w-64 border border-border bg-popover p-1 shadow-lg">
+              <button
+                type="button"
+                onClick={startNew}
+                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-muted"
+              >
+                <Plus className="size-3.5" /> {t.chatNew}
+              </button>
+              <div className="my-1 h-px bg-border" />
+              <div className="max-h-64 overflow-y-auto">
+                {conversations.length === 0 ? (
+                  <p className="px-2 py-3 text-center text-xs text-muted-foreground">{t.chatNone}</p>
+                ) : (
+                  conversations.map((c) => (
+                    <div
+                      key={c.id}
+                      className={cn("group flex items-center gap-1 px-2 py-1.5 transition-colors hover:bg-muted", c.id === conversationId && "bg-muted")}
+                    >
+                      <button type="button" onClick={() => void pick(c.id)} className="min-w-0 flex-1 text-left">
+                        <span className="block truncate text-xs">{c.title}</span>
+                        <span className="text-[10px] text-muted-foreground">{c.messageCount} message{c.messageCount > 1 ? "s" : ""}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void removeConversation(slug, c.id)}
+                        className="shrink-0 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+                        aria-label={t.chatDelete}
+                        title={t.chatDelete}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <button type="button" onClick={startNew} aria-label={t.chatNew} title={t.chatNew} className={HEADER_BUTTON}>
+          <Plus className="size-4" />
+        </button>
+
+        <div className="ml-auto flex min-w-0 items-center gap-2 pl-2 text-[10px] text-muted-foreground/70">
+          {thinking ? (
+            <span className="hidden tabular-nums text-primary/80 sm:inline">{t.chatThinking} · {elapsed.toFixed(1)} s</span>
+          ) : tokens > 0 ? (
+            <span className="hidden items-center gap-1.5 sm:flex">
+              <TokenMeter value={tokens} className="text-muted-foreground/70" />
+              {lastMs != null && <span className="tabular-nums">· {(lastMs / 1000).toFixed(1)} s</span>}
+            </span>
+          ) : null}
+          <CortexUsage sessionTokens={tokens} />
+        </div>
+
+        <button type="button" onClick={onFold} aria-label={t.chatFold} title={t.chatFold} className={HEADER_BUTTON}>
+          <ChevronDown className="size-4" />
+        </button>
       </div>
     </div>
   )

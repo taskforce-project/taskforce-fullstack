@@ -271,7 +271,8 @@ export function Markdown(props: MarkdownProps) {
   const blocks = parseBlocks(content)
   const inl = (s: string, k: string) => renderInline(s, k, props)
   return (
-    <div className={className ?? "space-y-2 text-sm leading-relaxed"}>
+    // `data-markdown` : le texte rédigé, que la conversation de Cortex agrandit pour sa dernière réponse (globals.css).
+    <div data-markdown="" className={className ?? "space-y-2 text-sm leading-relaxed"}>
       {blocks.map((b, i) => {
         if (b.type === "code") return <CodeBlock key={i} code={b.code} lang={b.lang} />
         if (b.type === "callout") {
