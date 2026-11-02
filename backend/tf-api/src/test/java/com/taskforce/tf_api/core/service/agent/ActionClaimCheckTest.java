@@ -64,6 +64,9 @@ class ActionClaimCheckTest {
         "La pull request a bien été fusionnée.                       | MERGE",
         "J'ai modifié la priorité de TESTTA-3.                       | UPDATE",
         "La carte a été mise à jour.                                 | UPDATE",
+        // Le rejeu en vrai du 02/11/2026 : une issue « marquée » faite, avec list_issues pour seul outil.
+        "TESTTA-1 was marked as Done.                                | UPDATE",
+        "J'ai marqué TESTTA-2 comme faite.                           | UPDATE",
         "**Issue created**: Title Cortex test.                       | CREATE",
         "Issue créée : Test, dans TaskForce.                         | CREATE",
         "✅ Carte TESTTA-2 supprimée.                                | DELETE",

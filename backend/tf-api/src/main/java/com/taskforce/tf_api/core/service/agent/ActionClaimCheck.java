@@ -139,8 +139,8 @@ public final class ActionClaimCheck {
         return switch (kind) {
             case CREATE -> "created|added|filed|" + fr("cr[ée]", "ajout");
             case DELETE -> "deleted|removed|erased|" + fr("supprim", "effac", "retir");
-            case UPDATE -> "changed|modified|updated|edited|renamed|closed|reopened|"
-                + fr("modifi", "chang", "renomm", "ferm", "cl[ôo]tur") + "|mise?s?\\s+à\\s+jour|rouvert(?:e|s|es)?";
+            case UPDATE -> "changed|modified|updated|edited|renamed|closed|reopened|marked|"
+                + fr("modifi", "chang", "renomm", "ferm", "cl[ôo]tur", "marqu") + "|mise?s?\\s+à\\s+jour|rouvert(?:e|s|es)?";
             case MOVE -> "moved|" + fr("d[ée]plac");
             case ASSIGN -> "assigned|reassigned|unassigned|" + fr("assign", "r[ée]assign", "d[ée]sassign", "attribu");
             case DELEGATE -> "delegated|" + fr("d[ée]l[ée]gu", "confi");
