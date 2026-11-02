@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
@@ -21,6 +22,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.dto.response.AssistantActionResult;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
@@ -58,6 +60,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -80,6 +83,7 @@ class AgentServiceTest {
     @Mock private CortexUndo undo;
     @Mock private HarnessRuleSetRepository ruleSets;
     @Mock private WorkspaceRepository workspaces;
+    @Mock private ScreenContext screens;
 
     @InjectMocks private AgentService service;
 
@@ -1100,5 +1104,231 @@ class AgentServiceTest {
         assertThat(result.status()).isEqualTo("success");
         assertThat(result.target()).containsEntry("runId", 100);
         assertThat(result.ref()).isNull(); // une mission lancée ne se défait pas : aucun Undo à nommer
+    }
+
+    // -------------------------------------------------------------------------
+    // R114 : l'écran ; R115 : TaskForce demande ; R117 : le plan de la demande (séance n°17)
+    // -------------------------------------------------------------------------
+
+    private static final Question WHICH = new Question("issue", "Which issue should be deleted?", List.of(
+        Question.Choice.recommended("TESTTA-2", "TESTTA-2 Ajouter la version LTS (In review by AI)"),
+        Question.Choice.of("TESTTA-3", "TESTTA-3 Corriger le login (Todo)")));
+
+    @SuppressWarnings("unchecked")
+    private String systemPrompt() {
+        ArgumentCaptor<List<Map<String, Object>>> messages = ArgumentCaptor.forClass(List.class);
+        verify(llm, Mockito.atLeastOnce()).rawChat(messages.capture(), anyList(), anyString());
+        return String.valueOf(messages.getAllValues().get(0).get(0).get("content"));
+    }
+
+    @Test
+    @DisplayName("R114 et R117 : le plan de la demande, puis l'écran, puis les notes, dans le prompt")
+    void the_plan_and_the_screen_come_before_the_notes() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        KnowledgeNode note = KnowledgeNode.builder().title("Release process").domain(NodeDomain.RUNBOOKS)
+            .content("Ship on Fridays").build();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of(note));
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"OK\"}"));
+        when(screens.describe(any())).thenReturn("On screen, what the person sees now.\nProject TESTTA \"test taskforce\".\n");
+
+        service.run("acme", 7L, "supprime l issue qu il y a dans in review by AI", List.of(), new Screen(12L, null));
+
+        String system = systemPrompt();
+        int plan = system.indexOf("Plan to delete or archive an issue:");
+        int screen = system.indexOf("On screen, what the person sees now.");
+        int notes = system.indexOf("Context (the workspace's notes)");
+        assertThat(plan).isPositive();
+        assertThat(screen).isGreaterThan(plan);
+        assertThat(notes).isGreaterThan(screen);
+        ArgumentCaptor<AgentContext> seen = ArgumentCaptor.forClass(AgentContext.class);
+        verify(screens).describe(seen.capture());
+        assertThat(seen.getValue().screen()).isEqualTo(new Screen(12L, null));
+    }
+
+    @Test
+    @DisplayName("sans écran, rien ne se lit, et une demande sans plan n'en reçoit aucun")
+    void without_a_screen_nothing_is_read() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"OK\"}"));
+
+        service.run("acme", 7L, "liste moi les issues dans test taskforce");
+
+        assertThat(systemPrompt()).doesNotContain("Plan to").doesNotContain("On screen");
+        verifyNoInteractions(screens);
+    }
+
+    @Test
+    @DisplayName("R115 : ce qu'il manque au geste, TaskForce le demande en carte, et la réponse s'arrête sur la question")
+    @SuppressWarnings("unchecked")
+    void a_missing_need_is_asked_by_taskforce() throws Exception {
+        modelCalls("delete_issue", "{}", "Which issue do you want me to delete?");
+        CortexGesture tool = gesture("delete_issue", "issue.delete");
+        when(tool.ask(any(), any())).thenThrow(new QuestionNeeded(WHICH));
+
+        AssistantAnswer answer = service.run("acme", 7L, "supprime ça", List.of(), new Screen(12L, 22L));
+
+        AssistantToolCall call = answer.toolCalls().get(0);
+        assertThat(call.status()).isEqualTo(AgentService.QUESTION);
+        assertThat(call.ref()).isEqualTo("hash"); // la réponse nommera cette question
+        assertThat(call.question().field()).isEqualTo("issue");
+        assertThat(call.question().choices()).extracting(AssistantAnswer.AssistantChoice::value).containsExactly("TESTTA-2", "TESTTA-3");
+        assertThat(call.question().choices().get(0).recommended()).isTrue();
+        // La question est celle de TaskForce, pas la phrase du modèle ; le modèle n'est pas rappelé.
+        assertThat(answer.answer()).isEqualTo("Which issue should be deleted?");
+        verify(llm, Mockito.times(1)).rawChat(anyList(), anyList(), anyString());
+        verify(tool, never()).preview(any(), any());
+        verify(tool, never()).perform(any(), any());
+        // Le dossier garde la question, les arguments du geste et l'écran, dont la suite reprendra.
+        ArgumentCaptor<Map<String, Object>> data = ArgumentCaptor.forClass(Map.class);
+        verify(records, Mockito.atLeastOnce()).append(eq(RECORD), eq("action.result"), any(), data.capture());
+        assertThat(data.getValue()).containsEntry("status", "question").containsEntry("arguments", "{}");
+        assertThat((Map<String, Object>) data.getValue().get("question")).containsEntry("field", "issue");
+        assertThat((Map<String, Object>) data.getValue().get("screen")).containsEntry("projectId", 12L).containsEntry("issueId", 22L);
+    }
+
+    @Test
+    @DisplayName("R115 : un geste qui découvre en cours ce qu'il ne peut pas deviner (deux Ada) demande, sans rien écrire")
+    void a_gesture_that_finds_an_ambiguity_asks() throws Exception {
+        modelCalls("update_issue", "{\"issue\":\"TF-12\",\"assignee\":\"ada\"}", "Done.");
+        CortexGesture tool = gesture("update_issue", "issue.update");
+        when(tool.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(tool.perform(any(), any())).thenThrow(new QuestionNeeded(new Question("assignee",
+            "Who should take TF-12? Several members of TaskForce match \"ada\".", List.of(
+                Question.Choice.of("ada@acme.test", "Ada Lovelace"), Question.Choice.of("ada.b@acme.test", "Ada Byron")))));
+
+        AssistantAnswer answer = service.run("acme", 7L, "assigne TF-12 à Ada");
+
+        assertThat(answer.toolCalls().get(0).status()).isEqualTo(AgentService.QUESTION);
+        assertThat(answer.toolCalls().get(0).question().choices()).hasSize(2).noneMatch(AssistantAnswer.AssistantChoice::recommended);
+        assertThat(answer.answer()).isEqualTo("Who should take TF-12? Several members of TaskForce match \"ada\".");
+    }
+
+    @Test
+    @DisplayName("R115 : l'issue que le geste a résolue est celle que la carte montre et que l'accord reprend")
+    void the_card_carries_the_issue_the_gesture_resolved() throws Exception {
+        modelCalls("delete_issue", "{\"issue\":\"in review by AI\"}", "Check the card.");
+        CortexGesture tool = gesture("delete_issue", "issue.delete");
+        when(tool.ask(any(), any())).thenReturn(Map.of("issue", "TESTTA-2", "projectId", 12, "issueId", 22));
+        when(tool.preview(any(), any())).thenReturn(new CortexGesture.Done("Deleting TESTTA-2 removes it for good.",
+            Map.of("issueId", 22, "key", "TESTTA-2"), null));
+
+        AssistantAnswer answer = service.run("acme", 7L, "supprime l issue qu il y a dans in review by AI");
+
+        assertThat(answer.toolCalls().get(0).status()).isEqualTo("pending");
+        assertThat(json.readTree(answer.toolCalls().get(0).input()).path("issue").asText()).isEqualTo("TESTTA-2");
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> previewed = ArgumentCaptor.forClass(Map.class);
+        verify(tool).preview(previewed.capture(), any());
+        assertThat(previewed.getValue()).containsEntry("issueId", 22);
+    }
+
+    /** La réponse de la personne reprend le geste, sans le modèle : la carte de suppression, ou la question suivante. */
+    private JsonNode askedBefore(String arguments, String field, String choices) throws Exception {
+        return json.readTree("{\"tool\":\"x\",\"status\":\"question\",\"arguments\":" + json.writeValueAsString(arguments)
+            + ",\"question\":{\"field\":\"" + field + "\",\"text\":\"?\",\"choices\":" + choices + "},"
+            + "\"screen\":{\"projectId\":12,\"issueId\":null}}");
+    }
+
+    @Test
+    @DisplayName("R115 : le clic de la personne reprend le geste : la carte de suppression de l'issue choisie")
+    @SuppressWarnings("unchecked")
+    void the_answer_resumes_the_gesture() throws Exception {
+        stubWorkspace();
+        when(records.owns(eq(RECORD), any())).thenReturn(true);
+        when(records.answer(RECORD, "delete_issue", "sha256:q1", 7L, "TESTTA-2"))
+            .thenReturn(Optional.of(askedBefore("{}", "issue", "[{\"value\":\"TESTTA-2\",\"label\":\"TESTTA-2 Ajouter\"}]")));
+        CortexGesture tool = Mockito.mock(CortexGesture.class);
+        when(tool.name()).thenReturn("delete_issue");
+        when(tool.action()).thenReturn("issue.delete");
+        when(tools.get("delete_issue")).thenReturn(tool);
+        when(tool.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(tool.preview(any(), any())).thenReturn(new CortexGesture.Done("Deleting TESTTA-2 removes it for good.",
+            Map.of("issueId", 22, "key", "TESTTA-2"), null));
+
+        AssistantToolCall next = service.answer("acme", 7L, "delete_issue", RECORD.toString(), "sha256:q1", "TESTTA-2");
+
+        assertThat(next.status()).isEqualTo("pending");
+        assertThat(next.record()).isEqualTo(RECORD.toString());
+        assertThat(next.target()).containsEntry("key", "TESTTA-2");
+        assertThat(json.readTree(next.input()).path("issue").asText()).isEqualTo("TESTTA-2");
+        ArgumentCaptor<AgentContext> ctx = ArgumentCaptor.forClass(AgentContext.class);
+        verify(tool).preview(any(), ctx.capture());
+        assertThat(ctx.getValue().screen()).isEqualTo(new Screen(12L, null)); // l'écran de la question
+        // Rejugée par les règles de l'espace, au même dossier.
+        verify(records).append(eq(RECORD), eq("action.decided"), any(), any());
+        verify(llm, never()).rawChat(anyList(), anyList(), anyString());
+    }
+
+    @Test
+    @DisplayName("R115 : une réponse peut amener la question suivante, au même dossier")
+    void an_answer_can_lead_to_the_next_question() throws Exception {
+        stubWorkspace();
+        when(records.owns(eq(RECORD), any())).thenReturn(true);
+        when(records.answer(RECORD, "create_project", "sha256:q1", 7L, "Atlas"))
+            .thenReturn(Optional.of(askedBefore("{\"stack\":\"Next.js\"}", "name", "[]")));
+        CortexGesture tool = Mockito.mock(CortexGesture.class);
+        when(tool.name()).thenReturn("create_project");
+        when(tool.action()).thenReturn("project.create");
+        when(tools.get("create_project")).thenReturn(tool);
+        when(tool.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(tool.perform(any(), any())).thenThrow(new QuestionNeeded(new Question("repository",
+            "Where does the code of Atlas live?", List.of(Question.Choice.recommended("new-private", "A new private repository")))));
+
+        AssistantToolCall next = service.answer("acme", 7L, "create_project", RECORD.toString(), "sha256:q1", "Atlas");
+
+        assertThat(next.status()).isEqualTo(AgentService.QUESTION);
+        assertThat(next.question().field()).isEqualTo("repository");
+        assertThat(next.ref()).isEqualTo("hash");
+        assertThat(json.readTree(next.input()).path("name").asText()).isEqualTo("Atlas");
+        assertThat(json.readTree(next.input()).path("stack").asText()).isEqualTo("Next.js");
+    }
+
+    /** Une question déjà répondue ne se répond plus ; le dossier d'un autre ne se prolonge pas. */
+    @ParameterizedTest(name = "dossier à soi {0}")
+    @ValueSource(booleans = {true, false})
+    void an_answer_is_refused(boolean owns) {
+        stubWorkspace();
+        when(records.owns(eq(RECORD), any())).thenReturn(owns);
+        CortexGesture tool = gesture("delete_issue", "issue.delete");
+        lenient().when(tools.get("delete_issue")).thenReturn(tool);
+        lenient().when(records.answer(any(), any(), any(), any(), any())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.answer("acme", 7L, "delete_issue", RECORD.toString(), "sha256:q1", "TESTTA-2"))
+            .isInstanceOf(owns ? BusinessException.class : ResourceNotFoundException.class);
+        verify(tool, never()).preview(any(), any());
+    }
+
+    @Test
+    void an_empty_answer_is_refused() {
+        stubWorkspace();
+        when(records.owns(eq(RECORD), any())).thenReturn(true);
+        CortexGesture tool = gesture("delete_issue", "issue.delete");
+        when(tools.get("delete_issue")).thenReturn(tool);
+
+        assertThatThrownBy(() -> service.answer("acme", 7L, "delete_issue", RECORD.toString(), "sha256:q1", "  "))
+            .isInstanceOf(BusinessException.class).hasMessage("Pick one of the choices, or write your answer.");
+        verify(records, never()).answer(any(), any(), any(), any(), any());
+    }
+
+    /** Une réponse tapée se lit parmi les choix : leur valeur, leur libellé, ou le seul qui la contient. */
+    @ParameterizedTest(name = "« {0} » : {1}")
+    @CsvSource({
+        "TESTTA-2, TESTTA-2",
+        "testta-3, TESTTA-3",
+        "login,    TESTTA-3",
+        "Ajouter,  TESTTA-2",
+        "TESTTA,   TESTTA",    // deux choix le contiennent : la réponse telle quelle, que le geste juge
+        "x,        x",
+        "TF-99,    TF-99",
+    })
+    void a_typed_answer_is_read_among_the_choices(String said, String value) throws Exception {
+        JsonNode question = json.valueToTree(WHICH);
+
+        assertThat(AgentService.chosen(question, said)).isEqualTo(value);
     }
 }

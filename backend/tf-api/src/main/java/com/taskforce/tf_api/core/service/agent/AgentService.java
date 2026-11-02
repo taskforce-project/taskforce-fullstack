@@ -21,8 +21,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.dto.response.AssistantActionResult;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantChoice;
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantQuestion;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantSource;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantStep;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantToolCall;
@@ -78,6 +81,7 @@ public class AgentService {
     private final CortexGate          gate;
     private final CortexRecordService records;
     private final CortexUndo          undo;
+    private final ScreenContext       screens;
 
     // Tier des tours avec outils externes MCP. Défaut "fast" ; "standard" pour plus de fiabilité
     // multi-outils si le matériel suit.
@@ -189,6 +193,69 @@ public class AgentService {
         return new AssistantActionResult(toolName, "success", undone);
     }
 
+    /**
+     * La réponse de la personne à une question de TaskForce (R115, séance n°17) : un choix cliqué ou une réponse tapée
+     * remplit ce que la question demandait, puis le geste reprend comme dans la réponse qui l'a posée, sans le modèle :
+     * rejugé par les règles de l'espace (elles ont pu changer), gardé au même dossier, avec les droits de la personne. Une
+     * question ne se répond qu'une fois. Le geste peut alors poser la question suivante, montrer sa carte, ou se faire.
+     */
+    public AssistantToolCall answer(String slug, Long userId, String toolName, String recordRef, String ref, String value) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        UUID record = recordId(recordRef);
+        if (!records.owns(record, new AgentContext(slug, ws.getId(), userId))) {
+            throw new ResourceNotFoundException("This conversation's record was not found.");
+        }
+        AgentTool tool = tools.get(toolName);
+        if (tool == null) {
+            throw new BusinessException("This action is no longer available.");
+        }
+        String said = value == null ? "" : value.strip();
+        if (said.isEmpty()) {
+            throw new BusinessException("Pick one of the choices, or write your answer.");
+        }
+        JsonNode asked = records.answer(record, toolName, ref, userId, said)
+            .orElseThrow(() -> new BusinessException("This question is already answered."));
+        JsonNode where = asked.path("screen");
+        AgentContext ctx = new AgentContext(slug, ws.getId(), userId,
+            new Screen(longOrNull(where.path("projectId")), longOrNull(where.path("issueId"))));
+        String argsJson;
+        try {
+            JsonNode before = objectMapper.readTree(asked.path("arguments").asText("{}"));
+            ObjectNode args = before.isObject() ? (ObjectNode) before : objectMapper.createObjectNode();
+            args.put(asked.path("question").path("field").asText(), chosen(asked.path("question"), said));
+            argsJson = objectMapper.writeValueAsString(args);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException("The arguments of this action are not readable.");
+        }
+        ToolOutcome outcome = new Kernel(ctx, record).apply(tool, toolName, argsJson);
+        String shown = outcome.input() != null ? outcome.input() : argsJson;
+        return new AssistantToolCall(toolName, outcome.status(), shown, outcome.result(), record.toString(), outcome.ref(),
+            outcome.target(), card(outcome.question()));
+    }
+
+    /**
+     * Ce que reçoit le geste : la valeur du choix cliqué, ou la réponse tapée lue parmi les choix (« testta-2 », « le
+     * login » : le seul choix qui le contient). Sinon, la réponse telle qu'elle est écrite : le geste la juge.
+     */
+    static String chosen(JsonNode question, String said) {
+        List<JsonNode> choices = new ArrayList<>();
+        question.path("choices").forEach(choices::add);
+        for (JsonNode choice : choices) {
+            if (said.equalsIgnoreCase(choice.path("value").asText()) || said.equalsIgnoreCase(choice.path("label").asText())) {
+                return choice.path("value").asText();
+            }
+        }
+        String wanted = said.toLowerCase(Locale.ROOT);
+        List<JsonNode> containing = wanted.length() < 2 ? List.of() : choices.stream()
+            .filter(choice -> choice.path("label").asText().toLowerCase(Locale.ROOT).contains(wanted))
+            .toList();
+        return containing.size() == 1 ? containing.get(0).path("value").asText() : said;
+    }
+
+    private static Long longOrNull(JsonNode node) {
+        return node != null && node.canConvertToLong() && !node.isNull() ? node.asLong() : null;
+    }
+
     /** Tracer avant d'agir : un événement que le dossier ne prend plus (il est plein) arrête l'action. */
     private void traceBefore(UUID record, String type, CortexRecordService.Actor actor, Map<String, ?> data) {
         if (records.append(record, type, actor, data).isEmpty()) {
@@ -227,8 +294,16 @@ public class AgentService {
      * (format {@code {role, content}}, ordre chronologique), injectés avant le message courant.
      */
     public AssistantAnswer run(String slug, Long userId, String message, List<Map<String, Object>> history) {
+        return run(slug, userId, message, history, Screen.NONE);
+    }
+
+    /**
+     * Avec ce que la personne voit à l'écran (R114, séance n°17) : le modèle le lit avant les notes, et un geste qui doit
+     * demander quelle issue propose d'abord celles de l'écran (R115).
+     */
+    public AssistantAnswer run(String slug, Long userId, String message, List<Map<String, Object>> history, Screen screen) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
-        AgentContext ctx = new AgentContext(slug, ws.getId(), userId);
+        AgentContext ctx = new AgentContext(slug, ws.getId(), userId, screen);
         List<Map<String, Object>> hist = history == null ? List.of() : history;
 
         // Salutation ou remerciement : réponse directe, sans recherche (pas de sources hors sujet).
@@ -406,12 +481,20 @@ public class AgentService {
                 external.stream().map(AgentTool::name).toList());
         }
 
-        List<Map<String, Object>> messages = withHistory(systemPrompt(hits, external, LocalDate.now(ZoneOffset.UTC)),
-            history, message);
+        // L'écran (R114) et le plan de la demande (R117), choisis par TaskForce avant le modèle : il n'a rien à deviner.
+        String screen = ctx.screen().isEmpty() ? null : screens.describe(ctx);
+        if (screen == null) screen = "";
+        CortexPlans.Plan plan = CortexPlans.forRequest(message).orElse(null);
+        List<Map<String, Object>> messages = withHistory(
+            systemPrompt(plan, screen, hits, external, LocalDate.now(ZoneOffset.UTC)), history, message);
         List<Map<String, Object>> toolDefs = tools.toolDefinitions(external);
         String tier = external.isEmpty() ? "fast" : mcpToolTier;
-        // Le noyau (R35) : les règles de l'espace et le dossier de la réponse, ouverts au premier outil.
-        Kernel kernel = new Kernel(ctx, message, origin(tier, hits));
+        // Le noyau (R35) : les règles de l'espace et le dossier de la réponse, ouverts au premier outil. Le dossier garde
+        // ce que le modèle a vu de l'écran et le plan qu'il a reçu.
+        Map<String, Object> origin = origin(tier, hits);
+        if (!screen.isEmpty()) origin.put("screen", screen);
+        if (plan != null) origin.put("plan", plan.id());
+        Kernel kernel = new Kernel(ctx, message, origin);
         return toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel);
     }
 
@@ -425,8 +508,9 @@ public class AgentService {
             .map(note -> KnowledgeNode.builder().title(note.title()).domain(domainOf(note.domain()))
                 .content(note.content()).build())
             .toList();
-        List<Map<String, Object>> messages = withHistory(systemPrompt(notes, List.of(), replayCase.askedOn()),
-            List.of(), replayCase.question());
+        // Le plan de la question, comme dans une réponse (R117) : la banque dit s'il est suivi.
+        List<Map<String, Object>> messages = withHistory(systemPrompt(CortexPlans.forRequest(replayCase.question()).orElse(null),
+            "", notes, List.of(), replayCase.askedOn()), List.of(), replayCase.question());
         ReplayStep step = new ReplayStep(replayCase, gate.rulesFor(ctx));
         llm.beginUsageCapture();
         try {
@@ -456,11 +540,13 @@ public class AgentService {
 
     /**
      * {@code input} : les arguments que la carte montre, quand le serveur les a résolus ; null, ceux de Cortex.
-     * {@code ref} : l'empreinte d'un résultat réussi au dossier, que « Undo » nomme. {@code target} : l'issue d'un geste.
+     * {@code ref} : l'empreinte d'un résultat réussi au dossier, que « Undo » nomme, ou de la question posée, que la
+     * réponse nomme. {@code target} : l'issue d'un geste. {@code question} : ce que TaskForce demande d'abord (R115).
      */
-    private record ToolOutcome(String status, String result, String input, String ref, Map<String, Object> target) {
+    private record ToolOutcome(String status, String result, String input, String ref, Map<String, Object> target,
+                               Question question) {
         ToolOutcome(String status, String result) {
-            this(status, result, null, null, null);
+            this(status, result, null, null, null, null);
         }
     }
 
@@ -490,6 +576,12 @@ public class AgentService {
         + "on the card.";
 
     /**
+     * Ce que garde le dossier quand TaskForce pose la question d'un geste (R115) : la réponse s'arrête sur la question, et
+     * le modèle ne la reprend pas à son compte.
+     */
+    private static final String QUESTION_ASKED = "Nothing was done: TaskForce asks the person first. ";
+
+    /**
      * Ce qui ne se défait pas d'ici se demande, même quand les règles le permettent (ADR-024, TF-J1-5) : confier une issue
      * à un agent lance sa mission sur la machine de la personne. Ce qui se défait se fait, avec « Undo » (R77).
      */
@@ -516,6 +608,7 @@ public class AgentService {
                 return msg.path("content").asText("");
             }
             messages.add(objectMapper.convertValue(msg, new TypeReference<Map<String, Object>>() {}));
+            Question asked = null;
             for (JsonNode call : calls) {
                 String id = call.path("id").asText();
                 String name = call.path("function").path("name").asText();
@@ -526,11 +619,28 @@ public class AgentService {
                     : step.apply(tool, name, argsJson);
                 String shown = outcome.input() != null ? outcome.input() : argsJson;
                 toolCalls.add(new AssistantToolCall(name, outcome.status(), shown, outcome.result(), step.recordRef(),
-                    outcome.ref(), outcome.target()));
+                    outcome.ref(), outcome.target(), card(outcome.question())));
                 messages.add(Map.of("role", "tool", "tool_call_id", id, "content", outcome.result()));
+                if (asked == null) asked = outcome.question();
             }
+            // R115 : TaskForce pose sa question, et la réponse s'arrête là. Le modèle ne devine pas la réponse, et sa
+            // phrase ne remplace pas la question : c'est elle que la personne lit, au-dessus de ses choix.
+            if (asked != null) return asked.text();
         }
         return "Answer interrupted (too many tool steps).";
+    }
+
+    /** Les arguments qu'un geste a résolus, ou ceux de Cortex quand il n'en rend aucun. */
+    private static Map<String, Object> resolvedOr(Map<String, Object> args, Map<String, Object> resolved) {
+        return resolved == null || resolved.isEmpty() ? args : resolved;
+    }
+
+    /** La question telle que la carte la montre ; null sans question. */
+    static AssistantQuestion card(Question question) {
+        if (question == null) return null;
+        return new AssistantQuestion(question.field(), question.text(), question.choices().stream()
+            .map(choice -> new AssistantChoice(choice.value(), choice.label(), choice.recommended()))
+            .toList());
     }
 
     /** Ce qui a répondu : le tier et les notes servies ; le modèle s'y ajoute à l'ouverture du dossier. */
@@ -610,6 +720,12 @@ public class AgentService {
             this.origin = origin;
         }
 
+        /** Le noyau d'un geste qui reprend après la réponse de la personne : le dossier est celui de sa question. */
+        Kernel(AgentContext ctx, UUID record) {
+            this(ctx, null, Map.of());
+            this.record = record;
+        }
+
         /** Tracer avant d'agir : la demande et la décision entrent au dossier avant tout effet. */
         @Override
         public ToolOutcome apply(AgentTool tool, String name, String argsJson) {
@@ -617,6 +733,7 @@ public class AgentService {
             String status = "success";
             String shown = null;
             CortexGesture.Done done = null;
+            Question asked = null;
             try {
                 CortexGate.Verdict verdict = judge(tool, argsJson);
                 if (verdict.denied()) {
@@ -631,9 +748,12 @@ public class AgentService {
                         status = "error";
                     } else {
                         // La carte dit ce que la personne accorde : l'issue qu'on supprimerait, ce qui partirait avec elle.
-                        done = preview(tool, argsJson);
+                        // Ce qu'il manque au geste se demande avant elle (R115), et l'accord reprend l'issue de la carte.
+                        String resolved = ask(tool, argsJson);
+                        done = preview(tool, resolved);
                         result = done == null ? PROPOSED : done.text() + " " + PROPOSED;
                         status = "pending";
+                        if (!resolved.equals(argsJson)) shown = resolved;
                     }
                 } else if (PREPARED.contains(name)) {
                     // Avant la carte, ce que seule la personne peut dire : sinon une question, et aucune carte. La carte
@@ -649,25 +769,73 @@ public class AgentService {
                         if (prepared != null && prepared.args() != null) shown = objectMapper.writeValueAsString(prepared.args());
                     }
                 } else if (!doneAtOnce(name, verdict)) {
+                    String resolved = ask(tool, argsJson);
                     result = ASKED_TEXT;
                     status = "pending";
+                    if (!resolved.equals(argsJson)) shown = resolved;
                 } else {
                     Map<String, Object> args = objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {});
                     if (tool instanceof CortexGesture gesture) {
-                        done = gesture.perform(args, ctx);
+                        done = gesture.perform(resolvedOr(args, gesture.ask(args, ctx)), ctx);
                         result = done.text();
                     } else {
                         result = tool.execute(args, ctx);
                     }
                 }
+            } catch (QuestionNeeded needed) {
+                // R115 : le geste attend une réponse que seule la personne peut donner. Rien n'est écrit ; TaskForce
+                // pose la question, en choix, et le geste reprend sur son clic.
+                asked = needed.question();
+                result = QUESTION_ASKED + asked.asText();
+                status = QUESTION;
+                done = null;
             } catch (Exception e) {
                 result = "Tool " + name + " failed: " + e.getMessage();
                 status = "error";
                 done = null;
             }
+            if (asked != null) {
+                return new ToolOutcome(status, result, null, asked(name, argsJson, result, asked), null, asked);
+            }
             String ref = result(name, status, result, done == null ? null : done.undo());
             return new ToolOutcome(status, result, shown, undoable(tool, status, done) ? ref : null,
-                done == null ? null : done.target());
+                done == null ? null : done.target(), null);
+        }
+
+        /**
+         * Ce qu'il manque au geste (R115), demandé avant qu'il agisse : une question levée, ou ses arguments tels qu'il les
+         * entend. Les mêmes que ceux de Cortex quand rien n'a changé.
+         */
+        private String ask(AgentTool tool, String argsJson) throws JsonProcessingException {
+            if (!(tool instanceof CortexGesture gesture)) return argsJson;
+            Map<String, Object> args = objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> resolved = resolvedOr(args, gesture.ask(args, ctx));
+            return resolved.equals(args) ? argsJson : objectMapper.writeValueAsString(resolved);
+        }
+
+        /**
+         * La question au dossier, avec ce que le geste reprendra : ses arguments tels que Cortex les a passés (en entier,
+         * le geste en a besoin), et l'écran, dont viendront les choix d'une question suivante. Son empreinte est ce que
+         * la réponse nomme ; sans dossier, la question ne se répond pas.
+         */
+        private String asked(String tool, String argsJson, String output, Question asked) {
+            if (record == null) return null;
+            try {
+                Map<String, Object> data = new LinkedHashMap<>();
+                data.put("tool", tool);
+                data.put("status", QUESTION);
+                data.put("output", CortexRecordService.shorten(output));
+                data.put("arguments", argsJson == null || argsJson.isBlank() ? "{}" : argsJson);
+                data.put("question", objectMapper.convertValue(asked, new TypeReference<Map<String, Object>>() {}));
+                Map<String, Object> screen = new LinkedHashMap<>();
+                screen.put("projectId", ctx.screen().projectId());
+                screen.put("issueId", ctx.screen().issueId());
+                data.put("screen", screen);
+                return records.append(record, "action.result", CortexRecordService.Actor.SERVER, data).orElse(null);
+            } catch (RuntimeException e) {
+                log.warn("Cortex : question de {} non gardée au dossier : {}", LogSafe.of(tool), LogSafe.of(e.getMessage()));
+                return null;
+            }
         }
 
         /** Ce que montre la carte d'un geste demandé ; null pour un autre outil, ou un geste sans rien de plus à montrer. */
@@ -745,7 +913,12 @@ public class AgentService {
         return messages;
     }
 
-    private String systemPrompt(List<KnowledgeNode> hits, List<AgentTool> external, LocalDate today) {
+    /**
+     * Le prompt : les consignes, puis le plan de la demande (R117), l'écran (R114), et les notes du Brain OS en dernier.
+     * {@code plan} est null et {@code screen} vide quand rien ne s'y applique.
+     */
+    private String systemPrompt(CortexPlans.Plan plan, String screen, List<KnowledgeNode> hits, List<AgentTool> external,
+                                LocalDate today) {
         StringBuilder sb = new StringBuilder();
         sb.append("You are Cortex, the AI copilot of a TaskForce workspace. Answer in the user's language, ")
           .append("concisely, grounded in the real context. ")
@@ -782,7 +955,11 @@ public class AgentService {
           .append("Claude Code, call delegate_issue: the person approves it on its card. When the person asks where a ")
           .append("mission stands, what an agent asks or what it produced, call get_mission: its cards let the person ")
           .append("answer a request or decide on the result. Never decide for the person, and never say that a request ")
-          .append("is answered or a result applied: only the buttons of the cards do that, even when the person writes yes. ");
+          .append("is answered or a result applied: only the buttons of the cards do that, even when the person writes yes. ")
+          // R115 : ce qu'un geste exige et que la demande ne dit pas, TaskForce le demande, pas le modèle.
+          .append("When a change needs something the request does not say (which issue, a project's name), call its tool ")
+          .append("with what you know and nothing invented: TaskForce asks the person, with choices. Never write that ")
+          .append("question yourself. ");
         if (!external.isEmpty()) {
             String names = external.stream().map(AgentTool::name).collect(Collectors.joining(", "));
             sb.append("External tools are connected (MCP servers): ").append(names).append(". ")
@@ -794,6 +971,8 @@ public class AgentService {
               .append("Call an external write tool only with explicit, checked parameters and only when the user ")
               .append("asked for it; it never runs directly: an owner or admin approves it in the conversation. ");
         }
+        if (plan != null) sb.append("\n\n").append(plan.text());
+        if (screen != null && !screen.isBlank()) sb.append("\n\n").append(screen.strip());
         if (!hits.isEmpty()) {
             sb.append("\n\nContext (the workspace's notes):\n");
             for (KnowledgeNode n : hits) {

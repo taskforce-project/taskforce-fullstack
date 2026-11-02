@@ -221,13 +221,15 @@ class BrainVisibilityIntegrationTest extends AbstractIntegrationTest {
         when(llm.isConfigured()).thenReturn(false); // Cortex répond par les notes trouvées
         cortex = new AgentService(access, search, mock(AgentToolRegistry.class), llm, mapper, mock(AiUsageService.class),
             mock(WorkspaceMcpService.class), mock(AuthorizationService.class), mock(CortexGate.class),
-            mock(CortexRecordService.class), mock(CortexUndo.class));
+            mock(CortexRecordService.class), mock(CortexUndo.class),
+            mock(com.taskforce.tf_api.core.service.agent.ScreenContext.class));
         searchBrainTool = new SearchBrainTool(search, access);
         // Les gestes sur une issue ne servent pas ici : les arguments de brain_search passent tels quels.
         IssueGestures gestures = mock(IssueGestures.class);
         when(gestures.withIds(any(), any(), any())).thenAnswer(inv -> inv.getArgument(2));
         TaskforceMcpTools tools = new TaskforceMcpTools(mapper, mock(ProjectService.class), mock(IssueService.class),
-            mock(SmartAssignService.class), search, mock(AnalyticsService.class), cortex, gestures);
+            mock(SmartAssignService.class), search, mock(AnalyticsService.class), cortex, gestures,
+            mock(com.taskforce.tf_api.core.service.mcpserver.ProjectGestures.class));
         mcp = new McpServerService(tools, mapper, userRepository, new JwtIdentityResolver(environment));
     }
 
