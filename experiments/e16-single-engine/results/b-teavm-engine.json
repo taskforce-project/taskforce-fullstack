@@ -15,40 +15,48 @@
     "brotli": 101098
   },
   "cases": {
-    "globs": 18,
-    "decisions": 51,
+    "globs": 22,
+    "decisions": 60,
     "digest": 2,
-    "passed": 71,
+    "passed": 84,
     "failures": []
   },
+  "rules": 36,
   "sequence": {
     "calls": 43,
+    "changedFromLog": [
+      "2026-10-29T13:16:49 Bash ask -> allow (run-reads)",
+      "2026-10-29T13:16:52 Bash ask -> allow (run-reads)",
+      "2026-10-29T13:24:31 Bash ask -> allow (run-reads)",
+      "2026-11-01T14:34:05 Bash ask -> allow (run-reads)",
+      "2026-11-01T14:34:37 Bash ask -> allow (run-reads)"
+    ],
     "mismatches": 0
   },
   "timing": {
-    "importMs": 229.8498,
-    "loadMs": 0.326,
-    "firstDigestMs": 9.8065,
+    "importMs": 86.6591,
+    "loadMs": 0.6735,
+    "firstDigestMs": 13.1226,
     "cold": {
       "n": 43,
-      "min": 0.001,
-      "p50": 0.019,
-      "p90": 0.079,
-      "p95": 0.245,
-      "p99": 3.426,
-      "max": 3.426,
-      "mean": 0.117
+      "min": 0.002,
+      "p50": 0.03,
+      "p90": 0.13,
+      "p95": 0.232,
+      "p99": 4.386,
+      "max": 4.386,
+      "mean": 0.15
     },
-    "firstDecisionMs": 0.2452,
+    "firstDecisionMs": 0.2324,
     "warm": {
       "n": 8600,
       "min": 0,
       "p50": 0.002,
-      "p90": 0.003,
-      "p95": 0.003,
-      "p99": 0.004,
-      "max": 0.351,
-      "mean": 0.002
+      "p90": 0.004,
+      "p95": 0.004,
+      "p99": 0.007,
+      "max": 0.359,
+      "mean": 0.003
     }
   }
 }
