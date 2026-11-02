@@ -1011,7 +1011,26 @@ class AgentServiceTest {
         assertThat(answer.toolCalls().get(0).status()).isEqualTo("pending");
         assertThat(answer.toolCalls().get(0).output()).contains("can't be undone from the conversation");
         assertThat(answer.toolCalls().get(0).ref()).isNull();
+        // La phrase est celle du serveur : le modèle ne dit pas « I have handed the issue to Claude Code » avant l'accord.
+        assertThat(answer.answer()).isEqualTo(AgentService.CARD_ANSWERS.get("delegate_issue"));
         verify(tool, never()).perform(any(), any());
+    }
+
+    @ParameterizedTest(name = "{0} [{1}] : la phrase du modèle gardée {2}")
+    @CsvSource({
+        "delete_issue,   pending, false",
+        "delegate_issue, pending, false",
+        "delete_issue,   success, true",
+        "update_issue,   success, true",
+        "create_issue,   pending, true",
+    })
+    @DisplayName("un geste qui attend la personne parle par sa carte")
+    void a_gesture_waiting_on_its_card_speaks_through_it(String tool, String status, boolean kept) {
+        List<AssistantToolCall> calls = List.of(new AssistantToolCall(tool, status, "{}", "out", "r"));
+
+        String answer = AgentService.cardAnswer("Otherwise, I'll proceed with deletion.", calls);
+
+        assertThat(answer.equals("Otherwise, I'll proceed with deletion.")).isEqualTo(kept);
     }
 
     @Test
@@ -1030,6 +1049,7 @@ class AgentServiceTest {
         assertThat(call.target()).isEqualTo(target);
         assertThat(call.output()).startsWith("Deleting TF-12 \"Fix login\" removes it for good").contains("waiting for their approval");
         assertThat(call.ref()).isNull();
+        assertThat(answer.answer()).isEqualTo(AgentService.CARD_ANSWERS.get("delete_issue"));
         verify(tool, never()).perform(any(), any());
     }
 

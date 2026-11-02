@@ -251,7 +251,8 @@ public class AgentService {
         List<AssistantToolCall> toolCalls = new ArrayList<>();
         try {
             steps.add(new AssistantStep(STEP_ANSWER, "active", "Cortex answers, with its tools if needed"));
-            String modelAnswer = runToolLoop(message, hits, ctx, toolCalls, hist);
+            // Un geste qui se demande parle par sa carte : la phrase du modèle ne dit pas « je supprime » à sa place.
+            String modelAnswer = cardAnswer(runToolLoop(message, hits, ctx, toolCalls, hist), toolCalls);
             String answer = honestAnswer(message, modelAnswer, toolCalls);
             if (answer.equals(modelAnswer)) {
                 steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", toolsDescription(toolCalls)));
@@ -849,6 +850,26 @@ public class AgentService {
         return failed
             ? "I couldn't do it, so nothing was created. Ask me again, or create it from the board."
             : "I didn't create anything: no action ran. Ask me again with the project's name, or create it from the board.";
+    }
+
+    /**
+     * Ce que dit la réponse quand un geste attend la personne sur sa carte. Sur la pile de dev, qwen3:8b montrait la carte
+     * de suppression puis écrivait « Otherwise, I'll proceed with deletion », et « I have handed the issue to Claude
+     * Code » avant tout accord (02/11/2026) : un « oui » écrit n'aurait rien fait (R1). La phrase est donc celle du
+     * serveur, qui dit où décider.
+     */
+    static final Map<String, String> CARD_ANSWERS = Map.of(
+        "delete_issue", "Nothing is deleted yet: choose on the card below. Archive hides the issue from the board and can "
+            + "be undone; Delete removes it for good.",
+        "delegate_issue", "Nothing is handed over yet: approve the mission on the card below, and Claude Code starts on "
+            + "your runner.");
+
+    static String cardAnswer(String answer, List<AssistantToolCall> toolCalls) {
+        return toolCalls.stream()
+            .filter(call -> "pending".equals(call.status()) && CARD_ANSWERS.containsKey(call.name()))
+            .map(call -> CARD_ANSWERS.get(call.name()))
+            .findFirst()
+            .orElse(answer);
     }
 
     /** Le fournisseur a refusé les outils : rien n'a été fait, on le dit, avec les notes trouvées. */
