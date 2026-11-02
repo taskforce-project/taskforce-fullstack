@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.dto.response;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Réponse structurée de l'assistant agentique. Pensée pour un rendu riche (kit chat) :
@@ -33,9 +34,18 @@ public record AssistantAnswer(
     /**
      * Un appel d'outil de l'agent. status : success | error | pending (proposé, il attend l'accord de la personne) |
      * refused (les règles de l'espace le refusent) | question (la carte attend une réponse de la personne, que Cortex lui
-     * demande : rien n'est préparé). {@code record} : le dossier de la réponse, que l'accord prolonge.
+     * demande : rien n'est préparé). {@code record} : le dossier de la réponse, que l'accord prolonge. {@code ref} :
+     * l'empreinte du résultat de cet appel au dossier, que « Undo » nomme pour défaire celui-là (R77). {@code target} :
+     * l'issue que touche un geste du MCP TaskForce ({@code issueId}, {@code projectId}, {@code key}, {@code title}, et
+     * {@code runId} de sa mission), dont la conversation montre les cartes (ADR-024).
      */
-    public record AssistantToolCall(String name, String status, String input, String output, String record) {}
+    public record AssistantToolCall(String name, String status, String input, String output, String record, String ref,
+                                    Map<String, Object> target) {
+        /** Un appel sans empreinte ni issue : une proposition, ou une réponse d'avant les gestes. */
+        public AssistantToolCall(String name, String status, String input, String output, String record) {
+            this(name, status, input, output, record, null, null);
+        }
+    }
 
     /** Tokens réellement consommés par ce tour (cumulés sur les appels LLM). */
     public record AssistantUsage(long promptTokens, long completionTokens, long totalTokens) {

@@ -132,6 +132,7 @@ public class AgentService {
             Map.of("effect", verdict.effect(), "facts", verdict.facts()));
         String status = "success";
         String output;
+        CortexGesture.Done done = null;
         try {
             if (verdict.denied()) {
                 status = "refused";
@@ -139,25 +140,31 @@ public class AgentService {
             } else {
                 Map<String, Object> args = objectMapper.readValue(argsJson == null || argsJson.isBlank() ? "{}" : argsJson,
                     new TypeReference<Map<String, Object>>() {});
-                output = tool.execute(args, ctx);
+                if (tool instanceof CortexGesture gesture) {
+                    done = gesture.perform(args, ctx);
+                    output = done.text();
+                } else {
+                    output = tool.execute(args, ctx);
+                }
             }
         } catch (JsonProcessingException e) {
             status = "error";
             output = "The arguments of this action are not readable.";
         } catch (RuntimeException e) {
-            traceAfter(record, toolName, "error", e.getMessage());
+            traceAfter(record, toolName, "error", e.getMessage(), null);
             throw e;
         }
-        traceAfter(record, toolName, status, output);
-        return new AssistantActionResult(toolName, status, output);
+        String ref = traceAfter(record, toolName, status, output, done == null ? null : done.undo());
+        return new AssistantActionResult(toolName, status, output, "success".equals(status) ? ref : null,
+            done == null ? null : done.target());
     }
 
     /**
-     * Défait d'un geste ce que Cortex vient de créer (R77, séance n°13) : la dernière création réussie de cet outil, dans
-     * le dossier de la réponse, une seule fois et avec les droits de la personne. L'outil dit ce qu'il a défait, ou
-     * pourquoi ce n'est plus possible (une exception métier).
+     * Défait d'un geste ce que Cortex vient de faire (R77, séance n°13) : le résultat que nomme {@code ref}, sinon la
+     * dernière réussite de cet outil, dans le dossier de la réponse, une seule fois et avec les droits de la personne.
+     * L'outil dit ce qu'il a défait, ou pourquoi ce n'est plus possible (une exception métier).
      */
-    public AssistantActionResult undo(String slug, Long userId, String toolName, String recordRef) {
+    public AssistantActionResult undo(String slug, Long userId, String toolName, String recordRef, String ref) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         AgentContext ctx = new AgentContext(slug, ws.getId(), userId);
         UUID record = recordId(recordRef);
@@ -167,7 +174,7 @@ public class AgentService {
         if (!undo.handles(toolName)) {
             throw new BusinessException("This action can't be undone.");
         }
-        String undone = records.undo(record, toolName, userId, created -> undo.undo(toolName, created, ctx))
+        String undone = records.undo(record, toolName, userId, ref, result -> undo.undo(toolName, result, ctx))
             .orElseThrow(() -> new BusinessException("There is nothing left to undo here."));
         return new AssistantActionResult(toolName, "success", undone);
     }
@@ -179,13 +186,21 @@ public class AgentService {
         }
     }
 
-    /** Le résultat au dossier. Une panne ici ne défait pas ce qui a été fait, ni ne le dit raté : elle se journalise. */
-    private void traceAfter(UUID record, String tool, String status, String output) {
+    /**
+     * Le résultat au dossier, avec de quoi le défaire pour un geste, et son empreinte, que « Undo » nommera. Une panne ici
+     * ne défait pas ce qui a été fait, ni ne le dit raté : elle se journalise, et le résultat n'a pas d'empreinte.
+     */
+    private String traceAfter(UUID record, String tool, String status, String output, Map<String, Object> undoData) {
         try {
-            records.append(record, "action.result", CortexRecordService.Actor.SERVER,
-                Map.of("tool", tool, "status", status, "output", CortexRecordService.shorten(output)));
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("tool", tool);
+            data.put("status", status);
+            data.put("output", CortexRecordService.shorten(output));
+            if (undoData != null) data.put("undo", undoData);
+            return records.append(record, "action.result", CortexRecordService.Actor.SERVER, data).orElse(null);
         } catch (RuntimeException e) {
             log.warn("Cortex : résultat de {} non gardé au dossier : {}", LogSafe.of(tool), LogSafe.of(e.getMessage()));
+            return null;
         }
     }
 
@@ -428,10 +443,13 @@ public class AgentService {
         String recordRef();
     }
 
-    /** {@code input} : les arguments que la carte montre, quand le serveur les a résolus ; null, ceux de Cortex. */
-    private record ToolOutcome(String status, String result, String input) {
+    /**
+     * {@code input} : les arguments que la carte montre, quand le serveur les a résolus ; null, ceux de Cortex.
+     * {@code ref} : l'empreinte d'un résultat réussi au dossier, que « Undo » nomme. {@code target} : l'issue d'un geste.
+     */
+    private record ToolOutcome(String status, String result, String input, String ref, Map<String, Object> target) {
         ToolOutcome(String status, String result) {
-            this(status, result, null);
+            this(status, result, null, null, null);
         }
     }
 
@@ -460,6 +478,18 @@ public class AgentService {
         + "choices, then prepare the card with the answer. Do not ask about anything else: the other fields stay editable "
         + "on the card.";
 
+    /**
+     * Ce qui ne se défait pas d'ici se demande, même quand les règles le permettent (ADR-024, TF-J1-5) : confier une issue
+     * à un agent lance sa mission sur la machine de la personne. Ce qui se défait se fait, avec « Undo » (R77).
+     */
+    private static final String ASKED_TEXT = "This can't be undone from the conversation, so it waits for the person's "
+        + "approval on the card below. Do not call this tool again; say in one sentence what you propose.";
+
+    /** Une lecture, ou un résultat que « Undo » défait : Cortex le fait sans demander, quand les règles le permettent. */
+    private static boolean doneAtOnce(String name, CortexGate.Verdict verdict) {
+        return CortexGate.READS.contains(verdict.facts().get("action")) || CortexUndo.TOOLS.contains(name);
+    }
+
     private static String refusedText(CortexGate.Verdict verdict) {
         return "Not run: the rules of this workspace refuse it. " + verdict.reason()
             + " Do not try again; tell the user why it was not done.";
@@ -484,7 +514,8 @@ public class AgentService {
                     ? new ToolOutcome("error", "Unknown tool: " + name)
                     : step.apply(tool, name, argsJson);
                 String shown = outcome.input() != null ? outcome.input() : argsJson;
-                toolCalls.add(new AssistantToolCall(name, outcome.status(), shown, outcome.result(), step.recordRef()));
+                toolCalls.add(new AssistantToolCall(name, outcome.status(), shown, outcome.result(), step.recordRef(),
+                    outcome.ref(), outcome.target()));
                 messages.add(Map.of("role", "tool", "tool_call_id", id, "content", outcome.result()));
             }
         }
@@ -574,6 +605,7 @@ public class AgentService {
             String result;
             String status = "success";
             String shown = null;
+            CortexGesture.Done done = null;
             try {
                 CortexGate.Verdict verdict = judge(tool, argsJson);
                 if (verdict.denied()) {
@@ -603,16 +635,26 @@ public class AgentService {
                         status = "pending";
                         if (prepared != null && prepared.args() != null) shown = objectMapper.writeValueAsString(prepared.args());
                     }
+                } else if (!doneAtOnce(name, verdict)) {
+                    result = ASKED_TEXT;
+                    status = "pending";
                 } else {
                     Map<String, Object> args = objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {});
-                    result = tool.execute(args, ctx);
+                    if (tool instanceof CortexGesture gesture) {
+                        done = gesture.perform(args, ctx);
+                        result = done.text();
+                    } else {
+                        result = tool.execute(args, ctx);
+                    }
                 }
             } catch (Exception e) {
                 result = "Tool " + name + " failed: " + e.getMessage();
                 status = "error";
+                done = null;
             }
-            result(name, status, result);
-            return new ToolOutcome(status, result, shown);
+            String ref = result(name, status, result, done == null ? null : done.undo());
+            return new ToolOutcome(status, result, shown, "success".equals(status) ? ref : null,
+                done == null ? null : done.target());
         }
 
         /** La demande, puis la décision des règles, au dossier avant tout effet : sans dossier, l'action ne part pas. */
@@ -627,9 +669,9 @@ public class AgentService {
             return verdict;
         }
 
-        /** Le résultat au dossier, s'il s'est ouvert. */
-        void result(String tool, String status, String output) {
-            if (record != null) traceAfter(record, tool, status, output);
+        /** Le résultat au dossier, s'il s'est ouvert, et son empreinte. */
+        String result(String tool, String status, String output, Map<String, Object> undoData) {
+            return record == null ? null : traceAfter(record, tool, status, output, undoData);
         }
 
         @Override
@@ -689,7 +731,7 @@ public class AgentService {
         sb.append("You are Cortex, the AI copilot of a TaskForce workspace. Answer in the user's language, ")
           .append("concisely, grounded in the real context. ")
           .append("Use your tools only when they help: search the workspace's notes, list or create TaskForce ")
-          .append("projects and issues, write a note. ")
+          .append("projects and issues, change, move, assign or comment an issue, hand it to an agent, write a note. ")
           .append("Never create anything the user did not ask for. ")
           .append("Say that you created, changed or deleted something only when a tool result in this conversation ")
           .append("confirms it; if no tool ran or a tool failed, say plainly that it was not done. ")
@@ -708,7 +750,16 @@ public class AgentService {
           .append("Backlog unless the work must start now, and set a due date only when the goal or the person gives ")
           .append("one. Ask one short question, with the choices, before preparing the card only when what matters is ")
           .append("unclear: the request does not say which project and there are several, or it names a person who ")
-          .append("matches several members. Never ask about the other fields: they stay editable on the card. ");
+          .append("matches several members. Never ask about the other fields: they stay editable on the card. ")
+          // Les gestes du MCP TaskForce (ADR-024, TF-J1-5) : faits d'emblée quand ils se défont, demandés sinon ; les
+          // décisions restent aux boutons des cartes, jamais à un « oui » écrit (R1).
+          .append("To change an existing issue (its title, description, priority, column, assignee, labels, points, cycle ")
+          .append("or due date), call update_issue with its key (like TF-12) and only the fields to change: it is done ")
+          .append("at once and the person can undo it. To comment on an issue, call add_comment. To hand an issue to ")
+          .append("Claude Code, call delegate_issue: the person approves it on its card. When the person asks where a ")
+          .append("mission stands, what an agent asks or what it produced, call get_mission: its cards let the person ")
+          .append("answer a request or decide on the result. Never decide for the person, and never say that a request ")
+          .append("is answered or a result applied: only the buttons of the cards do that, even when the person writes yes. ");
         if (!external.isEmpty()) {
             String names = external.stream().map(AgentTool::name).collect(Collectors.joining(", "));
             sb.append("External tools are connected (MCP servers): ").append(names).append(". ")

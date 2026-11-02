@@ -7,6 +7,7 @@ import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.taskforce.tf_api.core.enums.NodeRefType;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
@@ -19,6 +20,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.KnowledgeService;
 import com.taskforce.tf_api.core.service.ProjectService;
+import com.taskforce.tf_api.core.service.mcpserver.IssueGestures;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
@@ -28,13 +30,17 @@ import lombok.RequiredArgsConstructor;
  * a données, une issue que personne n'a commentée, ou une note sur laquelle rien ne s'appuie (ni page rangée dessous, ni
  * lien d'une autre note). Au-delà, la création ne se défait plus d'ici. La sortie de l'outil, gardée au dossier de la
  * réponse, dit ce qui a été créé.
+ *
+ * <p>Les gestes du MCP TaskForce aussi (ADR-024, TF-J1-5) : une issue changée revient à ses anciennes valeurs, un
+ * commentaire part, tant que personne n'a rien changé depuis. Ce qui ne se défait pas d'ici (confier l'issue à un agent)
+ * n'est pas fait d'emblée : Cortex le demande à la personne.</p>
  */
 @Component
 @RequiredArgsConstructor
 public class CortexUndo {
 
-    /** Les outils dont la création se défait. */
-    static final Set<String> TOOLS = Set.of("create_project", "create_issue", "create_note");
+    /** Les outils dont le résultat se défait : ceux-là seulement, Cortex les fait sans demander quand les règles le permettent. */
+    static final Set<String> TOOLS = Set.of("create_project", "create_issue", "create_note", "update_issue", "add_comment");
 
     private static final Pattern PROJECT = Pattern.compile("^Project created in TaskForce: (\\S+) \"(.*)\" \\(id (\\d+)\\)\\.$",
         Pattern.DOTALL);
@@ -53,9 +59,22 @@ public class CortexUndo {
     private final KnowledgeNodeRepository nodes;
     private final KnowledgeEdgeRepository edges;
     private final KnowledgeService knowledge;
+    private final IssueGestures gestures;
 
     public boolean handles(String tool) {
         return TOOLS.contains(tool);
+    }
+
+    /**
+     * Défait un résultat tel que le dossier le garde : un geste par ce qu'il a gardé pour se défaire, une création par
+     * ce que dit sa sortie.
+     */
+    public String undo(String tool, JsonNode result, AgentContext ctx) {
+        return switch (tool) {
+            case "update_issue" -> gestures.restore(ctx.slug(), ctx.userId(), result.get("undo"));
+            case "add_comment" -> gestures.removeComment(ctx.slug(), ctx.userId(), result.get("undo"));
+            default -> undo(tool, result.path("output").asText(""), ctx);
+        };
     }
 
     /** Défait ce que la sortie de l'outil dit créé, avec les droits de la personne, et dit ce qui est défait. */

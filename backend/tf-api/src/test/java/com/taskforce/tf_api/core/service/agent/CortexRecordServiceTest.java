@@ -218,9 +218,9 @@ class CortexRecordServiceTest {
     void undo_runs_once_and_is_kept() {
         UUID id = createdProject();
 
-        assertThat(service.undo(id, "create_project", 7L, created -> "Removed from: " + created))
+        assertThat(service.undo(id, "create_project", 7L, null, created -> "Removed from: " + created.path("output").asText()))
             .contains("Removed from: Project created in TaskForce: PRICING \"Pricing\" (id 27).");
-        assertThat(service.undo(id, "create_project", 7L, created -> "again")).isEmpty(); // un deuxième clic
+        assertThat(service.undo(id, "create_project", 7L, null, created -> "again")).isEmpty(); // un deuxième clic
         assertThat(stored).extracting(CortexRecordEvent::getType).endsWith("human.decision", "action.result");
         assertThat(stored.getLast().getData()).contains("\"status\":\"undone\"");
     }
@@ -230,8 +230,8 @@ class CortexRecordServiceTest {
     void nothing_to_undo() {
         UUID id = proposedNote();
 
-        assertThat(service.undo(id, "create_note", 7L, created -> "never")).isEmpty();
-        assertThat(service.undo(id, "create_project", 7L, created -> "never")).isEmpty();
+        assertThat(service.undo(id, "create_note", 7L, null, created -> "never")).isEmpty();
+        assertThat(service.undo(id, "create_project", 7L, null, created -> "never")).isEmpty();
     }
 
     @Test
@@ -240,7 +240,7 @@ class CortexRecordServiceTest {
         UUID id = createdProject();
         int before = stored.size();
 
-        assertThatThrownBy(() -> service.undo(id, "create_project", 7L, created -> {
+        assertThatThrownBy(() -> service.undo(id, "create_project", 7L, null, created -> {
             throw new BusinessException("PRICING has issues now");
         })).isInstanceOf(BusinessException.class).hasMessage("PRICING has issues now");
         assertThat(stored).hasSize(before);
@@ -253,5 +253,25 @@ class CortexRecordServiceTest {
         service.append(id, "human.decision", Actor.person(7L), Map.of("tool", "create_note", "decision", "undo"));
 
         assertThat(service.approve(id, "create_note", 7L, "{}")).isTrue();
+    }
+
+    @Test
+    @DisplayName("deux gestes d'une même réponse se défont chacun depuis sa carte, par l'empreinte de son résultat")
+    void undo_names_the_result_it_undoes() {
+        UUID id = service.open(ctx, "Move TF-1 and TF-2 to Done", Map.of());
+        String first = service.append(id, "action.result", Actor.SERVER, Map.of("tool", "update_issue", "status", "success",
+            "output", "Updated TF-1", "undo", Map.of("issueId", 1))).orElseThrow();
+        String second = service.append(id, "action.result", Actor.SERVER, Map.of("tool", "update_issue", "status", "success",
+            "output", "Updated TF-2", "undo", Map.of("issueId", 2))).orElseThrow();
+
+        // La carte de TF-1 défait TF-1, même si TF-2 est venu après, et ce qui a été gardé pour le défaire arrive à l'outil.
+        assertThat(service.undo(id, "update_issue", 7L, first, kept -> "back " + kept.path("undo").path("issueId").asInt()))
+            .contains("back 1");
+        assertThat(service.undo(id, "update_issue", 7L, first, kept -> "again")).isEmpty(); // un deuxième clic
+        // Sans empreinte : le dernier qui ne l'est pas encore.
+        assertThat(service.undo(id, "update_issue", 7L, null, kept -> "back " + kept.path("undo").path("issueId").asInt()))
+            .contains("back 2");
+        assertThat(service.undo(id, "update_issue", 7L, second, kept -> "again")).isEmpty();
+        assertThat(stored.getLast().getData()).contains("\"ref\":\"" + second + "\"", "\"status\":\"undone\"");
     }
 }

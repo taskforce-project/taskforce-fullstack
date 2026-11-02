@@ -154,7 +154,7 @@ class AssistantControllerWebMvcTest {
     @DisplayName("POST actions/undo → 200 : défait ce que Cortex a créé, par le dossier de la réponse (R77)")
     void undo_200() throws Exception {
         String record = "00000000-0000-0000-0000-0000000000aa";
-        when(agentService.undo("acme", 7L, "create_project", record))
+        when(agentService.undo("acme", 7L, "create_project", record, null))
             .thenReturn(new AssistantActionResult("create_project", "success", "Removed the project PRICING \"Pricing\"."));
 
         mockMvc.perform(post(URL + "/actions/undo").with(auth())
@@ -162,6 +162,21 @@ class AssistantControllerWebMvcTest {
                 .content("{\"tool\":\"create_project\",\"record\":\"" + record + "\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.output").value("Removed the project PRICING \"Pricing\"."));
+    }
+
+    @Test
+    @DisplayName("POST actions/undo avec ref → 200 : défait le geste que la carte nomme, parmi ceux de la réponse")
+    void undo_names_the_gesture_it_undoes() throws Exception {
+        String record = "00000000-0000-0000-0000-0000000000aa";
+        String ref = "sha256:" + "c".repeat(64);
+        when(agentService.undo("acme", 7L, "update_issue", record, ref))
+            .thenReturn(new AssistantActionResult("update_issue", "success", "Put back the column of TF-12 \"Fix login\"."));
+
+        mockMvc.perform(post(URL + "/actions/undo").with(auth())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tool\":\"update_issue\",\"record\":\"" + record + "\",\"ref\":\"" + ref + "\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.output").value("Put back the column of TF-12 \"Fix login\"."));
     }
 
     @ParameterizedTest(name = "undo {0} → 400")
@@ -173,6 +188,6 @@ class AssistantControllerWebMvcTest {
         mockMvc.perform(post(URL + "/actions/undo").with(auth())
                 .contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isBadRequest());
-        verify(agentService, never()).undo(any(), any(), any(), any());
+        verify(agentService, never()).undo(any(), any(), any(), any(), any());
     }
 }

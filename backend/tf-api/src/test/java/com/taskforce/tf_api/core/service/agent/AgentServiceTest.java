@@ -919,17 +919,19 @@ class AgentServiceTest {
     // -------------------------------------------------------------------------
 
     @Test
-    @DisplayName("undo défait par le dossier de la personne, et dit ce qui est défait")
+    @DisplayName("undo défait par le dossier de la personne le résultat que la carte nomme, et dit ce qui est défait")
     @SuppressWarnings("unchecked")
-    void undo_goes_through_the_record() {
+    void undo_goes_through_the_record() throws Exception {
         stubWorkspace();
         when(records.owns(eq(RECORD), any())).thenReturn(true);
         when(undo.handles("create_project")).thenReturn(true);
-        when(records.undo(eq(RECORD), eq("create_project"), eq(7L), any())).thenAnswer(inv ->
-            Optional.of(((java.util.function.UnaryOperator<String>) inv.getArgument(3)).apply("Project created in TaskForce: X")));
-        when(undo.undo(eq("create_project"), eq("Project created in TaskForce: X"), any())).thenReturn("Removed the project X.");
+        com.fasterxml.jackson.databind.JsonNode kept = json.readTree("{\"output\": \"Project created in TaskForce: X\"}");
+        when(records.undo(eq(RECORD), eq("create_project"), eq(7L), eq("sha256:r1"), any())).thenAnswer(inv ->
+            Optional.of(((java.util.function.Function<com.fasterxml.jackson.databind.JsonNode, String>) inv.getArgument(4))
+                .apply(kept)));
+        when(undo.undo(eq("create_project"), eq(kept), any(AgentContext.class))).thenReturn("Removed the project X.");
 
-        AssistantActionResult result = service.undo("acme", 7L, "create_project", RECORD.toString());
+        AssistantActionResult result = service.undo("acme", 7L, "create_project", RECORD.toString(), "sha256:r1");
 
         assertThat(result.status()).isEqualTo("success");
         assertThat(result.output()).isEqualTo("Removed the project X.");
@@ -945,10 +947,105 @@ class AgentServiceTest {
         stubWorkspace();
         lenient().when(records.owns(eq(RECORD), any())).thenReturn(owns);
         lenient().when(undo.handles("create_issue")).thenReturn(handles);
-        lenient().when(records.undo(eq(RECORD), eq("create_issue"), eq(7L), any()))
+        lenient().when(records.undo(eq(RECORD), eq("create_issue"), eq(7L), any(), any()))
             .thenReturn(somethingToUndo ? Optional.of("done") : Optional.empty());
 
-        assertThatThrownBy(() -> service.undo("acme", 7L, "create_issue", RECORD.toString()))
+        assertThatThrownBy(() -> service.undo("acme", 7L, "create_issue", RECORD.toString(), null))
             .isInstanceOf(owns ? BusinessException.class : ResourceNotFoundException.class);
+    }
+
+    // -------------------------------------------------------------------------
+    // Les gestes du MCP TaskForce (ADR-024, TF-J1-5)
+    // -------------------------------------------------------------------------
+
+    private CortexGesture gesture(String name, String action) {
+        CortexGesture tool = Mockito.mock(CortexGesture.class);
+        lenient().when(tool.name()).thenReturn(name);
+        lenient().when(tool.action()).thenReturn(action);
+        lenient().when(tools.get(eq(name), anyList())).thenReturn(tool);
+        return tool;
+    }
+
+    private void modelCalls(String name, String arguments, String answer) throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"" + name + "\",\"arguments\":"
+                + json.writeValueAsString(arguments) + "}}]}"),
+            json.readTree("{\"content\":\"" + answer + "\"}"));
+    }
+
+    @Test
+    @DisplayName("un geste qui se défait se fait d'emblée : la réponse rend l'issue, et le dossier de quoi le défaire")
+    @SuppressWarnings("unchecked")
+    void an_undoable_gesture_is_done_at_once() throws Exception {
+        modelCalls("update_issue", "{\"issue\":\"TF-12\",\"status\":\"In Progress\"}", "TF-12 is in progress.");
+        CortexGesture tool = gesture("update_issue", "issue.update");
+        Map<String, Object> target = Map.of("issueId", 5, "projectId", 12, "key", "TF-12", "title", "Fix login");
+        Map<String, Object> kept = Map.of("projectId", 12, "issueId", 5, "fields", Map.of());
+        when(tool.perform(any(), any())).thenReturn(new CortexGesture.Done("Updated TF-12 \"Fix login\": column from Todo "
+            + "to In Progress.", target, kept));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Move TF-12 to In Progress");
+
+        AssistantToolCall call = answer.toolCalls().get(0);
+        assertThat(call.status()).isEqualTo("success");
+        assertThat(call.ref()).isEqualTo("hash");
+        assertThat(call.target()).isEqualTo(target);
+        // Le résultat garde de quoi défaire le geste ; la règle update-issue l'a permis.
+        ArgumentCaptor<Map<String, Object>> data = ArgumentCaptor.forClass(Map.class);
+        verify(records, Mockito.atLeastOnce()).append(eq(RECORD), eq("action.result"), any(), data.capture());
+        assertThat(data.getValue()).containsEntry("undo", kept).containsEntry("status", "success");
+    }
+
+    @Test
+    @DisplayName("confier l'issue à un agent ne se défait pas d'ici : Cortex le demande, même quand les règles le permettent")
+    void a_gesture_that_cannot_be_undone_asks() throws Exception {
+        modelCalls("delegate_issue", "{\"issue\":\"TF-12\"}", "I propose to hand TF-12 to Claude Code.");
+        CortexGesture tool = gesture("delegate_issue", "mission.start");
+
+        AssistantAnswer answer = service.run("acme", 7L, "Give TF-12 to Claude Code");
+
+        assertThat(answer.toolCalls().get(0).status()).isEqualTo("pending");
+        assertThat(answer.toolCalls().get(0).output()).contains("can't be undone from the conversation");
+        assertThat(answer.toolCalls().get(0).ref()).isNull();
+        verify(tool, never()).perform(any(), any());
+    }
+
+    @Test
+    @DisplayName("lire une mission se fait d'emblée : la réponse rend l'issue et sa mission, sans rien décider")
+    void reading_a_mission_is_done_at_once() throws Exception {
+        modelCalls("get_mission", "{\"issue\":\"TF-12\"}", "Claude Code asks to fetch nodejs.org.");
+        CortexGesture tool = gesture("get_mission", "issue.read");
+        when(tool.perform(any(), any())).thenReturn(new CortexGesture.Done("The mission on TF-12 asks one thing.",
+            Map.of("issueId", 5, "runId", 100), null));
+
+        AssistantAnswer answer = service.run("acme", 7L, "What does Claude Code need on TF-12?");
+
+        assertThat(answer.toolCalls().get(0).status()).isEqualTo("success");
+        assertThat(answer.toolCalls().get(0).target()).containsEntry("runId", 100);
+    }
+
+    @Test
+    @DisplayName("accordée sur sa carte, la mission part, et la réponse rend l'issue pour montrer sa mission")
+    void an_approved_delegation_runs_and_returns_its_issue() throws Exception {
+        stubWorkspace();
+        when(records.owns(eq(RECORD), any())).thenReturn(true);
+        when(records.approve(RECORD, "delegate_issue", 7L, "{\"issue\":\"TF-12\"}")).thenReturn(true);
+        CortexGesture tool = Mockito.mock(CortexGesture.class);
+        when(tool.name()).thenReturn("delegate_issue");
+        when(tool.action()).thenReturn("mission.start");
+        when(tools.get("delegate_issue")).thenReturn(tool);
+        when(tool.perform(any(), any())).thenReturn(new CortexGesture.Done("Delegated TF-12 to Claude Code.",
+            Map.of("issueId", 5, "runId", 100), null));
+
+        AssistantActionResult result = service.runApproved("acme", 7L, "delegate_issue", "{\"issue\":\"TF-12\"}",
+            RECORD.toString());
+
+        assertThat(result.status()).isEqualTo("success");
+        assertThat(result.target()).containsEntry("runId", 100);
+        assertThat(result.ref()).isEqualTo("hash");
     }
 }
