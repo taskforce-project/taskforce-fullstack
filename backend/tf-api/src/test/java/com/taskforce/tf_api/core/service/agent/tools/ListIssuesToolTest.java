@@ -95,12 +95,14 @@ class ListIssuesToolTest {
         assertThat(out).startsWith("Issues in API Platform (1):").contains("API-2 Feature X [In Progress]");
     }
 
+    /** La colonne se lit comme sur le tableau : « To Do » est « Todo », « in review by ai » est « In Review by AI ». */
     @ParameterizedTest(name = "status « {0} » sans projet : {1} issue(s) de tout l'espace")
-    @CsvSource({"Blocked, 2", "blocked, 2", "Todo, 1", "Done, 0"})
+    @CsvSource({"Blocked, 2", "blocked, 2", "Todo, 1", "To Do, 1", "in review by ai, 1", "Done, 0"})
     void filters_on_a_column_across_projects(String column, int expected) {
         when(issueService.listIssues("acme", 3L, 7L)).thenReturn(List.of(
             issue(4L, "TF-4", "Deploy", "Blocked", IssueStatusCategory.STARTED, 3L, "TaskForce", null),
-            issue(5L, "TF-5", "Docs", "Todo", IssueStatusCategory.UNSTARTED, 3L, "TaskForce", null)));
+            issue(5L, "TF-5", "Docs", "Todo", IssueStatusCategory.UNSTARTED, 3L, "TaskForce", null),
+            issue(7L, "TF-7", "Spec", "In Review by AI", IssueStatusCategory.STARTED, 3L, "TaskForce", null)));
         when(issueService.listIssues("acme", 5L, 7L)).thenReturn(List.of(
             issue(6L, "API-6", "Quota", "Blocked", IssueStatusCategory.STARTED, 5L, "API Platform", null)));
 
