@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import type { Approval, RunnerEvent } from "../src/api.js";
-import { ApprovalServer, hookDecision, missionScopes, preToolUseAnswer, preToolUseDecision, type ApprovalApi } from "../src/approvals.js";
+import type { Approval, Ruling, RunnerEvent } from "../src/api.js";
+import {
+  ApprovalServer, CHANGES_CAP, hookDecision, missionScopes, preToolUseAnswer, preToolUseDecision, type ApprovalApi,
+  type ApprovalServerOptions,
+} from "../src/approvals.js";
 import { EventRelay } from "../src/events.js";
 import type { RulesBundle } from "../src/harness/rules.js";
 import { describeToolInput, toEvents, toolLabel } from "../src/stream.js";
@@ -539,5 +542,134 @@ describe("Accorder (R78) : la demande dit sa règle, et un accord peut valoir po
   it("portée sans morceau qui demande ni action connue : l'outil", () => {
     assert.deepEqual(missionScopes(DEFAULT_RULES, [], "mcp__linear__save_issue"), ["mcp__linear__save_issue"]);
     assert.deepEqual(missionScopes(undefined, [{ tool: "mcp__linear__save_issue" }], "mcp__linear__save_issue"), ["mcp__linear__save_issue"]);
+  });
+});
+
+describe("plafond des changements dans TaskForce (R110, séance n°16) : au-delà, la porte demande", () => {
+  const call = (tool: string, input: Record<string, unknown>) =>
+    ({ hook_event_name: "PreToolUse", tool_name: `mcp__taskforce__${tool}`, tool_input: input });
+  const UPDATE = call("update_issue", { projectId: 12, issueId: 55, statusId: 3 });
+  const COMMENT = call("add_comment", { projectId: 12, issueId: 55, content: "Done." });
+  const CHECK = call("check_checklist_item", { projectId: 12, issueId: 55, itemId: 31, done: true });
+  const CREATE = call("create_issue", { projectId: 12, title: "Follow-up" });
+  const READ = call("get_issue", { projectId: 12, issueId: 55 });
+
+  type Answer = [Approval["status"], Approval["scope"]?];
+
+  /** Faux TaskForce : la n-ième demande reçoit la n-ième réponse, et chaque demande garde ce qu'elle portait. */
+  function answering(answers: Answer[]) {
+    const asked: Array<{ tool: string; ruling: Ruling | undefined }> = [];
+    const api: ApprovalApi = {
+      requestApproval: async (_runId, tool, _summary, _askedBy, ruling) => {
+        asked.push({ tool, ruling });
+        return { approvalId: asked.length, status: "PENDING", expiresAt: "" };
+      },
+      approvalStatus: async (_runId, id) => {
+        const [status, scope] = answers[id - 1] ?? ["DENIED"];
+        return { approvalId: id, status, expiresAt: "", scope: scope ?? null };
+      },
+    };
+    return { api, asked };
+  }
+
+  /** Ce que la porte répond à une suite d'appels ; « none » : la décision revient aux permissions de Claude Code. */
+  async function replay(server: ApprovalServer, calls: Array<Record<string, unknown>>): Promise<string[]> {
+    await server.start();
+    try {
+      const out: string[] = [];
+      for (const body of calls) {
+        const { json } = await askHook(server.preToolUseUrl, server.token, body);
+        out.push((json as PreToolUseOutput).hookSpecificOutput?.permissionDecision ?? "none");
+      }
+      return out;
+    } finally {
+      await server.stop();
+    }
+  }
+
+  /** Une demande vue par TaskForce : l'outil et le nombre de changements que dit sa raison. */
+  const said = ({ tool, ruling }: { tool: string; ruling: Ruling | undefined }) =>
+    `${tool.replace("taskforce: ", "")} ${/already made (\d+) changes/.exec(ruling?.reason ?? "")?.[1] ?? "?"}`;
+
+  const sequences: Array<[string, number, Array<Record<string, unknown>>, Answer[], string[], string[]]> = [
+    ["jusqu'au plafond sans demander, puis une demande qui dit le nombre déjà fait", 3,
+      [UPDATE, COMMENT, CHECK, CREATE], [["DENIED"]],
+      ["allow", "allow", "allow", "deny"], ["create_issue 3"]],
+    ["les lectures ne comptent pas", 1,
+      [READ, READ, UPDATE, READ, COMMENT], [["DENIED"]],
+      ["allow", "allow", "allow", "allow", "deny"], ["add_comment 1"]],
+    ["un refus ne compte pas : la demande suivante dit le même nombre", 1,
+      [UPDATE, COMMENT, CHECK], [["DENIED"], ["DENIED"]],
+      ["allow", "deny", "deny"], ["add_comment 1", "check_checklist_item 1"]],
+    ["un accord pour une fois compte, et le changement suivant redemande", 1,
+      [UPDATE, COMMENT, CHECK], [["ALLOWED", "ONCE"], ["DENIED"]],
+      ["allow", "allow", "deny"], ["add_comment 1", "check_checklist_item 2"]],
+    ["un accord pour la mission lève le plafond jusqu'à la fin de la mission", 1,
+      [UPDATE, COMMENT, CHECK, CREATE, UPDATE], [["ALLOWED", "MISSION"]],
+      ["allow", "allow", "allow", "allow", "allow"], ["add_comment 1"]],
+  ];
+  /** La porte de la mission, avec la table par défaut et ce plafond. */
+  const gate = (api: ApprovalApi, cap: number, more: Partial<ApprovalServerOptions> = {}) =>
+    new ApprovalServer(api, 42, WORK, {
+      waitMs: 1_000, pollMs: 5, rules: DEFAULT_RULES, maxTaskForceChanges: cap, ...more,
+    });
+
+  for (const [label, cap, calls, answers, expected, asks] of sequences) {
+    it(`${label} (plafond ${cap})`, async () => {
+      const { api, asked } = answering(answers);
+      const server = gate(api, cap);
+      assert.deepEqual(await replay(server, calls), expected);
+      assert.deepEqual(asked.map(said), asks);
+      // Chaque demande vient du plafond, pas d'une règle : un accord pour la mission le lève, lui seul.
+      for (const { ruling } of asked) assert.equal(ruling?.rule, CHANGES_CAP);
+    });
+  }
+
+  it("la demande dit l'action et une raison que la personne lit", async () => {
+    const { api, asked } = answering([["DENIED"]]);
+    await replay(gate(api, 2), [UPDATE, CHECK, COMMENT]);
+    assert.deepEqual(asked, [{ tool: "taskforce: add_comment", ruling: {
+      action: "comment.create", rule: CHANGES_CAP,
+      reason: "Claude Code has already made 2 changes to TaskForce in this mission. Past 2, it asks before each one.",
+    } }]);
+  });
+
+  it("la trace dit la décision qui s'applique : la règle, puis le plafond, puis l'accord pour la mission", async () => {
+    const decisions: string[] = [];
+    const again: string[] = [];
+    const server = gate(answering([["ALLOWED", "MISSION"]]).api, 1, {
+      onDecision: (tool, d) => decisions.push(`${tool} ${d.effect} ${d.rule?.id ?? "-"}`),
+      onMissionAllowed: (tool, scope) => again.push(`${tool} ${scope}`),
+    });
+    await replay(server, [UPDATE, COMMENT, CHECK]);
+    assert.deepEqual(decisions, [
+      "mcp__taskforce__update_issue allow update-issue",
+      `mcp__taskforce__add_comment ask ${CHANGES_CAP}`,
+      `mcp__taskforce__check_checklist_item ask ${CHANGES_CAP}`,
+    ]);
+    assert.deepEqual(again, [`mcp__taskforce__check_checklist_item ${CHANGES_CAP}`]);
+  });
+
+  it("ce que les règles demandent ne compte pas, et se demande au nom de sa règle", async () => {
+    // Un espace dont la règle des commentaires demande : chaque commentaire est déjà décidé par la personne.
+    const rules: RulesBundle = {
+      ...DEFAULT_RULES,
+      rules: DEFAULT_RULES.rules.map((r) => (r.id === "comment" ? { ...r, effect: "ask" as const } : r)),
+    };
+    const { api, asked } = answering([["ALLOWED", "ONCE"], ["DENIED"]]);
+    assert.deepEqual(await replay(gate(api, 1, { rules }), [COMMENT, UPDATE, CHECK]), ["allow", "allow", "deny"]);
+    assert.deepEqual(asked.map(({ ruling }) => ruling?.rule), ["comment", CHANGES_CAP]);
+  });
+
+  it("un outil autorisé d'avance passe le plafond comme une règle qui demande : il revient à Claude Code", async () => {
+    const { api, asked } = answering([]);
+    const server = gate(api, 1, { allowedInAdvance: ["mcp__taskforce"] });
+    assert.deepEqual(await replay(server, [UPDATE, COMMENT, CHECK]), ["allow", "none", "none"]);
+    assert.deepEqual(asked, []);
+  });
+
+  it("sans plafond, rien ne se compte : chaque changement suit sa règle", () => {
+    const server = new ApprovalServer(answering([]).api, 42, WORK, { waitMs: 1_000, rules: DEFAULT_RULES });
+    for (let i = 0; i < 50; i++) assert.equal(server.judge(i % 2 === 0 ? UPDATE : COMMENT).effect, "allow");
   });
 });

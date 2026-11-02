@@ -119,6 +119,12 @@ describe("parseRunnerConfigFile", () => {
     assert.equal(cfg.keepWorktree, false);
     assert.equal(cfg.autoClone, true); // rien à configurer : le dépôt du projet est cloné à la demande
     assert.deepEqual(cfg.repos, {});
+    // R110 : au-delà de 30 changements dans TaskForce par mission, chacun se demande (une première valeur, à mesurer).
+    assert.equal(cfg.agent.maxTaskForceChanges, 30);
+  });
+
+  it("le plafond des changements dans TaskForce se règle sur le poste", () => {
+    assert.equal(parseRunnerConfigFile({ agent: { maxTaskForceChanges: 5 } }).agent.maxTaskForceChanges, 5);
   });
 
   it("indexe les dépôts en minuscules, accepte la forme courte (chemin seul)", () => {
@@ -134,6 +140,9 @@ describe("parseRunnerConfigFile", () => {
     ["branche de base exotique", { repos: { "a/b": { path: process.platform === "win32" ? "C:/x" : "/x", baseBranch: "main; rm -rf" } } }],
     ["auth inconnue", { agent: { auth: "oauth" } }],
     ["maxTurns négatif", { agent: { maxTurns: -1 } }],
+    ["plafond de changements nul", { agent: { maxTaskForceChanges: 0 } }],
+    ["plafond de changements non entier", { agent: { maxTaskForceChanges: 2.5 } }],
+    ["plafond de changements en texte", { agent: { maxTaskForceChanges: "30" } }],
     ["pollSeconds non entier", { pollSeconds: 1.5 }],
     ["setup qui n'est pas une liste", { repos: { "a/b": { path: process.platform === "win32" ? "C:/x" : "/x", setup: "npm ci" } } }],
     ["setup en chaînes shell (refusé : tableaux d'arguments seulement)", { repos: { "a/b": { path: process.platform === "win32" ? "C:/x" : "/x", setup: ["npm ci && rm -rf /"] } } }],
@@ -321,6 +330,14 @@ describe("textes produits", () => {
     for (const prompt of [buildPrompt(claim, "b"), buildReplyPrompt(claim)]) {
       assert.match(prompt, /check it with check_checklist_item/);
       assert.match(prompt, /Check only the items you completed/);
+    }
+  });
+
+  it("le brief dit la portée de l'agent dans TaskForce : son issue, nommée, et des issues créées dans le projet (R110)", () => {
+    for (const prompt of [buildPrompt(claim, "b"), buildReplyPrompt(claim)]) {
+      assert.match(prompt, /create issues in this project, and change only this issue \(issueId 55\)/);
+      assert.match(prompt, /Past a number of changes in one mission, each further change waits for the approval/);
+      assert.doesNotMatch(prompt, /issues of this project/);
     }
   });
 

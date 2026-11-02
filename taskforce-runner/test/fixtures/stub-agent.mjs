@@ -130,7 +130,10 @@ allPass &= expect("list workspace projects (read)", await call("list_projects", 
 allPass &= expect("search the Brain OS (read via POST)", await call("brain_search", { query: "architecture" }), false);
 allPass &= expect("comment the delegated issue (write, in scope)",
   await call("add_comment", { projectId, issueId, content: "Runner self-test: the delegated session reached this issue through the MCP server of the instance." }), false);
-// Hors périmètre : un AUTRE projet du même workspace, puis Cortex (niveau workspace).
+// Hors périmètre : une AUTRE issue du même projet (R110 : l'agent ne change que l'issue confiée), un AUTRE projet du
+// même workspace, puis Cortex (niveau workspace).
+allPass &= expect("comment ANOTHER issue of the same project (write, out of scope)",
+  await call("add_comment", { projectId, issueId: issueId + 1, content: "must be refused" }), true);
 allPass &= expect("create an issue in ANOTHER project (write, out of scope)",
   await call("create_issue", { projectId: projectId + 1, title: "must be refused" }), true);
 allPass &= expect("ask Cortex (workspace level, out of scope)", await call("ask_cortex", { message: "hello from the stub agent" }), true);

@@ -582,6 +582,21 @@ export const CONSTANTS_EN = {
         will: "Change data in a tool your workspace connected, outside TaskForce.",
         ifRefused: "It continues without this change.",
       },
+      "issue.update": {
+        want: "change this issue",
+        will: "Change this issue in TaskForce: a field, its column or a checklist item. The activity shows the change under its name, for you.",
+        ifRefused: "It continues without this change.",
+      },
+      "issue.create": {
+        want: "create an issue",
+        will: "Create an issue in this project. The activity shows it under its name, for you.",
+        ifRefused: "It continues without creating it.",
+      },
+      "comment.create": {
+        want: "comment on this issue",
+        will: "Post a comment on this issue, under its name, for you.",
+        ifRefused: "It continues without commenting.",
+      },
       "mission.start": {
         want: "start the mission",
         will: "Start Claude Code on this task, in a copy of the project on this computer.",

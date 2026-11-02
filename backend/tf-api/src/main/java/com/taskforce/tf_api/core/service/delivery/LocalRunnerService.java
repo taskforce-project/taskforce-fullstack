@@ -247,7 +247,7 @@ public class LocalRunnerService {
 
     /**
      * Ouvre la session déléguée d'une requête : vérifie que le run est bien tenu par ce runner, encore en
-     * cours et dans sa durée de vie, puis rend le périmètre (workspace, projet), le délégant au nom
+     * cours et dans sa durée de vie, puis rend le périmètre (workspace, projet, issue), le délégant au nom
      * duquel la requête sera évaluée et le nom de l'agent du run, que l'activité de l'issue garde avec ce qu'il y fait.
      * Appelé par {@code DeliverySessionFilter} à chaque requête.
      */
@@ -262,13 +262,15 @@ public class LocalRunnerService {
             log.warn("Session déléguée expirée : run {} (runner {})", runId, runner.clientId());
             throw new ForbiddenException(REFUSED);
         }
-        Project project = run.getIssue().getProject();
+        Issue issue = run.getIssue();
+        Project project = issue.getProject();
         User owner = run.getStartedBy();
         DeliveryAgentProvider provider = providers.get(run.getProviderKey());
         return new DeliverySession(
             run.getId(),
             project.getWorkspace().getSlug(),
             project.getId(),
+            issue.getId(),
             owner.getEmail(),
             owner.getKeycloakId(),
             runner.clientId(),
