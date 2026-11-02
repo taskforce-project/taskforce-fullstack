@@ -137,9 +137,10 @@ const HEADER_BUTTON =
 
 /**
  * La conversation avec Cortex : son en-tête (les conversations, une nouvelle, l'endroit), ses tours, et l'état vide qui
- * dit ce qu'on peut demander. Elle se lit dans `useCortexStore`, donc la même conversation se déplie au-dessus de la
- * barre (`place="bar"`) ou s'épingle dans le panneau de droite (`place="side"`) sans rien perdre ; la saisie reste la
- * barre unique, en bas de l'écran (R76).
+ * dit ce qu'on peut demander. Elle se lit dans `useCortexStore`, donc la même conversation s'ouvre en bulle au-dessus
+ * de la barre (`place="bar"`) ou s'épingle dans le panneau de droite (`place="side"`) sans rien perdre ; la saisie
+ * reste la barre unique, en bas de l'écran (R76). Dans la bulle, les contrôles sont ronds, comme ceux du composeur du
+ * site ; le panneau garde les angles droits de l'app.
  */
 export function AgentChat({ place, onSwitchPlace, onFold }: Readonly<{
   place: CortexPlace
@@ -238,11 +239,20 @@ export function AgentChat({ place, onSwitchPlace, onFold }: Readonly<{
     ? (conversations.find((c) => c.id === conversationId)?.title ?? "Conversation")
     : t.chatNew
   const recent = conversations.filter((c) => c.id !== conversationId).slice(0, 3)
+  const inBubble = place === "bar"
+  const headerButton = cn(HEADER_BUTTON, inBubble && "rounded-full")
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border/70 px-2 md:px-4">
-        {place === "bar" && <Sparkles className="mr-1 size-3.5 shrink-0 text-primary" aria-hidden="true" />}
+      <div className={cn(
+        "flex shrink-0 items-center gap-1 border-b",
+        inBubble ? "h-11 border-border/60 px-2" : "h-10 border-border/70 px-2 md:px-4",
+      )}>
+        {inBubble && (
+          <span className="mr-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary" aria-hidden="true">
+            <Sparkles className="size-3.5" />
+          </span>
+        )}
         <div
           ref={listRef}
           className="relative min-w-0"
@@ -255,9 +265,9 @@ export function AgentChat({ place, onSwitchPlace, onFold }: Readonly<{
             type="button"
             aria-expanded={showList}
             onClick={() => { setShowList((v) => !v); if (!showList) void loadConversations(slug) }}
-            className="flex max-w-full items-center gap-1.5 px-1.5 py-1 text-xs transition-colors hover:bg-muted"
+            className={cn("flex max-w-full items-center gap-1.5 py-1 text-xs transition-colors hover:bg-muted", inBubble ? "rounded-full px-2" : "px-1.5")}
           >
-            {place === "side" && <MessageSquare className="size-3.5 shrink-0 text-muted-foreground" />}
+            {!inBubble && <MessageSquare className="size-3.5 shrink-0 text-muted-foreground" />}
             <span className="truncate font-medium">{currentTitle}</span>
             <ChevronDown className={cn("size-3 shrink-0 transition-transform", showList && "rotate-180")} />
           </button>
@@ -302,7 +312,7 @@ export function AgentChat({ place, onSwitchPlace, onFold }: Readonly<{
           )}
         </div>
 
-        <button type="button" onClick={startNew} aria-label={t.chatNew} title={t.chatNew} className={HEADER_BUTTON}>
+        <button type="button" onClick={startNew} aria-label={t.chatNew} title={t.chatNew} className={headerButton}>
           <Plus className="size-4" />
         </button>
 
@@ -321,25 +331,25 @@ export function AgentChat({ place, onSwitchPlace, onFold }: Readonly<{
         <button
           type="button"
           onClick={onSwitchPlace}
-          aria-label={place === "bar" ? t.chatPinSide : t.chatBackToBar}
-          title={place === "bar" ? t.chatPinSide : t.chatBackToBar}
-          className={HEADER_BUTTON}
+          aria-label={inBubble ? t.chatPinSide : t.chatBackToBar}
+          title={inBubble ? t.chatPinSide : t.chatBackToBar}
+          className={headerButton}
         >
-          {place === "bar" ? <PanelRight className="size-4" /> : <PanelBottom className="size-4" />}
+          {inBubble ? <PanelRight className="size-4" /> : <PanelBottom className="size-4" />}
         </button>
         {onFold && (
-          <button type="button" onClick={onFold} aria-label={t.chatFold} title={t.chatFold} className={HEADER_BUTTON}>
+          <button type="button" onClick={onFold} aria-label={t.chatFold} title={t.chatFold} className={headerButton}>
             <ChevronDown className="size-4" />
           </button>
         )}
       </div>
 
-      <div ref={threadRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-6">
-        <div className={cn("flex flex-col", place === "bar" && "max-w-3xl")}>
+      <div ref={threadRef} className={cn("min-h-0 flex-1 overflow-y-auto", inBubble ? "px-3 py-3 md:px-4" : "px-3 py-4 md:px-6")}>
+        <div className="flex flex-col">
           {turns.length === 0 && !thinking ? (
             <div className="flex flex-col gap-3 py-1">
               <div className="flex items-start gap-2.5">
-                <div className="flex size-7 shrink-0 items-center justify-center bg-primary/10 text-primary">
+                <div className={cn("flex size-7 shrink-0 items-center justify-center bg-primary/10 text-primary", inBubble && "rounded-full")}>
                   <Sparkles className="size-4" />
                 </div>
                 <div>
@@ -350,7 +360,7 @@ export function AgentChat({ place, onSwitchPlace, onFold }: Readonly<{
               {aiStatus && !aiStatus.chatAvailable && <AiUnavailableNotice />}
               <div className="flex flex-wrap gap-1.5" aria-label={t.barSuggestions}>
                 {suggestionsFor(pathname).map((s) => (
-                  <PromptSuggestion key={s.label} onClick={() => suggest(s.text)}>{s.label}</PromptSuggestion>
+                  <PromptSuggestion key={s.label} onClick={() => suggest(s.text)} className={cn(inBubble && "rounded-full")}>{s.label}</PromptSuggestion>
                 ))}
               </div>
               {recent.length > 0 && (

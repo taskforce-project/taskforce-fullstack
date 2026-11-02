@@ -869,6 +869,65 @@ textarea:not([disabled]) { cursor: text; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   CORTEX - le composeur flottant et la bulle de la conversation
+   ─────────────────────────────────────────────────────────────────────────
+   Le CEO, après l'essai de l'app desktop 1.5.0 (02/11/2026) : la conversation, un tiroir plat sous le tableau, ne se
+   distinguait pas de l'écran. Elle prend la langue du composeur du site (landing-page, Composer.astro) : la barre
+   flotte en bas, la conversation s'ouvre au-dessus en bulle détachée, arrondie et ombrée, sur un halo circulaire. Ces
+   deux surfaces sont la seule exception aux angles droits et à « pas de dégradé dans le produit »
+   (.ai/design-grammar.md). Pas de backdrop-filter : la bulle est opaque et le halo n'est qu'un dégradé, flouter une
+   grande surface coûte cher au rendu (notes du site, .ai/site-desktop.md).
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* Un seul rayon pour ce qui flotte avec Cortex, celui du composeur du site. */
+  --cortex-radius: 1.125rem;
+  /* Le dégradé de la bulle : un bleu qui monte du composeur et s'éteint vers le haut. */
+  --cortex-glow: color-mix(in srgb, var(--primary) 13%, var(--card));
+  /* Le cœur bleu du halo, sous la jonction de la bulle et du composeur. */
+  --cortex-aura: color-mix(in srgb, var(--primary) 22%, transparent);
+}
+.dark {
+  --cortex-glow: color-mix(in srgb, var(--primary) 20%, var(--card));
+  --cortex-aura: color-mix(in srgb, var(--primary) 34%, transparent);
+}
+.cortex-composer {
+  border-radius: var(--cortex-radius);
+  background: var(--card);
+  box-shadow: var(--shadow-window);
+  transition: box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.cortex-composer:focus-within {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ring) 55%, transparent), var(--shadow-window);
+}
+.cortex-bubble {
+  border-radius: var(--cortex-radius);
+  background:
+    radial-gradient(130% 85% at 50% 110%, var(--cortex-glow) 0%, transparent 75%),
+    var(--card);
+  box-shadow: var(--shadow-window), var(--shadow-xl);
+}
+/* Dans la bulle, la demande de la personne est une bulle de discussion, arrondie sauf du côté de qui parle. */
+.cortex-bubble [data-role="user"] {
+  border-radius: 0.875rem 0.875rem 0.25rem 0.875rem;
+}
+/* Le halo derrière la bulle et le composeur : le fond de l'écran, presque plein près de la bulle, qui s'efface vers
+   les bords, et un cœur bleu sous la jonction des deux. L'écran reste lisible autour, et cliquable : le halo ne
+   capte rien. */
+.cortex-halo {
+  position: absolute;
+  inset: -3.5rem -8rem -6rem;
+  pointer-events: none;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--background) 82%, transparent) 70%, transparent);
+}
+.cortex-halo::after {
+  content: "";
+  position: absolute;
+  inset: 30% 6% -12%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--cortex-aura) 0%, color-mix(in srgb, var(--cortex-aura) 70%, transparent) 60%, transparent);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    APP DESKTOP - haut de la fenêtre dessiné par l'interface
    ─────────────────────────────────────────────────────────────────────────
    La coque n'a ni barre de titre ni menu du système (desktop/src/window-chrome.ts) : la barre du haut et
