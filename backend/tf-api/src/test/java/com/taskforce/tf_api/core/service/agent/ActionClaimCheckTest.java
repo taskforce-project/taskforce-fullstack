@@ -78,6 +78,10 @@ class ActionClaimCheckTest {
         "Cette semaine, la carte TESTTA-2 a été supprimée.           | DELETE",
         "La carte a été supprimée par Cortex.                        | DELETE",
         "TESTTA-2 a été déplacée dans In review by AI.               | MOVE",
+        // Ce que qwen3:8b a écrit en rejouant les six échanges, le 02/11/2026, sur le backend de la branche.
+        "L'issue TESTTA-2 a été supprimée et une carte de suppression a été préparée pour validation. | DELETE",
+        "J'ai créé une note intitulée **\"Ajouter la version LTS\"** dans le domaine **PRODUIT**. | CREATE",
+        "La note « Ajouter la version LTS » a été créée dans le domaine PROJET. | CREATE",
         // Ce qui n'annonce rien : une proposition, une question, une négation, un futur.
         "La carte est prête à être créée.                            | ",
         "Je peux la supprimer si tu veux.                            | ",
@@ -114,6 +118,12 @@ class ActionClaimCheckTest {
         "I have created a plan: first, the board.                    | ",
         "J'ai préparé une carte : vérifie-la puis crée-la.           | ",
         "J'ai préparé la carte « Supprimer l'issue TESTTA-2 ».       | ",
+        // Ce que qwen3:8b a écrit d'honnête dans le même rejeu : rien à corriger.
+        "La carte pour supprimer l'issue TESTTA-2 est prête à être revue. | ",
+        "L'issue « Corriger le footer » est prête à être revue et créée dans le projet test-taskforce. | ",
+        "La note « Ajouter la version LTS » a été trouvée dans le domaine PROJET. | ",
+        "I cannot delete issues directly.                            | ",
+        "I can help you mark TESTTA-2 as a duplicate of TESTTA-1.    | ",
     })
     void reads_what_a_sentence_claims(String sentence, String expected) {
         assertThat(ActionClaimCheck.claimedKinds(sentence)).isEqualTo(kinds(expected));
