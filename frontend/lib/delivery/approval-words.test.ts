@@ -36,6 +36,20 @@ describe("approvalWords", () => {
     expect(words.ifRefused).toBe(t.actions.other.ifRefused);
   });
 
+  it.each([
+    ["issue.update", "Claude Code wants to change this issue"],
+    ["issue.create", "Claude Code wants to create an issue"],
+    ["comment.create", "Claude Code wants to comment on this issue"],
+  ])("says the agent's %s in TaskForce in its own words, past the cap of changes", (action, title) => {
+    const words = approvalWords({
+      tool: "mcp__taskforce__update_issue", askedBy: "agent", action,
+      reason: "Claude Code has already made 30 changes to TaskForce in this mission. Past 30, it asks before each one.",
+    }, t);
+
+    expect(words.title).toBe(title);
+    expect(words.will).not.toBe(t.actions.other.will);
+  });
+
   it("says that no rule covers an action without one", () => {
     expect(approvalWords({ tool: "Bash", askedBy: "agent", action: "shell", reason: "  " }, t).why).toBe(t.noRule);
   });
