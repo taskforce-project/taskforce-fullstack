@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MotionGlobalConfig } from "framer-motion";
 
-import { CommandBar, CORTEX_PANEL_ID } from "./command-bar";
-import { sendAgentMessage } from "@/lib/api/assistant-service";
+import { CommandBar } from "./command-bar";
+import { sendAgentMessage, type AssistantAnswer } from "@/lib/api/assistant-service";
 import { listConversations } from "@/lib/api/ai-conversation-service";
-import { CORTEX_HEIGHT, useCortexStore } from "@/lib/store/cortex-store";
+import { useCortexStore, type CortexTurn } from "@/lib/store/cortex-store";
 import { usePanelStore } from "@/lib/store/panel-store";
 
 // Aucun réseau : la réponse de Cortex, les conversations, l'état de l'IA et les outils connectés sont simulés.
@@ -42,10 +42,21 @@ function answerWith(text: string) {
   };
 }
 
-describe("CommandBar : la barre flotte, la conversation s'ouvre en bulle au-dessus", () => {
+const said = (id: string, text: string): CortexTurn => ({ id, role: "user", text });
+const answered = (id: string, text: string): CortexTurn => ({
+  id, role: "assistant",
+  answer: { ...answerWith(text).answer, sources: [] } satisfies AssistantAnswer,
+});
+
+/** Le tour qui porte ce texte, tel que la conversation l'enveloppe (sa taille et son ton se lisent sur ses classes). */
+function turnWith(text: string): HTMLElement | null {
+  return screen.getByText(text).closest<HTMLElement>("[data-role]")?.parentElement?.parentElement ?? null;
+}
+
+describe("CommandBar : la barre flotte, la conversation s'ouvre au-dessus, sans carte, toujours en bas", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useCortexStore.setState({ ...initial, draft: "", workspace: null, turns: [], conversations: [], open: false, place: "bar", unread: false, sentAt: null });
+    useCortexStore.setState({ ...initial, draft: "", workspace: null, turns: [], conversations: [], open: false, unread: false, sentAt: null });
     usePanelStore.setState({ panels: [] });
     vi.mocked(listConversations).mockResolvedValue([]);
   });
@@ -71,7 +82,7 @@ describe("CommandBar : la barre flotte, la conversation s'ouvre en bulle au-dess
     expect(screen.getByRole("group", { name: "Suggestions for this screen" })).toBeTruthy();
   });
 
-  it("opens the answer in a bubble right above the bar, which becomes the reply box", async () => {
+  it("opens the answer right above the bar, which becomes the reply box", async () => {
     vi.mocked(sendAgentMessage).mockResolvedValue(answerWith("Two issues are blocked."));
     render(<CommandBar />);
     const input = screen.getByLabelText("What do you want done?");
@@ -103,19 +114,70 @@ describe("CommandBar : la barre flotte, la conversation s'ouvre en bulle au-dess
     expect(await screen.findByRole("region", { name: "Conversation with Cortex" })).toHaveTextContent("What changed this week?");
   });
 
-  it("minimizes from the bubble's own button, back into the bar", async () => {
+  it("minimizes from the conversation's own chevron, back into the bar", async () => {
     useCortexStore.setState({ workspace: "acme", open: true, turns: [{ id: "u1", role: "user", text: "What changed this week?" }] });
     render(<CommandBar />);
 
     fireEvent.click(screen.getByRole("button", { name: "Minimize (Esc)" }));
 
     await waitFor(() => expect(screen.queryByRole("region", { name: "Conversation with Cortex" })).toBeNull());
-    expect(useCortexStore.getState()).toMatchObject({ open: false, place: "bar" });
+    expect(useCortexStore.getState().open).toBe(false);
     expect(screen.getByRole("button", { name: "Show the conversation with Cortex" })).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByLabelText("What do you want done?")).toHaveFocus();
   });
 
-  it("keeps the bubble and the bar clear of a panel open on the right", () => {
+  it("stays at the bottom: nothing pins it to the side, sending opens no panel", async () => {
+    vi.mocked(sendAgentMessage).mockResolvedValue(answerWith("Done."));
+    useCortexStore.setState({ workspace: "acme", open: true });
+    render(<CommandBar />);
+    const input = screen.getByLabelText("What do you want done?");
+
+    expect(screen.queryByRole("button", { name: /side/i })).toBeNull();
+    fireEvent.change(input, { target: { value: "Summarize the decisions" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(screen.getByRole("region", { name: "Conversation with Cortex" })).toHaveTextContent("Done."));
+    expect(usePanelStore.getState().panels).toEqual([]);
+  });
+
+  it("is not modal: only its text catches the pointer, the screen above stays clickable", () => {
+    useCortexStore.setState({ workspace: "acme", open: true });
+    render(<CommandBar />);
+
+    const conversation = screen.getByRole("region", { name: "Conversation with Cortex" });
+    // Ni carte ni voile : la conversation passe au-dessus de l'écran dans une couche qui laisse passer les clics, et son
+    // dégradé n'en capte aucun (`.cortex-wash`, pointer-events: none dans globals.css).
+    expect(conversation).toHaveClass("pointer-events-auto");
+    expect(conversation.parentElement?.parentElement).toHaveClass("pointer-events-none");
+    expect(conversation.parentElement?.parentElement?.querySelector(".cortex-wash")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("reads the latest answer large, and the turns before its request smaller", () => {
+    useCortexStore.setState({
+      workspace: "acme", open: true,
+      turns: [said("u1", "Which issues are blocked?"), answered("a1", "Two issues are blocked."), said("u2", "Who owns them?"), answered("a2", "Ada owns both.")],
+    });
+    render(<CommandBar />);
+
+    expect(turnWith("Ada owns both.")).toHaveClass("cortex-latest");
+    expect(turnWith("Who owns them?")).not.toHaveClass("cortex-earlier");
+    expect(turnWith("Two issues are blocked.")).toHaveClass("cortex-earlier");
+    expect(turnWith("Which issues are blocked?")).toHaveClass("cortex-earlier");
+  });
+
+  it("keeps the large type for the answer, not for the request that waits for one", () => {
+    useCortexStore.setState({
+      workspace: "acme", open: true, sentAt: Date.now(),
+      turns: [said("u1", "Which issues are blocked?"), answered("a1", "Two issues are blocked."), said("u2", "Who owns them?")],
+    });
+    render(<CommandBar />);
+
+    expect(screen.getByRole("region", { name: "Conversation with Cortex" }).querySelector(".cortex-latest")).toBeNull();
+    expect(turnWith("Two issues are blocked.")).toHaveClass("cortex-earlier");
+    expect(turnWith("Who owns them?")).not.toHaveClass("cortex-earlier");
+  });
+
+  it("keeps the conversation and the bar clear of a panel open on the right", () => {
     usePanelStore.getState().openPanel({ id: "workflows", title: "AI Workflows", content: null });
     useCortexStore.setState({ workspace: "acme", open: true });
     render(<CommandBar />);
@@ -134,43 +196,4 @@ describe("CommandBar : la barre flotte, la conversation s'ouvre en bulle au-dess
     expect(useCortexStore.getState()).toMatchObject({ open: true, unread: false });
   });
 
-  it("pins the conversation to the side, and brings it back to the bar", async () => {
-    useCortexStore.setState({ workspace: "acme", open: true });
-    render(<CommandBar />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Pin to the side" }));
-
-    expect(useCortexStore.getState().place).toBe("side");
-    expect(usePanelStore.getState().panels.map((p) => p.id)).toEqual([CORTEX_PANEL_ID]);
-    await waitFor(() => expect(screen.queryByRole("region", { name: "Conversation with Cortex" })).toBeNull());
-
-    // Le panneau fermé par sa croix : la conversation est repliée, la barre peut la rouvrir à droite.
-    usePanelStore.getState().closePanel(CORTEX_PANEL_ID);
-    await waitFor(() => expect(useCortexStore.getState().open).toBe(false));
-    fireEvent.click(screen.getByRole("button", { name: "Show the conversation with Cortex" }));
-    expect(usePanelStore.getState().panels.map((p) => p.id)).toEqual([CORTEX_PANEL_ID]);
-  });
-
-  it("sends from the bar into the side panel when it is pinned there", async () => {
-    vi.mocked(sendAgentMessage).mockResolvedValue(answerWith("Done."));
-    useCortexStore.setState({ place: "side" });
-    render(<CommandBar />);
-    const input = screen.getByLabelText("What do you want done?");
-
-    fireEvent.change(input, { target: { value: "Summarize the decisions" } });
-    fireEvent.click(screen.getByRole("button", { name: "Send" }));
-
-    expect(usePanelStore.getState().panels.map((p) => p.id)).toEqual([CORTEX_PANEL_ID]);
-    await waitFor(() => expect(sendAgentMessage).toHaveBeenCalledWith("acme", "Summarize the decisions", null));
-    expect(screen.queryByRole("region", { name: "Conversation with Cortex" })).toBeNull();
-  });
-
-  it("resizes the conversation from its top edge with the keyboard", () => {
-    useCortexStore.setState({ workspace: "acme", open: true, height: CORTEX_HEIGHT.initial });
-    render(<CommandBar />);
-
-    fireEvent.keyDown(screen.getByRole("button", { name: "Resize the conversation" }), { key: "ArrowUp" });
-
-    expect(useCortexStore.getState().height).toBe(CORTEX_HEIGHT.initial + 40);
-  });
 });

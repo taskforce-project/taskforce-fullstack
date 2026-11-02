@@ -18,10 +18,12 @@ Décisions qui ne se rediscutent pas (CEO, 20/09) :
 - **Un seul radius de référence** : `--radius` = 10px (sm 6 / md 8 / lg et xl 10). On n'en ajoute pas.
 - **Plat** : aucun `backdrop-filter`, aucun gradient décoratif dans le produit (les dégradés vivent sur les
   pages d'auth et le Labs, jamais dans le workspace).
-- **Une exception, Cortex** (CEO, 02/11/2026) : la barre unique et la bulle de sa conversation parlent la langue du
-  composeur du site. Elles flottent, arrondies (`--cortex-radius`, 18 px), ombrées, la bulle sur un dégradé et un
-  halo bleus, leurs contrôles ronds ; toujours sans `backdrop-filter`. Les valeurs vivent dans les classes `.cortex-*`
-  de `globals.css` ; rien d'autre dans l'app ne s'arrondit ni ne prend de dégradé.
+- **Une exception, Cortex** (CEO, 02/11/2026) : la barre unique et sa conversation parlent la langue du composeur du
+  site. La barre flotte, arrondie (`--cortex-radius`, 18 px) et ombrée, ses contrôles ronds. La conversation n'est
+  pas une carte (« je veux pas de card ») : ni bord, ni fond, ni ombre ; son texte se pose sur un dégradé du fond qui
+  monte de la barre, avec un cœur bleu (`.cortex-wash`), et sa dernière réponse se lit en grand, à 18 px, seule
+  entorse aux corps de 13 à 14 px. Toujours en bas, jamais sur le côté ; toujours sans `backdrop-filter`. Les valeurs
+  vivent dans les classes `.cortex-*` de `globals.css` ; rien d'autre dans l'app ne s'arrondit ni ne prend de dégradé.
 
 ## 2. Tokens (source unique : `globals.css`)
 
