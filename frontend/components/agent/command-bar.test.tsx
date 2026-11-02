@@ -42,7 +42,7 @@ function answerWith(text: string) {
   };
 }
 
-describe("CommandBar : la conversation se déplie depuis la barre", () => {
+describe("CommandBar : la barre flotte, la conversation s'ouvre en bulle au-dessus", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useCortexStore.setState({ ...initial, draft: "", workspace: null, turns: [], conversations: [], open: false, place: "bar", unread: false, sentAt: null });
@@ -60,7 +60,18 @@ describe("CommandBar : la conversation se déplie depuis la barre", () => {
     expect(screen.queryByRole("region", { name: "Conversation with Cortex" })).toBeNull();
   });
 
-  it("unfolds the answer right above the bar, which becomes the reply box", async () => {
+  it("keeps the suggestions out of the way while the person writes", () => {
+    render(<CommandBar />);
+    const input = screen.getByLabelText("What do you want done?");
+
+    fireEvent.change(input, { target: { value: "Move the login issue to Done" } });
+    expect(screen.queryByRole("group", { name: "Suggestions for this screen" })).toBeNull();
+
+    fireEvent.change(input, { target: { value: "" } });
+    expect(screen.getByRole("group", { name: "Suggestions for this screen" })).toBeTruthy();
+  });
+
+  it("opens the answer in a bubble right above the bar, which becomes the reply box", async () => {
     vi.mocked(sendAgentMessage).mockResolvedValue(answerWith("Two issues are blocked."));
     render(<CommandBar />);
     const input = screen.getByLabelText("What do you want done?");
@@ -80,7 +91,7 @@ describe("CommandBar : la conversation se déplie depuis la barre", () => {
     expect(screen.getByText("Runbook")).toBeTruthy();
   });
 
-  it("folds with Escape and unfolds the same conversation again", async () => {
+  it("minimizes with Escape and opens the same conversation again", async () => {
     useCortexStore.setState({ workspace: "acme", open: true, turns: [{ id: "u1", role: "user", text: "What changed this week?" }] });
     render(<CommandBar />);
     expect(screen.getByRole("region", { name: "Conversation with Cortex" })).toBeTruthy();
@@ -90,6 +101,28 @@ describe("CommandBar : la conversation se déplie depuis la barre", () => {
     await waitFor(() => expect(screen.queryByRole("region", { name: "Conversation with Cortex" })).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "Show the conversation with Cortex" }));
     expect(await screen.findByRole("region", { name: "Conversation with Cortex" })).toHaveTextContent("What changed this week?");
+  });
+
+  it("minimizes from the bubble's own button, back into the bar", async () => {
+    useCortexStore.setState({ workspace: "acme", open: true, turns: [{ id: "u1", role: "user", text: "What changed this week?" }] });
+    render(<CommandBar />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Minimize (Esc)" }));
+
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Conversation with Cortex" })).toBeNull());
+    expect(useCortexStore.getState()).toMatchObject({ open: false, place: "bar" });
+    expect(screen.getByRole("button", { name: "Show the conversation with Cortex" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByLabelText("What do you want done?")).toHaveFocus();
+  });
+
+  it("keeps the bubble and the bar clear of a panel open on the right", () => {
+    usePanelStore.getState().openPanel({ id: "workflows", title: "AI Workflows", content: null });
+    useCortexStore.setState({ workspace: "acme", open: true });
+    render(<CommandBar />);
+
+    const room = screen.getByRole("region", { name: "Conversation with Cortex" }).closest<HTMLElement>("[style*='--cortex-right']");
+    expect(room?.style.getPropertyValue("--cortex-right")).toBe("420px");
+    expect(room?.style.getPropertyValue("--cortex-left")).toBe("0px");
   });
 
   it("tells when an answer waits while the conversation is folded", () => {

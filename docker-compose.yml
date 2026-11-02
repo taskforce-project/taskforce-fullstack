@@ -103,35 +103,6 @@ services:
       retries: 5
     restart: unless-stopped
 
-  ai-service:
-    build:
-      context: ./ai-service
-    environment:
-      TZ: UTC
-      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?missing value, run scripts/selfhost-init first}
-      # Ollama on this machine by default (qwen3:8b and bge-m3, see SELF_HOSTING.md), or any OpenAI-compatible API.
-      AI_PROVIDER: ${AI_PROVIDER:-}
-      AI_BASE_URL: ${AI_BASE_URL:-}
-      AI_API_KEY: ${AI_API_KEY:-}
-      AI_MODEL: ${AI_MODEL:-}
-      AI_MODEL_FAST: ${AI_MODEL_FAST:-}
-      AI_EMBED_BASE_URL: ${AI_EMBED_BASE_URL:-}
-      AI_EMBED_API_KEY: ${AI_EMBED_API_KEY:-}
-      AI_EMBED_MODEL: ${AI_EMBED_MODEL:-}
-      AI_TIMEOUT: ${AI_TIMEOUT:-120}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      LOG_LEVEL: INFO
-    # Linux: lets the container reach Ollama on the host (Docker Desktop already knows this name).
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)\" || exit 1"]
-      interval: 20s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    restart: unless-stopped
-
   backend:
     build:
       context: ./backend/tf-api
@@ -157,8 +128,19 @@ services:
       CORS_ALLOWED_ORIGINS: ${TF_APP_URL:-http://localhost:3000}
       # Session cookie. Browsers drop secure cookies over plain http (localhost aside): false for http on a network.
       AUTH_REFRESH_COOKIE_SECURE: ${AUTH_REFRESH_COOKIE_SECURE:-true}
-      AI_SERVICE_URL: http://ai-service:8000
-      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?missing value, run scripts/selfhost-init first}
+      # AI: Ollama on this machine by default (qwen3:8b and bge-m3, see SELF_HOSTING.md), any OpenAI-compatible API
+      # or Anthropic's API. The API talks to the provider itself.
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_MODEL_FAST: ${AI_MODEL_FAST:-}
+      AI_EMBED_BASE_URL: ${AI_EMBED_BASE_URL:-}
+      AI_EMBED_API_KEY: ${AI_EMBED_API_KEY:-}
+      AI_EMBED_MODEL: ${AI_EMBED_MODEL:-}
+      AI_TIMEOUT: ${AI_TIMEOUT:-120}
+      AI_MAX_TOKENS: ${AI_MAX_TOKENS:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       MINIO_ENDPOINT: http://minio:9000
       MINIO_PUBLIC_ENDPOINT: ${TF_STORAGE_URL:-http://localhost:9000}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-taskforce}
@@ -197,8 +179,9 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-      ai-service:
-        condition: service_healthy
+    # Linux: lets the API reach Ollama on the host (Docker Desktop already knows this name).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/readyz >/dev/null 2>&1 || exit 1"]
       interval: 30s

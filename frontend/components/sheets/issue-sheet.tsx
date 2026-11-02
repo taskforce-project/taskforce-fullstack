@@ -41,6 +41,7 @@ import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { describeActivity } from "@/lib/issue-activity"
+import { useIssueRealtime } from "@/lib/hooks/use-issue-realtime"
 import { agentAtWork } from "@/lib/delivery/agent-at-work"
 import { IssueAiSpecPanel } from "@/components/issues/issue-ai-spec"
 import { IssueDescription } from "@/components/issues/issue-description"
@@ -1250,6 +1251,16 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
       .catch(() => null)
       .finally(() => setLoadingActivity(false))
   }, [open, issue, workspaceSlug, projectId, fetchComments, fetchActivity])
+
+  // Ce qui arrive à l'issue pendant que la fiche est ouverte (le commentaire d'un agent, ce qu'il coche, sa pull
+  // request) relit le fil, sans le vider : il n'apparaissait qu'en rouvrant l'issue (rejeu de la 1.8.0).
+  const issueNumber = issue ? Number(issue.id) : null
+  const refreshFeed = useCallback(() => {
+    if (!workspaceSlug || !projectId || issueNumber === null) return
+    void fetchComments(workspaceSlug, projectId, issueNumber).catch(() => null)
+    void fetchActivity(workspaceSlug, projectId, issueNumber).catch(() => null)
+  }, [workspaceSlug, projectId, issueNumber, fetchComments, fetchActivity])
+  useIssueRealtime(open && projectId ? projectId : null, open ? issueNumber : null, refreshFeed)
 
   // Compteurs des sections repliées - on charge juste les longueurs à l'ouverture pour afficher un
   // badge « n » (façon Linear) sans avoir à déplier. Les onglets rechargent leur détail à l'ouverture.

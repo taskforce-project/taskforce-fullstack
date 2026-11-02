@@ -70,6 +70,8 @@ export const DELIVERY_ROUTES = {
   APPLY: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/apply`,
   DISCARD: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/discard`,
   RETRY: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/retry`,
+  /** Une mission qui n'a rien changé : l'issue se termine (POST, rejeu de la 1.8.0). */
+  DONE: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/done`,
   /** Serveur MCP de l'instance pour ce workspace (adresse à donner à Claude Code, pas appelée par le front). */
   MCP_SERVER: (slug: string) => `/api/workspaces/${slug}/mcp`,
   /**

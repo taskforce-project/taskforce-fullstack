@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { app } from "electron";
 
-import { AiRelay } from "./ai";
+import { aiEnvironment, BackendAi } from "./ai";
 import { backupBeforeMigration, lastVersion, updateNotice } from "./backup";
 import { downloadAccountAvatar } from "./avatar";
 import { Backend } from "./backend";
@@ -22,8 +22,8 @@ export interface Stack {
   dataDir: string;
   launchToken: string;
   origin: string;
-  /** Relais vers le fournisseur d'IA choisi (réglages « AI » de l'app). */
-  ai: AiRelay;
+  /** Fournisseur d'IA du backend (réglages « AI » de l'app), lu et changé par la coque seule. */
+  ai: BackendAi;
   /** Jeton GitHub de la personne (son `gh`), rendu au backend seul (Copilot, pull requests liées). */
   github: GitHubRelay;
   /** Notification à montrer une fois la fenêtre ouverte, au premier lancement d'une nouvelle version (cf. backup.ts). */
@@ -61,10 +61,9 @@ export async function startStack(account: Account, onStep: (step: string) => voi
   const proxy = new Proxy();
   const runner = new Runner();
   const runnerSecret = randomToken("tfs_");
-  const ai = new AiRelay(() => ({
-    settings: settings.aiSettings(account.subject),
-    apiKey: settings.secret(account.subject, "aiApiKey"),
-  }));
+  const shellSecret = randomToken("tfsh_");
+  const ai = new BackendAi(() => backend.port, launchToken, shellSecret);
+  const aiChoice = settings.aiSettings(account.subject);
   const github = new GitHubRelay();
 
   // Le runner d'abord : il rend au backend le résultat d'un run interrompu avant que celui-ci s'arrête. Chaque étape a un
@@ -74,7 +73,6 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     await within(proxy.stop(), 5_000);
     await within(frontend.stop(), 10_000);
     await within(backend.stop(), 15_000);
-    await within(ai.stop(), 5_000);
     await within(github.stop(), 5_000);
     await within(database.stop(), 45_000);
   };
@@ -99,7 +97,6 @@ export async function startStack(account: Account, onStep: (step: string) => voi
 
     const origin = await proxy.reserve(settings.windowPort(account.subject));
     settings.setWindowPort(account.subject, proxy.port);
-    await ai.start();
     await github.start();
     await avatar;
     onStep("Starting TaskForce");
@@ -112,7 +109,9 @@ export async function startStack(account: Account, onStep: (step: string) => voi
         encryptionKey: accountSecret(account.subject, "encryptionKey"),
         launchToken,
         uiOrigin: origin,
-        ai: { url: ai.url(), token: ai.token },
+        // Le fournisseur d'IA de la personne, clé du trousseau comprise : en mémoire du backend seulement.
+        ai: aiEnvironment(aiChoice, settings.aiKey(account.subject, aiChoice.provider)),
+        shellSecret,
         github: { url: github.url(), token: github.token },
         runnerSecret,
       }),

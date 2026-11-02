@@ -2,7 +2,7 @@ import { app, safeStorage } from "electron";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { DEFAULT_AI_SETTINGS, type AiSettings } from "./ai";
+import { DEFAULT_AI_SETTINGS, keySlot, type AiSettings } from "./ai";
 
 /** Compte TaskForce connecté, tel que l'API du compte le rend à la connexion. */
 export interface Account {
@@ -37,6 +37,8 @@ interface AccountSecrets {
   encryptionKey?: string;
   /** Clé de l'API d'IA choisie par la personne (fournisseur compatible OpenAI). */
   aiApiKey?: string;
+  /** Clé de l'API d'Anthropic : à part, pour qu'une clé ne parte jamais chez un autre fournisseur que le sien. */
+  aiAnthropicKey?: string;
 }
 
 interface StoredSettings {
@@ -111,6 +113,12 @@ export const settings = {
   setAiSettings(subject: string, ai: AiSettings): void {
     const current = read();
     write({ ...current, ai: { ...(current.ai ?? {}), [subject]: ai } });
+  },
+
+  /** Clé du fournisseur d'IA donné, gardée dans le trousseau ; aucune pour Ollama ou sans IA. */
+  aiKey(subject: string, provider: AiSettings["provider"]): string | undefined {
+    const slot = keySlot(provider);
+    return slot ? this.secret(subject, slot) : undefined;
   },
 
   windowPort(subject: string): number | undefined {

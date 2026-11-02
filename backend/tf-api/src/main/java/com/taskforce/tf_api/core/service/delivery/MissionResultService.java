@@ -33,10 +33,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Les trois gestes de la carte de résultat d'une mission (R78, séance n°13) : « Apply » fusionne la pull request sur
- * GitHub et termine l'issue ; « Discard » la ferme et supprime sa branche ; « Try again » écarte le résultat, poste la
- * remarque de la personne sur l'issue (l'agent la lit avec {@code get_issue}) et relance la mission. Seule la personne
- * qui a délégué tranche, une fois : le geste se garde sur la mission (le dossier de preuve est scellé à sa fin).
+ * Les gestes de la carte de résultat d'une mission (R78, séance n°13) : « Apply » fusionne la pull request sur GitHub et
+ * termine l'issue ; « Discard » la ferme et supprime sa branche ; « Try again » écarte le résultat, poste la remarque de
+ * la personne sur l'issue (l'agent la lit avec {@code get_issue}) et relance la mission. Une mission qui n'a rien changé
+ * ne s'applique pas : « Mark as done » termine l'issue (rejeu de la 1.8.0). Seule la personne qui a délégué tranche, une
+ * fois : le geste se garde sur la mission (le dossier de preuve est scellé à sa fin).
  */
 @Slf4j
 @Service
@@ -81,6 +82,23 @@ public class MissionResultService {
         mergedPullRequests.completeIssue(run.getIssue().getId(), userId);
         log.info("Run {} : résultat appliqué ({}#{}) par {}{}", runId, pr.repo(), pr.number(), userId,
             testsFailed ? ", malgré les tests" : "");
+    }
+
+    /**
+     * « Mark as done » : la mission n'a rien changé, ni pull request ni commit, parce que le travail était déjà fait
+     * (rejeu de la 1.8.0, TESTTA-2 : « Apply » restait éteint sans dire pourquoi). L'issue se termine au nom de la
+     * personne, et son activité le dit : « Pierre marked the issue done: no change was needed ». Un résultat qui change
+     * quelque chose s'applique ou s'écarte.
+     */
+    @Transactional
+    public void markDone(String slug, Long runId, Long userId) {
+        DeliveryRun run = decidable(slug, runId, userId);
+        if (changed(run)) {
+            throw new BusinessException("This result changes the code: apply it or discard it.");
+        }
+        decided(run, DeliveryRunOutcome.MARKED_DONE, userId);
+        mergedPullRequests.completeIssue(run.getIssue().getId(), userId);
+        log.info("Run {} : issue terminée sans changement par {}", runId, userId);
     }
 
     /** Ferme la pull request de l'agent et supprime sa branche ; sans pull request, le résultat est seulement écarté. */
@@ -163,7 +181,18 @@ public class MissionResultService {
     private static final Map<DeliveryRunOutcome, IssueActivityType> ACTIVITY = Map.of(
         DeliveryRunOutcome.APPLIED, IssueActivityType.MISSION_APPLIED,
         DeliveryRunOutcome.DISCARDED, IssueActivityType.MISSION_DISCARDED,
-        DeliveryRunOutcome.RETRIED, IssueActivityType.MISSION_RETRIED);
+        DeliveryRunOutcome.RETRIED, IssueActivityType.MISSION_RETRIED,
+        DeliveryRunOutcome.MARKED_DONE, IssueActivityType.MISSION_MARKED_DONE);
+
+    /**
+     * La mission a-t-elle changé quelque chose : une pull request, ou des commits sur sa branche ? La carte lit les mêmes
+     * faits pour dire « No code change was needed » ({@code resultLine}).
+     */
+    private static boolean changed(DeliveryRun run) {
+        boolean commits = run.getBranch() != null && !run.getBranch().isBlank()
+            && run.getCommits() != null && run.getCommits() > 0;
+        return pullRequest(run).isPresent() || commits;
+    }
 
     /** Le lien de l'issue vers cette pull request suit son nouveau statut, sans attendre la prochaine relecture. */
     private void markLink(DeliveryRun run, PullRequest pr, GitHubLinkStatus status) {

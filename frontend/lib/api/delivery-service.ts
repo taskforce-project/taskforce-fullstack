@@ -67,7 +67,8 @@ export interface DeliveryRun {
   outcomeAt?: string | null;
 }
 
-export type DeliveryRunOutcome = "APPLIED" | "DISCARDED" | "RETRIED";
+/** `MARKED_DONE` : la mission n'a rien changé, la personne a terminé l'issue (rejeu de la 1.8.0). */
+export type DeliveryRunOutcome = "APPLIED" | "DISCARDED" | "RETRIED" | "MARKED_DONE";
 
 export interface DeliveryRunTests {
   command: string;
@@ -89,6 +90,11 @@ export async function applyRun(slug: string, runId: number, reason = ""): Promis
 /** « Discard » : la pull request est fermée, sa branche supprimée. */
 export async function discardRun(slug: string, runId: number): Promise<void> {
   await apiClient.post(DELIVERY_ROUTES.DISCARD(slug, runId), {});
+}
+
+/** « Mark as done » : la mission n'a rien changé (ni pull request ni commit), l'issue se termine. */
+export async function markRunDone(slug: string, runId: number): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.DONE(slug, runId), {});
 }
 
 /** « Try again » : le résultat écarté, la remarque postée sur l'issue, une nouvelle mission ; rend cette mission. */

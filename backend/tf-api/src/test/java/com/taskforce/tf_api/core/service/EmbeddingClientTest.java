@@ -1,124 +1,100 @@
 package com.taskforce.tf_api.core.service;
 
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestTemplate;
 
 import com.taskforce.tf_api.core.service.AiStatusService.AiStatus;
+import com.taskforce.tf_api.core.service.ai.AiProviderSettings;
+import com.taskforce.tf_api.core.service.ai.ModelGateway;
+import com.taskforce.tf_api.core.service.ai.ModelProviderException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-/**
- * Contrat (format HTTP) d'{@link EmbeddingClient} avec l'ai-service : {@code POST /v1/embeddings}, secret
- * partagé en Bearer, {@code {texts:[...]}} en entrée, {@code {vectors:[[...]]}} en sortie. Sans modèle
- * d'embeddings disponible, aucun appel n'est fait.
- */
-@DisplayName("EmbeddingClient (contrat avec l'ai-service)")
+/** {@link EmbeddingClient} : best-effort, par la passerelle de modèles, avec le modèle de l'état de l'IA. */
+@DisplayName("EmbeddingClient")
 class EmbeddingClientTest {
 
+    private static final AiProviderSettings SETTINGS = AiProviderSettings.from(Map.<String, String>of()::get);
     private static final AiStatus AVAILABLE = new AiStatus(true, true, "m", "f", true, "bge-m3");
     private static final AiStatus NO_EMBEDDINGS = new AiStatus(true, true, "m", "f", false, "bge-m3");
 
+    private ModelGateway gateway;
     private AiStatusService status;
     private EmbeddingClient client;
-    private MockRestServiceServer server;
 
     @BeforeEach
     void setUp() {
+        gateway = mock(ModelGateway.class);
         status = mock(AiStatusService.class);
-        when(status.current()).thenReturn(AVAILABLE);
-        client = new EmbeddingClient(status, "http://ai-service:8000", "secret");
-        RestTemplate rt = (RestTemplate) ReflectionTestUtils.getField(client, "http");
-        server = MockRestServiceServer.createServer(rt);
+        ready(AVAILABLE);
+        client = new EmbeddingClient(gateway, status);
+    }
+
+    private void ready(AiStatus current) {
+        when(status.current()).thenReturn(current);
+        when(status.snapshot()).thenReturn(new AiStatusService.Snapshot(SETTINGS, current, true, List.of(), List.of()));
     }
 
     @Test
-    @DisplayName("embed : POST /v1/embeddings avec le secret partagé, {texts:[...]} et lecture de {vectors}")
-    void embed_posts_and_parses() {
-        server.expect(requestTo("http://ai-service:8000/v1/embeddings"))
-            .andExpect(method(HttpMethod.POST))
-            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer secret"))
-            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-            .andExpect(jsonPath("$.texts[0]").value("hello"))
-            .andRespond(withSuccess("{\"vectors\":[[1.0,2.0,3.5]]}", MediaType.APPLICATION_JSON));
+    @DisplayName("embed : un vecteur, avec le modèle de l'état de l'IA")
+    void embed() {
+        when(gateway.embed(SETTINGS, "bge-m3", List.of("hello"))).thenReturn(List.of(new float[]{1.0f, 2.0f, 3.5f}));
 
-        float[] vec = client.embed("hello");
-
-        assertThat(vec).containsExactly(1.0f, 2.0f, 3.5f);
-        server.verify();
+        assertThat(client.embed("hello")).containsExactly(1.0f, 2.0f, 3.5f);
     }
 
     @Test
-    @DisplayName("embedBatch : un vecteur par texte, dans l'ordre")
-    void embed_batch_maps_all() {
-        server.expect(requestTo("http://ai-service:8000/v1/embeddings"))
-            .andRespond(withSuccess("{\"vectors\":[[1.0,2.0],[3.0,4.0]]}", MediaType.APPLICATION_JSON));
+    @DisplayName("embedBatch : un vecteur par texte, dans l'ordre ; un compte faux vaut null")
+    void batch() {
+        when(gateway.embed(any(), eq("bge-m3"), eq(List.of("a", "b"))))
+            .thenReturn(List.of(new float[]{1.0f}, new float[]{3.0f, 4.0f}));
+        when(gateway.embed(any(), eq("bge-m3"), eq(List.of("x", "y")))).thenReturn(List.of(new float[]{1.0f}));
 
-        List<float[]> vecs = client.embedBatch(List.of("a", "b"));
-
-        assertThat(vecs).hasSize(2);
-        assertThat(vecs.get(1)).containsExactly(3.0f, 4.0f);
-        server.verify();
+        assertThat(client.embedBatch(List.of("a", "b")).get(1)).containsExactly(3.0f, 4.0f);
+        assertThat(client.embedBatch(List.of("x", "y"))).isNull();
     }
 
     @Test
-    @DisplayName("ai-service en erreur → null, et l'état de l'IA sera relu")
-    void server_error_returns_null() {
-        server.expect(requestTo("http://ai-service:8000/v1/embeddings")).andRespond(withServerError());
+    @DisplayName("fournisseur en erreur : null, et l'état de l'IA sera relu")
+    void failureReturnsNull() {
+        when(gateway.embed(any(), any(), any())).thenThrow(new ModelProviderException("Embeddings refused (HTTP 500)"));
 
         assertThat(client.embed("x")).isNull();
-        server.verify();
         verify(status).invalidate();
     }
 
     @Test
-    @DisplayName("réponse incomplète (pas de vecteurs, ou pas autant que de textes) → null")
-    void incomplete_answer_returns_null() {
-        server.expect(requestTo("http://ai-service:8000/v1/embeddings"))
-            .andRespond(withSuccess("{\"vectors\":[[1.0]]}", MediaType.APPLICATION_JSON));
-
-        assertThat(client.embedBatch(List.of("x", "y"))).isNull();
-        server.verify();
-    }
-
-    @Test
-    @DisplayName("sans modèle d'embeddings disponible → aucun appel, null, pas de modèle courant")
-    void unavailable_makes_no_call() {
-        when(status.current()).thenReturn(NO_EMBEDDINGS);
+    @DisplayName("sans modèle d'embeddings disponible : aucun appel, null, pas de modèle courant")
+    void unavailableMakesNoCall() {
+        ready(NO_EMBEDDINGS);
 
         assertThat(client.embed("x")).isNull();
         assertThat(client.currentModel()).isNull();
-        server.verify(); // aucune requête attendue, aucune reçue
+        assertThat(client.isAvailable()).isFalse();
+        verifyNoInteractions(gateway);
     }
 
     @Test
-    @DisplayName("modèle courant = celui annoncé par l'ai-service")
-    void current_model() {
+    @DisplayName("modèle courant = celui de l'état de l'IA")
+    void currentModel() {
         assertThat(client.currentModel()).isEqualTo("bge-m3");
         assertThat(client.isAvailable()).isTrue();
     }
 
     @Test
     @DisplayName("toVectorLiteral formate un vecteur en littéral pgvector")
-    void vector_literal() {
+    void vectorLiteral() {
         assertThat(EmbeddingClient.toVectorLiteral(new float[]{0.1f, 0.2f})).isEqualTo("[0.1,0.2]");
+        assertThat(EmbeddingClient.DIMENSIONS).isEqualTo(1024);
     }
 }

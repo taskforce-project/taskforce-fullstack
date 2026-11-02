@@ -18,6 +18,10 @@ Décisions qui ne se rediscutent pas (CEO, 20/09) :
 - **Un seul radius de référence** : `--radius` = 10px (sm 6 / md 8 / lg et xl 10). On n'en ajoute pas.
 - **Plat** : aucun `backdrop-filter`, aucun gradient décoratif dans le produit (les dégradés vivent sur les
   pages d'auth et le Labs, jamais dans le workspace).
+- **Une exception, Cortex** (CEO, 02/11/2026) : la barre unique et la bulle de sa conversation parlent la langue du
+  composeur du site. Elles flottent, arrondies (`--cortex-radius`, 18 px), ombrées, la bulle sur un dégradé et un
+  halo bleus, leurs contrôles ronds ; toujours sans `backdrop-filter`. Les valeurs vivent dans les classes `.cortex-*`
+  de `globals.css` ; rien d'autre dans l'app ne s'arrondit ni ne prend de dégradé.
 
 ## 2. Tokens (source unique : `globals.css`)
 

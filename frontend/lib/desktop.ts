@@ -9,26 +9,29 @@
 export const IS_DESKTOP = process.env.NEXT_PUBLIC_DESKTOP === "true";
 
 /**
- * App desktop : la connexion de GitHub et de Slack par OAuth n'y marche pas encore (PC-060) ; on ne montre que ce qui
- * marche (R12), ni dans le catalogue ni dans la pilule de l'accueil. Masqués avec revue au 30/11/2026 ; d'ici là,
- * GitHub passe par le GitHub CLI de la personne.
+ * App desktop : la connexion de GitHub et de Slack par OAuth n'y marche pas encore (PC-060) ; la pilule de l'accueil
+ * ne les propose pas (R12). Masqués avec revue au 30/11/2026 ; d'ici là, GitHub passe par le GitHub CLI de la personne.
+ * Le catalogue des intégrations, lui, les montre avec leur état (rejeu de la 1.8.0) : GitHub par le GitHub CLI, Slack
+ * sans geste de connexion.
  */
 export const DESKTOP_HIDDEN_CONNECTORS: ReadonlySet<string> = new Set(["github", "slack"]);
 
 /** Fournisseur d'IA choisi sur cet ordinateur (cf. `desktop/src/ai.ts`). Un modèle vide est choisi automatiquement. */
 export interface DesktopAiSettings {
-  provider: "ollama" | "custom" | "off";
+  provider: "ollama" | "custom" | "anthropic" | "off";
   baseUrl: string;
   model: string;
   modelFast: string;
   embedModel: string;
 }
 
-/** État lu chez le fournisseur : joignable ou non, modèles installés, modèles retenus. */
+/** État lu chez le fournisseur par le backend : joignable ou non, modèles installés, modèles retenus. */
 export interface DesktopAiState {
   configured: boolean;
   reachable: boolean;
   models: string[];
+  /** Modèles du fournisseur des vecteurs (Ollama sur l'ordinateur quand la conversation passe par Anthropic). */
+  embedModels?: string[];
   chat: { model: string | null; model_fast: string | null; available: boolean };
   embeddings: { model: string | null; dimensions: number; available: boolean };
 }
