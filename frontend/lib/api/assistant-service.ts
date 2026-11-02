@@ -30,12 +30,28 @@ export interface AssistantToolCall {
   output: string | null
   /** Le dossier de la réponse, que l'accord prolonge ; absent d'une réponse rendue avant le noyau. */
   record?: string | null
+  /** L'empreinte du résultat de cet appel au dossier : « Undo » défait celui-là, parmi ceux de la réponse (R77). */
+  ref?: string | null
+  /** L'issue que touche un geste du MCP TaskForce, dont la conversation montre les cartes (ADR-024). */
+  target?: AssistantTarget | null
+}
+/** L'issue d'un geste : sa clé et son titre, et sa mission quand elle en a une. */
+export interface AssistantTarget {
+  issueId: number
+  projectId: number
+  key: string | null
+  title: string
+  runId?: number | null
 }
 /** Ce que devient une action accordée : faite, refusée par les règles de l'espace (elles ont pu changer), ou en échec. */
 export interface AssistantActionResult {
   tool: string
   status: "success" | "refused" | "error"
   output: string
+  /** L'empreinte du résultat au dossier, que « Undo » nomme ensuite. */
+  ref?: string | null
+  /** L'issue d'un geste accordé (sa mission, une fois confiée à un agent). */
+  target?: AssistantTarget | null
 }
 /** Tokens réellement consommés par le tour (usage LLM cumulé). */
 export interface AssistantUsage {
@@ -117,24 +133,40 @@ export async function approveAction(slug: string, call: AssistantToolCall): Prom
   return { tool: call.name, status: "success", output: await executeMcpAction(slug, call.name, args) }
 }
 
-/** Les créations de Cortex qui se défont d'un geste (R77) : un projet, une issue, une note. */
-const UNDOABLE = new Set(["create_project", "create_issue", "create_note"])
+/**
+ * Ce que Cortex fait et qui se défait d'un geste (R77) : un projet, une issue, une note qu'il a créés, et ses gestes sur
+ * une issue (un changement de ses champs, un commentaire ; ADR-024). Confier une issue à un agent ne se défait pas : il
+ * se demande d'abord.
+ */
+const UNDOABLE = new Set(["create_project", "create_issue", "create_note", "update_issue", "add_comment"])
 
-/** Une création que Cortex vient de faire, et dont le dossier permet de la défaire. */
+/** Ce que Cortex vient de faire, et dont le dossier permet de le défaire. */
 export function isUndoable(call: AssistantToolCall): boolean {
   return call.status === "success" && Boolean(call.record) && UNDOABLE.has(call.name)
 }
 
 /**
- * Défait ce que Cortex a créé (R77, séance n°13), par le dossier de la réponse : une seule fois, avec les droits de la
- * personne. Un refus du serveur (le projet a des issues, l'issue des commentaires) remonte comme une erreur.
+ * Défait ce que Cortex a fait (R77, séance n°13), par le dossier de la réponse : une seule fois, avec les droits de la
+ * personne. L'empreinte du résultat nomme le bon geste quand la réponse en a plusieurs du même outil. Un refus du
+ * serveur (le projet a des issues, l'issue a changé depuis) remonte comme une erreur.
  */
 export async function undoAction(slug: string, call: AssistantToolCall): Promise<AssistantActionResult> {
   const res = await apiClient.post<{ data: AssistantActionResult }>(
     ASSISTANT_ROUTES.ACTION_UNDO(slug),
-    { tool: call.name, record: call.record },
+    call.ref ? { tool: call.name, record: call.record, ref: call.ref } : { tool: call.name, record: call.record },
   )
   return res.data.data
+}
+
+/** Les gestes qui montrent la mission d'une issue dans la conversation : la confier à un agent, lire où elle en est. */
+const MISSION_TOOLS = new Set(["delegate_issue", "get_mission"])
+
+/**
+ * Un geste réussi dont la conversation montre la mission (TF-J1-5) : ses demandes et son résultat, sur les cartes de la
+ * fiche de l'issue. La personne y décide par leurs boutons, jamais par un texte qu'elle ou un document aurait écrit (R1).
+ */
+export function isMission(call: AssistantToolCall): call is AssistantToolCall & { target: AssistantTarget } {
+  return call.status === "success" && MISSION_TOOLS.has(call.name) && typeof call.target?.issueId === "number"
 }
 
 /** Variante texte (compat) : renvoie seulement la réponse markdown. */

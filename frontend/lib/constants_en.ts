@@ -691,6 +691,8 @@ export const CONSTANTS_EN = {
     issueNeedsTitle: "An issue needs a title.",
     issueDueInPast: "The due date is in the past.",
     issueUnknownColumn: "This column isn't in the project anymore: choose another one.",
+    // The mission of an issue in the conversation (TF-J1-5): its requests and its result, decided with the cards' buttons.
+    missionOf: "Mission of {key}: {title}",
   },
 } as const
 
