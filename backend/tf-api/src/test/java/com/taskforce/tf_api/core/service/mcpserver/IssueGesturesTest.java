@@ -167,7 +167,7 @@ class IssueGesturesTest {
         when(visibility.canView(PROJECT, ME)).thenReturn(false);
 
         assertThatThrownBy(() -> gestures.withIds("acme", ME, args("{\"issue\": \"TF-12\"}")))
-            .hasMessage("There is no issue TF-12 in this workspace: check its key.");
+            .hasMessage("There is no issue TF-12 in this workspace: find its key with list_issues, by its column or its title.");
         verify(issues, never()).findByProjectIdAndSequenceNumber(anyLong(), any());
     }
 

@@ -184,7 +184,7 @@ public class IssueGestures {
             : issues.findByProjectIdAndSequenceNumber(project.getId(), Integer.valueOf(key.group(2))).orElse(null);
         if (issue == null) {
             throw new McpArgs.InvalidArgumentException("There is no issue " + identifier + "-" + key.group(2)
-                + " in this workspace: check its key.");
+                + " in this workspace: find its key with list_issues, by its column or its title.");
         }
         ObjectNode out = ((ObjectNode) args).deepCopy();
         out.put("projectId", project.getId());
