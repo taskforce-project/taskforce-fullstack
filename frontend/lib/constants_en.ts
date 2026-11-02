@@ -640,6 +640,8 @@ export const CONSTANTS_EN = {
     issueDue: "Due",
     issueNoDue: "No due date",
     issueColumn: "Column",
+    // Cortex named a column the project doesn't have: the issue goes to the project's default column instead.
+    issueColumnByDefault: "\"{asked}\" isn't a column of this project: the issue goes to {column}, its default column.",
     // Filled only from what the request or the project says; the person fills the rest here.
     issuePriority: "Priority",
     issuePriorities: { NONE: "No priority", LOW: "Low", MEDIUM: "Medium", HIGH: "High", URGENT: "Urgent" },

@@ -118,6 +118,9 @@ class CreateIssueToolTest {
         "''          | 10 | Backlog",      // rien de demandé : le Backlog, pas la colonne par défaut du projet
         "todo        | 11 | Todo",         // une colonne nommée, sans tenir compte de la casse
         "In Progress | 12 | In Progress",
+        "To Do       | 11 | Todo",         // ni des espaces (rejeu de la 1.8.0 : Cortex écrivait « To Do »)
+        "to-do       | 11 | Todo",         // ni de la ponctuation
+        "inprogress  | 12 | In Progress",
     })
     void places_the_issue_in_a_column(String status, Long columnId, String columnName) {
         when(issueService.listStatuses("acme", 3L, 7L)).thenReturn(COLUMNS);
@@ -141,14 +144,27 @@ class CreateIssueToolTest {
     }
 
     @Test
-    @DisplayName("colonne inconnue : les colonnes du projet, rien de créé")
-    void unknown_column() {
+    @DisplayName("colonne inconnue : l'issue part dans la colonne par défaut du projet, et la réponse le dit")
+    void unknown_column_falls_back_to_the_default() {
         when(issueService.listStatuses("acme", 3L, 7L)).thenReturn(COLUMNS);
+        created("Todo", null);
 
-        String out = tool().execute(Map.of("project", "TF", "title", "X", "status", "Doing"), CTX);
+        String out = tool().execute(Map.of("project", "TF", "title", "Rate limiting", "status", "Doing"), CTX);
 
-        assertThat(out).contains("no column \"Doing\" in TaskForce").contains("Backlog, Todo, In Progress");
-        nothingCreated();
+        assertThat(sent().getStatusId()).isEqualTo(11L);
+        assertThat(out).isEqualTo("Created TF-9 \"Rate limiting\" in the project TaskForce, in the column Todo, the "
+            + "project's default: it has no column \"Doing\".");
+    }
+
+    @Test
+    @DisplayName("colonne inconnue, et aucune colonne par défaut : celle du service")
+    void unknown_column_without_a_default_keeps_the_service_one() {
+        when(issueService.listStatuses("acme", 3L, 7L)).thenReturn(List.of(COLUMNS.get(0), COLUMNS.get(2)));
+        created("Backlog", null);
+
+        tool().execute(Map.of("project", "TF", "title", "Rate limiting", "status", "Doing"), CTX);
+
+        assertThat(sent().getStatusId()).isNull();
     }
 
     @ParameterizedTest(name = "dueDate « {0} »")
@@ -316,20 +332,6 @@ class CreateIssueToolTest {
         nothingCreated();
     }
 
-    @Test
-    @DisplayName("labels : ceux du projet, par leur nom ; un label inconnu arrête la création et donne les labels")
-    void labels_are_the_projects_own() {
-        when(issueService.listStatuses("acme", 3L, 7L)).thenReturn(COLUMNS);
-        when(projectService.listLabels("acme", 3L, 7L)).thenReturn(List.of(
-            ProjectLabelResponse.builder().id(41L).name("Bug").build(),
-            ProjectLabelResponse.builder().id(42L).name("Frontend").build()));
-        created("Backlog", null);
-
-        tool().execute(Map.of("project", "TF", "title", "Rate limiting", "labels", List.of("bug", "Frontend", "BUG")), CTX);
-
-        assertThat(sent().getLabelIds()).containsExactly(41L, 42L);
-    }
-
     /** Les membres, avec un second Pierre : le prénom de la personne qui demande désignerait sinon deux membres. */
     private static final List<ProjectMemberResponse> WITH_ANOTHER_PIERRE = List.of(
         MEMBERS.get(0), MEMBERS.get(1), member(11L, "Pierre Dupont", "pdupont@acme.dev"));
@@ -404,6 +406,20 @@ class CreateIssueToolTest {
     })
     void key_ignores_case_accents_spaces_and_punctuation(String value, String key) {
         assertThat(CreateIssueTool.key(value)).isEqualTo(key);
+    }
+
+    @Test
+    @DisplayName("labels : ceux du projet, par leur nom ; un label inconnu arrête la création et donne les labels")
+    void labels_are_the_projects_own() {
+        when(issueService.listStatuses("acme", 3L, 7L)).thenReturn(COLUMNS);
+        when(projectService.listLabels("acme", 3L, 7L)).thenReturn(List.of(
+            ProjectLabelResponse.builder().id(41L).name("Bug").build(),
+            ProjectLabelResponse.builder().id(42L).name("Frontend").build()));
+        created("Backlog", null);
+
+        tool().execute(Map.of("project", "TF", "title", "Rate limiting", "labels", List.of("bug", "Frontend", "BUG")), CTX);
+
+        assertThat(sent().getLabelIds()).containsExactly(41L, 42L);
     }
 
     @Test

@@ -54,6 +54,11 @@ import com.taskforce.tf_api.core.service.agent.AgentTool;
  * (recette du 01/11/2026) : l'assigné est un membre du projet, par son nom ou son e-mail ; les labels, ceux du projet ;
  * le cycle, l'un de ceux du projet, jamais créé. Une valeur qui ne se résout pas arrête la création et dit les choix :
  * rien n'est inventé. L'activité de l'issue garde que Cortex l'a préparée ({@code via}).</p>
+ *
+ * <p>Rejeu de la 1.8.0 (02/11/2026) : « assignée à moi » faisait demander qui prendre. « Moi », « me », son propre nom
+ * désignent la personne qui demande, sans question. Une colonne se lit sans la casse, les espaces ni la ponctuation
+ * (« To Do » est « Todo ») ; une colonne qui n'existe pas donne la colonne par défaut du projet, et la réponse le dit,
+ * au lieu d'arrêter la création.</p>
  */
 @Component
 public class CreateIssueTool implements AgentTool {
@@ -133,10 +138,9 @@ public class CreateIssueTool implements AgentTool {
         List<IssueStatusResponse> columns = issueService.listStatuses(ctx.slug(), project.getId(), ctx.userId());
         String asked = text(args.get("status"));
         IssueStatusResponse column = asked.isEmpty() ? backlog(columns) : named(columns, asked);
-        if (!asked.isEmpty() && column == null) {
-            return "There is no column \"" + asked + "\" in " + project.getName() + ". Its columns are: "
-                + columns.stream().map(IssueStatusResponse::getName).collect(Collectors.joining(", ")) + ".";
-        }
+        // Une colonne qui n'existe pas n'arrête plus la création : la colonne par défaut du projet, et la réponse le dit.
+        boolean byDefault = !asked.isEmpty() && column == null;
+        if (byDefault) column = defaultColumn(columns);
         LocalDate today = LocalDate.now(clock);
         LocalDate due;
         try {
@@ -182,7 +186,9 @@ public class CreateIssueTool implements AgentTool {
             cycleService.addIssueToCycle(ctx.slug(), project.getId(), cycle.value().getId(), inCycle, ctx.userId());
         }
         String projectName = issue.getProjectName() != null ? issue.getProjectName() : project.getName();
-        String placed = issue.getStatus() != null ? ", in the column " + issue.getStatus().getName() : "";
+        String placed = issue.getStatus() == null ? ""
+            : ", in the column " + issue.getStatus().getName()
+                + (byDefault ? ", the project's default: it has no column \"" + asked + "\"" : "");
         String dueText = issue.getDueDate() != null ? ", due " + issue.getDueDate() : "";
         String who = assignee.value() != null ? ", assigned to " + name(assignee.value()) : "";
         String when = cycle.value() != null ? ", in the cycle " + cycle.value().getName() : "";
@@ -385,8 +391,16 @@ public class CreateIssueTool implements AgentTool {
         return columns.stream().filter(c -> c.getCategory() == IssueStatusCategory.BACKLOG).findFirst().orElse(null);
     }
 
+    /** La colonne par défaut du projet ; sans elle, null : le service prend la sienne. */
+    private static IssueStatusResponse defaultColumn(List<IssueStatusResponse> columns) {
+        return columns.stream().filter(IssueStatusResponse::isDefault).findFirst().orElse(null);
+    }
+
+    /** La colonne nommée, sans la casse, les espaces ni la ponctuation : « To Do » est la colonne « Todo ». */
     private static IssueStatusResponse named(List<IssueStatusResponse> columns, String name) {
-        return columns.stream().filter(c -> name.equalsIgnoreCase(c.getName())).findFirst().orElse(null);
+        String wanted = key(name);
+        if (wanted.isEmpty()) return null;
+        return columns.stream().filter(c -> wanted.equals(key(c.getName()))).findFirst().orElse(null);
     }
 
     private static String text(Object o) {

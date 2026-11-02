@@ -203,10 +203,47 @@ describe("IssueDraftCard : l'issue que Cortex prépare (R78)", () => {
     expect((screen.getByRole("button", { name: "Create issue" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("names a column the project doesn't have", async () => {
+  it("names a column the project doesn't have, when it has no default column either", async () => {
     render(<IssueDraftCard slug="acme" call={call({ project: "WEB", title: "T", status: "Done" })} />);
 
     await waitFor(() => expect(screen.getByText("This column isn't in the project anymore: choose another one.")).toBeTruthy());
+  });
+
+  describe("a column Cortex named loosely (replay of 1.8.0)", () => {
+    const WITH_DEFAULT = [
+      ...COLUMNS,
+      { id: 3, name: "Todo", category: "UNSTARTED", isDefault: true, color: "", position: 2 },
+    ] as IssueStatus[];
+
+    it("reads \"To Do\" as the column Todo, and creates the issue there", async () => {
+      vi.mocked(listStatuses).mockResolvedValue(WITH_DEFAULT);
+      vi.mocked(approveAction).mockResolvedValue({ tool: "create_issue", status: "success", output: "Created WEB-16 \"T\" in the project Website." });
+      render(<IssueDraftCard slug="acme" call={call({ project: "WEB", title: "T", status: "To Do" })} />);
+
+      await waitFor(() => expect(screen.getByText("Todo")).toBeTruthy());
+      expect(screen.queryByText(/isn't a column|isn't in the project/)).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Create issue" }));
+
+      await waitFor(() => expect(approveAction).toHaveBeenCalled());
+      expect(JSON.parse(vi.mocked(approveAction).mock.calls[0][1].input ?? "{}")).toMatchObject({ status: "Todo" });
+    });
+
+    it("puts the issue in the default column when the project doesn't have the one named, and says so", async () => {
+      vi.mocked(listStatuses).mockResolvedValue(WITH_DEFAULT);
+      vi.mocked(approveAction).mockResolvedValue({ tool: "create_issue", status: "success", output: "Created WEB-17 \"T\" in the project Website." });
+      render(<IssueDraftCard slug="acme" call={call({ project: "WEB", title: "T", status: "Doing" })} />);
+
+      await waitFor(() => expect(
+        screen.getByText("\"Doing\" isn't a column of this project: the issue goes to Todo, its default column."),
+      ).toBeTruthy());
+      // Une note, pas une erreur : la création reste possible.
+      const create = screen.getByRole("button", { name: "Create issue" }) as HTMLButtonElement;
+      expect(create.disabled).toBe(false);
+      fireEvent.click(create);
+
+      await waitFor(() => expect(approveAction).toHaveBeenCalled());
+      expect(JSON.parse(vi.mocked(approveAction).mock.calls[0][1].input ?? "{}")).toMatchObject({ status: "Todo" });
+    });
   });
 
   it.each([
