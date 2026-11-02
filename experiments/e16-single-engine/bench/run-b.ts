@@ -34,7 +34,7 @@ const label = arg("label", "b-teavm");
 const code = readFileSync(file);
 const defaults = JSON.parse(readFileSync(join(REPO, "contracts", "rules", "default.rules.json"), "utf8")) as Record<string, unknown>;
 const cases = JSON.parse(readFileSync(join(REPO, "contracts", "rules", "cases.json"), "utf8")) as Cases;
-const { calls } = prepareMission();
+const { calls, changedFromLog } = prepareMission();
 
 let t = process.hrtime.bigint();
 const engine = (await import(pathToFileURL(file).href)) as Engine;
@@ -92,7 +92,8 @@ const result = {
     globs: cases.globs.length, decisions: cases.decisions.length, digest: 2,
     passed: cases.globs.length + cases.decisions.length + 2 - failures.length, failures,
   },
-  sequence: { calls: calls.length, mismatches },
+  rules: (defaults.rules as unknown[]).length,
+  sequence: { calls: calls.length, changedFromLog, mismatches },
   timing: { importMs, loadMs, firstDigestMs: digestMs, cold: stats(cold), firstDecisionMs: cold[0], warm: stats(warm) },
 };
 console.log(JSON.stringify(result, null, 2));

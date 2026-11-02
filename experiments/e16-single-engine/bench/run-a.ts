@@ -19,8 +19,8 @@ import { cpus } from "node:os";
 
 import { ContainerBackend, NativeBackend, ensureDatabase, javaOpts, restart, secrets, type Backend } from "./backend.js";
 import {
-  arg, cpuBusy, elapsedMs, machine, otherMavenBuilds, parseDecision, postJson, prepareMission, runnerToken, sameAs,
-  sleep, stats, writeResult, type PreparedCall,
+  arg, cpuBusy, defaultRules, elapsedMs, machine, otherMavenBuilds, parseDecision, postJson, prepareMission, runnerToken,
+  sameAs, sleep, stats, writeResult, type PreparedCall,
 } from "./common.js";
 
 const DECIDE = "/api/delivery/runner/rules/decide";
@@ -52,7 +52,8 @@ if (mode === "native") {
   backend = c;
 } else throw new Error("--mode native|container");
 
-const { calls } = prepareMission();
+const { calls, changedFromLog } = prepareMission();
+const ruleCount = defaultRules().rules.length;
 let mismatches = 0;
 
 async function decide(call: PreparedCall, token: string, agent: Agent | false): Promise<number> {
@@ -192,7 +193,7 @@ await backend.stop();
 const result = {
   experiment: "E16", way: "a", mode, jvm, at: new Date().toISOString(), machine: machine(), backend: description,
   otherMavenBuilds: { atStart: mavenAtStart, atEnd: otherMavenBuilds() },
-  calls: calls.length, mismatches,
+  rules: ruleCount, calls: calls.length, changedFromLog, mismatches,
   cold: { starts, all: stats(coldAll) },
   warm: { warmupDecisions, cpuBusyPercent: warmBusy, keepAlive: stats(warm), newConnection: stats(fresh) },
   paced: { capMs: pacedCapMs, gaps: stats(gaps), latency: stats(paced) },

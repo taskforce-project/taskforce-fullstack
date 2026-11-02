@@ -25,12 +25,21 @@ export interface Call {
   at: string;
   tool: string;
   input: Record<string, unknown>;
-  expect: Expected;
+  /** La décision du journal, prise avec la table de règles de l'époque. */
+  logged: Expected;
 }
 
 export interface PreparedCall extends Call {
   facts: Facts[];
+  /** La décision du moteur du runner avec la table d'aujourd'hui : la référence des autres moteurs. */
+  expect: Expected;
 }
+
+/**
+ * Les règles ajoutées à la table depuis les missions du journal : seules elles peuvent changer une décision du journal
+ * (#467, 02/11/2026 : `run-reads` autorise les lectures du shell que le journal montre demandées).
+ */
+const RULES_ADDED_SINCE_LOG: ReadonlySet<string> = new Set(["run-reads"]);
 
 /** Remplace `${WORKDIR}` dans les chaînes de l'entrée d'un outil. */
 function withWorkDir(value: unknown, workDir: string): unknown {
@@ -57,22 +66,27 @@ export function loadMission(): { calls: Call[]; workDir: string } {
 }
 
 /**
- * La suite, avec les faits que le runner en tire. Chaque décision du moteur du runner est vérifiée contre celle du
- * journal : la suite rejoue bien ce que les missions ont vécu.
+ * La suite, avec les faits et la décision du runner d'aujourd'hui. Chaque décision est vérifiée contre celle du
+ * journal : elle doit être la même, sauf quand une règle ajoutée depuis l'emporte. La suite rejoue bien ce que les
+ * missions ont vécu, sous la table actuelle.
  */
-export function prepareMission(): { calls: PreparedCall[]; workDir: string } {
+export function prepareMission(): { calls: PreparedCall[]; workDir: string; changedFromLog: string[] } {
   const { calls, workDir } = loadMission();
   const rules = defaultRules();
+  const changedFromLog: string[] = [];
   const prepared = calls.map((call) => {
     const facts = toolFacts(call.tool, call.input, workDir);
     const decision = decideAll(rules, facts);
-    const rule = decision.rule ? decision.rule.id : null;
-    if (decision.effect !== call.expect.effect || rule !== call.expect.rule) {
-      throw new Error(`The runner does not decide ${call.tool} at ${call.at} as the log: ${decision.effect} (${rule})`);
+    const expect: Expected = { effect: decision.effect, rule: decision.rule ? decision.rule.id : null };
+    if (!sameAs(expect, call.logged)) {
+      if (!expect.rule || !RULES_ADDED_SINCE_LOG.has(expect.rule)) {
+        throw new Error(`The runner does not decide ${call.tool} at ${call.at} as the log: ${expect.effect} (${expect.rule})`);
+      }
+      changedFromLog.push(`${call.at} ${call.tool} ${call.logged.effect} -> ${expect.effect} (${expect.rule})`);
     }
-    return { ...call, facts };
+    return { ...call, facts, expect };
   });
-  return { calls: prepared, workDir };
+  return { calls: prepared, workDir, changedFromLog };
 }
 
 export interface Stats {

@@ -28,7 +28,7 @@ for (const call of raw) {
 }
 
 // Puis la suite vérifiée contre le journal, chauffée, et mesurée à chaud.
-const { calls, workDir } = prepareMission();
+const { calls, workDir, changedFromLog } = prepareMission();
 for (let p = 0; p < WARMUP_PASSES; p++) for (const call of calls) decideAll(rules, call.facts);
 
 const warmDecide: number[] = [];
@@ -45,7 +45,7 @@ for (let p = 0; p < MEASURED_PASSES; p++) {
 }
 
 const result = {
-  experiment: "E16", label, machine: machine(), calls: calls.length,
+  experiment: "E16", label, machine: machine(), rules: rules.rules.length, calls: calls.length, changedFromLog,
   cold: { decide: stats(coldDecide), toolFacts: stats(coldFacts), firstDecideMs: coldDecide[0] },
   warm: { passes: MEASURED_PASSES, decide: stats(warmDecide), toolFacts: stats(warmFacts) },
 };
