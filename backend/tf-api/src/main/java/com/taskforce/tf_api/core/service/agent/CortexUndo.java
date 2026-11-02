@@ -38,7 +38,8 @@ public class CortexUndo {
 
     private static final Pattern PROJECT = Pattern.compile("^Project created in TaskForce: (\\S+) \"(.*)\" \\(id (\\d+)\\)\\.$",
         Pattern.DOTALL);
-    private static final Pattern ISSUE = Pattern.compile("^Created ([A-Za-z0-9]+)-(\\d+) \"(.*?)\" in the project ",
+    /** La clé d'un projet peut porter des tirets (« HR-1372 ») : le numéro de l'issue suit le dernier. */
+    private static final Pattern ISSUE = Pattern.compile("^Created ([A-Za-z0-9][A-Za-z0-9-]*)-(\\d+) \"(.*?)\" in the project ",
         Pattern.DOTALL);
     /** La sortie de {@code create_note}, que suit parfois la valeur gardée à la place d'un domaine ou d'un type inconnu. */
     private static final Pattern NOTE = Pattern.compile("^Note created: \"(.*)\" in [A-Z_]+ \\(id (\\d+)\\)\\.",

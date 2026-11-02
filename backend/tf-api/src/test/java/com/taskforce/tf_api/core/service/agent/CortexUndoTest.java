@@ -140,6 +140,19 @@ class CortexUndoTest {
     }
 
     @Test
+    @DisplayName("la clé d'un projet peut porter un tiret : l'issue HR-1372-3 se défait aussi")
+    void an_issue_of_a_project_key_with_a_hyphen_goes() {
+        when(projects.findByWorkspaceIdAndIdentifier(1L, "HR-1372"))
+            .thenReturn(Optional.of(Project.builder().id(28L).identifier("HR-1372").build()));
+        when(issues.findByProjectIdAndSequenceNumber(28L, 3))
+            .thenReturn(Optional.of(Issue.builder().id(346L).sequenceNumber(3).title("Check").build()));
+
+        assertThat(undo.undo("create_issue", "Created HR-1372-3 \"Check\" in the project Harness, in the column Backlog.", ctx))
+            .isEqualTo("Removed HR-1372-3 \"Check\".");
+        verify(issueService).deleteIssue("acme", 28L, 346L, 7L);
+    }
+
+    @Test
     @DisplayName("une issue commentée ne se défait plus d'ici")
     void a_commented_issue_stays() {
         when(projects.findByWorkspaceIdAndIdentifier(1L, "PRICING"))
