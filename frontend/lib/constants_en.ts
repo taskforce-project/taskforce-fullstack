@@ -619,6 +619,7 @@ export const CONSTANTS_EN = {
     system: "System",
     created: "created",
     createdVia: "created, prepared by {via}",
+    commented: "commented",
     checked: "checked \"{item}\"",
     unchecked: "unchecked \"{item}\"",
     openedPullRequest: "opened pull request",

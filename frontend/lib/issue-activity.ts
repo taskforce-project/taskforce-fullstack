@@ -44,6 +44,10 @@ export function describeActivity(a: IssueActivity, t: ActivityTexts): ActivityLi
   }
   const item = a.newValue ?? "";
   switch (a.action) {
+    // Un commentaire, dont celui que l'agent d'une mission laisse au nom de la personne : « Claude Code commented for
+    // Pierre » (rejeu de la 1.8.0), au lieu de « comment added ».
+    case "COMMENT_ADDED":
+      return { ...line, what: t.commented };
     case "CHECKLIST_CHECKED":
       return { ...line, what: fill(t.checked, { item }) };
     case "CHECKLIST_UNCHECKED":
