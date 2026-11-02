@@ -14485,6 +14485,13 @@
           },
           "record": {
             "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -14532,6 +14539,11 @@
             "type": "string",
             "maxLength": 64,
             "minLength": 0
+          },
+          "ref": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
           }
         },
         "required": [
@@ -14568,6 +14580,13 @@
           },
           "output": {
             "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -16272,6 +16291,9 @@
             "type": "integer",
             "format": "int64"
           },
+          "unassign": {
+            "type": "boolean"
+          },
           "parentId": {
             "type": "integer",
             "format": "int64"
@@ -16281,6 +16303,9 @@
           },
           "dueDate": {
             "type": "string"
+          },
+          "clearDueDate": {
+            "type": "boolean"
           },
           "position": {
             "type": "integer",
