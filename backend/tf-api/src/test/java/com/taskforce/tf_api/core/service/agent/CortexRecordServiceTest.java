@@ -154,6 +154,49 @@ class CortexRecordServiceTest {
         assertThat(service.approve(id, "create_note", 7L, "{}")).isEqualTo(approvable);
     }
 
+    /** Une réponse où TaskForce a demandé quelle issue supprimer (R115) : rend l'empreinte de la question. */
+    private String asked(UUID id) {
+        Map<String, Object> question = new LinkedHashMap<>();
+        question.put("tool", "delete_issue");
+        question.put("status", "question");
+        question.put("output", "Nothing was done: TaskForce asks the person first. Which issue should be deleted?");
+        question.put("arguments", "{}");
+        question.put("question", Map.of("field", "issue", "text", "Which issue should be deleted?", "choices", List.of()));
+        question.put("screen", Map.of("projectId", 12));
+        return service.append(id, "action.result", Actor.SERVER, question).orElseThrow();
+    }
+
+    @Test
+    @DisplayName("R115 : la réponse à une question de TaskForce entre au dossier une fois, et rend ce que le geste reprend")
+    void a_question_is_answered_once() {
+        UUID id = service.open(ctx, "supprime ça", Map.of());
+        String ref = asked(id);
+
+        Optional<com.fasterxml.jackson.databind.JsonNode> answered = service.answer(id, "delete_issue", ref, 7L, "TESTTA-2");
+
+        assertThat(answered).isPresent();
+        assertThat(answered.get().path("question").path("field").asText()).isEqualTo("issue");
+        assertThat(answered.get().path("screen").path("projectId").asLong()).isEqualTo(12L);
+        assertThat(stored.getLast().getType()).isEqualTo("human.decision");
+        assertThat(stored.getLast().getActorId()).isEqualTo("user-7");
+        assertThat(stored.getLast().getData()).contains("\"decision\":\"answered\"", "\"answer\":\"TESTTA-2\"", "\"field\":\"issue\"");
+        // Un deuxième clic ne répond plus : la question a sa réponse.
+        assertThat(service.answer(id, "delete_issue", ref, 7L, "TESTTA-3")).isEmpty();
+    }
+
+    @ParameterizedTest(name = "réponse à {0} avec {1} : rien")
+    @CsvSource(nullValues = "-", value = {
+        "update_issue, real",   // la question d'un autre geste
+        "delete_issue, other",  // une empreinte qui n'est pas celle d'une question
+        "delete_issue, -",
+    })
+    void only_an_open_question_takes_an_answer(String tool, String ref) {
+        UUID id = service.open(ctx, "supprime ça", Map.of());
+        String real = asked(id);
+
+        assertThat(service.answer(id, tool, "real".equals(ref) ? real : ref, 7L, "TESTTA-2")).isEmpty();
+    }
+
     @Test
     @DisplayName("un dossier introuvable ne prend aucun accord")
     void approval_on_a_missing_record() {

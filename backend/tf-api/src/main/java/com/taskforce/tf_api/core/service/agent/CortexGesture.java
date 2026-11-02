@@ -26,6 +26,16 @@ public interface CortexGesture extends AgentTool {
     }
 
     /**
+     * Ce qu'il manque au geste avant qu'il agisse (R115) : ce qu'il exige sans défaut sûr, ou qui ne se résout pas (une
+     * issue que la demande ne désigne pas). Lève {@link QuestionNeeded} avec la question que TaskForce pose, en choix ;
+     * sinon rend les arguments tels que le geste les entend (l'issue nommée par sa colonne devient sa clé), que sa carte
+     * montre et que l'accord reprend. Une lecture : rien n'est changé. Par défaut, rien ne manque.
+     */
+    default Map<String, Object> ask(Map<String, Object> args, AgentContext ctx) {
+        return args;
+    }
+
+    /**
      * @param text   ce que lit le modèle, et que la carte de l'outil montre
      * @param target l'issue que touche le geste ({@code issueId}, {@code projectId}, {@code key}, {@code title}, et
      *               {@code runId} de sa mission), que la conversation montre ; null sinon

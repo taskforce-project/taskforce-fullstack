@@ -36,7 +36,7 @@ public class IssueFields {
      * Les mots de la personne qui demande, lus par {@link #key} : « moi-même » et « moi même » donnent « moimeme ». Un
      * agent les recopie de la demande (« assignée à moi ») au lieu du nom de la personne.
      */
-    static final Set<String> SELF = Set.of("me", "myself", "moi", "moimeme", "i", "je");
+    public static final Set<String> SELF = Set.of("me", "myself", "moi", "moimeme", "i", "je");
 
     private final ProjectService projectService;
     private final CycleService cycleService;

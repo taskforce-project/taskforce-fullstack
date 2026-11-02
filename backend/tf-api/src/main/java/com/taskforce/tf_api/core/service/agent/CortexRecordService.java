@@ -164,6 +164,42 @@ public class CortexRecordService {
         return Optional.of(undoneText);
     }
 
+    /**
+     * Garde la réponse de la personne à une question de TaskForce (R115), si le dossier l'attend encore : la question de
+     * cet outil que nomme {@code ref} (l'empreinte de son résultat), à laquelle personne n'a répondu. La réponse entre au
+     * dossier comme une décision de la personne ; rend ce que la question a gardé (les arguments du geste, la question,
+     * l'écran). Vide si la question n'est pas là, déjà répondue, ou si le dossier est plein ; le verrou du dossier sépare
+     * deux clics.
+     */
+    @Transactional
+    public Optional<JsonNode> answer(UUID recordId, String tool, String ref, Long userId, String answer) {
+        records.findByIdForUpdate(recordId).orElseThrow(() -> new ResourceNotFoundException("Cortex record not found"));
+        if (ref == null || ref.isBlank()) return Optional.empty();
+        JsonNode asked = null;
+        boolean answered = false;
+        for (CortexRecordEvent event : eventRepository.findByRecordIdOrderBySeqAsc(recordId)) {
+            JsonNode data = parse(event.getData());
+            if (!tool.equals(data.path("tool").asText())) continue;
+            if ("action.result".equals(event.getType()) && "question".equals(data.path("status").asText())
+                    && ref.equals(event.getHash())) {
+                asked = data;
+            }
+            if ("human.decision".equals(event.getType()) && "answered".equals(data.path("decision").asText())
+                    && ref.equals(data.path("ref").asText())) {
+                answered = true;
+            }
+        }
+        if (asked == null || answered) return Optional.empty();
+        Map<String, Object> decision = new LinkedHashMap<>();
+        decision.put("tool", tool);
+        decision.put("decision", "answered");
+        decision.put("ref", ref);
+        decision.put("field", asked.path("question").path("field").asText());
+        decision.put("answer", shorten(answer));
+        return append(recordId, "human.decision", Actor.person(userId), decision).isPresent()
+            ? Optional.of(asked) : Optional.empty();
+    }
+
     /** Vrai si le dossier est celui de cette personne, dans cet espace : un autre ne se prolonge pas. */
     @Transactional(readOnly = true)
     public boolean owns(UUID recordId, AgentContext ctx) {

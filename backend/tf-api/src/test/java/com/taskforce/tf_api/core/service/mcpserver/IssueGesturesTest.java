@@ -45,6 +45,9 @@ import com.taskforce.tf_api.core.service.CycleService;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
+import com.taskforce.tf_api.core.service.agent.Question;
+import com.taskforce.tf_api.core.service.agent.QuestionNeeded;
+import com.taskforce.tf_api.core.service.agent.Screen;
 import com.taskforce.tf_api.core.service.delivery.DeliveryActivityService;
 import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProvider;
 import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProviderRegistry;
@@ -250,23 +253,127 @@ class IssueGesturesTest {
     }
 
     @Test
-    void an_unknown_column_writes_nothing_and_lists_the_columns() {
+    @DisplayName("R115 : une colonne qui n'existe pas se demande, avec les autres colonnes du projet en choix")
+    void an_unknown_column_writes_nothing_and_asks_with_the_columns() {
         stubIssue(issue());
 
         assertThatThrownBy(() -> gestures.update("acme", ME, args("{\"projectId\": 12, \"issueId\": 5, \"status\": \"Doing\"}")))
-            .hasMessage("There is no column \"Doing\" in TaskForce. Its columns are: Backlog, Todo, In Progress.");
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> {
+                assertThat(needed.question().field()).isEqualTo("status");
+                assertThat(needed.question().text()).isEqualTo("Which column should TF-12 move to? \"Doing\" isn't a column of TaskForce.");
+                // La colonne où l'issue est déjà n'est pas un choix.
+                assertThat(needed.question().choices()).extracting(Question.Choice::value).containsExactly("Backlog", "In Progress");
+            })
+            .hasMessage("Which column should TF-12 move to? \"Doing\" isn't a column of TaskForce. Choices: Backlog, In Progress.");
         verify(issueService, never()).updateIssue(any(), any(), any(), any(), any());
     }
 
     @Test
-    void several_members_matching_are_asked_not_guessed() {
+    void an_unknown_column_id_stays_an_error_for_an_agent() {
+        stubIssue(issue());
+
+        assertThatThrownBy(() -> gestures.update("acme", ME, args("{\"projectId\": 12, \"issueId\": 5, \"statusId\": 99}")))
+            .isNotInstanceOf(QuestionNeeded.class)
+            .hasMessage("There is no column 99 in TaskForce. Its columns are: Backlog, Todo, In Progress.");
+    }
+
+    @ParameterizedTest(name = "« {0} » : {1}")
+    @CsvSource(delimiter = '|', value = {
+        // Plusieurs membres : eux seuls en choix ; aucun ne choisit à la place de la personne.
+        "ada   | Several members of TaskForce match \"ada\". | ada@acme.test,ada.b@acme.test",
+        // Personne : tous les membres en choix.
+        "zoe   | No member of TaskForce matches \"zoe\".     | pierre@acme.test,ada@acme.test,ada.b@acme.test",
+    })
+    @DisplayName("R115 : un assigné qui ne désigne pas un seul membre se demande, avec les membres en choix")
+    void an_assignee_who_is_not_one_member_is_asked(String asked, String why, String choices) {
         stubIssue(issue());
         when(projectService.listMembers("acme", 12L, ME)).thenReturn(List.of(PIERRE, ADA,
             ProjectMemberResponse.builder().userId(9L).email("ada.b@acme.test").displayName("Ada Byron").build()));
 
-        assertThatThrownBy(() -> gestures.update("acme", ME, args("{\"projectId\": 12, \"issueId\": 5, \"assignee\": \"ada\"}")))
-            .hasMessageContaining("Several members of TaskForce match \"ada\"");
+        assertThatThrownBy(() -> gestures.update("acme", ME,
+                args("{\"projectId\": 12, \"issueId\": 5, \"assignee\": \"" + asked + "\"}")))
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> {
+                assertThat(needed.question().field()).isEqualTo("assignee");
+                assertThat(needed.question().text()).isEqualTo("Who should take TF-12? " + why);
+                assertThat(needed.question().choices()).extracting(Question.Choice::value)
+                    .containsExactly(choices.split(","));
+                assertThat(needed.question().choices()).noneMatch(Question.Choice::recommended);
+            });
         verify(issueService, never()).updateIssue(any(), any(), any(), any(), any());
+    }
+
+    // ------------------------------------------------------------------ l'issue que TaskForce demande (R115)
+
+    private static IssueResponse onBoard(long id, String key, String title, IssueStatusResponse column, int daysAgo) {
+        return IssueResponse.builder().id(id).projectId(12L).identifier(key).title(title).status(column)
+            .updatedAt(LocalDateTime.of(2026, 11, 2, 12, 0).minusDays(daysAgo)).build();
+    }
+
+    private static final IssueStatusResponse REVIEW = column(4L, "In review by AI", IssueStatusCategory.STARTED);
+    private static final List<IssueResponse> BOARD = List.of(
+        onBoard(21L, "TESTTA-1", "Ajouter la version LTS de Node.js au README", DOING, 5),
+        onBoard(22L, "TESTTA-2", "Ajouter la version LTS actuelle", REVIEW, 1),
+        onBoard(23L, "TESTTA-3", "Corriger le login", TODO, 3),
+        onBoard(24L, "TESTTA-4", "Corriger le footer", TODO, 2));
+
+    /**
+     * Ce que la demande dit de l'issue, et ce qu'en fait TaskForce : la résoudre quand cela ne désigne qu'une issue de
+     * l'écran, sinon demander, avec en choix les issues désignées, ou toutes celles de l'écran (l'ouverte d'abord).
+     */
+    @ParameterizedTest(name = "« {0} », issue ouverte {1} : {2}")
+    @CsvSource(delimiter = '|', quoteCharacter = '"', nullValues = "-", value = {
+        "in review by AI                  | -  | TESTTA-2 | ",
+        "l'issue qui est dans In review by AI | - | TESTTA-2 | ",
+        "testta 2                         | -  | TESTTA-2 | ",
+        "login                            | -  | TESTTA-3 | ",
+        "Todo                             | -  | -        | TESTTA-4,TESTTA-3",
+        "-                                | -  | -        | TESTTA-2,TESTTA-4,TESTTA-3,TESTTA-1",
+        "-                                | 23 | -        | TESTTA-3,TESTTA-2,TESTTA-4,TESTTA-1",
+        "ça                               | 23 | -        | TESTTA-3,TESTTA-2,TESTTA-4,TESTTA-1",
+    })
+    void the_issue_is_read_from_the_screen_or_asked(String asked, Long open, String resolved, String choices)
+            throws Exception {
+        when(issueService.listIssues("acme", 12L, ME)).thenReturn(BOARD);
+        String body = asked == null ? "{}" : "{\"issue\": \"" + asked.replace("\"", "\\\"") + "\"}";
+
+        if (resolved != null) {
+            JsonNode out = gestures.issueOf("acme", ME, new Screen(12L, open), args(body), "Which issue should be deleted?");
+            assertThat(out.path("issue").asText()).isEqualTo(resolved);
+            assertThat(out.path("projectId").asLong()).isEqualTo(12L);
+            return;
+        }
+        assertThatThrownBy(() -> gestures.issueOf("acme", ME, new Screen(12L, open), args(body), "Which issue should be deleted?"))
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> {
+                assertThat(needed.question().field()).isEqualTo("issue");
+                assertThat(needed.question().text()).isEqualTo("Which issue should be deleted?");
+                assertThat(needed.question().choices()).extracting(Question.Choice::value).containsExactly(choices.split(","));
+                // L'issue ouverte est le défaut, en premier ; sans issue ouverte, aucun défaut.
+                assertThat(needed.question().choices()).filteredOn(Question.Choice::recommended)
+                    .extracting(Question.Choice::value).containsExactlyElementsOf(open == null ? List.of() : List.of("TESTTA-3"));
+            });
+    }
+
+    @Test
+    @DisplayName("sans projet à l'écran, les choix sont les issues de la personne")
+    void without_a_project_on_screen_the_choices_are_my_issues() {
+        when(issueService.listMyIssues("acme", ME)).thenReturn(List.of(BOARD.get(2)));
+
+        assertThatThrownBy(() -> gestures.issueOf("acme", ME, Screen.NONE, json.createObjectNode(), "Which issue?"))
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> assertThat(needed.question().choices())
+                .extracting(Question.Choice::label).containsExactly("TESTTA-3 Corriger le login (Todo)"));
+        verify(issueService, never()).listIssues(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("une clé qu'on ne voit pas se demande avec ce qu'on voit, sans dire qu'elle existe")
+    void a_key_out_of_sight_is_asked_with_what_one_sees() throws Exception {
+        when(projects.findByWorkspaceIdAndIdentifier(1L, "HIDDEN")).thenReturn(Optional.of(PROJECT));
+        when(visibility.canView(PROJECT, ME)).thenReturn(false);
+        when(issueService.listIssues("acme", 12L, ME)).thenReturn(List.of(BOARD.get(0)));
+
+        assertThatThrownBy(() -> gestures.issueOf("acme", ME, new Screen(12L, null), args("{\"issue\": \"HIDDEN-3\"}"), "Which issue?"))
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> assertThat(needed.question().choices())
+                .extracting(Question.Choice::value).containsExactly("TESTTA-1"));
     }
 
     @Test
