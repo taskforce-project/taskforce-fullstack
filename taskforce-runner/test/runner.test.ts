@@ -333,6 +333,14 @@ describe("textes produits", () => {
     }
   });
 
+  it("le brief dit la portée de l'agent dans TaskForce : son issue, nommée, et des issues créées dans le projet (R110)", () => {
+    for (const prompt of [buildPrompt(claim, "b"), buildReplyPrompt(claim)]) {
+      assert.match(prompt, /create issues in this project, and change only this issue \(issueId 55\)/);
+      assert.match(prompt, /Past a number of changes in one mission, each further change waits for the approval/);
+      assert.doesNotMatch(prompt, /issues of this project/);
+    }
+  });
+
   it("corps de PR : les faits du runner, puis le résumé de l'agent sous son nom (R49)", () => {
     const body = pullRequestBody(claim, {
       facts: ["Pushed the branch `tf/web-12-fix-r42` (1 commit): allowed by the rule push-agent-branch-private.",
