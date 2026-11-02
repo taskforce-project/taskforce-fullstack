@@ -274,4 +274,33 @@ class CortexRecordServiceTest {
         assertThat(service.undo(id, "update_issue", 7L, second, kept -> "again")).isEmpty();
         assertThat(stored.getLast().getData()).contains("\"ref\":\"" + second + "\"", "\"status\":\"undone\"");
     }
+
+    @Test
+    @DisplayName("une correction de TaskForce entre au dossier de la réponse : un incident de confiance, signé du serveur (E17)")
+    void a_correction_is_a_trust_incident_in_the_record() {
+        UUID id = proposedNote();
+
+        UUID kept = service.incident(ctx, id, "What changed in this project this week?", Map.of(),
+            Map.of("incident", "trust", "experiment", "E17", "said", List.of("La carte TESTTA-2 a été supprimée.")));
+
+        assertThat(kept).isEqualTo(id);
+        assertThat(stored.getLast()).satisfies(event -> {
+            assertThat(event.getType()).isEqualTo("note");
+            assertThat(event.getActorKind()).isEqualTo("server");
+            assertThat(event.getActorId()).isEqualTo("taskforce");
+            assertThat(event.getData()).contains("\"experiment\":\"E17\"").contains("La carte TESTTA-2 a été supprimée.");
+        });
+        assertThat(EvidenceChain.firstBrokenLink(service.events(id))).isEqualTo(-1);
+    }
+
+    @Test
+    @DisplayName("une réponse sans outil n'avait pas de dossier : il s'ouvre pour l'incident, sur la question")
+    void an_incident_without_a_record_opens_one() {
+        UUID id = service.incident(ctx, null, "suprime testta 2", Map.of("model", "qwen3:8b"),
+            Map.of("incident", "trust", "experiment", "E17"));
+
+        assertThat(records).containsKey(id);
+        assertThat(stored).extracting(CortexRecordEvent::getType).containsExactly("mission.started", "note");
+        assertThat(stored.getFirst().getData()).contains("\"question\":\"suprime testta 2\"").contains("qwen3:8b");
+    }
 }

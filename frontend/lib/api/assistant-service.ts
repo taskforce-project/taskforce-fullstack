@@ -72,6 +72,11 @@ export interface AssistantAnswer {
   steps: AssistantStep[]
   toolCalls: AssistantToolCall[]
   usage: AssistantUsage
+  /**
+   * Le dossier de la réponse, quand elle en a un : celui de ses outils, ou celui que le serveur ouvre quand TaskForce
+   * corrige une réponse sans outil (R116). Absent d'une réponse rendue avant R116.
+   */
+  record?: string | null
 }
 
 /** Réponse d'un tour : la réponse de l'agent + la conversation où il est rattaché (créée si absente). */

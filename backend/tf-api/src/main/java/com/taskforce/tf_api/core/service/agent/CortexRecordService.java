@@ -164,6 +164,21 @@ public class CortexRecordService {
         return Optional.of(undoneText);
     }
 
+    /**
+     * TaskForce a remplacé des phrases de la réponse, des actions annoncées sans leur résultat d'outil (R116) : le dossier
+     * de la réponse le garde comme un incident de confiance (E17), avec ce que le modèle a dit et ce que TaskForce a
+     * montré, sous la signature du serveur. Une réponse sans outil n'avait pas de dossier : il s'ouvre pour l'incident,
+     * sur la question et ce qui a répondu. Rend le dossier.
+     */
+    @Transactional
+    public UUID incident(AgentContext ctx, UUID recordId, String question, Map<String, ?> origin, Map<String, ?> data) {
+        UUID id = recordId != null ? recordId : open(ctx, question, origin);
+        if (append(id, "note", Actor.SERVER, data).isEmpty()) {
+            log.warn("Dossier de Cortex {} plein : l'incident de confiance n'y entre pas", LogSafe.of(id));
+        }
+        return id;
+    }
+
     /** Vrai si le dossier est celui de cette personne, dans cet espace : un autre ne se prolonge pas. */
     @Transactional(readOnly = true)
     public boolean owns(UUID recordId, AgentContext ctx) {

@@ -9,7 +9,6 @@ import {
   Message, Steps, Reasoning, Tool, Sources, ThinkingBar, FeedbackBar, PromptSuggestion, TokenMeter,
   type ToolStatus,
 } from "@/components/chat"
-import { Markdown } from "@/components/ui/lightweight-markdown"
 import { cn } from "@/lib/utils"
 import {
   approveAction, isApprovable, isDeletion, isMission, isPreparedIssue, isQuestion, isUndoable, type AssistantActionResult,
@@ -23,6 +22,7 @@ import { useCortexStore, type CortexPlace } from "@/lib/store/cortex-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { IS_DESKTOP } from "@/lib/desktop"
+import { AnswerText } from "./answer-text"
 import { CortexUsage } from "./cortex-usage"
 import { DeleteIssueCard } from "./delete-issue-card"
 import { EvalCaseButton } from "./eval-case-dialog"
@@ -444,15 +444,16 @@ export function AgentChat({ place, onSwitchPlace, onFold }: Readonly<{
 function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: string }) {
   const hasBreakdown = answer.usage && (answer.usage.promptTokens > 0 || answer.usage.completionTokens > 0)
   // Le dossier de la réponse, que porte chacun de ses appels d'outil : il fait d'elle un cas de la banque (R61,
-  // séance n°10).
-  const record = answer.toolCalls.find((tc) => tc.record)?.record
+  // séance n°10). Une réponse sans outil que TaskForce a corrigée a le sien (R116).
+  const record = answer.record ?? answer.toolCalls.find((tc) => tc.record)?.record
   return (
     <div className="group/answer space-y-1">
       {answer.steps.length > 0 && (
         <Steps steps={answer.steps.map((s) => ({ title: s.label, status: s.status, description: s.description ?? undefined }))} />
       )}
       {answer.reasoning && <Reasoning content={answer.reasoning} />}
-      <Markdown content={answer.answer} />
+      {/* Ce que TaskForce dit à la place d'une phrase fausse se montre comme sa parole, pas celle du modèle (R116). */}
+      <AnswerText text={answer.answer} />
       {answer.toolCalls.map((tc, i) =>
         // Cortex demande d'abord ce qui compte (R102) : rien n'est préparé, sa question est la réponse.
         isQuestion(tc) ? null :

@@ -193,7 +193,7 @@ class EvalServiceTest {
     void a_case_is_frozen_by_the_server() throws Exception {
         stubRecord(answerThatCreatedAnIssue());
         EvalCriteria criteria = new EvalCriteria("create_issue", Map.of("project", List.of("CLEANU", "Cleanup check")),
-            "allow", null, null, null);
+            "allow", null, null, null, false);
 
         EvalBankResponse.CaseSummary created = service.create("acme", 7L, RECORD.toString(), null, criteria);
 
@@ -231,12 +231,13 @@ class EvalServiceTest {
 
     static Stream<Arguments> invalidCriteria() {
         return Stream.of(
-            Arguments.of("aucun critère", new EvalCriteria(null, null, null, null, null, null), "at least one criterion"),
-            Arguments.of("un outil inconnu", new EvalCriteria("make_coffee", null, null, null, null, null), "Unknown tool"),
-            Arguments.of("un outil interdit inconnu", new EvalCriteria(null, null, null, List.of("make_coffee"), null, null),
-                "Unknown tool"),
-            Arguments.of("un effet inconnu", new EvalCriteria("create_issue", null, "maybe", null, null, null), "allow, ask or deny"),
-            Arguments.of("un mot vide", new EvalCriteria(null, null, null, null, List.of(" "), null), "expected words"));
+            Arguments.of("aucun critère", new EvalCriteria(null, null, null, null, null, null, false), "at least one criterion"),
+            Arguments.of("un outil inconnu", new EvalCriteria("make_coffee", null, null, null, null, null, false), "Unknown tool"),
+            Arguments.of("un outil interdit inconnu", new EvalCriteria(null, null, null, List.of("make_coffee"), null, null,
+                false), "Unknown tool"),
+            Arguments.of("un effet inconnu", new EvalCriteria("create_issue", null, "maybe", null, null, null, false),
+                "allow, ask or deny"),
+            Arguments.of("un mot vide", new EvalCriteria(null, null, null, null, List.of(" "), null, false), "expected words"));
     }
 
     @ParameterizedTest(name = "{0} : refusé")
@@ -245,6 +246,18 @@ class EvalServiceTest {
         assertThatThrownBy(() -> service.create("acme", 7L, RECORD.toString(), "T", criteria))
             .isInstanceOf(BusinessException.class).hasMessageContaining(message);
         verify(cases, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("dire ce qui a été fait suffit à faire un cas (R116, R118) ; le critère se garde avec les autres")
+    void saying_what_was_done_is_a_criterion() throws Exception {
+        stubRecord(answerThatCreatedAnIssue());
+
+        service.create("acme", 7L, RECORD.toString(), "T", new EvalCriteria(null, null, null, null, null, null, true));
+
+        ArgumentCaptor<EvalCase> saved = ArgumentCaptor.forClass(EvalCase.class);
+        verify(cases).save(saved.capture());
+        assertThat(JSON.readValue(saved.getValue().getCriteria(), EvalCriteria.class).honest()).isTrue();
     }
 
     @Test
