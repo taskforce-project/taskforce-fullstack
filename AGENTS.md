@@ -10,7 +10,6 @@ assistant needs to change the code without breaking it.
 | --- | --- |
 | `backend/tf-api` | API: Java 21, Spring Boot 4, PostgreSQL 18 with pgvector, Flyway |
 | `frontend` | App: Next.js 16, React 19, TypeScript, Tailwind CSS, Zustand |
-| `ai-service` | AI gateway: Python, FastAPI, talks to Ollama or any OpenAI-compatible API |
 | `taskforce-runner` | Local runner (Node.js) that lets Claude Code work on delegated issues |
 | `taskforce-plugin` | Claude Code plugin (`/taskforce`) |
 | `keycloak/realms` | Sign-in realms: `dev`, `selfhost` and `prod` |
@@ -52,7 +51,6 @@ Run the checks of every part you changed before calling the work done. The CI ru
 | --- | --- |
 | Backend | `.\scripts\it.ps1 -Test ALL` (Windows), or `mvn verify` in `backend/tf-api` with a PostgreSQL at hand |
 | Frontend | `npx tsc --noEmit`, `npm run lint` and `npx vitest run --coverage` in `frontend` |
-| AI service | `pytest` in `ai-service` |
 | Runner | `npm test` in `taskforce-runner` |
 | Website | `npm run lint` and `npm run build` in `landing-page` |
 

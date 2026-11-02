@@ -10,7 +10,6 @@ privately as described in [SECURITY.md](./SECURITY.md), never in a public issue.
 | --- | --- |
 | `backend/tf-api` | API: Spring Boot 4, Java 21, PostgreSQL with Flyway migrations |
 | `frontend` | App: Next.js, TypeScript, Zustand stores |
-| `ai-service` | AI gateway: FastAPI, talks to Ollama or any OpenAI-compatible API |
 | `taskforce-runner` | Local runner that lets Claude Code work on delegated issues |
 | `taskforce-plugin` | Claude Code plugin (`/taskforce`) |
 | `keycloak` | Sign-in realms (development, self-hosting, hosted production) |
@@ -54,7 +53,6 @@ Run them before opening a pull request; the CI runs the same ones.
 | Backend, full suite against a real PostgreSQL | `.\scripts\it.ps1 -Test ALL` (Windows), or `mvn verify` in `backend/tf-api` with a PostgreSQL at hand |
 | Frontend tests with coverage thresholds | `npm run test:coverage` in `frontend` |
 | Frontend types and lint | `npx tsc --noEmit` and `npm run lint` in `frontend` |
-| AI service | `pytest` in `ai-service` |
 | Runner | `npm test` in `taskforce-runner` |
 
 New code comes with tests. Tests use real behaviour where they can (a real PostgreSQL for repositories and services,

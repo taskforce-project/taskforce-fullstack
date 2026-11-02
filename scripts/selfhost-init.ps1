@@ -19,7 +19,7 @@ function New-Secret {
 
 $content = (Get-Content (Join-Path $root ".env.selfhost.example") -Raw) -replace "`r`n", "`n"
 foreach ($key in @("DB_PASSWORD", "KEYCLOAK_ADMIN_PASSWORD", "KEYCLOAK_CLIENT_SECRET", "MINIO_ROOT_PASSWORD",
-                   "TF_ENCRYPTION_KEY", "AI_SERVICE_TOKEN", "TF_HUMAN_CHALLENGE_SECRET")) {
+                   "TF_ENCRYPTION_KEY", "TF_HUMAN_CHALLENGE_SECRET")) {
   $content = $content -replace "(?m)^$key=.*$", "$key=$(New-Secret)"
 }
 # UTF-8 without BOM and LF line endings: what docker compose expects.

@@ -57,6 +57,10 @@ desktop:
   launch-token: ${TF_DESKTOP_LAUNCH_TOKEN}
   # Secret du runner de Claude Code que la coque lance, tiré lui aussi à chaque lancement (DesktopRunnerTokens).
   runner-secret: ${TF_DESKTOP_RUNNER_SECRET:}
+  # Secret de la coque seule, tiré à chaque lancement : elle change le fournisseur d'IA du backend quand la personne
+  # le change dans ses réglages (DesktopAiService). La fenêtre ne le connaît pas. Le fournisseur de départ arrive par
+  # les variables AI_* du serveur, que la coque pose au lancement.
+  shell-secret: ${TF_DESKTOP_SHELL_SECRET:}
   # Dossier de données de l'app (fichiers, pièces jointes, Brain OS), propre au compte connecté.
   data-dir: ${TF_DESKTOP_DATA_DIR}
   # Jeton GitHub de la personne (son GitHub CLI), servi par la coque sur 127.0.0.1 (DesktopGitHubTokenSource) :

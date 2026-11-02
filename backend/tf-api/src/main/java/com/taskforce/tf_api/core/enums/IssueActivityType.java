@@ -30,5 +30,7 @@ public enum IssueActivityType {
     /** Les trois gestes de la carte de résultat d'une mission (R78) : appliquer, écarter, relancer. */
     MISSION_APPLIED,
     MISSION_DISCARDED,
-    MISSION_RETRIED
+    MISSION_RETRIED,
+    /** L'issue terminée par la personne, la mission n'ayant rien changé (rejeu de la 1.8.0, V114). */
+    MISSION_MARKED_DONE
 }

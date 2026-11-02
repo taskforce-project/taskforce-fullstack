@@ -2,13 +2,13 @@
 
 import { useEffect, useRef } from "react"
 import { useParams, usePathname } from "next/navigation"
-import { AnimatePresence, motion } from "framer-motion"
-import { ChevronDown, Loader2, MessageSquare, Send, Sparkles } from "lucide-react"
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
+import { ArrowUp, ChevronDown, Loader2, MessageSquare, Sparkles } from "lucide-react"
 
 import { AgentChat } from "./agent-chat"
 import { suggestionsFor } from "@/lib/cortex/suggestions"
 import { useCortexStore } from "@/lib/store/cortex-store"
-import { usePanelStore, type OpenPanelInput } from "@/lib/store/panel-store"
+import { usePanelStore, type OpenPanelInput, type PanelSide } from "@/lib/store/panel-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 
 /** Le panneau de droite, où la conversation va quand la personne l'y épingle : le même partout, rouvert sans doublon. */
@@ -31,16 +31,24 @@ export function pinToSide() {
   usePanelStore.getState().openPanel(cortexPanel())
 }
 
-/** Ramène la conversation au-dessus de la barre, dépliée. */
+/** Ramène la conversation au-dessus de la barre, ouverte. */
 export function backToBar() {
   usePanelStore.getState().closePanel(CORTEX_PANEL_ID)
   useCortexStore.getState().setPlace("bar")
   useCortexStore.getState().setOpen(true)
 }
 
+/** La largeur du panneau ouvert d'un côté, 0 sans panneau : la bulle et la barre se centrent sur l'écran qui reste. */
+function usePanelWidth(side: PanelSide): number {
+  return usePanelStore((s) => s.panels.find((p) => p.side === side)?.width ?? 0)
+}
+
+/** La bulle et la barre gardent la place des panneaux ouverts (en `md` et au-delà : en dessous, un panneau couvre tout). */
+const PANEL_ROOM = "transition-[padding] duration-200 ease-out motion-reduce:transition-none md:pl-(--cortex-left) md:pr-(--cortex-right)"
+
 /**
- * Le bord haut de la conversation dépliée : on le tire pour lui donner plus ou moins de place, ou on le règle au clavier
- * (flèches haut et bas) une fois qu'il a le focus.
+ * Le bord haut de la bulle : on le tire pour lui donner plus ou moins de place, ou on le règle au clavier (flèches haut
+ * et bas) une fois qu'il a le focus.
  */
 function ResizeEdge({ target, height, label, onResize }: Readonly<{
   target: React.RefObject<HTMLElement | null>
@@ -76,26 +84,28 @@ function ResizeEdge({ target, height, label, onResize }: Readonly<{
           onResize(height + (e.key === "ArrowUp" ? 40 : -40))
         }
       }}
-      className="group absolute inset-x-0 -top-1 z-10 flex h-2 cursor-row-resize items-center justify-center outline-none"
+      className="group absolute inset-x-12 top-0 z-10 flex h-1.5 cursor-row-resize justify-center outline-none"
     >
-      <span className="h-1 w-12 rounded-full bg-border opacity-0 transition-all duration-150 group-hover:w-16 group-hover:bg-primary/60 group-hover:opacity-100 group-focus-visible:opacity-100" />
+      <span className="mt-0.5 h-1 w-10 rounded-full bg-border opacity-0 transition-all duration-150 group-hover:w-14 group-hover:bg-primary/60 group-hover:opacity-100 group-focus-visible:w-14 group-focus-visible:bg-primary/60 group-focus-visible:opacity-100" />
     </button>
   )
 }
 
 /**
- * La barre unique, en bas de chaque écran (R76, séance n°13), et la conversation qui s'en déplie (revue UX du
- * 01/11/2026). On y écrit ce qu'on veut faire ; la réponse s'ouvre juste au-dessus, là où l'on vient d'écrire, et la
- * barre devient la saisie de la conversation. Elle se replie (Échap), se redimensionne par son bord haut, et s'épingle
- * à droite pour qui préfère l'ancien panneau. Dépliée, elle pousse l'écran vers le haut au lieu de le recouvrir : le
- * tableau reste visible pendant que Cortex agit. Rien ne part tant que la personne n'envoie pas, par Entrée ou par le
- * bouton ; une suggestion remplit la barre, elle n'envoie rien.
+ * La barre unique, en bas de chaque écran (R76, séance n°13), et la conversation qui s'ouvre au-dessus. Depuis le
+ * 02/11/2026, les deux parlent la langue du composeur du site : la barre flotte, détachée des bords, et la conversation
+ * s'ouvre au-dessus d'elle dans une bulle à part, arrondie, ombrée, sur un halo et un dégradé bleu, lisible sur
+ * n'importe quel écran (« une sorte de bulle de chat qui s'ouvrirait partout », le CEO). La bulle passe par-dessus
+ * l'écran sans le figer : rien n'est modal, le reste de l'écran se clique. Elle se réduit dans la barre (Échap, ou son
+ * chevron), se redimensionne par son bord haut, et s'épingle à droite pour qui préfère le panneau. Rien ne part tant
+ * que la personne n'envoie pas, par Entrée ou par le bouton ; une suggestion remplit la barre, elle n'envoie rien.
  */
 export function CommandBar() {
   const pathname = usePathname()
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const t = usePreferencesStore((s) => s.t.shell)
+  const reduceMotion = useReducedMotion()
 
   const draft = useCortexStore((s) => s.draft)
   const setDraft = useCortexStore((s) => s.setDraft)
@@ -112,8 +122,10 @@ export function CommandBar() {
   const sideShown = usePanelStore((s) => s.panels.some((p) => p.id === CORTEX_PANEL_ID))
   const openPanel = usePanelStore((s) => s.openPanel)
   const closePanel = usePanelStore((s) => s.closePanel)
+  const leftRoom = usePanelWidth("left")
+  const rightRoom = usePanelWidth("right")
   const inputRef = useRef<HTMLInputElement>(null)
-  const sectionRef = useRef<HTMLElement>(null)
+  const bubbleRef = useRef<HTMLElement>(null)
 
   useEffect(() => { enterWorkspace(slug) }, [slug, enterWorkspace])
 
@@ -149,11 +161,14 @@ export function CommandBar() {
   }
 
   const toggleLabel = unread && !open ? t.barNewAnswer : open ? t.barHideConversation : t.barShowConversation
+  // La bulle monte du composeur ; avec le mouvement réduit, elle apparaît en fondu, sans se déplacer.
+  const away = reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }
+  const room = { "--cortex-left": `${leftRoom}px`, "--cortex-right": `${rightRoom}px` } as React.CSSProperties
 
   return (
     <div
-      className="relative shrink-0 border-t border-border/70 bg-background"
-      data-tour="command-bar"
+      className="relative shrink-0 px-3 pb-3 pt-2 md:px-6"
+      style={room}
       onKeyDown={(e) => {
         if (e.key === "Escape" && open && !e.defaultPrevented) {
           e.preventDefault()
@@ -163,33 +178,48 @@ export function CommandBar() {
     >
       <AnimatePresence initial={false}>
         {unfolded && (
-          <motion.section
+          <motion.div
             key="conversation"
-            ref={sectionRef}
-            aria-label={t.chatLabel}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            // Plafonnée sous la moitié de l'écran : l'objet sur lequel Cortex agit reste visible au-dessus.
-            style={{ height: `min(${height}px, 45vh)` }}
-            className="relative flex flex-col border-b border-border/70"
+            initial={away}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={away}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            style={{ transformOrigin: "50% 100%" }}
+            // Au-dessus de l'écran, sans le bloquer : seule la bulle capte les clics, pas le halo autour.
+            className="pointer-events-none absolute inset-x-0 bottom-full z-30 px-3 pb-1 md:px-6"
           >
-            <ResizeEdge target={sectionRef} height={height} label={t.chatResize} onResize={setHeight} />
-            <AgentChat place="bar" onSwitchPlace={pinToSide} onFold={fold} />
-          </motion.section>
+            <div className={PANEL_ROOM}>
+              <div className="relative mx-auto w-full max-w-3xl">
+                <span className="cortex-halo" aria-hidden="true" />
+                <section
+                  ref={bubbleRef}
+                  aria-label={t.chatLabel}
+                  // Plafonnée par l'écran : la bulle s'arrête sous la barre du haut (et, dans l'app desktop, sous les
+                  // boutons de la fenêtre).
+                  style={{ height: `min(${height}px, calc(100dvh - 11rem))` }}
+                  className="cortex-bubble pointer-events-auto relative flex flex-col px-1 pb-2"
+                >
+                  <ResizeEdge target={bubbleRef} height={height} label={t.chatResize} onResize={setHeight} />
+                  <AgentChat place="bar" onSwitchPlace={pinToSide} onFold={fold} />
+                </section>
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="px-3 pb-2.5 pt-2 md:px-6">
-        <div className="flex h-11 items-center gap-2 border border-border bg-background px-2 focus-within:border-foreground/30">
+      <div className={PANEL_ROOM}>
+        <div
+          className="cortex-composer @container relative z-30 mx-auto flex h-13 w-full max-w-3xl items-center gap-1.5 px-2.5"
+          data-tour="command-bar"
+        >
           <button
             type="button"
             onClick={open ? fold : show}
             aria-expanded={open}
             aria-label={toggleLabel}
             title={toggleLabel}
-            className="relative flex size-8 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="relative flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             {open ? <ChevronDown className="size-4" /> : <MessageSquare className="size-4" />}
             {unread && !open && <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-primary" aria-hidden="true" />}
@@ -207,33 +237,35 @@ export function CommandBar() {
             }}
             placeholder={open && hasTurns ? t.barReply : t.barPlaceholder}
             aria-label={t.barPlaceholder}
-            className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+            className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
           />
+          {/* Fermée et vide, la barre dit ce qu'on peut demander sur cet écran, si la place le permet (sinon, la bulle
+              vide le dit) ; ouverte, la conversation est le contexte. */}
+          {!unfolded && !draft && (
+            <div role="group" className="hidden shrink-0 items-center gap-1 @[46rem]:flex" aria-label={t.barSuggestions}>
+              {suggestionsFor(pathname).map((s) => (
+                <button
+                  key={s.label}
+                  type="button"
+                  onClick={() => suggest(s.text)}
+                  className="h-7 rounded-full border border-border/70 px-2.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             type="button"
             onClick={submit}
             disabled={!draft.trim() || busy}
-            title={busy ? t.barAnswering : undefined}
-            className="flex h-8 shrink-0 items-center gap-1.5 bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:opacity-40"
+            aria-label={t.barSend}
+            title={busy ? t.barAnswering : t.barSend}
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-key transition-[background-color,transform] duration-150 hover:bg-primary-hover enabled:hover:-translate-y-px disabled:opacity-40 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
           >
-            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />} {t.barSend}
+            {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
           </button>
         </div>
-        {/* Repliée, la barre dit ce qu'on peut demander sur cet écran ; dépliée, la conversation est le contexte. */}
-        {!unfolded && (
-          <div className="mt-1.5 flex flex-wrap gap-1.5" aria-label={t.barSuggestions}>
-            {suggestionsFor(pathname).map((s) => (
-              <button
-                key={s.label}
-                type="button"
-                onClick={() => suggest(s.text)}
-                className="h-6 border border-border/70 bg-muted/40 px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   )

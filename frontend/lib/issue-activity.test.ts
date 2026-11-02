@@ -34,6 +34,16 @@ describe("describeActivity : qui a fait quoi sur une issue", () => {
     expect(line).toMatchObject({ who: "Claude Code", what, forWhom: "for Pierre" });
   });
 
+  it.each([
+    ["Claude Code", "Claude Code commented for Pierre"], // le commentaire de l'agent d'une mission (rejeu de la 1.8.0)
+    [null, "Pierre commented"],                          // la personne seule
+  ])("a comment, through %s", (via, said) => {
+    const line = describeActivity(activity({ action: "COMMENT_ADDED", via }), t);
+
+    expect([line.who, line.what, line.forWhom].filter(Boolean).join(" ")).toBe(said);
+    expect(line.change).toBeNull();
+  });
+
   it("the pull request the agent opened, with its link", () => {
     const url = "https://github.com/acme/website/pull/1";
     const line = describeActivity(activity({ action: "PULL_REQUEST_OPENED", newValue: url, via: "Claude Code" }), t);
@@ -54,6 +64,7 @@ describe("describeActivity : qui a fait quoi sur une issue", () => {
     ["MISSION_APPLIED", "applied the result"],
     ["MISSION_DISCARDED", "discarded the result"],
     ["MISSION_RETRIED", "tried again"],
+    ["MISSION_MARKED_DONE", "marked the issue done: no change was needed"],
   ] as const)("the person's decision on the result: %s", (action, what) => {
     expect(describeActivity(activity({ action }), t)).toMatchObject({ who: "Pierre", what, forWhom: null });
   });
@@ -76,6 +87,6 @@ describe("describeActivity : qui a fait quoi sur une issue", () => {
   it("an agent that acted for a person deleted since says what it did, for nobody", () => {
     const line = describeActivity(activity({ action: "COMMENT_ADDED", actor: null, via: "Claude Code" }), t);
 
-    expect(line).toMatchObject({ who: "Claude Code", what: "comment added", forWhom: null });
+    expect(line).toMatchObject({ who: "Claude Code", what: "commented", forWhom: null });
   });
 });

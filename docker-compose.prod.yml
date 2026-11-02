@@ -5,15 +5,16 @@
 #   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 #
 # ── Périmètre ────────────────────────────────────────────────────────────────
-# Décrit la pile COMPLÈTE : postgres, keycloak, backend, ai-service, frontend, landing, minio,
-# redis, nginx. (Avant le 22/07 il n'en déclarait que cinq — l'application ne pouvait pas démarrer.)
+# Décrit la pile COMPLÈTE : postgres, keycloak, backend, frontend, landing, minio, redis, nginx.
+# (Avant le 22/07 il n'en déclarait que cinq : l'application ne pouvait pas démarrer.) L'ancien
+# service Python ai-service n'existe plus : la passerelle de modèles est dans le backend (01/11/2026).
 #
 # ── Hors de ce fichier : le LLM ──────────────────────────────────────────────
 # Ollama n'est PAS conteneurisé ici. Les modèles configurés pèsent ~15,7 Go sur disque et doivent
 # rester résidents en mémoire pour servir ; les héberger avec le reste imposerait ~24 Gio de RAM et,
-# sans GPU, des temps de réponse de l'ordre de la minute (cf. OLLAMA_TIMEOUT=300 côté ai-service).
+# sans GPU, des temps de réponse de l'ordre de la minute (AI_TIMEOUT à relever en conséquence).
 # `AI_OLLAMA_BASE_URL` pointe donc vers un hôte au choix : machine dédiée, service managé, ou un
-# endpoint compatible. Le service reste fonctionnel avec Groq en secours côté backend.
+# endpoint compatible ; ou bien le chat part vers une API (Groq, OpenAI, Anthropic...).
 #
 # ── Mono-instance ────────────────────────────────────────────────────────────
 # Le temps réel utilise le broker STOMP EN MÉMOIRE (défaut `taskforce.realtime.relay.enabled=false`,
@@ -159,9 +160,30 @@ services:
       # CORS
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
 
-      # Service IA interne (passerelle vers le fournisseur), joint avec le secret partagé
-      AI_SERVICE_URL: http://ai-service:8000
-      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?AI_SERVICE_TOKEN est obligatoire (secret partagé backend / ai-service)}
+      # IA : la passerelle de modèles du backend joint elle-même le fournisseur (Ollama, toute API compatible
+      # OpenAI, l'API d'Anthropic). Mêmes variables que l'ancien ai-service, qu'un .env.prod existant garde
+      # telles quelles ; son AI_SERVICE_TOKEN ne sert plus. Le modèle tourne ailleurs (machine dédiée, service
+      # managé), pas dans ce compose. Vide = valeur par défaut (cf. AiProviderSettings).
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_MODEL_FAST: ${AI_MODEL_FAST:-}
+      AI_EMBED_BASE_URL: ${AI_EMBED_BASE_URL:-}
+      AI_EMBED_API_KEY: ${AI_EMBED_API_KEY:-}
+      AI_EMBED_MODEL: ${AI_EMBED_MODEL:-}
+      # Délai d'une réponse du modèle (secondes) ; AI_MAX_TOKENS plafonne une réponse d'Anthropic.
+      AI_TIMEOUT: ${AI_TIMEOUT:-120}
+      AI_MAX_TOKENS: ${AI_MAX_TOKENS:-}
+      # Alias d'avant le lot 4, toujours lus : GROQ_* (chat sur Groq), OLLAMA_* (Ollama).
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-}
+      GROQ_MODEL_FAST: ${GROQ_MODEL_FAST:-}
+      GROQ_BASE_URL: ${GROQ_BASE_URL:-}
+      OLLAMA_BASE_URL: ${AI_OLLAMA_BASE_URL:-}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-}
+      OLLAMA_MODEL_FAST: ${OLLAMA_MODEL_FAST:-}
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-}
 
       # Stockage objet — joint par nom de service (règle d'or #9). MINIO_PUBLIC_ENDPOINT est l'hôte
       # qui SIGNE les URL présignées : il doit être joignable depuis le navigateur, donc public.
@@ -231,8 +253,6 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-      ai-service:
-        condition: service_healthy
     networks:
       - taskforce-network
     healthcheck:
@@ -252,55 +272,6 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
-
-  # ================================
-  # AI Service (FastAPI — passerelle LLM)
-  # ================================
-  ai-service:
-    build:
-      context: ./ai-service
-      dockerfile: Dockerfile
-    container_name: taskforce-ai-service-prod
-    environment:
-      TZ: UTC
-      # Secret partagé avec le backend : sans lui, le service refuse tout appel.
-      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?AI_SERVICE_TOKEN est obligatoire (secret partagé backend / ai-service)}
-      # Fournisseur d'IA : format générique compatible OpenAI (cf. ai-service/app/config.py). Le modèle
-      # tourne ailleurs (machine dédiée, service managé), pas dans ce conteneur. Vide = valeur par défaut.
-      AI_PROVIDER: ${AI_PROVIDER:-}
-      AI_BASE_URL: ${AI_BASE_URL:-}
-      AI_API_KEY: ${AI_API_KEY:-}
-      AI_MODEL: ${AI_MODEL:-}
-      AI_MODEL_FAST: ${AI_MODEL_FAST:-}
-      AI_EMBED_BASE_URL: ${AI_EMBED_BASE_URL:-}
-      AI_EMBED_API_KEY: ${AI_EMBED_API_KEY:-}
-      AI_EMBED_MODEL: ${AI_EMBED_MODEL:-}
-      # Délai d'une réponse du modèle, sous ai.service.read-timeout-ms du backend (150 s).
-      AI_TIMEOUT: ${AI_TIMEOUT:-120}
-      # Alias d'avant le lot 4, toujours lus : GROQ_* (chat sur Groq), OLLAMA_* (Ollama).
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      GROQ_MODEL: ${GROQ_MODEL:-}
-      GROQ_MODEL_FAST: ${GROQ_MODEL_FAST:-}
-      GROQ_BASE_URL: ${GROQ_BASE_URL:-}
-      OLLAMA_BASE_URL: ${AI_OLLAMA_BASE_URL:-}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-}
-      OLLAMA_MODEL_FAST: ${OLLAMA_MODEL_FAST:-}
-      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-}
-      LOG_LEVEL: ${AI_SERVICE_LOG_LEVEL:-INFO}
-    networks:
-      - taskforce-network
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)\" || exit 1"]
-      interval: 20s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    restart: always
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-    # Simple passe-plat (fastapi/uvicorn/pydantic) : aucun modèle chargé en mémoire.
 
   # ================================
   # Frontend Next.js
