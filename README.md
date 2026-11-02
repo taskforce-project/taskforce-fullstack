@@ -227,7 +227,7 @@ flowchart TB
 ### Stack
 
 <!-- BADGES:START -->
-![Version](https://img.shields.io/badge/Version-1.8.0-blue.svg)
+![Version](https://img.shields.io/badge/Version-1.9.0-blue.svg)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)
 ![Java](https://img.shields.io/badge/Java-21-orange.svg)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.6-brightgreen.svg)
