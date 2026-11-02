@@ -10,6 +10,21 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 02/11/2026 - J1, TF-J1-1 : un seul moteur de règles, écrit en Java et compilé en JavaScript pour le runner ; la copie TypeScript disparaît.** `[backend + runner + CI]`
+> - **Décision du CEO** (02/11/2026) : « on adopte R90 (b) », sur les résultats d'E16 : demander chaque décision au backend laisse l'agent sans décision 20 à 23 s à chaque redémarrage ; le moteur Java compilé par TeaVM passe tous les cas partagés (ADR-025, brouillon).
+> - **Fait** (branche `feat/one-rules-engine`, PR #479 vers `dev`, étiquette `backend:release:patch`, pas fusionnée) :
+>   - `backend/rules-engine-js`, un module Maven (Java 21, TeaVM 0.16.0) : il lit en place `RulesEngine`, `RulesBundle`, `Glob`, `RulesDigest`, `CanonicalJson` et `EvidenceChain` dans `backend/tf-api`, sans les copier, et n'y ajoute que l'adaptateur JavaScript (`RulesEngineJs`, `JsValues`) et `MessageDigest` (SHA-256) et `HexFormat` par substitution de classes ; il compile contre le Jackson 2 du backend ; `mvn -B process-classes` écrit `taskforce-runner/src/harness/engine/rules-engine.js` et ses déclarations TypeScript ;
+>   - ce que le module exporte : `decide`, `decideAll` et `bundleDigest` (ce que le runner juge et vérifie) ; `firstBrokenLink`, `chain`, `canonicalJson` et `zeroHash` (le dossier exporté et les cas de `contracts/evidence`) ; `globMatch` (les cas de motifs). La règle gagnante revient comme l'objet même du paquet ;
+>   - le moteur Java : `EvidenceChain` crée ses événements sans `ObjectMapper` (le changement d'E16) ; `RulesEngine.decideAll`, qui ne vivait que dans le runner, avec quatre cas dans `HarnessContractTest` ;
+>   - le runner : `rules.ts`, `glob.ts` et `evidence.ts` supprimés ; `verify.ts` garde le contrôle d'un dossier exporté et prend `verifiedBundle` ; `facts.ts` ne change que d'import ; `npm run build` copie le module dans `dist`, que l'app desktop embarque (vérifié avec `prepare-resources.mjs runner`) ;
+>   - la CI `rules-engine.yml` recompile le module depuis Java, refuse un écart avec les fichiers versionnés et vérifie que le module et le backend ont le même Jackson 2 ;
+>   - docs : `contracts/README.md`, le README du runner, `AGENTS.md`.
+> - **Mesures** (Node 24.18.0, cinq processus neufs, les 43 actions réelles d'E16, table de 37 règles) : fichier de 400 576 octets, 130 178 avec gzip ; chargement en 20 à 27 ms ; première décision en 0,5 à 0,7 ms ; à chaud, 11 à 13 µs en médiane et 17 à 26 µs au 95e centile, le paquet étant converti à chaque appel (E16 le chargeait une fois : 2 µs) ; mêmes décisions et même empreinte que l'ancien moteur TypeScript ; build Maven et TeaVM d'environ 25 s dans Docker, mêmes octets d'un build propre à l'autre et avec le JDK de la CI (Temurin 21.0.13, contre 21.0.11 en local).
+> - **Contrôles** : runner `tsc --noEmit` propre et `npm test` à 454 tests (4 nouveaux) ; backend, 313 tests ciblés dans Docker (`HarnessContractTest` : 125) ; sur la PR, tout est vert : régénération du moteur (mêmes octets), `mvn verify` complet (2 629 tests, seuils de couverture tenus), tests du runner sous Linux et Windows (454), CodeQL, Semgrep, Trivy, étiquettes.
+> - **Non vérifié** : une mission réelle de Claude Code avec ce runner, dans la webapp ou dans l'app desktop (le Node d'Electron).
+> - **Brain OS** (`feature/lean-oss`, `0e5767b`) : `v1/road_to_v2/Specification_V2_Harnais.md` (§4.3 et §6.4) et `v1/02-produit/Backend.md` (BE-J1-ONE-RULES-ENGINE).
+> - **Suite** : la relecture du CEO sur la PR ; après la fusion, TF-J1-1 passe à fait dans `Roadmap_Backlog.md`.
+
 > **▶ MAJ 02/11/2026 (bis) - Release 1.9.0 EN PROD : la passerelle de modèles en Java, le chat en bulle, les correctifs du rejeu ; desktop 1.6.0 en construction.** `[release]`
 > - **Décision du CEO** : « go release », après la validation Tailscale pour contrôler VM1.
 > - **Avant** : `docker-compose.vm1.yml` (hors dépôt) ne surcharge que `keycloak`, `backend` et `cloudflared` : retirer le service `ai-service` ne bloque pas le déploiement automatique ; les noms des variables d'IA de `.env.prod` comparés à ceux que lit la passerelle (valeurs jamais lues).
