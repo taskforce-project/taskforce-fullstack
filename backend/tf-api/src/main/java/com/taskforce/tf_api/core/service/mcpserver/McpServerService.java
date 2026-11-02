@@ -147,14 +147,16 @@ public class McpServerService {
             return error(id, INVALID_PARAMS, "Unknown tool: " + name);
         }
         McpTool tool = found.get();
-        JsonNode args = params.path("arguments").isObject() ? params.get("arguments") : mapper.createObjectNode();
+        JsonNode raw = params.path("arguments").isObject() ? params.get("arguments") : mapper.createObjectNode();
         try {
+            Long userId = resolveUserId(principal);
+            // L'issue nommée par sa clé (« TF-12 ») devient ses ids avant tout : la portée juge l'équivalent REST sur eux.
+            JsonNode args = tools.resolve(slug, userId, raw);
             Optional<DelegatedScope> delegated = DelegatedScope.of(principal);
             if (delegated.isPresent() && !delegated.get().allows(slug, tool, args)) {
                 log.warn("MCP tool {} refused outside the delegated session (run {})", name, delegated.get().runId());
                 return result(id, toolError(delegated.get().refusal()));
             }
-            Long userId = resolveUserId(principal);
             Object value = tool.handler().call(slug, userId, args);
             log.info("MCP tool {} called in {} by user {}{}", LogSafe.of(name), LogSafe.of(slug), userId, via(principal));
             return result(id, toolResult(value));
@@ -174,7 +176,8 @@ public class McpServerService {
 
     private ObjectNode toolResult(Object value) {
         ObjectNode out = mapper.createObjectNode();
-        JsonNode tree = mapper.valueToTree(value);
+        // Un geste rend sa phrase, l'issue et ses changements ; de quoi le défaire ne sort pas du backend.
+        JsonNode tree = mapper.valueToTree(value instanceof IssueGestures.Gesture gesture ? gesture.forClient() : value);
         out.putArray("content").addObject().put("type", "text").put("text", write(tree));
         if (tree.isObject()) out.set("structuredContent", tree);
         out.put("isError", false);

@@ -2,12 +2,14 @@ package com.taskforce.tf_api.core.service.agent;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.UnaryOperator;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -127,27 +129,39 @@ public class CortexRecordService {
     }
 
     /**
-     * Défait la dernière création réussie de cet outil, une seule fois (R77) : l'action tourne sous le verrou du dossier,
-     * qui sépare deux clics, puis la décision et ce qui est défait entrent au dossier. Vide s'il n'y a rien à défaire ;
-     * une exception de l'action remonte telle quelle, et rien n'est gardé.
+     * Défait un résultat réussi de cet outil, une seule fois (R77) : celui que nomme {@code ref} (l'empreinte de son
+     * résultat au dossier, que la réponse rend avec chaque appel), sinon le dernier qui ne l'est pas encore. Deux gestes
+     * de Cortex dans une même réponse (déplacer TF-1 puis TF-2) se défont ainsi chacun depuis sa carte. L'action reçoit
+     * le résultat tel que le dossier le garde : la sortie de l'outil et, pour un geste, de quoi le défaire. Elle tourne
+     * sous le verrou du dossier, qui sépare deux clics, puis la décision et ce qui est défait entrent au dossier. Vide
+     * s'il n'y a rien à défaire ; une exception de l'action remonte telle quelle, et rien n'est gardé.
      */
     @Transactional
-    public Optional<String> undo(UUID recordId, String tool, Long userId, UnaryOperator<String> action) {
+    public Optional<String> undo(UUID recordId, String tool, Long userId, String ref, Function<JsonNode, String> action) {
         records.findByIdForUpdate(recordId).orElseThrow(() -> new ResourceNotFoundException("Cortex record not found"));
-        String created = null;
+        Map<String, JsonNode> done = new LinkedHashMap<>();
+        Set<String> undone = new HashSet<>();
+        String last = null;
         for (CortexRecordEvent event : eventRepository.findByRecordIdOrderBySeqAsc(recordId)) {
             JsonNode data = parse(event.getData());
             if (!tool.equals(data.path("tool").asText())) continue;
             if ("action.result".equals(event.getType()) && "success".equals(data.path("status").asText())) {
-                created = data.path("output").asText("");
+                done.put(event.getHash(), data);
+                last = event.getHash();
             }
-            if ("human.decision".equals(event.getType()) && "undo".equals(data.path("decision").asText())) created = null;
+            if ("human.decision".equals(event.getType()) && "undo".equals(data.path("decision").asText())) {
+                // Une décision d'avant les empreintes défaisait la dernière création réussie.
+                undone.add(data.hasNonNull("ref") ? data.get("ref").asText() : last);
+            }
         }
-        if (created == null) return Optional.empty();
-        String undone = action.apply(created);
-        append(recordId, "human.decision", Actor.person(userId), Map.of("tool", tool, "decision", "undo"));
-        append(recordId, "action.result", Actor.SERVER, Map.of("tool", tool, "status", "undone", "output", shorten(undone)));
-        return Optional.of(undone);
+        String target = ref != null ? ref
+            : done.keySet().stream().filter(hash -> !undone.contains(hash)).reduce((first, second) -> second).orElse(null);
+        if (target == null || !done.containsKey(target) || undone.contains(target)) return Optional.empty();
+        String undoneText = action.apply(done.get(target));
+        append(recordId, "human.decision", Actor.person(userId), Map.of("tool", tool, "decision", "undo", "ref", target));
+        append(recordId, "action.result", Actor.SERVER,
+            Map.of("tool", tool, "status", "undone", "output", shorten(undoneText), "ref", target));
+        return Optional.of(undoneText);
     }
 
     /** Vrai si le dossier est celui de cette personne, dans cet espace : un autre ne se prolonge pas. */

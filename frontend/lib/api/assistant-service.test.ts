@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  sendAgentMessage, sendAssistantMessage, isApprovable, isPreparedIssue, isQuestion, approveAction, isUndoable, undoAction,
+  sendAgentMessage, sendAssistantMessage, isApprovable, isDeletion, isMission, isPreparedIssue, isQuestion, approveAction, isUndoable,
+  undoAction,
   type AssistantToolCall,
 } from './assistant-service';
 import { apiClient } from './client';
@@ -145,7 +146,11 @@ describe('assistant-service: undoing what Cortex created (R77)', () => {
     ['a project Cortex created', call({}), true],
     ['an issue Cortex created', call({ name: 'create_issue' }), true],
     ['a note Cortex created', call({ name: 'create_note' }), true],
-    ['an issue Cortex updated, which does not undo', call({ name: 'update_issue' }), false],
+    ['an issue Cortex changed, moved or assigned', call({ name: 'update_issue', ref: 'sha256:r1' }), true],
+    ['a comment Cortex wrote', call({ name: 'add_comment', ref: 'sha256:r2' }), true],
+    ['a change that changed nothing, so the server gave it no ref', call({ name: 'update_issue' }), false],
+    ['an issue handed to an agent, which does not undo', call({ name: 'delegate_issue' }), false],
+    ['a mission Cortex read', call({ name: 'get_mission' }), false],
     ['a creation that failed', call({ status: 'error' }), false],
     ['a proposal still waiting', call({ status: 'pending' }), false],
     ['an answer without a record', call({ record: null }), false],
@@ -182,5 +187,42 @@ describe('assistant-service: undoing what Cortex created (R77)', () => {
 
     await expect(undoAction(slug, call({}))).resolves.toEqual(result);
     expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.ACTION_UNDO(slug), { tool: 'create_project', record: RECORD });
+  });
+
+  it('undoAction: names the gesture to undo when the answer has several of the same tool', async () => {
+    const result = { tool: 'update_issue', status: 'success' as const, output: 'Put back the column of TF-12 "Fix login".' };
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(result));
+
+    await undoAction(slug, call({ name: 'update_issue', ref: 'sha256:r1' }));
+
+    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.ACTION_UNDO(slug),
+      { tool: 'update_issue', record: RECORD, ref: 'sha256:r1' });
+  });
+});
+
+describe('assistant-service: the mission of an issue in the conversation (TF-J1-5)', () => {
+  const target = { issueId: 28, projectId: 3, key: 'TF-28', title: 'Fix the footer links', runId: 100 };
+  const call = (over: Partial<AssistantToolCall>): AssistantToolCall =>
+    ({ name: 'get_mission', status: 'success', input: '{"issue":"TF-28"}', output: 'The mission on TF-28', target, ...over });
+
+  it.each([
+    ['a mission Cortex read', call({}), true],
+    ['an issue handed to an agent', call({ name: 'delegate_issue' }), true],
+    ['a delegation still waiting for the person', call({ name: 'delegate_issue', status: 'pending', target: null }), false],
+    ['a mission read that failed', call({ status: 'error', target: null }), false],
+    ['a change of an issue', call({ name: 'update_issue' }), false],
+    ['an answer from before the gestures', call({ target: undefined }), false],
+  ])('isMission: %s -> %s', (_label, toolCall, expected) => {
+    expect(isMission(toolCall)).toBe(expected);
+  });
+
+  it.each([
+    ['a deletion Cortex asks for, with what goes with the issue', call({ name: 'delete_issue', status: 'pending', record: 'r' }), true],
+    ['a deletion without the record of its answer', call({ name: 'delete_issue', status: 'pending', record: null }), false],
+    ['a deletion already done', call({ name: 'delete_issue', status: 'success', record: 'r' }), false],
+    ['another proposal', call({ name: 'delegate_issue', status: 'pending', record: 'r' }), false],
+    ['a deletion whose issue the server did not find', call({ name: 'delete_issue', status: 'pending', record: 'r', target: null }), false],
+  ])('isDeletion: %s -> %s', (_label, toolCall, expected) => {
+    expect(isDeletion(toolCall)).toBe(expected);
   });
 });

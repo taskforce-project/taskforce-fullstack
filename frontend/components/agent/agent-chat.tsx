@@ -12,7 +12,8 @@ import {
 import { Markdown } from "@/components/ui/lightweight-markdown"
 import { cn } from "@/lib/utils"
 import {
-  approveAction, isApprovable, isPreparedIssue, isQuestion, isUndoable, type AssistantAnswer, type AssistantToolCall,
+  approveAction, isApprovable, isDeletion, isMission, isPreparedIssue, isQuestion, isUndoable, type AssistantActionResult,
+  type AssistantAnswer, type AssistantToolCall,
 } from "@/lib/api/assistant-service"
 import { getErrorMessage } from "@/lib/api/client"
 import { getMcpServers } from "@/lib/api/integration-service"
@@ -23,8 +24,10 @@ import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { CortexUsage } from "./cortex-usage"
+import { DeleteIssueCard } from "./delete-issue-card"
 import { EvalCaseButton } from "./eval-case-dialog"
 import { IssueDraftCard } from "./issue-draft-card"
+import { MissionInChat } from "./mission-in-chat"
 import { UndoAction } from "./undo-action"
 
 /**
@@ -87,14 +90,18 @@ const OUTCOME: Record<"success" | "refused" | "error", string> = {
 function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }) {
   const [state, setState] = useState<"idle" | "running" | "success" | "refused" | "error">("idle")
   const [output, setOutput] = useState<string | null>(null)
+  const [result, setResult] = useState<AssistantActionResult | null>(null)
   const external = call.name.includes("__")
+  // Accordée et faite : l'appel tel qu'il a abouti, avec l'empreinte que « Undo » nomme et l'issue qu'il touche.
+  const done: AssistantToolCall = { ...call, status: "success", output, ref: result?.ref ?? null, target: result?.target ?? null }
 
   const run = async () => {
     setState("running")
     try {
-      const result = await approveAction(slug, call)
-      setOutput(result.output)
-      setState(result.status)
+      const approved = await approveAction(slug, call)
+      setOutput(approved.output)
+      setResult(approved)
+      setState(approved.status)
     } catch (e) {
       setOutput(getErrorMessage(e))
       setState("error")
@@ -123,9 +130,9 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
             {OUTCOME[state]}{output}
           </p>
           {/* Accordée et faite, une création se défait aussi d'un geste (R77). */}
-          {state === "success" && isUndoable({ ...call, status: "success", output }) && (
-            <UndoAction slug={slug} call={{ ...call, status: "success", output }} />
-          )}
+          {state === "success" && isUndoable(done) && <UndoAction slug={slug} call={done} />}
+          {/* Accordée, la mission part : ses demandes et son résultat suivent ici, sur leurs cartes (TF-J1-5). */}
+          {state === "success" && isMission(done) && <MissionInChat slug={slug} target={done.target} />}
         </>
       )}
     </div>
@@ -452,13 +459,19 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
         // Une issue que Cortex a préparée : la carte la montre, la personne la modifie et la crée (R78).
         isPreparedIssue(tc) ? (
           <IssueDraftCard key={i} slug={slug} call={tc} />
+        ) :
+        // Une suppression demandée : archiver d'abord, qui se défait, ou supprimer, d'un clic de la personne (R1).
+        isDeletion(tc) ? (
+          <DeleteIssueCard key={i} slug={slug} call={tc} target={tc.target} />
         ) : (
           <div key={i}>
             <Tool name={tc.name} status={tc.status as ToolStatus} input={tc.input ?? undefined} output={tc.output ?? undefined} />
             {/* Action demandée par les règles de l'espace : validation explicite de l'utilisateur. */}
             {isApprovable(tc) && <PendingAction slug={slug} call={tc} />}
-            {/* Ce que Cortex vient de créer se défait d'un geste (R77). */}
+            {/* Ce que Cortex vient de faire se défait d'un geste (R77). */}
             {isUndoable(tc) && <UndoAction slug={slug} call={tc} />}
+            {/* La mission de l'issue, lue ou confiée : ses demandes et son résultat se décident sur ses cartes (TF-J1-5). */}
+            {isMission(tc) && <MissionInChat slug={slug} target={tc.target} />}
           </div>
         ),
       )}

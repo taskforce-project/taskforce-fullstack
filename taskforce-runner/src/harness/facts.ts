@@ -28,6 +28,11 @@ export const TASKFORCE_TOOLS: Readonly<Record<string, string>> = {
   update_issue: "issue.update",
   // Cocher une ligne de la checklist change l'issue, et se défait d'un geste : la règle update-issue le permet (R77).
   check_checklist_item: "issue.update",
+  // Les gestes de la conversation (ADR-024) : confier une issue lance une mission, lire la sienne ne change rien.
+  delegate_issue: "mission.start",
+  get_mission: "issue.read",
+  // Supprimer une issue ne se défait pas : la règle delete-issue la demande.
+  delete_issue: "issue.delete",
 };
 
 /**

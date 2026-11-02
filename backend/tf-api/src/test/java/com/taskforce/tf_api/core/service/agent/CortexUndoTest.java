@@ -13,6 +13,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.enums.NodeRefType;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
@@ -25,6 +27,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.KnowledgeService;
 import com.taskforce.tf_api.core.service.ProjectService;
+import com.taskforce.tf_api.core.service.mcpserver.IssueGestures;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,6 +55,7 @@ class CortexUndoTest {
     @Mock private KnowledgeNodeRepository nodes;
     @Mock private KnowledgeEdgeRepository edges;
     @Mock private KnowledgeService knowledge;
+    @Mock private IssueGestures gestures;
 
     private CortexUndo undo;
     private final AgentContext ctx = new AgentContext("acme", 1L, 7L);
@@ -62,7 +66,7 @@ class CortexUndoTest {
 
     @BeforeEach
     void setUp() {
-        undo = new CortexUndo(projectService, projects, issueService, issues, comments, nodes, edges, knowledge);
+        undo = new CortexUndo(projectService, projects, issueService, issues, comments, nodes, edges, knowledge, gestures);
     }
 
     private void note() {
@@ -140,6 +144,19 @@ class CortexUndoTest {
     }
 
     @Test
+    @DisplayName("la clé d'un projet peut porter un tiret : l'issue HR-1372-3 se défait aussi")
+    void an_issue_of_a_project_key_with_a_hyphen_goes() {
+        when(projects.findByWorkspaceIdAndIdentifier(1L, "HR-1372"))
+            .thenReturn(Optional.of(Project.builder().id(28L).identifier("HR-1372").build()));
+        when(issues.findByProjectIdAndSequenceNumber(28L, 3))
+            .thenReturn(Optional.of(Issue.builder().id(346L).sequenceNumber(3).title("Check").build()));
+
+        assertThat(undo.undo("create_issue", "Created HR-1372-3 \"Check\" in the project Harness, in the column Backlog.", ctx))
+            .isEqualTo("Removed HR-1372-3 \"Check\".");
+        verify(issueService).deleteIssue("acme", 28L, 346L, 7L);
+    }
+
+    @Test
     @DisplayName("une issue commentée ne se défait plus d'ici")
     void a_commented_issue_stays() {
         when(projects.findByWorkspaceIdAndIdentifier(1L, "PRICING"))
@@ -211,12 +228,35 @@ class CortexUndoTest {
             .isInstanceOf(BusinessException.class).hasMessageContaining(message);
     }
 
+    @ParameterizedTest(name = "{0} se défait : {1}")
+    @CsvSource({
+        "create_project, true", "create_issue, true", "create_note, true", "update_issue, true", "add_comment, true",
+        // Une mission lancée ne se défait pas d'ici : Cortex la demande d'abord (TF-J1-5).
+        "delegate_issue, false", "get_mission, false",
+    })
+    @DisplayName("les créations et les gestes sur une issue se défont, pas une mission lancée")
+    void what_can_be_undone(String tool, boolean undoable) {
+        assertThat(undo.handles(tool)).isEqualTo(undoable);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({"update_issue, Put back the column of TF-12.", "add_comment, Removed the comment on TF-12."})
+    @DisplayName("un geste se défait par ce qu'il a gardé au dossier, avec les droits de la personne")
+    void a_gesture_is_undone_by_what_it_kept(String tool, String said) throws Exception {
+        JsonNode kept = new ObjectMapper().readTree("{\"tool\": \"" + tool + "\", \"status\": \"success\", "
+            + "\"output\": \"Updated TF-12\", \"undo\": {\"projectId\": 12, \"issueId\": 5}}");
+        if ("update_issue".equals(tool)) when(gestures.restore("acme", 7L, kept.get("undo"))).thenReturn(said);
+        else when(gestures.removeComment("acme", 7L, kept.get("undo"))).thenReturn(said);
+
+        assertThat(undo.undo(tool, kept, ctx)).isEqualTo(said);
+    }
+
     @Test
-    @DisplayName("seules la création d'un projet, celle d'une issue et celle d'une note se défont")
-    void only_projects_issues_and_notes() {
-        assertThat(undo.handles("create_project")).isTrue();
-        assertThat(undo.handles("create_issue")).isTrue();
-        assertThat(undo.handles("create_note")).isTrue();
-        assertThat(undo.handles("update_issue")).isFalse();
+    void a_creation_is_still_undone_by_its_output() throws Exception {
+        project();
+        JsonNode kept = new ObjectMapper().readTree("{\"tool\": \"create_project\", \"status\": \"success\", \"output\": "
+            + new ObjectMapper().writeValueAsString(PROJECT_CREATED) + "}");
+
+        assertThat(undo.undo("create_project", kept, ctx)).startsWith("Removed the project PRICING");
     }
 }

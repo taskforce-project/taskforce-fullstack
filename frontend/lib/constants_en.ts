@@ -691,6 +691,26 @@ export const CONSTANTS_EN = {
     issueNeedsTitle: "An issue needs a title.",
     issueDueInPast: "The due date is in the past.",
     issueUnknownColumn: "This column isn't in the project anymore: choose another one.",
+    // The mission of an issue in the conversation (TF-J1-5): its requests and its result, decided with the cards' buttons.
+    missionOf: "Mission of {key}: {title}",
+    // Deleting an issue from the conversation asks first: archiving can be undone, deleting can't (TF-J1-5).
+    deleteTitle: "Delete {key}: {title}?",
+    deleteGoesWith: "Goes with it: {what}.",
+    deleteNothingElse: "Nothing else goes with it.",
+    deleteOneComment: "1 comment",
+    deleteComments: "{count} comments",
+    deleteOneChecklistItem: "a checklist of 1 item",
+    deleteChecklist: "a checklist of {count} items",
+    deleteMission: "its mission and the mission's record",
+    deleteHint: "Archiving hides it from the board and can be undone. Deleting removes it for good.",
+    deleteArchive: "Archive",
+    deleteArchived: "Archived: {key} no longer shows on the board.",
+    deleteAlreadyArchived: "{key} is already archived.",
+    deleteUndo: "Undo",
+    deleteDelete: "Delete",
+    deleteDeleted: "Deleted.",
+    deleteFailed: "Nothing was deleted: {why}",
+    archiveFailed: "Couldn't archive the issue. Try again in a moment.",
   },
 } as const
 

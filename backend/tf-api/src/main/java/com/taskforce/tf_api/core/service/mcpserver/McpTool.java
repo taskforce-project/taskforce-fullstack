@@ -17,6 +17,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  * @param description ce que fait l'outil, pour le modèle
  * @param inputSchema schéma JSON des arguments
  * @param readOnly    l'outil n'écrit rien (annotation {@code readOnlyHint})
+ * @param action      l'action que fait l'outil, dans les mots du contrat des règles ({@code contracts/rules}) : c'est
+ *                    elle que la table juge quand Cortex s'en sert (ADR-024) ; null pour un outil qu'aucune règle ne
+ *                    couvre, donc demandé
  * @param method      méthode HTTP de l'équivalent REST
  * @param path        chemin de l'équivalent REST sous {@code /api/workspaces/{slug}/}, d'après les arguments
  * @param handler     exécution, au nom de la personne
@@ -27,6 +30,7 @@ public record McpTool(
     String description,
     ObjectNode inputSchema,
     boolean readOnly,
+    String action,
     String method,
     Function<JsonNode, String> path,
     Handler handler

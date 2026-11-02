@@ -103,7 +103,11 @@ public class AssistantController {
             agentService.runApproved(slug, userId, body.tool(), body.input(), body.record())));
     }
 
-    /** Défait d'un geste ce que Cortex vient de créer, depuis le dossier de la réponse (R77). */
+    /**
+     * Défait d'un geste ce que Cortex vient de faire, depuis le dossier de la réponse (R77) : une création, ou un geste
+     * sur une issue (un changement, un commentaire). {@code ref} nomme le résultat à défaire, quand une réponse en a
+     * plusieurs du même outil.
+     */
     @PostMapping(value = "/actions/undo", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<AssistantActionResult>> undo(
         @PathVariable String slug,
@@ -111,7 +115,7 @@ public class AssistantController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success(agentService.undo(slug, userId, body.tool(), body.record())));
+        return ResponseEntity.ok(ApiResponse.success(agentService.undo(slug, userId, body.tool(), body.record(), body.ref())));
     }
 
     // -------------------------------------------------------------------------
@@ -130,8 +134,10 @@ public class AssistantController {
         @NotBlank @Size(max = 64) String record
     ) {}
 
+    /** {@code ref} : l'empreinte du résultat à défaire, telle que la réponse l'a rendue ; absente, le dernier. */
     public record AssistantUndoRequest(
         @NotBlank @Size(max = 128) String tool,
-        @NotBlank @Size(max = 64) String record
+        @NotBlank @Size(max = 64) String record,
+        @Size(max = 80) String ref
     ) {}
 }

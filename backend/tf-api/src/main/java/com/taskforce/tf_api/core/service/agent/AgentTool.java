@@ -25,6 +25,14 @@ public interface AgentTool {
     String execute(Map<String, Object> args, AgentContext ctx);
 
     /**
+     * L'action que fait l'outil, dans les mots du contrat des règles ({@code contracts/rules}), quand il la porte
+     * lui-même : un geste du MCP TaskForce (ADR-024). Null par défaut : {@link CortexGate} la cherche dans sa table.
+     */
+    default String action() {
+        return null;
+    }
+
+    /**
      * Pour un outil dont Cortex prépare l'action au lieu de la faire (une carte que la personne relit) : ce qui manque
      * pour la préparer et que seule la personne peut dire, à lui demander d'abord, ou la carte, avec les arguments tels
      * que le serveur les entend. Rien n'est écrit. Défaut : rien ne manque, la carte montre ce que Cortex a écrit.

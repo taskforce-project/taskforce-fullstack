@@ -548,6 +548,16 @@
       }
     },
     {
+      "name": "deleting an issue asks: it cannot be undone",
+      "facts": {
+        "action": "issue.delete"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "delete-issue"
+      }
+    },
+    {
       "name": "commenting is allowed",
       "facts": {
         "action": "comment.create"
@@ -985,6 +995,6 @@
   ],
   "digest": {
     "description": "The digest of default.rules.json as it is, with or without null members and its own digest field.",
-    "expected": "sha256:07211ed3bc134fd8f6557da0ca9c253f7e84b1834a2c838bf1d1bab958a41dca"
+    "expected": "sha256:83a5e35b6d63820f5869077f8a422fff74c515166f4c8ce3af33fe92c1d131a4"
   }
 }

@@ -20,7 +20,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest;
 import com.taskforce.tf_api.core.dto.response.ChecklistItemResponse;
@@ -66,14 +65,19 @@ class McpServerServiceTest {
     @Mock private AgentService agentService;
     @Mock private UserRepository userRepository;
     @Mock private JwtIdentityResolver identityResolver;
+    @Mock private IssueGestures gestures;
 
     private McpServerService service;
 
     @BeforeEach
     void setUp() {
         TaskforceMcpTools tools = new TaskforceMcpTools(mapper, projectService, issueService, smartAssignService,
-            brainSearchService, analyticsService, agentService);
+            brainSearchService, analyticsService, agentService, gestures);
         service = new McpServerService(tools, mapper, userRepository, identityResolver);
+        // Sans clé d'issue, les arguments passent tels quels ; les gestes répondent par leur phrase.
+        lenient().when(gestures.withIds(any(), any(), any())).thenAnswer(inv -> inv.getArgument(2));
+        lenient().when(gestures.update(any(), any(), any())).thenReturn(gesture("Updated"));
+        lenient().when(gestures.comment(any(), any(), any())).thenReturn(gesture("Commented"));
         lenient().when(identityResolver.resolveEmail(any())).thenAnswer(inv -> ((Jwt) inv.getArgument(0)).getClaimAsString("email"));
         lenient().when(userRepository.findByEmail("ada@taskforce.dev"))
             .thenReturn(Optional.of(User.builder().id(7L).email("ada@taskforce.dev").build()));
@@ -150,13 +154,14 @@ class McpServerServiceTest {
     void tools_list_describes_every_tool() {
         JsonNode tools = call(user(), "tools/list", Map.of()).path("result").path("tools");
 
-        assertThat(tools).hasSize(13);
+        assertThat(tools).hasSize(16);
         for (JsonNode tool : tools) {
             assertThat(tool.path("inputSchema").path("type").asText()).isEqualTo("object");
             assertThat(tool.path("description").asText()).isNotBlank();
         }
         assertThat(tools.findValuesAsText("name"))
-            .contains("get_issue", "add_comment", "brain_search", "ask_cortex", "check_checklist_item");
+            .contains("get_issue", "add_comment", "brain_search", "ask_cortex", "check_checklist_item", "update_issue",
+                "delegate_issue", "get_mission", "delete_issue");
     }
 
     @Test
@@ -166,6 +171,8 @@ class McpServerServiceTest {
         // Les outils qui écrivent restent proposés : ils servent sur l'issue du run, ou pour créer une issue.
         assertThat(tools.findValuesAsText("name")).doesNotContain("ask_cortex")
             .contains("get_issue", "add_comment", "check_checklist_item", "update_issue", "create_issue");
+        // Confier une issue, lire une mission : jamais depuis la session d'une autre mission.
+        assertThat(tools.findValuesAsText("name")).doesNotContain("delegate_issue", "get_mission", "delete_issue");
     }
 
     @Test
@@ -242,7 +249,6 @@ class McpServerServiceTest {
         "create_issue | {\"projectId\": \"12\", \"title\": \"x\"}            | projectId must be an integer",
         "create_issue | {\"projectId\": 12, \"title\": \"x\", \"priority\": \"soon\"} | priority has an unknown value",
         "create_issue | {\"projectId\": 12, \"title\": \"x\", \"dueDate\": \"2 nov\"} | dueDate must be a date",
-        "update_issue | {\"projectId\": 12, \"issueId\": 5}                  | Nothing to update",
         "list_issues  | {\"projectId\": 12, \"limit\": 500}                  | limit must be between 1 and 200",
         "get_issue    | {}                                                    | Missing argument: projectId",
         "check_checklist_item | {\"projectId\": 12, \"issueId\": 5, \"itemId\": 31} | Missing argument: done",
@@ -259,13 +265,28 @@ class McpServerServiceTest {
 
     @Test
     void a_refusal_of_the_service_is_a_tool_error() {
-        when(issueService.addComment(eq("acme"), eq(12L), eq(5L), any(CreateIssueCommentRequest.class), eq(7L)))
-            .thenThrow(new ForbiddenException("you can't write to this project"));
+        when(gestures.comment(eq("acme"), eq(7L), any())).thenThrow(new ForbiddenException("you can't write to this project"));
 
         JsonNode result = callTool(user(), "add_comment", Map.of("projectId", 12, "issueId", 5, "content", "Done"));
 
         assertThat(result.path("isError").asBoolean()).isTrue();
         assertThat(result.path("content").get(0).path("text").asText()).startsWith("Access denied: you can't write");
+    }
+
+    @Test
+    @DisplayName("un geste rend sa phrase, l'issue et ses changements, jamais de quoi le défaire")
+    void a_gesture_answers_without_what_undoes_it() {
+        when(gestures.update(eq("acme"), eq(7L), any())).thenReturn(new IssueGestures.Gesture("Updated TF-12",
+            Map.of("issueId", 5, "key", "TF-12"), List.of(new IssueGestures.Change("column", "Todo", "Done")), Map.of(),
+            Map.of("fields", Map.of("status", Map.of("from", 2, "to", 3)))));
+
+        JsonNode result = callTool(user(), "update_issue", Map.of("issue", "TF-12", "status", "Done"));
+
+        assertThat(result.path("isError").asBoolean()).isFalse();
+        JsonNode content = result.path("structuredContent");
+        assertThat(content.path("summary").asText()).isEqualTo("Updated TF-12");
+        assertThat(content.path("changes").get(0).path("to").asText()).isEqualTo("Done");
+        assertThat(content.has("undo")).isFalse();
     }
 
     @Test
@@ -280,8 +301,8 @@ class McpServerServiceTest {
     /** R110 (séance n°16) : la session du run 100 (projet 12, issue 5) change son issue et crée dans son projet. */
     @ParameterizedTest(name = "admis en session déléguée : {0} {1}")
     @CsvSource(delimiter = '|', value = {
-        "update_issue         | {\"projectId\": 12, \"issueId\": 5, \"statusId\": 3}                  | updateIssue",
-        "add_comment          | {\"projectId\": 12, \"issueId\": 5, \"content\": \"Done\"}            | addComment",
+        "update_issue         | {\"projectId\": 12, \"issueId\": 5, \"statusId\": 3}                  | update",
+        "add_comment          | {\"projectId\": 12, \"issueId\": 5, \"content\": \"Done\"}            | comment",
         "check_checklist_item | {\"projectId\": 12, \"issueId\": 5, \"itemId\": 31, \"done\": true} | updateChecklistItem",
         "create_issue         | {\"projectId\": 12, \"title\": \"Follow-up\"}                         | createIssue",
     })
@@ -290,9 +311,35 @@ class McpServerServiceTest {
         JsonNode result = callTool(delegated(), tool, mapper.readValue(arguments, Map.class));
 
         assertThat(result.path("isError").asBoolean()).isFalse();
-        assertThat(mockingDetails(issueService).getInvocations())
-            .extracting(invocation -> invocation.getMethod().getName())
+        assertThat(java.util.stream.Stream.concat(mockingDetails(issueService).getInvocations().stream(),
+                mockingDetails(gestures).getInvocations().stream())
+            .map(invocation -> invocation.getMethod().getName())
+            .filter(name -> !"withIds".equals(name)))
             .containsExactly(serviceMethod);
+    }
+
+    /**
+     * L'agent d'une mission nomme son issue par sa clé : la clé devient ses ids avant que la portée juge, et une autre
+     * issue reste hors d'atteinte.
+     */
+    @ParameterizedTest(name = "{0} est l'issue {1} : admis {2}")
+    @CsvSource({"TF-5, 5, true", "TF-6, 6, false"})
+    void a_delegated_agent_names_its_issue_by_its_key(String key, long issueId, boolean allowed) {
+        when(gestures.withIds(eq("acme"), eq(7L), any())).thenAnswer(inv -> {
+            ObjectNode args = ((JsonNode) inv.getArgument(2)).deepCopy();
+            return args.put("projectId", 12).put("issueId", issueId);
+        });
+
+        JsonNode result = callTool(delegated(), "update_issue", Map.of("issue", key, "status", "Done"));
+
+        assertThat(result.path("isError").asBoolean()).isEqualTo(!allowed);
+        if (allowed) {
+            ArgumentCaptor<JsonNode> args = ArgumentCaptor.forClass(JsonNode.class);
+            verify(gestures).update(eq("acme"), eq(7L), args.capture());
+            assertThat(args.getValue().path("issueId").asLong()).isEqualTo(issueId);
+        } else {
+            verify(gestures, org.mockito.Mockito.never()).update(any(), any(), any());
+        }
     }
 
     @ParameterizedTest(name = "refusé en session déléguée : {0} {1}")
@@ -318,6 +365,8 @@ class McpServerServiceTest {
         assertThat(result.path("content").get(0).path("text").asText())
             .contains("outside the delegation session").contains("issueId 5").contains("Do not retry");
         verifyNoInteractions(issueService, smartAssignService, agentService);
+        verify(gestures, org.mockito.Mockito.never()).update(any(), any(), any());
+        verify(gestures, org.mockito.Mockito.never()).comment(any(), any(), any());
     }
 
     @Test
@@ -370,6 +419,10 @@ class McpServerServiceTest {
     }
 
     // ------------------------------------------------------------------ outillage
+
+    private static IssueGestures.Gesture gesture(String summary) {
+        return new IssueGestures.Gesture(summary, Map.of("issueId", 5), List.of(), Map.of(), null);
+    }
 
     private JsonNode callTool(Jwt principal, String tool, Map<?, ?> arguments) {
         return callTool(principal, tool, arguments, "acme");

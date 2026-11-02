@@ -42,9 +42,13 @@ public class ListIssuesTool implements AgentTool {
 
     @Override public String name() { return "list_issues"; }
 
+    /**
+     * La description dit aussi à quoi l'outil sert avant un geste : trouver la clé d'une issue que la personne nomme par sa
+     * colonne (« l'issue qui est dans In review by AI », test du CEO du 02/11/2026) ou par son titre.
+     */
     @Override public String description() {
-        return "Lists TaskForce issues. Filters: project (key or name), status (a column, e.g. Blocked), mine. "
-            + "Each open issue says what blocks it.";
+        return "Lists issues with their keys, by project, column (status) or mine, and what blocks each open one. Finds "
+            + "the key of an issue named by its column or title.";
     }
 
     @Override public Map<String, Object> parametersSchema() {
@@ -86,8 +90,10 @@ public class ListIssuesTool implements AgentTool {
             severalProjects = true;
         }
         boolean onlyMine = mine;
+        // La colonne se lit comme sur le tableau : sans casse, espaces ni ponctuation (« in review by ai », « To Do »).
+        String wanted = IssueFields.key(column);
         List<IssueResponse> kept = issues.stream()
-            .filter(i -> column.isEmpty() || (i.getStatus() != null && column.equalsIgnoreCase(i.getStatus().getName())))
+            .filter(i -> column.isEmpty() || (i.getStatus() != null && wanted.equals(IssueFields.key(i.getStatus().getName()))))
             .filter(i -> !onlyMine || (i.getAssignee() != null && ctx.userId().equals(i.getAssignee().getId())))
             .toList();
         String filter = (column.isEmpty() ? "" : " in the column " + column) + (onlyMine ? " assigned to you" : "");

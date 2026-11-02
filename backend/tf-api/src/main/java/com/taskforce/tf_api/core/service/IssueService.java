@@ -526,6 +526,13 @@ public class IssueService {
                 issue.setAssignmentStatus(AssignmentStatus.PENDING);
                 notificationService.notifyAssigned(issue, actor);
             }
+        } else if (Boolean.TRUE.equals(request.getUnassign()) && issue.getAssignee() != null) {
+            // Retirer l'assigné : un assigneeId à null ne dit rien dans un patch partiel (« Undo » d'une assignation, R77).
+            String old = issue.getAssignee().getEmail();
+            issue.setAssignee(null);
+            issue.setAssignedBy(null);
+            issue.setAssignmentStatus(null);
+            logActivity(issue, actor, IssueActivityType.ASSIGNEE_CHANGED, old, null);
         }
         if (request.getParentId() != null) {
             Issue newParent = resolveIssue(request.getParentId(), project.getId());
@@ -540,6 +547,10 @@ public class IssueService {
         if (request.getDueDate() != null) {
             issue.setDueDate(LocalDate.parse(request.getDueDate()));
             logActivity(issue, actor, IssueActivityType.DUE_DATE_CHANGED, null, request.getDueDate());
+        } else if (Boolean.TRUE.equals(request.getClearDueDate()) && issue.getDueDate() != null) {
+            String old = issue.getDueDate().toString();
+            issue.setDueDate(null);
+            logActivity(issue, actor, IssueActivityType.DUE_DATE_CHANGED, old, null);
         }
         if (request.getPosition() != null) {
             issue.setPosition(request.getPosition());
@@ -787,7 +798,8 @@ public class IssueService {
         return r.getPosition() != null && r.getTitle() == null && r.getDescription() == null
             && r.getPriority() == null && r.getStatusId() == null && r.getTypeId() == null
             && r.getAssigneeId() == null && r.getParentId() == null && r.getStartDate() == null
-            && r.getDueDate() == null && r.getStoryPoints() == null && r.getLabelIds() == null;
+            && r.getDueDate() == null && r.getStoryPoints() == null && r.getLabelIds() == null
+            && !Boolean.TRUE.equals(r.getUnassign()) && !Boolean.TRUE.equals(r.getClearDueDate());
     }
 
     /** Diffuse un événement issue en temps réel sur le topic projet (best-effort). */
