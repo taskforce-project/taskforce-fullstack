@@ -547,8 +547,10 @@ public class IssueGestures {
      */
     public Gesture deletion(String slug, Long userId, JsonNode args) {
         Doomed doomed = doomed(slug, userId, args);
+        // Le modèle redit la carte au lieu de demander « on supprime ? » : un « oui » écrit ne supprimerait rien (R1).
         return new Gesture("Deleting " + named(doomed.issue()) + " removes it for good" + doomed.goesWith()
-            + ". Archiving hides it from the board and can be undone.", doomed.target(), List.of(), Map.of(), null);
+            + ". Archiving hides it from the board and can be undone. The person chooses on the card below, Archive or "
+            + "Delete: do not ask them to confirm in writing.", doomed.target(), List.of(), Map.of(), null);
     }
 
     /**

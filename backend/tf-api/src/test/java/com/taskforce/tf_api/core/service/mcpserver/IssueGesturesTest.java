@@ -492,7 +492,7 @@ class IssueGesturesTest {
 
         assertThat(preview.summary()).isEqualTo("Deleting TF-12 \"Fix login\" removes it for good, with its 3 comments, its "
             + "checklist of 2 items and its mission and the mission's record. Archiving hides it from the board and can be "
-            + "undone.");
+            + "undone. The person chooses on the card below, Archive or Delete: do not ask them to confirm in writing.");
         assertThat(preview.issue()).containsEntry("comments", 3).containsEntry("checklist", 2)
             .containsEntry("mission", "DONE").containsEntry("archived", false).containsEntry("runId", 100L);
         verify(issueService, never()).deleteIssue(any(), any(), any(), any());
