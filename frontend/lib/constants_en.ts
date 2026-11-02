@@ -417,6 +417,22 @@ export const CONSTANTS_EN = {
     saved: "Saved!",
   },
 
+  // Integrations catalog (Settings > Integrations): GitHub, Slack and Plane next to the tried MCP presets.
+  integrations: {
+    catalogWeb: "GitHub, Slack and Plane sync natively; any other tool connects through its MCP server.",
+    catalogDesktop: "GitHub works with GitHub CLI on this computer and Plane syncs natively; any other tool connects through its MCP server.",
+    // Desktop app: GitHub goes through the person's GitHub CLI, Slack can't be connected there yet.
+    desktopGitHubLine: "Clones the repository, pushes the agent's branch and opens its pull request with GitHub CLI on this computer.",
+    desktopSlackLine: "Issue notifications in your channels. Not available in the desktop app yet.",
+    githubCli: "GitHub CLI",
+    githubCliHelp: "TaskForce uses GitHub CLI on this computer. Your sign-in stays in the system's keychain, never in TaskForce.",
+    githubCliSignedIn: "Connected with GitHub CLI on this computer, as {login}.",
+    githubCliSignedInNoLogin: "Connected with GitHub CLI on this computer.",
+    githubCliPurpose: "Sign in to GitHub so that your agent can clone the repository, push its branch and open its pull request.",
+    webAppOnly: "Web app only",
+    slackDesktopHelp: "Slack can't be connected in the desktop app yet.",
+  },
+
   // App shell - footer, top bar, workspace switcher (rendered on every authenticated screen).
   shell: {
     // Footer
