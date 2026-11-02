@@ -858,6 +858,16 @@ textarea:not([disabled]) { cursor: text; }
   .auth-step-seg[data-state="current"] { background: var(--primary); }
 }
 
+/* Une carte qui arrive sur le board (créée ici, par un coéquipier ou par Cortex) s'allume une fois, d'un anneau bleu
+   qui s'éteint : l'œil trouve où l'action a eu lieu (revue UX du 01/11/2026). Un fondu de couleur, pas un mouvement. */
+@keyframes card-arrive {
+  0%, 35% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 55%, transparent); }
+  100% { box-shadow: 0 0 0 2px transparent; }
+}
+.card-arrive {
+  animation: card-arrive 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    APP DESKTOP - haut de la fenêtre dessiné par l'interface
    ─────────────────────────────────────────────────────────────────────────
@@ -881,6 +891,14 @@ textarea:not([disabled]) { cursor: text; }
   .desktop-content {
     border-radius: 0.75rem;
   }
+}
+/* Un panneau qui s'ouvre à droite (la fiche d'une issue) commence sous la bande des boutons du système : à pleine
+   hauteur, ses propres boutons, en haut à droite, passaient sous « Agrandir » et « Fermer » de la fenêtre, qui se
+   dessinent par-dessus la page (revue UX du 01/11/2026). Hors couche, cette règle l'emporte sur `inset-y-0` et
+   `h-full`. */
+.desktop-sheet-right {
+  top: env(titlebar-area-height, 0px);
+  height: auto;
 }
 /* Bande au-dessus du contenu arrondi : elle déplace aussi la fenêtre. */
 .desktop-top-drag {
