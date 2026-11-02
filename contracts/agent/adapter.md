@@ -48,6 +48,10 @@ a token that is random for each run (`taskforce-runner/src/approvals.ts`):
   tools, what the rules ask for goes to Claude Code's own permissions; a rule that denies blocks them anyway.
 - An approval for the mission (R46) covers each part of the command that asked: a later command passes without asking
   only when every part of it that asks is already covered.
+- Changes to TaskForce have a cap per mission (R110): the gate counts the calls of the TaskForce tools mapped to
+  `issue.update`, `issue.create` and `comment.create` that the rules allow, and past `agent.maxTaskForceChanges` (30 by
+  default) each one is asked like a rule that asks, with the number of changes already made as its reason. An approval
+  for the mission lifts the cap until the mission ends.
 - Both hooks use `onFailure: "block"`: if the runner does not answer, the action is blocked instead of let through.
   Claude Code 2.1.295 is the first version with it, according to its changelog, and the runner checks the version
   before each mission.
