@@ -6,15 +6,17 @@ import { after, describe, it } from "node:test";
 
 import { exitFacts, judgeExit } from "../src/exits.js";
 import { visibilityOf } from "../src/git.js";
-import { canonicalJson, chain, firstBrokenLink, ZERO_HASH, type EventInput, type Json } from "../src/harness/evidence.js";
+import {
+  bundleDigest, canonicalJson, chain, decide, decideAll, firstBrokenLink, globMatch, zeroHash, type Effect, type EventInput,
+  type Facts, type Json, type Rule, type RulesBundle,
+} from "../src/harness/engine/rules-engine.js";
 import {
   changesTaskForce, INTERNAL_TOOLS, splitCommand, TASKFORCE_CHANGES, TASKFORCE_TOOLS, toolFacts,
 } from "../src/harness/facts.js";
-import { globMatch } from "../src/harness/glob.js";
-import { bundleDigest, decide, decideAll, verifiedBundle, type Effect, type Facts, type RulesBundle } from "../src/harness/rules.js";
-import { verifyEvidence } from "../src/harness/verify.js";
+import { verifiedBundle, verifyEvidence } from "../src/harness/verify.js";
 
-// Tests de contrat (R16) : les cas partagés de contracts/, que le serveur rejoue à l'identique.
+// Tests de contrat (R16) : les cas partagés de contracts/, rejoués ici contre le moteur du serveur compilé en
+// JavaScript (src/harness/engine/rules-engine.js), comme le serveur les rejoue en Java.
 const contract = <T>(path: string): T => JSON.parse(readFileSync(new URL(`../../contracts/${path}`, import.meta.url), "utf8")) as T;
 
 interface RuleCases {
@@ -63,6 +65,16 @@ describe("contrat des règles : décisions avec la table par défaut", () => {
   it("les identifiants de règle sont uniques", () => {
     const ids = defaults.rules.map((r) => r.id);
     assert.equal(new Set(ids).size, ids.length);
+  });
+
+  it("la règle qui l'emporte est l'objet même du paquet donné", () => {
+    const d = decide(defaults, { action: "file.read", path: "src/a.ts" });
+    assert.ok(d.rule !== null && defaults.rules.includes(d.rule));
+  });
+
+  it("une règle sans conditions : le moteur refuse de juger, comme le serveur", () => {
+    const broken = { ...defaults, rules: [{ id: "no-when", effect: "allow" } as unknown as Rule] };
+    assert.throws(() => decide(broken, { action: "file.read" }));
   });
 });
 
@@ -350,7 +362,7 @@ describe("contrat de la preuve : JSON canonique", () => {
 });
 
 describe("contrat de la preuve : chaîne d'empreintes", () => {
-  it("part de l'empreinte nulle", () => assert.equal(ZERO_HASH, chainCases.zero));
+  it("part de l'empreinte nulle", () => assert.equal(zeroHash(), chainCases.zero));
 
   it("donne les mêmes empreintes que le cas de référence", () => {
     const chained = chain(chainCases.chain.events);
@@ -379,9 +391,12 @@ describe("dossier exporté, vérifié sans TaskForce", () => {
   const file = (events: unknown[], root: unknown = chained.at(-1)?.hash) =>
     JSON.stringify({ format: "taskforce-evidence/1", mission: {}, events, root });
   const changed = chained.map((e, i) => (i === 1 ? { ...e, data: { ...e.data, tampered: true } } : e));
+  const decimal = chained.map((e, i) => (i === 0 ? { ...e, data: { ...e.data, score: 0.5 } } : e));
   const cases: Array<[string, string, boolean, RegExp]> = [
     ["intact", file(chained), true, /Every hash holds: 4 events/],
     ["un événement changé", file(changed), false, /breaks at event 2/],
+    ["un nombre décimal dans un événement", file(decimal), false, /cannot be checked: Decimal numbers/],
+    ["un événement qui n'est pas un objet", file([chained[0], "x"]), false, /cannot be checked: Event 2 is not a JSON object/],
     ["le dernier événement retiré", file(chained.slice(0, -1)), false, /root is not the hash of the last event/],
     ["pas du JSON", "{not json", false, /Not a JSON file/],
     ["un autre format", JSON.stringify({ format: "x", events: [] }), false, /Not a TaskForce evidence file/],

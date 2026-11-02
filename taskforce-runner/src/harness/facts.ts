@@ -1,7 +1,7 @@
 import { lstatSync, realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-import type { Facts } from "./rules.js";
+import type { Facts } from "./engine/rules-engine.js";
 
 /**
  * Ce qu'on sait d'une action de Claude Code avant qu'elle parte, pour la juger (contracts/README.md). Une action qu'on

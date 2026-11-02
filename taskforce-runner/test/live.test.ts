@@ -8,7 +8,7 @@ import {
   type ApprovalServerOptions,
 } from "../src/approvals.js";
 import { EventRelay } from "../src/events.js";
-import type { RulesBundle } from "../src/harness/rules.js";
+import type { RulesBundle } from "../src/harness/engine/rules-engine.js";
 import { describeToolInput, toEvents, toolLabel } from "../src/stream.js";
 import { supportsApprovals } from "../src/version.js";
 

@@ -9,8 +9,8 @@ assistant needs to change the code without breaking it.
 | Folder | What it is |
 | --- | --- |
 | `backend/tf-api` | API: Java 21, Spring Boot 4, PostgreSQL 18 with pgvector, Flyway |
+| `backend/rules-engine-js` | The rules engine of `backend/tf-api`, compiled to JavaScript by TeaVM for the runner |
 | `frontend` | App: Next.js 16, React 19, TypeScript, Tailwind CSS, Zustand |
-| `ai-service` | AI gateway: Python, FastAPI, talks to Ollama or any OpenAI-compatible API |
 | `taskforce-runner` | Local runner (Node.js) that lets Claude Code work on delegated issues |
 | `taskforce-plugin` | Claude Code plugin (`/taskforce`) |
 | `keycloak/realms` | Sign-in realms: `dev`, `selfhost` and `prod` |
@@ -52,13 +52,15 @@ Run the checks of every part you changed before calling the work done. The CI ru
 | --- | --- |
 | Backend | `.\scripts\it.ps1 -Test ALL` (Windows), or `mvn verify` in `backend/tf-api` with a PostgreSQL at hand |
 | Frontend | `npx tsc --noEmit`, `npm run lint` and `npx vitest run --coverage` in `frontend` |
-| AI service | `pytest` in `ai-service` |
 | Runner | `npm test` in `taskforce-runner` |
 | Website | `npm run lint` and `npm run build` in `landing-page` |
 
 - Coverage thresholds apply to each file, not to the total: a new file needs its own tests.
 - `npm run test:coverage` starts Vitest in watch mode outside CI; `npx vitest run --coverage` runs once.
 - Run one Maven build at a time: two builds in the same `target/` fail at random.
+- The runner decides with the rules engine of `backend/tf-api` (`core/harness`), compiled to JavaScript: after a change
+  there, run `mvn -B process-classes` in `backend/rules-engine-js` and commit `taskforce-runner/src/harness/engine` with
+  it. Never edit that folder by hand; the CI compiles it again and refuses a difference.
 - The backend container runs a prebuilt JAR, so a Java change needs `.\scripts\docker.ps1 rebuild backend`. On
   Windows the frontend container may miss changes: `docker restart taskforce-frontend-dev`.
 

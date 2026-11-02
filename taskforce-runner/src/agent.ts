@@ -5,7 +5,7 @@ import type { Claim } from "./api.js";
 import { ApprovalServer, type ApprovalApi } from "./approvals.js";
 import type { RunnerConfig } from "./config.js";
 import { EventRelay, type EventSink } from "./events.js";
-import type { RulesBundle } from "./harness/rules.js";
+import type { RulesBundle } from "./harness/engine/rules-engine.js";
 import { log } from "./log.js";
 import { run } from "./proc.js";
 import { buildPrompt, buildReplyPrompt } from "./prompt.js";

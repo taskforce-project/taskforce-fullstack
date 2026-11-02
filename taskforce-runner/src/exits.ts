@@ -1,5 +1,5 @@
 import type { Ruling } from "./api.js";
-import { decide, type Facts, type RulesBundle } from "./harness/rules.js";
+import { decide, type Facts, type RulesBundle } from "./harness/engine/rules-engine.js";
 
 /**
  * Les sorties du bac à sable que fait le runner, après l'agent : pousser la branche, ouvrir la pull request

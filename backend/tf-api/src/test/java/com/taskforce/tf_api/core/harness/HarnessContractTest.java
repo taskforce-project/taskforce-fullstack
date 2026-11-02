@@ -90,6 +90,27 @@ class HarnessContractTest {
         assertThat(decision.rule() == null ? null : decision.rule().id()).isEqualTo(rule);
     }
 
+    static Stream<Arguments> decideAllCases() {
+        return Stream.of(
+            Arguments.of("aucun fait (outil interne de l'agent) : autorisé, sans règle", List.of(), "allow", null),
+            Arguments.of("autorisé puis refusé : refusé, par la règle qui refuse",
+                List.of(Map.of("action", "file.read"), Map.of("action", "shell", "command", "git push"),
+                    Map.of("action", "file.write")), "deny", "no-agent-push"),
+            Arguments.of("autorisé puis inconnu : demandé, sans règle",
+                List.of(Map.of("action", "file.read"), Map.of("tool", "PowerShell")), "ask", null),
+            Arguments.of("deux règles qui demandent : la première des faits l'emporte",
+                List.of(Map.of("action", "web.fetch"), Map.of("action", "web.search")), "ask", "fetch-web"));
+    }
+
+    /** Plusieurs faits pour un appel d'outil, comme le runner les juge avec ce moteur compilé en JavaScript. */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("decideAllCases")
+    void decideAll(String name, List<Map<String, String>> factsList, String effect, String rule) {
+        RulesEngine.Decision decision = RulesEngine.decideAll(defaults(), factsList);
+        assertThat(decision.effect()).isEqualTo(effect);
+        assertThat(decision.rule() == null ? null : decision.rule().id()).isEqualTo(rule);
+    }
+
     @Test
     @DisplayName("chaque règle par défaut a un propriétaire, une raison et une date de revue (R2)")
     void defaultRulesAreOwned() {
