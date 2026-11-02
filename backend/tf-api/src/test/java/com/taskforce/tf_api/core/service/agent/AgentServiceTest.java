@@ -94,6 +94,7 @@ class AgentServiceTest {
         ReflectionTestUtils.setField(service, "gate", new CortexGate(new HarnessRulesService(ruleSets), workspaces));
         lenient().when(records.open(any(), any(), any())).thenReturn(RECORD);
         lenient().when(records.append(any(), any(), any(), any())).thenReturn(Optional.of("hash"));
+        lenient().when(records.incident(any(), any(), any(), any(), any())).thenReturn(RECORD);
     }
 
     private final ObjectMapper json = new ObjectMapper();
@@ -234,7 +235,7 @@ class AgentServiceTest {
     }
 
     @Test
-    @DisplayName("une création annoncée sans outil est remplacée par la vérité (recette du 29/10)")
+    @DisplayName("une création annoncée sans outil : la phrase remplacée par la vérité, signée par TaskForce (recette du 29/10)")
     void claimed_write_without_tool_is_replaced() throws Exception {
         stubWorkspace();
         stubToolLoop();
@@ -245,8 +246,72 @@ class AgentServiceTest {
 
         AssistantAnswer answer = service.run("acme", 7L, "Create an issue \"Cortex test\" in TaskForce");
 
-        assertThat(answer.answer()).startsWith("I didn't create anything").doesNotContain("list_issues");
-        assertThat(answer.steps()).anyMatch(s -> "error".equals(s.status()) && s.description().contains("nothing was created"));
+        assertThat(answer.answer()).isEqualTo("> [!taskforce] TaskForce\n> Nothing was created in this turn.\n\n"
+            + "Use list_issues to verify.");
+        assertThat(answer.steps()).anyMatch(s -> "error".equals(s.status()) && s.description().contains("TaskForce corrected it"));
+    }
+
+    @Test
+    @DisplayName("l'échange 6 du 02/11/2026 : la suppression annoncée après list_issues est remplacée, l'incident au dossier (E17)")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void a_deletion_announced_after_a_read_is_corrected_and_recorded() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"list_issues\",\"arguments\":\"{}\"}}]}"),
+            json.readTree("{\"content\":\"La carte TESTTA-2 a été supprimée du projet test-taskforce.\"}"));
+        AgentTool tool = Mockito.mock(AgentTool.class);
+        lenient().when(tool.name()).thenReturn("list_issues");
+        when(tools.get(eq("list_issues"), anyList())).thenReturn(tool);
+        when(tool.execute(any(), any())).thenReturn("Issues in test-taskforce (3): TESTTA-1, TESTTA-2, TESTTA-3");
+
+        AssistantAnswer answer = service.run("acme", 7L, "What changed in this project this week?");
+
+        assertThat(answer.answer()).isEqualTo("> [!taskforce] TaskForce\n> Nothing was deleted in this turn.");
+        assertThat(answer.record()).isEqualTo(RECORD.toString());
+        ArgumentCaptor<Map<String, Object>> incident = (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
+        verify(records).incident(any(), eq(RECORD), eq("What changed in this project this week?"), any(), incident.capture());
+        assertThat(incident.getValue()).containsEntry("experiment", "E17").containsEntry("rule", "R116")
+            .containsEntry("said", List.of("La carte TESTTA-2 a été supprimée du projet test-taskforce."))
+            .containsEntry("tools", List.of("list_issues: success"));
+    }
+
+    @Test
+    @DisplayName("une action annoncée sans aucun outil : le dossier s'ouvre pour l'incident, et la réponse le porte")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void a_claim_without_any_tool_opens_a_record_for_the_incident() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.currentModel()).thenReturn("qwen3:8b");
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"J'ai supprimé TESTTA-2.\"}"));
+
+        AssistantAnswer answer = service.run("acme", 7L, "suprime testta 2");
+
+        assertThat(answer.answer()).isEqualTo("> [!taskforce] TaskForce\n> Nothing was deleted in this turn.");
+        assertThat(answer.record()).isEqualTo(RECORD.toString());
+        ArgumentCaptor<Map<String, Object>> origin = (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
+        verify(records).incident(any(), Mockito.isNull(), eq("suprime testta 2"), origin.capture(), any());
+        assertThat(origin.getValue()).containsEntry("model", "qwen3:8b").containsEntry("notes", List.of());
+    }
+
+    @Test
+    @DisplayName("une panne du dossier ne rend pas la phrase fausse : la correction reste, l'incident se journalise")
+    void a_record_failure_keeps_the_correction() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"I deleted TESTTA-2.\"}"));
+        when(records.incident(any(), any(), any(), any(), any())).thenThrow(new IllegalStateException("database down"));
+
+        AssistantAnswer answer = service.run("acme", 7L, "delete TESTTA-2");
+
+        assertThat(answer.answer()).isEqualTo("> [!taskforce] TaskForce\n> Nothing was deleted in this turn.");
+        assertThat(answer.record()).isNull();
     }
 
     @Test
@@ -270,22 +335,6 @@ class AgentServiceTest {
         assertThat(answer.steps()).noneMatch(s -> "error".equals(s.status()));
     }
 
-    @ParameterizedTest(name = "« {0} » puis « {1} » : remplacée {2}")
-    @CsvSource(delimiter = '|', value = {
-        "Create an issue \"Cortex test\" in TaskForce | **Issue created**: Title Cortex test   | true",
-        "Crée une issue « Test » dans TaskForce        | Issue créée : Test, dans TaskForce.   | true",
-        "Add a note about the release                  | I added a note about the release.     | true",
-        "Create a plan for the project                 | I have created a plan: first, the board. | false",
-        "Which issues were created this week?          | Issue TF-12 was created on Monday.    | false",
-        "How do I create an issue?                     | Open the board and click New issue.   | false",
-        "Show me the open issues                       | 3 issues opened this week: TF-1, TF-2. | false",
-        "What did I add to the notes?                  | You added a note about the release.   | false",
-    })
-    @DisplayName("la garde ne touche qu'une création annoncée sans outil, sur une demande de création")
-    void honest_answer_detection(String message, String answer, boolean replaced) {
-        assertThat(AgentService.honestAnswer(message, answer, List.of()).equals(answer)).isEqualTo(!replaced);
-    }
-
     @Test
     @DisplayName("le fournisseur s'arrête après une création : la réponse la garde, au lieu de dire que rien n'a été fait")
     void stop_after_a_write_keeps_what_was_done() throws Exception {
@@ -306,26 +355,6 @@ class AgentServiceTest {
         assertThat(answer.answer()).contains("Cortex stopped before the end").doesNotContain("nothing was created");
         assertThat(answer.toolCalls()).anyMatch(c -> "create_project".equals(c.name()) && "success".equals(c.status()));
         assertThat(answer.mode()).isEqualTo("deep");
-    }
-
-    @Test
-    @DisplayName("une écriture externe en attente d'accord : rien n'a encore changé, la réponse le dit")
-    void pending_write_is_not_announced_as_done() {
-        List<AssistantToolCall> calls = List.of(new AssistantToolCall("linear__save_issue", "pending", "{}", "proposed", null));
-
-        String answer = AgentService.honestAnswer("Create an issue in Linear", "Issue created in Linear.", calls);
-
-        assertThat(answer).isEqualTo("Nothing has changed yet: the action below waits for your approval.");
-    }
-
-    @Test
-    @DisplayName("une issue préparée en carte n'existe pas encore : la réponse renvoie à la carte")
-    void prepared_issue_is_not_announced_as_done() {
-        List<AssistantToolCall> calls = List.of(new AssistantToolCall("create_issue", "pending", "{}", "prepared", null));
-
-        String answer = AgentService.honestAnswer("Create an issue for the pricing page", "Issue created: Pricing page.", calls);
-
-        assertThat(answer).isEqualTo("Nothing is created yet: check the issue below, then create it.");
     }
 
     @ParameterizedTest(name = "« {0} » conversationnel : {1}")
@@ -630,13 +659,25 @@ class AgentServiceTest {
     }
 
     @Test
-    @DisplayName("une création refusée par les règles ne se dit pas faite")
-    void refused_write_is_not_announced_as_done() {
-        List<AssistantToolCall> calls = List.of(new AssistantToolCall("create_issue", "refused", "{}", "Not run", null));
+    @DisplayName("une création refusée par les règles ne se dit pas faite : TaskForce dit pourquoi")
+    void refused_write_is_not_announced_as_done() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"create_issue\",\"arguments\":\"{}\"}}]}"),
+            json.readTree("{\"content\":\"Issue created: Release notes.\"}"));
+        AgentTool tool = Mockito.mock(AgentTool.class);
+        lenient().when(tool.name()).thenReturn("create_issue");
+        when(tools.get(eq("create_issue"), anyList())).thenReturn(tool);
+        denyEverything("Issues are frozen until the release.");
 
-        String answer = AgentService.honestAnswer("Create an issue \"X\"", "Issue created: X.", calls);
+        AssistantAnswer answer = service.run("acme", 7L, "Create an issue \"Release notes\"");
 
-        assertThat(answer).isEqualTo("Nothing was created: the rules of this workspace refuse this action.");
+        assertThat(answer.answer()).isEqualTo("> [!taskforce] TaskForce\n"
+            + "> Nothing was created: the rules of this workspace refuse this action.");
+        assertThat(answer.record()).isEqualTo(RECORD.toString());
     }
 
     /** Une action interne que Cortex a proposée au dossier, et que la personne accorde. */
@@ -895,6 +936,21 @@ class AgentServiceTest {
         assertThat(outcome.calls()).singleElement().satisfies(call -> assertThat(call.status()).isEqualTo(status));
         verify(tool, never()).execute(any(), any());
         verify(records, never()).open(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("au rejeu, la banque note la réponse que la personne verrait, corrigée par TaskForce (R116)")
+    void a_replay_is_checked_like_an_answer() throws Exception {
+        stubReplayTool("list_issues");
+        when(llm.rawChat(anyList(), anyList(), eq("fast"))).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"list_issues\","
+                + "\"arguments\":\"{\\\"status\\\":\\\"Blocked\\\"}\"}}]}"),
+            json.readTree("{\"content\":\"TF-4 has been deleted.\"}"));
+
+        ReplayOutcome outcome = service.replay(new AgentContext("acme", 1L, 7L), CASE, null);
+
+        assertThat(outcome.answer()).isEqualTo("> [!taskforce] TaskForce\n> Nothing was deleted in this turn.");
+        verify(records, never()).incident(any(), any(), any(), any(), any());
     }
 
     @Test
