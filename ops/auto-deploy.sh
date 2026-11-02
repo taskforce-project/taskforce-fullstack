@@ -71,10 +71,7 @@ if [ "$ROLE" = "backend" ]; then
     echo "  → rebuild backend"
     dc_backend build backend && dc_backend up -d backend && rebuilt=1
   fi
-  if echo "$CHANGED" | grep -qE '^ai-service/'; then
-    echo "  → rebuild ai-service"
-    dc_backend build ai-service && dc_backend up -d ai-service && rebuilt=1
-  fi
+  # Plus d'ai-service depuis le 01/11/2026 : la passerelle de modèles est dans le backend.
 elif [ "$ROLE" = "frontend" ]; then
   if echo "$CHANGED" | grep -qE '^frontend/'; then
     echo "  → rebuild frontend"

@@ -17,8 +17,8 @@ import lombok.RequiredArgsConstructor;
  * GET /api/ai/status — tout utilisateur connecté ; aucune URL ni clé n'est exposée.
  *
  * <p>{@code refresh=true} relit l'état sans attendre la fin du cache de 30 s : l'app desktop le demande juste après
- * un changement de fournisseur dans ses réglages. La relecture reste bon marché, l'ai-service gardant lui aussi son
- * état en cache.</p>
+ * un changement de fournisseur dans ses réglages. La relecture reste bon marché : une liste de modèles par
+ * fournisseur, avec un délai court.</p>
  */
 @RestController
 @RequestMapping("/api/ai")

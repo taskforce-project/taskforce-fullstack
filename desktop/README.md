@@ -21,8 +21,11 @@ This folder holds the Electron shell. The app itself is the rest of the reposito
 - **Local stack.** At each start the shell starts the account's database, the backend and the interface, then a local
   proxy that gives the interface and the API one origin on 127.0.0.1. A launch token drawn at each start is the only
   way into the API; the window gets it through the preload bridge.
-- **AI.** The shell serves the AI service protocol to the backend and relays it to Ollama on the computer or to an
-  OpenAI-compatible API, chosen in Settings > AI. The API key stays in the keychain.
+- **AI.** The backend talks to the provider chosen in Settings > AI itself: Ollama on the computer, an
+  OpenAI-compatible API or Anthropic's API. The shell passes that choice to the backend at start, as the `AI_*`
+  variables a server reads, and again when the person changes it, through a local call protected by a secret drawn at
+  each start: the backend uses it right away, without restarting. The API key stays in the keychain; the backend keeps
+  it in memory only.
 - **Claude Code.** The shell starts the runner with a secret drawn at each start. Claude Code must be installed and
   signed in on the computer.
 - **Updates.** The app checks the `desktop-latest` release at start and every six hours, downloads in the background
