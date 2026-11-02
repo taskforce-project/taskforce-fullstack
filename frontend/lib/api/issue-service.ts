@@ -20,7 +20,9 @@ export type IssueActivityType =
   | "COMMENT_ADDED" | "COMMENT_DELETED" | "COMPLETED" | "REOPENED"
   // Ce qu'une mission fait sur l'issue, puis le geste de la personne sur son résultat (V112).
   | "CHECKLIST_CHECKED" | "CHECKLIST_UNCHECKED" | "PULL_REQUEST_OPENED"
-  | "MISSION_APPLIED" | "MISSION_DISCARDED" | "MISSION_RETRIED";
+  | "MISSION_APPLIED" | "MISSION_DISCARDED" | "MISSION_RETRIED"
+  // L'issue terminée par la personne, la mission n'ayant rien changé (V114, rejeu de la 1.8.0).
+  | "MISSION_MARKED_DONE";
 
 export interface UserSummary {
   id: number;

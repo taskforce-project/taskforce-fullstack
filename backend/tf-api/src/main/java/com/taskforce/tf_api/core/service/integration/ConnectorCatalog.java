@@ -58,8 +58,9 @@ public class ConnectorCatalog {
         // (401 avec WWW-Authenticate OAuth pour la plupart, donc OAuth en un clic possible).
 
         // ── Gestion de projet ────────────────────────────────────────────────
+        // Une ligne sur ce que fait chaque native, à côté des préréglages (rejeu de la 1.8.0, 02/11/2026).
         nativeIntegration("plane", "Plane", ConnectorCategory.PROJECT_MANAGEMENT, ConnectorAuthType.API_KEY,
-            "Projects and work items, synced into your workspace's knowledge",
+            "Syncs your Plane projects and work items into the workspace's knowledge.",
             "https://developers.plane.so/api-reference/introduction",
             "In Plane: your avatar > Settings > Personal access tokens > Add token, then paste the key here. "
             + "The workspace slug is in the URL: app.plane.so/<slug>/...",
@@ -75,7 +76,8 @@ public class ConnectorCatalog {
 
         // ── Dev & CI/CD ──────────────────────────────────────────────────────
         nativeIntegration("github", "GitHub", ConnectorCategory.DEV_CICD, ConnectorAuthType.OAUTH2,
-            "Repos, issues, pull requests", "https://docs.github.com",
+            "Links pull requests and commits to your issues; a merged pull request completes its issue.",
+            "https://docs.github.com",
             "One-click connect: you are redirected to GitHub to authorize access. Nothing to copy.",
             List.of(), List.of("observe", "act"), "https://github.com");
         mcp("sentry",  "Sentry",  ConnectorCategory.DEV_CICD, "Error & performance tracking", "https://mcp.sentry.dev/mcp",    "https://sentry.io");
@@ -102,7 +104,8 @@ public class ConnectorCatalog {
 
         // ── Communication ────────────────────────────────────────────────────
         nativeIntegration("slack", "Slack", ConnectorCategory.COMMUNICATION, ConnectorAuthType.OAUTH2,
-            "Issue notifications in your channels, channel history in the Brain OS", "https://api.slack.com",
+            "Posts issue notifications to your channels and brings their history into the workspace's knowledge.",
+            "https://api.slack.com",
             "One-click connect: you are redirected to Slack to authorize the app. Nothing to copy.",
             List.of(), List.of("observe", "act"), "https://slack.com");
 

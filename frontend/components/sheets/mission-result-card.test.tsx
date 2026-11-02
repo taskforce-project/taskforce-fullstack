@@ -164,6 +164,43 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
     expect((screen.getByRole("button", { name: "Apply" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  describe("a mission that changed nothing (replay of 1.8.0, TESTTA-2)", () => {
+    const NO_CHANGE: DeliveryRun = { ...RUN, resultUrl: null, commits: 0, summary: "The footer links were already fixed." };
+
+    it("offers Mark as done instead of a greyed Apply, and says what it will change", () => {
+      useDeliveryStore.setState({ runs: { 28: NO_CHANGE } });
+      show();
+
+      expect(screen.getByText("No code change was needed.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Apply" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Mark as done" })).toBeEnabled();
+      expect(screen.getByText("What will change if you mark it done")).toBeInTheDocument();
+      expect(screen.getByText("Move TF-28 to Done")).toBeInTheDocument();
+      // Discard et Try again restent.
+      expect(screen.getByRole("button", { name: "Discard" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+    });
+
+    it("Mark as done goes through the store, and says it is done", async () => {
+      const markRunDone = vi.fn().mockResolvedValue(true);
+      useDeliveryStore.setState({ runs: { 28: NO_CHANGE }, markRunDone });
+      show();
+
+      fireEvent.click(screen.getByRole("button", { name: "Mark as done" }));
+
+      await waitFor(() => expect(markRunDone).toHaveBeenCalledWith("acme", 28, 100));
+      const { toast } = await import("sonner");
+      expect(toast.success).toHaveBeenCalledWith("Done: no change was needed");
+    });
+
+    it("an older runner that says nothing about the branch counts as no change", () => {
+      useDeliveryStore.setState({ runs: { 28: { ...RUN, resultUrl: null, branch: null, commits: null } } });
+      show();
+
+      expect(screen.getByRole("button", { name: "Mark as done" })).toBeInTheDocument();
+    });
+  });
+
   it("downloads the record from How it was done", async () => {
     show();
 
@@ -177,6 +214,7 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
   it.each([
     ["a mission still running", { ...RUN, status: "RUNNING" as const }],
     ["a result already applied", { ...RUN, outcome: "APPLIED" as const }],
+    ["an issue already marked done", { ...RUN, resultUrl: null, commits: 0, outcome: "MARKED_DONE" as const }],
   ])("shows nothing for %s", (_label, run) => {
     useDeliveryStore.setState({ runs: { 28: run } });
     const { container } = render(<MissionResultCard slug="acme" issueId={28} issueKey="TF-28" issueTitle="x" responsible={null} />);

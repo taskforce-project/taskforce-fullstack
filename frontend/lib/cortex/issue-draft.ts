@@ -5,7 +5,9 @@
 //
 // La priorité, l'assigné, les labels, les points et le cycle ne se remplissent que de ce qui existe (recette du
 // 01/11/2026) : la carte résout ce que Cortex a écrit parmi les membres, les labels et les cycles du projet, et ce qui ne
-// s'y trouve pas reste vide, à remplir sur la carte. Rien n'est inventé.
+// s'y trouve pas reste vide, à remplir sur la carte. Rien n'est inventé. Le projet et l'assigné arrivent tels que le
+// serveur les a résolus (sa clé, l'e-mail du membre : « moi » est la personne qui demande) ; une colonne qui n'existe pas
+// donne la colonne par défaut du projet, et la carte le dit (rejeu de la 1.8.0, 02/11/2026).
 // ---------------------------------------------------------------------------
 
 export const DRAFT_PRIORITIES = ["NONE", "LOW", "MEDIUM", "HIGH", "URGENT"] as const;
@@ -21,7 +23,7 @@ export interface IssueDraft {
   checklist: string[];
   /** AAAA-MM-JJ, ou vide. */
   dueDate: string;
-  /** Le nom de la colonne, ou vide : le Backlog du projet. */
+  /** Le nom de la colonne, ou vide : le Backlog du projet. Une colonne que le projet n'a pas : sa colonne par défaut. */
   status: string;
   /** La priorité, ou vide : celle par défaut. */
   priority: DraftPriority | "";
@@ -185,11 +187,27 @@ export function draftCycle<C extends DatedCycle>(cycles: readonly C[], asked: st
   return openCycles(cycles).find((c) => c.name.toLowerCase() === wanted) ?? null;
 }
 
-/** La colonne où l'issue arrivera : celle que la carte nomme, sinon la première du Backlog, sinon celle par défaut. */
+/** Un nom sans la casse, les accents, les espaces ni la ponctuation : « To Do » et « Todo » se valent. */
+export const nameKey = (name: string): string =>
+  name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+
+/**
+ * La colonne que la carte nomme, comme le serveur la lit : sans la casse, les espaces ni la ponctuation (rejeu de la
+ * 1.8.0 : Cortex écrivait « To Do » pour la colonne « Todo »). Null quand le projet ne l'a pas.
+ */
+export function namedColumn<S extends Column>(columns: readonly S[], status: string): S | null {
+  const wanted = nameKey(status);
+  return wanted ? (columns.find((c) => nameKey(c.name) === wanted) ?? null) : null;
+}
+
+/**
+ * La colonne où l'issue arrivera : celle que la carte nomme ; une colonne que le projet n'a pas donne sa colonne par
+ * défaut, et la carte le dit. Rien de nommé : la première du Backlog, sinon celle par défaut.
+ */
 export function draftColumn<S extends Column>(columns: readonly S[], status: string): S | null {
-  const wanted = status.trim().toLowerCase();
-  if (wanted) return columns.find((c) => c.name.toLowerCase() === wanted) ?? null;
-  return columns.find((c) => c.category === "BACKLOG") ?? columns.find((c) => c.isDefault) ?? null;
+  const byDefault = columns.find((c) => c.isDefault) ?? null;
+  if (status.trim()) return namedColumn(columns, status) ?? byDefault;
+  return columns.find((c) => c.category === "BACKLOG") ?? byDefault;
 }
 
 /**

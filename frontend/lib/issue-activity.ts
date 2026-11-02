@@ -44,6 +44,10 @@ export function describeActivity(a: IssueActivity, t: ActivityTexts): ActivityLi
   }
   const item = a.newValue ?? "";
   switch (a.action) {
+    // Un commentaire, dont celui que l'agent d'une mission laisse au nom de la personne : « Claude Code commented for
+    // Pierre » (rejeu de la 1.8.0), au lieu de « comment added ».
+    case "COMMENT_ADDED":
+      return { ...line, what: t.commented };
     case "CHECKLIST_CHECKED":
       return { ...line, what: fill(t.checked, { item }) };
     case "CHECKLIST_UNCHECKED":
@@ -60,6 +64,9 @@ export function describeActivity(a: IssueActivity, t: ActivityTexts): ActivityLi
       return { ...line, what: t.discarded };
     case "MISSION_RETRIED":
       return { ...line, what: t.retried };
+    // La mission n'a rien changé : la personne a terminé l'issue (rejeu de la 1.8.0).
+    case "MISSION_MARKED_DONE":
+      return { ...line, what: t.markedDone };
     default:
       return {
         ...line,

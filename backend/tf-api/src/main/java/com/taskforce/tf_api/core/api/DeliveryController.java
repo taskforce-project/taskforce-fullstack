@@ -201,6 +201,18 @@ public class DeliveryController {
     /** Pourquoi appliquer malgré des tests en échec ; demandé seulement dans ce cas, posté sur l'issue. */
     public record MissionApplyRequest(@Size(max = 2000) String reason) {}
 
+    /**
+     * POST .../runs/{runId}/done : « Mark as done » : la mission n'a rien changé (ni pull request ni commit), l'issue
+     * se termine et son activité le dit (rejeu de la 1.8.0). Seule la personne qui a délégué tranche.
+     */
+    @PostMapping("/runs/{runId}/done")
+    public ResponseEntity<ApiResponse<Void>> markDone(
+        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId
+    ) {
+        missionResults.markDone(slug, runId, resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Marked as done: no change was needed", null));
+    }
+
     /** POST .../runs/{runId}/discard : « Discard » : la pull request est fermée, sa branche supprimée. */
     @PostMapping("/runs/{runId}/discard")
     public ResponseEntity<ApiResponse<Void>> discard(

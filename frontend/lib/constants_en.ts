@@ -417,6 +417,22 @@ export const CONSTANTS_EN = {
     saved: "Saved!",
   },
 
+  // Integrations catalog (Settings > Integrations): GitHub, Slack and Plane next to the tried MCP presets.
+  integrations: {
+    catalogWeb: "GitHub, Slack and Plane sync natively; any other tool connects through its MCP server.",
+    catalogDesktop: "GitHub works with GitHub CLI on this computer and Plane syncs natively; any other tool connects through its MCP server.",
+    // Desktop app: GitHub goes through the person's GitHub CLI, Slack can't be connected there yet.
+    desktopGitHubLine: "Clones the repository, pushes the agent's branch and opens its pull request with GitHub CLI on this computer.",
+    desktopSlackLine: "Issue notifications in your channels. Not available in the desktop app yet.",
+    githubCli: "GitHub CLI",
+    githubCliHelp: "TaskForce uses GitHub CLI on this computer. Your sign-in stays in the system's keychain, never in TaskForce.",
+    githubCliSignedIn: "Connected with GitHub CLI on this computer, as {login}.",
+    githubCliSignedInNoLogin: "Connected with GitHub CLI on this computer.",
+    githubCliPurpose: "Sign in to GitHub so that your agent can clone the repository, push its branch and open its pull request.",
+    webAppOnly: "Web app only",
+    slackDesktopHelp: "Slack can't be connected in the desktop app yet.",
+  },
+
   // App shell - footer, top bar, workspace switcher (rendered on every authenticated screen).
   shell: {
     // Footer
@@ -522,6 +538,10 @@ export const CONSTANTS_EN = {
       requestsAnswered: "Requests answered",
       requestsCount: "{answered} of {asked}",
       willChange: "What will change if you apply",
+      // A mission that changed nothing (the work was already done): nothing to apply, the issue is marked done.
+      willChangeDone: "What will change if you mark it done",
+      markDone: "Mark as done",
+      markedDone: "Done: no change was needed",
       mergeChange: "Merge pull request #{number} on GitHub",
       moveChange: "Move {key} to Done",
       final: "final",
@@ -615,6 +635,7 @@ export const CONSTANTS_EN = {
     system: "System",
     created: "created",
     createdVia: "created, prepared by {via}",
+    commented: "commented",
     checked: "checked \"{item}\"",
     unchecked: "unchecked \"{item}\"",
     openedPullRequest: "opened pull request",
@@ -622,6 +643,7 @@ export const CONSTANTS_EN = {
     applied: "applied the result",
     discarded: "discarded the result",
     retried: "tried again",
+    markedDone: "marked the issue done: no change was needed",
     forWhom: "for {who}",
   },
 
@@ -640,6 +662,8 @@ export const CONSTANTS_EN = {
     issueDue: "Due",
     issueNoDue: "No due date",
     issueColumn: "Column",
+    // Cortex named a column the project doesn't have: the issue goes to the project's default column instead.
+    issueColumnByDefault: "\"{asked}\" isn't a column of this project: the issue goes to {column}, its default column.",
     // Filled only from what the request or the project says; the person fills the rest here.
     issuePriority: "Priority",
     issuePriorities: { NONE: "No priority", LOW: "Low", MEDIUM: "Medium", HIGH: "High", URGENT: "Urgent" },
