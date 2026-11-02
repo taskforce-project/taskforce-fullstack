@@ -28,7 +28,7 @@ class RulesDecisionServiceTest {
             Arguments.of("une commande composée prend le plus strict",
                 List.of(shell("git status"), shell("git push origin main")), "deny", "no-agent-push"),
             Arguments.of("un morceau qu'aucune règle ne couvre est demandé",
-                List.of(shell("git status"), shell("ls -la")), "ask", null),
+                List.of(shell("git status"), shell("npm install")), "ask", null),
             Arguments.of("une lecture hors de la copie, sans son action, est demandée",
                 List.of(Map.of("action", "file.read", "tool", "Read", "path", "/etc/hosts"),
                     Map.of("tool", "Read", "path", "/etc/hosts")), "ask", null),
