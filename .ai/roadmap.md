@@ -10,6 +10,13 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 02/11/2026 - La fiche d'une issue retire vraiment l'assigné et l'échéance (PC-065).** `[frontend]`
+> - **Constat** (signalé le 02/11) : « No assignee » envoyait `assigneeId: null` et vider l'échéance `dueDate: null` ; `PATCH /issues/{id}` lit un champ à null comme « pas de changement » (patch partiel), donc la fiche disait « Unassigned » et « Due date removed » quand l'issue gardait les deux.
+> - **Fait** (branche `fix/issue-sheet-unassign-due-date`, sur `dev` après la fusion de la PR #480, PR #481 vers `dev`, étiquette `frontend:release:patch`, pas fusionnée) : la fiche envoie `unassign` et `clearDueDate`, arrivés avec la PR #480 ; `UpdateIssuePayload` ne type plus null pour l'assigné, l'échéance, le parent ni la date de début, que le serveur ignore tous les quatre : le compilateur refuse l'ancien payload ; assigner, retirer l'assigné et changer l'échéance ne se confirment qu'une fois enregistrés, sinon la fiche remet la valeur d'avant (« Assigned to ... » s'affichait aussi en échec). Les autres appelants d'`updateIssue` (board, liste, backlog, assignation groupée) n'envoient jamais null.
+> - **Contrôles** : `tsc --noEmit` propre, `npm run lint` sans erreur (74 avertissements, aucun sur les lignes changées), `CI=1 npx vitest run --coverage` vert (120 fichiers, 1 489 tests) ; le service et le store testés avec `unassign` et `clearDueDate`.
+> - **Non vérifié** : les gestes dans un navigateur ; la fiche n'a pas de test de composant.
+> - **Brain OS** (`feature/lean-oss`, `6635281`) : PC-065 dans `v1/09-audits/Problemes_Connus.md`, FE-ISS-CLEAR-FIELDS dans `v1/02-produit/Frontend.md`.
+
 > **▶ MAJ 02/11/2026 - J1, TF-J1-5 et TF-J1-6 : les premiers gestes du chat, ajoutés une fois dans le MCP TaskForce, et l'inventaire de ce que le chat sait faire.** `[backend + frontend + runner + contrats]`
 > - **Décision du CEO** (02/11/2026) : « l'UX je suis convaincu que ca doit passer par le chat », et le MCP TaskForce est la seule surface d'outils, la même pour Cortex et pour un agent extérieur, sous les mêmes règles (ADR-024, brouillon). Ajouté le même jour, après son test : supprimer une issue (« supprime testta 2 » préparait une issue « Supprimer l'issue TESTTA-2 »), et l'issue nommée par sa colonne (« celle qui est dans In review by AI »).
 > - **Fait** (branche `feat/chat-first-gestures`, PR #480 vers `dev`, étiquettes `backend:release:minor` et `frontend:release:minor`, pas fusionnée) :
