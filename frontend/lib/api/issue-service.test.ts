@@ -138,6 +138,21 @@ describe('issue-service', () => {
       expect(apiClient.patch).toHaveBeenCalledWith(ISSUE_ROUTES.UPDATE(SLUG, PID, IID), payload);
       expect(result).toEqual(issue);
     });
+
+    // Le serveur lit un champ à null comme « pas de changement » : retirer passe par ces deux drapeaux.
+    it('PATCH unassign et clearDueDate tels quels, pour retirer l’assigné et l’échéance', async () => {
+      const payload = { unassign: true, clearDueDate: true };
+      const issue = { id: IID, assignee: null, dueDate: null };
+      vi.mocked(apiClient.patch).mockResolvedValue(envelope(issue));
+
+      const result = await updateIssue(SLUG, PID, IID, payload);
+
+      expect(apiClient.patch).toHaveBeenCalledWith(ISSUE_ROUTES.UPDATE(SLUG, PID, IID), {
+        unassign: true,
+        clearDueDate: true,
+      });
+      expect(result).toEqual(issue);
+    });
   });
 
   describe('deleteIssue', () => {

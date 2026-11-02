@@ -1340,9 +1340,15 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
   async function saveDueDate(val: string) {
     const next = val || null
+    const previous = dueDate
     setDueDate(next)
-    // callUpdate toaste deja l'erreur : on ne confirme QUE si l'ecriture a reussi.
-    if (await callUpdate({ dueDate: next })) toast.success(next ? "Due date updated" : "Due date removed")
+    // Un dueDate à null ne retire rien (patch partiel) : retirer l'échéance passe par clearDueDate.
+    // callUpdate toaste deja l'erreur : on ne confirme QUE si l'ecriture a reussi, sinon la date d'avant revient.
+    if (await callUpdate(next ? { dueDate: next } : { clearDueDate: true })) {
+      toast.success(next ? "Due date updated" : "Due date removed")
+    } else {
+      setDueDate(previous)
+    }
   }
 
   function toggleLabel(l: IssueLabel) {
@@ -1687,9 +1693,11 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                     toast.success(`Assigned to ${name}`)
                   }}
                   onUnassign={async () => {
+                    const previous = assignee
                     setAssignee(null)
-                    await callUpdate({ assigneeId: null })
-                    toast.success("Unassigned")
+                    // Un assigneeId à null ne retire rien (patch partiel) : retirer l'assigné passe par unassign.
+                    if (await callUpdate({ unassign: true })) toast.success("Unassigned")
+                    else setAssignee(previous)
                   }}
                   onDelegate={async (agentKey) => {
                     const agent = availableAgents.find((a) => a.key === agentKey)

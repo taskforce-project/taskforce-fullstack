@@ -163,16 +163,24 @@ export interface CreateIssuePayload {
   labelIds?: number[];
 }
 
+/**
+ * Patch partiel : un champ absent ne change rien, et le serveur lit un champ à null de la même façon.
+ * Retirer l'assigné ou l'échéance passe donc par `unassign` et `clearDueDate`.
+ */
 export interface UpdateIssuePayload {
   title?: string;
   description?: string;
   statusId?: number;
   typeId?: number;
   priority?: IssuePriority;
-  assigneeId?: number | null;
+  assigneeId?: number;
+  /** true = retirer l'assigné. */
+  unassign?: boolean;
   parentId?: number | null;
   startDate?: string | null;
-  dueDate?: string | null;
+  dueDate?: string;
+  /** true = retirer l'échéance. */
+  clearDueDate?: boolean;
   position?: number;
   /** Story points : undefined = pas de changement ; 0 = retirer l'estimation ; >0 = valeur */
   storyPoints?: number;
