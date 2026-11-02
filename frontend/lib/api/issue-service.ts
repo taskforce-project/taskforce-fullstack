@@ -17,7 +17,12 @@ export type IssueActivityType =
   | "CREATED" | "STATUS_CHANGED" | "PRIORITY_CHANGED" | "ASSIGNEE_CHANGED"
   | "TYPE_CHANGED" | "TITLE_CHANGED" | "DESCRIPTION_CHANGED" | "LABEL_ADDED"
   | "LABEL_REMOVED" | "DUE_DATE_CHANGED" | "START_DATE_CHANGED" | "PARENT_CHANGED"
-  | "COMMENT_ADDED" | "COMMENT_DELETED" | "COMPLETED" | "REOPENED";
+  | "COMMENT_ADDED" | "COMMENT_DELETED" | "COMPLETED" | "REOPENED"
+  // Ce qu'une mission fait sur l'issue, puis le geste de la personne sur son résultat (V112).
+  | "CHECKLIST_CHECKED" | "CHECKLIST_UNCHECKED" | "PULL_REQUEST_OPENED"
+  | "MISSION_APPLIED" | "MISSION_DISCARDED" | "MISSION_RETRIED"
+  // L'issue terminée par la personne, la mission n'ayant rien changé (V114, rejeu de la 1.8.0).
+  | "MISSION_MARKED_DONE";
 
 export interface UserSummary {
   id: number;
@@ -103,6 +108,11 @@ export interface IssueActivity {
   action: IssueActivityType;
   oldValue: string | null;
   newValue: string | null;
+  /**
+   * L'agent par qui l'action est passée : « Cortex » qui a préparé l'issue, ou l'agent d'une mission qui a agi au nom
+   * de `actor` (« Claude Code ») ; null quand la personne a agi seule.
+   */
+  via?: string | null;
   createdAt: string;
 }
 

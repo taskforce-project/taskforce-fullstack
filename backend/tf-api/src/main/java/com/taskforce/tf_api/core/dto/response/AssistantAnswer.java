@@ -32,7 +32,8 @@ public record AssistantAnswer(
 
     /**
      * Un appel d'outil de l'agent. status : success | error | pending (proposé, il attend l'accord de la personne) |
-     * refused (les règles de l'espace le refusent). {@code record} : le dossier de la réponse, que l'accord prolonge.
+     * refused (les règles de l'espace le refusent) | question (la carte attend une réponse de la personne, que Cortex lui
+     * demande : rien n'est préparé). {@code record} : le dossier de la réponse, que l'accord prolonge.
      */
     public record AssistantToolCall(String name, String status, String input, String output, String record) {}
 

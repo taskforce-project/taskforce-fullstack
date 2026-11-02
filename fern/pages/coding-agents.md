@@ -44,11 +44,24 @@ the first time it needs it.
 
 - Claude Code works in a separate worktree, on a new branch: your checkout and your current branch are never touched.
 - The issue shows the run live: each tool call, each failure, each refusal.
-- Reading and editing files and local git commands run without asking. Anything else, such as running tests,
-  installing a package or using the network, waits for your **Allow** or **Deny** on the issue. Only the person who
-  delegated can answer; without an answer within 10 minutes, the action is denied.
+- Reading and editing files, printing a line with `echo`, and git commands that read or stay in the copy (`git status`,
+  `git diff`, `git log`, `git add`, a local commit, listing branches and remotes, `git rev-parse`, `git ls-files`,
+  `git blame`) run without asking. Anything else, such as creating or deleting a branch, running tests, installing a
+  package or using the network, waits for your **Allow** or **Deny** on the issue. Only the person who delegated can
+  answer; without an answer within 10 minutes, the action is denied.
+- Until you review the result, the issue's **Assignee** shows the agent working for you ("Claude Code, for Pierre");
+  the issue keeps its assignee.
+- The agent checks each item of the issue's checklist once it has done its work, and only those. The issue's activity
+  keeps what it did in your name ("Claude Code checked …", "Claude Code opened pull request #1"), then your decision.
+- In TaskForce, the agent changes only the issue you delegated (its fields, its column, its checklist, its comments),
+  and may create issues in the same project. After 30 changes in a run, each further change waits for your **Allow**;
+  **Allow for this mission** stops asking until the run ends. The runner's `agent.maxTaskForceChanges` sets the number.
 - When the agent is done, the runner pushes the branch and opens the pull request, then posts the summary on the
   issue.
+- You review the result under the issue's title: **Apply** merges the pull request and completes the issue,
+  **Discard** closes it, **Try again** starts a new run with your note. When the agent changed nothing because the
+  work was already done, **Mark as done** completes the issue instead. A comment the agent leaves shows on the open
+  issue as it lands ("Claude Code commented for Pierre").
 - A project without a repository works too: Claude Code then delivers its work as a comment on the issue.
 
 TaskForce notifies you when an agent asks for approval, finishes or fails (Settings > Notifications > Coding agents).

@@ -1443,6 +1443,7 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
 function IntegrationsPanel() {
   const { activeWorkspace } = useWorkspaceStore()
   const slug = activeWorkspace?.slug ?? ""
+  const ti = usePreferencesStore((s) => s.t.integrations)
   const {
     githubStatus, slackStatus, slackChannels,
     fetchGitHubStatus, disconnectGitHub,
@@ -1514,9 +1515,7 @@ function IntegrationsPanel() {
       {/* ---- Catalogue (le pool générique) ---- */}
       <SectionCard
         title="Integrations catalog"
-        description={IS_DESKTOP
-          ? "Plane syncs natively; any other tool connects through its MCP server."
-          : "GitHub, Slack and Plane sync natively; any other tool connects through its MCP server."}
+        description={IS_DESKTOP ? ti.catalogDesktop : ti.catalogWeb}
       >
 
         {slug && <IntegrationsCatalog slug={slug} />}

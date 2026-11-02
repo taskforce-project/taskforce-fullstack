@@ -26,7 +26,22 @@ export const TASKFORCE_TOOLS: Readonly<Record<string, string>> = {
   add_comment: "comment.create",
   create_issue: "issue.create",
   update_issue: "issue.update",
+  // Cocher une ligne de la checklist change l'issue, et se défait d'un geste : la règle update-issue le permet (R77).
+  check_checklist_item: "issue.update",
 };
+
+/**
+ * Les actions de TaskForce qui y changent quelque chose : la porte en compte le nombre sur une mission, et demande
+ * au-delà d'un plafond (R110, séance n°16 ; approvals.ts).
+ */
+export const TASKFORCE_CHANGES: ReadonlySet<string> = new Set(["issue.update", "issue.create", "comment.create"]);
+
+/** Un outil MCP de TaskForce qui y change quelque chose (une issue, sa checklist, un commentaire, une issue créée). */
+export function changesTaskForce(toolName: string): boolean {
+  const name = /^mcp__taskforce__([a-z_]+)$/.exec(toolName)?.[1];
+  return name !== undefined && Object.hasOwn(TASKFORCE_TOOLS, name)
+    && TASKFORCE_CHANGES.has(TASKFORCE_TOOLS[name] ?? "");
+}
 
 const FILE_TOOLS: Record<string, string> = {
   Read: "file.read",

@@ -61,9 +61,9 @@ export function AppShell({ children }: AppShellProps) {
           </AnimatePresence>
           <PanelDock side="right" />
         </div>
-        {/* La barre unique (R76, séance n°13) : écrire ce qu'on veut faire, sur chaque écran. La conversation s'en
-            déplie et pousse l'écran vers le haut, sans le recouvrir (revue UX du 01/11/2026). Pas de pied de site
-            entre les deux : la version et les liens légaux sont dans le menu du compte. */}
+        {/* La barre unique (R76, séance n°13) : écrire ce qu'on veut faire, sur chaque écran. Elle flotte dans sa
+            propre bande, sans rien recouvrir ; la conversation s'ouvre au-dessus, en bulle, par-dessus l'écran
+            (02/11/2026). Pas de pied de site : la version et les liens légaux sont dans le menu du compte. */}
         <CommandBar />
       </SidebarInset>
 

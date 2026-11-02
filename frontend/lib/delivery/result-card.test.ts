@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { DeliveryRun, DeliveryRunActivity, DeliveryRunApproval } from "@/lib/api/delivery-service";
 import { CONSTANTS_EN } from "@/lib/constants_en";
-import { pullRequestOf, resultCard, resultLine, workMinutes } from "./result-card";
+import { changedNothing, pullRequestOf, resultCard, resultLine, workMinutes } from "./result-card";
 
 const t = CONSTANTS_EN.missions.result;
 
@@ -93,7 +93,28 @@ describe("resultCard", () => {
     const card = resultCard(run({ resultUrl: null, rulesVersion: null }), undefined, null, t);
 
     expect(card.changes).toEqual([]);
+    expect(card.noChange).toBe(false); // des commits sur la branche : ce n'est pas « rien »
     expect(card.how).toBe("Rules v? · 0 steps · 0 requests, 0 answered");
+  });
+
+  it("a mission that changed nothing: marking it done moves the issue to Done (replay of 1.8.0)", () => {
+    const card = resultCard(run({ resultUrl: null, commits: 0 }), undefined, "TF-28", t);
+
+    expect(card.noChange).toBe(true);
+    expect(card.pr).toBeNull();
+    expect(card.changes).toEqual([{ text: "Move TF-28 to Done", final: false }]);
+  });
+});
+
+describe("changedNothing", () => {
+  it.each([
+    ["a pull request", { resultUrl: "https://github.com/acme/website/pull/212", branch: null, commits: null }, false],
+    ["commits on the agent's branch", { resultUrl: null, branch: "tf/tf-28", commits: 2 }, false],
+    ["a branch without commits", { resultUrl: null, branch: "tf/tf-28", commits: 0 }, true],
+    ["nothing said by an older runner", { resultUrl: null, branch: null, commits: null }, true],
+    ["an address that is not a pull request", { resultUrl: "https://github.com/acme/website", branch: null, commits: null }, true],
+  ])("%s: %s", (_label, facts, nothing) => {
+    expect(changedNothing(facts)).toBe(nothing);
   });
 });
 

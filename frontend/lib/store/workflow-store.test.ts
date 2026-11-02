@@ -17,7 +17,7 @@ vi.mock('@/lib/api/analysis-service', () => ({
 }));
 
 const job = (id: number, status = 'RUNNING'): AnalysisJob =>
-  ({ id, projectId: 1, projectName: 'Web', depth: 'QUICK', status, plan: [], question: null, error: null, briefId: null, createdAt: '2026-07-01T00:00:00.000Z' }) as AnalysisJob;
+  ({ id, projectId: 1, projectName: 'Web', depth: 'QUICK', status, question: null, error: null, briefId: null, createdAt: '2026-07-01T00:00:00.000Z' }) as AnalysisJob;
 
 const priority = (id: number, title = `P${id}`): StoredPriority =>
   ({ id, level: 'HIGH', title, rationale: 'parce que', status: 'PENDING', issueId: null, issueIdentifier: null, position: 0 }) as StoredPriority;

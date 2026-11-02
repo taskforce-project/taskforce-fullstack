@@ -126,7 +126,7 @@
     },
     {
       "name": "AI analysis (workflows)",
-      "description": "AI analysis jobs: plan, run and resume."
+      "description": "AI analysis jobs: launch, follow and resume."
     },
     {
       "name": "Skill suggestions"
@@ -3993,6 +3993,45 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseDeliveryRunResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/delivery/runs/{runId}/done": {
+      "post": {
+        "tags": [
+          "Coding agents"
+        ],
+        "operationId": "markDone",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
                 }
               }
             }
@@ -11574,6 +11613,12 @@
               "type": "integer",
               "format": "int64"
             }
+          },
+          "storyPoints": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 0
           }
         },
         "required": [
@@ -14036,6 +14081,9 @@
             "type": "integer",
             "format": "int64"
           },
+          "startedByName": {
+            "type": "string"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -14771,13 +14819,6 @@
           },
           "status": {
             "type": "string"
-          },
-          "plan": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": {}
-            }
           },
           "question": {
             "type": "string"
@@ -16909,13 +16950,23 @@
               "COMMENT_ADDED",
               "COMMENT_DELETED",
               "COMPLETED",
-              "REOPENED"
+              "REOPENED",
+              "CHECKLIST_CHECKED",
+              "CHECKLIST_UNCHECKED",
+              "PULL_REQUEST_OPENED",
+              "MISSION_APPLIED",
+              "MISSION_DISCARDED",
+              "MISSION_RETRIED",
+              "MISSION_MARKED_DONE"
             ]
           },
           "oldValue": {
             "type": "string"
           },
           "newValue": {
+            "type": "string"
+          },
+          "via": {
             "type": "string"
           },
           "createdAt": {

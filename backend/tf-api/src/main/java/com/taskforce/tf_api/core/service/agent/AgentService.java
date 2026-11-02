@@ -428,7 +428,11 @@ public class AgentService {
         String recordRef();
     }
 
-    private record ToolOutcome(String status, String result) {
+    /** {@code input} : les arguments que la carte montre, quand le serveur les a résolus ; null, ceux de Cortex. */
+    private record ToolOutcome(String status, String result, String input) {
+        ToolOutcome(String status, String result) {
+            this(status, result, null);
+        }
     }
 
     private static final String PROPOSED = "Action proposed to the user, waiting for their approval in the conversation. "
@@ -444,6 +448,17 @@ public class AgentService {
     private static final String PREPARED_TEXT = "Issue prepared as a card in the conversation: the person checks it, "
         + "edits it and creates it. Do not call this tool again; say in one sentence that the card is ready to review, "
         + "and do not say that the issue exists.";
+
+    /**
+     * Ce qui manque pour préparer la carte, que seule la personne peut dire (le projet, la personne nommée) : rien ne se
+     * montre, Cortex pose une seule question courte (R102 : « pas chiant à remplir »). Statut du résultat : la carte
+     * n'attend rien, la question suit dans la réponse.
+     */
+    static final String QUESTION = "question";
+
+    private static final String QUESTION_TEXT = " No card is shown yet. Ask the person one short question with the "
+        + "choices, then prepare the card with the answer. Do not ask about anything else: the other fields stay editable "
+        + "on the card.";
 
     private static String refusedText(CortexGate.Verdict verdict) {
         return "Not run: the rules of this workspace refuse it. " + verdict.reason()
@@ -468,7 +483,8 @@ public class AgentService {
                 ToolOutcome outcome = tool == null
                     ? new ToolOutcome("error", "Unknown tool: " + name)
                     : step.apply(tool, name, argsJson);
-                toolCalls.add(new AssistantToolCall(name, outcome.status(), argsJson, outcome.result(), step.recordRef()));
+                String shown = outcome.input() != null ? outcome.input() : argsJson;
+                toolCalls.add(new AssistantToolCall(name, outcome.status(), shown, outcome.result(), step.recordRef()));
                 messages.add(Map.of("role", "tool", "tool_call_id", id, "content", outcome.result()));
             }
         }
@@ -557,6 +573,7 @@ public class AgentService {
         public ToolOutcome apply(AgentTool tool, String name, String argsJson) {
             String result;
             String status = "success";
+            String shown = null;
             try {
                 CortexGate.Verdict verdict = judge(tool, argsJson);
                 if (verdict.denied()) {
@@ -574,8 +591,18 @@ public class AgentService {
                         status = "pending";
                     }
                 } else if (PREPARED.contains(name)) {
-                    result = PREPARED_TEXT;
-                    status = "pending";
+                    // Avant la carte, ce que seule la personne peut dire : sinon une question, et aucune carte. La carte
+                    // montre les arguments tels que le serveur les entend (« moi » : la personne qui demande).
+                    AgentTool.Prepared prepared = tool.prepare(objectMapper.readValue(argsJson,
+                        new TypeReference<Map<String, Object>>() {}), ctx);
+                    if (prepared != null && prepared.asks()) {
+                        result = prepared.question() + QUESTION_TEXT;
+                        status = QUESTION;
+                    } else {
+                        result = PREPARED_TEXT;
+                        status = "pending";
+                        if (prepared != null && prepared.args() != null) shown = objectMapper.writeValueAsString(prepared.args());
+                    }
                 } else {
                     Map<String, Object> args = objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {});
                     result = tool.execute(args, ctx);
@@ -585,7 +612,7 @@ public class AgentService {
                 status = "error";
             }
             result(name, status, result);
-            return new ToolOutcome(status, result);
+            return new ToolOutcome(status, result, shown);
         }
 
         /** La demande, puis la décision des règles, au dossier avant tout effet : sans dossier, l'action ne part pas. */
@@ -673,11 +700,15 @@ public class AgentService {
           .append("server can still be connected there. Never make data up. ")
           .append("Today is ").append(today.format(TODAY)).append(" (UTC). ")
           .append("When the person asks for an issue, prepare it with create_issue: it becomes a card the person ")
-          .append("checks, edits and creates. Fill what the request and the project justify: a title, a short ")
-          .append("description, subtasks when the work has steps. Place it in time from its goal: read the project's ")
-          .append("columns and active cycle, keep it in the Backlog unless the work must start now, and set a due date ")
-          .append("only when the goal or the person gives one. When the project is unclear, ask the person, with the ")
-          .append("choices, before preparing anything. ");
+          .append("checks, edits and creates. Fill only what the request or the project says: a title, a short ")
+          .append("description, a checklist when the work has steps; a priority, an assignee (a member of the project), ")
+          .append("labels (existing ones), points or a cycle (an existing one) only when the request or the project ")
+          .append("gives them. Leave the rest empty: the person fills it on the card. Place it in time from its goal: ")
+          .append("read the project's columns, active cycle, labels and members with list_projects, keep it in the ")
+          .append("Backlog unless the work must start now, and set a due date only when the goal or the person gives ")
+          .append("one. Ask one short question, with the choices, before preparing the card only when what matters is ")
+          .append("unclear: the request does not say which project and there are several, or it names a person who ")
+          .append("matches several members. Never ask about the other fields: they stay editable on the card. ");
         if (!external.isEmpty()) {
             String names = external.stream().map(AgentTool::name).collect(Collectors.joining(", "));
             sb.append("External tools are connected (MCP servers): ").append(names).append(". ")

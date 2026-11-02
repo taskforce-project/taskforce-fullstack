@@ -9,9 +9,10 @@
 export const IS_DESKTOP = process.env.NEXT_PUBLIC_DESKTOP === "true";
 
 /**
- * App desktop : la connexion de GitHub et de Slack par OAuth n'y marche pas encore (PC-060) ; on ne montre que ce qui
- * marche (R12), ni dans le catalogue ni dans la pilule de l'accueil. Masqués avec revue au 30/11/2026 ; d'ici là,
- * GitHub passe par le GitHub CLI de la personne.
+ * App desktop : la connexion de GitHub et de Slack par OAuth n'y marche pas encore (PC-060) ; la pilule de l'accueil
+ * ne les propose pas (R12). Masqués avec revue au 30/11/2026 ; d'ici là, GitHub passe par le GitHub CLI de la personne.
+ * Le catalogue des intégrations, lui, les montre avec leur état (rejeu de la 1.8.0) : GitHub par le GitHub CLI, Slack
+ * sans geste de connexion.
  */
 export const DESKTOP_HIDDEN_CONNECTORS: ReadonlySet<string> = new Set(["github", "slack"]);
 

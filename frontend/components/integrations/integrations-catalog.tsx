@@ -13,10 +13,14 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BrandLogo } from "@/components/ui/brand-logo"
+import { DesktopGitHubConnect } from "@/components/desktop/desktop-github-connect"
 import { cn } from "@/lib/utils"
-import { DESKTOP_HIDDEN_CONNECTORS, IS_DESKTOP } from "@/lib/desktop"
+import { IS_DESKTOP, type DesktopToolsStatus } from "@/lib/desktop"
 import { getErrorMessage } from "@/lib/api/client"
+import type { CONSTANTS_EN } from "@/lib/constants_en"
+import { useDesktopToolsStore } from "@/lib/store/desktop-tools-store"
 import { useIntegrationStore } from "@/lib/store/integration-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 import {
   getIntegrationCatalog, getPlaneStatus, connectPlane, listPlaneProjects, syncPlane, disconnectPlane,
   getMcpServers, connectMcpServer, disconnectMcpServer, startMcpOAuth,
@@ -64,14 +68,52 @@ function CatPill({ active, onClick, children }: Readonly<{ active: boolean; onCl
   )
 }
 
-/** Le catalogue tel que l'app peut le tenir : sans les connecteurs masqués, comptes recalculés. */
-export function catalogForThisApp(catalog: IntegrationCatalog, desktop: boolean = IS_DESKTOP): IntegrationCatalog {
+/** GitHub sur cet ordinateur, tel que la coque le lit avec le GitHub CLI (`gh auth token`, `gh api user`). */
+type DesktopGitHub = DesktopToolsStatus["github"]
+
+type IntegrationTexts = (typeof CONSTANTS_EN)["integrations"]
+
+/** Une intégration que l'app desktop ne sait pas encore connecter (PC-060) : elle se montre, avec son état, sans le geste. */
+const laterOnDesktop = (tool: ConnectorView, desktop: boolean) => desktop && tool.key === "slack"
+
+/** GitHub dans l'app desktop : par le GitHub CLI de la personne, pas par la connexion OAuth de l'espace. */
+const throughGitHubCli = (tool: ConnectorView, desktop: boolean) => desktop && tool.key === "github"
+
+/**
+ * Le catalogue tel que l'app peut le tenir. La webapp le montre tel quel. L'app desktop montre aussi GitHub, Slack et
+ * Plane à côté des préréglages essayés, avec leur état et une ligne sur ce qu'ils y font (rejeu de la 1.8.0,
+ * 02/11/2026) : GitHub est connecté quand le GitHub CLI de la personne l'est sur cet ordinateur ; Slack, pas encore
+ * connectable ici, garde l'état que le serveur lui connaît.
+ */
+export function catalogForThisApp(
+  catalog: IntegrationCatalog,
+  t: IntegrationTexts,
+  desktop: boolean = IS_DESKTOP,
+  github: DesktopGitHub | null = null,
+): IntegrationCatalog {
   if (!desktop) return catalog
-  const categories = catalog.categories
-    .map((g) => ({ ...g, tools: g.tools.filter((t) => !DESKTOP_HIDDEN_CONNECTORS.has(t.key)) }))
-    .filter((g) => g.tools.length > 0)
+  const categories = catalog.categories.map((g) => ({
+    ...g,
+    tools: g.tools.map((tool): ConnectorView => {
+      if (throughGitHubCli(tool, desktop)) {
+        return { ...tool, connected: github?.signedIn === true, description: t.desktopGitHubLine, setupHint: null }
+      }
+      return laterOnDesktop(tool, desktop) ? { ...tool, description: t.desktopSlackLine, setupHint: null } : tool
+    }),
+  }))
   const tools = categories.flatMap((g) => g.tools)
-  return { ...catalog, categories, total: tools.length, connected: tools.filter((t) => t.connected).length }
+  return { ...catalog, categories, total: tools.length, connected: tools.filter((tool) => tool.connected).length }
+}
+
+/** Comment l'intégration se connecte dans cette app : le mot de la carte, l'aide de la fiche, et si le geste existe. */
+export function connectionOf(
+  tool: ConnectorView,
+  t: IntegrationTexts,
+  desktop: boolean = IS_DESKTOP,
+): { label: string; help: string; canConnect: boolean } {
+  if (throughGitHubCli(tool, desktop)) return { label: t.githubCli, help: t.githubCliHelp, canConnect: true }
+  if (laterOnDesktop(tool, desktop)) return { label: t.webAppOnly, help: t.slackDesktopHelp, canConnect: false }
+  return { label: AUTH_LABEL[tool.authType], help: AUTH_HELP[tool.authType], canConnect: true }
 }
 
 /**
@@ -79,12 +121,13 @@ export function catalogForThisApp(catalog: IntegrationCatalog, desktop: boolean 
  * préréglage, et tout autre serveur MCP ajouté à la main (« Connect an MCP server »).
  */
 export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
-  const [catalog, setCatalog] = useState<IntegrationCatalog | null>(null)
+  const t = usePreferencesStore((s) => s.t.integrations)
+  const [loaded, setLoaded] = useState<IntegrationCatalog | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [dialogTool, setDialogTool] = useState<ConnectorView | null>(null)
-  // Connecteur affiché en fiche détaillée (clic sur une carte). null = grille.
-  const [detailTool, setDetailTool] = useState<ConnectorView | null>(null)
+  // Connecteur affiché en fiche détaillée (clic sur une carte), par sa clé : la fiche suit le catalogue. null = grille.
+  const [detailKey, setDetailKey] = useState<string | null>(null)
   const [query, setQuery] = useState("")
   const [activeCat, setActiveCat] = useState<string>("all")
   // Filtre « ce que j'ai connecté ou pas » (en plus du filtre par catégorie).
@@ -92,20 +135,21 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   const { connectGitHub, connectSlack } = useIntegrationStore()
   // Une déconnexion GitHub ou Slack faite ailleurs (sections de Settings) incrémente ce compteur.
   const changes = useIntegrationStore((s) => s.changes)
+  // App desktop : GitHub est connecté quand le GitHub CLI de la personne l'est sur cet ordinateur.
+  const desktopGitHub = useDesktopToolsStore((s) => s.status?.github ?? null)
+  const refreshDesktopTools = useDesktopToolsStore((s) => s.refresh)
+
+  useEffect(() => {
+    if (IS_DESKTOP && useDesktopToolsStore.getState().status === null) void refreshDesktopTools()
+  }, [refreshDesktopTools])
 
   const refresh = useCallback(() => {
     setLoading(true)
     setError(false)
     getIntegrationCatalog(slug)
-      .then((loaded) => {
-        const c = catalogForThisApp(loaded)
-        setCatalog(c)
+      .then((c) => {
+        setLoaded(c)
         setError(false)
-        // Garde la fiche ouverte à jour (ex. état « connecté » après connexion) ; un serveur déconnecté
-        // disparaît du catalogue, sa fiche se ferme.
-        setDetailTool((prev) => prev
-          ? c.categories.flatMap((g) => g.tools).find((t) => t.key === prev.key) ?? null
-          : null)
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false))
@@ -113,7 +157,25 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
 
   useEffect(() => { refresh() }, [refresh, changes])
 
+  const catalog = useMemo(
+    () => (loaded ? catalogForThisApp(loaded, t, IS_DESKTOP, desktopGitHub) : null),
+    [loaded, t, desktopGitHub],
+  )
+  // La fiche ouverte suit le catalogue (ex. « connecté » après connexion) ; un serveur déconnecté en disparaît, sa
+  // fiche se ferme.
+  const detailTool = useMemo(
+    () => (detailKey && catalog ? catalog.categories.flatMap((g) => g.tools).find((tool) => tool.key === detailKey) ?? null : null),
+    [detailKey, catalog],
+  )
+
   async function handleAction(tool: ConnectorView) {
+    const connection = connectionOf(tool, t)
+    if (!connection.canConnect) return
+    // App desktop : GitHub se connecte avec le GitHub CLI de la personne, dans le dialogue.
+    if (throughGitHubCli(tool, IS_DESKTOP)) {
+      setDialogTool(tool)
+      return
+    }
     // GitHub / Slack non connectés : OAuth 1-clic dédié (redirection). Le reste ouvre le dialogue.
     if (!tool.connected && (tool.key === "github" || tool.key === "slack")) {
       try {
@@ -167,7 +229,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
           <ConnectorDetailView
             tool={detailTool}
             categoryLabel={catalog.categories.find((c) => c.category === detailTool.category)?.label ?? detailTool.category}
-            onBack={() => setDetailTool(null)}
+            onBack={() => setDetailKey(null)}
             onConnect={() => handleAction(detailTool)}
           />
         ) : (
@@ -231,7 +293,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{group.label}</h4>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {group.tools.map((tool) => (
-                  <ConnectorCard key={tool.key} tool={tool} onOpenDetail={() => setDetailTool(tool)} />
+                  <ConnectorCard key={tool.key} tool={tool} onOpenDetail={() => setDetailKey(tool.key)} />
                 ))}
               </div>
             </section>
@@ -260,6 +322,7 @@ function shownCapabilities(tool: ConnectorView): string[] {
 
 /** Tuile d'un connecteur - clic → fiche détaillée. Logo, état, description, capacités. */
 function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; onOpenDetail: () => void }>) {
+  const t = usePreferencesStore((s) => s.t.integrations)
   const caps = shownCapabilities(tool)
   return (
     <div
@@ -279,7 +342,7 @@ function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; o
             <Check className="size-3" /> Connected
           </Badge>
         ) : (
-          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">{AUTH_LABEL[tool.authType]}</span>
+          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">{connectionOf(tool, t).label}</span>
         )}
       </div>
 
@@ -307,6 +370,7 @@ function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; o
 function ConnectorDetailView({
   tool, categoryLabel, onBack, onConnect,
 }: Readonly<{ tool: ConnectorView; categoryLabel: string; onBack: () => void; onConnect: () => void }>) {
+  const connection = connectionOf(tool, usePreferencesStore((s) => s.t.integrations))
   return (
     <div className="flex flex-col gap-6">
       {/* Retour */}
@@ -332,10 +396,12 @@ function ConnectorDetailView({
             {tool.description && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{tool.description}</p>}
           </div>
         </div>
-        <Button size="sm" className="shrink-0 gap-1.5" variant={tool.connected ? "outline" : "default"} onClick={onConnect}>
-          <Plug className="size-3.5" />
-          {tool.connected ? "Manage" : "Connect"}
-        </Button>
+        {connection.canConnect && (
+          <Button size="sm" className="shrink-0 gap-1.5" variant={tool.connected ? "outline" : "default"} onClick={onConnect}>
+            <Plug className="size-3.5" />
+            {tool.connected ? "Manage" : "Connect"}
+          </Button>
+        )}
       </div>
 
       {/* Ce que ça permet */}
@@ -355,8 +421,8 @@ function ConnectorDetailView({
       <section className="flex flex-col gap-2">
         <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Connection</h4>
         <p className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{AUTH_LABEL[tool.authType]}</span>
-          {`: ${AUTH_HELP[tool.authType]}`}
+          <span className="font-medium text-foreground">{connection.label}</span>
+          {`: ${connection.help}`}
         </p>
         {tool.setupHint && (
           <div className="flex gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
@@ -413,11 +479,33 @@ function ConnectorDialog({
           <McpServerForm slug={slug} tool={tool} onClose={onClose} onChanged={onChanged} onWide={setWide} />
         ) : tool.key === "plane" ? (
           <PlaneForm slug={slug} tool={tool} onClose={onClose} onChanged={onChanged} />
+        ) : throughGitHubCli(tool, IS_DESKTOP) ? (
+          <DesktopGitHubPanel />
         ) : (
           <NativeOAuthPanel slug={slug} tool={tool} onClose={onClose} onChanged={onChanged} />
         )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * GitHub dans l'app desktop : le GitHub CLI de la personne, connecté ou à connecter (code à usage unique, comme
+ * `gh auth login`). La connexion reste dans le trousseau du système : rien à déconnecter ici.
+ */
+function DesktopGitHubPanel() {
+  const t = usePreferencesStore((s) => s.t.integrations)
+  const github = useDesktopToolsStore((s) => s.status?.github ?? null)
+  return (
+    <div className="flex flex-col gap-3">
+      {github?.signedIn && (
+        <div className="flex items-center gap-2 rounded-md border border-shape-green/25 bg-shape-green/10 p-3 text-xs text-ink-green">
+          <Check className="size-4 shrink-0" />
+          <span>{github.login ? t.githubCliSignedIn.replace("{login}", github.login) : t.githubCliSignedInNoLogin}</span>
+        </div>
+      )}
+      <DesktopGitHubConnect purpose={t.githubCliPurpose} />
+    </div>
   )
 }
 

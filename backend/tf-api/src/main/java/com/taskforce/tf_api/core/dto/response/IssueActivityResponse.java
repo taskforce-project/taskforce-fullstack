@@ -19,5 +19,7 @@ public class IssueActivityResponse {
     private IssueActivityType action;
     private String oldValue;
     private String newValue;
+    /** L'agent par qui l'action est passée (Cortex qui a préparé l'issue, l'agent d'une mission) ; null sinon. */
+    private String via;
     private LocalDateTime createdAt;
 }

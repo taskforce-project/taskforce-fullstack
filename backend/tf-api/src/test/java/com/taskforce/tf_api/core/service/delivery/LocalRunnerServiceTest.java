@@ -67,6 +67,7 @@ class LocalRunnerServiceTest {
     @Mock private DeliveryActivityService activityService;
     @Mock private HarnessRulesService rulesService;
     @Mock private MissionEvidenceService evidenceService;
+    @Mock private DeliveryAgentProviderRegistry providers;
 
     private static final RulesBundle RULES = new RulesBundle(
         RulesBundle.FORMAT, "acme", null, 3, "sha256:" + "a".repeat(64), null, List.of());
@@ -79,7 +80,7 @@ class LocalRunnerServiceTest {
     void setUp() {
         LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15);
         service = new LocalRunnerService(runRepository, userRepository, visibilityGuard, deliveryRunner, settings, activityService,
-            rulesService, evidenceService, presence);
+            rulesService, evidenceService, presence, providers);
         owner = User.builder().id(7L).email(OWNER_EMAIL).keycloakId("kc-7").isActive(true).build();
     }
 
@@ -234,14 +235,30 @@ class LocalRunnerServiceTest {
     void open_session_returns_scope_and_owner() {
         DeliveryRun held1 = run(100L, DeliveryRunStatus.RUNNING, "tf-runner-pierre", owner, LocalDateTime.now().minusMinutes(5));
         when(runRepository.findById(100L)).thenReturn(Optional.of(held1));
+        DeliveryAgentProvider claudeCode = mock(DeliveryAgentProvider.class);
+        when(claudeCode.displayName()).thenReturn("Claude Code");
+        when(providers.get("claude-code")).thenReturn(claudeCode);
 
         DeliverySession session = service.openSession(100L, RUNNER);
 
         assertThat(session.workspaceSlug()).isEqualTo("acme");
         assertThat(session.projectId()).isEqualTo(12L);
+        // L'issue du run, la seule que l'agent modifie (R110).
+        assertThat(session.issueId()).isEqualTo(55L);
         assertThat(session.ownerEmail()).isEqualTo(OWNER_EMAIL);
         assertThat(session.ownerKeycloakId()).isEqualTo("kc-7");
         assertThat(session.runnerClientId()).isEqualTo("tf-runner-pierre");
+        // L'agent du run : l'activité de l'issue dit par qui passe ce qu'il fait au nom du délégant.
+        assertThat(session.agentName()).isEqualTo("Claude Code");
+    }
+
+    @Test
+    @DisplayName("openSession : un provider que le registre ne connaît plus garde sa clé pour nom")
+    void open_session_names_an_unknown_provider_by_its_key() {
+        DeliveryRun held1 = run(100L, DeliveryRunStatus.RUNNING, "tf-runner-pierre", owner, LocalDateTime.now().minusMinutes(5));
+        when(runRepository.findById(100L)).thenReturn(Optional.of(held1));
+
+        assertThat(service.openSession(100L, RUNNER).agentName()).isEqualTo("claude-code");
     }
 
     static Stream<Arguments> refusedSessions() {

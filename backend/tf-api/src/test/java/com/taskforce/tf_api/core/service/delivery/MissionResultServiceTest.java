@@ -18,6 +18,7 @@ import com.taskforce.tf_api.core.enums.DeliveryRunOutcome;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkType;
+import com.taskforce.tf_api.core.enums.IssueActivityType;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueGitHubLink;
@@ -109,6 +110,78 @@ class MissionResultServiceTest {
             .isInstanceOf(BusinessException.class).hasMessageContaining("no pull request to apply");
         verify(pullRequests, never()).merge(anyLong(), any(), anyInt());
         assertThat(run.getOutcome()).isNull();
+        verify(issueService, never()).logActivity(any(), any(), any(), any(), any(), any());
+    }
+
+    @ParameterizedTest(name = "{0} : {1} à l'activité de l'issue, au nom de la personne")
+    @CsvSource({
+        "apply,   MISSION_APPLIED",
+        "discard, MISSION_DISCARDED",
+        "retry,   MISSION_RETRIED",
+        "done,    MISSION_MARKED_DONE",
+    })
+    @DisplayName("chaque geste entre à l'activité de l'issue : « Pierre applied the result »")
+    void each_gesture_enters_the_activity(String gesture, IssueActivityType expected) {
+        switch (gesture) {
+            case "apply" -> service.apply("acme", 100L, 7L, null);
+            case "discard" -> service.discard("acme", 100L, 7L);
+            case "done" -> {
+                run.setResultUrl(null);
+                service.markDone("acme", 100L, 7L);
+            }
+            default -> service.retry("acme", 100L, 7L, null);
+        }
+
+        verify(issueService).logActivity(run.getIssue(), delegator, expected, null, null, null);
+    }
+
+    @ParameterizedTest(name = "branche [{0}], {1} commits : l'issue terminée, sans rien fusionner ni fermer")
+    @CsvSource({
+        ",          ",   // un runner plus ancien ne dit ni branche ni commits
+        "tf/web-28, 0",  // l'agent n'a rien commité : le travail était déjà fait (TESTTA-2)
+        "tf/web-28, ",
+        "'',        3",  // des commits sans branche ne se relisent nulle part
+    })
+    @DisplayName("Mark as done : une mission qui n'a rien changé termine l'issue, au nom de la personne (rejeu de la 1.8.0)")
+    void mark_done_completes_an_issue_without_change(String branch, Integer commits) {
+        run.setResultUrl(null);
+        run.setBranch(branch);
+        run.setCommits(commits);
+
+        service.markDone("acme", 100L, 7L);
+
+        assertThat(run.getOutcome()).isEqualTo(DeliveryRunOutcome.MARKED_DONE);
+        assertThat(run.getOutcomeBy()).isEqualTo(delegator);
+        assertThat(run.getOutcomeAt()).isNotNull();
+        verify(mergedPullRequests).completeIssue(55L, 7L);
+        verify(pullRequests, never()).merge(anyLong(), any(), anyInt());
+        verify(pullRequests, never()).close(anyLong(), any(), anyInt());
+    }
+
+    @ParameterizedTest(name = "pull request [{0}], {1} commits : refusé")
+    @CsvSource({
+        "https://github.com/acme/website/pull/212, ", // une pull request : elle s'applique ou s'écarte
+        ",                                         2", // des commits sur la branche de l'agent
+    })
+    @DisplayName("Mark as done refusé sur un résultat qui change le code : rien n'est terminé ni gardé")
+    void mark_done_refuses_a_result_with_changes(String resultUrl, Integer commits) {
+        run.setResultUrl(resultUrl);
+        run.setCommits(commits);
+
+        assertThatThrownBy(() -> service.markDone("acme", 100L, 7L))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("apply it or discard it");
+        assertThat(run.getOutcome()).isNull();
+        verify(mergedPullRequests, never()).completeIssue(any(), any());
+        verify(issueService, never()).logActivity(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Mark as done : seule la personne qui a délégué termine l'issue")
+    void only_the_delegator_marks_done() {
+        run.setResultUrl(null);
+
+        assertThatThrownBy(() -> service.markDone("acme", 100L, 8L)).isInstanceOf(ForbiddenException.class);
+        verify(mergedPullRequests, never()).completeIssue(any(), any());
     }
 
     @Test

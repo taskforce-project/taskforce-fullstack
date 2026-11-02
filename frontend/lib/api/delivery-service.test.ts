@@ -11,6 +11,7 @@ import {
   downloadEvidence,
   applyRun,
   discardRun,
+  markRunDone,
   retryRun,
 } from './delivery-service';
 import { apiClient } from './client';
@@ -180,6 +181,14 @@ describe('delivery-service : les gestes de la carte de résultat (R78)', () => {
     expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.APPLY(SLUG, 100), {});
     expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DISCARD(SLUG, 100), {});
     expect(DELIVERY_ROUTES.APPLY(SLUG, 100)).toBe('/api/workspaces/acme/delivery/runs/100/apply');
+  });
+
+  it('markRunDone : POST sur la mission qui n\'a rien changé', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
+
+    await markRunDone(SLUG, 100);
+
+    expect(apiClient.post).toHaveBeenCalledWith('/api/workspaces/acme/delivery/runs/100/done', {});
   });
 
   it.each([

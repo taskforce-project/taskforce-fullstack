@@ -29,6 +29,11 @@ export interface Change {
 
 export interface ResultCardModel {
   pr: PullRequest | null;
+  /**
+   * Ni pull request ni commit : le travail était déjà fait. Rien ne s'applique, la carte propose « Mark as done » (rejeu
+   * de la 1.8.0, TESTTA-2 : « Apply » restait éteint sans dire pourquoi).
+   */
+  noChange: boolean;
   /** Minutes de travail, du moment où le runner a pris la mission à sa fin ; null sans fin connue. */
   minutes: number | null;
   checks: Check[];
@@ -79,14 +84,13 @@ export function resultCard(
   const answered = approvals.filter((a) => a.status === "ALLOWED" || a.status === "DENIED").length;
   const checks: Check[] = [testsCheck(run, t)];
   if (asked > 0) checks.push({ label: t.requestsAnswered, value: fill(t.requestsCount, { answered, asked }), ok: answered === asked });
-  const changes: Change[] = pr
-    ? [
-        { text: fill(t.mergeChange, { number: pr.number }), final: true },
-        ...(issueKey ? [{ text: fill(t.moveChange, { key: issueKey }), final: false }] : []),
-      ]
-    : [];
+  const noChange = changedNothing(run);
+  const move: Change[] = issueKey ? [{ text: fill(t.moveChange, { key: issueKey }), final: false }] : [];
+  const changes: Change[] = pr ? [{ text: fill(t.mergeChange, { number: pr.number }), final: true }, ...move]
+    : noChange ? move : [];
   return {
     pr,
+    noChange,
     minutes: workMinutes(run),
     checks,
     changes,
@@ -94,6 +98,14 @@ export function resultCard(
       version: run.rulesVersion ?? "?", actions: activity?.events.length ?? 0, asked, answered,
     }),
   };
+}
+
+/**
+ * Une mission qui n'a rien changé : ni pull request, ni commit sur sa branche. Le serveur lit les mêmes faits avant de
+ * terminer l'issue (`MissionResultService.markDone`).
+ */
+export function changedNothing(run: Pick<DeliveryRun, "resultUrl" | "branch" | "commits">): boolean {
+  return !pullRequestOf(run.resultUrl) && !(run.branch && run.commits);
 }
 
 /** La phrase du résultat : la pull request, sinon la branche, sinon rien à changer. */

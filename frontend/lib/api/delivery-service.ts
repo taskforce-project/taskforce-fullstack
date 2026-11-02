@@ -48,6 +48,8 @@ export interface DeliveryRun {
   /** Refusée au départ par une règle (FAILED pour la file) : l'écran dit « Not started », pas une panne (R38). */
   refused?: boolean;
   startedById: number | null;
+  /** Le nom de la personne qui a délégué (son e-mail sans nom) : l'issue montre l'agent qui travaille pour elle. */
+  startedByName?: string | null;
   createdAt: string | null;
   updatedAt: string | null;
   /** Le travail commencé (le runner a pris la mission) et fini : la durée de la carte de résultat (R78). */
@@ -65,7 +67,8 @@ export interface DeliveryRun {
   outcomeAt?: string | null;
 }
 
-export type DeliveryRunOutcome = "APPLIED" | "DISCARDED" | "RETRIED";
+/** `MARKED_DONE` : la mission n'a rien changé, la personne a terminé l'issue (rejeu de la 1.8.0). */
+export type DeliveryRunOutcome = "APPLIED" | "DISCARDED" | "RETRIED" | "MARKED_DONE";
 
 export interface DeliveryRunTests {
   command: string;
@@ -87,6 +90,11 @@ export async function applyRun(slug: string, runId: number, reason = ""): Promis
 /** « Discard » : la pull request est fermée, sa branche supprimée. */
 export async function discardRun(slug: string, runId: number): Promise<void> {
   await apiClient.post(DELIVERY_ROUTES.DISCARD(slug, runId), {});
+}
+
+/** « Mark as done » : la mission n'a rien changé (ni pull request ni commit), l'issue se termine. */
+export async function markRunDone(slug: string, runId: number): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.DONE(slug, runId), {});
 }
 
 /** « Try again » : le résultat écarté, la remarque postée sur l'issue, une nouvelle mission ; rend cette mission. */

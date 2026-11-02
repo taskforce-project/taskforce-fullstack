@@ -16,12 +16,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Exécution asynchrone d'un workflow d'analyse — la boucle OODA jouée étape par étape.
+ * Exécution asynchrone d'un workflow d'analyse : la boucle OODA.
  *
  * <p>Le runner ne touche pas à la base directement : il enchaîne les briques de
- * {@link DecisionService} (observe → contexte → analyse) et confie chaque transition d'état à
- * {@link AnalysisJobService}, qui persiste et diffuse le plan sur STOMP. Le dock voit donc les
- * étapes se dérouler en direct.
+ * {@link DecisionService} (observe → contexte → analyse) et confie chaque changement de statut à
+ * {@link AnalysisJobService}, qui le persiste et le diffuse sur STOMP. Le plan d'étapes figé que le
+ * panneau montrait est retiré (TF-J1-3) : le statut dit seul où en est l'analyse.
  *
  * <p>Bean séparé (et non une méthode {@code @Async} de {@code AnalysisJobService}) : Spring
  * n'applique pas {@code @Async} sur un auto-appel — la méthode s'exécuterait alors sur le thread
@@ -50,15 +50,11 @@ public class AnalysisJobRunner {
 
             // Observe — métriques réelles du projet.
             Snapshot snapshot = decisionService.snapshot(ctx.project().getId());
-            jobService.step(jobId, AnalysisPlan.OBSERVE, AnalysisPlan.COMPLETED);
 
             // Contexte — Brain OS (RAG).
-            jobService.step(jobId, AnalysisPlan.CONTEXT, AnalysisPlan.IN_PROGRESS);
             List<KnowledgeNode> hits = decisionService.retrieveContext(ctx.workspaceId(), ctx.project());
-            jobService.step(jobId, AnalysisPlan.CONTEXT, AnalysisPlan.COMPLETED);
 
             // Analyse — le modèle décide, ou demande une clarification (DEEP, premier tour seulement).
-            jobService.step(jobId, AnalysisPlan.ANALYZE, AnalysisPlan.IN_PROGRESS);
             boolean allowQuestion = deep && clarification == null;
             // Métré : gate quota (au-dessus du plafond → job en échec avec message d'upsell) + comptage réel.
             Analysis analysis = aiMeter.metered(ctx.workspaceId(),
@@ -68,14 +64,8 @@ public class AnalysisJobRunner {
                 jobService.suspend(jobId, analysis.question());
                 return;  // reprise sur réponse humaine → run(jobId) rejoué
             }
-            jobService.step(jobId, AnalysisPlan.ANALYZE, AnalysisPlan.COMPLETED);
-            if (deep) {
-                // Étape franchie : soit l'humain a répondu, soit le modèle n'a pas eu besoin de demander.
-                jobService.step(jobId, AnalysisPlan.CLARIFY, AnalysisPlan.COMPLETED);
-            }
 
             // Persiste le brief : ses priorités deviennent actionnables.
-            jobService.step(jobId, AnalysisPlan.PERSIST, AnalysisPlan.IN_PROGRESS);
             jobService.complete(jobId, analysis.brief());
 
         } catch (Exception ex) {

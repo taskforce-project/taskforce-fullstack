@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Sparkles, Loader2, Check, ChevronDown, UserRound } from "lucide-react"
+import { Bot, Sparkles, Loader2, Check, ChevronDown, UserRound } from "lucide-react"
 
 import {
   Popover,
@@ -61,6 +61,11 @@ interface AssigneeMenuProps {
   onAssign: (userId: number) => void | Promise<void>
   onUnassign: () => void | Promise<void>
   onDelegate: (agentKey: string) => void | Promise<void>
+  /**
+   * L'agent qui travaille sur l'issue au nom de la personne qui l'a déléguée (« Claude Code, for Pierre »), tant que la
+   * mission court ou attend sa relecture : le bouton le montre à la place de l'assigné, qui ne change pas.
+   */
+  working?: { label: string; hint: string } | null
 }
 
 /** Résumé court "pourquoi" pour une personne quand le LLM n'a pas rendu de phrase. */
@@ -102,6 +107,7 @@ export function AssigneeMenu({
   onAssign,
   onUnassign,
   onDelegate,
+  working = null,
 }: Readonly<AssigneeMenuProps>) {
   const [open, setOpen] = useState(false)
   const [suggesting, setSuggesting] = useState(false)
@@ -145,7 +151,13 @@ export function AssigneeMenu({
           aria-label="Change assignee"
           className="flex min-h-8 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-1 text-left text-sm shadow-xs outline-none transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-input/30 dark:hover:bg-input/50"
         >
-          {assignee ? (
+          {working ? (
+            // Le nom de l'agent seul, jamais son logo (conditions d'Anthropic, ADR-013).
+            <span className="flex min-w-0 items-center gap-1.5" title={working.hint}>
+              <Bot className="size-4 shrink-0 text-primary" />
+              <span className="truncate">{working.label}</span>
+            </span>
+          ) : assignee ? (
             <span className="flex min-w-0 items-center gap-1.5">
               <UserAvatar email={assignee.email ?? undefined} name={assignee.name} avatarUrl={assignee.avatarUrl} className="size-4 shrink-0" fallbackClassName="text-[8px]" />
               <span className="truncate">{assignee.name}</span>

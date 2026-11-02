@@ -8,10 +8,12 @@ import org.springframework.stereotype.Component;
 
 import com.taskforce.tf_api.core.dto.response.CycleResponse;
 import com.taskforce.tf_api.core.dto.response.IssueStatusResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.enums.CycleStatus;
 import com.taskforce.tf_api.core.service.CycleService;
 import com.taskforce.tf_api.core.service.IssueService;
+import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.shared.util.LogSafe;
@@ -23,6 +25,9 @@ import lombok.extern.slf4j.Slf4j;
  * Outil interne de lecture (TF-MCP-03) : les projets du workspace TaskForce, avec de quoi placer une issue dans le
  * temps (R48, séance n°8) : le but du projet (sa description), ses colonnes et son cycle actif. Les autres outils
  * désignent un projet par sa clé ou son nom : aucun identifiant n'est montré au modèle, il n'a rien à deviner.
+ *
+ * <p>Avec ses labels et ses membres (recette du 01/11/2026) : la carte d'une issue ne se remplit que de ce qui existe,
+ * et Cortex voit quand une personne nommée désigne plusieurs membres, pour le demander avant de préparer la carte.</p>
  */
 @Component
 @RequiredArgsConstructor
@@ -31,15 +36,18 @@ public class ListProjectsTool implements AgentTool {
 
     private static final int MAX_PROJECTS = 20;
     private static final int MAX_GOAL = 140;
+    /** Les labels et les membres d'un projet montrés au modèle, au plus : de quoi choisir sans saturer son contexte. */
+    private static final int MAX_NAMES = 15;
 
     private final ProjectResolver projects;
     private final IssueService issueService;
     private final CycleService cycleService;
+    private final ProjectService projectService;
 
     @Override public String name() { return "list_projects"; }
 
     @Override public String description() {
-        return "Lists the workspace's projects: key, name, goal, columns, active cycle and open issues. "
+        return "Lists the workspace's projects: key, name, goal, columns, active cycle, labels, members and open issues. "
             + "The other tools take the key or the name.";
     }
 
@@ -54,7 +62,8 @@ public class ListProjectsTool implements AgentTool {
         for (ProjectResponse p : visible.stream().limit(MAX_PROJECTS).toList()) {
             sb.append("\n- ").append(p.getIdentifier()).append(" ").append(p.getName())
               .append(": ").append(p.getOpenIssues()).append("/").append(p.getTotalIssues()).append(" open")
-              .append(timing(p, ctx));
+              .append(timing(p, ctx))
+              .append(people(p, ctx));
             String goal = goal(p.getDescription());
             if (!goal.isEmpty()) sb.append("; goal: ").append(goal);
         }
@@ -76,6 +85,28 @@ public class ListProjectsTool implements AgentTool {
             log.debug("Cortex : colonnes ou cycle non lus pour {} : {}", LogSafe.of(p.getIdentifier()), LogSafe.of(e.getMessage()));
         }
         return sb.toString();
+    }
+
+    /** Les labels et les membres d'un projet, par leur nom ; vide s'ils ne se lisent pas, le projet reste listé. */
+    private String people(ProjectResponse p, AgentContext ctx) {
+        StringBuilder sb = new StringBuilder();
+        try {
+            String labels = names(projectService.listLabels(ctx.slug(), p.getId(), ctx.userId()).stream()
+                .map(ProjectLabelResponse::getName).toList());
+            if (!labels.isEmpty()) sb.append("; labels: ").append(labels);
+            String members = names(projectService.listMembers(ctx.slug(), p.getId(), ctx.userId()).stream()
+                .map(m -> m.getDisplayName() != null && !m.getDisplayName().isBlank() ? m.getDisplayName() : m.getEmail())
+                .toList());
+            if (!members.isEmpty()) sb.append("; members: ").append(members);
+        } catch (RuntimeException e) {
+            log.debug("Cortex : labels ou membres non lus pour {} : {}", LogSafe.of(p.getIdentifier()), LogSafe.of(e.getMessage()));
+        }
+        return sb.toString();
+    }
+
+    private static String names(List<String> names) {
+        String shown = names.stream().limit(MAX_NAMES).collect(Collectors.joining(", "));
+        return names.size() > MAX_NAMES ? shown + " and " + (names.size() - MAX_NAMES) + " more" : shown;
     }
 
     private static String cycle(CycleResponse c) {

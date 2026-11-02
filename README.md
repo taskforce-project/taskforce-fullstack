@@ -110,8 +110,8 @@ summary.
 and can use the tools you connect. Analytics are computed from your own board, without a spreadsheet.
 
 **Connect your tools.** GitHub links pull requests and commits to issues and keeps their status up to date. Slack
-sends notifications per channel and event. Any MCP server connects with one-click OAuth or a token, with 25 official
-servers listed (Linear, Jira, Notion, Sentry and more). Outgoing webhooks are signed with HMAC-SHA256 and retried.
+sends notifications per channel and event. Any MCP server connects with one-click OAuth or a token; the catalog lists
+the official servers tried end to end, Linear for now. Outgoing webhooks are signed with HMAC-SHA256 and retried.
 
 **Use the AI you choose.** A local model through Ollama, free and private, any OpenAI-compatible API with your own key
 (OpenAI, Groq, Mistral, OpenRouter, LM Studio) or Anthropic's API. Without AI, the board, Brain OS and analytics keep
@@ -227,7 +227,7 @@ flowchart TB
 ### Stack
 
 <!-- BADGES:START -->
-![Version](https://img.shields.io/badge/Version-1.7.0-blue.svg)
+![Version](https://img.shields.io/badge/Version-1.8.0-blue.svg)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)
 ![Java](https://img.shields.io/badge/Java-21-orange.svg)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.6-brightgreen.svg)

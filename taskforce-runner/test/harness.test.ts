@@ -7,7 +7,9 @@ import { after, describe, it } from "node:test";
 import { exitFacts, judgeExit } from "../src/exits.js";
 import { visibilityOf } from "../src/git.js";
 import { canonicalJson, chain, firstBrokenLink, ZERO_HASH, type EventInput, type Json } from "../src/harness/evidence.js";
-import { INTERNAL_TOOLS, splitCommand, TASKFORCE_TOOLS, toolFacts } from "../src/harness/facts.js";
+import {
+  changesTaskForce, INTERNAL_TOOLS, splitCommand, TASKFORCE_CHANGES, TASKFORCE_TOOLS, toolFacts,
+} from "../src/harness/facts.js";
 import { globMatch } from "../src/harness/glob.js";
 import { bundleDigest, decide, decideAll, verifiedBundle, type Effect, type Facts, type RulesBundle } from "../src/harness/rules.js";
 import { verifyEvidence } from "../src/harness/verify.js";
@@ -159,6 +161,7 @@ describe("faits d'une action de Claude Code, jugés par la table par défaut", (
     ["recherche web", "WebSearch", { query: "x" }, "ask", "search-web"],
     ["lire l'issue", "mcp__taskforce__get_issue", { projectId: 1, issueId: 2 }, "allow", "read-issues"],
     ["commenter l'issue", "mcp__taskforce__add_comment", { projectId: 1, issueId: 2, content: "x" }, "allow", "comment"],
+    ["cocher une ligne de la checklist", "mcp__taskforce__check_checklist_item", { projectId: 1, issueId: 2, itemId: 3, done: true }, "allow", "update-issue"],
     ["Cortex, hors de la mission", "mcp__taskforce__ask_cortex", { message: "x" }, "ask", null],
     ["outil interne de l'agent", "TodoWrite", { todos: [] }, "allow", null],
     ["sous-agent, dont chaque action passe par la porte", "Task", { prompt: "x" }, "allow", null],
@@ -168,6 +171,15 @@ describe("faits d'une action de Claude Code, jugés par la table par défaut", (
     ["lister la copie", "Bash", { command: "ls -la" }, "allow", "run-reads"],
     ["lister la copie par son chemin", "Bash", { command: `ls -la "${slash(work)}"` }, "allow", "run-reads"],
     ["lire un fichier de la copie", "Bash", { command: "head -20 src/app.ts" }, "allow", "run-reads"],
+    // Rejeu de la 1.8.0 (02/11/2026) : deux commandes sans effet étaient demandées, à cause d'`echo` et de `git branch`.
+    ["lister, afficher un séparateur, lire le journal", "Bash", { command: "ls -la && echo \"---\" && git log --oneline -5" }, "allow", "run-reads"],
+    ["la branche courante, puis l'état de la copie", "Bash", { command: "git branch --show-current && git status --short --branch" }, "allow", "run-git-info"],
+    ["les branches et les dépôts distants", "Bash", { command: "git branch -a; git remote -v" }, "allow", "run-git-info"],
+    ["echo vers un fichier l'écrit", "Bash", { command: "echo done > notes.txt" }, "ask", null],
+    ["echo d'une variable ne se borne pas", "Bash", { command: "echo $HOME" }, "ask", null],
+    ["créer une branche reste demandé", "Bash", { command: "git branch new-feature" }, "ask", null],
+    ["supprimer une branche reste demandé", "Bash", { command: "git status && git branch -D main" }, "ask", null],
+    ["git difftool n'est pas git diff", "Bash", { command: "git difftool" }, "ask", null],
     // Un commit comme Claude Code l'écrit, précédé d'un `cd` dans la copie : aucun morceau ne demande.
     ["aller dans la copie puis commiter", "Bash", { command: `cd "${slash(work)}" && git diff && git add README.md && git commit -m "docs: add Node.js 26.13.0 (LTS \\"Lithium\\")" && git log --oneline -1` }, "allow", "run-reads"],
     ["un programme qui commence comme une lecture n'en est pas une", "Bash", { command: "lsof -i" }, "ask", null],
@@ -224,6 +236,30 @@ describe("faits d'une action de Claude Code, jugés par la table par défaut", (
 
   it("chaque outil MCP de TaskForce a sa règle dans la table par défaut", () => {
     for (const [tool, action] of Object.entries(TASKFORCE_TOOLS)) assert.notEqual(decide(defaults, { action }).rule, null, tool);
+  });
+
+  // R110 (séance n°16) : la porte compte les changements dans TaskForce, et demande au-delà d'un plafond par mission.
+  const changes: Array<[string, boolean]> = [
+    ["mcp__taskforce__update_issue", true],
+    ["mcp__taskforce__check_checklist_item", true],
+    ["mcp__taskforce__add_comment", true],
+    ["mcp__taskforce__create_issue", true],
+    ["mcp__taskforce__get_issue", false],
+    ["mcp__taskforce__list_issues", false],
+    ["mcp__taskforce__brain_search", false],
+    ["mcp__taskforce__ask_cortex", false],
+    ["mcp__taskforce__constructor", false],
+    ["mcp__linear__save_issue", false],
+    ["Edit", false],
+    ["Bash", false],
+  ];
+  for (const [tool, expected] of changes) {
+    it(`change TaskForce : ${tool} -> ${expected}`, () => assert.equal(changesTaskForce(tool), expected));
+  }
+
+  it("chaque action qui change TaskForce est celle d'un outil MCP de TaskForce", () => {
+    const actions = new Set(Object.values(TASKFORCE_TOOLS));
+    for (const action of TASKFORCE_CHANGES) assert.ok(actions.has(action), action);
   });
 
   it("un outil interne n'a aucun fait", () => {

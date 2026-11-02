@@ -9,6 +9,7 @@ import {
   applyRun as applyRunApi,
   decideApproval as decideApprovalApi,
   discardRun as discardRunApi,
+  markRunDone as markRunDoneApi,
   retryRun as retryRunApi,
   downloadEvidence as downloadEvidenceApi,
   provisionRunner as provisionRunnerApi,
@@ -59,6 +60,8 @@ interface DeliveryState {
   /** Les gestes de la carte de résultat (R78) ; `false` (ou `null`) en cas d'échec, la raison dans `resultErrors`. */
   applyRun: (slug: string, issueId: number, runId: number, reason?: string) => Promise<boolean>;
   discardRun: (slug: string, issueId: number, runId: number) => Promise<boolean>;
+  /** Une mission qui n'a rien changé : l'issue se termine (rejeu de la 1.8.0). */
+  markRunDone: (slug: string, issueId: number, runId: number) => Promise<boolean>;
   retryRun: (slug: string, issueId: number, runId: number, note: string) => Promise<DeliveryRun | null>;
 }
 
@@ -203,6 +206,18 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   discardRun: async (slug, issueId, runId) => {
     try {
       await discardRunApi(slug, runId);
+      set((state) => ({ resultErrors: withoutError(state.resultErrors, runId) }));
+      await get().fetchRun(slug, issueId);
+      return true;
+    } catch (e) {
+      set((state) => ({ resultErrors: { ...state.resultErrors, [runId]: getErrorMessage(e) } }));
+      return false;
+    }
+  },
+
+  markRunDone: async (slug, issueId, runId) => {
+    try {
+      await markRunDoneApi(slug, runId);
       set((state) => ({ resultErrors: withoutError(state.resultErrors, runId) }));
       await get().fetchRun(slug, issueId);
       return true;

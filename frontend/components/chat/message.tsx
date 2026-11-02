@@ -33,7 +33,7 @@ export function Message({ role, content, children, className }: MessageProps) {
           <Sparkles className="size-3 text-primary" />
         </div>
       )}
-      <div className={cn(
+      <div data-role={role} className={cn(
         "max-w-[85%] text-sm leading-relaxed",
         // Réponse assistant : ni bordure ni fond ni ombre (retour user) - juste le texte, façon chat.
         isUser

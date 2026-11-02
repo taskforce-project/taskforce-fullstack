@@ -5,6 +5,7 @@ import { ExternalLink, FileCheck2, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { Markdown } from "@/components/ui/lightweight-markdown"
 import { fillText, resultCard, resultLine } from "@/lib/delivery/result-card"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
@@ -17,6 +18,8 @@ import { cn } from "@/lib/utils"
  * l'agent pour ce qu'ils sont, puis trois gestes : « Discard », « Try again », « Apply ». Seule la personne qui a délégué
  * tranche : les gestes ne s'affichent que pour elle, le serveur le vérifie, et la carte dit pourquoi il refuse. Des tests
  * en échec éteignent « Apply » (R87, séance n°14) : on ne passe outre que par « Apply anyway », en écrivant pourquoi.
+ * Une mission qui n'a rien changé n'a rien à appliquer : le geste principal devient « Mark as done », qui termine
+ * l'issue (rejeu de la 1.8.0, TESTTA-2 : « Apply » restait éteint sans dire pourquoi).
  */
 export function MissionResultCard({ slug, issueId, issueKey, issueTitle, responsible }: Readonly<{
   slug: string
@@ -31,11 +34,12 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
   const error = useDeliveryStore((s) => (run ? s.resultErrors[run.id] : undefined))
   const applyRun = useDeliveryStore((s) => s.applyRun)
   const discardRun = useDeliveryStore((s) => s.discardRun)
+  const markRunDone = useDeliveryStore((s) => s.markRunDone)
   const retryRun = useDeliveryStore((s) => s.retryRun)
   const downloadEvidence = useDeliveryStore((s) => s.downloadEvidence)
   // `id` est typé `string` mais l'API /users/me le sérialise en `number` : comparer en chaînes.
   const viewerId = useUserStore((s) => s.user?.id)
-  const [busy, setBusy] = useState<"apply" | "discard" | "retry" | null>(null)
+  const [busy, setBusy] = useState<Gesture | null>(null)
   const [retrying, setRetrying] = useState(false)
   const [note, setNote] = useState("")
   const [overriding, setOverriding] = useState(false)
@@ -53,14 +57,15 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
     card.minutes === null ? null : card.minutes < 1 ? r.underAMinute : fillText(r.minutes, { minutes: card.minutes }),
   ].filter(Boolean).join(" · ")
 
-  async function act(kind: "apply" | "discard" | "retry") {
+  async function act(kind: Gesture) {
     if (!run) return
     setBusy(kind)
     const ok = kind === "apply" ? await applyRun(slug, issueId, run.id, overriding ? reason : undefined)
       : kind === "discard" ? await discardRun(slug, issueId, run.id)
+      : kind === "done" ? await markRunDone(slug, issueId, run.id)
       : (await retryRun(slug, issueId, run.id, note)) !== null
     setBusy(null)
-    if (ok) toast.success(kind === "apply" ? r.apply : kind === "discard" ? r.discard : r.tryAgain)
+    if (ok) toast.success({ apply: r.apply, discard: r.discard, done: r.markedDone, retry: r.tryAgain }[kind])
   }
 
   async function download(format: "json" | "md") {
@@ -101,7 +106,7 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
       </Zone>
 
       {card.changes.length > 0 && (
-        <Zone label={r.willChange}>
+        <Zone label={card.noChange ? r.willChangeDone : r.willChange}>
           <ul className="flex flex-col gap-1">
             {card.changes.map((change) => (
               <li key={change.text} className="flex items-baseline justify-between gap-2">
@@ -115,7 +120,10 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
 
       {run.summary && (
         <Zone label={r.inItsWords}>
-          <p className="line-clamp-6 whitespace-pre-wrap break-words text-muted-foreground">{run.summary}</p>
+          {/* L'agent écrit en Markdown (titres, gras, listes) : rendu comme une description, sans balise brute ni HTML. */}
+          <div className="max-h-64 overflow-y-auto pr-1">
+            <Markdown content={run.summary} compact className="space-y-1.5 break-words leading-relaxed text-muted-foreground" />
+          </div>
         </Zone>
       )}
 
@@ -157,9 +165,16 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
               <Button variant="outline" size="sm" className="h-8 text-xs" disabled={busy !== null} onClick={() => setRetrying(true)}>
                 {r.tryAgain}
               </Button>
-              <Button size="sm" className="h-8 text-xs" disabled={busy !== null || !card.pr || testsFailed} onClick={() => void act("apply")}>
-                {busy === "apply" ? <Loader2 className="size-3 animate-spin" /> : r.apply}
-              </Button>
+              {card.noChange ? (
+                // Rien à appliquer : le travail était déjà fait, l'issue se termine.
+                <Button size="sm" className="h-8 text-xs" disabled={busy !== null} onClick={() => void act("done")}>
+                  {busy === "done" ? <Loader2 className="size-3 animate-spin" /> : r.markDone}
+                </Button>
+              ) : (
+                <Button size="sm" className="h-8 text-xs" disabled={busy !== null || !card.pr || testsFailed} onClick={() => void act("apply")}>
+                  {busy === "apply" ? <Loader2 className="size-3 animate-spin" /> : r.apply}
+                </Button>
+              )}
             </div>
             {testsFailed && card.pr && (
               <p className="flex flex-wrap items-baseline gap-x-2 text-muted-foreground">
@@ -189,6 +204,9 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
     </section>
   )
 }
+
+/** Les gestes de la carte : « done » termine l'issue d'une mission qui n'a rien changé. */
+type Gesture = "apply" | "discard" | "done" | "retry"
 
 function Zone({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
