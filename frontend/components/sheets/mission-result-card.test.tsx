@@ -137,6 +137,18 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
     expect(screen.queryByRole("button", { name: "Discard" })).toBeNull();
   });
 
+  it("renders the agent's words as Markdown, not as raw marks", () => {
+    const summary = "## What changed\n- **Footer**: fixed 3 links\n- Kept the `Privacy` link\n\nSee [the issue](https://github.com/acme/website/issues/9).";
+    useDeliveryStore.setState({ runs: { 28: { ...RUN, summary } } });
+    show();
+
+    expect(screen.getByText("What changed")).toBeInTheDocument();
+    expect(screen.getByText("Footer").tagName).toBe("STRONG");
+    expect(screen.getByText("Privacy").tagName).toBe("CODE");
+    expect(screen.getByRole("link", { name: "the issue" })).toHaveAttribute("href", "https://github.com/acme/website/issues/9");
+    expect(document.body.textContent).not.toMatch(/##|\*\*/);
+  });
+
   it("shows why the server refused", () => {
     useDeliveryStore.setState({ resultErrors: { 100: "GitHub can't merge pull request #212 on acme/website right now." } });
     show();

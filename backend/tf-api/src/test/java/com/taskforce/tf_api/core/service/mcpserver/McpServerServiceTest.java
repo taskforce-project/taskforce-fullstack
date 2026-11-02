@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,7 +22,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
+import com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueRequest;
+import com.taskforce.tf_api.core.dto.response.ChecklistItemResponse;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.model.User;
@@ -150,26 +153,37 @@ class McpServerServiceTest {
     void tools_list_describes_every_tool() {
         JsonNode tools = call(user(), "tools/list", Map.of()).path("result").path("tools");
 
-        assertThat(tools).hasSize(12);
+        assertThat(tools).hasSize(13);
         for (JsonNode tool : tools) {
             assertThat(tool.path("inputSchema").path("type").asText()).isEqualTo("object");
             assertThat(tool.path("description").asText()).isNotBlank();
         }
-        assertThat(tools.findValuesAsText("name")).contains("get_issue", "add_comment", "brain_search", "ask_cortex");
+        assertThat(tools.findValuesAsText("name"))
+            .contains("get_issue", "add_comment", "brain_search", "ask_cortex", "check_checklist_item");
     }
 
     @Test
     void tools_list_of_a_delegated_session_hides_what_it_can_never_use() {
         JsonNode tools = call(delegated(12L), "tools/list", Map.of()).path("result").path("tools");
 
-        assertThat(tools.findValuesAsText("name")).doesNotContain("ask_cortex").contains("get_issue", "add_comment");
+        assertThat(tools.findValuesAsText("name")).doesNotContain("ask_cortex")
+            .contains("get_issue", "add_comment", "check_checklist_item");
+    }
+
+    @Test
+    void initialize_asks_to_check_the_checklist_items_the_agent_completes() {
+        JsonNode result = call(user(), "initialize", Map.of("protocolVersion", "2025-06-18")).path("result");
+
+        assertThat(result.path("instructions").asText()).contains("check_checklist_item");
     }
 
     // ------------------------------------------------------------------ outils
 
     @Test
-    void get_issue_returns_the_issue_and_its_thread() {
+    void get_issue_returns_the_issue_its_checklist_and_its_thread() {
         when(issueService.getIssue("acme", 12L, 5L, 7L)).thenReturn(IssueResponse.builder().id(5L).title("Fix the footer").build());
+        when(issueService.listChecklist("acme", 12L, 5L, 7L)).thenReturn(List.of(
+            ChecklistItemResponse.builder().id(31L).content("Update the README").done(false).position(0).build()));
         when(issueService.listComments("acme", 12L, 5L, 7L)).thenReturn(List.of());
 
         JsonNode result = callTool(user(), "get_issue", Map.of("projectId", 12, "issueId", 5));
@@ -177,7 +191,29 @@ class McpServerServiceTest {
         assertThat(result.path("isError").asBoolean()).isFalse();
         assertThat(result.path("structuredContent").path("commentCount").asInt()).isZero();
         assertThat(result.path("structuredContent").path("issue").path("title").asText()).isEqualTo("Fix the footer");
+        // Les lignes de la checklist avec leur id : l'agent coche celle qu'il a faite (check_checklist_item).
+        JsonNode item = result.path("structuredContent").path("checklist").get(0);
+        assertThat(item.path("id").asLong()).isEqualTo(31L);
+        assertThat(item.path("content").asText()).isEqualTo("Update the README");
+        assertThat(item.path("done").asBoolean()).isFalse();
         assertThat(result.path("content").get(0).path("text").asText()).contains("\"commentCount\":0");
+    }
+
+    @ParameterizedTest(name = "done={0}")
+    @ValueSource(booleans = {true, false})
+    void check_checklist_item_checks_or_unchecks_by_id(boolean done) {
+        when(issueService.updateChecklistItem(eq("acme"), eq(12L), eq(5L), eq(31L), eq(7L), any(UpdateChecklistItemRequest.class)))
+            .thenReturn(ChecklistItemResponse.builder().id(31L).content("Update the README").done(done).build());
+
+        JsonNode result = callTool(delegated(12L), "check_checklist_item",
+            Map.of("projectId", 12, "issueId", 5, "itemId", 31, "done", done));
+
+        assertThat(result.path("isError").asBoolean()).isFalse();
+        assertThat(result.path("structuredContent").path("done").asBoolean()).isEqualTo(done);
+        ArgumentCaptor<UpdateChecklistItemRequest> request = ArgumentCaptor.forClass(UpdateChecklistItemRequest.class);
+        verify(issueService).updateChecklistItem(eq("acme"), eq(12L), eq(5L), eq(31L), eq(7L), request.capture());
+        assertThat(request.getValue().getDone()).isEqualTo(done);
+        assertThat(request.getValue().getContent()).isNull(); // l'agent coche, il ne réécrit pas la ligne
     }
 
     @Test
@@ -211,6 +247,9 @@ class McpServerServiceTest {
         "update_issue | {\"projectId\": 12, \"issueId\": 5}                  | Nothing to update",
         "list_issues  | {\"projectId\": 12, \"limit\": 500}                  | limit must be between 1 and 200",
         "get_issue    | {}                                                    | Missing argument: projectId",
+        "check_checklist_item | {\"projectId\": 12, \"issueId\": 5, \"itemId\": 31} | Missing argument: done",
+        "check_checklist_item | {\"projectId\": 12, \"issueId\": 5, \"itemId\": 31, \"done\": \"yes\"} | done must be true or false",
+        "check_checklist_item | {\"projectId\": 12, \"issueId\": 5, \"done\": true} | Missing argument: itemId",
     })
     void invalid_arguments_are_tool_errors_the_model_can_fix(String tool, String arguments, String message) throws Exception {
         JsonNode result = callTool(user(), tool, mapper.readValue(arguments, Map.class));
@@ -253,6 +292,7 @@ class McpServerServiceTest {
         "update_issue | {\"projectId\": 99, \"issueId\": 5, \"title\": \"x\"}",
         "add_comment  | {\"projectId\": 99, \"issueId\": 5, \"content\": \"x\"}",
         "create_issue | {\"projectId\": 99, \"title\": \"x\"}",
+        "check_checklist_item | {\"projectId\": 99, \"issueId\": 5, \"itemId\": 31, \"done\": true}",
         "ask_cortex   | {\"message\": \"what changed?\"}",
     })
     void delegated_session_cannot_reach_beyond_its_scope(String tool, String arguments) throws Exception {

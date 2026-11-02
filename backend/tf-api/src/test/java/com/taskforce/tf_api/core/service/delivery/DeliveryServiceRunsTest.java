@@ -5,6 +5,8 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -14,6 +16,7 @@ import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.Project;
+import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.IntegrationRepository;
@@ -107,6 +110,31 @@ class DeliveryServiceRunsTest {
         assertThat(res.projectId()).isEqualTo(3L);
         assertThat(res.projectName()).isEqualTo("Website");
         assertThat(res.resultUrl()).isEqualTo("https://github.com/acme/website/pull/9");
+        assertThat(res.startedByName()).isNull(); // sans délégant connu
+    }
+
+    @ParameterizedTest(name = "délégant [{0}, {1}] : {2}")
+    @CsvSource(value = {
+        "Pierre, pierre@acme.dev, Pierre",
+        "'  ',   pierre@acme.dev, pierre@acme.dev",
+        "NULL,   pierre@acme.dev, pierre@acme.dev",
+    }, nullValues = "NULL")
+    @DisplayName("le run nomme la personne qui a délégué : l'issue montre l'agent qui y travaille en son nom")
+    void the_run_names_its_delegator(String displayName, String email, String expected) {
+        Workspace ws = mock(Workspace.class);
+        when(ws.getId()).thenReturn(5L);
+        when(access.resolveAndAuthorize("acme", 1L)).thenReturn(ws);
+        when(visibilityGuard.viewableProjectIds(5L, 1L)).thenReturn(List.of(3L));
+        Issue issue = mock(Issue.class);
+        DeliveryRun run = DeliveryRun.builder().id(9L).issue(issue).providerKey("claude-code")
+            .status(DeliveryRunStatus.RUNNING)
+            .startedBy(User.builder().id(7L).displayName(displayName).email(email).build()).build();
+        when(runRepository.findByProjectIds(eq(List.of(3L)), any(Pageable.class))).thenReturn(List.of(run));
+
+        DeliveryRunResponse res = service.listRuns("acme", 1L).get(0);
+
+        assertThat(res.startedById()).isEqualTo(7L);
+        assertThat(res.startedByName()).isEqualTo(expected);
     }
 
     @Test

@@ -10,6 +10,8 @@ package com.taskforce.tf_api.core.service.delivery;
  * @param ownerEmail      délégant, dont les droits plafonnent la session
  * @param ownerKeycloakId identifiant Keycloak du délégant (claim {@code sub} du principal délégué)
  * @param runnerClientId  runner qui tient la session (traçabilité)
+ * @param agentName       nom affiché de l'agent du run (« Claude Code ») : l'activité de l'issue dit par qui une action
+ *                        faite au nom du délégant est passée
  */
 public record DeliverySession(
     Long runId,
@@ -17,5 +19,6 @@ public record DeliverySession(
     Long projectId,
     String ownerEmail,
     String ownerKeycloakId,
-    String runnerClientId
+    String runnerClientId,
+    String agentName
 ) {}

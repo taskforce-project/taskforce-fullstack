@@ -459,6 +459,9 @@ export const CONSTANTS_EN = {
   // Delegated missions: what an agent asks while it works (R78, the Allow screen).
   missions: {
     agent: "Claude Code",
+    // The issue's Assignee while a mission works on it, in the delegator's name; the stored assignee doesn't change.
+    workingFor: "{agent}, for {who}",
+    workingHint: "Works on this issue until you review its result",
     taskforce: "TaskForce",
     wantsTo: "wants to",
     willDo: "What it will do",
@@ -583,6 +586,21 @@ export const CONSTANTS_EN = {
     },
   },
 
+  // An issue's activity: who did what, and through which agent.
+  issueActivity: {
+    system: "System",
+    created: "created",
+    createdVia: "created, prepared by {via}",
+    checked: "checked \"{item}\"",
+    unchecked: "unchecked \"{item}\"",
+    openedPullRequest: "opened pull request",
+    openedAPullRequest: "opened a pull request",
+    applied: "applied the result",
+    discarded: "discarded the result",
+    retried: "tried again",
+    forWhom: "for {who}",
+  },
+
   // Cortex in the conversation.
   cortex: {
     // The issue Cortex prepares as a card (R78): the person checks it, edits it, then creates it.
@@ -593,11 +611,26 @@ export const CONSTANTS_EN = {
     issueChange: "Change",
     issueTitle: "Title",
     issueDescription: "Description",
-    issueSubtasks: "Subtasks",
-    issueSubtasksHint: "One per line",
+    issueChecklist: "Checklist",
+    issueChecklistHint: "One item per line",
     issueDue: "Due",
     issueNoDue: "No due date",
     issueColumn: "Column",
+    // Filled only from what the request or the project says; the person fills the rest here.
+    issuePriority: "Priority",
+    issuePriorities: { NONE: "No priority", LOW: "Low", MEDIUM: "Medium", HIGH: "High", URGENT: "Urgent" },
+    issueAssignee: "Assignee",
+    issueUnassigned: "Unassigned",
+    issueLabels: "Labels",
+    issueNoLabels: "No labels",
+    issueProjectHasNoLabels: "This project has no labels yet",
+    issuePoints: "Points",
+    issueNoPoints: "No estimate",
+    issueOnePoint: "1 point",
+    issuePointsValue: "{points} points",
+    issueCycle: "Cycle",
+    issueNoCycle: "No cycle",
+    issueActiveCycle: "(active)",
     issueVisibleTo: "Visible to",
     issueVisibleWorkspace: "Workspace",
     issueVisibleCollaborators: "Collaborators only",
