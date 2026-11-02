@@ -60,6 +60,9 @@ export function describeActivity(a: IssueActivity, t: ActivityTexts): ActivityLi
       return { ...line, what: t.discarded };
     case "MISSION_RETRIED":
       return { ...line, what: t.retried };
+    // La mission n'a rien changé : la personne a terminé l'issue (rejeu de la 1.8.0).
+    case "MISSION_MARKED_DONE":
+      return { ...line, what: t.markedDone };
     default:
       return {
         ...line,

@@ -522,6 +522,10 @@ export const CONSTANTS_EN = {
       requestsAnswered: "Requests answered",
       requestsCount: "{answered} of {asked}",
       willChange: "What will change if you apply",
+      // A mission that changed nothing (the work was already done): nothing to apply, the issue is marked done.
+      willChangeDone: "What will change if you mark it done",
+      markDone: "Mark as done",
+      markedDone: "Done: no change was needed",
       mergeChange: "Merge pull request #{number} on GitHub",
       moveChange: "Move {key} to Done",
       final: "final",
@@ -622,6 +626,7 @@ export const CONSTANTS_EN = {
     applied: "applied the result",
     discarded: "discarded the result",
     retried: "tried again",
+    markedDone: "marked the issue done: no change was needed",
     forWhom: "for {who}",
   },
 

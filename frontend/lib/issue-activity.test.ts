@@ -54,6 +54,7 @@ describe("describeActivity : qui a fait quoi sur une issue", () => {
     ["MISSION_APPLIED", "applied the result"],
     ["MISSION_DISCARDED", "discarded the result"],
     ["MISSION_RETRIED", "tried again"],
+    ["MISSION_MARKED_DONE", "marked the issue done: no change was needed"],
   ] as const)("the person's decision on the result: %s", (action, what) => {
     expect(describeActivity(activity({ action }), t)).toMatchObject({ who: "Pierre", what, forWhom: null });
   });
