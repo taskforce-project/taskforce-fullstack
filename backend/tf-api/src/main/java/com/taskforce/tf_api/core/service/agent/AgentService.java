@@ -9,9 +9,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -263,18 +263,23 @@ public class AgentService {
             steps.add(new AssistantStep(STEP_ANSWER, "active", "Cortex answers, with its tools if needed"));
             // Un geste qui se demande parle par sa carte : la phrase du modèle ne dit pas « je supprime » à sa place.
             String modelAnswer = cardAnswer(runToolLoop(message, hits, ctx, toolCalls, hist), toolCalls);
-            String answer = honestAnswer(message, modelAnswer, toolCalls);
-            if (answer.equals(modelAnswer)) {
+            // R116 : une phrase qui annonce une action sans son résultat d'outil est remplacée par la vérité, signée par
+            // TaskForce, et l'incident entre au dossier de la réponse (E17).
+            ActionClaimCheck.Checked checked = ActionClaimCheck.check(modelAnswer, ActionClaimCheck.Ran.of(toolCalls));
+            String record = toolCalls.stream().map(AssistantToolCall::record).filter(Objects::nonNull).findFirst().orElse(null);
+            if (!checked.corrected()) {
                 steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", toolsDescription(toolCalls)));
             } else {
-                log.warn("Cortex (ws={}) : la réponse annonçait une écriture qu'aucun outil n'a faite, remplacée",
+                log.warn("Cortex (ws={}) : la réponse annonçait une action qu'aucun outil n'a faite, corrigée par TaskForce",
                     ws.getId());
-                steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", "No action ran: nothing was created"));
+                record = trustIncident(ctx, message, hits, toolCalls, checked, record);
+                steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
+                    "Cortex said something was done that no action did: TaskForce corrected it"));
             }
             LlmUsage usage = llm.currentUsage();
             recordUsage(ws.getId(), usage);
-            return new AssistantAnswer(answer, null, toolCalls.isEmpty() ? "fast" : "deep",
-                sources, steps, toolCalls, toUsage(usage));
+            return new AssistantAnswer(checked.answer(), null, toolCalls.isEmpty() ? "fast" : "deep",
+                sources, steps, toolCalls, toUsage(usage), record);
         } catch (LlmToolsRefusedException ex) {
             log.warn("Cortex (slug={}) : le fournisseur refuse les outils", LogSafe.of(slug));
             LlmUsage usage = llm.currentUsage();
@@ -306,6 +311,25 @@ public class AgentService {
         String answer = "> [!warning] Cortex stopped before the end\n> " + cause
             + ". What it had already done shows in its steps: check it before asking again, so nothing is done twice.";
         return new AssistantAnswer(answer, null, "deep", sources, steps, toolCalls, toUsage(usage));
+    }
+
+    /**
+     * L'incident de confiance au dossier de la réponse (E17) : ce que le modèle a dit, ce que TaskForce a montré. Une
+     * réponse sans outil n'avait pas de dossier : il s'ouvre pour l'incident. Une panne du dossier ne défait pas la
+     * correction, déjà faite : elle se journalise.
+     */
+    private String trustIncident(AgentContext ctx, String message, List<KnowledgeNode> hits,
+                                 List<AssistantToolCall> toolCalls, ActionClaimCheck.Checked checked, String record) {
+        try {
+            Map<String, Object> origin = new LinkedHashMap<>();
+            origin.put("model", llm.currentModel());
+            origin.putAll(origin(null, hits));
+            return records.incident(ctx, record == null ? null : UUID.fromString(record), message, origin,
+                checked.incident(ActionClaimCheck.Ran.of(toolCalls))).toString();
+        } catch (RuntimeException e) {
+            log.warn("Cortex : incident de confiance non gardé au dossier : {}", LogSafe.of(e.getMessage()));
+            return record;
+        }
     }
 
     /** Détail de l'étape de réponse une fois terminée : outils mobilisés, s'il y en a eu. */
@@ -435,7 +459,11 @@ public class AgentService {
                     ? llm.rawChat(msgs, defs, "fast")
                     : llm.rawChatWithModel(msgs, defs, model),
                 step);
-            return new ReplayOutcome(answer, step.calls, llm.currentModel(), llm.currentUsage());
+            // R116 : la banque note la réponse que la personne verrait, corrigée par TaskForce.
+            List<ActionClaimCheck.Ran> ran = step.calls.stream()
+                .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList();
+            return new ReplayOutcome(ActionClaimCheck.check(answer, ran).answer(), step.calls, llm.currentModel(),
+                llm.currentUsage());
         } finally {
             llm.endUsageCapture();
         }
@@ -804,62 +832,6 @@ public class AgentService {
             }
         }
         return sb.toString();
-    }
-
-    // -------------------------------------------------------------------------
-    // Une action ne se dit faite que si un outil l'a faite (R35, séance n°7 du Conseil)
-    // -------------------------------------------------------------------------
-
-    /** Les écritures de TaskForce : seule la réussite de l'une d'elles permet d'annoncer une création. */
-    private static final Set<String> WRITE_TOOLS = Set.of("create_issue", "create_project", "create_note");
-
-    private static final int REGEX_FLAGS = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS
-        | Pattern.DOTALL;
-
-    /**
-     * Une demande de création : le message COMMENCE par le verbe (après « please », « can you », « peux-tu »…), puis un
-     * objet de l'espace, en anglais ou en français. « Show me the open issues » n'en est pas une.
-     */
-    private static final Pattern WRITE_REQUEST = Pattern.compile(
-        "^\\s*(please\\s+|can\\s+you\\s+|could\\s+you\\s+|peux-tu\\s+|pourrais-tu\\s+|merci\\s+de\\s+)?"
-            + "(create|add|make|file|log|open\\s+(a|an)|crée[rz]?|cree[rz]?|ajoute[rz]?)\\b.*"
-            + "\\b(issues?|tickets?|tasks?|bugs?|projects?|notes?|tâches?|taches?|projets?)\\b", REGEX_FLAGS);
-
-    /**
-     * Une phrase qui annonce une création faite, toujours rattachée à son objet. Pas « opened » : « 3 issues opened this
-     * week » décrit l'espace, n'annonce rien.
-     */
-    private static final Pattern WRITE_CLAIM = Pattern.compile(
-        "\\b(issue|ticket|task|project|note)s?\\s+(has\\s+been\\s+|have\\s+been\\s+|was\\s+|were\\s+)?(created|added)\\b"
-            + "|\\b(created|added)\\s+(a\\s+|an\\s+|the\\s+|your\\s+|\\d+\\s+)?(new\\s+)?(issue|ticket|task|project|note)s?\\b"
-            + "|\\b(issue|ticket|tâche|tache|projet|note)s?\\s+(a\\s+été\\s+|ont\\s+été\\s+)?(créée?s?|ajoutée?s?)"
-            + "|\\b(créé|ajouté)e?s?\\s+(une\\s+|un\\s+|la\\s+|le\\s+|les\\s+|\\d+\\s+)?(nouvelle\\s+|nouveau\\s+)?"
-            + "(issue|ticket|tâche|tache|projet|note)s?\\b", REGEX_FLAGS);
-
-    /**
-     * La réponse à montrer : celle du modèle, sauf s'il annonce une création qu'aucun outil n'a faite. Un petit modèle
-     * l'a fait le 29/10/2026 (« Issue created », rien de créé) ; c'est le résultat de l'outil qui fait foi, pas la
-     * phrase. Ne joue que sur une demande de création, pour ne pas toucher une réponse qui raconte l'historique.
-     */
-    static String honestAnswer(String message, String answer, List<AssistantToolCall> toolCalls) {
-        if (answer == null || message == null) return answer == null ? "" : answer;
-        boolean wrote = toolCalls.stream()
-            .anyMatch(call -> WRITE_TOOLS.contains(call.name()) && "success".equals(call.status()));
-        if (wrote || !WRITE_REQUEST.matcher(message).find() || !WRITE_CLAIM.matcher(answer).find()) return answer;
-        if (toolCalls.stream().anyMatch(call -> "pending".equals(call.status()) && PREPARED.contains(call.name()))) {
-            return "Nothing is created yet: check the issue below, then create it.";
-        }
-        if (toolCalls.stream().anyMatch(call -> "pending".equals(call.status()))) {
-            return "Nothing has changed yet: the action below waits for your approval.";
-        }
-        if (toolCalls.stream().anyMatch(call -> "refused".equals(call.status()))) {
-            return "Nothing was created: the rules of this workspace refuse this action.";
-        }
-        boolean failed = toolCalls.stream()
-            .anyMatch(call -> WRITE_TOOLS.contains(call.name()) && "error".equals(call.status()));
-        return failed
-            ? "I couldn't do it, so nothing was created. Ask me again, or create it from the board."
-            : "I didn't create anything: no action ran. Ask me again with the project's name, or create it from the board.";
     }
 
     /**

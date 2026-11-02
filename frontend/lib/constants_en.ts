@@ -646,6 +646,12 @@ export const CONSTANTS_EN = {
 
   // Cortex in the conversation.
   cortex: {
+    // R116: TaskForce's own words in an answer, in place of a sentence where Cortex said something was done that no
+    // action of the turn did. Shown under TaskForce's name and style, never as the model's words.
+    taskforceSays: "TaskForce",
+    taskforceSaysWhat: "corrected what Cortex said was done",
+    taskforceSaysLabel: "Correction by TaskForce",
+    taskforceSaysHint: "Cortex said something was done, but no action of this turn did it. TaskForce replaced its sentence with what happened: these are not the model's words.",
     // The issue Cortex prepares as a card (R78): the person checks it, edits it, then creates it.
     issueCardTitle: "New issue, prepared by Cortex",
     issueCardHint: "Filled from your request and the project",
