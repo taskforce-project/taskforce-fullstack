@@ -10,6 +10,20 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 02/11/2026 - J1 : le chat en bulle, comme le composeur du site, qui s'ouvre au-dessus de la barre sur chaque écran.** `[frontend]`
+> - **Demande du CEO** (essai de l'app desktop 1.5.0, produit 1.8.0) : « Le chat comme ca on voit que dalle, ca pourrait etre le mm que sur le site web tu vois ? Avec un bg gradient comme ca right ? Une sorte de bulle de chat qui s ouvrirais partout quoi. » Sur sa capture, la conversation de #469 est un tiroir plat sous le tableau, du même fond, qu'on distingue mal. Le même jour, il a décidé que l'expérience passe par le chat (ADR-024, brouillon).
+> - **Fait** (branche `feat/chat-bubble`, PR #475 vers `dev`, étiquette `frontend:release:minor`, pas fusionnée) :
+>   - la barre flotte dans sa propre bande en bas de chaque écran (72 px au lieu de 92) : arrondie, ombrée, « Send » rond ; vide et repliée, elle montre à droite les suggestions de l'écran quand la place le permet, et les range pendant qu'on écrit ;
+>   - la conversation s'ouvre au-dessus, dans une bulle à part : arrondie (18 px, le rayon du composeur du site), ombrée, un dégradé bleu qui monte de la barre, sur un halo qui estompe l'écran autour ; lisible sur n'importe quel écran, en clair et en sombre ; rien de modal, le halo ne capte aucun clic ;
+>   - « Minimize » (Échap, le chevron de la bulle ou le bouton de la barre) la range dans la barre, le point bleu reste ; son bord haut la redimensionne, plafonnée sous la barre du haut (et sous les boutons de la fenêtre dans l'app desktop) ; « Pin to the side » reste ;
+>   - avec un panneau ouvert à droite (AI Workflows), la bulle et la barre se centrent sur ce qui reste au lieu de passer dessous ;
+>   - mouvement réduit : la bulle apparaît en fondu, sans se déplacer ; pas de `backdrop-filter` ; l'arc du parcours du site n'est pas repris ;
+>   - les valeurs vivent dans les classes `.cortex-*` de `globals.css`, et `design-grammar.md` note l'exception (les seules surfaces arrondies et en dégradé de l'app) ; R76 tient, la conversation reste dans `useCortexStore`.
+> - **Contrôles** : `tsc --noEmit` propre ; `npm run lint` sans erreur (les 74 avertissements d'avant) ; `CI=1 npx vitest run --coverage` : 117 fichiers, 1 400 tests, seuils par fichier tenus (`command-bar.test.tsx` passe de 7 à 10 tests) ; les vrais composants rendus sur une page locale temporaire, jamais commitée, en clair et en sombre (ouverte, vide, repliée avec une réponse en attente, à côté d'un panneau, épinglée, mouvement réduit, largeur de téléphone).
+> - **Non vérifié** : l'app elle-même, faute de connexion dans cette session : ni la webapp ni l'app desktop (sa barre de titre et ses boutons de fenêtre) rejouées en direct.
+> - **Brain OS** : `v1/02-produit/Frontend.md` (FE-CHAT-BUBBLE : le contrat de mise en page change) et une ligne datée dans `v1/14-design/Revue_UX_2026-11-01.md`, sur `feature/lean-oss`.
+> - **Suite** : la relecture du CEO sur la PR, puis la prochaine version desktop.
+
 > **▶ MAJ 02/11/2026 - Release 1.8.0 EN PROD : la porte qui demande, l'issue qui dit vrai, la conversation depuis la barre ; desktop 1.5.0 publiée.** `[release]`
 > - **Décision du CEO** : « go release ».
 > - **En prod** : `chore(desktop)` 1.5.0 (`253e6f69`) ; release #473 vers `main` (`b7c74ab4`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.8.0 en plomberie ; étiquettes `minor` pour le backend et le front). Dedans : la porte (#467, R107, R108) ; les écritures de l'agent bornées à l'issue confiée, avec un plafond de 30 changements par mission (#472, R110) ; l'issue qui dit vrai et l'agent qui la tient à jour (#471, R110, R111) ; la revue UI/UX et la conversation depuis la barre (#469, R112) ; le catalogue réduit aux préréglages essayés et le plan figé d'« AI Workflows » retiré (#468, TF-J1-3). Migrations V112 et V113.
