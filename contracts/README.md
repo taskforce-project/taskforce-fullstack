@@ -6,9 +6,23 @@ cases.
 
 | Contract | Files | Read by | Proved by |
 | --- | --- | --- | --- |
-| Rules bundle, `taskforce-rules/1` | `rules/taskforce-rules-1.schema.json`, `rules/default.rules.json` | the server (Java) publishes it, the runner (TypeScript) applies it | `rules/cases.json`: the same actions must get the same decision on both sides |
+| Rules bundle, `taskforce-rules/1` | `rules/taskforce-rules-1.schema.json`, `rules/default.rules.json` | the server publishes it and judges its own tools with it, the runner applies it to the agent's actions | `rules/cases.json`: the same actions must get the same decision on both sides |
 | Evidence file, `taskforce-evidence/1` | `evidence/taskforce-evidence-1.schema.json` | the server writes the chain, anyone can check an export | `evidence/chain-cases.json`: the same events must give the same hashes on both sides |
 | Agent adapter | `agent/adapter.md` | the runner, one adapter per agent | the adapter tests in `taskforce-runner` |
+
+## One engine for both sides
+
+The rules engine and the evidence chain are written once, in Java, in `backend/tf-api`
+(`core/harness`: `RulesEngine`, `Glob`, `RulesDigest`, `CanonicalJson`, `EvidenceChain`). The runner runs the same
+code, compiled to JavaScript by TeaVM: `backend/rules-engine-js` builds `taskforce-runner/src/harness/engine/rules-engine.js`
+and its TypeScript declarations, which are committed so that the runner needs no JDK. A rule, a glob or a hash cannot
+mean one thing on the server and another in the runner (R90, decided on 02/11/2026).
+
+"Both sides" above are therefore the Java engine and its compiled module: the server's tests replay the cases in Java,
+the runner's tests replay them against the compiled module, which also catches a mistake of the compiler. The CI
+compiles the module again from the Java sources and refuses a difference with the committed file
+(`.github/workflows/rules-engine.yml`). What turns a tool call into facts stays the runner's own code
+(`taskforce-runner/src/harness/facts.ts`), as the agent adapter says.
 
 ## Rules: how a decision is made
 
@@ -22,6 +36,9 @@ cases.
    the same effect, the first in the bundle wins.
 4. No matching rule: the action is unknown and the decision is `ask` (invariant 3). Nothing else is implied.
 5. No model, no network, no clock: the same bundle and the same facts always give the same decision (invariant 1).
+   One tool call may be described by several sets of facts (a compound command, one set per part): the strictest
+   decision wins, the first one among equals. A call with no facts at all (an internal tool of the agent, with no
+   effect outside its session) is allowed, with no rule.
 6. The bundle's `digest` is `sha256:` followed by the hex SHA-256 of the canonical JSON (see below) of the bundle
    without its `digest` field and without any member whose value is `null`, at every level. The runner recomputes it
    and refuses a bundle that does not match: no mission starts without rules.
