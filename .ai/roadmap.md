@@ -10,12 +10,13 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
-> **▶ MAJ 02/11/2026 - Release 1.8.0 EN PROD : la porte qui demande, l'issue qui dit vrai, la conversation depuis la barre ; desktop 1.5.0 en construction.** `[release]`
+> **▶ MAJ 02/11/2026 - Release 1.8.0 EN PROD : la porte qui demande, l'issue qui dit vrai, la conversation depuis la barre ; desktop 1.5.0 publiée.** `[release]`
 > - **Décision du CEO** : « go release ».
 > - **En prod** : `chore(desktop)` 1.5.0 (`253e6f69`) ; release #473 vers `main` (`b7c74ab4`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.8.0 en plomberie ; étiquettes `minor` pour le backend et le front). Dedans : la porte (#467, R107, R108) ; les écritures de l'agent bornées à l'issue confiée, avec un plafond de 30 changements par mission (#472, R110) ; l'issue qui dit vrai et l'agent qui la tient à jour (#471, R110, R111) ; la revue UI/UX et la conversation depuis la barre (#469, R112) ; le catalogue réduit aux préréglages essayés et le plan figé d'« AI Workflows » retiré (#468, TF-J1-3). Migrations V112 et V113.
 > - **Pas dedans** : la passerelle de modèles en Java (#470), qui attend le contrôle de `docker-compose.vm1.yml` sur VM1 (hors dépôt : un service `ai-service` surchargé là bloquerait le déploiement automatique).
 > - **Vérifié** : l'API a redémarré à 11:15:42 UTC, 3 min 30 après la fusion (28 s de coupure, puis `readyz` 200 : V112 et V113 passées) ; la webapp affiche 1.8.0 sur `/auth/login` à 11:16:26 ; le site affiche 1.8.0. Sans SSH, la base de prod n'a pas été lue.
-> - **Suite** : la desktop 1.5.0 (run 41435511568), puis le site reconstruit ; le rejeu de la mission 6 par le CEO, qui clôt J0 (R109) ; la passerelle (#470) ; E16 ; TF-J1-4.
+> - **Desktop 1.5.0 publiée** : run 41435511568 depuis `main`, vert, VirusTotal compris ; `desktop-v1.5.0` (préversion, comme les précédentes) et `desktop-latest`, dont `latest.yml` annonce 1.5.0 aux apps installées ; le site est reconstruit pour la proposer.
+> - **Suite** : le rejeu de la mission 6 par le CEO, qui clôt J0 (R109) ; la passerelle (#470) ; E16 ; TF-J1-4.
 
 > **▶ MAJ 02/11/2026 - J0, R110 : l'agent n'écrit que sur l'issue confiée, et demande au-delà d'un plafond par mission.** `[backend + runner]`
 > - **Décision** (séance n°16 du Conseil, retenue par le CEO le 01/11/2026) : pendant la mission, l'agent met à jour ce qui se défait sur la seule issue confiée (lignes de la checklist, champs, colonne, ses commentaires), chaque changement sous son nom (fait avec #471) ; au-delà d'un plafond par mission, il demande. Signal d'arrêt : un changement de l'agent sur une autre issue que celle confiée.
