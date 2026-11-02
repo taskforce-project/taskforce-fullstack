@@ -290,6 +290,15 @@ class DeliveryControllerWebMvcTest {
     }
 
     @Test
+    @DisplayName("POST /runs/{id}/done : la personne termine l'issue d'une mission qui n'a rien changé")
+    void mark_done_200() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/done").with(auth()))
+            .andExpect(status().isOk());
+
+        verify(missionResults).markDone("acme", 100L, 7L);
+    }
+
+    @Test
     @DisplayName("POST /runs/{id}/retry : une nouvelle mission part avec la remarque")
     void retry_200() throws Exception {
         var a = auth();
