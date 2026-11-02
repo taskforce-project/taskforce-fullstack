@@ -5,16 +5,15 @@ import {
   ReactFlow, Background, Controls, MiniMap, Handle, Position,
   type Node, type Edge, type NodeProps, type ColorMode,
 } from "@xyflow/react"
-import { Bot, FileText, GitBranch, Layers } from "lucide-react"
+import { Bot, FileText, Layers } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import type { AnalysisJob } from "@/lib/api/analysis-service"
-import type { PlanTask } from "@/components/ui/agent-plan"
 import type { DeliveryProvider, DeliveryRun } from "@/lib/api/delivery-service"
 
 // NB : la CSS de React Flow est importee dans app/globals.css APRES tailwindcss (ordre requis Tailwind v4).
 
-// ─── Statut unifie (plan d'analyse + job + run de delegation) -> couleur/libelle. ───
+// ─── Statut unifie (job d'analyse + run de delegation) -> couleur/libelle. ───
 type Tone = "done" | "running" | "waiting" | "failed" | "idle"
 const TONE_COLOR: Record<Tone, string> = {
   done: "var(--shape-green)", running: "var(--primary)", waiting: "var(--shape-yellow)", failed: "var(--shape-red)", idle: "var(--subtle)",
@@ -25,17 +24,17 @@ const TONE_INK: Record<Tone, string> = {
 }
 function toneOf(status: string | undefined): Tone {
   switch (status) {
-    case "completed": case "DONE": return "done"
-    case "in-progress": case "RUNNING": return "running"
-    case "need-help": case "WAITING_FOR_INPUT": return "waiting"
-    case "failed": case "FAILED": return "failed"
-    default: return "idle" // pending / QUEUED / null
+    case "DONE": return "done"
+    case "RUNNING": return "running"
+    case "WAITING_FOR_INPUT": return "waiting"
+    case "FAILED": return "failed"
+    default: return "idle" // QUEUED / null
   }
 }
 const statusLabel = (s?: string) => (s ?? "").toLowerCase().replace(/_/g, " ") || "pending"
 
-// ─── Noeud du canvas (kind = job / task / agent / run). Style aux tokens de l'app (theme auto). ───
-type NodeKind = "job" | "task" | "agent" | "run"
+// ─── Noeud du canvas (kind = job / agent / run). Style aux tokens de l'app (theme auto). ───
+type NodeKind = "job" | "agent" | "run"
 interface FlowData extends Record<string, unknown> {
   kind: NodeKind
   title: string
@@ -46,7 +45,7 @@ interface FlowData extends Record<string, unknown> {
   projectRef?: number | null // projet de l'issue d'un run : requis par le lien profond du board
 }
 
-const KIND_ICON = { job: Layers, task: GitBranch, agent: Bot, run: FileText } as const
+const KIND_ICON = { job: Layers, agent: Bot, run: FileText } as const
 
 function FlowNode({ data, selected }: NodeProps<Node<FlowData>>) {
   const Icon = KIND_ICON[data.kind]
@@ -80,74 +79,28 @@ function FlowNode({ data, selected }: NodeProps<Node<FlowData>>) {
 
 const nodeTypes = { flow: FlowNode }
 
-// ─── Layout deterministe : bandes (1 job = 1 bande, taches en colonnes par niveau de dependance),
-// puis une region « delegations » (issues -> agents). Overlap-free (chaque colonne empile). ───
+// ─── Layout deterministe : les analyses en colonne (un noeud par analyse : le plan d'etapes fige qu'elles
+// montraient est retire, TF-J1-3), puis une region « delegations » (issues -> agents). Overlap-free. ───
 const COL_W = 240, ROW_H = 84, BAND_GAP = 56
-
-/** Niveau topologique d'une tache dans le plan (0 = racine), anti-cycle. */
-function computeLevels(tasks: PlanTask[]): Map<string, number> {
-  const byId = new Map(tasks.map((t) => [t.id, t]))
-  const level = new Map<string, number>()
-  const visiting = new Set<string>()
-  const walk = (id: string): number => {
-    if (level.has(id)) return level.get(id)!
-    if (visiting.has(id)) return 0 // cycle -> coupe
-    visiting.add(id)
-    const deps = (byId.get(id)?.dependencies ?? []).filter((d) => byId.has(d) && d !== id)
-    const lvl = deps.length ? 1 + Math.max(...deps.map(walk)) : 0
-    visiting.delete(id)
-    level.set(id, lvl)
-    return lvl
-  }
-  for (const t of tasks) walk(t.id)
-  return level
-}
 
 interface BuildInput { jobs: AnalysisJob[]; runs: DeliveryRun[]; providers: DeliveryProvider[] }
 function buildFlow({ jobs, runs, providers }: BuildInput): { nodes: Node<FlowData>[]; edges: Edge[] } {
   const nodes: Node<FlowData>[] = []
   const edges: Edge[] = []
-  let cursorY = 0
   const edge = (id: string, source: string, target: string, tone: Tone): Edge => ({
     id, source, target, type: "smoothstep",
     animated: tone === "running",
     style: { stroke: TONE_COLOR[tone], strokeWidth: 1.5, opacity: tone === "idle" ? 0.4 : 0.8 },
   })
 
-  // ── Region A : workflows d'analyse (plan = DAG). ──
-  for (const job of jobs) {
-    const jobId = `job-${job.id}`
-    const tasks = job.plan ?? []
-    const levels = computeLevels(tasks)
-    const rowInCol = new Map<number, number>() // compteur de ligne par colonne (empilage sans chevauchement)
-    const posOf = new Map<string, { x: number; y: number }>()
-    const colCounts = new Map<number, number>()
-    for (const t of tasks) colCounts.set(levels.get(t.id) ?? 0, (colCounts.get(levels.get(t.id) ?? 0) ?? 0) + 1)
-    const bandRows = Math.max(1, ...colCounts.values())
-    const bandH = bandRows * ROW_H
-
+  // ── Region A : les analyses, statut en direct. ──
+  jobs.forEach((job, i) => {
     nodes.push({
-      id: jobId, type: "flow", position: { x: 0, y: cursorY + bandH / 2 - ROW_H / 2 },
+      id: `job-${job.id}`, type: "flow", position: { x: 0, y: i * ROW_H },
       data: { kind: "job", title: job.projectName, sub: job.depth === "DEEP" ? "Deep analysis" : "Quick analysis", tone: toneOf(job.status), status: job.status, ref: job.projectId },
     })
-
-    for (const t of tasks) {
-      const col = levels.get(t.id) ?? 0
-      const r = rowInCol.get(col) ?? 0
-      rowInCol.set(col, r + 1)
-      const colCount = colCounts.get(col) ?? 1
-      const x = (col + 1) * COL_W + 40
-      const y = cursorY + (bandH - colCount * ROW_H) / 2 + r * ROW_H // colonne centree verticalement dans la bande
-      posOf.set(t.id, { x, y })
-      const done = t.subtasks?.filter((s) => s.status === "completed").length ?? 0
-      const sub = t.subtasks?.length ? `${done}/${t.subtasks.length} steps` : undefined
-      nodes.push({ id: `task-${job.id}-${t.id}`, type: "flow", position: { x, y }, data: { kind: "task", title: t.title, sub, tone: toneOf(t.status), status: t.status } })
-      const deps = (t.dependencies ?? []).filter((d) => posOf.has(d) || tasks.some((x) => x.id === d))
-      if (deps.length === 0) edges.push(edge(`e-${jobId}-${t.id}`, jobId, `task-${job.id}-${t.id}`, toneOf(t.status)))
-      for (const d of deps) edges.push(edge(`e-${job.id}-${d}-${t.id}`, `task-${job.id}-${d}`, `task-${job.id}-${t.id}`, toneOf(t.status)))
-    }
-    cursorY += bandH + BAND_GAP
-  }
+  })
+  const cursorY = jobs.length ? jobs.length * ROW_H + BAND_GAP : 0
 
   // ── Region B : delegations (issue -> agent), agents en colonne. ──
   if (runs.length) {
@@ -192,9 +145,9 @@ interface WorkflowCanvasProps {
 }
 
 /**
- * Canvas React Flow unifie du « workflow IA » : les workflows d'analyse (plan = DAG tache/dependance)
- * ET les delegations vers agents (issue -> agent, plusieurs en parallele), avec statut live et couleurs.
- * Presentation pure : recoit les donnees reelles (stores), aucune mutation.
+ * Canvas React Flow unifie du « workflow IA » : les analyses (un noeud chacune) ET les delegations vers
+ * agents (issue -> agent, plusieurs en parallele), avec statut live et couleurs. Le plan d'etapes fige des
+ * analyses n'y est plus dessine (TF-J1-3). Presentation pure : recoit les donnees reelles (stores), aucune mutation.
  */
 export function WorkflowCanvas({ jobs, runs, providers, onSelectProject, onSelectIssue }: Readonly<WorkflowCanvasProps>) {
   const colorMode = useColorMode()

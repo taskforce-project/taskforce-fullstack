@@ -54,7 +54,8 @@ const PM_CATEGORY = "PROJECT_MANAGEMENT"
 
 // ---------------------------------------------------------------------------
 // CreateProjectDialog - deux modes : projet vierge, ou import d'un projet depuis un outil connecté
-// en MCP (TF-MCP-04). En mode import : grille de logos (Linear, Asana, Jira…), avec connexion 1-clic
+// en MCP (TF-MCP-04). En mode import : grille de logos des préréglages de gestion de projet que montre le
+// catalogue (ceux essayés, Linear seul aujourd'hui, et ceux déjà connectés : TF-J1-3), avec connexion 1-clic
 // inline pour les outils pas encore branchés.
 // ---------------------------------------------------------------------------
 

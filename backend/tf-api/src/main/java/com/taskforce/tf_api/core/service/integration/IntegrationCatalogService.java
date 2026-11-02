@@ -32,6 +32,10 @@ import lombok.RequiredArgsConstructor;
 /**
  * Assemble le {@link IntegrationCatalogResponse} d'un workspace : le catalogue ({@link ConnectorCatalog}) groupé
  * par catégorie, avec l'état de connexion réel, puis les serveurs MCP ajoutés à la main par le workspace.
+ *
+ * <p>Un préréglage jamais essayé n'y figure que pour le workspace qui l'a connecté (TF-J1-3,
+ * {@link ConnectorCatalog#isShown}). Cortex lit ce même catalogue ({@code find_integration}) : il ne propose pas non
+ * plus un outil que l'écran ne montre pas.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -59,12 +63,15 @@ public class IntegrationCatalogService {
         List<ConnectedServer> servers = workspaceMcp.connectedServers(ws.getId());
         servers.stream().map(ConnectedServer::connectorKey).filter(catalog::isMcpPreset).forEach(connectedKeys::add);
 
-        // Groupement par catégorie, dans l'ordre de déclaration du catalogue.
+        // Groupement par catégorie, dans l'ordre de déclaration du catalogue, sans les préréglages jamais essayés
+        // que ce workspace n'a pas connectés.
         Map<String, CategoryGroup> groups = new LinkedHashMap<>();
+        int shown = 0;
         int connected = 0;
-        List<ConnectorDescriptor> all = catalog.all();
-        for (ConnectorDescriptor d : all) {
+        for (ConnectorDescriptor d : catalog.all()) {
             boolean isConnected = connectedKeys.contains(d.key());
+            if (!catalog.isShown(d.key(), isConnected)) continue;
+            shown++;
             if (isConnected) connected++;
 
             ConnectorView view = new ConnectorView(
@@ -87,7 +94,7 @@ public class IntegrationCatalogService {
             groups.put(cat.name(), new CategoryGroup(cat.name(), cat.getLabel(), new ArrayList<>(custom)));
         }
 
-        return new IntegrationCatalogResponse(all.size() + custom.size(), connected + custom.size(),
+        return new IntegrationCatalogResponse(shown + custom.size(), connected + custom.size(),
             new ArrayList<>(groups.values()));
     }
 

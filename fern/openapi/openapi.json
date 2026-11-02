@@ -126,7 +126,7 @@
     },
     {
       "name": "AI analysis (workflows)",
-      "description": "AI analysis jobs: plan, run and resume."
+      "description": "AI analysis jobs: launch, follow and resume."
     },
     {
       "name": "Skill suggestions"
@@ -14780,13 +14780,6 @@
           },
           "status": {
             "type": "string"
-          },
-          "plan": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": {}
-            }
           },
           "question": {
             "type": "string"
