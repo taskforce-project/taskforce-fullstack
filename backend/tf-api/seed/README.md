@@ -17,6 +17,9 @@
 - **Notifications** (inbox admin) : assigned/mention/commented/dueSoon/overdue/statusChanged/overload, mix lu/non-lu.
 - **Favoris projet**, **pages** (doc projet), **invitations en attente** (email sans compte).
 - **3 équipes** + association projets · **historique d'assignations** (score Smart Assign).
+- **Banque d'évaluations de Cortex** (Réglages > Test bank) : les six échanges du CEO du 02/11/2026 (séance n°17,
+  R118), figés avec leur question, leur date et la cassette de `list_issues` du projet `test-taskforce`. La banque n'a
+  pas de cas intégrés : c'est ce seed qui les met dans un espace neuf, puis chaque modèle se rejoue dessus.
 
 > ⚠️ Requiert les migrations **V41→V48** appliquées (rebuild backend récent).
 

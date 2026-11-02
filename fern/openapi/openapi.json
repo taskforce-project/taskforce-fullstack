@@ -13870,6 +13870,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "honest": {
+            "type": "boolean"
           }
         }
       },
@@ -14436,6 +14439,9 @@
           },
           "usage": {
             "$ref": "#/components/schemas/AssistantUsage"
+          },
+          "record": {
+            "type": "string"
           }
         }
       },

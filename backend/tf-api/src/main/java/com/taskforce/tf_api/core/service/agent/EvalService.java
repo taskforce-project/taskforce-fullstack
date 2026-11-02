@@ -323,8 +323,8 @@ public class EvalService {
         List<Call> internal = calls.stream().filter(Call::internal).toList();
         Call act = internal.stream().filter(call -> !call.read()).findFirst()
             .orElse(internal.stream().findFirst().orElse(null));
-        if (act == null) return new EvalCriteria(EvalCriteria.NO_TOOL, null, null, null, null, null);
-        return new EvalCriteria(act.tool, shortArgs(act.arguments), act.read() ? null : act.effect, null, null, null);
+        if (act == null) return new EvalCriteria(EvalCriteria.NO_TOOL, null, null, null, null, null, false);
+        return new EvalCriteria(act.tool, shortArgs(act.arguments), act.read() ? null : act.effect, null, null, null, false);
     }
 
     /** Les arguments courts d'un appel, chacun avec sa valeur pour seule valeur acceptée ; un texte long n'en est pas un critère. */
@@ -369,7 +369,7 @@ public class EvalService {
         items(criteria.contains(), "expected words");
         items(criteria.notContains(), "forbidden words");
         boolean empty = criteria.tool().isEmpty() && criteria.forbid().isEmpty() && criteria.contains().isEmpty()
-            && criteria.notContains().isEmpty();
+            && criteria.notContains().isEmpty() && !criteria.honest();
         if (empty) throw new BusinessException("A case needs at least one criterion.");
     }
 

@@ -9,6 +9,9 @@ import java.util.Map;
  *
  * <p>{@code mode} : "fast" (Q&A simple), "deep" (raisonnement + outils), "fallback" (sans LLM —
  * on expose quand même le RAG : sources réelles + réponse de repli).
+ *
+ * <p>{@code record} : le dossier de la réponse, quand elle en a un : celui de ses appels d'outil, ou celui qui s'ouvre
+ * quand TaskForce corrige une réponse sans outil (R116). Il fait d'elle un cas de la banque.
  */
 public record AssistantAnswer(
     String answer,
@@ -17,8 +20,15 @@ public record AssistantAnswer(
     List<AssistantSource> sources,
     List<AssistantStep> steps,
     List<AssistantToolCall> toolCalls,
-    AssistantUsage usage
+    AssistantUsage usage,
+    String record
 ) {
+    /** Une réponse sans dossier à elle. */
+    public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
+                           List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage) {
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, null);
+    }
+
     /** Une note Brain OS utilisée pour fonder la réponse (RAG). */
     public record AssistantSource(String title, String domain, Double score) {}
 
