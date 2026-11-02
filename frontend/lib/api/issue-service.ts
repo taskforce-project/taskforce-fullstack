@@ -176,8 +176,8 @@ export interface UpdateIssuePayload {
   assigneeId?: number;
   /** true = retirer l'assigné. */
   unassign?: boolean;
-  parentId?: number | null;
-  startDate?: string | null;
+  parentId?: number;
+  startDate?: string;
   dueDate?: string;
   /** true = retirer l'échéance. */
   clearDueDate?: boolean;
