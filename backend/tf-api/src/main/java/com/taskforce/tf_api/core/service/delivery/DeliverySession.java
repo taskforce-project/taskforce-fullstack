@@ -6,7 +6,8 @@ package com.taskforce.tf_api.core.service.delivery;
  *
  * @param runId           run en cours qui porte la session
  * @param workspaceSlug   workspace du run : seul workspace atteignable, en lecture
- * @param projectId       projet du run : seul projet modifiable
+ * @param projectId       projet du run : seul projet où l'agent peut créer une issue
+ * @param issueId         issue du run : la seule que l'agent modifie (R110, séance n°16)
  * @param ownerEmail      délégant, dont les droits plafonnent la session
  * @param ownerKeycloakId identifiant Keycloak du délégant (claim {@code sub} du principal délégué)
  * @param runnerClientId  runner qui tient la session (traçabilité)
@@ -17,6 +18,7 @@ public record DeliverySession(
     Long runId,
     String workspaceSlug,
     Long projectId,
+    Long issueId,
     String ownerEmail,
     String ownerKeycloakId,
     String runnerClientId,

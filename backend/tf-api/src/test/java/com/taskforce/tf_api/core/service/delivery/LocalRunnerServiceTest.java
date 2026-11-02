@@ -243,6 +243,8 @@ class LocalRunnerServiceTest {
 
         assertThat(session.workspaceSlug()).isEqualTo("acme");
         assertThat(session.projectId()).isEqualTo(12L);
+        // L'issue du run, la seule que l'agent modifie (R110).
+        assertThat(session.issueId()).isEqualTo(55L);
         assertThat(session.ownerEmail()).isEqualTo(OWNER_EMAIL);
         assertThat(session.ownerKeycloakId()).isEqualTo("kc-7");
         assertThat(session.runnerClientId()).isEqualTo("tf-runner-pierre");
