@@ -433,10 +433,10 @@ export const CONSTANTS_EN = {
     barSend: "Send",
     barAnswering: "Cortex is answering…",
     barShowConversation: "Show the conversation with Cortex",
-    barHideConversation: "Fold the conversation",
+    barHideConversation: "Minimize the conversation",
     barNewAnswer: "A new answer from Cortex is waiting",
     barSuggestions: "Suggestions for this screen",
-    // The conversation unfolds from the bar (UX review, 01/11/2026), or sits in the right panel when pinned there.
+    // The conversation opens above the bar in a floating bubble (02/11/2026), or sits in the right panel when pinned there.
     chatLabel: "Conversation with Cortex",
     chatNew: "New conversation",
     chatNone: "No conversations yet.",
@@ -444,7 +444,7 @@ export const CONSTANTS_EN = {
     chatRecent: "Recent conversations",
     chatPinSide: "Pin to the side",
     chatBackToBar: "Back to the bar",
-    chatFold: "Fold (Esc)",
+    chatFold: "Minimize (Esc)",
     chatResize: "Resize the conversation",
     chatThinking: "Cortex is thinking",
     chatIntro: "TaskForce's AI agent, built on your workspace's knowledge. It cites its sources.",
