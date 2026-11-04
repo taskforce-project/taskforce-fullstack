@@ -173,7 +173,7 @@ public class DeliveryService {
         DeliveryContext context = new DeliveryContext(userId, ws, project);
         // Pour une issue, le menu ne montre que les agents qui savent faire ce genre de tâche (R51 : l'agent à l'essai
         // ne prend que les tâches sans dépôt) ; les réglages les montrent tous.
-        return registry.all().stream().filter(p -> project == null || p.shownFor(context)).map(p -> {
+        return registry.all().stream().filter(p -> project == null || !p.hiddenFor(context)).map(p -> {
             String reason = p.unavailableReason(context);
             return new DeliveryProviderResponse(p.key(), p.displayName(), p.logoKey(), p.available(), p.models(),
                 reason == null, reason, p.trial());

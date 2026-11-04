@@ -65,8 +65,8 @@ public class TrialAgentProvider implements DeliveryAgentProvider {
     }
 
     @Override
-    public boolean shownFor(DeliveryContext context) {
-        return context.project() == null || !hasRepository(context.project());
+    public boolean hiddenFor(DeliveryContext context) {
+        return context.project() != null && hasRepository(context.project());
     }
 
     @Override

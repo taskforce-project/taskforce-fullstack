@@ -55,11 +55,11 @@ class TrialAgentProviderTest {
         assertThat(provider.trial()).isTrue();
         assertThat(provider.available()).isTrue();
         assertThat(provider.pullBased()).isFalse();
-        assertThat(provider.shownFor(context(null))).isTrue();
+        assertThat(provider.hiddenFor(context(null))).isFalse();
         assertThat(provider.unavailableReason(context(null))).isNull();
-        assertThat(provider.shownFor(context("acme/site"))).isFalse();
+        assertThat(provider.hiddenFor(context("acme/site"))).isTrue();
         assertThat(provider.unavailableReason(context("acme/site"))).contains("without a repository");
-        assertThat(provider.shownFor(new DeliveryContext(7L, null, null))).isTrue();
+        assertThat(provider.hiddenFor(new DeliveryContext(7L, null, null))).isFalse();
     }
 
     @Test

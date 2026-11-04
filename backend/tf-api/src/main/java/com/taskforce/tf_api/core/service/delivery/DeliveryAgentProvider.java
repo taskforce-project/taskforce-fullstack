@@ -47,12 +47,12 @@ public interface DeliveryAgentProvider {
     }
 
     /**
-     * Le menu de délégation montre-t-il cet agent pour ce contexte ? Un agent qui ne sait pas faire ce genre de tâche n'y
+     * Le menu de délégation cache-t-il cet agent pour ce contexte ? Un agent qui ne sait pas faire ce genre de tâche n'y
      * paraît pas, au lieu d'y être grisé ({@link #unavailableReason} dit alors pourquoi on ne peut pas le choisir).
-     * Défaut : toujours.
+     * Défaut : jamais.
      */
-    default boolean shownFor(DeliveryContext context) {
-        return true;
+    default boolean hiddenFor(DeliveryContext context) {
+        return false;
     }
 
     /**
