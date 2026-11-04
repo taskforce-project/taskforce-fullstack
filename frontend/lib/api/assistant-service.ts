@@ -34,6 +34,27 @@ export interface AssistantToolCall {
   ref?: string | null
   /** L'issue que touche un geste du MCP TaskForce, dont la conversation montre les cartes (ADR-024). */
   target?: AssistantTarget | null
+  /** Ce que TaskForce demande avant le geste (R115), avec un statut question : la carte montre ses choix. */
+  question?: AssistantQuestion | null
+}
+/**
+ * Une question de TaskForce (R115, séance n°17) : l'argument que la réponse remplit, la question, et ses choix, le défaut
+ * d'abord quand il y en a un. Une réponse tapée est toujours possible.
+ */
+export interface AssistantQuestion {
+  field: string
+  text: string
+  choices: AssistantChoice[]
+}
+export interface AssistantChoice {
+  value: string
+  label: string
+  recommended: boolean
+}
+/** Ce que la personne voit quand elle écrit (R114) : le projet ouvert et l'issue ouverte, par leurs ids. */
+export interface AssistantScreen {
+  projectId: number
+  issueId?: number | null
 }
 /** L'issue d'un geste : sa clé et son titre, et sa mission quand elle en a une. */
 export interface AssistantTarget {
@@ -94,11 +115,32 @@ export async function sendAgentMessage(
   slug: string,
   message: string,
   conversationId?: number | null,
+  screen?: AssistantScreen | null,
 ): Promise<ChatTurnResponse> {
-  const res = await apiClient.post<{ data: ChatTurnResponse }>(
-    ASSISTANT_ROUTES.CHAT(slug),
-    { message, conversationId: conversationId ?? null },
-    { timeout: AI_TIMEOUT_MS },
+  // L'écran part avec le message quand la personne regarde un projet (R114) : Cortex le lit avant les notes.
+  const body = screen
+    ? { message, conversationId: conversationId ?? null, screen }
+    : { message, conversationId: conversationId ?? null }
+  const res = await apiClient.post<{ data: ChatTurnResponse }>(ASSISTANT_ROUTES.CHAT(slug), body, { timeout: AI_TIMEOUT_MS })
+  return res.data.data
+}
+
+/**
+ * Une question de TaskForce que la personne peut répondre (R115) : elle porte ses choix, le dossier de la réponse et
+ * l'empreinte de la question, que la réponse nomme. Une question d'avant R115 n'a que sa phrase, dans la réponse.
+ */
+export function isQuestionCard(call: AssistantToolCall): call is AssistantToolCall & { question: AssistantQuestion } {
+  return call.status === "question" && Boolean(call.question) && Boolean(call.record) && Boolean(call.ref)
+}
+
+/**
+ * Répond à une question de TaskForce : la valeur du choix cliqué, ou la réponse tapée. Le geste reprend sur le serveur,
+ * sans le modèle, et rend la suite : une autre question, sa carte, ou ce qu'il a fait.
+ */
+export async function answerQuestion(slug: string, call: AssistantToolCall, value: string): Promise<AssistantToolCall> {
+  const res = await apiClient.post<{ data: AssistantToolCall }>(
+    ASSISTANT_ROUTES.ACTION_ANSWER(slug),
+    { tool: call.name, record: call.record, ref: call.ref, value },
   )
   return res.data.data
 }

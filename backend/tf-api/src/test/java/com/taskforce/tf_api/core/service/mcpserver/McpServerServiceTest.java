@@ -66,13 +66,14 @@ class McpServerServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private JwtIdentityResolver identityResolver;
     @Mock private IssueGestures gestures;
+    @Mock private ProjectGestures projectGestures;
 
     private McpServerService service;
 
     @BeforeEach
     void setUp() {
         TaskforceMcpTools tools = new TaskforceMcpTools(mapper, projectService, issueService, smartAssignService,
-            brainSearchService, analyticsService, agentService, gestures);
+            brainSearchService, analyticsService, agentService, gestures, projectGestures);
         service = new McpServerService(tools, mapper, userRepository, identityResolver);
         // Sans clé d'issue, les arguments passent tels quels ; les gestes répondent par leur phrase.
         lenient().when(gestures.withIds(any(), any(), any())).thenAnswer(inv -> inv.getArgument(2));
@@ -154,14 +155,14 @@ class McpServerServiceTest {
     void tools_list_describes_every_tool() {
         JsonNode tools = call(user(), "tools/list", Map.of()).path("result").path("tools");
 
-        assertThat(tools).hasSize(16);
+        assertThat(tools).hasSize(17);
         for (JsonNode tool : tools) {
             assertThat(tool.path("inputSchema").path("type").asText()).isEqualTo("object");
             assertThat(tool.path("description").asText()).isNotBlank();
         }
         assertThat(tools.findValuesAsText("name"))
             .contains("get_issue", "add_comment", "brain_search", "ask_cortex", "check_checklist_item", "update_issue",
-                "delegate_issue", "get_mission", "delete_issue");
+                "delegate_issue", "get_mission", "delete_issue", "create_project");
     }
 
     @Test
@@ -173,6 +174,8 @@ class McpServerServiceTest {
             .contains("get_issue", "add_comment", "check_checklist_item", "update_issue", "create_issue");
         // Confier une issue, lire une mission : jamais depuis la session d'une autre mission.
         assertThat(tools.findValuesAsText("name")).doesNotContain("delegate_issue", "get_mission", "delete_issue");
+        // Créer un projet sort de la portée d'une mission : jamais proposé non plus.
+        assertThat(tools.findValuesAsText("name")).doesNotContain("create_project");
     }
 
     @Test

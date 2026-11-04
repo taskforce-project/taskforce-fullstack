@@ -1,11 +1,15 @@
 import { create } from "zustand";
 
-import { sendAgentMessage, type AssistantAnswer } from "@/lib/api/assistant-service";
+import {
+  answerQuestion as sendAnswer, sendAgentMessage, type AssistantAnswer, type AssistantToolCall,
+} from "@/lib/api/assistant-service";
 import {
   deleteConversation, getConversation, listConversations,
   type ConversationMessage, type ConversationSummary,
 } from "@/lib/api/ai-conversation-service";
 import { getErrorMessage, getErrorStatus } from "@/lib/api/client";
+import { screenFrom } from "@/lib/cortex/screen";
+import { useScreenStore } from "@/lib/store/screen-store";
 
 // ---------------------------------------------------------------------------
 // Store de la barre unique (R76, séance n°13) et de la conversation qu'elle ouvre. La conversation vit ici, pas dans
@@ -55,6 +59,13 @@ interface CortexState {
   /** Supprime une conversation ; false en cas d'échec. */
   removeConversation: (slug: string, id: number) => Promise<boolean>;
   setOpen: (open: boolean) => void;
+  /**
+   * Répond à une question de TaskForce (R115) : la suite du geste (une autre question, sa carte, ce qu'il a fait), ou
+   * null en cas d'échec, et la raison dans `questionProblem`.
+   */
+  answerQuestion: (slug: string, call: AssistantToolCall, value: string) => Promise<AssistantToolCall | null>;
+  /** Pourquoi la dernière réponse à une question n'est pas passée, dans les mots du serveur ; null sinon. */
+  questionProblem: string | null;
 }
 
 let lastId = 0;
@@ -108,8 +119,13 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
     get().enterWorkspace(slug);
     const sentAt = Date.now();
     set((s) => ({ draft: "", sentAt, open: true, unread: false, turns: [...s.turns, { id: nextId("u"), role: "user", text }] }));
+    // Ce que la personne voit (R114) : le projet de la route, l'issue de la route ou de la fiche ouverte.
+    const screen = screenFrom(typeof window === "undefined" ? null : window.location.pathname,
+      useScreenStore.getState().openIssue);
     try {
-      const res = await sendAgentMessage(slug, text, get().conversationId);
+      const res = screen
+        ? await sendAgentMessage(slug, text, get().conversationId, screen)
+        : await sendAgentMessage(slug, text, get().conversationId);
       set((s) => ({
         conversationId: res.conversationId,
         tokens: s.tokens + (res.answer.usage?.totalTokens ?? 0),
@@ -173,4 +189,18 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
   },
 
   setOpen: (open) => set(open ? { open, unread: false } : { open }),
+
+  questionProblem: null,
+
+  answerQuestion: async (slug, call, value) => {
+    const said = value.trim();
+    if (!slug || !said) return null;
+    set({ questionProblem: null });
+    try {
+      return await sendAnswer(slug, call, said);
+    } catch (e) {
+      set({ questionProblem: getErrorMessage(e) });
+      return null;
+    }
+  },
 }));

@@ -7,9 +7,11 @@ import static com.taskforce.tf_api.core.service.mcpserver.McpArgs.requiredLong;
 import static com.taskforce.tf_api.core.service.mcpserver.McpArgs.requiredString;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -51,6 +53,9 @@ import com.taskforce.tf_api.core.service.CycleService;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
+import com.taskforce.tf_api.core.service.agent.Question;
+import com.taskforce.tf_api.core.service.agent.QuestionNeeded;
+import com.taskforce.tf_api.core.service.agent.Screen;
 import com.taskforce.tf_api.core.service.agent.tools.CreateIssueTool;
 import com.taskforce.tf_api.core.service.agent.tools.IssueFields;
 import com.taskforce.tf_api.core.service.agent.tools.IssueFields.Found;
@@ -146,11 +151,11 @@ public class IssueGestures {
     public record Gesture(String summary, Map<String, Object> issue, List<Change> changes, Map<String, Object> detail,
                           Map<String, Object> undo) {
 
-        /** Ce que lit un client MCP : tout, sauf de quoi défaire le geste. */
+        /** Ce que lit un client MCP : tout, sauf de quoi défaire le geste. Un geste sur un projet n'a pas d'issue. */
         public Map<String, Object> forClient() {
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("summary", summary);
-            out.put("issue", issue);
+            if (issue != null) out.put("issue", issue);
             if (!changes.isEmpty()) out.put("changes", changes);
             out.putAll(detail);
             return out;
@@ -190,6 +195,122 @@ public class IssueGestures {
         out.put("projectId", project.getId());
         out.put("issueId", issue.getId());
         return out;
+    }
+
+    // ------------------------------------------------------------------ ce que TaskForce demande (R115)
+
+    /**
+     * L'issue d'un geste de Cortex, telle que la demande la désigne : des ids, une clé qu'elle voit, ou ce qu'elle lit à
+     * l'écran (une colonne, un bout de titre, « testta 2 ») quand cela ne désigne qu'une issue, comme un bout de nom ne
+     * désigne qu'une personne ({@link IssueFields#assignee}). Sinon, rien ne se devine : TaskForce demande laquelle, avec
+     * en choix les issues de l'écran (celles du projet ouvert, l'issue ouverte d'abord, en défaut), ou les siennes quand
+     * aucun projet n'est ouvert. Rien n'est changé.
+     */
+    @Transactional(readOnly = true)
+    public JsonNode issueOf(String slug, Long userId, Screen screen, JsonNode args, String question) {
+        if (args.hasNonNull("projectId") && args.hasNonNull("issueId")) return args;
+        String asked = args.path("issue").isTextual() ? args.get("issue").asText().strip() : "";
+        if (KEY.matcher(asked).matches()) {
+            try {
+                return withIds(slug, userId, args);
+            } catch (McpArgs.InvalidArgumentException unknown) {
+                // Une clé qu'elle ne voit pas : la question la remplace, avec ce qu'elle voit.
+            }
+        }
+        List<IssueResponse> candidates = candidates(slug, userId, screen);
+        List<IssueResponse> named = asked.isEmpty() ? List.of() : designated(candidates, asked);
+        if (named.size() == 1) {
+            IssueResponse issue = named.get(0);
+            ObjectNode out = ((ObjectNode) args).deepCopy();
+            out.put("issue", issue.getIdentifier());
+            out.put("projectId", issue.getProjectId());
+            out.put("issueId", issue.getId());
+            return out;
+        }
+        List<IssueResponse> shown = named.isEmpty() ? candidates : named;
+        Long open = screen == null ? null : screen.issueId();
+        throw new QuestionNeeded(new Question("issue", question, shown.stream()
+            .map(issue -> Objects.equals(open, issue.getId())
+                ? Question.Choice.recommended(issue.getIdentifier(), choiceLabel(issue))
+                : Question.Choice.of(issue.getIdentifier(), choiceLabel(issue)))
+            .toList()));
+    }
+
+    /**
+     * Les issues que la personne a sous les yeux : celles du projet ouvert, l'issue ouverte d'abord puis les dernières
+     * changées, avec ses droits ; sans projet ouvert, les siennes. Une lecture refusée n'en donne aucune.
+     */
+    private List<IssueResponse> candidates(String slug, Long userId, Screen screen) {
+        List<IssueResponse> issues;
+        try {
+            issues = screen != null && !screen.isEmpty()
+                ? issueService.listIssues(slug, screen.projectId(), userId)
+                : issueService.listMyIssues(slug, userId);
+        } catch (RuntimeException e) {
+            return List.of();
+        }
+        Long open = screen == null ? null : screen.issueId();
+        return issues.stream()
+            .filter(issue -> !issue.isArchived())
+            .sorted(Comparator.comparing((IssueResponse issue) -> !Objects.equals(open, issue.getId()))
+                .thenComparing(IssueGestures::changedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+            .toList();
+    }
+
+    /**
+     * Les issues que désigne ce que la demande en dit : sa clé écrite autrement (« testta 2 »), le nom de sa colonne
+     * (« in review by AI »), ou un bout de son titre. Lu sans la casse, les espaces ni la ponctuation.
+     */
+    private static List<IssueResponse> designated(List<IssueResponse> candidates, String asked) {
+        String wanted = IssueFields.key(asked);
+        if (wanted.length() < 2) return List.of();
+        List<IssueResponse> byKey = candidates.stream()
+            .filter(issue -> wanted.equals(IssueFields.key(issue.getIdentifier()))).toList();
+        if (!byKey.isEmpty()) return byKey;
+        List<IssueResponse> byColumn = candidates.stream()
+            .filter(issue -> issue.getStatus() != null && IssueFields.key(issue.getStatus().getName()).length() >= 4
+                && wanted.contains(IssueFields.key(issue.getStatus().getName())))
+            .toList();
+        if (!byColumn.isEmpty()) return byColumn;
+        return wanted.length() < 3 ? List.of() : candidates.stream()
+            .filter(issue -> IssueFields.key(issue.getTitle()).contains(wanted)).toList();
+    }
+
+    private static String choiceLabel(IssueResponse issue) {
+        String title = issue.getTitle() == null ? "" : issue.getTitle().replaceAll("\\s+", " ").strip();
+        return issue.getIdentifier() + " " + clip(title, 50)
+            + (issue.getStatus() == null ? "" : " (" + issue.getStatus().getName() + ")");
+    }
+
+    private static LocalDateTime changedAt(IssueResponse issue) {
+        return issue.getUpdatedAt() != null ? issue.getUpdatedAt() : issue.getCreatedAt();
+    }
+
+    /**
+     * Qui prend l'issue, quand le nom ne désigne pas un seul membre (R115) : ceux qu'il désigne, sinon les membres du
+     * projet, en choix ; « personne » quand l'issue a un assigné. Le défaut n'existe pas : TaskForce ne choisit pas.
+     */
+    private Question whoTakes(String slug, Long userId, ProjectResponse project, IssueResponse before, String asked) {
+        List<ProjectMemberResponse> members = projectService.listMembers(slug, project.getId(), userId);
+        String wanted = asked.toLowerCase(Locale.ROOT);
+        List<ProjectMemberResponse> matching = members.stream()
+            .filter(m -> (m.getDisplayName() != null && m.getDisplayName().toLowerCase(Locale.ROOT).contains(wanted))
+                || (m.getEmail() != null && m.getEmail().toLowerCase(Locale.ROOT).startsWith(wanted)))
+            .toList();
+        boolean several = matching.size() > 1;
+        String why;
+        if (several) {
+            why = "Several members of " + project.getName() + " match \"" + clip(asked, 40) + "\".";
+        } else if (IssueFields.SELF.contains(IssueFields.key(asked))) {
+            why = "You are not a member of " + project.getName() + ".";
+        } else {
+            why = "No member of " + project.getName() + " matches \"" + clip(asked, 40) + "\".";
+        }
+        List<Question.Choice> choices = new ArrayList<>((several ? matching : members).stream()
+            .map(m -> Question.Choice.of(m.getEmail() != null ? m.getEmail() : IssueFields.name(m), IssueFields.name(m)))
+            .toList());
+        if (before.getAssignee() != null) choices.add(Question.Choice.of(NO_VALUE, "Nobody"));
+        return new Question("assignee", "Who should take " + before.getIdentifier() + "? " + why, choices);
     }
 
     // ------------------------------------------------------------------ changer les champs, déplacer, assigner
@@ -265,12 +386,19 @@ public class IssueGestures {
         IssueStatusResponse column = statusId != null
             ? columns.stream().filter(c -> statusId.equals(c.getId())).findFirst().orElse(null)
             : IssueFields.named(columns, asked);
-        if (column == null) {
-            throw new McpArgs.InvalidArgumentException("There is no column " + (statusId != null ? statusId : "\"" + asked + "\"")
-                + " in " + project.getName() + ". Its columns are: "
-                + IssueFields.listed(columns, IssueStatusResponse::getName) + ".");
-        }
         Long current = before.getStatus() == null ? null : before.getStatus().getId();
+        if (column == null && statusId != null) {
+            throw new McpArgs.InvalidArgumentException("There is no column " + statusId + " in " + project.getName()
+                + ". Its columns are: " + IssueFields.listed(columns, IssueStatusResponse::getName) + ".");
+        }
+        if (column == null) {
+            // R115 : une colonne nommée qui n'existe pas ne s'invente pas, TaskForce demande, avec celles du projet.
+            throw new QuestionNeeded(new Question("status", "Which column should " + before.getIdentifier() + " move to? \""
+                + clip(asked.strip(), 40) + "\" isn't a column of " + project.getName() + ".", columns.stream()
+                    .filter(c -> !c.getId().equals(current))
+                    .map(c -> Question.Choice.of(c.getName(), c.getName()))
+                    .toList()));
+        }
         if (column.getId().equals(current)) return;
         request.setStatusId(column.getId());
         changes.add(new Change("column", before.getStatus() == null ? NO_VALUE : before.getStatus().getName(), column.getName()));
@@ -300,7 +428,7 @@ public class IssueGestures {
                     + project.getName() + "."));
         } else {
             Found<ProjectMemberResponse> found = fields.assignee(project, asked.strip(), slug, userId);
-            if (!found.ok()) throw new McpArgs.InvalidArgumentException(found.problem());
+            if (!found.ok()) throw new QuestionNeeded(whoTakes(slug, userId, project, before, asked.strip()));
             member = found.value();
         }
         if (member.getUserId().equals(current)) return;

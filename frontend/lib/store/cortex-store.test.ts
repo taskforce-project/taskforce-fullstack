@@ -2,13 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 
 import { messagesToTurns, useCortexStore } from "./cortex-store";
-import { sendAgentMessage, type AssistantAnswer } from "@/lib/api/assistant-service";
+import { useScreenStore } from "./screen-store";
+import {
+  answerQuestion, sendAgentMessage, type AssistantAnswer, type AssistantToolCall,
+} from "@/lib/api/assistant-service";
 import {
   deleteConversation, getConversation, listConversations, type ConversationSummary,
 } from "@/lib/api/ai-conversation-service";
 
 // Aucun réseau : la réponse de Cortex et les conversations sont simulées ; les erreurs passent par le vrai client.
-vi.mock("@/lib/api/assistant-service", () => ({ sendAgentMessage: vi.fn() }));
+vi.mock("@/lib/api/assistant-service", () => ({ sendAgentMessage: vi.fn(), answerQuestion: vi.fn() }));
 vi.mock("@/lib/api/ai-conversation-service", () => ({
   listConversations: vi.fn(), getConversation: vi.fn(), deleteConversation: vi.fn(),
 }));
@@ -209,5 +212,43 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
     const turns = messagesToTurns([{ id: 9, role: "assistant", content: "ok", mode: null, totalTokens: 3, createdAt: null }]);
 
     expect(turns[0].answer).toMatchObject({ mode: "fast", usage: { totalTokens: 3 } });
+  });
+
+  // R114 : la barre envoie ce que la personne voit.
+  it("sends the screen: the project of the route and the issue whose sheet is open", async () => {
+    vi.mocked(sendAgentMessage).mockResolvedValue({ conversationId: 3, title: "t", answer: answer("ok") });
+    window.history.pushState({}, "", "/acme/projects/12");
+    useScreenStore.setState({ openIssue: { projectId: 12, issueId: 34 } });
+    useCortexStore.getState().setDraft("supprime ça");
+
+    await useCortexStore.getState().send("acme");
+
+    expect(sendAgentMessage).toHaveBeenCalledWith("acme", "supprime ça", null, { projectId: 12, issueId: 34 });
+    useScreenStore.setState({ openIssue: null });
+    window.history.pushState({}, "", "/");
+  });
+
+  // R115 : la réponse à une question de TaskForce reprend le geste ; un refus dit pourquoi.
+  const question: AssistantToolCall = {
+    name: "delete_issue", status: "question", input: "{}", output: "", record: "r", ref: "q",
+    question: { field: "issue", text: "Which issue should be deleted?", choices: [] },
+  };
+
+  it("answers a question and returns how the gesture goes on", async () => {
+    const next: AssistantToolCall = { name: "delete_issue", status: "pending", input: "{\"issue\":\"TESTTA-2\"}", output: "", record: "r" };
+    vi.mocked(answerQuestion).mockResolvedValue(next);
+
+    await expect(useCortexStore.getState().answerQuestion("acme", question, "  TESTTA-2 ")).resolves.toEqual(next);
+    expect(answerQuestion).toHaveBeenCalledWith("acme", question, "TESTTA-2");
+    expect(useCortexStore.getState().questionProblem).toBeNull();
+  });
+
+  it("returns null with the server's reason when the answer fails, and sends nothing empty", async () => {
+    vi.mocked(answerQuestion).mockRejectedValue(httpError(400, { message: "This question is already answered." }));
+
+    await expect(useCortexStore.getState().answerQuestion("acme", question, "TESTTA-2")).resolves.toBeNull();
+    expect(useCortexStore.getState().questionProblem).toBe("This question is already answered.");
+    await expect(useCortexStore.getState().answerQuestion("acme", question, "   ")).resolves.toBeNull();
+    expect(answerQuestion).toHaveBeenCalledTimes(1);
   });
 });

@@ -40,6 +40,7 @@ import { DelegateAgentControl } from "@/components/sheets/delegate-agent-control
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
+import { useScreenStore } from "@/lib/store/screen-store"
 import { describeActivity } from "@/lib/issue-activity"
 import { useIssueRealtime } from "@/lib/hooks/use-issue-realtime"
 import { agentAtWork } from "@/lib/delivery/agent-at-work"
@@ -1142,6 +1143,16 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const { labelsByProject, fetchLabels } = useLabelStore()
   const { githubLinks, githubStatus, fetchGitHubStatus, fetchGitHubLinks } = useIntegrationStore()
   const openSettings = useSettingsStore((s) => s.openSettings)
+
+  // Ce que la personne voit (R114) : l'issue ouverte part avec chaque message à Cortex, tant que sa fiche est ouverte.
+  const showIssue = useScreenStore((s) => s.showIssue)
+  const hideIssue = useScreenStore((s) => s.hideIssue)
+  const shownIssueId = open && issue && projectId ? Number(issue.id) : null
+  useEffect(() => {
+    if (shownIssueId === null || !projectId) return
+    showIssue(projectId, shownIssueId)
+    return () => hideIssue(shownIssueId)
+  }, [shownIssueId, projectId, showIssue, hideIssue])
 
   const initDescription = issue?.description ?? ""
   const [comment, setComment] = useState("")
