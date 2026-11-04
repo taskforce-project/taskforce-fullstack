@@ -100,9 +100,30 @@ class CortexPlansTest {
         assertThatThrownBy(() -> CortexPlans.parse("broken", "match: \\bdelete\\b\nPlan without separator."))
             .isInstanceOf(IllegalStateException.class);
 
-        CortexPlans.Plan parsed = CortexPlans.parse("ok", "match: \\bdelete\\b\r\ngestures: delete_issue, list_issues\r\n---\r\n\r\nPlan.\r\n");
+        CortexPlans.Plan parsed = CortexPlans.parse("ok",
+            "match: \\bdelete\\b\r\ngestures: delete_issue, list_issues\r\nask: delete_issue\r\n---\r\n\r\nPlan.\r\n");
         assertThat(parsed.text()).isEqualTo("Plan.");
         assertThat(parsed.gestures()).containsExactly("delete_issue", "list_issues");
         assertThat(parsed.unless()).isNull();
+        assertThat(parsed.ask()).isEqualTo("delete_issue");
+    }
+
+    /**
+     * Le geste dont TaskForce pose les questions quand Cortex n'en fait aucun : un geste du plan, qui demande sans
+     * arguments ce qu'il exige, donc ne fait rien (supprimer, créer un projet).
+     */
+    @ParameterizedTest(name = "{0} : {1}")
+    @CsvSource(nullValues = "-", value = {
+        "delete,         delete_issue",
+        "create-project, create_project",
+        "move-assign,    -",
+        "what-changed,   -",
+        "summarize,      -",
+    })
+    void the_gesture_taskforce_asks_for(String id, String ask) {
+        CortexPlans.Plan plan = CortexPlans.all().stream().filter(p -> p.id().equals(id)).findFirst().orElseThrow();
+
+        assertThat(plan.ask()).isEqualTo(ask);
+        if (ask != null) assertThat(plan.gestures()).contains(ask);
     }
 }

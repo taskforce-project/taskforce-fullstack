@@ -527,7 +527,24 @@ public class AgentService {
         if (!screen.isEmpty()) origin.put("screen", screen);
         if (plan != null) origin.put("plan", plan.id());
         Kernel kernel = new Kernel(ctx, message, origin);
-        return toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel);
+        String answer = toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel);
+        return toolCalls.isEmpty() && plan != null && plan.ask() != null ? askedForCortex(plan.ask(), kernel, toolCalls, answer)
+            : answer;
+    }
+
+    /**
+     * La demande appelle un geste que Cortex n'a pas fait : à « supprime ça », qwen3:8b répond « dites-moi laquelle »
+     * sans outil (04/11/2026). TaskForce pose alors lui-même ce que ce geste exige (R115), avec l'écran en choix, au
+     * dossier de la réponse ; rien n'est fait. Sans question à poser, la réponse de Cortex reste.
+     */
+    private String askedForCortex(String name, Kernel kernel, List<AssistantToolCall> toolCalls, String answer) {
+        AgentTool gesture = tools.get(name);
+        if (!(gesture instanceof CortexGesture)) return answer;
+        ToolOutcome outcome = kernel.apply(gesture, name, "{}");
+        if (outcome.question() == null) return answer;
+        toolCalls.add(new AssistantToolCall(name, outcome.status(), "{}", outcome.result(), kernel.recordRef(), outcome.ref(),
+            outcome.target(), card(outcome.question())));
+        return outcome.question().text();
     }
 
     /**

@@ -40,10 +40,11 @@ public final class CortexPlans {
     private CortexPlans() {}
 
     /**
-     * Un plan : son nom, ce qui l'appelle et ce qui l'écarte dans un message, son texte pour le modèle, et les gestes
-     * qu'il nomme (que les tests confrontent à ceux de Cortex).
+     * Un plan : son nom, ce qui l'appelle et ce qui l'écarte dans un message, son texte pour le modèle, les gestes qu'il
+     * nomme (que les tests confrontent à ceux de Cortex), et le geste dont TaskForce pose lui-même les questions quand
+     * Cortex n'en fait aucun ({@code ask}, null sinon) : « supprime ça » demande alors laquelle, avec l'écran en choix.
      */
-    public record Plan(String id, Pattern match, Pattern unless, String text, List<String> gestures) {
+    public record Plan(String id, Pattern match, Pattern unless, String text, List<String> gestures, String ask) {
 
         /** Où le message nomme ce plan, ou -1 s'il ne l'appelle pas. */
         int position(String message) {
@@ -84,6 +85,7 @@ public final class CortexPlans {
         String[] lines = source.replace("\r\n", "\n").split("\n");
         String match = null;
         String unless = null;
+        String ask = null;
         List<String> gestures = new ArrayList<>();
         int body = -1;
         for (int i = 0; i < lines.length; i++) {
@@ -94,6 +96,7 @@ public final class CortexPlans {
             }
             if (line.startsWith("match:")) match = line.substring("match:".length()).strip();
             if (line.startsWith("unless:")) unless = line.substring("unless:".length()).strip();
+            if (line.startsWith("ask:")) ask = line.substring("ask:".length()).strip();
             if (line.startsWith("gestures:")) {
                 for (String gesture : line.substring("gestures:".length()).split(",")) {
                     if (!gesture.isBlank()) gestures.add(gesture.strip());
@@ -106,6 +109,6 @@ public final class CortexPlans {
             if (!text.isEmpty() || !lines[i].isBlank()) text.append(lines[i].stripTrailing()).append('\n');
         }
         return new Plan(id, Pattern.compile(match, FLAGS), unless == null ? null : Pattern.compile(unless, FLAGS),
-            text.toString().strip(), List.copyOf(gestures));
+            text.toString().strip(), List.copyOf(gestures), ask == null || ask.isBlank() ? null : ask);
     }
 }

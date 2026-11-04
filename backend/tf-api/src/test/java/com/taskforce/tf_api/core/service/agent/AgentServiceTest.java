@@ -1247,6 +1247,49 @@ class AgentServiceTest {
         assertThat((Map<String, Object>) data.getValue().get("screen")).containsEntry("projectId", 12L).containsEntry("issueId", 22L);
     }
 
+    /**
+     * « Supprime ça » : qwen3:8b répondait « dites-moi laquelle » sans outil (04/11/2026). Le plan de la demande nomme le
+     * geste ; TaskForce en pose lui-même la question, avec l'écran en choix, au dossier de la réponse.
+     */
+    @ParameterizedTest(name = "« {0} » sans outil : {1}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+        "supprime ça                   | delete_issue",
+        "crée un projet Next.js        | create_project",
+        "résume le projet              | -",
+    })
+    void taskforce_asks_when_cortex_does_not_act(String message, String gesture) throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString()))
+            .thenReturn(json.readTree("{\"content\":\"Dites-moi laquelle, et je m'en occupe.\"}"));
+        Question asked = new Question("delete_issue".equals(gesture) ? "issue" : "name", "Which one?", List.of());
+        if (gesture != null) {
+            CortexGesture tool = Mockito.mock(CortexGesture.class);
+            lenient().when(tool.name()).thenReturn(gesture);
+            lenient().when(tool.action()).thenReturn("delete_issue".equals(gesture) ? "issue.delete" : "project.create");
+            when(tools.get(gesture)).thenReturn(tool);
+            lenient().when(tool.ask(any(), any())).thenThrow(new QuestionNeeded(asked));
+            lenient().when(tool.perform(any(), any())).thenThrow(new QuestionNeeded(asked));
+        }
+
+        AssistantAnswer answer = service.run("acme", 7L, message);
+
+        if (gesture == null) {
+            assertThat(answer.answer()).isEqualTo("Dites-moi laquelle, et je m'en occupe.");
+            assertThat(answer.toolCalls()).isEmpty();
+            return;
+        }
+        assertThat(answer.answer()).isEqualTo("> [!taskforce] TaskForce\n> Which one?\n");
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
+            assertThat(call.name()).isEqualTo(gesture);
+            assertThat(call.status()).isEqualTo(AgentService.QUESTION);
+            assertThat(call.record()).isEqualTo(RECORD.toString());
+            assertThat(call.ref()).isEqualTo("hash");
+        });
+    }
+
     @Test
     @DisplayName("R115 : un geste qui découvre en cours ce qu'il ne peut pas deviner (deux Ada) demande, sans rien écrire")
     void a_gesture_that_finds_an_ambiguity_asks() throws Exception {
