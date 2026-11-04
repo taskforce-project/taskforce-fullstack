@@ -4549,6 +4549,46 @@
         }
       }
     },
+    "/api/workspaces/{slug}/assistant/actions/answer": {
+      "post": {
+        "tags": [
+          "AI assistant"
+        ],
+        "operationId": "answerQuestion",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantAnswerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAssistantToolCall"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/analytics/charts": {
       "get": {
         "tags": [
@@ -14383,11 +14423,27 @@
           "conversationId": {
             "type": "integer",
             "format": "int64"
+          },
+          "screen": {
+            "$ref": "#/components/schemas/ScreenRequest"
           }
         },
         "required": [
           "message"
         ]
+      },
+      "ScreenRequest": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "issueId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "ApiResponseChatTurnResponse": {
         "type": "object",
@@ -14445,6 +14501,37 @@
           }
         }
       },
+      "AssistantChoice": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "recommended": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AssistantQuestion": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistantChoice"
+            }
+          }
+        }
+      },
       "AssistantSource": {
         "type": "object",
         "properties": {
@@ -14498,6 +14585,9 @@
           "target": {
             "type": "object",
             "additionalProperties": {}
+          },
+          "question": {
+            "$ref": "#/components/schemas/AssistantQuestion"
           }
         }
       },
@@ -14619,6 +14709,55 @@
           "record",
           "tool"
         ]
+      },
+      "AssistantAnswerRequest": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "record": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "ref": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "record",
+          "ref",
+          "tool",
+          "value"
+        ]
+      },
+      "ApiResponseAssistantToolCall": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AssistantToolCall"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       },
       "SaveChartRequest": {
         "type": "object",

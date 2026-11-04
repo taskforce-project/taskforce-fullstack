@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   sendAgentMessage, sendAssistantMessage, isApprovable, isDeletion, isMission, isPreparedIssue, isQuestion, approveAction, isUndoable,
-  undoAction,
+  undoAction, answerQuestion, isQuestionCard,
   type AssistantToolCall,
 } from './assistant-service';
 import { apiClient } from './client';
@@ -224,5 +224,42 @@ describe('assistant-service: the mission of an issue in the conversation (TF-J1-
     ['a deletion whose issue the server did not find', call({ name: 'delete_issue', status: 'pending', record: 'r', target: null }), false],
   ])('isDeletion: %s -> %s', (_label, toolCall, expected) => {
     expect(isDeletion(toolCall)).toBe(expected);
+  });
+
+  // R114 : l'écran part avec le message ; R115 : la question de TaskForce et sa réponse.
+  const slug = 'acme';
+
+  it('sendAgentMessage: sends the screen the person sees, when there is one', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(buildTurn()));
+
+    await sendAgentMessage(slug, 'supprime ça', 4, { projectId: 12, issueId: 34 });
+
+    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.CHAT(slug),
+      { message: 'supprime ça', conversationId: 4, screen: { projectId: 12, issueId: 34 } }, expect.anything());
+  });
+
+  const question = { field: 'issue', text: 'Which issue should be deleted?', choices: [
+    { value: 'TESTTA-2', label: 'TESTTA-2 Ajouter (In review by AI)', recommended: true },
+  ] };
+
+  it.each([
+    ['a question of TaskForce, with its record and its ref', call({ status: 'question', record: 'r', ref: 'q', question }), true],
+    ['a question asked before R115, with no choices', call({ status: 'question', record: 'r', ref: 'q', question: null }), false],
+    ['a question without its ref', call({ status: 'question', record: 'r', ref: null, question }), false],
+    ['a pending gesture', call({ status: 'pending', record: 'r', ref: 'q', question }), false],
+  ])('isQuestionCard: %s -> %s', (_label, toolCall, expected) => {
+    expect(isQuestionCard(toolCall)).toBe(expected);
+  });
+
+  it('answerQuestion: POST the answer with the record and the ref, and returns how the gesture goes on', async () => {
+    const next = call({ name: 'delete_issue', status: 'pending', record: 'r' });
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(next));
+
+    const result = await answerQuestion(slug, call({ name: 'delete_issue', status: 'question', record: 'r', ref: 'q', question }),
+      'TESTTA-2');
+
+    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.ACTION_ANSWER(slug),
+      { tool: 'delete_issue', record: 'r', ref: 'q', value: 'TESTTA-2' });
+    expect(result).toEqual(next);
   });
 });
