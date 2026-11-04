@@ -494,7 +494,13 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
                   <UserAvatar email={c.author.email} name={c.author.displayName ?? c.author.email} avatarUrl={c.author.avatarUrl} className="size-7 shrink-0 mt-0.5" fallbackClassName="text-[9px]" />
                   <div className="min-w-0 flex-1">
                     <div className="mb-1 flex items-center gap-2">
-                      <span className="text-xs font-semibold text-foreground">{c.author.displayName ?? c.author.email}</span>
+                      {/* Écrit par un agent pour son auteur (R51, #471) : « qwen3:8b for Pierre ». */}
+                      <span className="text-xs font-semibold text-foreground">{c.via?.trim() || (c.author.displayName ?? c.author.email)}</span>
+                      {c.via?.trim() && (
+                        <span className="text-xs text-muted-foreground/70">
+                          {activityText.forWhom.replace("{who}", c.author.displayName ?? c.author.email)}
+                        </span>
+                      )}
                       <span className="text-xs text-muted-foreground">{formatCommentTime(c.createdAt)}</span>
                       {c.isEdited && <span className="text-[10px] italic text-muted-foreground/60">(edited)</span>}
                       {isMe && (
