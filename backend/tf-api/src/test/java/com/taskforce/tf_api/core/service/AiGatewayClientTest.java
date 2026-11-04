@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.service.AiStatusService.AiStatus;
 import com.taskforce.tf_api.core.service.ai.AiProviderSettings;
+import com.taskforce.tf_api.core.service.ai.ChosenModel;
 import com.taskforce.tf_api.core.service.ai.ModelGateway;
 import com.taskforce.tf_api.core.service.ai.ModelProviderException;
 
@@ -84,6 +85,32 @@ class AiGatewayClientTest {
         verify(gateway).chat(same(SETTINGS), call.capture());
         assertThat(call.getValue().model()).isEqualTo(model);
         assertThat(call.getValue().think()).isEqualTo(think);
+    }
+
+    static Stream<Arguments> chosen() {
+        return Stream.of(
+            Arguments.of("fast", null, "qwen3:14b", false),
+            Arguments.of("standard", null, "qwen3:14b", false),
+            Arguments.of("deep", null, "qwen3:14b", true),
+            // Le rejeu d'un cas nomme son modèle : il passe avant le choix de la personne.
+            Arguments.of(null, "qwen2.5:7b-instruct", "qwen2.5:7b-instruct", false));
+    }
+
+    @ParameterizedTest(name = "palier {0}, modèle nommé {1} : {2}")
+    @MethodSource("chosen")
+    @DisplayName("le modèle choisi par la personne remplace celui du palier, le temps de l'action seulement")
+    void chosenModelReplacesTheTier(String tier, String named, String model, boolean think) {
+        when(gateway.chat(any(), any())).thenReturn(reply(model, "ok"));
+        ArgumentCaptor<ModelGateway.ChatCall> call = ArgumentCaptor.forClass(ModelGateway.ChatCall.class);
+
+        ChosenModel.using("qwen3:14b", () -> tier == null
+            ? client.rawChatWithModel(List.of(Map.of("role", "user", "content", "q")), List.of(), named)
+            : client.rawChat(List.of(Map.of("role", "user", "content", "q")), List.of(), tier));
+
+        verify(gateway).chat(same(SETTINGS), call.capture());
+        assertThat(call.getValue().model()).isEqualTo(model);
+        assertThat(call.getValue().think()).isEqualTo(think);
+        assertThat(ChosenModel.current()).isEmpty();
     }
 
     @Test
