@@ -40,6 +40,22 @@ public interface DeliveryAgentProvider {
     }
 
     /**
+     * {@code true} pour un agent à l'essai (R51) : le menu le dit, et Smart Assign ne le propose jamais de lui-même.
+     */
+    default boolean trial() {
+        return false;
+    }
+
+    /**
+     * Le menu de délégation montre-t-il cet agent pour ce contexte ? Un agent qui ne sait pas faire ce genre de tâche n'y
+     * paraît pas, au lieu d'y être grisé ({@link #unavailableReason} dit alors pourquoi on ne peut pas le choisir).
+     * Défaut : toujours.
+     */
+    default boolean shownFor(DeliveryContext context) {
+        return true;
+    }
+
+    /**
      * {@code true} pour un provider <b>« pull »</b> : l'exécution a lieu sur une machine que le backend ne
      * peut pas joindre (runner local, ADR-013). Le run n'est alors pas dispatché : il reste {@code QUEUED}
      * jusqu'à ce qu'un runner le réclame, puis le runner poste lui-même le résultat.
@@ -62,6 +78,14 @@ public interface DeliveryAgentProvider {
      */
     default DeliveryDispatch dispatch(AgentBrief brief) {
         throw new UnsupportedOperationException(key() + " can't run yet");
+    }
+
+    /**
+     * Le même lancement, pour un provider qui a besoin de son run : l'agent à l'essai le suit lui-même jusqu'à sa fin
+     * (R51). Défaut : {@link #dispatch(AgentBrief)}.
+     */
+    default DeliveryDispatch dispatch(Long runId, AgentBrief brief) {
+        return dispatch(brief);
     }
 
     /**
