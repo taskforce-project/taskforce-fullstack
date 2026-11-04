@@ -279,7 +279,7 @@ public class TaskforceMcpTools {
                 false, "project.create", "POST", args -> "projects",
                 (slug, userId, args) -> projectGestures.create(slug, userId, args))
                 .needing(
-                    Need.askedWhen("name", "What should the project be called?", null,
+                    Need.inOwnWords("name", "What should the project be called?",
                         "the request gives no name, or only what it is built with"),
                     Need.askedWhen("repository", "Where does its code live?", null,
                         "a code project (a stack is named), where TaskForce can create or link a repository"),

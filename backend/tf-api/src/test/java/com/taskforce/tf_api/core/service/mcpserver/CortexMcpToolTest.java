@@ -126,6 +126,35 @@ class CortexMcpToolTest {
             .containsEntry("content", "Done in #12");
     }
 
+    /**
+     * Un nom que la demande ne dit pas, le modèle l'a inventé : qwen3:8b nommait « Web Application » le projet de « crée
+     * un projet Next.js » (04/11/2026). TaskForce le demande, la proposition du modèle en suggestion ; une réponse de la
+     * personne, sans demande à relire, passe.
+     */
+    @ParameterizedTest(name = "« {1} » pour « {0} » : demandé {2}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+        "crée un projet Next.js                 | Web Application | true",
+        "crée un projet Next.js appelé Orion    | Orion           | false",
+        "crée un projet Next.js appelé orion    | Orion           | false",
+        "crée le projet Équipe Café             | Equipe cafe     | false",
+        "-                                      | Atlas           | false",
+    })
+    void a_name_the_request_does_not_say_is_asked(String request, String name, boolean asked) {
+        CortexGesture create = (CortexGesture) tool("create_project");
+        AgentContext asking = new AgentContext("acme", 1L, 7L, Screen.NONE, request);
+
+        if (!asked) {
+            assertThat(create.ask(Map.of("name", name, "stack", "Next.js"), asking)).containsEntry("name", name);
+            return;
+        }
+        assertThatThrownBy(() -> create.ask(Map.of("name", name, "stack", "Next.js"), asking))
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> {
+                assertThat(needed.question().field()).isEqualTo("name");
+                assertThat(needed.question().choices()).extracting(c -> c.value() + "/" + c.recommended())
+                    .containsExactly(name + "/false");
+            });
+    }
+
     @Test
     @DisplayName("R115 : l'issue se résout parmi celles de l'écran, qui va avec chaque appel")
     void the_issue_is_resolved_with_the_screen() {

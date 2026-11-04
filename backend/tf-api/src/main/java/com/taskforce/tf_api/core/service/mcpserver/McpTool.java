@@ -72,22 +72,29 @@ public record McpTool(
      * @param question    la question posée quand il manque ; null pour un argument qui ne se demande jamais
      * @param safeDefault le défaut sûr, dans les mots de l'interface ; null quand il n'y en a pas
      * @param when        la condition d'un besoin conditionnel, jugée par le geste ; null pour un besoin de toujours
+     * @param ownWords    la valeur vient des mots de la personne (un nom) : celle que sa demande ne dit pas, le modèle l'a
+     *                    inventée, et TaskForce la demande, la proposition du modèle en suggestion
      */
-    public record Need(String field, String question, String safeDefault, String when) {
+    public record Need(String field, String question, String safeDefault, String when, boolean ownWords) {
 
         /** Exigé, sans défaut sûr : TaskForce le demande quand il manque. */
         public static Need asked(String field, String question) {
-            return new Need(field, question, null, null);
+            return new Need(field, question, null, null, false);
         }
 
         /** Exigé seulement dans un cas que le geste juge : demandé alors, son défaut sûr en premier s'il en a un. */
         public static Need askedWhen(String field, String question, String safeDefault, String when) {
-            return new Need(field, question, safeDefault, when);
+            return new Need(field, question, safeDefault, when, false);
+        }
+
+        /** Exigé dans les mots de la personne : demandé quand il manque ou que sa demande ne le dit pas. */
+        public static Need inOwnWords(String field, String question, String when) {
+            return new Need(field, question, null, when, true);
         }
 
         /** Un défaut sûr : jamais demandé. */
         public static Need byDefault(String field, String safeDefault) {
-            return new Need(field, null, safeDefault, null);
+            return new Need(field, null, safeDefault, null, false);
         }
 
         /** Vrai quand TaskForce le demande s'il manque. */

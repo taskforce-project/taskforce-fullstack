@@ -16,6 +16,7 @@ import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.CortexGesture;
 import com.taskforce.tf_api.core.service.agent.Question;
 import com.taskforce.tf_api.core.service.agent.QuestionNeeded;
+import com.taskforce.tf_api.core.service.agent.tools.IssueFields;
 
 /**
  * Un outil du MCP TaskForce tel que Cortex s'en sert dans la conversation (ADR-024) : le même outil qu'un agent
@@ -83,13 +84,24 @@ final class CortexMcpTool implements CortexGesture {
     @Override public Map<String, Object> ask(Map<String, Object> args, AgentContext ctx) {
         JsonNode resolved = resolved(args, ctx);
         for (McpTool.Need need : tool.needs()) {
-            if (!need.isAsked() || need.when() != null || ISSUE.equals(need.field())) continue;
             JsonNode value = resolved.path(need.field());
-            if (value.isMissingNode() || value.isNull() || (value.isTextual() && value.asText().isBlank())) {
-                throw new QuestionNeeded(Question.free(need.field(), need.question()));
+            boolean missing = value.isMissingNode() || value.isNull() || (value.isTextual() && value.asText().isBlank());
+            // Un nom que la demande ne dit pas, le modèle l'a inventé (« Web Application » pour « crée un projet Next.js »,
+            // qwen3:8b, 04/11/2026) : TaskForce le demande, la proposition du modèle en suggestion.
+            if (need.ownWords() && !missing && ctx.request() != null && !said(value.asText(), ctx.request())) {
+                throw new QuestionNeeded(new Question(need.field(), need.question(),
+                    List.of(Question.Choice.of(value.asText().strip(), value.asText().strip()))));
             }
+            if (!need.isAsked() || need.when() != null || ISSUE.equals(need.field())) continue;
+            if (missing) throw new QuestionNeeded(Question.free(need.field(), need.question()));
         }
         return mapper.convertValue(resolved, MAP);
+    }
+
+    /** La valeur se lit dans la demande, sans la casse, les accents, les espaces ni la ponctuation. */
+    private static boolean said(String value, String request) {
+        String wanted = IssueFields.key(value);
+        return !wanted.isEmpty() && IssueFields.key(request).contains(wanted);
     }
 
     @Override public Done perform(Map<String, Object> args, AgentContext ctx) {

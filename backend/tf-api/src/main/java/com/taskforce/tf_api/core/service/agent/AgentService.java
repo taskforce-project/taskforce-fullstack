@@ -304,7 +304,7 @@ public class AgentService {
      */
     public AssistantAnswer run(String slug, Long userId, String message, List<Map<String, Object>> history, Screen screen) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
-        AgentContext ctx = new AgentContext(slug, ws.getId(), userId, screen);
+        AgentContext ctx = new AgentContext(slug, ws.getId(), userId, screen, message);
         List<Map<String, Object>> hist = history == null ? List.of() : history;
 
         // Salutation ou remerciement : réponse directe, sans recherche (pas de sources hors sujet).
