@@ -84,7 +84,7 @@ class DeliveryRunnerTest {
             .id(10L).issue(issue).providerKey("push").status(DeliveryRunStatus.QUEUED).build();
         when(runRepository.findById(10L)).thenReturn(Optional.of(run));
         DeliveryAgentProvider push = mock(DeliveryAgentProvider.class);
-        when(push.dispatch(any())).thenReturn(new DeliveryDispatch("ref-10"));
+        when(push.dispatch(eq(10L), any())).thenReturn(new DeliveryDispatch("ref-10"));
         when(push.poll(eq("ref-10"), any())).thenReturn(
             new DeliveryPoll(DeliveryRunStatus.DONE, "Pull request opened", "https://example.com/pull/10", null));
         when(registry.get("push")).thenReturn(push);
@@ -119,7 +119,7 @@ class DeliveryRunnerTest {
         when(runRepository.findById(20L)).thenReturn(Optional.of(run));
 
         DeliveryAgentProvider sync = mock(DeliveryAgentProvider.class);
-        when(sync.dispatch(any())).thenReturn(new DeliveryDispatch(
+        when(sync.dispatch(eq(20L), any())).thenReturn(new DeliveryDispatch(
             "ref-1", new DeliveryPoll(DeliveryRunStatus.DONE, "resume sync", "http://x", null)));
         when(registry.get("sync")).thenReturn(sync);
         when(issueStatusRepository.findByProjectIdAndName(200L, "In review by AI")).thenReturn(Optional.empty());
@@ -163,7 +163,7 @@ class DeliveryRunnerTest {
         runner.execute(30L);
 
         assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.QUEUED);
-        verify(pull, never()).dispatch(any());
+        verify(pull, never()).dispatch(any(), any());
         // Aucune sauvegarde : elle pourrait écraser un claim arrivé entre-temps.
         verify(runRepository, never()).save(any());
     }

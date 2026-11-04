@@ -11,6 +11,7 @@ import {
   type ToolStatus,
 } from "@/components/chat"
 import { cn } from "@/lib/utils"
+import { fillModelText } from "@/lib/ai/model-table"
 import {
   approveAction, isApprovable, isDeletion, isMission, isPreparedIssue, isQuestion, isQuestionCard, isUndoable,
   type AssistantActionResult,
@@ -30,6 +31,7 @@ import { DeleteIssueCard } from "./delete-issue-card"
 import { EvalCaseButton } from "./eval-case-dialog"
 import { IssueDraftCard } from "./issue-draft-card"
 import { MissionInChat } from "./mission-in-chat"
+import { ModelOffer } from "./model-offer"
 import { QuestionCard } from "./question-card"
 import { UndoAction } from "./undo-action"
 
@@ -161,6 +163,7 @@ export function AgentChat({ onFold }: Readonly<{
   const pathname = usePathname()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const t = usePreferencesStore((s) => s.t.shell)
+  const models = usePreferencesStore((s) => s.t.models)
   const reduceMotion = useReducedMotion()
 
   const turns = useCortexStore((s) => s.turns)
@@ -327,7 +330,15 @@ export function AgentChat({ onFold }: Readonly<{
                 className={cn(i < lastAsk && "cortex-earlier", turn.id === latest && "cortex-latest")}
               >
                 {turn.role === "user" ? (
-                  <Message role="user" content={turn.text} />
+                  <>
+                    <Message role="user" content={turn.text} />
+                    {/* La demande renvoyée d'un clic au modèle que TaskForce proposait (R118) : on voit où elle part. */}
+                    {turn.sentTo && (
+                      <p className="mt-0.5 text-right text-[10px] text-muted-foreground">
+                        {fillModelText(models.sentTo, { model: turn.sentTo })}
+                      </p>
+                    )}
+                  </>
                 ) : turn.kind === "quota" ? (
                   <Message role="assistant">
                     <QuotaNotice />
@@ -335,6 +346,7 @@ export function AgentChat({ onFold }: Readonly<{
                 ) : (
                   <Message role="assistant">
                     {turn.answer && <AgentAnswerView answer={turn.answer} slug={slug} />}
+                    <ModelOffer slug={slug} turn={turn} />
                   </Message>
                 )}
               </div>

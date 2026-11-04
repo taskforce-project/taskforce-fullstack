@@ -387,6 +387,18 @@ export const AI_ROUTES = {
 } as const;
 
 /**
+ * Ce que sait faire chaque modèle (R113) : la table de l'instance, une mesure cas par cas, le modèle de Cortex choisi.
+ * Backend: @RequestMapping("/api/workspaces/{slug}/ai/models").
+ */
+export const AI_MODEL_ROUTES = {
+  TABLE: (slug: string) => `/api/workspaces/${slug}/ai/models`,
+  RUNS: (slug: string) => `/api/workspaces/${slug}/ai/models/runs`,
+  RUN_CASE: (slug: string, runId: number, caseKey: string) =>
+    `/api/workspaces/${slug}/ai/models/runs/${runId}/cases/${encodeURIComponent(caseKey)}`,
+  CHOICE: (slug: string) => `/api/workspaces/${slug}/ai/models/choice`,
+} as const;
+
+/**
  * Routes notifications
  * Backend: /api/workspaces/{slug}/notifications
  */

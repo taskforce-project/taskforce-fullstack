@@ -948,6 +948,8 @@ public class IssueService {
             .issue(issue)
             .author(author)
             .content(request.getContent())
+            // Écrit par un agent pour la personne (une mission, l'agent à l'essai, Cortex) : le commentaire le dit.
+            .via(clip(DelegatedAgent.current().orElse(null), ACTIVITY_VIA_MAX))
             .build();
         comment = commentRepository.save(comment);
         logActivity(issue, author, IssueActivityType.COMMENT_ADDED, null, null);
@@ -1324,6 +1326,7 @@ public class IssueService {
             .id(c.getId())
             .author(toUserSummary(c.getAuthor()))
             .content(c.getContent())
+            .via(c.getVia())
             .isEdited(c.isEdited())
             .createdAt(c.getCreatedAt())
             .updatedAt(c.getUpdatedAt())

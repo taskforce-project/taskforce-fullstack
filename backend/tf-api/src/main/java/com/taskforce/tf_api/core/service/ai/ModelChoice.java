@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.service.ai;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -28,6 +29,9 @@ public final class ModelChoice {
     static final List<String> EMBED_PREFERENCES = List.of("bge-m3", "mxbai-embed-large");
 
     private static final Pattern EMBEDDING_NAME = Pattern.compile("embed|bge|minilm|nomic|e5-|gte-", Pattern.CASE_INSENSITIVE);
+    /** Les modèles d'une liste qui ne conversent pas : la voix, la transcription, les filtres de sécurité, le tri. */
+    private static final Pattern NOT_CHAT_NAME =
+        Pattern.compile("whisper|tts|orpheus|playai|speech|transcribe|guard|moderation|rerank", Pattern.CASE_INSENSITIVE);
     /** Date d'une version figée chez Anthropic : {@code claude-haiku-4-5} répond sous {@code claude-haiku-4-5-20251001}. */
     private static final String DATED = "-\\d{8}";
 
@@ -69,6 +73,24 @@ public final class ModelChoice {
             .anyMatch(id -> id.equals(model) || id.equals(model + ":latest") || id.matches(Pattern.quote(model) + DATED));
     }
 
+    /**
+     * Les modèles de conversation d'une liste, ceux des préférences d'abord, dans leur ordre, puis les autres dans l'ordre
+     * du fournisseur : la table de ce que sait faire chaque modèle (R113) les lit dans cet ordre, et TaskForce propose le
+     * premier qui sait faire.
+     */
+    public static List<String> chatModels(AiProvider provider, List<String> models) {
+        if (models == null || models.isEmpty()) return List.of();
+        List<String> chat = models.stream()
+            .filter(id -> !EMBEDDING_NAME.matcher(id).find() && !NOT_CHAT_NAME.matcher(id).find())
+            .toList();
+        List<String> ordered = new ArrayList<>();
+        for (String wanted : provider == AiProvider.ANTHROPIC ? ANTHROPIC_CHAT_PREFERENCES : CHAT_PREFERENCES) {
+            chat.stream().filter(id -> matches(id, wanted) && !ordered.contains(id)).forEach(ordered::add);
+        }
+        chat.stream().filter(id -> !ordered.contains(id)).forEach(ordered::add);
+        return List.copyOf(ordered);
+    }
+
     /** Premier modèle annoncé qui correspond à une préférence ({@code bge-m3} trouve {@code bge-m3:latest}). */
     static String pick(List<String> models, List<String> preferences) {
         if (models == null) {
@@ -76,13 +98,18 @@ public final class ModelChoice {
         }
         for (String wanted : preferences) {
             for (String id : models) {
-                if (id.equals(wanted) || id.startsWith(wanted + ":") || lastSegment(id).equals(wanted)
-                    || id.matches(Pattern.quote(wanted) + DATED)) {
+                if (matches(id, wanted)) {
                     return id;
                 }
             }
         }
         return null;
+    }
+
+    /** Le modèle annoncé {@code id} est-il la préférence {@code wanted}, avec son étiquette, son espace ou sa date ? */
+    private static boolean matches(String id, String wanted) {
+        return id.equals(wanted) || id.startsWith(wanted + ":") || lastSegment(id).equals(wanted)
+            || id.matches(Pattern.quote(wanted) + DATED);
     }
 
     private static String autoChat(AiProvider provider, List<String> models) {
