@@ -714,6 +714,14 @@ export const CONSTANTS_EN = {
     deleteDeleted: "Deleted.",
     deleteFailed: "Nothing was deleted: {why}",
     archiveFailed: "Couldn't archive the issue. Try again in a moment.",
+    // R115: TaskForce asks what a gesture needs, one question at a time, with choices and a free answer.
+    questionChoices: "Choose an answer",
+    questionDefault: "Default",
+    questionFree: "Or type your answer",
+    questionSend: "Answer",
+    questionSending: "Sending…",
+    questionAnswered: "Your answer: {value}",
+    questionFailed: "Your answer didn't go through: {why}",
   },
 } as const
 

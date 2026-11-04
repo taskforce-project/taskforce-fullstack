@@ -355,6 +355,8 @@ export const ASSISTANT_ROUTES = {
   CHAT: (slug: string) => `/api/workspaces/${slug}/assistant`,
   ACTION_EXECUTE: (slug: string) => `/api/workspaces/${slug}/assistant/actions/execute`,
   ACTION_UNDO: (slug: string) => `/api/workspaces/${slug}/assistant/actions/undo`,
+  /** La réponse de la personne à une question de TaskForce (R115) : le geste reprend sur son clic. */
+  ACTION_ANSWER: (slug: string) => `/api/workspaces/${slug}/assistant/actions/answer`,
 } as const;
 
 /**

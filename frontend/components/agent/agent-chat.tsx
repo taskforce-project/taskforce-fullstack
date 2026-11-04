@@ -12,7 +12,8 @@ import {
 } from "@/components/chat"
 import { cn } from "@/lib/utils"
 import {
-  approveAction, isApprovable, isDeletion, isMission, isPreparedIssue, isQuestion, isUndoable, type AssistantActionResult,
+  approveAction, isApprovable, isDeletion, isMission, isPreparedIssue, isQuestion, isQuestionCard, isUndoable,
+  type AssistantActionResult,
   type AssistantAnswer, type AssistantToolCall,
 } from "@/lib/api/assistant-service"
 import { getErrorMessage } from "@/lib/api/client"
@@ -29,6 +30,7 @@ import { DeleteIssueCard } from "./delete-issue-card"
 import { EvalCaseButton } from "./eval-case-dialog"
 import { IssueDraftCard } from "./issue-draft-card"
 import { MissionInChat } from "./mission-in-chat"
+import { QuestionCard } from "./question-card"
 import { UndoAction } from "./undo-action"
 
 /**
@@ -433,6 +435,36 @@ export function AgentChat({ onFold }: Readonly<{
 }
 
 /**
+ * Un appel d'outil de la réponse, et la carte qui va avec : la question de TaskForce (R115), la carte d'une issue
+ * préparée, d'une suppression, d'une action demandée, d'Undo ou d'une mission. Après la réponse à une question, la
+ * suite du geste se rend ici à son tour, sous la question (`followUp`).
+ */
+function ToolCallView({ slug, call, followUp = false }: { slug: string; call: AssistantToolCall; followUp?: boolean }) {
+  // TaskForce demande ce qu'il manque au geste (R115) : ses choix, et la suite sur le clic de la personne.
+  if (isQuestionCard(call)) {
+    return <QuestionCard slug={slug} call={call} showText={followUp}
+      then={(next) => <ToolCallView slug={slug} call={next} followUp />} />
+  }
+  // Cortex demande d'abord ce qui compte (R102) : rien n'est préparé, sa question est la réponse.
+  if (isQuestion(call)) return null
+  // Une issue que Cortex a préparée : la carte la montre, la personne la modifie et la crée (R78).
+  if (isPreparedIssue(call)) return <IssueDraftCard slug={slug} call={call} />
+  // Une suppression demandée : archiver d'abord, qui se défait, ou supprimer, d'un clic de la personne (R1).
+  if (isDeletion(call)) return <DeleteIssueCard slug={slug} call={call} target={call.target} />
+  return (
+    <div>
+      <Tool name={call.name} status={call.status as ToolStatus} input={call.input ?? undefined} output={call.output ?? undefined} />
+      {/* Action demandée par les règles de l'espace : validation explicite de l'utilisateur. */}
+      {isApprovable(call) && <PendingAction slug={slug} call={call} />}
+      {/* Ce que Cortex vient de faire se défait d'un geste (R77). */}
+      {isUndoable(call) && <UndoAction slug={slug} call={call} />}
+      {/* La mission de l'issue, lue ou confiée : ses demandes et son résultat se décident sur ses cartes (TF-J1-5). */}
+      {isMission(call) && <MissionInChat slug={slug} target={call.target} />}
+    </div>
+  )
+}
+
+/**
  * Rend la réponse structurée : étapes, raisonnement, la réponse, puis ce qu'elle propose ou a fait (les cartes), puis
  * les sources repliées. Les cartes viennent après le texte, au plus près de la barre : le serveur écrit « the action
  * below » ou « check the issue below », et c'est la dernière chose à décider.
@@ -450,28 +482,7 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
       {answer.reasoning && <Reasoning content={answer.reasoning} />}
       {/* Ce que TaskForce dit à la place d'une phrase fausse se montre comme sa parole, pas celle du modèle (R116). */}
       <AnswerText text={answer.answer} />
-      {answer.toolCalls.map((tc, i) =>
-        // Cortex demande d'abord ce qui compte (R102) : rien n'est préparé, sa question est la réponse.
-        isQuestion(tc) ? null :
-        // Une issue que Cortex a préparée : la carte la montre, la personne la modifie et la crée (R78).
-        isPreparedIssue(tc) ? (
-          <IssueDraftCard key={i} slug={slug} call={tc} />
-        ) :
-        // Une suppression demandée : archiver d'abord, qui se défait, ou supprimer, d'un clic de la personne (R1).
-        isDeletion(tc) ? (
-          <DeleteIssueCard key={i} slug={slug} call={tc} target={tc.target} />
-        ) : (
-          <div key={i}>
-            <Tool name={tc.name} status={tc.status as ToolStatus} input={tc.input ?? undefined} output={tc.output ?? undefined} />
-            {/* Action demandée par les règles de l'espace : validation explicite de l'utilisateur. */}
-            {isApprovable(tc) && <PendingAction slug={slug} call={tc} />}
-            {/* Ce que Cortex vient de faire se défait d'un geste (R77). */}
-            {isUndoable(tc) && <UndoAction slug={slug} call={tc} />}
-            {/* La mission de l'issue, lue ou confiée : ses demandes et son résultat se décident sur ses cartes (TF-J1-5). */}
-            {isMission(tc) && <MissionInChat slug={slug} target={tc.target} />}
-          </div>
-        ),
-      )}
+      {answer.toolCalls.map((tc, i) => <ToolCallView key={i} slug={slug} call={tc} />)}
       {answer.sources.length > 0 && (
         <Sources items={answer.sources.map((s) => ({ title: s.title, snippet: s.domain, score: s.score ?? undefined }))} />
       )}
