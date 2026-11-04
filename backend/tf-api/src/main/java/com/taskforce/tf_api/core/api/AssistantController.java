@@ -23,7 +23,9 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.AiConversationService;
 import com.taskforce.tf_api.core.service.agent.AgentService;
+import com.taskforce.tf_api.core.service.agent.ModelCapabilityService;
 import com.taskforce.tf_api.core.service.agent.Screen;
+import com.taskforce.tf_api.core.service.ai.ChosenModel;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -53,6 +55,7 @@ public class AssistantController {
     private final UserRepository        userRepository;
     private final BrainAccessGuard      access;
     private final AiConversationService conversationService;
+    private final ModelCapabilityService capabilities;
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
@@ -81,15 +84,27 @@ public class AssistantController {
         // Mémoire multi-tours : historique de la conversation AVANT d'ajouter le tour courant. L'écran de la personne
         // (R114) : Cortex le lit avant les notes, avec ses droits.
         List<Map<String, Object>> history = conversationService.recentHistory(conv.getId());
-        AssistantAnswer answer = agentService.run(slug, userId, body.message(), history, body.screenOf());
+        // Le modèle : celui vers lequel la personne envoie la demande d'un clic (R118), sinon celui qu'elle a choisi
+        // (R113), sinon celui de l'instance. TaskForce ne change jamais de modèle sans elle.
+        String sentTo = capabilities.requestedModel(body.model());
+        String chosen = sentTo != null ? sentTo : capabilities.chosenModel(userId);
+        AssistantAnswer answer = ChosenModel.using(chosen, () -> agentService.run(slug, userId, body.message(), history,
+            body.screenOf()));
+        // Ce que TaskForce dit sous la réponse : la proposition d'un modèle plus fort, ou la demande envoyée à un autre.
+        ChatTurnResponse.Escalation escalation = sentTo != null ? null
+            : capabilities.offer(body.message(), history, capabilities.cortexModel(chosen)).orElse(null);
+        String notice = sentTo != null ? ModelCapabilityService.sentNotice(sentTo)
+            : escalation != null ? escalation.text() : null;
 
-        // Persiste le tour dans la conversation (multi-conversation + historique).
+        // Persiste le tour dans la conversation (multi-conversation + historique), avec ce que TaskForce y a dit : une
+        // conversation rouverte se relit pareil.
         conversationService.appendMessage(conv.getId(), "user", body.message(), null, 0);
-        conversationService.appendMessage(conv.getId(), "assistant", answer.answer(), answer.mode(),
+        conversationService.appendMessage(conv.getId(), "assistant",
+            notice == null ? answer.answer() : answer.answer() + ModelCapabilityService.block(notice), answer.mode(),
             answer.usage() != null ? answer.usage().totalTokens() : 0);
         String title = conversationService.autoTitle(conv.getId(), body.message());
 
-        return ResponseEntity.ok(ApiResponse.success(new ChatTurnResponse(conv.getId(), title, answer)));
+        return ResponseEntity.ok(ApiResponse.success(new ChatTurnResponse(conv.getId(), title, answer, escalation, sentTo)));
     }
 
     /**
@@ -142,11 +157,16 @@ public class AssistantController {
     // DTOs internes
     // -------------------------------------------------------------------------
 
-    /** {@code screen} : ce que la personne voit quand elle écrit (R114) ; absent, Cortex répond sans l'écran. */
+    /**
+     * {@code screen} : ce que la personne voit quand elle écrit (R114) ; absent, Cortex répond sans l'écran.
+     * {@code model} : le modèle vers lequel la personne envoie cette demande, d'un clic sur la proposition de TaskForce
+     * (R118).
+     */
     public record AssistantRequest(
         @NotBlank @Size(max = 4000) String message,
         Long conversationId,
-        @Valid ScreenRequest screen
+        @Valid ScreenRequest screen,
+        @Size(max = 128) String model
     ) {
         Screen screenOf() {
             return screen == null ? Screen.NONE : new Screen(screen.projectId(), screen.issueId());
