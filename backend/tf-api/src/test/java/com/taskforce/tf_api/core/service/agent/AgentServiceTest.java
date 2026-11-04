@@ -1234,8 +1234,8 @@ class AgentServiceTest {
         assertThat(call.question().field()).isEqualTo("issue");
         assertThat(call.question().choices()).extracting(AssistantAnswer.AssistantChoice::value).containsExactly("TESTTA-2", "TESTTA-3");
         assertThat(call.question().choices().get(0).recommended()).isTrue();
-        // La question est celle de TaskForce, pas la phrase du modèle ; le modèle n'est pas rappelé.
-        assertThat(answer.answer()).isEqualTo("Which issue should be deleted?");
+        // La question est celle de TaskForce, signée, pas la phrase du modèle ; le modèle n'est pas rappelé.
+        assertThat(answer.answer()).isEqualTo("> [!taskforce] TaskForce\n> Which issue should be deleted?\n");
         verify(llm, Mockito.times(1)).rawChat(anyList(), anyList(), anyString());
         verify(tool, never()).preview(any(), any());
         verify(tool, never()).perform(any(), any());
@@ -1261,7 +1261,8 @@ class AgentServiceTest {
 
         assertThat(answer.toolCalls().get(0).status()).isEqualTo(AgentService.QUESTION);
         assertThat(answer.toolCalls().get(0).question().choices()).hasSize(2).noneMatch(AssistantAnswer.AssistantChoice::recommended);
-        assertThat(answer.answer()).isEqualTo("Who should take TF-12? Several members of TaskForce match \"ada\".");
+        assertThat(answer.answer())
+            .isEqualTo("> [!taskforce] TaskForce\n> Who should take TF-12? Several members of TaskForce match \"ada\".\n");
     }
 
     @Test
@@ -1369,6 +1370,55 @@ class AgentServiceTest {
         assertThatThrownBy(() -> service.answer("acme", 7L, "delete_issue", RECORD.toString(), "sha256:q1", "  "))
             .isInstanceOf(BusinessException.class).hasMessage("Pick one of the choices, or write your answer.");
         verify(records, never()).answer(any(), any(), any(), any(), any());
+    }
+
+    /**
+     * Cortex n'a rien dit (décision du CEO, 02/11/2026) : TaskForce dit ce qui s'est passé, signé comme ses corrections
+     * (R116). Une ligne par appel du tour, dans l'ordre ; une réponse écrite reste celle de Cortex.
+     */
+    @ParameterizedTest(name = "« {0} » après {1} [{2}] : {3}")
+    @CsvSource(delimiter = '|', quoteCharacter = '`', nullValues = "-", value = {
+        "        | -                  | -        | -                                      | Cortex didn't answer. Nothing was done.",
+        "   \\n   | -                  | -        | -                                      | Cortex didn't answer. Nothing was done.",
+        "        | create_issue       | pending  | Issue prepared as a card               | Cortex didn't answer.~Nothing is created yet: check the issue below, then create it.",
+        "        | linear__save_issue | pending  | Action proposed                        | Cortex didn't answer.~Nothing has changed yet: the action below waits for your approval.",
+        "        | update_issue       | success  | Updated TF-12 \"Fix login\": column from Todo to Done. | Cortex didn't answer.~Updated TF-12 \"Fix login\": column from Todo to Done.",
+        "        | list_issues        | success  | Issues in TaskForce (2):\\n- TF-1 A\\n- TF-2 B | Cortex didn't answer.~What it read or did shows below.",
+        "        | update_issue       | refused  | Not run: the rules refuse it.          | Cortex didn't answer.~Nothing was done: the rules of this workspace refuse it.",
+        "        | update_issue       | error    | Tool update_issue failed: There is no issue TF-99. | Cortex didn't answer.~An action failed, so nothing was done: There is no issue TF-99.",
+        "        | delete_issue       | question | Nothing was done: TaskForce asks first. | Cortex didn't answer.~TaskForce asks a question below.",
+        "Done.   | update_issue       | success  | Updated TF-12.                         | -",
+    })
+    void taskforce_speaks_when_cortex_says_nothing(String answer, String tool, String status, String output, String said) {
+        String written = answer == null ? "" : answer.replace("\\n", "\n");
+        List<AssistantToolCall> calls = tool == null ? List.of()
+            : List.of(new AssistantToolCall(tool, status, "{}", output.replace("\\n", "\n"), "r"));
+
+        String shown = AgentService.silentAnswer(written, calls);
+
+        if (said == null) {
+            assertThat(shown).isEqualTo(written);
+            return;
+        }
+        StringBuilder expected = new StringBuilder("> [!taskforce] TaskForce");
+        for (String line : said.split("~")) expected.append("\n> ").append(line);
+        assertThat(shown).isEqualTo(expected.append('\n').toString());
+    }
+
+    @Test
+    @DisplayName("Cortex n'a rien dit après un geste : la réponse est celle de TaskForce, qui redit le geste, signée")
+    void an_empty_answer_after_a_gesture_is_taskforces() throws Exception {
+        modelCalls("update_issue", "{\"issue\":\"TF-12\",\"status\":\"Done\"}", "");
+        CortexGesture tool = gesture("update_issue", "issue.update");
+        when(tool.perform(any(), any())).thenReturn(new CortexGesture.Done("Updated TF-12 \"Fix login\": column from Todo "
+            + "to Done.", Map.of("issueId", 5), Map.of("fields", Map.of())));
+
+        AssistantAnswer answer = service.run("acme", 7L, "move TF-12 to Done");
+
+        assertThat(answer.answer()).isEqualTo("> [!taskforce] TaskForce\n> Cortex didn't answer.\n> Updated TF-12 \"Fix login\": "
+            + "column from Todo to Done.\n");
+        assertThat(answer.steps()).last().satisfies(step -> assertThat(step.description())
+            .isEqualTo("Cortex said nothing: TaskForce said what happened"));
     }
 
     /** Une réponse tapée se lit parmi les choix : leur valeur, leur libellé, ou le seul qui la contient. */

@@ -6,6 +6,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -351,9 +352,16 @@ public class AgentService {
                 steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
                     "Cortex said something was done that no action did: TaskForce corrected it"));
             }
+            // La question d'un geste est la parole de TaskForce (R115), signée ; et quand Cortex n'a rien dit (qwen3:8b,
+            // souvent, après une demande de suppression), TaskForce dit ce qui s'est passé.
+            String asked = askedAnswer(checked.answer(), toolCalls);
+            String answer = silentAnswer(asked, toolCalls);
+            if (!answer.equals(asked)) {
+                steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", "Cortex said nothing: TaskForce said what happened"));
+            }
             LlmUsage usage = llm.currentUsage();
             recordUsage(ws.getId(), usage);
-            return new AssistantAnswer(checked.answer(), null, toolCalls.isEmpty() ? "fast" : "deep",
+            return new AssistantAnswer(answer, null, toolCalls.isEmpty() ? "fast" : "deep",
                 sources, steps, toolCalls, toUsage(usage), record);
         } catch (LlmToolsRefusedException ex) {
             log.warn("Cortex (slug={}) : le fournisseur refuse les outils", LogSafe.of(slug));
@@ -1031,6 +1039,63 @@ public class AgentService {
             .map(call -> CARD_ANSWERS.get(call.name()))
             .findFirst()
             .orElse(answer);
+    }
+
+    /** Une sortie d'outil que TaskForce redit telle quelle : une phrase courte, pas une liste lue. */
+    private static final int MAX_SAID = 280;
+
+    /**
+     * Ce que dit la réponse quand Cortex n'a rien dit (décision du CEO, 02/11/2026 : qwen3:8b répond souvent par un texte
+     * vide à une demande de suppression). TaskForce dit à sa place ce qui s'est passé dans le tour, signé comme ses
+     * corrections (R116) : rien, ce que dit la carte qui attend, ou ce qu'un outil a fait ou refusé. Une réponse écrite
+     * reste celle de Cortex.
+     */
+    static String silentAnswer(String answer, List<AssistantToolCall> toolCalls) {
+        if (answer != null && !answer.isBlank()) return answer;
+        Set<String> said = new LinkedHashSet<>();
+        said.add(toolCalls.isEmpty() ? "Cortex didn't answer. Nothing was done." : "Cortex didn't answer.");
+        for (AssistantToolCall call : toolCalls) {
+            String output = call.output() == null ? "" : call.output().strip();
+            switch (call.status()) {
+                case "pending" -> said.add(CARD_ANSWERS.getOrDefault(call.name(), PREPARED.contains(call.name())
+                    ? "Nothing is created yet: check the issue below, then create it."
+                    : "Nothing has changed yet: the action below waits for your approval."));
+                case "success" -> said.add(output.isEmpty() || output.length() > MAX_SAID || output.contains("\n")
+                    ? "What it read or did shows below." : output);
+                case "refused" -> said.add("Nothing was done: the rules of this workspace refuse it.");
+                case "error" -> said.add("An action failed, so nothing was done: "
+                    + clipped(output.replaceFirst("^Tool \\S+ failed: ", ""), MAX_SAID));
+                case QUESTION -> said.add(call.question() != null ? call.question().text() : "TaskForce asks a question below.");
+                default -> { /* un résultat défait ou inconnu : rien de plus à dire */ }
+            }
+        }
+        return signed(List.copyOf(said));
+    }
+
+    /**
+     * La réponse d'un tour qui s'arrête sur la question d'un geste (R115) : la question est celle de TaskForce, pas du
+     * modèle, et se montre signée comme ses corrections (R116) ; la carte en dessous porte ses choix.
+     */
+    static String askedAnswer(String answer, List<AssistantToolCall> toolCalls) {
+        if (answer == null) return null;
+        return toolCalls.stream()
+            .filter(call -> QUESTION.equals(call.status()) && call.question() != null
+                && answer.strip().equals(call.question().text()))
+            .map(call -> signed(List.of(call.question().text())))
+            .findFirst()
+            .orElse(answer);
+    }
+
+    /** Un bloc de TaskForce, tel que l'app le montre comme sa parole (R116) : la signature, puis une ligne par phrase. */
+    private static String signed(List<String> lines) {
+        StringBuilder block = new StringBuilder(ActionClaimCheck.SIGNATURE);
+        lines.forEach(line -> block.append("\n> ").append(line));
+        return block.append('\n').toString();
+    }
+
+    private static String clipped(String text, int max) {
+        String flat = text.replaceAll("\\s+", " ").strip();
+        return flat.length() <= max ? flat : flat.substring(0, max).stripTrailing() + "...";
     }
 
     /** Le fournisseur a refusé les outils : rien n'a été fait, on le dit, avec les notes trouvées. */
