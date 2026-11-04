@@ -128,7 +128,7 @@ public class AssistantController {
      * qu'il a fait.
      */
     @PostMapping(value = "/actions/answer", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ApiResponse<AssistantToolCall>> answer(
+    public ResponseEntity<ApiResponse<AssistantToolCall>> answerQuestion(
         @PathVariable String slug,
         @Valid @RequestBody AssistantAnswerRequest body,
         @AuthenticationPrincipal Jwt jwt
