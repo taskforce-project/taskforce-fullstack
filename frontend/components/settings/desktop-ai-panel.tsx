@@ -4,12 +4,15 @@ import { useEffect, useState } from "react"
 import { CircleAlert, CircleCheck, Loader2 } from "lucide-react"
 
 import { CopyableCode } from "@/components/settings/copyable-code"
+import { ModelCapabilityTable } from "@/components/settings/model-capability-table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { desktopBridge, type DesktopAiSettings, type DesktopAiView } from "@/lib/desktop"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
+import { useModelCapabilityStore } from "@/lib/store/model-capability-store"
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
 
 /** Valeur des listes de modèles pour « choisi automatiquement » (un élément de liste ne peut pas être vide). */
 const AUTO = "__auto"
@@ -36,6 +39,8 @@ const PROVIDERS: { value: DesktopAiSettings["provider"]; label: string; hint: st
  */
 export function DesktopAiPanel() {
   const fetchAiStatus = useAiStatusStore((s) => s.fetchStatus)
+  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug) ?? ""
+  const fetchModels = useModelCapabilityStore((s) => s.fetchTable)
   const [view, setView] = useState<DesktopAiView | null>(null)
   const [draft, setDraft] = useState<DesktopAiSettings | null>(null)
   const [apiKey, setApiKey] = useState("")
@@ -80,6 +85,7 @@ export function DesktopAiPanel() {
     setSaved(true)
     // Cortex et les autres écrans relisent l'état tout de suite, sans attendre les caches.
     void fetchAiStatus(true)
+    if (slug) void fetchModels(slug)
   }
 
   if (!draft || !view) {
@@ -201,6 +207,14 @@ export function DesktopAiPanel() {
       )}
 
       <StatusLine view={view} />
+
+      {/* Ce que sait faire chaque modèle de l'ordinateur (R113) : « Use for Cortex » remplit les deux modèles de
+          conversation ci-dessus (Cortex répond avec le rapide), et la personne enregistre. */}
+      {slug && draft.provider !== "off" && state.reachable && (
+        <div className="border-t border-border/60 pt-6">
+          <ModelCapabilityTable slug={slug} onUse={(model) => update({ model, modelFast: model })} />
+        </div>
+      )}
 
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex flex-wrap items-center gap-2">

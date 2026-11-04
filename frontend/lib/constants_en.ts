@@ -417,6 +417,51 @@ export const CONSTANTS_EN = {
     saved: "Saved!",
   },
 
+  // What each model can do (R113): measured on this computer or server by TaskForce's test cases, never taken from a
+  // vendor's sheet. TaskForce proposes the first capable model; the person chooses. Then R118's offer in the conversation.
+  models: {
+    title: "What each model can do",
+    hint: "Measured here by TaskForce's test cases, not taken from the vendor. Measuring a model replays {cases} short cases with Cortex's tools and counts in your AI usage.",
+    model: "Model",
+    measured: "Measured",
+    notMeasured: "Not measured",
+    never: "Never",
+    measure: "Measure",
+    measureAgain: "Measure again",
+    measuring: "Measuring {model}: {done} of {total}",
+    waiting: "The AI allows a request per minute here: next case in {seconds} s",
+    stop: "Stop",
+    inUse: "Cortex uses it",
+    use: "Use for Cortex",
+    useHint: "Cortex answers you with this model",
+    useInstance: "Use the instance's model",
+    instanceModel: "This instance's model for Cortex: {model}.",
+    yourChoice: "You chose {model} for Cortex.",
+    noModels: "The AI of this instance serves no model right now.",
+    proposalTitle: "TaskForce proposes",
+    proposalEverything: "For everything measured: {model}.",
+    proposalNone: "No model passed every case yet: measure the models to see which one fits.",
+    proposalFor: "{capability}: {model}",
+    nobodyYet: "no model yet",
+    heldWords: "holds {words} words",
+    heldNone: "lost the shortest document",
+    partial: "{passed} of {measured} measured",
+    caseFailed: "Failed: {title}",
+    lastMeasure: "Last measure of {model}: {passed} of {total} cases passed.",
+    desktopUse: "Use for Cortex sets the conversation and quick answer models below: save to apply.",
+    // R118: TaskForce's words under an answer when the bank says the model failed this kind of request.
+    saysWhat: "about the model that answers",
+    saysLabel: "TaskForce, about the model that answers",
+    saysHint: "TaskForce's test cases measure what each model can do on this computer or server. TaskForce proposes a model; only you send a request to it.",
+    offerAsk: "Ask {model}",
+    sentTo: "to {model}",
+    answeredBy: "Answered by {model}, as you asked.",
+    // R51: TaskForce's own loop on a local model, on trial, for the tasks answered in a comment.
+    trial: "Trial",
+    trialHint: "Answers in a comment. No code, no repository.",
+    trialAgent: "TaskForce's own loop on {model}, on trial: it reads the issue, its project and the notes you can read, and answers in a comment, under its name and for you. Only for tasks without a repository: code stays with Claude Code.",
+  },
+
   // Integrations catalog (Settings > Integrations): GitHub, Slack and Plane next to the tried MCP presets.
   integrations: {
     catalogWeb: "GitHub, Slack and Plane sync natively; any other tool connects through its MCP server.",
@@ -523,6 +568,8 @@ export const CONSTANTS_EN = {
       openPullRequest: "Open the pull request",
       branchOnly: "{commits} commits on the branch {branch}, without a pull request.",
       noChange: "No code change was needed.",
+      // R51: the trial agent answers in a comment, without a repository.
+      answeredInComment: "Answered in a comment on this issue.",
       isItGood: "Is it good?",
       testsRan: "Tests ran",
       testsFailed: "Tests failed",
