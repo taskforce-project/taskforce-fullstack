@@ -40,7 +40,7 @@ class CortexPlansTest {
 
         assertThat(plan.text().lines().count()).isLessThanOrEqualTo(CortexPlans.MAX_LINES);
         assertThat(plan.text().length()).isLessThanOrEqualTo(CortexPlans.MAX_CHARS);
-        assertThat(plan.text()).doesNotContain("—"); // pas de tiret cadratin
+        assertThat(plan.text()).doesNotContain(String.valueOf((char) 0x2014)); // pas de tiret cadratin
         assertThat(plan.gestures()).isNotEmpty().allMatch(CORTEX_TOOLS::contains);
         Set<String> named = new HashSet<>();
         Matcher found = TOOL_NAME.matcher(plan.text());
