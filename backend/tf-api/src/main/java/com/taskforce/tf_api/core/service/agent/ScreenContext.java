@@ -119,7 +119,8 @@ public class ScreenContext {
             List<IssueResponse> in = byColumn.get(column.getId());
             sb.append("- ").append(column.getName()).append(": ");
             if (in.isEmpty()) {
-                sb.append("none");
+                // Coupé au plafond, une colonne sans issue montrée peut en avoir : le modèle ne doit pas la croire vide.
+                sb.append(shown.size() < total ? "none of these" : "none");
             } else {
                 for (int i = 0; i < in.size(); i++) {
                     if (i > 0) sb.append("; ");

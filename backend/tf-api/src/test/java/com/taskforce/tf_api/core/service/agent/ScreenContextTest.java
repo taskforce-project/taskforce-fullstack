@@ -149,7 +149,9 @@ class ScreenContextTest {
 
         assertThat(text.length()).isLessThanOrEqualTo(ScreenContext.MAX_CHARS);
         assertThat(text).contains("WEB-0 ", "WEB-1 ").doesNotContain("WEB-45", "WEB-999", "Archived")
-            .contains("of its 46 issues").contains("The other issues: list_issues reads them.");
+            .contains("of its 46 issues").contains("The other issues: list_issues reads them.")
+            // Coupé au plafond, une colonne sans issue montrée n'est pas dite vide.
+            .contains("- Backlog: none of these").doesNotContain("- Backlog: none\n");
         long shown = text.lines().filter(line -> line.startsWith("- ")).mapToLong(line -> line.split("WEB-").length - 1).sum();
         assertThat(shown).isBetween(1L, (long) ScreenContext.MAX_ISSUES);
         // Un titre long se coupe : la clé et le début suffisent.
