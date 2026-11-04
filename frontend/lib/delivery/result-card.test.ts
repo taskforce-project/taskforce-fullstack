@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { DeliveryRun, DeliveryRunActivity, DeliveryRunApproval } from "@/lib/api/delivery-service";
 import { CONSTANTS_EN } from "@/lib/constants_en";
-import { changedNothing, pullRequestOf, resultCard, resultLine, workMinutes } from "./result-card";
+import { changedNothing, missionAgentName, pullRequestOf, resultCard, resultLine, workMinutes } from "./result-card";
 
 const t = CONSTANTS_EN.missions.result;
 
@@ -123,7 +123,17 @@ describe("resultLine", () => {
     ["the pull request", run(), "Pull request #212 on acme/website."],
     ["the branch, without a pull request", run({ resultUrl: null }), "2 commits on the branch tf/tf-28, without a pull request."],
     ["no change", run({ resultUrl: null, commits: 0 }), "No code change was needed."],
+    ["the trial agent's comment (R51)", run({ resultUrl: null, branch: null, commits: null, providerKey: "taskforce-agent" }),
+      "Answered in a comment on this issue."],
   ])("says %s", (_label, r, line) => {
     expect(resultLine(r, t)).toBe(line);
+  });
+});
+
+describe("missionAgentName", () => {
+  it("names the trial agent after the model that answers, and keeps the others' names", () => {
+    expect(missionAgentName({ providerKey: "taskforce-agent", model: "qwen3:8b" }, "Claude Code")).toBe("qwen3:8b");
+    expect(missionAgentName({ providerKey: "taskforce-agent", model: null }, "Claude Code")).toBe("Claude Code");
+    expect(missionAgentName({ providerKey: "claude-code", model: "claude-opus-5" }, "Claude Code")).toBe("Claude Code");
   });
 });

@@ -22,6 +22,7 @@ import { BrandLogo } from "@/components/ui/brand-logo"
 import { cn } from "@/lib/utils"
 import type { ProjectMember } from "@/lib/api/project-service"
 import type { DeliveryProvider } from "@/lib/api/delivery-service"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 import {
   smartAssignIssue,
   type SmartAssignCandidate,
@@ -109,6 +110,7 @@ export function AssigneeMenu({
   onDelegate,
   working = null,
 }: Readonly<AssigneeMenuProps>) {
+  const models = usePreferencesStore((s) => s.t.models)
   const [open, setOpen] = useState(false)
   const [suggesting, setSuggesting] = useState(false)
   const [ran, setRan] = useState(false)
@@ -295,12 +297,23 @@ export function AssigneeMenu({
                       <span className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted p-0.5">
                         <BrandLogo slug={a.logoKey} name={a.displayName} className="size-full" />
                       </span>
-                      {a.ready ? (
+                      {a.ready && !a.trial ? (
                         <span className="truncate">{a.displayName}</span>
                       ) : (
                         <span className="min-w-0">
-                          <span className="block truncate">{a.displayName}</span>
-                          {a.reason && (
+                          <span className="flex items-center gap-1.5">
+                            <span className="truncate">{a.displayName}</span>
+                            {/* L'agent à l'essai de R51 se dit à l'essai, et dit ce qu'il rend. */}
+                            {a.trial && (
+                              <span className="shrink-0 border border-border px-1 text-[10px] uppercase text-muted-foreground">
+                                {models.trial}
+                              </span>
+                            )}
+                          </span>
+                          {a.ready && a.trial && (
+                            <span className="block whitespace-normal text-xs text-muted-foreground">{models.trialHint}</span>
+                          )}
+                          {!a.ready && a.reason && (
                             <span className="block whitespace-normal text-xs text-muted-foreground">{a.reason}</span>
                           )}
                         </span>
