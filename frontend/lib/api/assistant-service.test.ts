@@ -54,6 +54,15 @@ describe('assistant-service', () => {
     expect(result).toEqual(turn);
   });
 
+  it('sendAgentMessage: sends the request to the model the person clicked (R118)', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(buildTurn()));
+
+    await sendAgentMessage(slug, 'hi', 7, null, 'qwen3:8b');
+
+    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.CHAT(slug), { message: 'hi', conversationId: 7, model: 'qwen3:8b' },
+      expect.anything());
+  });
+
   it('sendAssistantMessage: returns only the answer markdown string', async () => {
     const turn = buildTurn();
     vi.mocked(apiClient.post).mockResolvedValue(envelope(turn));

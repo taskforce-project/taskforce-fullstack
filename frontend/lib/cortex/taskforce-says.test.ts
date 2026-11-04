@@ -47,6 +47,14 @@ describe("splitAnswer : ce que Cortex écrit, ce que TaskForce dit (R116)", () =
     expect(splitAnswer("> [!taskforce] TaskForce\nDone.")).toEqual([{ by: "cortex", text: "Done." }])
   })
 
+  it("reads a block about the model that answers apart from a correction (R118)", () => {
+    const answer = "Moved.\n\n> [!taskforce] TaskForce · models\n> Answered by qwen3:8b, as you asked."
+    expect(splitAnswer(answer)).toEqual([
+      { by: "cortex", text: "Moved." },
+      { by: "taskforce", lines: ["Answered by qwen3:8b, as you asked."], kind: "models" },
+    ])
+  })
+
   it("gives nothing for an empty answer", () => {
     expect(splitAnswer("")).toEqual([])
   })

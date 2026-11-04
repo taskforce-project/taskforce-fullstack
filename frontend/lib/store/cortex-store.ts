@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 import {
-  answerQuestion as sendAnswer, sendAgentMessage, type AssistantAnswer, type AssistantToolCall,
+  answerQuestion as sendAnswer, sendAgentMessage, type AssistantAnswer, type AssistantToolCall, type ModelEscalation,
 } from "@/lib/api/assistant-service";
 import {
   deleteConversation, getConversation, listConversations,
@@ -25,6 +25,11 @@ export interface CortexTurn {
   answer?: AssistantAnswer;
   /** Tour spécial : plafond de tokens IA atteint, une carte d'information au lieu d'une réponse. */
   kind?: "quota";
+  /** Ce que TaskForce propose sous la réponse (R118) ; `escalated` une fois la demande envoyée au modèle proposé. */
+  escalation?: ModelEscalation | null;
+  escalated?: boolean;
+  /** Le modèle vers lequel la personne a envoyé la demande, d'un clic : sur sa demande et sur la réponse. */
+  sentTo?: string | null;
 }
 
 interface CortexState {
@@ -51,6 +56,11 @@ interface CortexState {
   enterWorkspace: (slug: string) => void;
   /** Envoie le texte de la barre : false pour une barre vide, sans espace, ou pendant qu'une réponse est attendue. */
   send: (slug: string) => Promise<boolean>;
+  /**
+   * Envoie de nouveau la demande d'une réponse au modèle que TaskForce y propose (R118), d'un clic de la personne ; false
+   * sans proposition, déjà envoyée, ou pendant qu'une réponse est attendue.
+   */
+  escalate: (slug: string, turnId: string) => Promise<boolean>;
   /** Liste les conversations de l'espace ; false en cas d'échec (la liste reste celle d'avant). */
   loadConversations: (slug: string) => Promise<boolean>;
   /** Rouvre une conversation et son historique ; false en cas d'échec. */
@@ -97,6 +107,20 @@ export function messagesToTurns(messages: ConversationMessage[]): CortexTurn[] {
 
 const EMPTY_CONVERSATION = { turns: [], conversationId: null, tokens: 0, lastMs: null, unread: false };
 
+/**
+ * Le tour d'une demande qui n'a pas abouti. 409 : le plafond de tokens de l'instance, une carte d'information plutôt
+ * qu'un « réessayez » trompeur. 429 : le frein de débit, avec sa limite et la vraie attente (R52). Le reste : un repli.
+ */
+function failedTurn(e: unknown): CortexTurn {
+  const status = getErrorStatus(e);
+  return status === 409
+    ? { id: nextId("a"), role: "assistant", kind: "quota" }
+    : {
+        id: nextId("a"), role: "assistant",
+        answer: fallbackAnswer(status === 429 ? getErrorMessage(e) : "Sorry, I couldn't answer. Please try again."),
+      };
+}
+
 export const useCortexStore = create<CortexState>()((set, get) => ({
   draft: "",
   workspace: null,
@@ -129,24 +153,50 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
       set((s) => ({
         conversationId: res.conversationId,
         tokens: s.tokens + (res.answer.usage?.totalTokens ?? 0),
-        turns: [...s.turns, { id: nextId("a"), role: "assistant", answer: res.answer }],
+        turns: [...s.turns, { id: nextId("a"), role: "assistant", answer: res.answer, escalation: res.escalation ?? null }],
       }));
       void get().loadConversations(slug);
       return true;
     } catch (e) {
-      // 409 : le plafond de tokens de l'instance, une carte d'information plutôt qu'un « réessayez » trompeur.
-      // 429 : le frein de débit, avec sa limite et la vraie attente (R52). Le reste : un repli générique.
-      const status = getErrorStatus(e);
-      const turn: CortexTurn = status === 409
-        ? { id: nextId("a"), role: "assistant", kind: "quota" }
-        : {
-            id: nextId("a"), role: "assistant",
-            answer: fallbackAnswer(status === 429 ? getErrorMessage(e) : "Sorry, I couldn't answer. Please try again."),
-          };
-      set((s) => ({ turns: [...s.turns, turn] }));
+      set((s) => ({ turns: [...s.turns, failedTurn(e)] }));
       return false;
     } finally {
       // Repliée pendant l'attente : la barre signale qu'une réponse attend d'être lue.
+      set((s) => ({ sentAt: null, lastMs: Date.now() - sentAt, unread: !s.open }));
+    }
+  },
+
+  escalate: async (slug, turnId) => {
+    const turns = get().turns;
+    const at = turns.findIndex((turn) => turn.id === turnId);
+    const offer = at >= 0 ? turns[at].escalation : null;
+    const asked = turns.slice(0, Math.max(at, 0)).reverse().find((turn) => turn.role === "user")?.text;
+    if (!offer || turns[at].escalated || !asked || !slug || get().sentAt !== null) return false;
+    const sentAt = Date.now();
+    // La demande repart telle quelle, vers le modèle proposé : la conversation montre où elle va.
+    set((s) => ({
+      sentAt, open: true, unread: false,
+      turns: [
+        ...s.turns.map((turn) => (turn.id === turnId ? { ...turn, escalated: true } : turn)),
+        { id: nextId("u"), role: "user", text: asked, sentTo: offer.to },
+      ],
+    }));
+    try {
+      // L'écran de maintenant (R114), comme pour une demande écrite dans la barre.
+      const screen = screenFrom(typeof window === "undefined" ? null : window.location.pathname,
+        useScreenStore.getState().openIssue);
+      const res = await sendAgentMessage(slug, asked, get().conversationId, screen, offer.to);
+      set((s) => ({
+        conversationId: res.conversationId,
+        tokens: s.tokens + (res.answer.usage?.totalTokens ?? 0),
+        turns: [...s.turns, { id: nextId("a"), role: "assistant", answer: res.answer, sentTo: res.sentTo ?? offer.to }],
+      }));
+      void get().loadConversations(slug);
+      return true;
+    } catch (e) {
+      set((s) => ({ turns: [...s.turns, failedTurn(e)] }));
+      return false;
+    } finally {
       set((s) => ({ sentAt: null, lastMs: Date.now() - sentAt, unread: !s.open }));
     }
   },

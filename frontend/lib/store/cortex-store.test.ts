@@ -251,4 +251,48 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
     await expect(useCortexStore.getState().answerQuestion("acme", question, "   ")).resolves.toBeNull();
     expect(answerQuestion).toHaveBeenCalledTimes(1);
   });
+
+  const OFFER = {
+    capability: "tools", from: "qwen2.5:7b-instruct", to: "qwen3:8b",
+    text: "qwen2.5:7b-instruct failed 1 of 2 test cases for requests that use TaskForce's tools; qwen3:8b passed them all.",
+  };
+
+  it("keeps TaskForce's offer of a stronger model with the answer, and sends the request there on a click (R118)", async () => {
+    vi.mocked(sendAgentMessage)
+      .mockResolvedValueOnce({ conversationId: 7, title: "Move", answer: answer("Done."), escalation: OFFER })
+      .mockResolvedValueOnce({ conversationId: 7, title: "Move", answer: answer("Moved ATLAS-3.", 80), sentTo: "qwen3:8b" });
+    useCortexStore.getState().setDraft("Move ATLAS-3 to Done");
+    await useCortexStore.getState().send("acme");
+    const offered = useCortexStore.getState().turns[1];
+    expect(offered.escalation).toEqual(OFFER);
+
+    await expect(useCortexStore.getState().escalate("acme", offered.id)).resolves.toBe(true);
+
+    expect(sendAgentMessage).toHaveBeenLastCalledWith("acme", "Move ATLAS-3 to Done", 7, null, "qwen3:8b");
+    const turns = useCortexStore.getState().turns;
+    expect(turns).toHaveLength(4);
+    expect(turns[1].escalated).toBe(true);
+    expect(turns[2]).toMatchObject({ role: "user", text: "Move ATLAS-3 to Done", sentTo: "qwen3:8b" });
+    expect(turns[3]).toMatchObject({ role: "assistant", sentTo: "qwen3:8b" });
+    expect(turns[3].answer?.answer).toBe("Moved ATLAS-3.");
+    expect(useCortexStore.getState().tokens).toBe(200);
+    // Une seule fois : la proposition est faite.
+    await expect(useCortexStore.getState().escalate("acme", offered.id)).resolves.toBe(false);
+    expect(sendAgentMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it("sends nothing without an offer, and shows a failure like any answer", async () => {
+    vi.mocked(sendAgentMessage)
+      .mockResolvedValueOnce({ conversationId: 7, title: "Move", answer: answer("Done."), escalation: OFFER })
+      .mockRejectedValueOnce(httpError(409));
+    useCortexStore.getState().setDraft("Move ATLAS-3 to Done");
+    await useCortexStore.getState().send("acme");
+
+    await expect(useCortexStore.getState().escalate("acme", "missing")).resolves.toBe(false);
+    await expect(useCortexStore.getState().escalate("acme", useCortexStore.getState().turns[0].id)).resolves.toBe(false);
+    await expect(useCortexStore.getState().escalate("acme", useCortexStore.getState().turns[1].id)).resolves.toBe(false);
+
+    expect(useCortexStore.getState().turns.at(-1)).toMatchObject({ role: "assistant", kind: "quota" });
+    expect(useCortexStore.getState().sentAt).toBeNull();
+  });
 });

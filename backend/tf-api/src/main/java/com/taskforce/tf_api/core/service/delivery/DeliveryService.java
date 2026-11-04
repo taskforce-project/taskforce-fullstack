@@ -171,10 +171,12 @@ public class DeliveryService {
             .filter(p -> p.getWorkspace() != null && ws.getId().equals(p.getWorkspace().getId()))
             .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
         DeliveryContext context = new DeliveryContext(userId, ws, project);
-        return registry.all().stream().map(p -> {
+        // Pour une issue, le menu ne montre que les agents qui savent faire ce genre de tâche (R51 : l'agent à l'essai
+        // ne prend que les tâches sans dépôt) ; les réglages les montrent tous.
+        return registry.all().stream().filter(p -> project == null || !p.hiddenFor(context)).map(p -> {
             String reason = p.unavailableReason(context);
             return new DeliveryProviderResponse(p.key(), p.displayName(), p.logoKey(), p.available(), p.models(),
-                reason == null, reason);
+                reason == null, reason, p.trial());
         }).toList();
     }
 

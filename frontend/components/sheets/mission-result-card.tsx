@@ -6,7 +6,7 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Markdown } from "@/components/ui/lightweight-markdown"
-import { fillText, resultCard, resultLine } from "@/lib/delivery/result-card"
+import { fillText, missionAgentName, resultCard, resultLine } from "@/lib/delivery/result-card"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useUserStore } from "@/lib/store/user-store"
@@ -53,7 +53,7 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
   const testsFailed = run.tests?.ran === true && !run.tests.passed
   const who = [
     responsible ? fillText(r.responsible, { who: responsible }) : null,
-    fillText(r.delegatedTo, { agent: t.agent }),
+    fillText(r.delegatedTo, { agent: missionAgentName(run, t.agent) }),
     card.minutes === null ? null : card.minutes < 1 ? r.underAMinute : fillText(r.minutes, { minutes: card.minutes }),
   ].filter(Boolean).join(" · ")
 

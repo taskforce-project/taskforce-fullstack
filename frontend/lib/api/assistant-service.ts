@@ -100,11 +100,26 @@ export interface AssistantAnswer {
   record?: string | null
 }
 
+/**
+ * Ce que TaskForce propose sous une réponse (R118) : la banque dit que le modèle de Cortex (`from`) échoue à ce genre de
+ * demande (`capability`) et qu'un autre modèle servi (`to`) le réussit ; `text` est sa phrase, gardée dans la conversation.
+ */
+export interface ModelEscalation {
+  capability: string
+  from: string
+  to: string
+  text: string
+}
+
 /** Réponse d'un tour : la réponse de l'agent + la conversation où il est rattaché (créée si absente). */
 export interface ChatTurnResponse {
   conversationId: number
   title: string
   answer: AssistantAnswer
+  /** La proposition d'un modèle plus fort, quand la banque dit que celui de Cortex échoue à ce genre de demande. */
+  escalation?: ModelEscalation | null
+  /** Le modèle vers lequel la personne a envoyé cette demande, d'un clic. */
+  sentTo?: string | null
 }
 
 /**
@@ -116,11 +131,13 @@ export async function sendAgentMessage(
   message: string,
   conversationId?: number | null,
   screen?: AssistantScreen | null,
+  model?: string | null,
 ): Promise<ChatTurnResponse> {
-  // L'écran part avec le message quand la personne regarde un projet (R114) : Cortex le lit avant les notes.
-  const body = screen
-    ? { message, conversationId: conversationId ?? null, screen }
-    : { message, conversationId: conversationId ?? null }
+  // L'écran part avec le message quand la personne regarde un projet (R114) : Cortex le lit avant les notes. Le
+  // modèle, quand la personne envoie la demande à celui que TaskForce propose (R118) ; sans lui, rien ne change.
+  const body = {
+    message, conversationId: conversationId ?? null, ...(screen ? { screen } : {}), ...(model ? { model } : {}),
+  }
   const res = await apiClient.post<{ data: ChatTurnResponse }>(ASSISTANT_ROUTES.CHAT(slug), body, { timeout: AI_TIMEOUT_MS })
   return res.data.data
 }

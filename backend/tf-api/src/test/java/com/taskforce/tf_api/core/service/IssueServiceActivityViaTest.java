@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -15,26 +16,32 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
+import com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest;
 import com.taskforce.tf_api.core.enums.IssueActivityType;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueActivity;
 import com.taskforce.tf_api.core.model.IssueChecklistItem;
+import com.taskforce.tf_api.core.model.IssueComment;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.IssueActivityRepository;
 import com.taskforce.tf_api.core.repository.IssueChecklistItemRepository;
+import com.taskforce.tf_api.core.repository.IssueCommentRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.security.DelegatedAgent;
 import com.taskforce.tf_api.core.security.DeliverySessionFilter;
+import com.taskforce.tf_api.core.service.SlackIntegrationService;
 
 /**
  * L'activité d'une issue dit qui a fait quoi : une action faite par l'agent d'une mission, au nom de la personne qui
@@ -52,6 +59,10 @@ class IssueServiceActivityViaTest {
     @Mock private UserRepository userRepository;
     @Mock private IssueChecklistItemRepository checklistRepository;
     @Mock private ProjectVisibilityGuard visibilityGuard;
+    @Mock private IssueCommentRepository commentRepository;
+    @Mock private NotificationService notificationService;
+    @Mock private SlackIntegrationService slackService;
+    @Mock private ApplicationEventPublisher events;
 
     @InjectMocks private IssueService service;
 
@@ -112,6 +123,29 @@ class IssueServiceActivityViaTest {
         assertThat(activity.getNewValue()).isEqualTo("Update the README");
         assertThat(activity.getActor()).isEqualTo(pierre);
         assertThat(activity.getVia()).isEqualTo("Claude Code");
+    }
+
+    @Test
+    @DisplayName("le commentaire que l'agent à l'essai écrit pour Pierre dit son modèle (R51), celui de Pierre n'en dit rien")
+    void a_comment_names_the_agent_that_wrote_it() {
+        Workspace acme = Workspace.builder().id(1L).slug("acme").build();
+        Project testta = Project.builder().id(3L).workspace(acme).identifier("TESTTA").build();
+        Issue issue = Issue.builder().id(55L).project(testta).sequenceNumber(4).title("Triage").build();
+        when(workspaceRepository.findBySlug("acme")).thenReturn(Optional.of(acme));
+        when(projectRepository.findByIdAndWorkspaceId(3L, 1L)).thenReturn(Optional.of(testta));
+        when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(1L, 7L)).thenReturn(true);
+        when(issueRepository.findById(55L)).thenReturn(Optional.of(issue));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(pierre));
+        when(commentRepository.save(any(IssueComment.class))).thenAnswer(call -> call.getArgument(0));
+        CreateIssueCommentRequest request = new CreateIssueCommentRequest();
+        request.setContent("Three themes stand out.");
+
+        var byTheModel = DelegatedAgent.actingAs("qwen3:8b", () -> service.addComment("acme", 3L, 55L, request, 7L));
+        var byPierre = service.addComment("acme", 3L, 55L, request, 7L);
+
+        assertThat(byTheModel.getVia()).isEqualTo("qwen3:8b");
+        assertThat(byTheModel.getAuthor().getEmail()).isEqualTo("pierre@acme.dev");
+        assertThat(byPierre.getVia()).isNull();
     }
 
     @Test
