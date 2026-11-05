@@ -317,6 +317,23 @@ export const CONSTANTS_EN = {
     skipToContent: "Skip to main content",
   },
 
+  // Desktop app update, in one toast that stays (desktop-update-toast.tsx). Since 05/11/2026 the installer runs without
+  // a window: this toast is where an update that didn't install is told.
+  desktopUpdate: {
+    downloading: "Downloading TaskForce {version}",
+    progress: "{percent}% · Keep TaskForce open: the download starts over if you quit.",
+    progressLabel: "Update download",
+    ready: "TaskForce {version} is ready",
+    readyHint: "Restart to use it now. Otherwise it installs when you quit TaskForce.",
+    restart: "Restart now",
+    later: "Later",
+    notInstalled: "TaskForce {version} didn't install",
+    notInstalledHint: "TaskForce is still on the previous version. Restart to try again. If it fails again, download TaskForce from taskforce-project.fr.",
+    failed: "TaskForce {version} couldn't download",
+    failedHint: "Check your connection, then try again.",
+    tryAgain: "Try again",
+  },
+
   // Navigation (sidebar)
   nav: {
     dashboard: "Dashboard",

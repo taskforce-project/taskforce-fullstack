@@ -121,12 +121,13 @@ export type DesktopUpdateCheck =
 
 /**
  * État de la mise à jour, envoyé par la coque à chaque changement (cf. `desktop/src/update-state.ts`) : le toast de la
- * mise à jour en montre l'avancement, puis le bouton de redémarrage.
+ * mise à jour en montre l'avancement, puis le bouton de redémarrage. `retry` : cette version devait déjà s'installer au
+ * dernier arrêt, et l'app tourne encore sur la précédente (l'installeur tourne sans fenêtre, c'est le toast qui le dit).
  */
 export type DesktopUpdateState =
   | { status: "idle" }
   | { status: "downloading"; version: string; percent: number }
-  | { status: "ready"; version: string }
+  | { status: "ready"; version: string; retry?: boolean }
   | { status: "failed"; version: string; message: string };
 
 /** Ce que la coque expose à la fenêtre de l'app. */
