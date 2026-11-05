@@ -95,11 +95,16 @@ export interface AssistantActionResult {
   /** L'issue d'un geste accordé (sa mission, une fois confiée à un agent). */
   target?: AssistantTarget | null
 }
-/** Tokens réellement consommés par le tour (usage LLM cumulé). */
+/**
+ * Tokens réellement consommés par le tour (usage LLM cumulé), et ce que le modèle a lu à son dernier appel : la taille de
+ * ce prompt et la fenêtre de contexte que la passerelle lui a donnée (null quand le fournisseur la tient lui-même).
+ */
 export interface AssistantUsage {
   promptTokens: number
   completionTokens: number
   totalTokens: number
+  lastPromptTokens?: number
+  contextWindow?: number | null
 }
 export interface AssistantAnswer {
   answer: string

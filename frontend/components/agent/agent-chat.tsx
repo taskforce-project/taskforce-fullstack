@@ -435,7 +435,7 @@ export function AgentChat({ onFold }: Readonly<{
               {lastMs != null && <span className="tabular-nums">· {(lastMs / 1000).toFixed(1)} s</span>}
             </span>
           ) : null}
-          <CortexUsage sessionTokens={tokens} />
+          <CortexUsage />
         </div>
 
         <button type="button" onClick={onFold} aria-label={t.chatFold} title={t.chatFold} className={HEADER_BUTTON}>

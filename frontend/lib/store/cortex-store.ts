@@ -9,6 +9,7 @@ import {
   type ConversationMessage, type ConversationSummary,
 } from "@/lib/api/ai-conversation-service";
 import { getErrorMessage, getErrorStatus } from "@/lib/api/client";
+import { contextFrom, type CortexContext } from "@/lib/cortex/context-gauge";
 import { screenFrom } from "@/lib/cortex/screen";
 import { useScreenStore } from "@/lib/store/screen-store";
 
@@ -41,8 +42,13 @@ interface CortexState {
   turns: CortexTurn[];
   conversationId: number | null;
   conversations: ConversationSummary[];
-  /** Tokens de la conversation en cours (la jauge de contexte). */
+  /** Tokens consommés par la conversation en cours. */
   tokens: number;
+  /**
+   * Ce que le modèle a lu à la dernière demande de la conversation (son prompt, la fenêtre que la passerelle lui a donnée) :
+   * la jauge de contexte. null avant la première réponse d'un modèle, et dans une conversation rouverte.
+   */
+  context: CortexContext | null;
   /** Une réponse est attendue depuis cet instant (ms), sinon null. */
   sentAt: number | null;
   /** Durée de la dernière réponse, en ms. */
@@ -106,7 +112,7 @@ export function messagesToTurns(messages: ConversationMessage[]): CortexTurn[] {
   );
 }
 
-const EMPTY_CONVERSATION = { turns: [], conversationId: null, tokens: 0, lastMs: null, unread: false };
+const EMPTY_CONVERSATION = { turns: [], conversationId: null, tokens: 0, context: null, lastMs: null, unread: false };
 
 /**
  * Le tour d'une demande qui n'a pas abouti. 409 : le plafond de tokens de l'instance, une carte d'information plutôt
@@ -154,6 +160,8 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
       set((s) => ({
         conversationId: res.conversationId,
         tokens: s.tokens + (res.answer.usage?.totalTokens ?? 0),
+        // Une réponse sans modèle (un repli) ne mesure rien : la jauge garde la dernière mesure.
+        context: contextFrom(res.answer.usage) ?? s.context,
         turns: [...s.turns, { id: nextId("a"), role: "assistant", answer: res.answer, escalation: res.escalation ?? null }],
       }));
       void get().loadConversations(slug);
@@ -190,6 +198,7 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
       set((s) => ({
         conversationId: res.conversationId,
         tokens: s.tokens + (res.answer.usage?.totalTokens ?? 0),
+        context: contextFrom(res.answer.usage) ?? s.context,
         turns: [...s.turns, { id: nextId("a"), role: "assistant", answer: res.answer, sentTo: res.sentTo ?? offer.to }],
       }));
       void get().loadConversations(slug);
@@ -218,7 +227,7 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
       const detail = await getConversation(slug, id);
       set({
         workspace: slug, turns: messagesToTurns(detail.messages), conversationId: detail.id,
-        tokens: detail.totalTokens, lastMs: null, unread: false,
+        tokens: detail.totalTokens, context: null, lastMs: null, unread: false,
       });
       return true;
     } catch {
