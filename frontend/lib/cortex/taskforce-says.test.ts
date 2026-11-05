@@ -55,6 +55,13 @@ describe("splitAnswer : ce que Cortex écrit, ce que TaskForce dit (R116)", () =
     ])
   })
 
+  it("reads TaskForce's questions before a gesture apart from a correction, one per line (R115)", () => {
+    const answer = "> [!taskforce] TaskForce · asks\n> What should the project be called?\n> Where does its code live?\n"
+    expect(splitAnswer(answer)).toEqual([
+      { by: "taskforce", lines: ["What should the project be called?", "Where does its code live?"], kind: "asks" },
+    ])
+  })
+
   it("gives nothing for an empty answer", () => {
     expect(splitAnswer("")).toEqual([])
   })

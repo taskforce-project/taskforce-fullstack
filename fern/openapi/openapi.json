@@ -14850,6 +14850,9 @@
           "label": {
             "type": "string"
           },
+          "description": {
+            "type": "string"
+          },
           "recommended": {
             "type": "boolean"
           }
@@ -14861,8 +14864,14 @@
           "field": {
             "type": "string"
           },
+          "header": {
+            "type": "string"
+          },
           "text": {
             "type": "string"
+          },
+          "multiple": {
+            "type": "boolean"
           },
           "choices": {
             "type": "array",
@@ -14926,8 +14935,11 @@
             "type": "object",
             "additionalProperties": {}
           },
-          "question": {
-            "$ref": "#/components/schemas/AssistantQuestion"
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistantQuestion"
+            }
           }
         }
       },
@@ -15091,17 +15103,48 @@
             "maxLength": 80,
             "minLength": 0
           },
-          "value": {
+          "answers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionAnswer"
+            },
+            "maxItems": 2,
+            "minItems": 0
+          }
+        },
+        "required": [
+          "answers",
+          "record",
+          "ref",
+          "tool"
+        ]
+      },
+      "QuestionAnswer": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 0
+            },
+            "maxItems": 4,
+            "minItems": 0
+          },
+          "other": {
             "type": "string",
             "maxLength": 2000,
             "minLength": 0
           }
         },
         "required": [
-          "record",
-          "ref",
-          "tool",
-          "value"
+          "field"
         ]
       },
       "ApiResponseAssistantToolCall": {

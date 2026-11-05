@@ -34,22 +34,36 @@ export interface AssistantToolCall {
   ref?: string | null
   /** L'issue que touche un geste du MCP TaskForce, dont la conversation montre les cartes (ADR-024). */
   target?: AssistantTarget | null
-  /** Ce que TaskForce demande avant le geste (R115), avec un statut question : la carte montre ses choix. */
-  question?: AssistantQuestion | null
+  /**
+   * Ce que TaskForce demande avant le geste (R115), avec un statut question : deux questions au plus dans la même carte,
+   * qui montre leurs choix et part d'un seul envoi.
+   */
+  questions?: AssistantQuestion[] | null
 }
 /**
- * Une question de TaskForce (R115, séance n°17) : l'argument que la réponse remplit, la question, et ses choix, le défaut
- * d'abord quand il y en a un. Une réponse tapée est toujours possible.
+ * Une question de TaskForce (R115, séance n°17), dans la forme des questions de Claude (décision du CEO, 05/11/2026) :
+ * l'argument que la réponse remplit, un titre court, la question, si plusieurs choix se cochent, et ses choix, quatre au
+ * plus, le recommandé d'abord. Une réponse tapée (« Other ») est toujours possible.
  */
 export interface AssistantQuestion {
   field: string
+  header: string | null
   text: string
+  multiple: boolean
   choices: AssistantChoice[]
 }
+/** Un choix : la valeur que reçoit le geste, ce que la carte en montre, ce qu'il veut dire en une ligne, s'il est recommandé. */
 export interface AssistantChoice {
   value: string
   label: string
+  description: string | null
   recommended: boolean
+}
+/** La réponse à une question de la carte : les valeurs des choix cochés, et ce qui est tapé dans « Other ». */
+export interface QuestionAnswer {
+  field: string
+  values: string[]
+  other?: string
 }
 /** Ce que la personne voit quand elle écrit (R114) : le projet ouvert et l'issue ouverte, par leurs ids. */
 export interface AssistantScreen {
@@ -143,21 +157,24 @@ export async function sendAgentMessage(
 }
 
 /**
- * Une question de TaskForce que la personne peut répondre (R115) : elle porte ses choix, le dossier de la réponse et
- * l'empreinte de la question, que la réponse nomme. Une question d'avant R115 n'a que sa phrase, dans la réponse.
+ * Une carte de questions de TaskForce que la personne peut répondre (R115) : elle porte ses questions, le dossier de la
+ * réponse et l'empreinte de la carte, que les réponses nomment. Une question d'avant R115 n'a que sa phrase, dans la
+ * réponse.
  */
-export function isQuestionCard(call: AssistantToolCall): call is AssistantToolCall & { question: AssistantQuestion } {
-  return call.status === "question" && Boolean(call.question) && Boolean(call.record) && Boolean(call.ref)
+export function isQuestionCard(call: AssistantToolCall): call is AssistantToolCall & { questions: AssistantQuestion[] } {
+  return call.status === "question" && (call.questions?.length ?? 0) > 0 && Boolean(call.record) && Boolean(call.ref)
 }
 
 /**
- * Répond à une question de TaskForce : la valeur du choix cliqué, ou la réponse tapée. Le geste reprend sur le serveur,
- * sans le modèle, et rend la suite : une autre question, sa carte, ou ce qu'il a fait.
+ * Répond à une carte de TaskForce, toutes ses questions à la fois : pour chacune, les choix cochés ou la réponse tapée.
+ * Le geste reprend sur le serveur, sans le modèle, et rend la suite : d'autres questions, sa carte, ou ce qu'il a fait.
  */
-export async function answerQuestion(slug: string, call: AssistantToolCall, value: string): Promise<AssistantToolCall> {
+export async function answerQuestion(
+  slug: string, call: AssistantToolCall, answers: QuestionAnswer[],
+): Promise<AssistantToolCall> {
   const res = await apiClient.post<{ data: AssistantToolCall }>(
     ASSISTANT_ROUTES.ACTION_ANSWER(slug),
-    { tool: call.name, record: call.record, ref: call.ref, value },
+    { tool: call.name, record: call.record, ref: call.ref, answers },
   )
   return res.data.data
 }

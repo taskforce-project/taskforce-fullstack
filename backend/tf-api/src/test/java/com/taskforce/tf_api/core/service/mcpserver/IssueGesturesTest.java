@@ -269,6 +269,54 @@ class IssueGesturesTest {
     }
 
     @Test
+    @DisplayName("R115 : les colonnes qui ressemblent à ce qui est écrit viennent d'abord, chacune dit ce qu'elle veut dire")
+    void the_columns_like_the_asked_one_come_first() {
+        stubIssue(issue());
+
+        assertThatThrownBy(() -> gestures.update("acme", ME, args("{\"projectId\": 12, \"issueId\": 5, \"status\": \"progress\"}")))
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> {
+                assertThat(needed.question().header()).isEqualTo("Column");
+                assertThat(needed.question().multiple()).isFalse();
+                assertThat(needed.question().choices()).extracting(Question.Choice::value, Question.Choice::description)
+                    .containsExactly(org.assertj.core.groups.Tuple.tuple("In Progress", "Work in progress"),
+                        org.assertj.core.groups.Tuple.tuple("Backlog", "Not planned yet"));
+            });
+    }
+
+    /**
+     * Un label à ajouter qui n'existe pas (R115) : TaskForce demande lesquels, plusieurs se cochent, parmi ceux du projet
+     * que l'issue n'a pas ; celui que la demande nomme et qui existe est recommandé. Sans label à proposer, l'erreur reste.
+     */
+    @ParameterizedTest(name = "ajoute {0} à une issue qui a {1} : {2}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+        "bug,urgent | ui     | bug (recommended)",
+        "urgent     | ui     | bug",
+        "urgent     | ui,bug | -",
+    })
+    void an_unknown_label_is_asked_with_checkable_choices(String add, String has, String choices) {
+        List<ProjectLabelResponse> on = java.util.Arrays.stream(has.split(","))
+            .map(name -> "bug".equals(name) ? BUG : UI).toList();
+        stubIssue(issue().labels(on));
+        String body = "{\"projectId\": 12, \"issueId\": 5, \"addLabels\": [\"" + String.join("\", \"", add.split(",")) + "\"]}";
+
+        if (choices == null) {
+            assertThatThrownBy(() -> gestures.update("acme", ME, args(body)))
+                .isNotInstanceOf(QuestionNeeded.class)
+                .hasMessageStartingWith("There is no label \"urgent\" in TaskForce.");
+            return;
+        }
+        assertThatThrownBy(() -> gestures.update("acme", ME, args(body)))
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> {
+                assertThat(needed.question().field()).isEqualTo("addLabels");
+                assertThat(needed.question().header()).isEqualTo("Labels");
+                assertThat(needed.question().multiple()).isTrue();
+                assertThat(needed.question().text()).isEqualTo("Which labels should TF-12 get? \"urgent\" isn't a label of TaskForce.");
+            })
+            .hasMessageEndingWith("Choices, several possible: " + choices + ".");
+        verify(issueService, never()).updateIssue(any(), any(), any(), any(), any());
+    }
+
+    @Test
     void an_unknown_column_id_stays_an_error_for_an_agent() {
         stubIssue(issue());
 
@@ -359,8 +407,12 @@ class IssueGesturesTest {
         when(issueService.listMyIssues("acme", ME)).thenReturn(List.of(BOARD.get(2)));
 
         assertThatThrownBy(() -> gestures.issueOf("acme", ME, Screen.NONE, json.createObjectNode(), "Which issue?"))
-            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> assertThat(needed.question().choices())
-                .extracting(Question.Choice::label).containsExactly("TESTTA-3 Corriger le login (Todo)"));
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> {
+                assertThat(needed.question().header()).isEqualTo("Issue");
+                // Le choix dit l'issue ; sa ligne dit où elle est.
+                assertThat(needed.question().choices()).extracting(Question.Choice::label, Question.Choice::description)
+                    .containsExactly(org.assertj.core.groups.Tuple.tuple("TESTTA-3 Corriger le login", "Todo"));
+            });
         verify(issueService, never()).listIssues(any(), any(), any());
     }
 

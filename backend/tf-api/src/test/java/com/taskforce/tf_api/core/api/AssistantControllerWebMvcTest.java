@@ -202,28 +202,40 @@ class AssistantControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("POST actions/answer → 200 : la réponse à la question de TaskForce, et la suite du geste (R115)")
+    @DisplayName("POST actions/answer → 200 : les réponses d'une carte de TaskForce, toutes à la fois, et la suite du geste (R115)")
     void answer_200() throws Exception {
         String record = "00000000-0000-0000-0000-0000000000aa";
         String ref = "sha256:" + "d".repeat(64);
-        when(agentService.answer("acme", 7L, "delete_issue", record, ref, "TESTTA-2"))
-            .thenReturn(new AssistantToolCall("delete_issue", "pending", "{\"issue\":\"TESTTA-2\"}", "Deleting TESTTA-2...",
-                record, null, java.util.Map.of("key", "TESTTA-2")));
+        when(agentService.answer(eq("acme"), eq(7L), eq("create_project"), eq(record), eq(ref), any()))
+            .thenReturn(new AssistantToolCall("create_project", "success", "{\"name\":\"Atlas\"}",
+                "Project created in TaskForce: ATLAS \"Atlas\" (id 31).", record, "sha256:r1", null));
 
         mockMvc.perform(post(URL + "/actions/answer").with(auth())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"tool\":\"delete_issue\",\"record\":\"" + record + "\",\"ref\":\"" + ref + "\",\"value\":\"TESTTA-2\"}"))
+                .content("{\"tool\":\"create_project\",\"record\":\"" + record + "\",\"ref\":\"" + ref + "\",\"answers\":["
+                    + "{\"field\":\"name\",\"other\":\"Atlas\"},{\"field\":\"repository\",\"values\":[\"new-private\"]}]}"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.status").value("pending"))
-            .andExpect(jsonPath("$.data.target.key").value("TESTTA-2"));
+            .andExpect(jsonPath("$.data.status").value("success"))
+            .andExpect(jsonPath("$.data.ref").value("sha256:r1"));
+        // Chaque question a sa réponse, telle que la carte l'a envoyée : ce qui est tapé, et les choix cochés.
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<java.util.List<com.taskforce.tf_api.core.service.agent.Question.Answer>> answers =
+            org.mockito.ArgumentCaptor.forClass(java.util.List.class);
+        verify(agentService).answer(eq("acme"), eq(7L), eq("create_project"), eq(record), eq(ref), answers.capture());
+        org.assertj.core.api.Assertions.assertThat(answers.getValue()).containsExactly(
+            new com.taskforce.tf_api.core.service.agent.Question.Answer("name", java.util.List.of(), "Atlas"),
+            new com.taskforce.tf_api.core.service.agent.Question.Answer("repository", java.util.List.of("new-private"), ""));
     }
 
     @ParameterizedTest(name = "answer {0} → 400")
     @ValueSource(strings = {
-        "{\"tool\":\"delete_issue\",\"record\":\"r\",\"ref\":\"q\"}",            // sans réponse
-        "{\"tool\":\"delete_issue\",\"record\":\"r\",\"value\":\"TESTTA-2\"}",   // sans question
-        "{\"tool\":\"delete_issue\",\"ref\":\"q\",\"value\":\"TESTTA-2\"}",      // sans dossier
-        "{\"tool\":\"delete_issue\",\"record\":\"r\",\"ref\":\"q\",\"value\":\"  \"}",
+        "{\"tool\":\"delete_issue\",\"record\":\"r\",\"ref\":\"q\"}",                                        // sans réponse
+        "{\"tool\":\"delete_issue\",\"record\":\"r\",\"ref\":\"q\",\"answers\":[]}",                         // une carte vide
+        "{\"tool\":\"delete_issue\",\"record\":\"r\",\"answers\":[{\"field\":\"issue\",\"other\":\"x\"}]}",  // sans carte
+        "{\"tool\":\"delete_issue\",\"ref\":\"q\",\"answers\":[{\"field\":\"issue\",\"other\":\"x\"}]}",     // sans dossier
+        "{\"tool\":\"delete_issue\",\"record\":\"r\",\"ref\":\"q\",\"answers\":[{\"other\":\"x\"}]}",        // sans question
+        "{\"tool\":\"t\",\"record\":\"r\",\"ref\":\"q\",\"answers\":[{\"field\":\"a\"},{\"field\":\"b\"},{\"field\":\"c\"}]}",
+        "{\"tool\":\"t\",\"record\":\"r\",\"ref\":\"q\",\"answers\":[{\"field\":\"a\",\"values\":[\"1\",\"2\",\"3\",\"4\",\"5\"]}]}",
     })
     void answer_incomplete_400(String body) throws Exception {
         mockMvc.perform(post(URL + "/actions/answer").with(auth())

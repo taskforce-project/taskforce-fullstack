@@ -19,6 +19,7 @@ vi.mock("@/lib/api/assistant-service", () => ({
   isApprovable: () => false,
   isPreparedIssue: () => false,
   isUndoable: () => false,
+  isQuestionCard: () => false,
 }));
 vi.mock("@/lib/api/ai-conversation-service", () => ({
   listConversations: vi.fn(), getConversation: vi.fn(), deleteConversation: vi.fn(),
