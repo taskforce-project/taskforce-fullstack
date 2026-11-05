@@ -173,7 +173,8 @@ function openBrowser(url: string): Promise<void> {
   return shell.openExternal(url);
 }
 
-function splashWindow(): BrowserWindow {
+/** L'écran d'attente : au démarrage, ses étapes arrivent ensuite (cf. `openApp`) ; pour une mise à jour, `hash` les donne. */
+function splashWindow(hash?: string): BrowserWindow {
   const window = new BrowserWindow({
     width: 420,
     height: 280,
@@ -186,9 +187,28 @@ function splashWindow(): BrowserWindow {
     backgroundColor: "#fbfbfc",
     webPreferences: { contextIsolation: true, sandbox: true },
   });
-  void window.loadFile(staticPage("splash.html"));
+  void window.loadFile(staticPage("splash.html"), hash ? { hash } : undefined);
   window.once("ready-to-show", () => window.show());
   return window;
+}
+
+/**
+ * Avant d'installer une mise à jour (« Restart now », cf. `installNow` dans updater.ts) : l'écran d'attente de l'app, à
+ * ses couleurs, remplace la fenêtre pendant que la pile s'arrête proprement. L'installeur, lui, ne montre plus rien.
+ */
+async function prepareUpdate(version: string): Promise<void> {
+  quitting = true;
+  const splash = splashWindow(new URLSearchParams({
+    step: `Installing TaskForce ${version}`,
+    note: "TaskForce closes, installs it, then opens again.",
+  }).toString());
+  // La fenêtre se ferme une fois l'écran affiché : l'app n'a jamais zéro fenêtre, ce qui la ferait quitter.
+  await new Promise<void>((resolve) => {
+    splash.once("show", () => resolve());
+    setTimeout(resolve, 2_000).unref();
+  });
+  mainWindow?.close();
+  await stopStack();
 }
 
 /**
@@ -336,7 +356,7 @@ function registerIpc(): void {
   ipcMain.handle("desktop:check-updates", () => check());
   // Le toast de la mise à jour lit l'état à son ouverture, puis le reçoit à chaque changement (cf. updater.ts).
   ipcMain.handle("desktop:update-state", () => updateState());
-  ipcMain.handle("desktop:install-update", () => installNow());
+  ipcMain.handle("desktop:install-update", () => installNow(prepareUpdate));
   ipcMain.handle("desktop:open-logs", () => shell.openPath(appLogDir()));
   // Copies de la base faites avant chaque mise à jour (cf. backup.ts).
   ipcMain.handle("desktop:open-backups", () => {
@@ -500,15 +520,20 @@ function buildMenu(): Menu {
 }
 
 /** Arrêt propre : l'interface, le backend puis la base, avant de rendre la main au système. */
-app.on("before-quit", (event) => {
-  if (quitting || !stack) return;
-  event.preventDefault();
-  quitting = true;
+async function stopStack(): Promise<void> {
+  if (!stack) return;
   githubSignIn.cancel();
   const current = stack;
   stack = null;
   log.info("Stopping");
-  void current.stop().finally(() => app.quit());
+  await current.stop();
+}
+
+app.on("before-quit", (event) => {
+  if (quitting || !stack) return;
+  event.preventDefault();
+  quitting = true;
+  void stopStack().finally(() => app.quit());
 });
 
 app.on("window-all-closed", () => app.quit());
