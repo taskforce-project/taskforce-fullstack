@@ -10,8 +10,9 @@ public final class ConversationDtos {
     /** Résumé pour la liste (historique). */
     public record ConversationSummary(Long id, String title, String updatedAt, int messageCount, long totalTokens) {}
 
-    /** Message d'une conversation. */
-    public record MessageDto(Long id, String role, String content, String mode, long totalTokens, String createdAt) {}
+    /** Message d'une conversation ; {@code model} : celui qui a écrit la réponse, null pour une demande ou un repli. */
+    public record MessageDto(Long id, String role, String content, String mode, long totalTokens, String createdAt,
+                             String model) {}
 
     /** Détail : conversation + messages + empreinte tokens (jauge de contexte). */
     public record ConversationDetail(Long id, String title, long totalTokens, List<MessageDto> messages) {}

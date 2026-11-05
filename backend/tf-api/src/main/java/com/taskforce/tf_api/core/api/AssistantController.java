@@ -105,7 +105,7 @@ public class AssistantController {
         conversationService.appendMessage(conv.getId(), "user", body.message(), null, 0);
         conversationService.appendMessage(conv.getId(), "assistant",
             notice == null ? answer.answer() : answer.answer() + ModelCapabilityService.block(notice), answer.mode(),
-            answer.usage() != null ? answer.usage().totalTokens() : 0);
+            answer.usage() != null ? answer.usage().totalTokens() : 0, answer.model());
         String title = conversationService.autoTitle(conv.getId(), body.message());
 
         return ResponseEntity.ok(ApiResponse.success(new ChatTurnResponse(conv.getId(), title, answer, escalation, sentTo)));
