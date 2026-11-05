@@ -76,6 +76,8 @@ export interface AssistantTarget {
   projectId: number
   key: string | null
   title: string
+  /** La colonne où est l'issue, que la carte d'une suppression montre avec sa clé (test du CEO du 05/11/2026). */
+  column?: string | null
   runId?: number | null
   /** Pour une suppression demandée : ce qui partirait avec l'issue, et si elle est déjà archivée. */
   comments?: number
@@ -93,11 +95,16 @@ export interface AssistantActionResult {
   /** L'issue d'un geste accordé (sa mission, une fois confiée à un agent). */
   target?: AssistantTarget | null
 }
-/** Tokens réellement consommés par le tour (usage LLM cumulé). */
+/**
+ * Tokens réellement consommés par le tour (usage LLM cumulé), et ce que le modèle a lu à son dernier appel : la taille de
+ * ce prompt et la fenêtre de contexte que la passerelle lui a donnée (null quand le fournisseur la tient lui-même).
+ */
 export interface AssistantUsage {
   promptTokens: number
   completionTokens: number
   totalTokens: number
+  lastPromptTokens?: number
+  contextWindow?: number | null
 }
 export interface AssistantAnswer {
   answer: string
@@ -112,6 +119,8 @@ export interface AssistantAnswer {
    * corrige une réponse sans outil (R116). Absent d'une réponse rendue avant R116.
    */
   record?: string | null
+  /** Le modèle qui a répondu, tel que la passerelle l'a appelé ; absent d'un repli. */
+  model?: string | null
 }
 
 /**

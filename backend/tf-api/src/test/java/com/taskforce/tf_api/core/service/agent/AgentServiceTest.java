@@ -41,6 +41,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.LlmClient;
+import com.taskforce.tf_api.core.service.LlmContext;
 import com.taskforce.tf_api.core.service.LlmToolsRefusedException;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
@@ -87,6 +88,7 @@ class AgentServiceTest {
     @Mock private HarnessRuleSetRepository ruleSets;
     @Mock private WorkspaceRepository workspaces;
     @Mock private ScreenContext screens;
+    @Mock private IssueMaterial material;
 
     @InjectMocks private AgentService service;
 
@@ -149,6 +151,31 @@ class AgentServiceTest {
         assertThat(answer.usage().totalTokens()).isEqualTo(46);
         assertThat(answer.usage().promptTokens()).isEqualTo(12);
         assertThat(answer.toolCalls()).isEmpty();
+    }
+
+    /**
+     * Tests du CEO du 05/11/2026 : la jauge de contexte comparait le cumul de la conversation à une fenêtre écrite en dur,
+     * et rien ne disait quel modèle avait répondu. La réponse dit le modèle que la passerelle a appelé, la taille du prompt
+     * de son dernier appel et la fenêtre que la passerelle lui a donnée (null quand le fournisseur la tient).
+     */
+    @ParameterizedTest(name = "fenêtre {1} : modèle {0}")
+    @CsvSource(nullValues = "-", value = {"qwen3:8b, 8192", "openai/gpt-oss-20b, -"})
+    void the_answer_says_its_model_and_what_it_read(String model, Integer window) throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Direct answer\"}"));
+        when(llm.currentUsage()).thenReturn(new LlmUsage(6200, 140, 6340));
+        when(llm.currentModel()).thenReturn(model);
+        when(llm.currentContext()).thenReturn(new LlmContext(3100, window));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Give me the status of the project");
+
+        assertThat(answer.model()).isEqualTo(model);
+        assertThat(answer.usage().promptTokens()).isEqualTo(6200); // le tour entier, pour la consommation
+        assertThat(answer.usage().lastPromptTokens()).isEqualTo(3100); // le dernier appel, pour la jauge
+        assertThat(answer.usage().contextWindow()).isEqualTo(window);
     }
 
     @Test
@@ -1319,6 +1346,114 @@ class AgentServiceTest {
             .isEqualTo("> [!taskforce] TaskForce · asks\n> Who should take TF-12? Several members of TaskForce match \"ada\".\n");
     }
 
+    /**
+     * Test du CEO du 05/11/2026 : « supprime l'issue qu'il y a dans In review by AI ». Quand Cortex ne fait pas le geste
+     * (aucun outil, ou une lecture seulement), TaskForce le fait sur la demande : la colonne nommée désigne l'issue, et sa
+     * carte attend la personne, sans rien supprimer ; la réponse dit où décider.
+     */
+    @ParameterizedTest(name = "le modèle : {0}")
+    @ValueSource(strings = {"none", "list_issues"})
+    void taskforce_shows_the_card_of_the_issue_the_column_names(String modelDid) throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        if ("none".equals(modelDid)) {
+            when(llm.rawChat(anyList(), anyList(), anyString()))
+                .thenReturn(json.readTree("{\"content\":\"Laquelle voulez-vous supprimer ?\"}"));
+        } else {
+            gesture("list_issues", "issue.read");
+            when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
+                json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"list_issues\",\"arguments\":\"{}\"}}]}"),
+                json.readTree("{\"content\":\"TESTTA-1 et TESTTA-2 ont le meme titre.\"}"));
+        }
+        CortexGesture delete = Mockito.mock(CortexGesture.class);
+        lenient().when(delete.name()).thenReturn("delete_issue");
+        lenient().when(delete.action()).thenReturn("issue.delete");
+        when(tools.get("delete_issue")).thenReturn(delete);
+        when(delete.ask(any(), any())).thenReturn(Map.of("issue", "TESTTA-2", "projectId", 12, "issueId", 22));
+        when(delete.preview(any(), any())).thenReturn(new CortexGesture.Done("Deleting TESTTA-2, in In review by AI, removes "
+            + "it for good.", Map.of("issueId", 22, "key", "TESTTA-2", "column", "In review by AI"), null));
+
+        AssistantAnswer answer = service.run("acme", 7L, "supprime l'issue qu'il y a dans In review by AI", List.of(),
+            new Screen(12L, null));
+
+        AssistantToolCall card = answer.toolCalls().get(answer.toolCalls().size() - 1);
+        assertThat(card.name()).isEqualTo("delete_issue");
+        assertThat(card.status()).isEqualTo("pending");
+        assertThat(card.record()).isEqualTo(RECORD.toString());
+        assertThat(card.target()).containsEntry("key", "TESTTA-2").containsEntry("column", "In review by AI");
+        assertThat(json.readTree(card.input()).path("issueId").asInt()).isEqualTo(22); // l'accord reprend cette issue
+        assertThat(answer.answer()).isEqualTo(AgentService.CARD_ANSWERS.get("delete_issue"));
+        ArgumentCaptor<AgentContext> ctx = ArgumentCaptor.forClass(AgentContext.class);
+        verify(delete).ask(any(), ctx.capture());
+        assertThat(ctx.getValue().request()).isEqualTo("supprime l'issue qu'il y a dans In review by AI");
+        verify(delete, never()).perform(any(), any());
+    }
+
+    @Test
+    @DisplayName("une carte qui attend déjà la personne : TaskForce n'en ajoute pas une seconde")
+    void no_second_card_when_one_already_waits() throws Exception {
+        modelCalls("update_issue", "{\"issue\":\"TF-12\",\"assignee\":\"ada\"}", "Done.");
+        CortexGesture update = gesture("update_issue", "issue.update");
+        when(update.ask(any(), any())).thenThrow(new QuestionNeeded(Question.of("assignee", "Assignee", "Who?", List.of())));
+
+        AssistantAnswer answer = service.run("acme", 7L, "supprime TF-12 puis assigne-la a Ada");
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> assertThat(call.name()).isEqualTo("update_issue"));
+        verify(tools, never()).get("delete_issue");
+    }
+
+    /**
+     * Test du CEO du 05/11/2026 : « prend OPS-35 et propose moi un resume dans les commentaire stp ». Pour résumer, TaskForce
+     * lit l'issue nommée et la donne au modèle avant qu'il écrive, après le plan. Une autre demande ne la lit pas.
+     */
+    @ParameterizedTest(name = "« {0} » : lue {1}")
+    @CsvSource(delimiter = '|', value = {
+        "prend OPS-35 et propose moi un resume dans les commentaire stp | true",
+        "liste moi les issues de OPS                                     | false",
+    })
+    void a_summary_reads_the_issue_first(String message, boolean read) throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"OK\"}"));
+        lenient().when(material.describe(any(), eq(message))).thenReturn(IssueMaterial.HEADER
+            + "OPS-35 \"Iteration #35\": in Done, unassigned.\nDescription: none.\n");
+
+        service.run("acme", 7L, message);
+
+        String system = systemPrompt();
+        if (!read) {
+            assertThat(system).doesNotContain("The issue to summarize");
+            verify(material, never()).describe(any(), any());
+            return;
+        }
+        assertThat(system.indexOf("The issue to summarize")).isGreaterThan(system.indexOf("Plan to summarize:"));
+        assertThat(system).contains("OPS-35 \"Iteration #35\": in Done, unassigned.");
+    }
+
+    /**
+     * Test du CEO du 05/11/2026 : une réponse donnée se redemandait. Chaque envoi d'une carte note ses questions dans les
+     * arguments du geste, après celles des cartes d'avant ; une valeur d'une autre forme ne compte pas.
+     */
+    @ParameterizedTest(name = "avant {0}, carte {1} : {2}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+        "-                         | name,repository | name,repository",
+        "[\"name\",\"repository\"] | repository      | name,repository,repository",
+        "\"oops\"                  | name            | name",
+    })
+    void the_answered_questions_are_marked(String before, String card, String marked) throws Exception {
+        ObjectNode args = (ObjectNode) json.readTree(before == null ? "{}" : "{\"answered\": " + before + "}");
+        List<Question> questions = java.util.Arrays.stream(card.split(","))
+            .map(field -> Question.free(field, field, "?")).toList();
+
+        AgentService.markAnswered(args, questions);
+
+        assertThat(json.convertValue(args.get(Question.ANSWERED), List.class)).isEqualTo(List.of(marked.split(",")));
+    }
+
     @Test
     @DisplayName("R115 : l'issue que le geste a résolue est celle que la carte montre et que l'accord reprend")
     void the_card_carries_the_issue_the_gesture_resolved() throws Exception {
@@ -1425,7 +1560,9 @@ class AgentServiceTest {
         ArgumentCaptor<Map<String, Object>> args = ArgumentCaptor.forClass(Map.class);
         verify(tool).perform(args.capture(), any());
         assertThat(args.getValue()).containsEntry("name", "Atlas").containsEntry("repository", "new-private")
-            .containsEntry("stack", "Next.js");
+            .containsEntry("stack", "Next.js")
+            // Le geste sait que ces deux valeurs viennent de la personne : il ne les redemandera pas.
+            .containsEntry(Question.ANSWERED, List.of("name", "repository"));
         Map<String, String> said = new LinkedHashMap<>();
         said.put("name", "Atlas");
         said.put("repository", "new-private");

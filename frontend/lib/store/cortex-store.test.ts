@@ -174,6 +174,17 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
     expect(useCortexStore.getState().conversationId).toBe(4);
   });
 
+  // Test du CEO de la 1.10.0 : quel modèle a répondu ? Une réponse rouverte le dit encore, quand il a été gardé.
+  it("reopens an answer with the model that wrote it, when it was kept", () => {
+    const turns = messagesToTurns([
+      { id: 9, role: "assistant", content: "ok", mode: "deep", totalTokens: 3, createdAt: null, model: "qwen3:8b" },
+      { id: 10, role: "assistant", content: "ok", mode: "deep", totalTokens: 3, createdAt: null },
+    ]);
+
+    expect(turns[0].answer?.model).toBe("qwen3:8b");
+    expect(turns[1].answer?.model).toBeNull();
+  });
+
   it("deletes a conversation, and starts afresh when it was the open one", async () => {
     vi.mocked(deleteConversation).mockResolvedValue(undefined);
     useCortexStore.setState({ conversationId: 4, turns: [{ id: "u1", role: "user", text: "x" }], conversations: [summary(4, "a"), summary(5, "b")] });
@@ -212,6 +223,31 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
     const turns = messagesToTurns([{ id: 9, role: "assistant", content: "ok", mode: null, totalTokens: 3, createdAt: null }]);
 
     expect(turns[0].answer).toMatchObject({ mode: "fast", usage: { totalTokens: 3 } });
+  });
+
+  /**
+   * Test du CEO de la 1.10.0 : la jauge montrait le cumul de la conversation contre une fenêtre écrite en dur (« 45k / 33k
+   * (100%) »). Elle garde ce que le modèle a lu à la dernière demande : son prompt et la fenêtre que la passerelle lui a
+   * donnée ; un repli ne mesure rien, une conversation neuve ou rouverte repart sans mesure.
+   */
+  it("keeps what the model read at the last request, not the sum of the conversation", async () => {
+    const measured = (prompt: number, window: number | null, total: number): AssistantAnswer => ({
+      ...answer("ok", total), usage: { promptTokens: total - 20, completionTokens: 20, totalTokens: total, lastPromptTokens: prompt, contextWindow: window },
+    });
+    vi.mocked(sendAgentMessage)
+      .mockResolvedValueOnce({ conversationId: 7, title: "t", answer: measured(2900, 8192, 6000) })
+      .mockResolvedValueOnce({ conversationId: 7, title: "t", answer: measured(3400, 8192, 7000) })
+      .mockResolvedValueOnce({ conversationId: 7, title: "t", answer: { ...answer("fallback", 0), mode: "fallback" } });
+
+    for (const text of ["one", "two", "three"]) {
+      useCortexStore.getState().setDraft(text);
+      await useCortexStore.getState().send("acme");
+    }
+
+    expect(useCortexStore.getState().tokens).toBe(13_000);
+    expect(useCortexStore.getState().context).toEqual({ tokens: 3400, window: 8192 });
+    useCortexStore.getState().newConversation();
+    expect(useCortexStore.getState().context).toBeNull();
   });
 
   // R114 : la barre envoie ce que la personne voit.

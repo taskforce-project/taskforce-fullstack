@@ -67,7 +67,7 @@ public class AiConversationService {
         AiConversation conv = requireOwned(id, userId);
         List<MessageDto> messages = messageRepository.findByConversationIdOrderByCreatedAtAsc(id).stream()
             .map(m -> new MessageDto(m.getId(), m.getRole(), m.getContent(), m.getMode(), m.getTotalTokens(),
-                m.getCreatedAt() != null ? m.getCreatedAt().toString() : null))
+                m.getCreatedAt() != null ? m.getCreatedAt().toString() : null, m.getModel()))
             .toList();
         return new ConversationDetail(conv.getId(), conv.getTitle(),
             messageRepository.sumTokens(id), messages);
@@ -207,12 +207,19 @@ public class AiConversationService {
 
     @Transactional
     public void appendMessage(Long conversationId, String role, String content, String mode, long tokens) {
+        appendMessage(conversationId, role, content, mode, tokens, null);
+    }
+
+    /** Un message, avec le modèle qui a écrit la réponse (null pour une demande ou un repli). */
+    @Transactional
+    public void appendMessage(Long conversationId, String role, String content, String mode, long tokens, String model) {
         AiMessage m = new AiMessage();
         m.setConversationId(conversationId);
         m.setRole(role);
         m.setContent(content);
         m.setMode(mode);
         m.setTotalTokens(tokens);
+        m.setModel(model == null || model.isBlank() ? null : model.length() > 128 ? model.substring(0, 128) : model);
         messageRepository.save(m);
         // Remonte la conversation en tête de liste.
         conversationRepository.findById(conversationId).ifPresent(c -> {

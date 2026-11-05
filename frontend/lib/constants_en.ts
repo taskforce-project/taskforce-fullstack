@@ -446,6 +446,8 @@ export const CONSTANTS_EN = {
     measure: "Measure",
     measureAgain: "Measure again",
     measuring: "Measuring {model}: {done} of {total}",
+    // Cortex's model is measured once, without a click, the first time this table opens without a measure for it.
+    autoMeasuring: "Measuring {model}, the model Cortex uses, once: {done} of {total}. The other models stay on demand.",
     waiting: "The AI allows a request per minute here: next case in {seconds} s",
     stop: "Stop",
     inUse: "Cortex uses it",
@@ -765,6 +767,8 @@ export const CONSTANTS_EN = {
     missionOf: "Mission of {key}: {title}",
     // Deleting an issue from the conversation asks first: archiving can be undone, deleting can't (TF-J1-5).
     deleteTitle: "Delete {key}: {title}?",
+    // The issue's column next to its key, so a card for another issue than the one meant shows at once (05/11/2026).
+    deleteTitleIn: "Delete {key} ({column}): {title}?",
     deleteGoesWith: "Goes with it: {what}.",
     deleteNothingElse: "Nothing else goes with it.",
     deleteOneComment: "1 comment",
@@ -798,6 +802,16 @@ export const CONSTANTS_EN = {
     taskforceAsksWhat: "asked before it acted",
     taskforceAsksLabel: "Questions from TaskForce",
     taskforceAsksHint: "TaskForce, not the model, asked what this action needed. Nothing was done until the answers were sent.",
+    // The gauge under the conversation: what Cortex sent the model for its last answer, against the context window the
+    // AI gateway gave that request (CEO's test of 1.10.0: it showed the whole conversation against a fixed window).
+    contextLine: "What Cortex sent the model for its last answer (instructions, tools, the screen, notes and this conversation), against the window it got.",
+    contextLineUpTo: "What Cortex sent the model for its last answer, against the window it got. The window grows with the request, up to {max}.",
+    contextFull: "Nearly full: a longer conversation would lose its start. A new conversation starts empty.",
+    contextProvider: "What Cortex sent the model for its last answer. The AI provider sets the window.",
+    contextNone: "Shows after Cortex's next answer: what it sends the model, against the window the model gets.",
+    contextTokens: "{tokens} tokens",
+    // Under each answer: the model that wrote it, as the AI gateway called it (CEO's test of 1.10.0).
+    answeredWith: "Answered by {model}",
   },
 } as const
 

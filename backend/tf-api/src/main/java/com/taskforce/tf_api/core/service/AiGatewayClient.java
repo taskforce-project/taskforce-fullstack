@@ -32,6 +32,8 @@ public class AiGatewayClient implements LlmClient {
     /** Accumulateur d'usage par thread : [prompt, completion, total]. {@code null} = capture inactive. */
     private final ThreadLocal<long[]> usageAccumulator = new ThreadLocal<>();
     private final ThreadLocal<String> lastModel = new ThreadLocal<>();
+    /** Le prompt du dernier appel et sa fenêtre, pendant une capture : la jauge de contexte, pas une somme. */
+    private final ThreadLocal<LlmContext> lastContext = new ThreadLocal<>();
 
     public AiGatewayClient(ModelGateway gateway, AiStatusService status) {
         this.gateway = gateway;
@@ -49,6 +51,7 @@ public class AiGatewayClient implements LlmClient {
     public void beginUsageCapture() {
         usageAccumulator.set(new long[3]);
         lastModel.remove();
+        lastContext.remove();
     }
 
     @Override
@@ -61,6 +64,7 @@ public class AiGatewayClient implements LlmClient {
     public void endUsageCapture() {
         usageAccumulator.remove();
         lastModel.remove();
+        lastContext.remove();
     }
 
     @Override
@@ -68,11 +72,20 @@ public class AiGatewayClient implements LlmClient {
         return lastModel.get();
     }
 
-    /** Garde le modèle qui a répondu, pendant une capture seulement : hors capture, rien ne le lira. */
-    private void rememberModel(String model) {
-        if (usageAccumulator.get() != null && model != null && !model.isBlank()) {
-            lastModel.set(model);
-        }
+    @Override
+    public LlmContext currentContext() {
+        return lastContext.get();
+    }
+
+    /**
+     * Garde le modèle qui a répondu, son prompt et sa fenêtre, pendant une capture seulement : hors capture, rien ne les
+     * lira.
+     */
+    private void remember(ModelGateway.ChatReply reply) {
+        if (usageAccumulator.get() == null) return;
+        if (reply.model() != null && !reply.model().isBlank()) lastModel.set(reply.model());
+        long prompt = reply.usage() == null ? 0 : reply.usage().promptTokens();
+        lastContext.set(new LlmContext(prompt, reply.contextWindow()));
     }
 
     @Override
@@ -110,7 +123,7 @@ public class AiGatewayClient implements LlmClient {
             ModelGateway.ChatReply reply = gateway.chat(snapshot.settings(),
                 new ModelGateway.ChatCall(messages, tools, jsonMode, chosen, think));
             accumulateUsage(reply.usage());
-            rememberModel(reply.model());
+            remember(reply);
             return reply.message();
         } catch (ModelProviderException.ToolsRefused refused) { // le fournisseur répond : son état reste valable
             log.error("AI provider refused the tools: {}", LogSafe.of(refused.getMessage()));

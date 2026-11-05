@@ -123,6 +123,7 @@ class AiGatewayClientTest {
         String out = client.chatCompletion("sys", "user", true, "fast");
         LlmUsage usage = client.currentUsage();
         String model = client.currentModel();
+        LlmContext context = client.currentContext();
         client.endUsageCapture();
 
         verify(gateway).chat(any(), call.capture());
@@ -131,7 +132,36 @@ class AiGatewayClientTest {
         assertThat(out).isEqualTo("{}");
         assertThat(usage.totalTokens()).isEqualTo(5);
         assertThat(model).isEqualTo("fast-one");
+        assertThat(context).isEqualTo(new LlmContext(3, null)); // le prompt du dernier appel ; pas de fenêtre ici
         assertThat(client.currentUsage()).isEqualTo(LlmUsage.ZERO);
+        assertThat(client.currentContext()).isNull();
+    }
+
+    /**
+     * Test du CEO du 05/11/2026 : la jauge de contexte montrait le cumul de la conversation. Ce que le modèle a lu, c'est le
+     * prompt du dernier appel du tour, avec la fenêtre que la passerelle lui a donnée ; la consommation, elle, s'additionne.
+     */
+    @Test
+    @DisplayName("la jauge : le prompt du dernier appel et sa fenêtre, pas une somme")
+    void theContextIsTheLastCall() {
+        ObjectNode message = new ObjectMapper().createObjectNode().put("role", "assistant").put("content", "ok");
+        when(gateway.chat(any(), any())).thenReturn(
+            new ModelGateway.ChatReply("qwen3:8b", message, new LlmUsage(2800, 40, 2840), 8192),
+            new ModelGateway.ChatReply("qwen3:8b", message, new LlmUsage(3400, 60, 3460), 16_384));
+        List<Map<String, Object>> asked = List.of(Map.of("role", "user", "content", "x"));
+
+        client.beginUsageCapture();
+        client.rawChat(asked, List.of(), "fast");
+        client.rawChat(asked, List.of(), "fast");
+        LlmUsage usage = client.currentUsage();
+        LlmContext context = client.currentContext();
+        client.endUsageCapture();
+
+        assertThat(usage.promptTokens()).isEqualTo(6200);
+        assertThat(context).isEqualTo(new LlmContext(3400, 16_384));
+        // Hors capture, rien n'est gardé.
+        client.rawChat(asked, List.of(), "fast");
+        assertThat(client.currentContext()).isNull();
     }
 
     @Test

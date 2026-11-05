@@ -435,7 +435,7 @@ export function AgentChat({ onFold }: Readonly<{
               {lastMs != null && <span className="tabular-nums">· {(lastMs / 1000).toFixed(1)} s</span>}
             </span>
           ) : null}
-          <CortexUsage sessionTokens={tokens} />
+          <CortexUsage />
         </div>
 
         <button type="button" onClick={onFold} aria-label={t.chatFold} title={t.chatFold} className={HEADER_BUTTON}>
@@ -481,6 +481,7 @@ function ToolCallView({ slug, call }: { slug: string; call: AssistantToolCall })
  * below » ou « check the issue below », et c'est la dernière chose à décider.
  */
 function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: string }) {
+  const t = usePreferencesStore((s) => s.t.cortex)
   const hasBreakdown = answer.usage && (answer.usage.promptTokens > 0 || answer.usage.completionTokens > 0)
   // Le dossier de la réponse, que porte chacun de ses appels d'outil : il fait d'elle un cas de la banque (R61,
   // séance n°10). Une réponse sans outil que TaskForce a corrigée a le sien (R116).
@@ -504,10 +505,14 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
           <FeedbackBar onCopy={() => navigator.clipboard?.writeText(answer.answer)} />
           {record && <EvalCaseButton slug={slug} record={record} />}
         </div>
-        {/* Le mode et les tokens de la réponse : au survol, pour qui les cherche, sans peser sur la lecture. */}
+        {/* Le mode, le modèle et les tokens de la réponse : au survol, pour qui les cherche, sans peser sur la lecture. Le
+            modèle est celui que la passerelle a appelé (test du CEO du 05/11/2026 : « jsp avec quel model il a fait ca »). */}
         {answer.usage && answer.usage.totalTokens > 0 && (
           <span className="flex shrink-0 items-center gap-1.5 text-[10px] tabular-nums text-muted-foreground/60 opacity-0 transition-opacity group-hover/answer:opacity-100 group-focus-within/answer:opacity-100">
             <span className="bg-muted px-1 py-px font-medium uppercase tracking-wide">{answer.mode}</span>
+            {answer.model && (
+              <span className="font-mono normal-case" title={fillModelText(t.answeredWith, { model: answer.model })}>{answer.model}</span>
+            )}
             {answer.usage.totalTokens.toLocaleString("en-US")} tokens
             {hasBreakdown && <span className="opacity-70">({answer.usage.promptTokens}↑ {answer.usage.completionTokens}↓)</span>}
           </span>

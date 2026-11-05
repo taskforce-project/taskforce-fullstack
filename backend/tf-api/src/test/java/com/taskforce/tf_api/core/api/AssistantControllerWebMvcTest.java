@@ -80,8 +80,10 @@ class AssistantControllerWebMvcTest {
         AtomicReference<String> model = new AtomicReference<>();
         when(agentService.run(anyString(), anyLong(), anyString(), any(), any())).thenAnswer(call -> {
             model.set(ChosenModel.current().orElse(null));
+            // Le modèle qui répond, comme la passerelle le dit : celui que la personne a choisi ou cliqué, ici.
             return new com.taskforce.tf_api.core.dto.response.AssistantAnswer(text, null, "deep", java.util.List.of(),
-                java.util.List.of(), java.util.List.of(), com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE);
+                java.util.List.of(), java.util.List.of(), com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE,
+                null, model.get());
         });
         return model;
     }
@@ -105,7 +107,7 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.answer.answer").value("Done."));
         // Rien n'a changé de modèle : la personne décide d'un clic.
         org.assertj.core.api.Assertions.assertThat(used.get()).isNull();
-        verify(conversationService).appendMessage(1L, "assistant", "Done." + ModelCapabilityService.block(text), "deep", 0);
+        verify(conversationService).appendMessage(1L, "assistant", "Done." + ModelCapabilityService.block(text), "deep", 0, null);
     }
 
     @Test
@@ -123,7 +125,7 @@ class AssistantControllerWebMvcTest {
         org.assertj.core.api.Assertions.assertThat(used.get()).isEqualTo("qwen3:8b");
         verify(capabilities, never()).offer(anyString(), any(), anyString());
         verify(conversationService).appendMessage(1L, "assistant",
-            "Moved." + ModelCapabilityService.block(ModelCapabilityService.sentNotice("qwen3:8b")), "deep", 0);
+            "Moved." + ModelCapabilityService.block(ModelCapabilityService.sentNotice("qwen3:8b")), "deep", 0, "qwen3:8b");
     }
 
     @Test
@@ -137,9 +139,11 @@ class AssistantControllerWebMvcTest {
                 .accept(MediaType.APPLICATION_JSON)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Hello\"}"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.escalation").doesNotExist());
+            .andExpect(jsonPath("$.data.escalation").doesNotExist())
+            .andExpect(jsonPath("$.data.answer.model").value("qwen3:14b"));
         org.assertj.core.api.Assertions.assertThat(used.get()).isEqualTo("qwen3:14b");
-        verify(conversationService).appendMessage(1L, "assistant", "Hi.", "deep", 0);
+        // Le modèle qui a répondu reste avec la réponse : une conversation rouverte le montre encore.
+        verify(conversationService).appendMessage(1L, "assistant", "Hi.", "deep", 0, "qwen3:14b");
     }
 
     @Test
