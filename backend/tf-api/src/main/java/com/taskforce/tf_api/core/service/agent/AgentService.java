@@ -40,6 +40,7 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.LlmClient;
+import com.taskforce.tf_api.core.service.LlmContext;
 import com.taskforce.tf_api.core.service.LlmToolsRefusedException;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
@@ -448,23 +449,25 @@ public class AgentService {
             LlmUsage usage = llm.currentUsage();
             recordUsage(ws.getId(), usage);
             return new AssistantAnswer(answer, null, toolCalls.isEmpty() ? "fast" : "deep",
-                sources, steps, toolCalls, toUsage(usage), record);
+                sources, steps, toolCalls, usage(usage), record, llm.currentModel());
         } catch (LlmToolsRefusedException ex) {
             log.warn("Cortex (slug={}) : le fournisseur refuse les outils", LogSafe.of(slug));
             LlmUsage usage = llm.currentUsage();
             recordUsage(ws.getId(), usage);
-            if (!toolCalls.isEmpty()) return stopped(steps, sources, toolCalls, usage, "The AI provider refused Cortex's tools");
+            if (!toolCalls.isEmpty()) {
+                return stopped(steps, sources, toolCalls, usage(usage), llm.currentModel(), "The AI provider refused Cortex's tools");
+            }
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
                 "The AI provider refused Cortex's tools: nothing was done"));
-            return new AssistantAnswer(toolsRefusedAnswer(hits), null, "fallback", sources, steps, List.of(), toUsage(usage));
+            return new AssistantAnswer(toolsRefusedAnswer(hits), null, "fallback", sources, steps, List.of(), usage(usage));
         } catch (Exception ex) {
             log.warn("Agent LLM indisponible (slug={}): {}", LogSafe.of(slug), LogSafe.of(ex.getMessage()));
             LlmUsage usage = llm.currentUsage(); // usage partiel réel (appels déjà faits avant l'échec)
             recordUsage(ws.getId(), usage);
-            if (!toolCalls.isEmpty()) return stopped(steps, sources, toolCalls, usage, "The model stopped answering");
+            if (!toolCalls.isEmpty()) return stopped(steps, sources, toolCalls, usage(usage), llm.currentModel(), "The model stopped answering");
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
                 "The model did not answer: here are the notes of your workspace"));
-            return new AssistantAnswer(fallbackAnswer(hits), null, "fallback", sources, steps, List.of(), toUsage(usage));
+            return new AssistantAnswer(fallbackAnswer(hits), null, "fallback", sources, steps, List.of(), usage(usage));
         } finally {
             llm.endUsageCapture();
         }
@@ -475,11 +478,12 @@ public class AgentService {
      * que la personne le voie et ne le redemande pas (une issue déjà créée ne doit pas passer pour « rien n'a été fait »).
      */
     private static AssistantAnswer stopped(List<AssistantStep> steps, List<AssistantSource> sources,
-                                           List<AssistantToolCall> toolCalls, LlmUsage usage, String cause) {
+                                           List<AssistantToolCall> toolCalls, AssistantUsage usage, String model,
+                                           String cause) {
         steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", cause + ": Cortex stopped before the end"));
         String answer = "> [!warning] Cortex stopped before the end\n> " + cause
             + ". What it had already done shows in its steps: check it before asking again, so nothing is done twice.";
-        return new AssistantAnswer(answer, null, "deep", sources, steps, toolCalls, toUsage(usage));
+        return new AssistantAnswer(answer, null, "deep", sources, steps, toolCalls, usage, null, model);
     }
 
     /**
@@ -507,9 +511,15 @@ public class AgentService {
         return used.isEmpty() ? "Answered directly (no tool needed)" : "Tools: " + used;
     }
 
-    private static AssistantUsage toUsage(LlmUsage u) {
+    /**
+     * L'usage du tour, et ce que le modèle a lu à son dernier appel : la taille de ce prompt et la fenêtre que la passerelle
+     * lui a donnée, que la jauge de contexte compare (test du CEO du 05/11/2026).
+     */
+    private AssistantUsage usage(LlmUsage u) {
         if (u == null) return AssistantUsage.NONE; // garde défensive (mocks)
-        return new AssistantUsage(u.promptTokens(), u.completionTokens(), u.totalTokens());
+        LlmContext last = llm.currentContext();
+        return new AssistantUsage(u.promptTokens(), u.completionTokens(), u.totalTokens(),
+            last == null ? 0 : last.promptTokens(), last == null ? null : last.window());
     }
 
     /** Enregistre la conso IA (best-effort : ne casse jamais la réponse de l'agent). */
@@ -567,13 +577,13 @@ public class AgentService {
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", "Answered directly"));
             LlmUsage usage = llm.currentUsage();
             recordUsage(workspaceId, usage);
-            return new AssistantAnswer(answer, null, "fast", List.of(), steps, List.of(), toUsage(usage));
+            return new AssistantAnswer(answer, null, "fast", List.of(), steps, List.of(), usage(usage), null, llm.currentModel());
         } catch (Exception ex) {
             log.warn("Cortex (conversation) indisponible : {}", ex.getMessage());
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", "The model did not answer"));
             LlmUsage usage = llm.currentUsage();
             recordUsage(workspaceId, usage);
-            return new AssistantAnswer(smallTalkFallback(), null, "fallback", List.of(), steps, List.of(), toUsage(usage));
+            return new AssistantAnswer(smallTalkFallback(), null, "fallback", List.of(), steps, List.of(), usage(usage));
         } finally {
             llm.endUsageCapture();
         }

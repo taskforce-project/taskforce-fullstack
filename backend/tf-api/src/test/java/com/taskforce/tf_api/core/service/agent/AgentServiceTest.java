@@ -41,6 +41,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.LlmClient;
+import com.taskforce.tf_api.core.service.LlmContext;
 import com.taskforce.tf_api.core.service.LlmToolsRefusedException;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
@@ -150,6 +151,31 @@ class AgentServiceTest {
         assertThat(answer.usage().totalTokens()).isEqualTo(46);
         assertThat(answer.usage().promptTokens()).isEqualTo(12);
         assertThat(answer.toolCalls()).isEmpty();
+    }
+
+    /**
+     * Tests du CEO du 05/11/2026 : la jauge de contexte comparait le cumul de la conversation à une fenêtre écrite en dur,
+     * et rien ne disait quel modèle avait répondu. La réponse dit le modèle que la passerelle a appelé, la taille du prompt
+     * de son dernier appel et la fenêtre que la passerelle lui a donnée (null quand le fournisseur la tient).
+     */
+    @ParameterizedTest(name = "fenêtre {1} : modèle {0}")
+    @CsvSource(nullValues = "-", value = {"qwen3:8b, 8192", "openai/gpt-oss-20b, -"})
+    void the_answer_says_its_model_and_what_it_read(String model, Integer window) throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Direct answer\"}"));
+        when(llm.currentUsage()).thenReturn(new LlmUsage(6200, 140, 6340));
+        when(llm.currentModel()).thenReturn(model);
+        when(llm.currentContext()).thenReturn(new LlmContext(3100, window));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Give me the status of the project");
+
+        assertThat(answer.model()).isEqualTo(model);
+        assertThat(answer.usage().promptTokens()).isEqualTo(6200); // le tour entier, pour la consommation
+        assertThat(answer.usage().lastPromptTokens()).isEqualTo(3100); // le dernier appel, pour la jauge
+        assertThat(answer.usage().contextWindow()).isEqualTo(window);
     }
 
     @Test

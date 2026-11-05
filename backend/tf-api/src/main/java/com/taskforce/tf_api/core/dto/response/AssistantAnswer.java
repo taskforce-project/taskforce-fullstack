@@ -12,6 +12,9 @@ import java.util.Map;
  *
  * <p>{@code record} : le dossier de la réponse, quand elle en a un : celui de ses appels d'outil, ou celui qui s'ouvre
  * quand TaskForce corrige une réponse sans outil (R116). Il fait d'elle un cas de la banque.
+ *
+ * <p>{@code model} : le modèle qui a répondu, tel que la passerelle l'a appelé ; null quand aucun modèle n'a répondu (un
+ * repli). Le pied de la réponse le montre (test du CEO du 05/11/2026 : « jsp avec quel model il a fait ca »).
  */
 public record AssistantAnswer(
     String answer,
@@ -21,12 +24,20 @@ public record AssistantAnswer(
     List<AssistantStep> steps,
     List<AssistantToolCall> toolCalls,
     AssistantUsage usage,
-    String record
+    String record,
+    String model
 ) {
     /** Une réponse sans dossier à elle. */
     public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
                            List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage) {
-        this(answer, reasoning, mode, sources, steps, toolCalls, usage, null);
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, null, null);
+    }
+
+    /** Une réponse dont le modèle n'est pas connu. */
+    public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
+                           List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage,
+                           String record) {
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, record, null);
     }
 
     /** Une note Brain OS utilisée pour fonder la réponse (RAG). */
@@ -79,8 +90,19 @@ public record AssistantAnswer(
      */
     public record AssistantChoice(String value, String label, String description, boolean recommended) {}
 
-    /** Tokens réellement consommés par ce tour (cumulés sur les appels LLM). */
-    public record AssistantUsage(long promptTokens, long completionTokens, long totalTokens) {
+    /**
+     * Tokens réellement consommés par ce tour (cumulés sur les appels LLM), et ce que le modèle a lu au dernier appel :
+     * {@code lastPromptTokens}, la taille de ce prompt (0 sans appel), et {@code contextWindow}, la fenêtre de contexte
+     * que la passerelle lui a donnée (Ollama), null quand le fournisseur la tient lui-même. La jauge de contexte de la
+     * conversation compare ces deux-là, pas le cumul.
+     */
+    public record AssistantUsage(long promptTokens, long completionTokens, long totalTokens, long lastPromptTokens,
+                                 Integer contextWindow) {
         public static final AssistantUsage NONE = new AssistantUsage(0, 0, 0);
+
+        /** Un usage sans ce qu'a lu le dernier appel. */
+        public AssistantUsage(long promptTokens, long completionTokens, long totalTokens) {
+            this(promptTokens, completionTokens, totalTokens, 0, null);
+        }
     }
 }
