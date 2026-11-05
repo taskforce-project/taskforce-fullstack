@@ -6,12 +6,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -21,8 +22,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.dto.response.AssistantActionResult;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantChoice;
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantQuestion;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantSource;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantStep;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantToolCall;
@@ -78,6 +83,7 @@ public class AgentService {
     private final CortexGate          gate;
     private final CortexRecordService records;
     private final CortexUndo          undo;
+    private final ScreenContext       screens;
 
     // Tier des tours avec outils externes MCP. Défaut "fast" ; "standard" pour plus de fiabilité
     // multi-outils si le matériel suit.
@@ -132,6 +138,7 @@ public class AgentService {
             Map.of("effect", verdict.effect(), "facts", verdict.facts()));
         String status = "success";
         String output;
+        CortexGesture.Done done = null;
         try {
             if (verdict.denied()) {
                 status = "refused";
@@ -139,25 +146,41 @@ public class AgentService {
             } else {
                 Map<String, Object> args = objectMapper.readValue(argsJson == null || argsJson.isBlank() ? "{}" : argsJson,
                     new TypeReference<Map<String, Object>>() {});
-                output = tool.execute(args, ctx);
+                if (tool instanceof CortexGesture gesture) {
+                    done = gesture.perform(args, ctx);
+                    output = done.text();
+                } else {
+                    output = tool.execute(args, ctx);
+                }
             }
         } catch (JsonProcessingException e) {
             status = "error";
             output = "The arguments of this action are not readable.";
         } catch (RuntimeException e) {
-            traceAfter(record, toolName, "error", e.getMessage());
+            traceAfter(record, toolName, "error", e.getMessage(), null);
             throw e;
         }
-        traceAfter(record, toolName, status, output);
-        return new AssistantActionResult(toolName, status, output);
+        String ref = traceAfter(record, toolName, status, output, done == null ? null : done.undo());
+        return new AssistantActionResult(toolName, status, output, undoable(tool, status, done) ? ref : null,
+            done == null ? null : done.target());
     }
 
     /**
-     * Défait d'un geste ce que Cortex vient de créer (R77, séance n°13) : la dernière création réussie de cet outil, dans
-     * le dossier de la réponse, une seule fois et avec les droits de la personne. L'outil dit ce qu'il a défait, ou
-     * pourquoi ce n'est plus possible (une exception métier).
+     * Un résultat que « Undo » peut nommer : une création réussie, ou un geste qui a gardé de quoi se défaire. Un geste qui
+     * n'a rien changé (« already has these values ») ou une lecture n'en a pas : la carte ne montre pas d'Undo qui
+     * échouerait (vérification du 02/11/2026).
      */
-    public AssistantActionResult undo(String slug, Long userId, String toolName, String recordRef) {
+    private static boolean undoable(AgentTool tool, String status, CortexGesture.Done done) {
+        if (!"success".equals(status)) return false;
+        return !(tool instanceof CortexGesture) || (done != null && done.undo() != null);
+    }
+
+    /**
+     * Défait d'un geste ce que Cortex vient de faire (R77, séance n°13) : le résultat que nomme {@code ref}, sinon la
+     * dernière réussite de cet outil, dans le dossier de la réponse, une seule fois et avec les droits de la personne.
+     * L'outil dit ce qu'il a défait, ou pourquoi ce n'est plus possible (une exception métier).
+     */
+    public AssistantActionResult undo(String slug, Long userId, String toolName, String recordRef, String ref) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         AgentContext ctx = new AgentContext(slug, ws.getId(), userId);
         UUID record = recordId(recordRef);
@@ -167,9 +190,135 @@ public class AgentService {
         if (!undo.handles(toolName)) {
             throw new BusinessException("This action can't be undone.");
         }
-        String undone = records.undo(record, toolName, userId, created -> undo.undo(toolName, created, ctx))
+        String undone = records.undo(record, toolName, userId, ref, result -> undo.undo(toolName, result, ctx))
             .orElseThrow(() -> new BusinessException("There is nothing left to undo here."));
         return new AssistantActionResult(toolName, "success", undone);
+    }
+
+    /**
+     * Les réponses de la personne à une carte de TaskForce (R115, séance n°17), envoyées ensemble (décision du CEO,
+     * 05/11/2026) : pour chaque question, les choix cochés ou la réponse tapée remplissent ce qu'elle demandait, puis le
+     * geste reprend comme dans la réponse qui l'a posée, sans le modèle : rejugé par les règles de l'espace (elles ont pu
+     * changer), gardé au même dossier, avec les droits de la personne. Ce sont ses clics et ses mots sur la carte, jamais
+     * une décision lue dans un message (R1). Une carte ne se répond qu'une fois, et toutes ses questions à la fois. Le
+     * geste peut alors poser les questions suivantes, montrer sa carte, ou se faire.
+     */
+    public AssistantToolCall answer(String slug, Long userId, String toolName, String recordRef, String ref,
+                                    List<Question.Answer> answers) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        UUID record = recordId(recordRef);
+        if (!records.owns(record, new AgentContext(slug, ws.getId(), userId))) {
+            throw new ResourceNotFoundException("This conversation's record was not found.");
+        }
+        AgentTool tool = tools.get(toolName);
+        if (tool == null) {
+            throw new BusinessException("This action is no longer available.");
+        }
+        JsonNode asked = records.question(record, toolName, ref)
+            .orElseThrow(() -> new BusinessException("This question is already answered."));
+        ObjectNode args;
+        try {
+            JsonNode before = objectMapper.readTree(asked.path("arguments").asText("{}"));
+            args = before.isObject() ? (ObjectNode) before : objectMapper.createObjectNode();
+        } catch (JsonProcessingException e) {
+            throw new BusinessException("The arguments of this action are not readable.");
+        }
+        // Tout se juge avant d'entrer au dossier : une réponse refusée laisse la carte ouverte, à corriger.
+        Map<String, String> said = filled(args, questionsOf(asked), answers == null ? List.of() : answers);
+        records.answer(record, toolName, ref, userId, said)
+            .orElseThrow(() -> new BusinessException("This question is already answered."));
+        JsonNode where = asked.path("screen");
+        AgentContext ctx = new AgentContext(slug, ws.getId(), userId,
+            new Screen(longOrNull(where.path("projectId")), longOrNull(where.path("issueId"))));
+        String argsJson = args.toString();
+        ToolOutcome outcome = new Kernel(ctx, record).apply(tool, toolName, argsJson);
+        String shown = outcome.input() != null ? outcome.input() : argsJson;
+        return new AssistantToolCall(toolName, outcome.status(), shown, outcome.result(), record.toString(), outcome.ref(),
+            outcome.target(), card(outcome.questions()));
+    }
+
+    /**
+     * Les questions de la carte gardées au dossier ; une carte d'avant le 05/11/2026 n'en a qu'une, sous {@code question},
+     * sans titre ni lignes qui disent ses choix.
+     */
+    private List<Question> questionsOf(JsonNode asked) {
+        List<Question> questions = new ArrayList<>();
+        JsonNode kept = asked.path("questions").isArray() ? asked.path("questions")
+            : objectMapper.createArrayNode().add(asked.path("question"));
+        for (JsonNode question : kept) {
+            if (question.isObject()) questions.add(objectMapper.convertValue(question, Question.class));
+        }
+        if (questions.isEmpty()) throw new BusinessException("This question can't be read anymore: ask again.");
+        return questions;
+    }
+
+    /**
+     * Remplit les arguments du geste avec les réponses de la carte, et rend ce que chacune dit, pour le dossier. Chaque
+     * question a sa réponse : un choix coché, ou la réponse tapée, pour une question à un seul choix ; des choix cochés et
+     * la réponse tapée (ses parties séparées par des virgules) pour une question dont plusieurs se cochent, qui remplit
+     * une liste. Un choix coché est un choix de la question ; une réponse tapée se lit parmi les choix ({@link #chosen}).
+     */
+    static Map<String, String> filled(ObjectNode args, List<Question> questions, List<Question.Answer> answers) {
+        Map<String, Question.Answer> byField = new LinkedHashMap<>();
+        for (Question.Answer answer : answers) {
+            boolean asked = questions.stream().anyMatch(question -> question.field().equals(answer.field()));
+            if (!asked || byField.putIfAbsent(answer.field(), answer) != null) {
+                throw new BusinessException("This card has no other question to answer.");
+            }
+        }
+        Map<String, String> said = new LinkedHashMap<>();
+        for (Question question : questions) {
+            Question.Answer answer = byField.get(question.field());
+            String named = question.header() == null || question.header().isBlank() ? "this question" : question.header();
+            if (answer == null || (answer.values().isEmpty() && answer.other().isEmpty())) {
+                throw new BusinessException("Answer " + named + ": pick one of the choices, or write your answer.");
+            }
+            for (String value : answer.values()) {
+                if (question.choices().stream().noneMatch(choice -> choice.value().equals(value))) {
+                    throw new BusinessException("\"" + clipped(value, 40) + "\" isn't a choice of " + named
+                        + ": write it as your own answer.");
+                }
+            }
+            if (!question.multiple()) {
+                if (answer.values().size() + (answer.other().isEmpty() ? 0 : 1) > 1) {
+                    throw new BusinessException("Pick one answer for " + named + ".");
+                }
+                String value = answer.other().isEmpty() ? answer.values().get(0) : chosen(question, answer.other());
+                args.put(question.field(), value);
+                said.put(question.field(), value);
+            } else {
+                List<String> values = new ArrayList<>(answer.values());
+                for (String part : answer.other().split(",")) {
+                    if (!part.isBlank()) values.add(chosen(question, part.strip()));
+                }
+                List<String> kept = values.stream().distinct().toList();
+                ArrayNode list = args.putArray(question.field());
+                kept.forEach(list::add);
+                said.put(question.field(), String.join(", ", kept));
+            }
+        }
+        return said;
+    }
+
+    /**
+     * Ce que reçoit le geste d'une réponse tapée : lue parmi les choix (« testta-2 », « le login », « todo » : la valeur,
+     * le libellé, ou le seul choix dont le libellé ou la ligne qui le dit la contient). Sinon, la réponse telle qu'elle
+     * est écrite : le geste la juge.
+     */
+    static String chosen(Question question, String said) {
+        for (Question.Choice choice : question.choices()) {
+            if (said.equalsIgnoreCase(choice.value()) || said.equalsIgnoreCase(choice.label())) return choice.value();
+        }
+        String wanted = said.toLowerCase(Locale.ROOT);
+        List<Question.Choice> containing = wanted.length() < 2 ? List.of() : question.choices().stream()
+            .filter(choice -> choice.label().toLowerCase(Locale.ROOT).contains(wanted)
+                || (choice.description() != null && choice.description().toLowerCase(Locale.ROOT).contains(wanted)))
+            .toList();
+        return containing.size() == 1 ? containing.get(0).value() : said;
+    }
+
+    private static Long longOrNull(JsonNode node) {
+        return node != null && node.canConvertToLong() && !node.isNull() ? node.asLong() : null;
     }
 
     /** Tracer avant d'agir : un événement que le dossier ne prend plus (il est plein) arrête l'action. */
@@ -179,13 +328,21 @@ public class AgentService {
         }
     }
 
-    /** Le résultat au dossier. Une panne ici ne défait pas ce qui a été fait, ni ne le dit raté : elle se journalise. */
-    private void traceAfter(UUID record, String tool, String status, String output) {
+    /**
+     * Le résultat au dossier, avec de quoi le défaire pour un geste, et son empreinte, que « Undo » nommera. Une panne ici
+     * ne défait pas ce qui a été fait, ni ne le dit raté : elle se journalise, et le résultat n'a pas d'empreinte.
+     */
+    private String traceAfter(UUID record, String tool, String status, String output, Map<String, Object> undoData) {
         try {
-            records.append(record, "action.result", CortexRecordService.Actor.SERVER,
-                Map.of("tool", tool, "status", status, "output", CortexRecordService.shorten(output)));
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("tool", tool);
+            data.put("status", status);
+            data.put("output", CortexRecordService.shorten(output));
+            if (undoData != null) data.put("undo", undoData);
+            return records.append(record, "action.result", CortexRecordService.Actor.SERVER, data).orElse(null);
         } catch (RuntimeException e) {
             log.warn("Cortex : résultat de {} non gardé au dossier : {}", LogSafe.of(tool), LogSafe.of(e.getMessage()));
+            return null;
         }
     }
 
@@ -202,8 +359,16 @@ public class AgentService {
      * (format {@code {role, content}}, ordre chronologique), injectés avant le message courant.
      */
     public AssistantAnswer run(String slug, Long userId, String message, List<Map<String, Object>> history) {
+        return run(slug, userId, message, history, Screen.NONE);
+    }
+
+    /**
+     * Avec ce que la personne voit à l'écran (R114, séance n°17) : le modèle le lit avant les notes, et un geste qui doit
+     * demander quelle issue propose d'abord celles de l'écran (R115).
+     */
+    public AssistantAnswer run(String slug, Long userId, String message, List<Map<String, Object>> history, Screen screen) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
-        AgentContext ctx = new AgentContext(slug, ws.getId(), userId);
+        AgentContext ctx = new AgentContext(slug, ws.getId(), userId, screen, message);
         List<Map<String, Object>> hist = history == null ? List.of() : history;
 
         // Salutation ou remerciement : réponse directe, sans recherche (pas de sources hors sujet).
@@ -236,19 +401,32 @@ public class AgentService {
         List<AssistantToolCall> toolCalls = new ArrayList<>();
         try {
             steps.add(new AssistantStep(STEP_ANSWER, "active", "Cortex answers, with its tools if needed"));
-            String modelAnswer = runToolLoop(message, hits, ctx, toolCalls, hist);
-            String answer = honestAnswer(message, modelAnswer, toolCalls);
-            if (answer.equals(modelAnswer)) {
+            // Un geste qui se demande parle par sa carte : la phrase du modèle ne dit pas « je supprime » à sa place.
+            String modelAnswer = cardAnswer(runToolLoop(message, hits, ctx, toolCalls, hist), toolCalls);
+            // R116 : une phrase qui annonce une action sans son résultat d'outil est remplacée par la vérité, signée par
+            // TaskForce, et l'incident entre au dossier de la réponse (E17).
+            ActionClaimCheck.Checked checked = ActionClaimCheck.check(modelAnswer, ActionClaimCheck.Ran.of(toolCalls));
+            String record = toolCalls.stream().map(AssistantToolCall::record).filter(Objects::nonNull).findFirst().orElse(null);
+            if (!checked.corrected()) {
                 steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", toolsDescription(toolCalls)));
             } else {
-                log.warn("Cortex (ws={}) : la réponse annonçait une écriture qu'aucun outil n'a faite, remplacée",
+                log.warn("Cortex (ws={}) : la réponse annonçait une action qu'aucun outil n'a faite, corrigée par TaskForce",
                     ws.getId());
-                steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", "No action ran: nothing was created"));
+                record = trustIncident(ctx, message, hits, toolCalls, checked, record);
+                steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
+                    "Cortex said something was done that no action did: TaskForce corrected it"));
+            }
+            // La question d'un geste est la parole de TaskForce (R115), signée ; et quand Cortex n'a rien dit (qwen3:8b,
+            // souvent, après une demande de suppression), TaskForce dit ce qui s'est passé.
+            String asked = askedAnswer(checked.answer(), toolCalls);
+            String answer = silentAnswer(asked, toolCalls);
+            if (!answer.equals(asked)) {
+                steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", "Cortex said nothing: TaskForce said what happened"));
             }
             LlmUsage usage = llm.currentUsage();
             recordUsage(ws.getId(), usage);
             return new AssistantAnswer(answer, null, toolCalls.isEmpty() ? "fast" : "deep",
-                sources, steps, toolCalls, toUsage(usage));
+                sources, steps, toolCalls, toUsage(usage), record);
         } catch (LlmToolsRefusedException ex) {
             log.warn("Cortex (slug={}) : le fournisseur refuse les outils", LogSafe.of(slug));
             LlmUsage usage = llm.currentUsage();
@@ -280,6 +458,25 @@ public class AgentService {
         String answer = "> [!warning] Cortex stopped before the end\n> " + cause
             + ". What it had already done shows in its steps: check it before asking again, so nothing is done twice.";
         return new AssistantAnswer(answer, null, "deep", sources, steps, toolCalls, toUsage(usage));
+    }
+
+    /**
+     * L'incident de confiance au dossier de la réponse (E17) : ce que le modèle a dit, ce que TaskForce a montré. Une
+     * réponse sans outil n'avait pas de dossier : il s'ouvre pour l'incident. Une panne du dossier ne défait pas la
+     * correction, déjà faite : elle se journalise.
+     */
+    private String trustIncident(AgentContext ctx, String message, List<KnowledgeNode> hits,
+                                 List<AssistantToolCall> toolCalls, ActionClaimCheck.Checked checked, String record) {
+        try {
+            Map<String, Object> origin = new LinkedHashMap<>();
+            origin.put("model", llm.currentModel());
+            origin.putAll(origin(null, hits));
+            return records.incident(ctx, record == null ? null : UUID.fromString(record), message, origin,
+                checked.incident(ActionClaimCheck.Ran.of(toolCalls))).toString();
+        } catch (RuntimeException e) {
+            log.warn("Cortex : incident de confiance non gardé au dossier : {}", LogSafe.of(e.getMessage()));
+            return record;
+        }
     }
 
     /** Détail de l'étape de réponse une fois terminée : outils mobilisés, s'il y en a eu. */
@@ -380,13 +577,38 @@ public class AgentService {
                 external.stream().map(AgentTool::name).toList());
         }
 
-        List<Map<String, Object>> messages = withHistory(systemPrompt(hits, external, LocalDate.now(ZoneOffset.UTC)),
-            history, message);
+        // L'écran (R114) et le plan de la demande (R117), choisis par TaskForce avant le modèle : il n'a rien à deviner.
+        String screen = ctx.screen().isEmpty() ? null : screens.describe(ctx);
+        if (screen == null) screen = "";
+        CortexPlans.Plan plan = CortexPlans.forRequest(message).orElse(null);
+        List<Map<String, Object>> messages = withHistory(
+            systemPrompt(plan, screen, hits, external, LocalDate.now(ZoneOffset.UTC)), history, message);
         List<Map<String, Object>> toolDefs = tools.toolDefinitions(external);
         String tier = external.isEmpty() ? "fast" : mcpToolTier;
-        // Le noyau (R35) : les règles de l'espace et le dossier de la réponse, ouverts au premier outil.
-        Kernel kernel = new Kernel(ctx, message, origin(tier, hits));
-        return toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel);
+        // Le noyau (R35) : les règles de l'espace et le dossier de la réponse, ouverts au premier outil. Le dossier garde
+        // ce que le modèle a vu de l'écran et le plan qu'il a reçu.
+        Map<String, Object> origin = origin(tier, hits);
+        if (!screen.isEmpty()) origin.put("screen", screen);
+        if (plan != null) origin.put("plan", plan.id());
+        Kernel kernel = new Kernel(ctx, message, origin);
+        String answer = toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel);
+        return toolCalls.isEmpty() && plan != null && plan.ask() != null ? askedForCortex(plan.ask(), kernel, toolCalls, answer)
+            : answer;
+    }
+
+    /**
+     * La demande appelle un geste que Cortex n'a pas fait : à « supprime ça », qwen3:8b répond « dites-moi laquelle »
+     * sans outil (04/11/2026). TaskForce pose alors lui-même ce que ce geste exige (R115), avec l'écran en choix, au
+     * dossier de la réponse ; rien n'est fait. Sans question à poser, la réponse de Cortex reste.
+     */
+    private String askedForCortex(String name, Kernel kernel, List<AssistantToolCall> toolCalls, String answer) {
+        AgentTool gesture = tools.get(name);
+        if (!(gesture instanceof CortexGesture)) return answer;
+        ToolOutcome outcome = kernel.apply(gesture, name, "{}");
+        if (outcome.questions() == null) return answer;
+        toolCalls.add(new AssistantToolCall(name, outcome.status(), "{}", outcome.result(), kernel.recordRef(), outcome.ref(),
+            outcome.target(), card(outcome.questions())));
+        return asking(outcome.questions());
     }
 
     /**
@@ -399,8 +621,9 @@ public class AgentService {
             .map(note -> KnowledgeNode.builder().title(note.title()).domain(domainOf(note.domain()))
                 .content(note.content()).build())
             .toList();
-        List<Map<String, Object>> messages = withHistory(systemPrompt(notes, List.of(), replayCase.askedOn()),
-            List.of(), replayCase.question());
+        // Le plan de la question, comme dans une réponse (R117) : la banque dit s'il est suivi.
+        List<Map<String, Object>> messages = withHistory(systemPrompt(CortexPlans.forRequest(replayCase.question()).orElse(null),
+            "", notes, List.of(), replayCase.askedOn()), List.of(), replayCase.question());
         ReplayStep step = new ReplayStep(replayCase, gate.rulesFor(ctx));
         llm.beginUsageCapture();
         try {
@@ -409,7 +632,11 @@ public class AgentService {
                     ? llm.rawChat(msgs, defs, "fast")
                     : llm.rawChatWithModel(msgs, defs, model),
                 step);
-            return new ReplayOutcome(answer, step.calls, llm.currentModel(), llm.currentUsage());
+            // R116 : la banque note la réponse que la personne verrait, corrigée par TaskForce.
+            List<ActionClaimCheck.Ran> ran = step.calls.stream()
+                .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList();
+            return new ReplayOutcome(ActionClaimCheck.check(answer, ran).answer(), step.calls, llm.currentModel(),
+                llm.currentUsage());
         } finally {
             llm.endUsageCapture();
         }
@@ -428,10 +655,16 @@ public class AgentService {
         String recordRef();
     }
 
-    /** {@code input} : les arguments que la carte montre, quand le serveur les a résolus ; null, ceux de Cortex. */
-    private record ToolOutcome(String status, String result, String input) {
+    /**
+     * {@code input} : les arguments que la carte montre, quand le serveur les a résolus ; null, ceux de Cortex.
+     * {@code ref} : l'empreinte d'un résultat réussi au dossier, que « Undo » nomme, ou de la carte de questions posée,
+     * que la réponse nomme. {@code target} : l'issue d'un geste. {@code questions} : ce que TaskForce demande d'abord,
+     * deux questions au plus dans la même carte (R115) ; null sans question.
+     */
+    private record ToolOutcome(String status, String result, String input, String ref, Map<String, Object> target,
+                               List<Question> questions) {
         ToolOutcome(String status, String result) {
-            this(status, result, null);
+            this(status, result, null, null, null, null);
         }
     }
 
@@ -460,6 +693,24 @@ public class AgentService {
         + "choices, then prepare the card with the answer. Do not ask about anything else: the other fields stay editable "
         + "on the card.";
 
+    /**
+     * Ce que garde le dossier quand TaskForce pose la question d'un geste (R115) : la réponse s'arrête sur la question, et
+     * le modèle ne la reprend pas à son compte.
+     */
+    private static final String QUESTION_ASKED = "Nothing was done: TaskForce asks the person first. ";
+
+    /**
+     * Ce qui ne se défait pas d'ici se demande, même quand les règles le permettent (ADR-024, TF-J1-5) : confier une issue
+     * à un agent lance sa mission sur la machine de la personne. Ce qui se défait se fait, avec « Undo » (R77).
+     */
+    private static final String ASKED_TEXT = "This can't be undone from the conversation, so it waits for the person's "
+        + "approval on the card below. Do not call this tool again; say in one sentence what you propose.";
+
+    /** Une lecture, ou un résultat que « Undo » défait : Cortex le fait sans demander, quand les règles le permettent. */
+    private static boolean doneAtOnce(String name, CortexGate.Verdict verdict) {
+        return CortexGate.READS.contains(verdict.facts().get("action")) || CortexUndo.TOOLS.contains(name);
+    }
+
     private static String refusedText(CortexGate.Verdict verdict) {
         return "Not run: the rules of this workspace refuse it. " + verdict.reason()
             + " Do not try again; tell the user why it was not done.";
@@ -475,6 +726,7 @@ public class AgentService {
                 return msg.path("content").asText("");
             }
             messages.add(objectMapper.convertValue(msg, new TypeReference<Map<String, Object>>() {}));
+            List<Question> asked = null;
             for (JsonNode call : calls) {
                 String id = call.path("id").asText();
                 String name = call.path("function").path("name").asText();
@@ -484,11 +736,37 @@ public class AgentService {
                     ? new ToolOutcome("error", "Unknown tool: " + name)
                     : step.apply(tool, name, argsJson);
                 String shown = outcome.input() != null ? outcome.input() : argsJson;
-                toolCalls.add(new AssistantToolCall(name, outcome.status(), shown, outcome.result(), step.recordRef()));
+                toolCalls.add(new AssistantToolCall(name, outcome.status(), shown, outcome.result(), step.recordRef(),
+                    outcome.ref(), outcome.target(), card(outcome.questions())));
                 messages.add(Map.of("role", "tool", "tool_call_id", id, "content", outcome.result()));
+                if (asked == null) asked = outcome.questions();
             }
+            // R115 : TaskForce pose ses questions, et la réponse s'arrête là. Le modèle ne devine pas les réponses, et sa
+            // phrase ne remplace pas les questions : ce sont elles que la personne lit, sur la carte de leurs choix.
+            if (asked != null) return asking(asked);
         }
         return "Answer interrupted (too many tool steps).";
+    }
+
+    /** Les arguments qu'un geste a résolus, ou ceux de Cortex quand il n'en rend aucun. */
+    private static Map<String, Object> resolvedOr(Map<String, Object> args, Map<String, Object> resolved) {
+        return resolved == null || resolved.isEmpty() ? args : resolved;
+    }
+
+    /** Les questions d'une carte telles que la réponse les dit : une par ligne, dans l'ordre de la carte. */
+    static String asking(List<Question> questions) {
+        return questions.stream().map(Question::text).collect(Collectors.joining("\n"));
+    }
+
+    /** Les questions telles que la carte les montre ; null sans question. */
+    static List<AssistantQuestion> card(List<Question> questions) {
+        if (questions == null || questions.isEmpty()) return null;
+        return questions.stream()
+            .map(question -> new AssistantQuestion(question.field(), question.header(), question.text(), question.multiple(),
+                question.choices().stream()
+                    .map(choice -> new AssistantChoice(choice.value(), choice.label(), choice.description(), choice.recommended()))
+                    .toList()))
+            .toList();
     }
 
     /** Ce qui a répondu : le tier et les notes servies ; le modèle s'y ajoute à l'ouverture du dossier. */
@@ -568,12 +846,20 @@ public class AgentService {
             this.origin = origin;
         }
 
+        /** Le noyau d'un geste qui reprend après la réponse de la personne : le dossier est celui de sa question. */
+        Kernel(AgentContext ctx, UUID record) {
+            this(ctx, null, Map.of());
+            this.record = record;
+        }
+
         /** Tracer avant d'agir : la demande et la décision entrent au dossier avant tout effet. */
         @Override
         public ToolOutcome apply(AgentTool tool, String name, String argsJson) {
             String result;
             String status = "success";
             String shown = null;
+            CortexGesture.Done done = null;
+            List<Question> asked = null;
             try {
                 CortexGate.Verdict verdict = judge(tool, argsJson);
                 if (verdict.denied()) {
@@ -587,8 +873,13 @@ public class AgentService {
                             + "tool. Tell the user that an owner or admin has to make this change.";
                         status = "error";
                     } else {
-                        result = PROPOSED;
+                        // La carte dit ce que la personne accorde : l'issue qu'on supprimerait, ce qui partirait avec elle.
+                        // Ce qu'il manque au geste se demande avant elle (R115), et l'accord reprend l'issue de la carte.
+                        String resolved = ask(tool, argsJson);
+                        done = preview(tool, resolved);
+                        result = done == null ? PROPOSED : done.text() + " " + PROPOSED;
                         status = "pending";
+                        if (!resolved.equals(argsJson)) shown = resolved;
                     }
                 } else if (PREPARED.contains(name)) {
                     // Avant la carte, ce que seule la personne peut dire : sinon une question, et aucune carte. La carte
@@ -603,16 +894,80 @@ public class AgentService {
                         status = "pending";
                         if (prepared != null && prepared.args() != null) shown = objectMapper.writeValueAsString(prepared.args());
                     }
+                } else if (!doneAtOnce(name, verdict)) {
+                    String resolved = ask(tool, argsJson);
+                    result = ASKED_TEXT;
+                    status = "pending";
+                    if (!resolved.equals(argsJson)) shown = resolved;
                 } else {
                     Map<String, Object> args = objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {});
-                    result = tool.execute(args, ctx);
+                    if (tool instanceof CortexGesture gesture) {
+                        done = gesture.perform(resolvedOr(args, gesture.ask(args, ctx)), ctx);
+                        result = done.text();
+                    } else {
+                        result = tool.execute(args, ctx);
+                    }
                 }
+            } catch (QuestionNeeded needed) {
+                // R115 : le geste attend des réponses que seule la personne peut donner. Rien n'est écrit ; TaskForce
+                // pose ses questions, deux au plus dans la même carte, et le geste reprend sur son envoi.
+                asked = needed.questions();
+                result = QUESTION_ASKED + needed.getMessage();
+                status = QUESTION;
+                done = null;
             } catch (Exception e) {
                 result = "Tool " + name + " failed: " + e.getMessage();
                 status = "error";
+                done = null;
             }
-            result(name, status, result);
-            return new ToolOutcome(status, result, shown);
+            if (asked != null) {
+                return new ToolOutcome(status, result, null, asked(name, argsJson, result, asked), null, asked);
+            }
+            String ref = result(name, status, result, done == null ? null : done.undo());
+            return new ToolOutcome(status, result, shown, undoable(tool, status, done) ? ref : null,
+                done == null ? null : done.target(), null);
+        }
+
+        /**
+         * Ce qu'il manque au geste (R115), demandé avant qu'il agisse : une question levée, ou ses arguments tels qu'il les
+         * entend. Les mêmes que ceux de Cortex quand rien n'a changé.
+         */
+        private String ask(AgentTool tool, String argsJson) throws JsonProcessingException {
+            if (!(tool instanceof CortexGesture gesture)) return argsJson;
+            Map<String, Object> args = objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> resolved = resolvedOr(args, gesture.ask(args, ctx));
+            return resolved.equals(args) ? argsJson : objectMapper.writeValueAsString(resolved);
+        }
+
+        /**
+         * La carte de questions au dossier, avec ce que le geste reprendra : ses arguments tels que Cortex les a passés
+         * (en entier, le geste en a besoin), et l'écran, dont viendront les choix d'une question suivante. Son empreinte
+         * est ce que la réponse nomme ; sans dossier, la carte ne se répond pas.
+         */
+        private String asked(String tool, String argsJson, String output, List<Question> asked) {
+            if (record == null) return null;
+            try {
+                Map<String, Object> data = new LinkedHashMap<>();
+                data.put("tool", tool);
+                data.put("status", QUESTION);
+                data.put("output", CortexRecordService.shorten(output));
+                data.put("arguments", argsJson == null || argsJson.isBlank() ? "{}" : argsJson);
+                data.put("questions", objectMapper.convertValue(asked, new TypeReference<List<Map<String, Object>>>() {}));
+                Map<String, Object> screen = new LinkedHashMap<>();
+                screen.put("projectId", ctx.screen().projectId());
+                screen.put("issueId", ctx.screen().issueId());
+                data.put("screen", screen);
+                return records.append(record, "action.result", CortexRecordService.Actor.SERVER, data).orElse(null);
+            } catch (RuntimeException e) {
+                log.warn("Cortex : question de {} non gardée au dossier : {}", LogSafe.of(tool), LogSafe.of(e.getMessage()));
+                return null;
+            }
+        }
+
+        /** Ce que montre la carte d'un geste demandé ; null pour un autre outil, ou un geste sans rien de plus à montrer. */
+        private CortexGesture.Done preview(AgentTool tool, String argsJson) throws JsonProcessingException {
+            if (!(tool instanceof CortexGesture gesture)) return null;
+            return gesture.preview(objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {}), ctx);
         }
 
         /** La demande, puis la décision des règles, au dossier avant tout effet : sans dossier, l'action ne part pas. */
@@ -627,9 +982,9 @@ public class AgentService {
             return verdict;
         }
 
-        /** Le résultat au dossier, s'il s'est ouvert. */
-        void result(String tool, String status, String output) {
-            if (record != null) traceAfter(record, tool, status, output);
+        /** Le résultat au dossier, s'il s'est ouvert, et son empreinte. */
+        String result(String tool, String status, String output, Map<String, Object> undoData) {
+            return record == null ? null : traceAfter(record, tool, status, output, undoData);
         }
 
         @Override
@@ -684,12 +1039,17 @@ public class AgentService {
         return messages;
     }
 
-    private String systemPrompt(List<KnowledgeNode> hits, List<AgentTool> external, LocalDate today) {
+    /**
+     * Le prompt : les consignes, puis le plan de la demande (R117), l'écran (R114), et les notes du Brain OS en dernier.
+     * {@code plan} est null et {@code screen} vide quand rien ne s'y applique.
+     */
+    private String systemPrompt(CortexPlans.Plan plan, String screen, List<KnowledgeNode> hits, List<AgentTool> external,
+                                LocalDate today) {
         StringBuilder sb = new StringBuilder();
         sb.append("You are Cortex, the AI copilot of a TaskForce workspace. Answer in the user's language, ")
           .append("concisely, grounded in the real context. ")
           .append("Use your tools only when they help: search the workspace's notes, list or create TaskForce ")
-          .append("projects and issues, write a note. ")
+          .append("projects and issues, change, move, assign or comment an issue, hand it to an agent, write a note. ")
           .append("Never create anything the user did not ask for. ")
           .append("Say that you created, changed or deleted something only when a tool result in this conversation ")
           .append("confirms it; if no tool ran or a tool failed, say plainly that it was not done. ")
@@ -708,7 +1068,24 @@ public class AgentService {
           .append("Backlog unless the work must start now, and set a due date only when the goal or the person gives ")
           .append("one. Ask one short question, with the choices, before preparing the card only when what matters is ")
           .append("unclear: the request does not say which project and there are several, or it names a person who ")
-          .append("matches several members. Never ask about the other fields: they stay editable on the card. ");
+          .append("matches several members. Never ask about the other fields: they stay editable on the card. ")
+          // Les gestes du MCP TaskForce (ADR-024, TF-J1-5) : faits d'emblée quand ils se défont, demandés sinon ; les
+          // décisions restent aux boutons des cartes, jamais à un « oui » écrit (R1).
+          .append("To change an existing issue (its title, description, priority, column, assignee, labels, points, cycle ")
+          .append("or due date), call update_issue with its key (like TF-12) and only the fields to change: it is done ")
+          .append("at once and the person can undo it. When the person names an issue by its column or its title rather ")
+          .append("than its key, find its key first with list_issues, which filters by column. To comment on an issue, ")
+          .append("call add_comment. To delete or archive an issue, call delete_issue: it never deletes on its own, its ")
+          .append("card lets the person archive it (which can be undone) or delete it. Never prepare an issue to ask for ")
+          .append("a deletion. To hand an issue to ")
+          .append("Claude Code, call delegate_issue: the person approves it on its card. When the person asks where a ")
+          .append("mission stands, what an agent asks or what it produced, call get_mission: its cards let the person ")
+          .append("answer a request or decide on the result. Never decide for the person, and never say that a request ")
+          .append("is answered or a result applied: only the buttons of the cards do that, even when the person writes yes. ")
+          // R115 : ce qu'un geste exige et que la demande ne dit pas, TaskForce le demande, pas le modèle.
+          .append("When a change needs something the request does not say (which issue, a project's name), call its tool ")
+          .append("with what you know and nothing invented: TaskForce asks the person, with choices. Never write that ")
+          .append("question yourself. ");
         if (!external.isEmpty()) {
             String names = external.stream().map(AgentTool::name).collect(Collectors.joining(", "));
             sb.append("External tools are connected (MCP servers): ").append(names).append(". ")
@@ -720,6 +1097,8 @@ public class AgentService {
               .append("Call an external write tool only with explicit, checked parameters and only when the user ")
               .append("asked for it; it never runs directly: an owner or admin approves it in the conversation. ");
         }
+        if (plan != null) sb.append("\n\n").append(plan.text());
+        if (screen != null && !screen.isBlank()) sb.append("\n\n").append(screen.strip());
         if (!hits.isEmpty()) {
             sb.append("\n\nContext (the workspace's notes):\n");
             for (KnowledgeNode n : hits) {
@@ -732,60 +1111,95 @@ public class AgentService {
         return sb.toString();
     }
 
-    // -------------------------------------------------------------------------
-    // Une action ne se dit faite que si un outil l'a faite (R35, séance n°7 du Conseil)
-    // -------------------------------------------------------------------------
+    /**
+     * Ce que dit la réponse quand un geste attend la personne sur sa carte. Sur la pile de dev, qwen3:8b montrait la carte
+     * de suppression puis écrivait « Otherwise, I'll proceed with deletion », et « I have handed the issue to Claude
+     * Code » avant tout accord (02/11/2026) : un « oui » écrit n'aurait rien fait (R1). La phrase est donc celle du
+     * serveur, qui dit où décider.
+     */
+    static final Map<String, String> CARD_ANSWERS = Map.of(
+        "delete_issue", "Nothing is deleted yet: choose on the card below. Archive hides the issue from the board and can "
+            + "be undone; Delete removes it for good.",
+        "delegate_issue", "Nothing is handed over yet: approve the mission on the card below, and Claude Code starts on "
+            + "your runner.");
 
-    /** Les écritures de TaskForce : seule la réussite de l'une d'elles permet d'annoncer une création. */
-    private static final Set<String> WRITE_TOOLS = Set.of("create_issue", "create_project", "create_note");
+    static String cardAnswer(String answer, List<AssistantToolCall> toolCalls) {
+        return toolCalls.stream()
+            .filter(call -> "pending".equals(call.status()) && CARD_ANSWERS.containsKey(call.name()))
+            .map(call -> CARD_ANSWERS.get(call.name()))
+            .findFirst()
+            .orElse(answer);
+    }
 
-    private static final int REGEX_FLAGS = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS
-        | Pattern.DOTALL;
+    /** Une sortie d'outil que TaskForce redit telle quelle : une phrase courte, pas une liste lue. */
+    private static final int MAX_SAID = 280;
 
     /**
-     * Une demande de création : le message COMMENCE par le verbe (après « please », « can you », « peux-tu »…), puis un
-     * objet de l'espace, en anglais ou en français. « Show me the open issues » n'en est pas une.
+     * Ce que dit la réponse quand Cortex n'a rien dit (décision du CEO, 02/11/2026 : qwen3:8b répond souvent par un texte
+     * vide à une demande de suppression). TaskForce dit à sa place ce qui s'est passé dans le tour, signé comme ses
+     * corrections (R116) : rien, ce que dit la carte qui attend, ou ce qu'un outil a fait ou refusé. Une réponse écrite
+     * reste celle de Cortex.
      */
-    private static final Pattern WRITE_REQUEST = Pattern.compile(
-        "^\\s*(please\\s+|can\\s+you\\s+|could\\s+you\\s+|peux-tu\\s+|pourrais-tu\\s+|merci\\s+de\\s+)?"
-            + "(create|add|make|file|log|open\\s+(a|an)|crée[rz]?|cree[rz]?|ajoute[rz]?)\\b.*"
-            + "\\b(issues?|tickets?|tasks?|bugs?|projects?|notes?|tâches?|taches?|projets?)\\b", REGEX_FLAGS);
+    static String silentAnswer(String answer, List<AssistantToolCall> toolCalls) {
+        if (answer != null && !answer.isBlank()) return answer;
+        Set<String> said = new LinkedHashSet<>();
+        said.add(toolCalls.isEmpty() ? "Cortex didn't answer. Nothing was done." : "Cortex didn't answer.");
+        for (AssistantToolCall call : toolCalls) {
+            String output = call.output() == null ? "" : call.output().strip();
+            switch (call.status()) {
+                case "pending" -> said.add(CARD_ANSWERS.getOrDefault(call.name(), PREPARED.contains(call.name())
+                    ? "Nothing is created yet: check the issue below, then create it."
+                    : "Nothing has changed yet: the action below waits for your approval."));
+                case "success" -> said.add(output.isEmpty() || output.length() > MAX_SAID || output.contains("\n")
+                    ? "What it read or did shows below." : output);
+                case "refused" -> said.add("Nothing was done: the rules of this workspace refuse it.");
+                case "error" -> said.add("An action failed, so nothing was done: "
+                    + clipped(output.replaceFirst("^Tool \\S+ failed: ", ""), MAX_SAID));
+                case QUESTION -> {
+                    if (call.questions() == null || call.questions().isEmpty()) said.add("TaskForce asks a question below.");
+                    else call.questions().forEach(question -> said.add(question.text()));
+                }
+                default -> { /* un résultat défait ou inconnu : rien de plus à dire */ }
+            }
+        }
+        return signed(List.copyOf(said));
+    }
 
     /**
-     * Une phrase qui annonce une création faite, toujours rattachée à son objet. Pas « opened » : « 3 issues opened this
-     * week » décrit l'espace, n'annonce rien.
+     * La signature des questions de TaskForce (R115) : l'app montre la carte à leur place, et une conversation rouverte,
+     * sans sa carte, les relit sous le nom de TaskForce, comme le modèle dans son historique.
      */
-    private static final Pattern WRITE_CLAIM = Pattern.compile(
-        "\\b(issue|ticket|task|project|note)s?\\s+(has\\s+been\\s+|have\\s+been\\s+|was\\s+|were\\s+)?(created|added)\\b"
-            + "|\\b(created|added)\\s+(a\\s+|an\\s+|the\\s+|your\\s+|\\d+\\s+)?(new\\s+)?(issue|ticket|task|project|note)s?\\b"
-            + "|\\b(issue|ticket|tâche|tache|projet|note)s?\\s+(a\\s+été\\s+|ont\\s+été\\s+)?(créée?s?|ajoutée?s?)"
-            + "|\\b(créé|ajouté)e?s?\\s+(une\\s+|un\\s+|la\\s+|le\\s+|les\\s+|\\d+\\s+)?(nouvelle\\s+|nouveau\\s+)?"
-            + "(issue|ticket|tâche|tache|projet|note)s?\\b", REGEX_FLAGS);
+    static final String ASKS = ActionClaimCheck.SIGNATURE + " · asks";
 
     /**
-     * La réponse à montrer : celle du modèle, sauf s'il annonce une création qu'aucun outil n'a faite. Un petit modèle
-     * l'a fait le 29/10/2026 (« Issue created », rien de créé) ; c'est le résultat de l'outil qui fait foi, pas la
-     * phrase. Ne joue que sur une demande de création, pour ne pas toucher une réponse qui raconte l'historique.
+     * La réponse d'un tour qui s'arrête sur les questions d'un geste (R115) : ce sont celles de TaskForce, pas du modèle,
+     * une par ligne, sous sa signature ; la carte porte leurs choix.
      */
-    static String honestAnswer(String message, String answer, List<AssistantToolCall> toolCalls) {
-        if (answer == null || message == null) return answer == null ? "" : answer;
-        boolean wrote = toolCalls.stream()
-            .anyMatch(call -> WRITE_TOOLS.contains(call.name()) && "success".equals(call.status()));
-        if (wrote || !WRITE_REQUEST.matcher(message).find() || !WRITE_CLAIM.matcher(answer).find()) return answer;
-        if (toolCalls.stream().anyMatch(call -> "pending".equals(call.status()) && PREPARED.contains(call.name()))) {
-            return "Nothing is created yet: check the issue below, then create it.";
-        }
-        if (toolCalls.stream().anyMatch(call -> "pending".equals(call.status()))) {
-            return "Nothing has changed yet: the action below waits for your approval.";
-        }
-        if (toolCalls.stream().anyMatch(call -> "refused".equals(call.status()))) {
-            return "Nothing was created: the rules of this workspace refuse this action.";
-        }
-        boolean failed = toolCalls.stream()
-            .anyMatch(call -> WRITE_TOOLS.contains(call.name()) && "error".equals(call.status()));
-        return failed
-            ? "I couldn't do it, so nothing was created. Ask me again, or create it from the board."
-            : "I didn't create anything: no action ran. Ask me again with the project's name, or create it from the board.";
+    static String askedAnswer(String answer, List<AssistantToolCall> toolCalls) {
+        if (answer == null) return null;
+        return toolCalls.stream()
+            .filter(call -> QUESTION.equals(call.status()) && call.questions() != null && !call.questions().isEmpty())
+            .map(call -> call.questions().stream().map(AssistantQuestion::text).toList())
+            .filter(texts -> answer.strip().equals(String.join("\n", texts)))
+            .map(texts -> signed(ASKS, texts))
+            .findFirst()
+            .orElse(answer);
+    }
+
+    /** Un bloc de TaskForce, tel que l'app le montre comme sa parole (R116) : la signature, puis une ligne par phrase. */
+    private static String signed(List<String> lines) {
+        return signed(ActionClaimCheck.SIGNATURE, lines);
+    }
+
+    private static String signed(String signature, List<String> lines) {
+        StringBuilder block = new StringBuilder(signature);
+        lines.forEach(line -> block.append("\n> ").append(line));
+        return block.append('\n').toString();
+    }
+
+    private static String clipped(String text, int max) {
+        String flat = text.replaceAll("\\s+", " ").strip();
+        return flat.length() <= max ? flat : flat.substring(0, max).stripTrailing() + "...";
     }
 
     /** Le fournisseur a refusé les outils : rien n'a été fait, on le dit, avec les notes trouvées. */

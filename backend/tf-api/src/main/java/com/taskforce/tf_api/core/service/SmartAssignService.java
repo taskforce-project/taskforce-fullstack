@@ -435,8 +435,9 @@ public class SmartAssignService {
             DeliveryAgentProvider p = agentRegistry.get(key);
             if (p != null && p.available() && p.unavailableReason(context) == null) return p;
         }
+        // Un agent à l'essai (R51) se choisit dans le menu, jamais sur une proposition de Smart Assign.
         return agentRegistry.all().stream()
-            .filter(p -> p.available() && p.unavailableReason(context) == null)
+            .filter(p -> !p.trial() && p.available() && p.unavailableReason(context) == null)
             .findFirst().orElse(null);
     }
 

@@ -869,26 +869,35 @@ textarea:not([disabled]) { cursor: text; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   CORTEX - le composeur flottant et la bulle de la conversation
+   CORTEX - le composeur flottant et la conversation sur son dégradé
    ─────────────────────────────────────────────────────────────────────────
-   Le CEO, après l'essai de l'app desktop 1.5.0 (02/11/2026) : la conversation, un tiroir plat sous le tableau, ne se
-   distinguait pas de l'écran. Elle prend la langue du composeur du site (landing-page, Composer.astro) : la barre
-   flotte en bas, la conversation s'ouvre au-dessus en bulle détachée, arrondie et ombrée, sur un halo circulaire. Ces
-   deux surfaces sont la seule exception aux angles droits et à « pas de dégradé dans le produit »
-   (.ai/design-grammar.md). Pas de backdrop-filter : la bulle est opaque et le halo n'est qu'un dégradé, flouter une
-   grande surface coûte cher au rendu (notes du site, .ai/site-desktop.md).
+   La barre et la conversation parlent la langue du composeur du site (landing-page, Composer.astro). La barre flotte
+   en bas de chaque écran. La conversation n'est pas une carte (le CEO, 02/11/2026 : « je veux pas de card, comme sur
+   le site genre un bg simple ») : son texte se pose sur un dégradé qui monte de la barre, le fond de l'écran presque
+   plein sous le texte, qui s'efface vers les bords et vers le haut, avec un cœur bleu sous la barre ; l'écran se voit
+   autour. Ce sont les seules surfaces arrondies et en dégradé de l'app (.ai/design-grammar.md). Pas de
+   backdrop-filter : le dégradé n'est qu'un dégradé, flouter une grande surface coûte cher au rendu (notes du site,
+   .ai/site-desktop.md).
    ══════════════════════════════════════════════════════════════════════════ */
 :root {
   /* Un seul rayon pour ce qui flotte avec Cortex, celui du composeur du site. */
   --cortex-radius: 1.125rem;
-  /* Le dégradé de la bulle : un bleu qui monte du composeur et s'éteint vers le haut. */
-  --cortex-glow: color-mix(in srgb, var(--primary) 13%, var(--card));
-  /* Le cœur bleu du halo, sous la jonction de la bulle et du composeur. */
-  --cortex-aura: color-mix(in srgb, var(--primary) 22%, transparent);
+  /* Le cœur bleu du dégradé, sous la barre. */
+  --cortex-aura: color-mix(in srgb, var(--primary) 14%, transparent);
+  /* La largeur du dégradé, en part de l'écran (le site : 72 %, 130 % sur un téléphone). */
+  --cortex-wash-x: 72%;
+  /* Ce que le dégradé monte au-dessus de la conversation, pour que le texte du haut se lise encore sur l'écran. */
+  --cortex-rise: 4rem;
+  /* Le fondu du haut de la conversation, où les tours d'avant s'effacent. */
+  --cortex-fade: 2.5rem;
 }
 .dark {
-  --cortex-glow: color-mix(in srgb, var(--primary) 20%, var(--card));
-  --cortex-aura: color-mix(in srgb, var(--primary) 34%, transparent);
+  --cortex-aura: color-mix(in srgb, var(--primary) 26%, transparent);
+}
+@media (max-width: 759px) {
+  :root {
+    --cortex-wash-x: 130%;
+  }
 }
 .cortex-composer {
   border-radius: var(--cortex-radius);
@@ -899,32 +908,93 @@ textarea:not([disabled]) { cursor: text; }
 .cortex-composer:focus-within {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--ring) 55%, transparent), var(--shadow-window);
 }
-.cortex-bubble {
-  border-radius: var(--cortex-radius);
-  background:
-    radial-gradient(130% 85% at 50% 110%, var(--cortex-glow) 0%, transparent 75%),
-    var(--card);
-  box-shadow: var(--shadow-window), var(--shadow-xl);
-}
-/* Dans la bulle, la demande de la personne est une bulle de discussion, arrondie sauf du côté de qui parle. */
-.cortex-bubble [data-role="user"] {
-  border-radius: 0.875rem 0.875rem 0.25rem 0.875rem;
-}
-/* Le halo derrière la bulle et le composeur : le fond de l'écran, presque plein près de la bulle, qui s'efface vers
-   les bords, et un cœur bleu sous la jonction des deux. L'écran reste lisible autour, et cliquable : le halo ne
-   capte rien. */
-.cortex-halo {
+/* Le dégradé, celui du parcours du site (.flow-glow) : une ellipse posée au bas de l'écran, sous la barre, qui monte
+   au-dessus du texte. Presque plein au centre, il s'efface vers les bords et vers le haut ; il ne capte aucun clic. À
+   côté d'un panneau ouvert, il s'arrête à son bord. */
+.cortex-wash {
   position: absolute;
-  inset: -3.5rem -8rem -6rem;
+  inset: calc(-1 * var(--cortex-rise)) 0 -4.5rem;
   pointer-events: none;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--background) 82%, transparent) 70%, transparent);
+  background: radial-gradient(
+    ellipse var(--cortex-wash-x) 100% at 50% 100%,
+    color-mix(in srgb, var(--background) 97%, transparent) 0%,
+    color-mix(in srgb, var(--background) 95%, transparent) 66%,
+    color-mix(in srgb, var(--background) 78%, transparent) 84%,
+    transparent 100%
+  );
 }
-.cortex-halo::after {
+@media (min-width: 768px) {
+  .cortex-wash {
+    left: var(--cortex-left, 0px);
+    right: var(--cortex-right, 0px);
+  }
+}
+/* Derrière la colonne du texte, comme derrière le texte d'une étape sur le site (.flow-panels::before) : le fond plus
+   plein, aux côtés fondus, qui s'éteint vers le haut. Sans bord net, ce n'est pas une carte. */
+.cortex-wash::before {
   content: "";
   position: absolute;
-  inset: 30% 6% -12%;
+  inset-block: 0;
+  left: 50%;
+  width: min(100%, 54rem);
+  transform: translateX(-50%);
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--background) 92%, transparent) 0%,
+    color-mix(in srgb, var(--background) 86%, transparent) 70%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(to right, transparent, black 3rem, black calc(100% - 3rem), transparent);
+  mask-image: linear-gradient(to right, transparent, black 3rem, black calc(100% - 3rem), transparent);
+}
+.cortex-wash::after {
+  content: "";
+  position: absolute;
+  inset: 55% 24% -30%;
   border-radius: 50%;
-  background: radial-gradient(closest-side, var(--cortex-aura) 0%, color-mix(in srgb, var(--cortex-aura) 70%, transparent) 60%, transparent);
+  background: radial-gradient(closest-side, var(--cortex-aura), transparent);
+}
+/* La conversation : pas de cadre, pas de fond, pas d'ombre. Elle prend la place de son texte, jusqu'à un plafond qui
+   laisse l'écran au-dessus à voir (et, dans l'app desktop, loin des boutons de la fenêtre). */
+.cortex-conversation {
+  max-height: min(30rem, 56dvh);
+}
+/* Le fil : en haut, les tours qui montent s'effacent dans un fondu ; au repos, son retrait le laisse vide. Sa barre de
+   défilement ne se montre qu'au survol, comme celle de la barre latérale : pas de bord visible. */
+.cortex-thread {
+  padding-top: var(--cortex-fade);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--cortex-fade));
+  mask-image: linear-gradient(to bottom, transparent, black var(--cortex-fade));
+}
+.cortex-thread::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+.cortex-thread:hover::-webkit-scrollbar-thumb {
+  background: var(--fill-primary);
+}
+/* Le texte de Cortex se détache de l'écran comme sur le site : un liseré du fond autour des lettres. */
+.cortex-thread [data-role="assistant"] > * > [data-markdown],
+.cortex-say {
+  text-shadow: 0 0 2px var(--background), 0 0 14px var(--background);
+}
+/* La dernière réponse se lit en grand, ses titres avec elle ; les cartes qu'elle porte gardent leur taille. */
+.cortex-latest [data-role="assistant"] > * > [data-markdown] {
+  --text-sm: 1.125rem;
+  --text-base: 1.25rem;
+  --text-lg: 1.375rem;
+  --text-xl: 1.5rem;
+  line-height: 1.55;
+  letter-spacing: -0.011em;
+}
+/* Les tours d'avant l'échange en cours restent à la taille du texte de l'app, un ton plus bas. */
+.cortex-earlier :is([data-role="assistant"] > * > [data-markdown], [data-role="user"]) {
+  color: var(--label-secondary);
+}
+/* La demande de la personne : une pastille à peine plus sombre que le fond, arrondie sauf du côté de qui parle. */
+.cortex-thread [data-role="user"] {
+  border-radius: 0.875rem 0.875rem 0.25rem 0.875rem;
+  background: color-mix(in srgb, var(--foreground) 6%, var(--background));
+  color: var(--foreground);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

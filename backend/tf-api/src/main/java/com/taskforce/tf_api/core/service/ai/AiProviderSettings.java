@@ -21,6 +21,8 @@ import java.util.function.Function;
  *       compatible OpenAI. Par défaut au même endroit que la conversation, sauf pour Groq et Anthropic, qui n'en ont
  *       pas : alors Ollama.</li>
  *   <li>{@code AI_TIMEOUT} (secondes) ; {@code AI_MAX_TOKENS}, le plafond d'une réponse d'Anthropic, qui l'exige.</li>
+ *   <li>{@code AI_OLLAMA_MAX_CONTEXT} : la plus grande fenêtre de contexte (en jetons) que la passerelle demande à
+ *       Ollama ; elle la taille à chaque requête ({@code OllamaProtocol.window}). 16 384 par défaut.</li>
  *   <li>Alias d'avant le lot 4, toujours lus : {@code GROQ_API_KEY}, {@code GROQ_BASE_URL}, {@code GROQ_MODEL},
  *       {@code GROQ_MODEL_FAST} ; {@code OLLAMA_BASE_URL} (sans {@code /v1}), {@code OLLAMA_MODEL},
  *       {@code OLLAMA_MODEL_FAST}, {@code OLLAMA_EMBED_MODEL}, {@code OLLAMA_TIMEOUT}.</li>
@@ -41,6 +43,7 @@ import java.util.function.Function;
  * @param modelFast    modèle des réponses rapides ; vide, choisi (un Haiku chez Anthropic) ou celui de la conversation
  * @param embedBaseUrl URL de base des vecteurs (API compatible OpenAI), avec {@code /v1}
  * @param embedModel   modèle des vecteurs ; vide, choisi parmi les modèles installés
+ * @param ollamaMaxContext la plus grande fenêtre de contexte demandée à Ollama, en jetons
  */
 public record AiProviderSettings(
     boolean enabled,
@@ -53,7 +56,8 @@ public record AiProviderSettings(
     String embedApiKey,
     String embedModel,
     Duration timeout,
-    int maxTokens) {
+    int maxTokens,
+    int ollamaMaxContext) {
 
     /** Ollama de la machine hôte, vu depuis un conteneur. */
     public static final String DEFAULT_OLLAMA_URL = "http://host.docker.internal:11434";
@@ -71,11 +75,19 @@ public record AiProviderSettings(
     static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(120);
     /** Plafond d'une réponse chez Anthropic, raisonnement compris : large, on ne paie que ce qui est produit. */
     static final int DEFAULT_MAX_TOKENS = 16_000;
+    /**
+     * Plafond de la fenêtre de contexte demandée à Ollama. Mesuré le 05/11/2026 sur une RTX 5070 portable de 8 Go
+     * (Ollama 0.40.14, cache KV en q8_0) : qwen3:8b tient entier sur le GPU jusqu'à 16 384 jetons (6,28 Go, contre
+     * 5,30 Go à 4 096) ; à 24 576, 17 % du modèle passe sur le processeur, 31 % à 40 960. 16 384 jetons tiennent le
+     * prompt de Cortex, un document de 3 000 mots et l'historique. Une carte plus grande relève le plafond.
+     */
+    static final int DEFAULT_OLLAMA_MAX_CONTEXT = 16_384;
 
     /** Les variables lues : l'app desktop ne peut poser que celles-là. */
     public static final List<String> VARIABLES = List.of(
         "AI_PROVIDER", "AI_BASE_URL", "AI_API_KEY", "AI_MODEL", "AI_MODEL_FAST",
         "AI_EMBED_BASE_URL", "AI_EMBED_API_KEY", "AI_EMBED_MODEL", "AI_TIMEOUT", "AI_MAX_TOKENS",
+        "AI_OLLAMA_MAX_CONTEXT",
         "GROQ_API_KEY", "GROQ_BASE_URL", "GROQ_MODEL", "GROQ_MODEL_FAST",
         "OLLAMA_BASE_URL", "OLLAMA_MODEL", "OLLAMA_MODEL_FAST", "OLLAMA_EMBED_MODEL", "OLLAMA_TIMEOUT");
 
@@ -159,7 +171,8 @@ public record AiProviderSettings(
             embedKey,
             first(env, legacy ? LEGACY_EMBED_MODEL : "", "AI_EMBED_MODEL", "OLLAMA_EMBED_MODEL"),
             seconds(first(env, "", "AI_TIMEOUT", "OLLAMA_TIMEOUT")),
-            positive(first(env, "", "AI_MAX_TOKENS"), DEFAULT_MAX_TOKENS));
+            positive(first(env, "", "AI_MAX_TOKENS"), DEFAULT_MAX_TOKENS),
+            positive(first(env, "", "AI_OLLAMA_MAX_CONTEXT"), DEFAULT_OLLAMA_MAX_CONTEXT));
     }
 
     /** Les vecteurs passent par le même point d'accès, avec la même clé, que la conversation. */
@@ -173,6 +186,7 @@ public record AiProviderSettings(
             return "off (AI_PROVIDER=none)";
         }
         return provider + " at " + host(baseUrl) + ", models " + orAuto(model) + " / " + orAuto(modelFast)
+            + (provider == AiProvider.OLLAMA ? ", context up to " + ollamaMaxContext + " tokens" : "")
             + ", key " + (apiKey.isEmpty() ? "none" : "set") + "; embeddings at " + host(embedBaseUrl) + ", model "
             + orAuto(embedModel);
     }

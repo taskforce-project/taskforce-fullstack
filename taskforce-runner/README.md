@@ -142,6 +142,28 @@ recomputing every hash:
 npm run verify -- evidence-run-42.json
 ```
 
+## The rules engine
+
+The runner judges each action with the rules engine of the TaskForce server, not with a copy of it: the Java code of
+`backend/tf-api` (decisions, globs, the digest of a rules bundle, the evidence chain), compiled to JavaScript by TeaVM
+in [`backend/rules-engine-js`](../backend/rules-engine-js/pom.xml). The result, `src/harness/engine/rules-engine.js`,
+and its TypeScript declarations are committed here, so the runner builds and runs without a JDK; `npm run build`
+copies them into `dist`. The runner's own part stays in TypeScript: how a Claude Code tool call becomes facts
+(`src/harness/facts.ts`), what it does with a decision, and the checks of a received bundle or an exported record
+(`src/harness/verify.ts`).
+
+Never edit the two files by hand. After a change to the Java engine, build them again and commit them with the
+change; the CI builds them again from the Java sources and refuses a difference:
+
+```bash
+cd backend/rules-engine-js && mvn -B process-classes      # Java 21
+# or, without a JDK, from the root of the repository:
+docker run --rm -v "$PWD":/work -w /work/backend/rules-engine-js maven:3.9-eclipse-temurin-21 mvn -B process-classes
+```
+
+`npm test` replays the shared cases of [`contracts/`](../contracts/README.md) against the compiled module, as the
+server's tests replay them in Java.
+
 ## Troubleshooting
 
 - **`claude`: "The specified executable is not a valid application for this OS platform"** (Windows, right after

@@ -154,6 +154,60 @@ class CortexRecordServiceTest {
         assertThat(service.approve(id, "create_note", 7L, "{}")).isEqualTo(approvable);
     }
 
+    /** Une réponse où TaskForce a demandé le nom d'un projet et où vit son code (R115) : rend l'empreinte de la carte. */
+    private String asked(UUID id) {
+        Map<String, Object> card = new LinkedHashMap<>();
+        card.put("tool", "create_project");
+        card.put("status", "question");
+        card.put("output", "Nothing was done: TaskForce asks the person first. What should the project be called?");
+        card.put("arguments", "{\"stack\":\"Next.js\"}");
+        card.put("questions", List.of(
+            Map.of("field", "name", "header", "Name", "text", "What should the project be called?", "choices", List.of()),
+            Map.of("field", "repository", "header", "Repository", "text", "Where does its code live?", "choices", List.of())));
+        card.put("screen", Map.of("projectId", 12));
+        return service.append(id, "action.result", Actor.SERVER, card).orElseThrow();
+    }
+
+    @Test
+    @DisplayName("R115 : les réponses à une carte de TaskForce entrent au dossier une fois, ensemble, et rendent ce que le geste reprend")
+    void a_card_is_answered_once() {
+        UUID id = service.open(ctx, "crée un projet Next.js", Map.of());
+        String ref = asked(id);
+        Map<String, String> answers = new LinkedHashMap<>();
+        answers.put("name", "Atlas");
+        answers.put("repository", "new-private");
+
+        assertThat(service.question(id, "create_project", ref)).isPresent(); // une lecture : rien n'entre au dossier
+        int before = stored.size();
+        Optional<com.fasterxml.jackson.databind.JsonNode> answered = service.answer(id, "create_project", ref, 7L, answers);
+
+        assertThat(answered).isPresent();
+        assertThat(answered.get().path("questions").get(1).path("field").asText()).isEqualTo("repository");
+        assertThat(answered.get().path("screen").path("projectId").asLong()).isEqualTo(12L);
+        assertThat(stored).hasSize(before + 1);
+        assertThat(stored.getLast().getType()).isEqualTo("human.decision");
+        assertThat(stored.getLast().getActorId()).isEqualTo("user-7");
+        assertThat(stored.getLast().getData()).contains("\"decision\":\"answered\"",
+            "\"answers\":{\"name\":\"Atlas\",\"repository\":\"new-private\"}");
+        // Un deuxième envoi ne répond plus : la carte a ses réponses.
+        assertThat(service.answer(id, "create_project", ref, 7L, Map.of("name", "Orion"))).isEmpty();
+        assertThat(service.question(id, "create_project", ref)).isEmpty();
+    }
+
+    @ParameterizedTest(name = "réponse à {0} avec {1} : rien")
+    @CsvSource(nullValues = "-", value = {
+        "update_issue, real",    // la carte d'un autre geste
+        "create_project, other", // une empreinte qui n'est pas celle d'une carte
+        "create_project, -",
+    })
+    void only_an_open_card_takes_answers(String tool, String ref) {
+        UUID id = service.open(ctx, "crée un projet Next.js", Map.of());
+        String real = asked(id);
+
+        assertThat(service.question(id, tool, "real".equals(ref) ? real : ref)).isEmpty();
+        assertThat(service.answer(id, tool, "real".equals(ref) ? real : ref, 7L, Map.of("name", "Atlas"))).isEmpty();
+    }
+
     @Test
     @DisplayName("un dossier introuvable ne prend aucun accord")
     void approval_on_a_missing_record() {
@@ -218,9 +272,9 @@ class CortexRecordServiceTest {
     void undo_runs_once_and_is_kept() {
         UUID id = createdProject();
 
-        assertThat(service.undo(id, "create_project", 7L, created -> "Removed from: " + created))
+        assertThat(service.undo(id, "create_project", 7L, null, created -> "Removed from: " + created.path("output").asText()))
             .contains("Removed from: Project created in TaskForce: PRICING \"Pricing\" (id 27).");
-        assertThat(service.undo(id, "create_project", 7L, created -> "again")).isEmpty(); // un deuxième clic
+        assertThat(service.undo(id, "create_project", 7L, null, created -> "again")).isEmpty(); // un deuxième clic
         assertThat(stored).extracting(CortexRecordEvent::getType).endsWith("human.decision", "action.result");
         assertThat(stored.getLast().getData()).contains("\"status\":\"undone\"");
     }
@@ -230,8 +284,8 @@ class CortexRecordServiceTest {
     void nothing_to_undo() {
         UUID id = proposedNote();
 
-        assertThat(service.undo(id, "create_note", 7L, created -> "never")).isEmpty();
-        assertThat(service.undo(id, "create_project", 7L, created -> "never")).isEmpty();
+        assertThat(service.undo(id, "create_note", 7L, null, created -> "never")).isEmpty();
+        assertThat(service.undo(id, "create_project", 7L, null, created -> "never")).isEmpty();
     }
 
     @Test
@@ -240,7 +294,7 @@ class CortexRecordServiceTest {
         UUID id = createdProject();
         int before = stored.size();
 
-        assertThatThrownBy(() -> service.undo(id, "create_project", 7L, created -> {
+        assertThatThrownBy(() -> service.undo(id, "create_project", 7L, null, created -> {
             throw new BusinessException("PRICING has issues now");
         })).isInstanceOf(BusinessException.class).hasMessage("PRICING has issues now");
         assertThat(stored).hasSize(before);
@@ -253,5 +307,54 @@ class CortexRecordServiceTest {
         service.append(id, "human.decision", Actor.person(7L), Map.of("tool", "create_note", "decision", "undo"));
 
         assertThat(service.approve(id, "create_note", 7L, "{}")).isTrue();
+    }
+
+    @Test
+    @DisplayName("deux gestes d'une même réponse se défont chacun depuis sa carte, par l'empreinte de son résultat")
+    void undo_names_the_result_it_undoes() {
+        UUID id = service.open(ctx, "Move TF-1 and TF-2 to Done", Map.of());
+        String first = service.append(id, "action.result", Actor.SERVER, Map.of("tool", "update_issue", "status", "success",
+            "output", "Updated TF-1", "undo", Map.of("issueId", 1))).orElseThrow();
+        String second = service.append(id, "action.result", Actor.SERVER, Map.of("tool", "update_issue", "status", "success",
+            "output", "Updated TF-2", "undo", Map.of("issueId", 2))).orElseThrow();
+
+        // La carte de TF-1 défait TF-1, même si TF-2 est venu après, et ce qui a été gardé pour le défaire arrive à l'outil.
+        assertThat(service.undo(id, "update_issue", 7L, first, kept -> "back " + kept.path("undo").path("issueId").asInt()))
+            .contains("back 1");
+        assertThat(service.undo(id, "update_issue", 7L, first, kept -> "again")).isEmpty(); // un deuxième clic
+        // Sans empreinte : le dernier qui ne l'est pas encore.
+        assertThat(service.undo(id, "update_issue", 7L, null, kept -> "back " + kept.path("undo").path("issueId").asInt()))
+            .contains("back 2");
+        assertThat(service.undo(id, "update_issue", 7L, second, kept -> "again")).isEmpty();
+        assertThat(stored.getLast().getData()).contains("\"ref\":\"" + second + "\"", "\"status\":\"undone\"");
+    }
+
+    @Test
+    @DisplayName("une correction de TaskForce entre au dossier de la réponse : un incident de confiance, signé du serveur (E17)")
+    void a_correction_is_a_trust_incident_in_the_record() {
+        UUID id = proposedNote();
+
+        UUID kept = service.incident(ctx, id, "What changed in this project this week?", Map.of(),
+            Map.of("incident", "trust", "experiment", "E17", "said", List.of("La carte TESTTA-2 a été supprimée.")));
+
+        assertThat(kept).isEqualTo(id);
+        assertThat(stored.getLast()).satisfies(event -> {
+            assertThat(event.getType()).isEqualTo("note");
+            assertThat(event.getActorKind()).isEqualTo("server");
+            assertThat(event.getActorId()).isEqualTo("taskforce");
+            assertThat(event.getData()).contains("\"experiment\":\"E17\"").contains("La carte TESTTA-2 a été supprimée.");
+        });
+        assertThat(EvidenceChain.firstBrokenLink(service.events(id))).isEqualTo(-1);
+    }
+
+    @Test
+    @DisplayName("une réponse sans outil n'avait pas de dossier : il s'ouvre pour l'incident, sur la question")
+    void an_incident_without_a_record_opens_one() {
+        UUID id = service.incident(ctx, null, "suprime testta 2", Map.of("model", "qwen3:8b"),
+            Map.of("incident", "trust", "experiment", "E17"));
+
+        assertThat(records).containsKey(id);
+        assertThat(stored).extracting(CortexRecordEvent::getType).containsExactly("mission.started", "note");
+        assertThat(stored.getFirst().getData()).contains("\"question\":\"suprime testta 2\"").contains("qwen3:8b");
     }
 }

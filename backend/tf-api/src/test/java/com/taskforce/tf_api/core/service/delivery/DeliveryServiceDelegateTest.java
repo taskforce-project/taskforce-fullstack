@@ -114,6 +114,25 @@ class DeliveryServiceDelegateTest {
     }
 
     @Test
+    @DisplayName("un agent caché pour ce projet (l'agent à l'essai, R51) manque à sa liste, pas à celle des réglages")
+    void an_agent_hidden_for_the_project_is_left_out_of_its_list_only() {
+        when(access.resolveAndAuthorize("acme", 7L)).thenReturn(workspace);
+        when(projectRepository.findById(12L)).thenReturn(Optional.of(project));
+        DeliveryAgentProvider trial = mock(DeliveryAgentProvider.class);
+        when(claude.key()).thenReturn("claude-code");
+        when(trial.key()).thenReturn("taskforce-agent");
+        when(trial.hiddenFor(any())).thenAnswer(call -> ((DeliveryContext) call.getArgument(0)).project() != null);
+        when(trial.trial()).thenReturn(true);
+        when(registry.all()).thenReturn(List.of(claude, trial));
+
+        assertThat(service.listProviders("acme", 12L, 7L)).extracting(DeliveryProviderResponse::key)
+            .containsExactly("claude-code");
+        List<DeliveryProviderResponse> all = service.listProviders("acme", null, 7L);
+        assertThat(all).extracting(DeliveryProviderResponse::key).containsExactly("claude-code", "taskforce-agent");
+        assertThat(all).extracting(DeliveryProviderResponse::trial).containsExactly(false, true);
+    }
+
+    @Test
     void a_project_of_another_workspace_is_not_found() {
         when(access.resolveAndAuthorize("acme", 7L)).thenReturn(workspace);
         Project foreign = Project.builder().id(99L).workspace(Workspace.builder().id(4L).build()).build();

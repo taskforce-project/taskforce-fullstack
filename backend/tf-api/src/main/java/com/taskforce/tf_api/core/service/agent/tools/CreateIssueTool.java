@@ -1,18 +1,13 @@
 package com.taskforce.tf_api.core.service.agent.tools;
 
-import java.text.Normalizer;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -26,14 +21,13 @@ import com.taskforce.tf_api.core.dto.response.IssueStatusResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectMemberResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
-import com.taskforce.tf_api.core.enums.CycleStatus;
 import com.taskforce.tf_api.core.enums.IssuePriority;
-import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.service.CycleService;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
+import com.taskforce.tf_api.core.service.agent.tools.IssueFields.Found;
 
 /**
  * Outil interne d'écriture (TF-MCP-03) : crée une issue <b>native</b> dans un projet TaskForce. C'est la cible <b>par
@@ -69,15 +63,12 @@ public class CreateIssueTool implements AgentTool {
     /** Ce qu'une ligne de checklist accepte (CreateChecklistItemRequest), et combien Cortex en ajoute au plus. */
     private static final int MAX_ITEM = 500;
     private static final int MAX_ITEMS = 20;
-    /** Les points d'une estimation, comme {@code CreateIssueRequest} les accepte (0 : aucune). */
-    private static final int MAX_POINTS = 100;
-    /** Au-delà, la liste des choix rendue au modèle est coupée : elle doit rester lisible. */
-    private static final int MAX_CHOICES = 15;
 
     private final IssueService issueService;
     private final ProjectResolver projects;
-    private final ProjectService projectService;
     private final CycleService cycleService;
+    /** L'assigné, les labels, le cycle et la colonne, résolus comme pour les gestes du MCP TaskForce (ADR-024). */
+    private final IssueFields fields;
     private final Clock clock;
 
     @Autowired
@@ -90,8 +81,8 @@ public class CreateIssueTool implements AgentTool {
                     CycleService cycleService, Clock clock) {
         this.issueService = issueService;
         this.projects = projects;
-        this.projectService = projectService;
         this.cycleService = cycleService;
+        this.fields = new IssueFields(projectService, cycleService);
         this.clock = clock;
     }
 
@@ -122,7 +113,7 @@ public class CreateIssueTool implements AgentTool {
         properties.put("labels", Map.of("type", "array", "items", Map.of("type", "string"), "description",
             "Labels of the project, by name (optional), only existing ones that the request or the project calls for."));
         properties.put("points", Map.of("type", "integer", "description",
-            "Estimate in points, 1 to " + MAX_POINTS + " (optional), only when the request gives one."));
+            "Estimate in points, 1 to " + IssueFields.MAX_POINTS + " (optional), only when the request gives one."));
         properties.put("cycle", Map.of("type", "string", "description",
             "A cycle of the project, by name (optional): the one the request names, or the active one when the work starts now."));
         return Map.of("type", "object", "properties", properties, "required", List.of("project", "title"));
@@ -137,10 +128,10 @@ public class CreateIssueTool implements AgentTool {
 
         List<IssueStatusResponse> columns = issueService.listStatuses(ctx.slug(), project.getId(), ctx.userId());
         String asked = text(args.get("status"));
-        IssueStatusResponse column = asked.isEmpty() ? backlog(columns) : named(columns, asked);
+        IssueStatusResponse column = asked.isEmpty() ? IssueFields.backlog(columns) : IssueFields.named(columns, asked);
         // Une colonne qui n'existe pas n'arrête plus la création : la colonne par défaut du projet, et la réponse le dit.
         boolean byDefault = !asked.isEmpty() && column == null;
-        if (byDefault) column = defaultColumn(columns);
+        if (byDefault) column = IssueFields.defaultColumn(columns);
         LocalDate today = LocalDate.now(clock);
         LocalDate due;
         try {
@@ -153,13 +144,13 @@ public class CreateIssueTool implements AgentTool {
         if (due != null && due.isBefore(today.minusDays(1))) {
             return "dueDate " + due + " is in the past (today is " + today + "): choose a later date, or none.";
         }
-        Found<ProjectMemberResponse> assignee = assignee(project, text(args.get("assignee")), ctx);
+        Found<ProjectMemberResponse> assignee = fields.assignee(project, text(args.get("assignee")), ctx.slug(), ctx.userId());
         if (!assignee.ok()) return assignee.problem();
-        Found<List<ProjectLabelResponse>> labels = labels(project, args.get("labels"), ctx);
+        Found<List<ProjectLabelResponse>> labels = fields.labels(project, strings(args.get("labels")), ctx.slug(), ctx.userId());
         if (!labels.ok()) return labels.problem();
-        Found<CycleResponse> cycle = cycle(project, text(args.get("cycle")), ctx);
+        Found<CycleResponse> cycle = fields.cycle(project, text(args.get("cycle")), ctx.slug(), ctx.userId());
         if (!cycle.ok()) return cycle.problem();
-        Found<Integer> points = points(args.get("points"));
+        Found<Integer> points = IssueFields.points(args.get("points"));
         if (!points.ok()) return points.problem();
 
         CreateIssueRequest req = new CreateIssueRequest();
@@ -190,7 +181,7 @@ public class CreateIssueTool implements AgentTool {
             : ", in the column " + issue.getStatus().getName()
                 + (byDefault ? ", the project's default: it has no column \"" + asked + "\"" : "");
         String dueText = issue.getDueDate() != null ? ", due " + issue.getDueDate() : "";
-        String who = assignee.value() != null ? ", assigned to " + name(assignee.value()) : "";
+        String who = assignee.value() != null ? ", assigned to " + IssueFields.name(assignee.value()) : "";
         String when = cycle.value() != null ? ", in the cycle " + cycle.value().getName() : "";
         String steps = checklist.isEmpty() ? ""
             : ", with a checklist of " + checklist.size() + (checklist.size() == 1 ? " item" : " items");
@@ -211,7 +202,7 @@ public class CreateIssueTool implements AgentTool {
     @Override public Prepared prepare(Map<String, Object> args, AgentContext ctx) {
         ProjectResolver.Resolution where = projects.resolve(args.get("project"), ctx);
         if (!where.found()) return Prepared.ask(where.problem());
-        Found<ProjectMemberResponse> assignee = assignee(where.project(), text(args.get("assignee")), ctx);
+        Found<ProjectMemberResponse> assignee = fields.assignee(where.project(), text(args.get("assignee")), ctx.slug(), ctx.userId());
         if (!assignee.ok()) return Prepared.ask(assignee.problem());
         Map<String, Object> shown = new LinkedHashMap<>(args);
         if (where.project().getIdentifier() != null) shown.put("project", where.project().getIdentifier());
@@ -219,112 +210,9 @@ public class CreateIssueTool implements AgentTool {
         return Prepared.card(shown);
     }
 
-    /** Une valeur nommée par Cortex, résolue parmi ce qui existe : la valeur, ou ce qu'il faut dire au modèle. */
-    record Found<T>(T value, String problem) {
-        static <T> Found<T> of(T value) {
-            return new Found<>(value, null);
-        }
-
-        static <T> Found<T> problem(String problem) {
-            return new Found<>(null, problem);
-        }
-
-        boolean ok() {
-            return problem == null;
-        }
-    }
-
-    /**
-     * L'assigné, parmi les membres du projet. D'abord la personne qui demande, quand Cortex la désigne : « moi », « me »,
-     * « je »… ou son propre nom (son nom, son prénom, son e-mail), sans question (rejeu de la 1.8.0, 02/11/2026). Puis
-     * l'e-mail exact, le nom exact, une partie du nom ou le début de l'e-mail s'ils ne désignent qu'une personne.
-     * Plusieurs : la personne choisit ; aucun : les membres. Jamais inventé.
-     */
-    Found<ProjectMemberResponse> assignee(ProjectResponse project, String asked, AgentContext ctx) {
-        if (asked.isEmpty()) return Found.of(null);
-        List<ProjectMemberResponse> members = projectService.listMembers(ctx.slug(), project.getId(), ctx.userId());
-        ProjectMemberResponse me = members.stream().filter(m -> Objects.equals(ctx.userId(), m.getUserId())).findFirst()
-            .orElse(null);
-        if (me != null && (SELF.contains(key(asked)) || ownName(me, asked))) return Found.of(me);
-        if (SELF.contains(key(asked))) {
-            return Found.problem("The person asking is not a member of " + project.getName() + ", so the issue can't be "
-                + "assigned to them. " + (members.isEmpty() ? "The project has no member yet."
-                    : "Its members are: " + listed(members, this::name) + ".")
-                + " Ask the person who should take it, or leave the assignee empty.");
-        }
-        String wanted = asked.toLowerCase(Locale.ROOT);
-        List<ProjectMemberResponse> byEmail = members.stream().filter(m -> wanted.equals(lower(m.getEmail()))).toList();
-        if (byEmail.size() == 1) return Found.of(byEmail.get(0));
-        List<ProjectMemberResponse> byName = members.stream().filter(m -> wanted.equals(lower(m.getDisplayName()))).toList();
-        if (byName.size() == 1) return Found.of(byName.get(0));
-        List<ProjectMemberResponse> byPart = members.stream()
-            .filter(m -> lower(m.getDisplayName()).contains(wanted) || lower(m.getEmail()).startsWith(wanted))
-            .toList();
-        List<ProjectMemberResponse> several = byName.size() > 1 ? byName : byPart;
-        if (several.size() == 1) return Found.of(several.get(0));
-        if (several.size() > 1) {
-            return Found.problem("Several members of " + project.getName() + " match \"" + asked + "\": "
-                + listed(several, m -> name(m) + " (" + m.getEmail() + ")")
-                + ". Ask the person which one; do not pick one yourself.");
-        }
-        return Found.problem("No member of " + project.getName() + " matches \"" + asked + "\". "
-            + (members.isEmpty() ? "The project has no member yet." : "Its members are: " + listed(members, this::name) + ".")
-            + " Ask the person who should take it, or leave the assignee empty.");
-    }
-
-    /** Les labels, parmi ceux du projet, par leur nom exact (sans tenir compte de la casse). Jamais un nouveau label. */
-    Found<List<ProjectLabelResponse>> labels(ProjectResponse project, Object raw, AgentContext ctx) {
-        List<String> asked = strings(raw);
-        if (asked.isEmpty()) return Found.of(List.of());
-        List<ProjectLabelResponse> existing = projectService.listLabels(ctx.slug(), project.getId(), ctx.userId());
-        List<ProjectLabelResponse> found = new ArrayList<>();
-        for (String name : asked) {
-            ProjectLabelResponse label = existing.stream().filter(l -> name.equalsIgnoreCase(l.getName())).findFirst()
-                .orElse(null);
-            if (label == null) {
-                return Found.problem("There is no label \"" + name + "\" in " + project.getName() + ". "
-                    + (existing.isEmpty() ? "The project has no label: leave the labels empty."
-                        : "Its labels are: " + listed(existing, ProjectLabelResponse::getName) + ". Use existing labels only, or none."));
-            }
-            if (!found.contains(label)) found.add(label);
-        }
-        return Found.of(found);
-    }
-
-    /** Le cycle, parmi ceux du projet, par son nom exact ; un cycle terminé ne prend plus d'issue. Jamais créé. */
-    Found<CycleResponse> cycle(ProjectResponse project, String asked, AgentContext ctx) {
-        if (asked.isEmpty()) return Found.of(null);
-        List<CycleResponse> cycles = cycleService.listCycles(ctx.slug(), project.getId(), ctx.userId());
-        CycleResponse cycle = cycles.stream().filter(c -> asked.equalsIgnoreCase(c.getName())).findFirst().orElse(null);
-        List<CycleResponse> open = cycles.stream().filter(c -> c.getStatus() != CycleStatus.COMPLETED).toList();
-        String choices = open.isEmpty() ? "The project has no open cycle: leave the cycle empty."
-            : "Its open cycles are: " + listed(open, c -> c.getName() + (c.getStatus() == CycleStatus.ACTIVE ? " (active)" : ""))
-                + ". Use one of them, or none.";
-        if (cycle == null) return Found.problem("There is no cycle \"" + asked + "\" in " + project.getName() + ". " + choices);
-        if (cycle.getStatus() == CycleStatus.COMPLETED) {
-            return Found.problem("The cycle " + cycle.getName() + " of " + project.getName() + " is completed. " + choices);
-        }
-        return Found.of(cycle);
-    }
-
-    /** L'estimation : un nombre entier de 1 à 100 ; absente ou 0, aucune. */
+    /** L'estimation : un nombre entier de 1 à 100 ; absente ou 0, aucune ({@link IssueFields#points}). */
     static Found<Integer> points(Object raw) {
-        if (raw == null || text(raw).isEmpty()) return Found.of(null);
-        int value;
-        try {
-            if (raw instanceof Number number) {
-                if (number.doubleValue() != Math.rint(number.doubleValue())) throw new NumberFormatException();
-                value = number.intValue();
-            } else {
-                value = Integer.parseInt(text(raw));
-            }
-        } catch (NumberFormatException e) {
-            return Found.problem("points must be a whole number from 1 to " + MAX_POINTS + ", or none.");
-        }
-        if (value < 0 || value > MAX_POINTS) {
-            return Found.problem("points must be a whole number from 1 to " + MAX_POINTS + ", or none.");
-        }
-        return Found.of(value == 0 ? null : value);
+        return IssueFields.points(raw);
     }
 
     /** La checklist de l'issue : une ligne par étape, sans les vides, vingt au plus. */
@@ -345,62 +233,9 @@ public class CreateIssueTool implements AgentTool {
             .toList();
     }
 
-    private String name(ProjectMemberResponse member) {
-        return member.getDisplayName() != null && !member.getDisplayName().isBlank() ? member.getDisplayName() : member.getEmail();
-    }
-
-    private static <T> String listed(List<T> items, Function<T, String> label) {
-        String shown = items.stream().limit(MAX_CHOICES).map(label).collect(Collectors.joining(", "));
-        return items.size() > MAX_CHOICES ? shown + " and " + (items.size() - MAX_CHOICES) + " more" : shown;
-    }
-
-    private static String lower(String value) {
-        return value == null ? "" : value.toLowerCase(Locale.ROOT);
-    }
-
-    /**
-     * Les mots de la personne qui demande, lus par {@link #key} : « moi-même » et « moi même » donnent « moimeme ». Cortex
-     * les recopie de la demande (« assignée à moi ») au lieu du nom de la personne.
-     */
-    private static final Set<String> SELF = Set.of("me", "myself", "moi", "moimeme", "i", "je");
-
-    /**
-     * Un nom sans la casse, les accents, les espaces ni la ponctuation : « To Do » et « todo », « Moi-même » et
-     * « moimeme » se valent.
-     */
+    /** Un nom sans la casse, les accents, les espaces ni la ponctuation ({@link IssueFields#key}). */
     static String key(String value) {
-        if (value == null) return "";
-        return Normalizer.normalize(value, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT)
-            .replaceAll("[^\\p{L}\\p{N}]", "");
-    }
-
-    /** La personne nommée par son nom, son prénom, son e-mail ou ce qui le précède : c'est elle qui demande. */
-    private static boolean ownName(ProjectMemberResponse me, String asked) {
-        String wanted = key(asked);
-        if (wanted.isEmpty()) return false;
-        String email = lower(me.getEmail());
-        String local = email.contains("@") ? email.substring(0, email.indexOf('@')) : email;
-        String full = me.getDisplayName() == null ? "" : me.getDisplayName().strip();
-        String first = full.isEmpty() ? "" : full.split("\\s+")[0];
-        return asked.strip().equalsIgnoreCase(email) || wanted.equals(key(local)) || wanted.equals(key(full))
-            || wanted.equals(key(first));
-    }
-
-    /** La première colonne de la catégorie Backlog ; sans elle, null : le service prend la colonne par défaut. */
-    private static IssueStatusResponse backlog(List<IssueStatusResponse> columns) {
-        return columns.stream().filter(c -> c.getCategory() == IssueStatusCategory.BACKLOG).findFirst().orElse(null);
-    }
-
-    /** La colonne par défaut du projet ; sans elle, null : le service prend la sienne. */
-    private static IssueStatusResponse defaultColumn(List<IssueStatusResponse> columns) {
-        return columns.stream().filter(IssueStatusResponse::isDefault).findFirst().orElse(null);
-    }
-
-    /** La colonne nommée, sans la casse, les espaces ni la ponctuation : « To Do » est la colonne « Todo ». */
-    private static IssueStatusResponse named(List<IssueStatusResponse> columns, String name) {
-        String wanted = key(name);
-        if (wanted.isEmpty()) return null;
-        return columns.stream().filter(c -> wanted.equals(key(c.getName()))).findFirst().orElse(null);
+        return IssueFields.key(value);
     }
 
     private static String text(Object o) {

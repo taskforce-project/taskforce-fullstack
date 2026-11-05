@@ -25,10 +25,22 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class AiStatusService {
 
-    /** État de l'IA. Les noms de modèles sont {@code null} quand on ne sait pas lesquels serviraient. */
+    /**
+     * État de l'IA. Les noms de modèles sont {@code null} quand on ne sait pas lesquels serviraient.
+     * {@code contextWindow} et {@code fastContextWindow} : la plus grande fenêtre de contexte, en jetons, que la
+     * passerelle donne à chacun des deux modèles sur Ollama, qui la taille à chaque requête ; {@code null} ailleurs, où
+     * le fournisseur la tient.
+     */
     public record AiStatus(boolean configured, boolean chatAvailable, String chatModel, String fastModel,
-                           boolean embeddingsAvailable, String embeddingModel) {
+                           boolean embeddingsAvailable, String embeddingModel, Integer contextWindow,
+                           Integer fastContextWindow) {
         public static final AiStatus UNREACHABLE = new AiStatus(false, false, null, null, false, null);
+
+        /** Sans fenêtre connue : l'IA coupée ou injoignable, ou un autre fournisseur qu'Ollama. */
+        public AiStatus(boolean configured, boolean chatAvailable, String chatModel, String fastModel,
+                        boolean embeddingsAvailable, String embeddingModel) {
+            this(configured, chatAvailable, chatModel, fastModel, embeddingsAvailable, embeddingModel, null, null);
+        }
     }
 
     /**
@@ -104,7 +116,12 @@ public class AiStatusService {
         if (chat.isEmpty()) {
             log.warn("AI provider unreachable ({})", settings.describe());
         }
-        AiStatus status = new AiStatus(true, chatAvailable, models.chat(), models.fast(), embedAvailable, models.embed());
+        // La fenêtre que reçoit chaque modèle (Ollama seulement) : le maximum du modèle est lu une fois par la passerelle.
+        Integer window = chatAvailable ? gateway.contextWindow(settings, models.chat()).orElse(null) : null;
+        Integer fastWindow = !chatAvailable ? null
+            : models.fast().equals(models.chat()) ? window : gateway.contextWindow(settings, models.fast()).orElse(null);
+        AiStatus status = new AiStatus(true, chatAvailable, models.chat(), models.fast(), embedAvailable, models.embed(),
+            window, fastWindow);
         return new Snapshot(settings, status, chat.isPresent(), chat.orElse(List.of()), embed.orElse(List.of()));
     }
 }

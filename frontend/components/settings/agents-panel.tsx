@@ -9,7 +9,9 @@ import { DesktopClaudeCodeSetup } from "@/components/settings/desktop-claude-cod
 import { LocalRunnerSetup } from "@/components/settings/local-runner-setup"
 import { Badge } from "@/components/ui/badge"
 import { IS_DESKTOP } from "@/lib/desktop"
+import { TRIAL_AGENT } from "@/lib/delivery/result-card"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useDesktopToolsStore } from "@/lib/store/desktop-tools-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 
@@ -20,6 +22,7 @@ import { useWorkspaceStore } from "@/lib/store/workspace-store"
  */
 export function AgentsPanel() {
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug) ?? ""
+  const models = usePreferencesStore((s) => s.t.models)
   const providers = useDeliveryStore((s) => s.providers)
   const fetchProviders = useDeliveryStore((s) => s.fetchProviders)
   // App desktop : Copilot travaille avec le compte GitHub de la personne (son GitHub CLI) ; une connexion faite ici
@@ -49,9 +52,12 @@ export function AgentsPanel() {
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 text-sm font-medium text-foreground">
                     {p.displayName}
+                    {p.trial && <Badge variant="outline" className="text-[10px] uppercase">{models.trial}</Badge>}
                     {!p.available && <Badge variant="secondary" className="text-[10px] uppercase">Off</Badge>}
                   </p>
-                  <p className="text-xs text-muted-foreground">{descriptionFor(p.key, p.available)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {p.key === TRIAL_AGENT ? models.trialAgent.replace("{model}", p.displayName) : descriptionFor(p.key, p.available)}
+                  </p>
                   {p.available && !p.ready && p.reason && (
                     <p className="mt-0.5 text-xs text-ink-yellow">{p.reason}</p>
                   )}

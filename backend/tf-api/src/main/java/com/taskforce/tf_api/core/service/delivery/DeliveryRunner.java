@@ -102,7 +102,7 @@ public class DeliveryRunner {
                 project != null ? project.getRepoFullName() : null, run.getModel());
 
             run.setStatus(DeliveryRunStatus.RUNNING);
-            DeliveryDispatch dispatch = provider.dispatch(brief);
+            DeliveryDispatch dispatch = provider.dispatch(run.getId(), brief);
             run.setExternalRef(dispatch.externalRef());
             runRepository.save(run);
 

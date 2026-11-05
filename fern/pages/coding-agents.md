@@ -83,6 +83,14 @@ task and follows it until the pull request. It needs:
 - a GitHub repository linked to the project;
 - a GitHub account with a Copilot plan that includes the coding agent, enabled for that repository.
 
+## The trial agent, for tasks answered in a comment
+
+For an issue whose project has no repository, the delegation menu also offers TaskForce's own agent, under the name of
+the model it runs on (`qwen3:8b` with Ollama, by default) and labelled as a trial. It reads the issue, its checklist and
+comments, the other issues of the project and the notes you can read, writes its answer and posts it as a comment on
+that issue, under the model's name and for you. It changes nothing else: no code, no other issue. The workspace's rule
+for comments applies, and the run keeps its record like any mission.
+
 ## Claude Code in your terminal
 
 You can also work on your issues from your own Claude Code session: TaskForce is an MCP server that Claude Code

@@ -15,6 +15,8 @@ public class IssueCommentResponse {
     private Long id;
     private UserSummaryResponse author;
     private String content;
+    /** L'agent qui l'a écrit au nom de l'auteur (« qwen3:8b », « Claude Code », « Cortex ») ; null quand l'auteur l'a écrit. */
+    private String via;
     private boolean isEdited;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

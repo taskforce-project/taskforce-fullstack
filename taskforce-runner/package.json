@@ -10,7 +10,7 @@
   },
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"require('node:fs').cpSync('src/harness/engine', 'dist/harness/engine', { recursive: true })\"",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "check": "tsx src/index.ts --check",

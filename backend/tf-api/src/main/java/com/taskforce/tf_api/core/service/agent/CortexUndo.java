@@ -7,6 +7,7 @@ import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.taskforce.tf_api.core.enums.NodeRefType;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
@@ -19,6 +20,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.KnowledgeService;
 import com.taskforce.tf_api.core.service.ProjectService;
+import com.taskforce.tf_api.core.service.mcpserver.IssueGestures;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
@@ -28,17 +30,22 @@ import lombok.RequiredArgsConstructor;
  * a données, une issue que personne n'a commentée, ou une note sur laquelle rien ne s'appuie (ni page rangée dessous, ni
  * lien d'une autre note). Au-delà, la création ne se défait plus d'ici. La sortie de l'outil, gardée au dossier de la
  * réponse, dit ce qui a été créé.
+ *
+ * <p>Les gestes du MCP TaskForce aussi (ADR-024, TF-J1-5) : une issue changée revient à ses anciennes valeurs, un
+ * commentaire part, tant que personne n'a rien changé depuis. Ce qui ne se défait pas d'ici (confier l'issue à un agent)
+ * n'est pas fait d'emblée : Cortex le demande à la personne.</p>
  */
 @Component
 @RequiredArgsConstructor
 public class CortexUndo {
 
-    /** Les outils dont la création se défait. */
-    static final Set<String> TOOLS = Set.of("create_project", "create_issue", "create_note");
+    /** Les outils dont le résultat se défait : ceux-là seulement, Cortex les fait sans demander quand les règles le permettent. */
+    static final Set<String> TOOLS = Set.of("create_project", "create_issue", "create_note", "update_issue", "add_comment");
 
     private static final Pattern PROJECT = Pattern.compile("^Project created in TaskForce: (\\S+) \"(.*)\" \\(id (\\d+)\\)\\.$",
         Pattern.DOTALL);
-    private static final Pattern ISSUE = Pattern.compile("^Created ([A-Za-z0-9]+)-(\\d+) \"(.*?)\" in the project ",
+    /** La clé d'un projet peut porter des tirets (« HR-1372 ») : le numéro de l'issue suit le dernier. */
+    private static final Pattern ISSUE = Pattern.compile("^Created ([A-Za-z0-9][A-Za-z0-9-]*)-(\\d+) \"(.*?)\" in the project ",
         Pattern.DOTALL);
     /** La sortie de {@code create_note}, que suit parfois la valeur gardée à la place d'un domaine ou d'un type inconnu. */
     private static final Pattern NOTE = Pattern.compile("^Note created: \"(.*)\" in [A-Z_]+ \\(id (\\d+)\\)\\.",
@@ -52,9 +59,27 @@ public class CortexUndo {
     private final KnowledgeNodeRepository nodes;
     private final KnowledgeEdgeRepository edges;
     private final KnowledgeService knowledge;
+    private final IssueGestures gestures;
 
     public boolean handles(String tool) {
         return TOOLS.contains(tool);
+    }
+
+    /**
+     * Défait un résultat tel que le dossier le garde : un geste par ce qu'il a gardé pour se défaire, une création par
+     * ce que dit sa sortie.
+     */
+    public String undo(String tool, JsonNode result, AgentContext ctx) {
+        return switch (tool) {
+            case "update_issue" -> gestures.restore(ctx.slug(), ctx.userId(), result.get("undo"));
+            case "add_comment" -> gestures.removeComment(ctx.slug(), ctx.userId(), result.get("undo"));
+            // Le geste du MCP (R115) garde le projet créé ; un dossier d'avant ne garde que la phrase de l'outil.
+            case "create_project" -> result.path("undo").hasNonNull("projectId")
+                ? removeProject(result.path("undo").path("projectId").asLong(),
+                    result.path("undo").path("createdRepository").asText(null), ctx)
+                : undo(tool, result.path("output").asText(""), ctx);
+            default -> undo(tool, result.path("output").asText(""), ctx);
+        };
     }
 
     /** Défait ce que la sortie de l'outil dit créé, avec les droits de la personne, et dit ce qui est défait. */
@@ -71,7 +96,14 @@ public class CortexUndo {
     private String undoProject(String output, AgentContext ctx) {
         Matcher created = PROJECT.matcher(output);
         if (!created.matches()) throw new BusinessException("This answer created no project to undo.");
-        Long projectId = Long.valueOf(created.group(3));
+        return removeProject(Long.valueOf(created.group(3)), null, ctx);
+    }
+
+    /**
+     * Retire le projet resté vide. Un dépôt GitHub créé avec lui ne se défait pas d'ici : il reste, et la phrase le dit
+     * (R115 : c'est pourquoi sa création se demande).
+     */
+    private String removeProject(Long projectId, String createdRepository, AgentContext ctx) {
         Project project = projects.findByIdAndWorkspaceId(projectId, ctx.workspaceId())
             .orElseThrow(() -> new BusinessException("This project no longer exists."));
         if (issues.countByProjectId(projectId) > 0) {
@@ -91,7 +123,9 @@ public class CortexUndo {
         if (folder != null) knowledge.deleteNode(ctx.slug(), folder.getId(), ctx.userId());
         projectService.deleteProject(ctx.slug(), projectId, ctx.userId());
         return "Removed the project " + project.getIdentifier() + " \"" + project.getName() + "\""
-            + (pages.isEmpty() ? "." : " and its " + pages.size() + " knowledge pages.");
+            + (pages.isEmpty() ? "." : " and its " + pages.size() + " knowledge pages.")
+            + (createdRepository == null || createdRepository.isBlank() ? ""
+                : " Its repository " + createdRepository + " stays on GitHub: delete it there if you want it gone.");
     }
 
     private String undoIssue(String output, AgentContext ctx) {

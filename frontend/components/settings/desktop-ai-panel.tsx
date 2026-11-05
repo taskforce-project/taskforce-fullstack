@@ -4,12 +4,17 @@ import { useEffect, useState } from "react"
 import { CircleAlert, CircleCheck, Loader2 } from "lucide-react"
 
 import { CopyableCode } from "@/components/settings/copyable-code"
+import { ModelCapabilityTable } from "@/components/settings/model-capability-table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { fillModelText } from "@/lib/ai/model-table"
 import { desktopBridge, type DesktopAiSettings, type DesktopAiView } from "@/lib/desktop"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
+import { useModelCapabilityStore } from "@/lib/store/model-capability-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
 
 /** Valeur des listes de modèles pour « choisi automatiquement » (un élément de liste ne peut pas être vide). */
 const AUTO = "__auto"
@@ -36,6 +41,10 @@ const PROVIDERS: { value: DesktopAiSettings["provider"]; label: string; hint: st
  */
 export function DesktopAiPanel() {
   const fetchAiStatus = useAiStatusStore((s) => s.fetchStatus)
+  // La fenêtre de contexte que reçoit le modèle de conversation, sur Ollama (taillée à chaque requête, jusque-là).
+  const contextWindow = useAiStatusStore((s) => s.status?.contextWindow ?? null)
+  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug) ?? ""
+  const fetchModels = useModelCapabilityStore((s) => s.fetchTable)
   const [view, setView] = useState<DesktopAiView | null>(null)
   const [draft, setDraft] = useState<DesktopAiSettings | null>(null)
   const [apiKey, setApiKey] = useState("")
@@ -61,6 +70,9 @@ export function DesktopAiPanel() {
   useEffect(() => {
     void load()
   }, [])
+  useEffect(() => {
+    void fetchAiStatus()
+  }, [fetchAiStatus])
 
   const save = async () => {
     const bridge = desktopBridge()
@@ -80,6 +92,7 @@ export function DesktopAiPanel() {
     setSaved(true)
     // Cortex et les autres écrans relisent l'état tout de suite, sans attendre les caches.
     void fetchAiStatus(true)
+    if (slug) void fetchModels(slug)
   }
 
   if (!draft || !view) {
@@ -200,7 +213,15 @@ export function DesktopAiPanel() {
         </section>
       )}
 
-      <StatusLine view={view} />
+      <StatusLine view={view} contextWindow={contextWindow} />
+
+      {/* Ce que sait faire chaque modèle de l'ordinateur (R113) : « Use for Cortex » remplit les deux modèles de
+          conversation ci-dessus (Cortex répond avec le rapide), et la personne enregistre. */}
+      {slug && draft.provider !== "off" && state.reachable && (
+        <div className="border-t border-border/60 pt-6">
+          <ModelCapabilityTable slug={slug} onUse={(model) => update({ model, modelFast: model })} />
+        </div>
+      )}
 
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex flex-wrap items-center gap-2">
@@ -262,7 +283,8 @@ function ModelField({
 }
 
 /** Ce qui marche maintenant, et quoi faire sinon. */
-function StatusLine({ view }: Readonly<{ view: DesktopAiView }>) {
+function StatusLine({ view, contextWindow }: Readonly<{ view: DesktopAiView; contextWindow: number | null }>) {
+  const t = usePreferencesStore((s) => s.t.models)
   const { settings, state } = view
   if (settings.provider === "off") {
     return <p className="text-xs text-muted-foreground">AI is off. Cortex still searches your notes and cites what it finds.</p>
@@ -299,6 +321,7 @@ function StatusLine({ view }: Readonly<{ view: DesktopAiView }>) {
         ok={state.chat.available}
         label="Conversation"
         model={state.chat.model}
+        detail={local && contextWindow ? fillModelText(t.contextWindow, { tokens: contextWindow.toLocaleString("en-US") }) : null}
         missing={local ? "pull a conversation model, for example qwen3:8b" : "choose a model in the list above"}
       />
       <StatusItem
@@ -315,12 +338,19 @@ function StatusLine({ view }: Readonly<{ view: DesktopAiView }>) {
   )
 }
 
-function StatusItem({ ok, label, model, missing }: Readonly<{ ok: boolean; label: string; model: string | null; missing: string }>) {
+function StatusItem({ ok, label, model, detail = null, missing }: Readonly<{
+  ok: boolean
+  label: string
+  model: string | null
+  /** Ce qui suit le modèle prêt, par exemple sa fenêtre de contexte. */
+  detail?: string | null
+  missing: string
+}>) {
   return (
     <li className="flex items-center gap-1.5 text-muted-foreground">
       {ok ? <CircleCheck className="size-3.5 text-ink-green" /> : <CircleAlert className="size-3.5 text-ink-yellow" />}
       <span className="font-medium text-foreground">{label}</span>
-      {ok ? `ready with ${model}` : `not ready: ${missing}`}
+      {ok ? `ready with ${model}${detail ? `, ${detail}` : ""}` : `not ready: ${missing}`}
     </li>
   )
 }

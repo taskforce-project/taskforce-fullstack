@@ -66,4 +66,30 @@ class DelegatedAgentTest {
 
         assertThat(DelegatedAgent.current()).isEmpty();
     }
+
+    @Test
+    @DisplayName("un geste de Cortex dans la conversation : « Cortex » pendant le geste seulement, même imbriqué")
+    void cortex_acts_for_the_person_during_its_gesture() {
+        SecurityContextHolder.getContext().setAuthentication(token(person()));
+
+        String inside = DelegatedAgent.actingAs("Cortex", () -> {
+            String nested = DelegatedAgent.actingAs("Other", () -> DelegatedAgent.current().orElseThrow());
+            return nested + "/" + DelegatedAgent.current().orElseThrow();
+        });
+
+        assertThat(inside).isEqualTo("Other/Cortex");
+        assertThat(DelegatedAgent.current()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("un geste qui échoue ne laisse pas « Cortex » sur le fil")
+    void a_failed_gesture_leaves_nothing_behind() {
+        try {
+            DelegatedAgent.actingAs("Cortex", () -> { throw new IllegalStateException("boom"); });
+        } catch (IllegalStateException expected) {
+            // l'échec remonte tel quel
+        }
+
+        assertThat(DelegatedAgent.current()).isEmpty();
+    }
 }

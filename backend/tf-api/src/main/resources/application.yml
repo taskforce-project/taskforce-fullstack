@@ -75,7 +75,7 @@ ai:
   # Le fournisseur et les modèles ne sont pas des propriétés : la passerelle de modèles du backend
   # (core/service/ai/AiProviderSettings) lit les variables d'environnement de l'ancien ai-service, AI_PROVIDER
   # (ollama, openai, anthropic, groq, none), AI_BASE_URL, AI_API_KEY, AI_MODEL, AI_MODEL_FAST, AI_EMBED_*,
-  # AI_TIMEOUT, et leurs alias GROQ_* et OLLAMA_*. Rien de posé : Ollama de la machine hôte.
+  # AI_TIMEOUT, AI_OLLAMA_MAX_CONTEXT, et leurs alias GROQ_* et OLLAMA_*. Rien de posé : Ollama de la machine hôte.
 
 # Actuator Configuration
 management:

@@ -443,6 +443,35 @@ public class GitHubIntegrationService implements ProjectRepoHost {
     // Sync read (PROD-5.1) : lecture des dépôts / issues / PR via l'API GitHub
     // ----------------------------------------------------------------
 
+    /** Un dépôt se crée et se lie ici quand GitHub est connecté à l'espace (R115 : sinon, la conversation ne le propose pas). */
+    @Override
+    public boolean createsRepos(String workspaceSlug) {
+        return connected(workspaceSlug);
+    }
+
+    @Override
+    public boolean linksRepos(String workspaceSlug) {
+        return connected(workspaceSlug);
+    }
+
+    /** Les derniers dépôts changés du compte connecté ; aucun quand GitHub ne répond pas : la réponse libre reste. */
+    @Override
+    public List<String> recentRepos(String workspaceSlug, int limit) {
+        try {
+            return listRepositories(workspaceSlug).stream().map(GitHubRepoResponse::fullName)
+                .filter(GitHubRepoNames::isFullName).limit(limit).toList();
+        } catch (RuntimeException e) {
+            log.debug("Dépôts GitHub non lus pour la conversation : {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private boolean connected(String workspaceSlug) {
+        return workspaceRepository.findBySlug(workspaceSlug)
+            .flatMap(workspace -> integrationRepository.findByWorkspaceIdAndProvider(workspace.getId(), IntegrationProvider.GITHUB))
+            .isPresent();
+    }
+
     /** Liste les dépôts accessibles via le token connecté du workspace. */
     public List<GitHubRepoResponse> listRepositories(String workspaceSlug) {
         String token = requireAccessToken(workspaceSlug);

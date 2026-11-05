@@ -19,6 +19,8 @@ export interface DeliveryProvider {
   models: string[];
   ready: boolean;
   reason: string | null;
+  /** Un agent à l'essai (R51) : le menu le dit. */
+  trial?: boolean;
 }
 
 /** Agents de la délégation pour la personne connectée, et pour ce projet si `projectId` est donné. */
