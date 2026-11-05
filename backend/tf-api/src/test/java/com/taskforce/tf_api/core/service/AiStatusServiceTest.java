@@ -3,10 +3,14 @@ package com.taskforce.tf_api.core.service;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import com.taskforce.tf_api.core.service.AiStatusService.AiStatus;
 import com.taskforce.tf_api.core.service.ai.AiProviderConfig;
@@ -15,6 +19,7 @@ import com.taskforce.tf_api.core.service.ai.ModelGateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -105,6 +110,32 @@ class AiStatusServiceTest {
         assertThat(snapshot.models()).containsExactly("claude-opus-5-5", "claude-haiku-5-5");
         assertThat(snapshot.embedModels()).containsExactly("bge-m3:latest");
         assertThat(snapshot.settings().apiKey()).isEqualTo("sk-ant");
+    }
+
+    static Stream<Arguments> windows() {
+        return Stream.of(
+            // Le même modèle pour les deux paliers : une seule lecture.
+            Arguments.of(Map.of(), 16_384, 16_384, 1),
+            // Un modèle rapide plus petit, de fenêtre plus courte : chacun la sienne.
+            Arguments.of(Map.of("AI_MODEL_FAST", "qwen3:4b"), 16_384, 8_192, 2),
+            // Un modèle absent ne répondrait pas : pas de fenêtre.
+            Arguments.of(Map.of("AI_MODEL", "missing:1b"), null, null, 0));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("windows")
+    @DisplayName("la fenêtre de contexte de chaque modèle, lue par la passerelle, quand il répond")
+    void contextWindows(Map<String, String> env, Integer window, Integer fastWindow, int reads) {
+        config.replace(env);
+        when(gateway.chatModels(any())).thenReturn(Optional.of(List.of("qwen3:8b", "qwen3:4b", "bge-m3:latest")));
+        when(gateway.contextWindow(any(), eq("qwen3:8b"))).thenReturn(Optional.of(16_384));
+        when(gateway.contextWindow(any(), eq("qwen3:4b"))).thenReturn(Optional.of(8_192));
+
+        AiStatus status = service.current();
+
+        assertThat(status.contextWindow()).isEqualTo(window);
+        assertThat(status.fastContextWindow()).isEqualTo(fastWindow);
+        verify(gateway, times(reads)).contextWindow(any(), any());
     }
 
     @Test

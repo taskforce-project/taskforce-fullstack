@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { fillModelText, proposalLines, scoreText, scoreTone } from "@/lib/ai/model-table"
+import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { useModelCapabilityStore } from "@/lib/store/model-capability-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { cn } from "@/lib/utils"
@@ -33,10 +34,16 @@ export function ModelCapabilityTable({ slug, onUse }: Readonly<{
   const measure = useModelCapabilityStore((s) => s.measure)
   const stop = useModelCapabilityStore((s) => s.stop)
   const choose = useModelCapabilityStore((s) => s.choose)
+  // La fenêtre de contexte du modèle de Cortex (le rapide), dite par l'état de l'IA quand le fournisseur est Ollama.
+  const contextWindow = useAiStatusStore((s) => s.status?.fastContextWindow ?? null)
+  const fetchAiStatus = useAiStatusStore((s) => s.fetchStatus)
 
   useEffect(() => {
     if (slug) void fetchTable(slug)
   }, [slug, fetchTable])
+  useEffect(() => {
+    void fetchAiStatus()
+  }, [fetchAiStatus])
 
   if (!table) {
     return <p className="text-xs text-muted-foreground">{t.title}…</p>
@@ -138,7 +145,9 @@ export function ModelCapabilityTable({ slug, onUse }: Readonly<{
       {!onUse && table.models.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           {table.choice ? fillModelText(t.yourChoice, { model: table.choice })
-            : table.instanceModel ? fillModelText(t.instanceModel, { model: table.instanceModel }) : null}
+            : table.instanceModel ? fillModelText(contextWindow ? t.instanceModelWindow : t.instanceModel, {
+              model: table.instanceModel, tokens: contextWindow ? contextWindow.toLocaleString("en-US") : "",
+            }) : null}
           {table.choice && (
             <Button size="sm" variant="ghost" onClick={() => void choose(slug, null)}>{t.useInstance}</Button>
           )}

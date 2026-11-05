@@ -19690,6 +19690,14 @@
           },
           "embeddingModel": {
             "type": "string"
+          },
+          "contextWindow": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fastContextWindow": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

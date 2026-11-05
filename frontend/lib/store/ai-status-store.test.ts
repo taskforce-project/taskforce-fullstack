@@ -7,7 +7,7 @@ vi.mock("../api/ai-status-service", () => ({ getAiStatus: vi.fn() }))
 
 const ready: AiStatus = {
   configured: true, chatAvailable: true, chatModel: "qwen3:8b", fastModel: "qwen3:4b",
-  embeddingsAvailable: true, embeddingModel: "bge-m3",
+  embeddingsAvailable: true, embeddingModel: "bge-m3", contextWindow: 16384, fastContextWindow: 8192,
 }
 
 describe("ai-status-store", () => {

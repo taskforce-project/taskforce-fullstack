@@ -15,6 +15,12 @@ export interface AiStatus {
   /** Le modèle d'embeddings répond (sinon le Brain OS cherche en plein texte). */
   embeddingsAvailable: boolean
   embeddingModel: string | null
+  /**
+   * Sur Ollama, la plus grande fenêtre de contexte (en jetons) que reçoit le modèle de conversation, puis le rapide (celui
+   * de Cortex) : la passerelle la taille à chaque requête, jusque-là. null ailleurs, où le fournisseur la tient.
+   */
+  contextWindow: number | null
+  fastContextWindow: number | null
 }
 
 /** `refresh` relit l'état sans attendre la fin du cache du backend (30 s), juste après un changement de fournisseur. */
