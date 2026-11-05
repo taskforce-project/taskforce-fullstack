@@ -107,6 +107,7 @@ export function messagesToTurns(messages: ConversationMessage[]): CortexTurn[] {
             ...fallbackAnswer(m.content),
             mode: (m.mode as AssistantAnswer["mode"] | null) ?? "fast",
             usage: { promptTokens: 0, completionTokens: 0, totalTokens: m.totalTokens },
+            model: m.model ?? null,
           },
         },
   );

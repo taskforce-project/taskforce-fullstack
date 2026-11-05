@@ -119,6 +119,8 @@ export interface AssistantAnswer {
    * corrige une réponse sans outil (R116). Absent d'une réponse rendue avant R116.
    */
   record?: string | null
+  /** Le modèle qui a répondu, tel que la passerelle l'a appelé ; absent d'un repli. */
+  model?: string | null
 }
 
 /**

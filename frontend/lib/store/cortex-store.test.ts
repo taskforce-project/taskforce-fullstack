@@ -174,6 +174,17 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
     expect(useCortexStore.getState().conversationId).toBe(4);
   });
 
+  // Test du CEO de la 1.10.0 : quel modèle a répondu ? Une réponse rouverte le dit encore, quand il a été gardé.
+  it("reopens an answer with the model that wrote it, when it was kept", () => {
+    const turns = messagesToTurns([
+      { id: 9, role: "assistant", content: "ok", mode: "deep", totalTokens: 3, createdAt: null, model: "qwen3:8b" },
+      { id: 10, role: "assistant", content: "ok", mode: "deep", totalTokens: 3, createdAt: null },
+    ]);
+
+    expect(turns[0].answer?.model).toBe("qwen3:8b");
+    expect(turns[1].answer?.model).toBeNull();
+  });
+
   it("deletes a conversation, and starts afresh when it was the open one", async () => {
     vi.mocked(deleteConversation).mockResolvedValue(undefined);
     useCortexStore.setState({ conversationId: 4, turns: [{ id: "u1", role: "user", text: "x" }], conversations: [summary(4, "a"), summary(5, "b")] });

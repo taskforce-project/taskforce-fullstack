@@ -819,6 +819,8 @@ export const CONSTANTS_EN = {
     usageRequests: "{count} req.",
     usageRefresh: "Refresh",
     usageDetails: "Details",
+    // Under each answer: the model that wrote it, as the AI gateway called it (CEO's test of 1.10.0).
+    answeredWith: "Answered by {model}",
   },
 } as const
 
