@@ -32,6 +32,7 @@ export function ModelCapabilityTable({ slug, onUse }: Readonly<{
   const error = useModelCapabilityStore((s) => s.error)
   const fetchTable = useModelCapabilityStore((s) => s.fetchTable)
   const measure = useModelCapabilityStore((s) => s.measure)
+  const measureCortexModel = useModelCapabilityStore((s) => s.measureCortexModel)
   const stop = useModelCapabilityStore((s) => s.stop)
   const choose = useModelCapabilityStore((s) => s.choose)
   // La fenêtre de contexte du modèle de Cortex (le rapide), dite par l'état de l'IA quand le fournisseur est Ollama.
@@ -44,6 +45,12 @@ export function ModelCapabilityTable({ slug, onUse }: Readonly<{
   useEffect(() => {
     void fetchAiStatus()
   }, [fetchAiStatus])
+  // Le modèle de Cortex sans mesure complète se mesure une fois, sans clic : à l'ouverture de la table, et quand le
+  // modèle de Cortex change (« Use for Cortex », ou les réglages d'IA enregistrés dans l'app desktop). Les autres
+  // restent à la demande ; le store garde ce qu'il a déjà mesuré seul.
+  useEffect(() => {
+    if (slug && table) void measureCortexModel(slug)
+  }, [slug, table, measureCortexModel])
 
   if (!table) {
     return <p className="text-xs text-muted-foreground">{t.title}…</p>
@@ -128,7 +135,8 @@ export function ModelCapabilityTable({ slug, onUse }: Readonly<{
           <Loader2 className="size-3.5 animate-spin" />
           {progress.waitSeconds !== null
             ? fillModelText(t.waiting, { seconds: progress.waitSeconds })
-            : fillModelText(t.measuring, { model: progress.model, done: progress.done, total: progress.total })}
+            : fillModelText(progress.auto ? t.autoMeasuring : t.measuring,
+              { model: progress.model, done: progress.done, total: progress.total })}
           <Button size="sm" variant="ghost" onClick={stop} disabled={progress.stopping}>{t.stop}</Button>
         </div>
       )}

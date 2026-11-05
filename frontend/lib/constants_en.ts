@@ -446,6 +446,8 @@ export const CONSTANTS_EN = {
     measure: "Measure",
     measureAgain: "Measure again",
     measuring: "Measuring {model}: {done} of {total}",
+    // Cortex's model is measured once, without a click, the first time this table opens without a measure for it.
+    autoMeasuring: "Measuring {model}, the model Cortex uses, once: {done} of {total}. The other models stay on demand.",
     waiting: "The AI allows a request per minute here: next case in {seconds} s",
     stop: "Stop",
     inUse: "Cortex uses it",
