@@ -147,7 +147,7 @@ class CortexMcpToolTest {
     @Test
     @DisplayName("R115 : le nom inventé par le modèle et où vit le code, dans la même carte, sa proposition en premier")
     void the_invented_name_and_the_repository_are_asked_in_one_card() {
-        when(projects.questions(eq("acme"), any())).thenReturn(List.of(
+        when(projects.questions(eq("acme"), any(), any())).thenReturn(List.of(
             Question.of("name", "Name", "What should the project be called?",
                 List.of(Question.Choice.of("Next.js app", "Next.js app", "Suggested from your request"))),
             Question.of("repository", "Repository", "Where does its code live?",
@@ -166,7 +166,7 @@ class CortexMcpToolTest {
             });
         // Le geste lit la demande sans le nom que le modèle a inventé : il demande le nom, avec ce que la demande dit.
         org.mockito.ArgumentCaptor<JsonNode> seen = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
-        org.mockito.Mockito.verify(projects).questions(eq("acme"), seen.capture());
+        org.mockito.Mockito.verify(projects).questions(eq("acme"), seen.capture(), eq("crée un projet Next.js"));
         assertThat(seen.getValue().has("name")).isFalse();
         assertThat(seen.getValue().path("stack").asText()).isEqualTo("Next.js");
     }
@@ -229,6 +229,24 @@ class CortexMcpToolTest {
         ((CortexGesture) tool(name)).ask(Map.of("issue", "TESTTA-1"), asking);
 
         assertThat(sent.getValue()).isEqualTo(withRequest ? request : null);
+    }
+
+    /**
+     * Ce que la personne a répondu sur les cartes, seul le serveur le note : celui que passerait le modèle est retiré, celui
+     * d'une réponse à une carte reste et parvient au geste.
+     */
+    @ParameterizedTest(name = "demande « {0} » : la note reste {1}")
+    @CsvSource(nullValues = "-", value = {"crée un projet Next.js appelé Orion, false", "-, true"})
+    void only_the_server_marks_what_was_answered(String request, boolean kept) {
+        AgentContext asking = new AgentContext("acme", 1L, 7L, Screen.NONE, request);
+        org.mockito.ArgumentCaptor<JsonNode> seen = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
+        when(projects.questions(eq("acme"), seen.capture(), any())).thenReturn(List.of());
+
+        Map<String, Object> resolved = ((CortexGesture) tool("create_project"))
+            .ask(Map.of("name", "Orion", "stack", "Next.js", Question.ANSWERED, List.of("name")), asking);
+
+        assertThat(resolved.containsKey(Question.ANSWERED)).isEqualTo(kept);
+        assertThat(seen.getValue().has(Question.ANSWERED)).isEqualTo(kept);
     }
 
     @Test

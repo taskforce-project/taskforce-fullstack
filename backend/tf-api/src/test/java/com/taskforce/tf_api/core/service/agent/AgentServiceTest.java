@@ -1377,6 +1377,26 @@ class AgentServiceTest {
         verify(tools, never()).get("delete_issue");
     }
 
+    /**
+     * Test du CEO du 05/11/2026 : une réponse donnée se redemandait. Chaque envoi d'une carte note ses questions dans les
+     * arguments du geste, après celles des cartes d'avant ; une valeur d'une autre forme ne compte pas.
+     */
+    @ParameterizedTest(name = "avant {0}, carte {1} : {2}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+        "-                         | name,repository | name,repository",
+        "[\"name\",\"repository\"] | repository      | name,repository,repository",
+        "\"oops\"                  | name            | name",
+    })
+    void the_answered_questions_are_marked(String before, String card, String marked) throws Exception {
+        ObjectNode args = (ObjectNode) json.readTree(before == null ? "{}" : "{\"answered\": " + before + "}");
+        List<Question> questions = java.util.Arrays.stream(card.split(","))
+            .map(field -> Question.free(field, field, "?")).toList();
+
+        AgentService.markAnswered(args, questions);
+
+        assertThat(json.convertValue(args.get(Question.ANSWERED), List.class)).isEqualTo(List.of(marked.split(",")));
+    }
+
     @Test
     @DisplayName("R115 : l'issue que le geste a résolue est celle que la carte montre et que l'accord reprend")
     void the_card_carries_the_issue_the_gesture_resolved() throws Exception {
@@ -1483,7 +1503,9 @@ class AgentServiceTest {
         ArgumentCaptor<Map<String, Object>> args = ArgumentCaptor.forClass(Map.class);
         verify(tool).perform(args.capture(), any());
         assertThat(args.getValue()).containsEntry("name", "Atlas").containsEntry("repository", "new-private")
-            .containsEntry("stack", "Next.js");
+            .containsEntry("stack", "Next.js")
+            // Le geste sait que ces deux valeurs viennent de la personne : il ne les redemandera pas.
+            .containsEntry(Question.ANSWERED, List.of("name", "repository"));
         Map<String, String> said = new LinkedHashMap<>();
         said.put("name", "Atlas");
         said.put("repository", "new-private");

@@ -84,13 +84,14 @@ final class CortexMcpTool implements CortexGesture {
      * son nom et où vit son code), sur les arguments sans les mots que le modèle a mis à la place de ceux de la personne.
      */
     @Override public Map<String, Object> ask(Map<String, Object> args, AgentContext ctx) {
+        Map<String, Object> given = fromTheModel(args, ctx);
         List<Question> asked = new ArrayList<>();
         JsonNode resolved;
         try {
-            resolved = resolved(args, ctx);
+            resolved = resolved(given, ctx);
         } catch (QuestionNeeded needed) {
             asked.addAll(needed.questions());
-            resolved = mapper.valueToTree(args == null ? Map.of() : args);
+            resolved = mapper.valueToTree(given);
         }
         ObjectNode own = resolved.deepCopy();
         Map<String, Question.Choice> proposed = new LinkedHashMap<>();
@@ -109,7 +110,7 @@ final class CortexMcpTool implements CortexGesture {
             if (missing) asked.add(Question.free(need.field(), need.header(), need.question()));
         }
         if (tool.asker() != null) {
-            for (Question question : tool.asker().ask(ctx.slug(), ctx.userId(), own)) {
+            for (Question question : tool.asker().ask(ctx.slug(), ctx.userId(), own, ctx.request())) {
                 Question.Choice suggestion = proposed.remove(question.field());
                 asked.add(suggestion == null ? question : question.suggesting(suggestion));
             }
@@ -119,6 +120,18 @@ final class CortexMcpTool implements CortexGesture {
             .findFirst().ifPresent(need -> asked.add(Question.of(field, need.header(), need.question(), List.of(suggestion)))));
         if (!asked.isEmpty()) throw new QuestionNeeded(asked);
         return mapper.convertValue(resolved, MAP);
+    }
+
+    /**
+     * Les arguments d'un tour du modèle, sans ce que seul le serveur écrit : les réponses de la personne sur les cartes
+     * ({@link Question#ANSWERED}). Hors d'un tour du modèle (une réponse à une carte, un accord), ils restent tels quels.
+     */
+    private static Map<String, Object> fromTheModel(Map<String, Object> args, AgentContext ctx) {
+        Map<String, Object> given = args == null ? Map.of() : args;
+        if (ctx.request() == null || !given.containsKey(Question.ANSWERED)) return given;
+        Map<String, Object> kept = new LinkedHashMap<>(given);
+        kept.remove(Question.ANSWERED);
+        return kept;
     }
 
     /** La valeur se lit dans la demande, sans la casse, les accents, les espaces ni la ponctuation. */

@@ -25,6 +25,14 @@ public record Question(String field, String header, String text, boolean multipl
     /** Comme sur Claude : au-delà de quatre choix, la carte ne se lit plus d'un coup d'œil ; « Other » reste là. */
     public static final int MAX_CHOICES = 4;
 
+    /**
+     * L'argument où le serveur note, à chaque envoi d'une carte, les questions auxquelles la personne a répondu (leurs
+     * {@code field}, une fois par réponse). Le geste qui reprend sait ainsi qu'une valeur vient d'elle et ne la redemande
+     * jamais, et qu'une carte a déjà été montrée (test du CEO du 05/11/2026 : la même carte revenait sur une réponse
+     * tapée). Seul le serveur l'écrit : celui que passerait le modèle est retiré.
+     */
+    public static final String ANSWERED = "answered";
+
     public Question {
         choices = choices == null ? List.of() : List.copyOf(choices.stream().limit(MAX_CHOICES).toList());
     }

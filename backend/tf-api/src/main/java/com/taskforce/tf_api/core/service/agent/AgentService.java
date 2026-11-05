@@ -23,6 +23,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.dto.response.AssistantActionResult;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
@@ -224,7 +225,9 @@ public class AgentService {
             throw new BusinessException("The arguments of this action are not readable.");
         }
         // Tout se juge avant d'entrer au dossier : une réponse refusée laisse la carte ouverte, à corriger.
-        Map<String, String> said = filled(args, questionsOf(asked), answers == null ? List.of() : answers);
+        List<Question> questions = questionsOf(asked);
+        Map<String, String> said = filled(args, questions, answers == null ? List.of() : answers);
+        markAnswered(args, questions);
         records.answer(record, toolName, ref, userId, said)
             .orElseThrow(() -> new BusinessException("This question is already answered."));
         JsonNode where = asked.path("screen");
@@ -298,6 +301,24 @@ public class AgentService {
             }
         }
         return said;
+    }
+
+    /**
+     * Note dans les arguments les questions auxquelles la personne vient de répondre ({@link Question#ANSWERED}), après
+     * celles des cartes d'avant : le geste qui reprend ne redemande pas ce qu'elle a dit, et sait qu'une carte a déjà été
+     * montrée (test du CEO du 05/11/2026).
+     */
+    static void markAnswered(ObjectNode args, List<Question> questions) {
+        JsonNode before = args.get(Question.ANSWERED);
+        ArrayNode answered = JsonNodeFactory.instance.arrayNode();
+        // Les questions déjà notées, en textes ; une valeur d'une autre forme ne compte pas.
+        if (before != null && before.isArray()) {
+            before.forEach(field -> {
+                if (field.isTextual()) answered.add(field.asText());
+            });
+        }
+        questions.forEach(question -> answered.add(question.field()));
+        args.set(Question.ANSWERED, answered);
     }
 
     /**
