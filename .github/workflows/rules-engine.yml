@@ -1,0 +1,80 @@
+name: Rules Engine (JavaScript)
+
+# Le runner décide avec le moteur de règles du serveur, compilé en JavaScript par TeaVM (backend/rules-engine-js ;
+# R90, ADR-025). Le module produit et ses déclarations sont versionnés dans taskforce-runner/src/harness/engine, pour que
+# le runner se construise sans JDK. Ce job les régénère depuis les sources Java et échoue s'ils diffèrent des fichiers
+# versionnés : un changement du moteur Java ne part pas sans le JavaScript qui va avec. Les cas partagés de contracts/
+# se rejouent ensuite des deux côtés (Backend Tests, Runner Tests).
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'feature/**'
+      - 'fix/**'
+    paths:
+      - 'backend/tf-api/src/main/java/com/taskforce/tf_api/core/harness/**'
+      - 'backend/tf-api/pom.xml'
+      - 'backend/rules-engine-js/**'
+      - 'taskforce-runner/src/harness/engine/**'
+      - '.github/workflows/rules-engine.yml'
+  pull_request:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'backend/tf-api/src/main/java/com/taskforce/tf_api/core/harness/**'
+      - 'backend/tf-api/pom.xml'
+      - 'backend/rules-engine-js/**'
+      - 'taskforce-runner/src/harness/engine/**'
+      - '.github/workflows/rules-engine.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regenerate:
+    name: Regenerate the compiled rules engine
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+          cache-dependency-path: backend/rules-engine-js/pom.xml
+
+      # Le module compile les sources du backend contre son propre Jackson 2 : ce doit être celui du backend.
+      - name: Same Jackson 2 as the backend
+        run: |
+          backend=$(grep -A2 '<groupId>com.fasterxml.jackson</groupId>' backend/tf-api/pom.xml \
+            | sed -n 's:.*<version>\(.*\)</version>.*:\1:p' | head -1)
+          module=$(sed -n 's:.*<jackson2.version>\(.*\)</jackson2.version>.*:\1:p' backend/rules-engine-js/pom.xml)
+          echo "backend/tf-api: ${backend}, backend/rules-engine-js: ${module}"
+          if [ -z "$backend" ] || [ "$backend" != "$module" ]; then
+            echo "::error::backend/rules-engine-js/pom.xml (jackson2.version) must use the Jackson 2 BOM of backend/tf-api/pom.xml."
+            exit 1
+          fi
+
+      - name: Compile the engine to JavaScript
+        working-directory: backend/rules-engine-js
+        run: mvn -B -ntp process-classes
+
+      # Le contenu, pas l'état des fichiers : la taille notée à l'extraction peut différer sans que rien ne change.
+      - name: The committed module is the one built from Java
+        run: |
+          added=$(git ls-files --others --exclude-standard -- taskforce-runner/src/harness/engine)
+          if ! git diff --quiet -- taskforce-runner/src/harness/engine || [ -n "$added" ]; then
+            git diff --stat -- taskforce-runner/src/harness/engine
+            if [ -n "$added" ]; then echo "Not committed: ${added}"; fi
+            echo "::error::taskforce-runner/src/harness/engine is not the module built from backend/tf-api: run 'mvn -B process-classes' in backend/rules-engine-js and commit both files."
+            exit 1
+          fi
+          echo "rules-engine.js and rules-engine.d.ts match the Java sources."

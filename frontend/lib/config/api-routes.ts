@@ -355,6 +355,8 @@ export const ASSISTANT_ROUTES = {
   CHAT: (slug: string) => `/api/workspaces/${slug}/assistant`,
   ACTION_EXECUTE: (slug: string) => `/api/workspaces/${slug}/assistant/actions/execute`,
   ACTION_UNDO: (slug: string) => `/api/workspaces/${slug}/assistant/actions/undo`,
+  /** La réponse de la personne à une question de TaskForce (R115) : le geste reprend sur son clic. */
+  ACTION_ANSWER: (slug: string) => `/api/workspaces/${slug}/assistant/actions/answer`,
 } as const;
 
 /**
@@ -382,6 +384,18 @@ export const AI_ROUTES = {
   USAGE: (slug: string) => `/api/workspaces/${slug}/ai/usage`,
   CONVERSATIONS: (slug: string) => `/api/workspaces/${slug}/ai/conversations`,
   CONVERSATION: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}`,
+} as const;
+
+/**
+ * Ce que sait faire chaque modèle (R113) : la table de l'instance, une mesure cas par cas, le modèle de Cortex choisi.
+ * Backend: @RequestMapping("/api/workspaces/{slug}/ai/models").
+ */
+export const AI_MODEL_ROUTES = {
+  TABLE: (slug: string) => `/api/workspaces/${slug}/ai/models`,
+  RUNS: (slug: string) => `/api/workspaces/${slug}/ai/models/runs`,
+  RUN_CASE: (slug: string, runId: number, caseKey: string) =>
+    `/api/workspaces/${slug}/ai/models/runs/${runId}/cases/${encodeURIComponent(caseKey)}`,
+  CHOICE: (slug: string) => `/api/workspaces/${slug}/ai/models/choice`,
 } as const;
 
 /**

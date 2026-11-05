@@ -97,6 +97,8 @@ export interface IssueComment {
   id: number;
   author: UserSummary;
   content: string;
+  /** L'agent qui l'a écrit pour son auteur (« qwen3:8b », « Claude Code », « Cortex ») ; absent quand l'auteur l'a écrit. */
+  via?: string | null;
   isEdited: boolean;
   createdAt: string;
   updatedAt: string;

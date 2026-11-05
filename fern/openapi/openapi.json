@@ -125,6 +125,10 @@
       "description": "Test cases drawn from Cortex answers, replayed on a named model without touching the workspace, and graded by code."
     },
     {
+      "name": "Model capabilities",
+      "description": "What each model the instance's AI reaches can do, measured by fixed test cases: the table, a measure case by case, and the model the person chooses for Cortex."
+    },
+    {
       "name": "AI analysis (workflows)",
       "description": "AI analysis jobs: launch, follow and resume."
     },
@@ -146,7 +150,7 @@
     },
     {
       "name": "Coding agents",
-      "description": "Delegating an issue to a coding agent (Claude Code, GitHub Copilot) and following the run."
+      "description": "Delegating an issue to a coding agent (Claude Code, GitHub Copilot), or an issue without repository to the trial agent that answers in a comment, and following the run."
     },
     {
       "name": "Coding agent runners",
@@ -715,6 +719,46 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseListDashboardCardResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/ai/models/choice": {
+      "put": {
+        "tags": [
+          "Model capabilities"
+        ],
+        "operationId": "chooseCortexModel",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseModelCapabilityResponse"
                 }
               }
             }
@@ -4549,6 +4593,46 @@
         }
       }
     },
+    "/api/workspaces/{slug}/assistant/actions/answer": {
+      "post": {
+        "tags": [
+          "AI assistant"
+        ],
+        "operationId": "answerQuestion",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantAnswerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAssistantToolCall"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/analytics/charts": {
       "get": {
         "tags": [
@@ -4807,6 +4891,93 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseAnalysisJobResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/ai/models/runs": {
+      "post": {
+        "tags": [
+          "Model capabilities"
+        ],
+        "operationId": "startModelMeasure",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRunStarted"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/ai/models/runs/{runId}/cases/{caseKey}": {
+      "post": {
+        "tags": [
+          "Model capabilities"
+        ],
+        "operationId": "measureModelCase",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "caseKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCaseResult"
                 }
               }
             }
@@ -8852,6 +9023,36 @@
         }
       }
     },
+    "/api/workspaces/{slug}/ai/models": {
+      "get": {
+        "tags": [
+          "Model capabilities"
+        ],
+        "operationId": "modelCapabilities",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseModelCapabilityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/ai/conversations": {
       "get": {
         "tags": [
@@ -10740,6 +10941,177 @@
           }
         }
       },
+      "ModelRequest": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0
+          }
+        }
+      },
+      "ApiResponseModelCapabilityResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ModelCapabilityResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CapabilityInfo": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "cases": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "CaseInfo": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "ModelCapabilityResponse": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "instanceModel": {
+            "type": "string"
+          },
+          "choice": {
+            "type": "string"
+          },
+          "current": {
+            "type": "string"
+          },
+          "suiteVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityInfo"
+            }
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseInfo"
+            }
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelRow"
+            }
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Proposal"
+            }
+          },
+          "proposed": {
+            "type": "string"
+          }
+        }
+      },
+      "ModelRow": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "measuredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Score"
+            }
+          }
+        }
+      },
+      "Proposal": {
+        "type": "object",
+        "properties": {
+          "capability": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          }
+        }
+      },
+      "Score": {
+        "type": "object",
+        "properties": {
+          "capability": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "measured": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "capable": {
+            "type": "boolean"
+          },
+          "heldWords": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "measuredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "Item": {
         "type": "object",
         "properties": {
@@ -12123,6 +12495,9 @@
             "$ref": "#/components/schemas/UserSummaryResponse"
           },
           "content": {
+            "type": "string"
+          },
+          "via": {
             "type": "string"
           },
           "createdAt": {
@@ -13870,6 +14245,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "honest": {
+            "type": "boolean"
           }
         }
       },
@@ -14380,11 +14758,32 @@
           "conversationId": {
             "type": "integer",
             "format": "int64"
+          },
+          "screen": {
+            "$ref": "#/components/schemas/ScreenRequest"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0
           }
         },
         "required": [
           "message"
         ]
+      },
+      "ScreenRequest": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "issueId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "ApiResponseChatTurnResponse": {
         "type": "object",
@@ -14436,6 +14835,49 @@
           },
           "usage": {
             "$ref": "#/components/schemas/AssistantUsage"
+          },
+          "record": {
+            "type": "string"
+          }
+        }
+      },
+      "AssistantChoice": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "recommended": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AssistantQuestion": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "header": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "multiple": {
+            "type": "boolean"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistantChoice"
+            }
           }
         }
       },
@@ -14485,6 +14927,19 @@
           },
           "record": {
             "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistantQuestion"
+            }
           }
         }
       },
@@ -14517,6 +14972,29 @@
           },
           "answer": {
             "$ref": "#/components/schemas/AssistantAnswer"
+          },
+          "escalation": {
+            "$ref": "#/components/schemas/Escalation"
+          },
+          "sentTo": {
+            "type": "string"
+          }
+        }
+      },
+      "Escalation": {
+        "type": "object",
+        "properties": {
+          "capability": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
           }
         }
       },
@@ -14531,6 +15009,11 @@
           "record": {
             "type": "string",
             "maxLength": 64,
+            "minLength": 0
+          },
+          "ref": {
+            "type": "string",
+            "maxLength": 80,
             "minLength": 0
           }
         },
@@ -14568,6 +15051,13 @@
           },
           "output": {
             "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -14594,6 +15084,86 @@
           "record",
           "tool"
         ]
+      },
+      "AssistantAnswerRequest": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "record": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "ref": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "answers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionAnswer"
+            },
+            "maxItems": 2,
+            "minItems": 0
+          }
+        },
+        "required": [
+          "answers",
+          "record",
+          "ref",
+          "tool"
+        ]
+      },
+      "QuestionAnswer": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 0
+            },
+            "maxItems": 4,
+            "minItems": 0
+          },
+          "other": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "field"
+        ]
+      },
+      "ApiResponseAssistantToolCall": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AssistantToolCall"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       },
       "SaveChartRequest": {
         "type": "object",
@@ -14870,6 +15440,100 @@
         "required": [
           "answer"
         ]
+      },
+      "ApiResponseRunStarted": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunStarted"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RunStarted": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "model": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ApiResponseCaseResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CaseResult"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CaseResult": {
+        "type": "object",
+        "properties": {
+          "caseKey": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Check"
+            }
+          },
+          "calls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayCall"
+            }
+          },
+          "answer": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "promptTokens": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "CreatePersonalAccessTokenRequest": {
         "type": "object",
@@ -16272,6 +16936,9 @@
             "type": "integer",
             "format": "int64"
           },
+          "unassign": {
+            "type": "boolean"
+          },
           "parentId": {
             "type": "integer",
             "format": "int64"
@@ -16281,6 +16948,9 @@
           },
           "dueDate": {
             "type": "string"
+          },
+          "clearDueDate": {
+            "type": "boolean"
           },
           "position": {
             "type": "integer",
@@ -18119,6 +18789,9 @@
           },
           "reason": {
             "type": "string"
+          },
+          "trial": {
+            "type": "boolean"
           }
         }
       },
@@ -19017,6 +19690,14 @@
           },
           "embeddingModel": {
             "type": "string"
+          },
+          "contextWindow": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fastContextWindow": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

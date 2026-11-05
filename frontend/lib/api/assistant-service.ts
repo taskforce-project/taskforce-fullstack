@@ -30,12 +30,68 @@ export interface AssistantToolCall {
   output: string | null
   /** Le dossier de la réponse, que l'accord prolonge ; absent d'une réponse rendue avant le noyau. */
   record?: string | null
+  /** L'empreinte du résultat de cet appel au dossier : « Undo » défait celui-là, parmi ceux de la réponse (R77). */
+  ref?: string | null
+  /** L'issue que touche un geste du MCP TaskForce, dont la conversation montre les cartes (ADR-024). */
+  target?: AssistantTarget | null
+  /**
+   * Ce que TaskForce demande avant le geste (R115), avec un statut question : deux questions au plus dans la même carte,
+   * qui montre leurs choix et part d'un seul envoi.
+   */
+  questions?: AssistantQuestion[] | null
+}
+/**
+ * Une question de TaskForce (R115, séance n°17), dans la forme des questions de Claude (décision du CEO, 05/11/2026) :
+ * l'argument que la réponse remplit, un titre court, la question, si plusieurs choix se cochent, et ses choix, quatre au
+ * plus, le recommandé d'abord. Une réponse tapée (« Other ») est toujours possible.
+ */
+export interface AssistantQuestion {
+  field: string
+  header: string | null
+  text: string
+  multiple: boolean
+  choices: AssistantChoice[]
+}
+/** Un choix : la valeur que reçoit le geste, ce que la carte en montre, ce qu'il veut dire en une ligne, s'il est recommandé. */
+export interface AssistantChoice {
+  value: string
+  label: string
+  description: string | null
+  recommended: boolean
+}
+/** La réponse à une question de la carte : les valeurs des choix cochés, et ce qui est tapé dans « Other ». */
+export interface QuestionAnswer {
+  field: string
+  values: string[]
+  other?: string
+}
+/** Ce que la personne voit quand elle écrit (R114) : le projet ouvert et l'issue ouverte, par leurs ids. */
+export interface AssistantScreen {
+  projectId: number
+  issueId?: number | null
+}
+/** L'issue d'un geste : sa clé et son titre, et sa mission quand elle en a une. */
+export interface AssistantTarget {
+  issueId: number
+  projectId: number
+  key: string | null
+  title: string
+  runId?: number | null
+  /** Pour une suppression demandée : ce qui partirait avec l'issue, et si elle est déjà archivée. */
+  comments?: number
+  checklist?: number
+  mission?: string | null
+  archived?: boolean
 }
 /** Ce que devient une action accordée : faite, refusée par les règles de l'espace (elles ont pu changer), ou en échec. */
 export interface AssistantActionResult {
   tool: string
   status: "success" | "refused" | "error"
   output: string
+  /** L'empreinte du résultat au dossier, que « Undo » nomme ensuite. */
+  ref?: string | null
+  /** L'issue d'un geste accordé (sa mission, une fois confiée à un agent). */
+  target?: AssistantTarget | null
 }
 /** Tokens réellement consommés par le tour (usage LLM cumulé). */
 export interface AssistantUsage {
@@ -51,6 +107,22 @@ export interface AssistantAnswer {
   steps: AssistantStep[]
   toolCalls: AssistantToolCall[]
   usage: AssistantUsage
+  /**
+   * Le dossier de la réponse, quand elle en a un : celui de ses outils, ou celui que le serveur ouvre quand TaskForce
+   * corrige une réponse sans outil (R116). Absent d'une réponse rendue avant R116.
+   */
+  record?: string | null
+}
+
+/**
+ * Ce que TaskForce propose sous une réponse (R118) : la banque dit que le modèle de Cortex (`from`) échoue à ce genre de
+ * demande (`capability`) et qu'un autre modèle servi (`to`) le réussit ; `text` est sa phrase, gardée dans la conversation.
+ */
+export interface ModelEscalation {
+  capability: string
+  from: string
+  to: string
+  text: string
 }
 
 /** Réponse d'un tour : la réponse de l'agent + la conversation où il est rattaché (créée si absente). */
@@ -58,6 +130,10 @@ export interface ChatTurnResponse {
   conversationId: number
   title: string
   answer: AssistantAnswer
+  /** La proposition d'un modèle plus fort, quand la banque dit que celui de Cortex échoue à ce genre de demande. */
+  escalation?: ModelEscalation | null
+  /** Le modèle vers lequel la personne a envoyé cette demande, d'un clic. */
+  sentTo?: string | null
 }
 
 /**
@@ -68,11 +144,37 @@ export async function sendAgentMessage(
   slug: string,
   message: string,
   conversationId?: number | null,
+  screen?: AssistantScreen | null,
+  model?: string | null,
 ): Promise<ChatTurnResponse> {
-  const res = await apiClient.post<{ data: ChatTurnResponse }>(
-    ASSISTANT_ROUTES.CHAT(slug),
-    { message, conversationId: conversationId ?? null },
-    { timeout: AI_TIMEOUT_MS },
+  // L'écran part avec le message quand la personne regarde un projet (R114) : Cortex le lit avant les notes. Le
+  // modèle, quand la personne envoie la demande à celui que TaskForce propose (R118) ; sans lui, rien ne change.
+  const body = {
+    message, conversationId: conversationId ?? null, ...(screen ? { screen } : {}), ...(model ? { model } : {}),
+  }
+  const res = await apiClient.post<{ data: ChatTurnResponse }>(ASSISTANT_ROUTES.CHAT(slug), body, { timeout: AI_TIMEOUT_MS })
+  return res.data.data
+}
+
+/**
+ * Une carte de questions de TaskForce que la personne peut répondre (R115) : elle porte ses questions, le dossier de la
+ * réponse et l'empreinte de la carte, que les réponses nomment. Une question d'avant R115 n'a que sa phrase, dans la
+ * réponse.
+ */
+export function isQuestionCard(call: AssistantToolCall): call is AssistantToolCall & { questions: AssistantQuestion[] } {
+  return call.status === "question" && (call.questions?.length ?? 0) > 0 && Boolean(call.record) && Boolean(call.ref)
+}
+
+/**
+ * Répond à une carte de TaskForce, toutes ses questions à la fois : pour chacune, les choix cochés ou la réponse tapée.
+ * Le geste reprend sur le serveur, sans le modèle, et rend la suite : d'autres questions, sa carte, ou ce qu'il a fait.
+ */
+export async function answerQuestion(
+  slug: string, call: AssistantToolCall, answers: QuestionAnswer[],
+): Promise<AssistantToolCall> {
+  const res = await apiClient.post<{ data: AssistantToolCall }>(
+    ASSISTANT_ROUTES.ACTION_ANSWER(slug),
+    { tool: call.name, record: call.record, ref: call.ref, answers },
   )
   return res.data.data
 }
@@ -117,24 +219,54 @@ export async function approveAction(slug: string, call: AssistantToolCall): Prom
   return { tool: call.name, status: "success", output: await executeMcpAction(slug, call.name, args) }
 }
 
-/** Les créations de Cortex qui se défont d'un geste (R77) : un projet, une issue, une note. */
-const UNDOABLE = new Set(["create_project", "create_issue", "create_note"])
+/**
+ * Ce que Cortex fait et qui se défait d'un geste (R77) : un projet, une issue, une note qu'il a créés, et ses gestes sur
+ * une issue (un changement de ses champs, un commentaire ; ADR-024). Confier une issue à un agent ne se défait pas : il
+ * se demande d'abord.
+ */
+const UNDOABLE = new Set(["create_project", "create_issue", "create_note", "update_issue", "add_comment"])
 
-/** Une création que Cortex vient de faire, et dont le dossier permet de la défaire. */
+/** Les gestes sur une issue : le serveur ne leur donne une empreinte que s'ils ont changé quelque chose à défaire. */
+const GESTURES = new Set(["update_issue", "add_comment"])
+
+/** Ce que Cortex vient de faire, et dont le dossier permet de le défaire. */
 export function isUndoable(call: AssistantToolCall): boolean {
-  return call.status === "success" && Boolean(call.record) && UNDOABLE.has(call.name)
+  if (call.status !== "success" || !call.record || !UNDOABLE.has(call.name)) return false
+  // « TF-12 already has these values » n'a rien à défaire : pas d'Undo qui échouerait.
+  return !GESTURES.has(call.name) || Boolean(call.ref)
 }
 
 /**
- * Défait ce que Cortex a créé (R77, séance n°13), par le dossier de la réponse : une seule fois, avec les droits de la
- * personne. Un refus du serveur (le projet a des issues, l'issue des commentaires) remonte comme une erreur.
+ * Défait ce que Cortex a fait (R77, séance n°13), par le dossier de la réponse : une seule fois, avec les droits de la
+ * personne. L'empreinte du résultat nomme le bon geste quand la réponse en a plusieurs du même outil. Un refus du
+ * serveur (le projet a des issues, l'issue a changé depuis) remonte comme une erreur.
  */
 export async function undoAction(slug: string, call: AssistantToolCall): Promise<AssistantActionResult> {
   const res = await apiClient.post<{ data: AssistantActionResult }>(
     ASSISTANT_ROUTES.ACTION_UNDO(slug),
-    { tool: call.name, record: call.record },
+    call.ref ? { tool: call.name, record: call.record, ref: call.ref } : { tool: call.name, record: call.record },
   )
   return res.data.data
+}
+
+/** Les gestes qui montrent la mission d'une issue dans la conversation : la confier à un agent, lire où elle en est. */
+const MISSION_TOOLS = new Set(["delegate_issue", "get_mission"])
+
+/**
+ * Un geste réussi dont la conversation montre la mission (TF-J1-5) : ses demandes et son résultat, sur les cartes de la
+ * fiche de l'issue. La personne y décide par leurs boutons, jamais par un texte qu'elle ou un document aurait écrit (R1).
+ */
+export function isMission(call: AssistantToolCall): call is AssistantToolCall & { target: AssistantTarget } {
+  return call.status === "success" && MISSION_TOOLS.has(call.name) && typeof call.target?.issueId === "number"
+}
+
+/**
+ * Une suppression que Cortex demande (TF-J1-5, test du CEO du 02/11/2026) : la règle delete-issue la demande, et sa carte
+ * propose d'abord d'archiver, qui se défait, puis de supprimer. Seul le clic de la personne supprime (R1).
+ */
+export function isDeletion(call: AssistantToolCall): call is AssistantToolCall & { target: AssistantTarget } {
+  return call.name === "delete_issue" && call.status === "pending" && Boolean(call.record)
+    && typeof call.target?.issueId === "number"
 }
 
 /** Variante texte (compat) : renvoie seulement la réponse markdown. */

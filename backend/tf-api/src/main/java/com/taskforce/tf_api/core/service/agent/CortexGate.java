@@ -75,13 +75,18 @@ public class CortexGate {
         return new Verdict(decision.effect(), rule == null ? null : rule.id(), rule == null ? NO_RULE : rule.reason(), facts);
     }
 
-    /** Les faits d'un outil : son action, son nom et, pour un outil externe, le serveur qui le porte. */
+    /**
+     * Les faits d'un outil : son action, son nom et, pour un outil externe, le serveur qui le porte. Un geste du MCP
+     * TaskForce porte son action lui-même (ADR-024) : la même que la table juge quand un agent extérieur le fait.
+     */
     static Map<String, String> facts(AgentTool tool) {
         String name = tool.name() == null ? "" : tool.name();
         Map<String, String> facts = new LinkedHashMap<>();
         if (tool instanceof ExternalMcpTool external) {
             facts.put("action", external.isReadOnly() ? "mcp.read" : "mcp.write");
             facts.put("server", external.connectorKey());
+        } else if (tool.action() != null) {
+            facts.put("action", tool.action());
         } else if (ACTIONS.containsKey(name)) {
             facts.put("action", ACTIONS.get(name));
         }

@@ -13,7 +13,8 @@ import com.taskforce.tf_api.shared.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 
 /**
- * État de l'IA de l'instance, pour l'interface (« IA non configurée », modèles utilisés).
+ * État de l'IA de l'instance, pour l'interface (« IA non configurée », modèles utilisés et, sur Ollama, leur fenêtre de
+ * contexte).
  * GET /api/ai/status — tout utilisateur connecté ; aucune URL ni clé n'est exposée.
  *
  * <p>{@code refresh=true} relit l'état sans attendre la fin du cache de 30 s : l'app desktop le demande juste après

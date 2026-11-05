@@ -51,6 +51,12 @@ to plain text.
 With `AI_PROVIDER` set, a model left empty is picked among those the provider lists; without it, TaskForce uses
 `qwen3:8b` and `bge-m3`, as before. `AI_PROVIDER=none` turns AI off.
 
+With Ollama, TaskForce sizes the context window of each request to what it carries (Cortex's instructions and tools,
+the screen, the notes, the conversation): from 8,192 tokens up to `AI_OLLAMA_MAX_CONTEXT`, 16,384 by default, or the
+model's own maximum if it is smaller. A larger window takes more GPU memory: on an 8 GB GPU, `qwen3:8b` stays
+entirely on the GPU up to 16,384 tokens with Ollama's `OLLAMA_KV_CACHE_TYPE=q8_0`. With more memory, set
+`AI_OLLAMA_MAX_CONTEXT=32768` in `.env`; with less, `8192`.
+
 After a change in `.env`: `docker compose up -d`.
 
 ## Email

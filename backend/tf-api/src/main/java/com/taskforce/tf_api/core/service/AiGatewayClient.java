@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.taskforce.tf_api.core.service.AiStatusService.AiStatus;
+import com.taskforce.tf_api.core.service.ai.ChosenModel;
 import com.taskforce.tf_api.core.service.ai.ModelGateway;
 import com.taskforce.tf_api.core.service.ai.ModelProviderException;
 import com.taskforce.tf_api.shared.util.LogSafe;
@@ -100,10 +101,10 @@ public class AiGatewayClient implements LlmClient {
         if (!current.chatAvailable()) {
             throw new LlmException("AI is not available on this instance", null);
         }
-        // Le palier choisit le modèle ; sans palier, le modèle nommé (rejeu de la banque, R61), sinon le principal.
-        String chosen = tier != null
-            ? ("fast".equals(tier) ? current.fastModel() : current.chatModel())
-            : (model != null && !model.isBlank() ? model : current.chatModel());
+        // Le modèle nommé d'abord (rejeu de la banque, R61), puis celui que la personne a choisi pour cette action
+        // (R113, R118), sinon celui du palier.
+        String chosen = model != null && !model.isBlank() ? model
+            : ChosenModel.current().orElseGet(() -> "fast".equals(tier) ? current.fastModel() : current.chatModel());
         boolean think = "deep".equals(tier);
         try {
             ModelGateway.ChatReply reply = gateway.chat(snapshot.settings(),

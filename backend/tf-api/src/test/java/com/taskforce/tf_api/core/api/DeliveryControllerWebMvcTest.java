@@ -77,7 +77,7 @@ class DeliveryControllerWebMvcTest {
         var a = auth();
         when(deliveryService.listProviders("acme", 12L, 7L)).thenReturn(List.of(
             new DeliveryProviderResponse("claude-code", "Claude Code", "anthropic", true, List.of("claude-opus-5"), false,
-                "Set up your local runner first (Settings > Agents), then start it on your machine.")));
+                "Set up your local runner first (Settings > Agents), then start it on your machine.", false)));
 
         mockMvc.perform(get("/api/workspaces/acme/delivery/providers").param("projectId", "12").with(a))
             .andExpect(status().isOk())

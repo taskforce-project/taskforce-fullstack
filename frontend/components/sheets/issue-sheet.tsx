@@ -40,6 +40,7 @@ import { DelegateAgentControl } from "@/components/sheets/delegate-agent-control
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
+import { useScreenStore } from "@/lib/store/screen-store"
 import { describeActivity } from "@/lib/issue-activity"
 import { useIssueRealtime } from "@/lib/hooks/use-issue-realtime"
 import { agentAtWork } from "@/lib/delivery/agent-at-work"
@@ -493,7 +494,13 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
                   <UserAvatar email={c.author.email} name={c.author.displayName ?? c.author.email} avatarUrl={c.author.avatarUrl} className="size-7 shrink-0 mt-0.5" fallbackClassName="text-[9px]" />
                   <div className="min-w-0 flex-1">
                     <div className="mb-1 flex items-center gap-2">
-                      <span className="text-xs font-semibold text-foreground">{c.author.displayName ?? c.author.email}</span>
+                      {/* Écrit par un agent pour son auteur (R51, #471) : « qwen3:8b for Pierre ». */}
+                      <span className="text-xs font-semibold text-foreground">{c.via?.trim() || (c.author.displayName ?? c.author.email)}</span>
+                      {c.via?.trim() && (
+                        <span className="text-xs text-muted-foreground/70">
+                          {activityText.forWhom.replace("{who}", c.author.displayName ?? c.author.email)}
+                        </span>
+                      )}
                       <span className="text-xs text-muted-foreground">{formatCommentTime(c.createdAt)}</span>
                       {c.isEdited && <span className="text-[10px] italic text-muted-foreground/60">(edited)</span>}
                       {isMe && (
@@ -1142,6 +1149,16 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const { labelsByProject, fetchLabels } = useLabelStore()
   const { githubLinks, githubStatus, fetchGitHubStatus, fetchGitHubLinks } = useIntegrationStore()
   const openSettings = useSettingsStore((s) => s.openSettings)
+
+  // Ce que la personne voit (R114) : l'issue ouverte part avec chaque message à Cortex, tant que sa fiche est ouverte.
+  const showIssue = useScreenStore((s) => s.showIssue)
+  const hideIssue = useScreenStore((s) => s.hideIssue)
+  const shownIssueId = open && issue && projectId ? Number(issue.id) : null
+  useEffect(() => {
+    if (shownIssueId === null || !projectId) return
+    showIssue(projectId, shownIssueId)
+    return () => hideIssue(shownIssueId)
+  }, [shownIssueId, projectId, showIssue, hideIssue])
 
   const initDescription = issue?.description ?? ""
   const [comment, setComment] = useState("")

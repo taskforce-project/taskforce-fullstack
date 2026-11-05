@@ -50,6 +50,10 @@ public class IssueComment {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
+    /** L'agent qui l'a écrit au nom de l'auteur (V116) : un modèle, l'agent d'une mission, Cortex ; null sinon. */
+    @Column(length = 60)
+    private String via;
+
     @Column(name = "is_edited", nullable = false)
     @Builder.Default
     private boolean isEdited = false;

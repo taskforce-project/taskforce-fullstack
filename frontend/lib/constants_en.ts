@@ -417,6 +417,54 @@ export const CONSTANTS_EN = {
     saved: "Saved!",
   },
 
+  // What each model can do (R113): measured on this computer or server by TaskForce's test cases, never taken from a
+  // vendor's sheet. TaskForce proposes the first capable model; the person chooses. Then R118's offer in the conversation.
+  models: {
+    title: "What each model can do",
+    hint: "Measured here by TaskForce's test cases, not taken from the vendor. Measuring a model replays {cases} short cases with Cortex's tools and counts in your AI usage.",
+    model: "Model",
+    measured: "Measured",
+    notMeasured: "Not measured",
+    never: "Never",
+    measure: "Measure",
+    measureAgain: "Measure again",
+    measuring: "Measuring {model}: {done} of {total}",
+    waiting: "The AI allows a request per minute here: next case in {seconds} s",
+    stop: "Stop",
+    inUse: "Cortex uses it",
+    use: "Use for Cortex",
+    useHint: "Cortex answers you with this model",
+    useInstance: "Use the instance's model",
+    instanceModel: "This instance's model for Cortex: {model}.",
+    // On Ollama, the gateway sizes the context window to each request, up to this many tokens.
+    instanceModelWindow: "This instance's model for Cortex: {model}, with a context window of up to {tokens} tokens.",
+    contextWindow: "context window of up to {tokens} tokens",
+    yourChoice: "You chose {model} for Cortex.",
+    noModels: "The AI of this instance serves no model right now.",
+    proposalTitle: "TaskForce proposes",
+    proposalEverything: "For everything measured: {model}.",
+    proposalNone: "No model passed every case yet: measure the models to see which one fits.",
+    proposalFor: "{capability}: {model}",
+    nobodyYet: "no model yet",
+    heldWords: "holds {words} words",
+    heldNone: "lost the shortest document",
+    partial: "{passed} of {measured} measured",
+    caseFailed: "Failed: {title}",
+    lastMeasure: "Last measure of {model}: {passed} of {total} cases passed.",
+    desktopUse: "Use for Cortex sets the conversation and quick answer models below: save to apply.",
+    // R118: TaskForce's words under an answer when the bank says the model failed this kind of request.
+    saysWhat: "about the model that answers",
+    saysLabel: "TaskForce, about the model that answers",
+    saysHint: "TaskForce's test cases measure what each model can do on this computer or server. TaskForce proposes a model; only you send a request to it.",
+    offerAsk: "Ask {model}",
+    sentTo: "to {model}",
+    answeredBy: "Answered by {model}, as you asked.",
+    // R51: TaskForce's own loop on a local model, on trial, for the tasks answered in a comment.
+    trial: "Trial",
+    trialHint: "Answers in a comment. No code, no repository.",
+    trialAgent: "TaskForce's own loop on {model}, on trial: it reads the issue, its project and the notes you can read, and answers in a comment, under its name and for you. Only for tasks without a repository: code stays with Claude Code.",
+  },
+
   // Integrations catalog (Settings > Integrations): GitHub, Slack and Plane next to the tried MCP presets.
   integrations: {
     catalogWeb: "GitHub, Slack and Plane sync natively; any other tool connects through its MCP server.",
@@ -452,16 +500,13 @@ export const CONSTANTS_EN = {
     barHideConversation: "Minimize the conversation",
     barNewAnswer: "A new answer from Cortex is waiting",
     barSuggestions: "Suggestions for this screen",
-    // The conversation opens above the bar in a floating bubble (02/11/2026), or sits in the right panel when pinned there.
+    // The conversation opens above the bar, its text on the bar's gradient, never on the side (02/11/2026).
     chatLabel: "Conversation with Cortex",
     chatNew: "New conversation",
     chatNone: "No conversations yet.",
     chatDelete: "Delete this conversation",
     chatRecent: "Recent conversations",
-    chatPinSide: "Pin to the side",
-    chatBackToBar: "Back to the bar",
     chatFold: "Minimize (Esc)",
-    chatResize: "Resize the conversation",
     chatThinking: "Cortex is thinking",
     chatIntro: "TaskForce's AI agent, built on your workspace's knowledge. It cites its sources.",
     chatHint: "Write in the bar below, then press Enter.",
@@ -526,6 +571,8 @@ export const CONSTANTS_EN = {
       openPullRequest: "Open the pull request",
       branchOnly: "{commits} commits on the branch {branch}, without a pull request.",
       noChange: "No code change was needed.",
+      // R51: the trial agent answers in a comment, without a repository.
+      answeredInComment: "Answered in a comment on this issue.",
       isItGood: "Is it good?",
       testsRan: "Tests ran",
       testsFailed: "Tests failed",
@@ -649,6 +696,12 @@ export const CONSTANTS_EN = {
 
   // Cortex in the conversation.
   cortex: {
+    // R116: TaskForce's own words in an answer, in place of a sentence where Cortex said something was done that no
+    // action of the turn did. Shown under TaskForce's name and style, never as the model's words.
+    taskforceSays: "TaskForce",
+    taskforceSaysWhat: "corrected what Cortex said was done",
+    taskforceSaysLabel: "Correction by TaskForce",
+    taskforceSaysHint: "Cortex said something was done, but no action of this turn did it. TaskForce replaced its sentence with what happened: these are not the model's words.",
     // The issue Cortex prepares as a card (R78): the person checks it, edits it, then creates it.
     issueCardTitle: "New issue, prepared by Cortex",
     issueCardHint: "Filled from your request and the project",
@@ -691,6 +744,43 @@ export const CONSTANTS_EN = {
     issueNeedsTitle: "An issue needs a title.",
     issueDueInPast: "The due date is in the past.",
     issueUnknownColumn: "This column isn't in the project anymore: choose another one.",
+    // The mission of an issue in the conversation (TF-J1-5): its requests and its result, decided with the cards' buttons.
+    missionOf: "Mission of {key}: {title}",
+    // Deleting an issue from the conversation asks first: archiving can be undone, deleting can't (TF-J1-5).
+    deleteTitle: "Delete {key}: {title}?",
+    deleteGoesWith: "Goes with it: {what}.",
+    deleteNothingElse: "Nothing else goes with it.",
+    deleteOneComment: "1 comment",
+    deleteComments: "{count} comments",
+    deleteOneChecklistItem: "a checklist of 1 item",
+    deleteChecklist: "a checklist of {count} items",
+    deleteMission: "its mission and the mission's record",
+    deleteHint: "Archiving hides it from the board and can be undone. Deleting removes it for good.",
+    deleteArchive: "Archive",
+    deleteArchived: "Archived: {key} no longer shows on the board.",
+    deleteAlreadyArchived: "{key} is already archived.",
+    deleteUndo: "Undo",
+    deleteDelete: "Delete",
+    deleteDeleted: "Deleted.",
+    deleteFailed: "Nothing was deleted: {why}",
+    archiveFailed: "Couldn't archive the issue. Try again in a moment.",
+    // R115: TaskForce asks what a gesture needs, like Claude asks: up to two questions on one card, each with its
+    // choices and what they mean, the recommended one first, "Other" to type an answer, and one Send for the card.
+    questionCard: "Questions from TaskForce",
+    questionWhat: "asks before it acts",
+    questionRecommended: "Recommended",
+    questionSeveral: "Choose one or more.",
+    questionOther: "Other",
+    questionOtherPlaceholder: "Type your answer",
+    questionOtherLabel: "Your own answer: {question}",
+    questionSend: "Send",
+    questionSending: "Sending…",
+    questionAnswered: "Your answer: {value}",
+    questionAnswers: "Your answers: {value}",
+    questionFailed: "Your answers didn't go through: {why}",
+    taskforceAsksWhat: "asked before it acted",
+    taskforceAsksLabel: "Questions from TaskForce",
+    taskforceAsksHint: "TaskForce, not the model, asked what this action needed. Nothing was done until the answers were sent.",
   },
 } as const
 

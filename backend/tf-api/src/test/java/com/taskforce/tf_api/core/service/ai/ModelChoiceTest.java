@@ -103,4 +103,29 @@ class ModelChoiceTest {
         assertThat(ModelChoice.pick(OLLAMA, List.of("mxbai-embed-large"))).isNull();
         assertThat(ModelChoice.pick(null, List.of("bge-m3"))).isNull();
     }
+
+    static Stream<Arguments> chatModels() {
+        return Stream.of(
+            // Les modèles de cette machine le 04/11/2026 : les préférences d'abord, puis l'ordre d'Ollama, sans vecteurs.
+            Arguments.of(AiProvider.OLLAMA,
+                List.of("qwen2.5-coder:7b-base", "qwen3-embedding:0.6b", "qwen3:14b", "bge-m3:latest", "qwen2.5:7b-instruct",
+                    "qwen3:8b"),
+                List.of("qwen3:8b", "qwen2.5:7b-instruct", "qwen2.5-coder:7b-base", "qwen3:14b")),
+            // Groq : la voix, la transcription et les filtres de sécurité ne conversent pas.
+            Arguments.of(AiProvider.OPENAI,
+                List.of("whisper-large-v3", "openai/gpt-oss-120b", "meta-llama/llama-guard-4-12b", "playai-tts",
+                    "openai/gpt-oss-20b"),
+                List.of("openai/gpt-oss-120b", "openai/gpt-oss-20b")),
+            Arguments.of(AiProvider.ANTHROPIC, List.of("claude-haiku-4-5-20251001", "claude-sonnet-5-5"),
+                List.of("claude-sonnet-5-5", "claude-haiku-4-5-20251001")),
+            Arguments.of(AiProvider.OLLAMA, List.of(), List.of()));
+    }
+
+    @ParameterizedTest(name = "{0} : {2}")
+    @MethodSource("chatModels")
+    @DisplayName("la table lit les modèles de conversation, ceux des préférences d'abord")
+    void chatModelsInTheOrderOfTheTable(AiProvider provider, List<String> listed, List<String> expected) {
+        assertThat(ModelChoice.chatModels(provider, listed)).containsExactlyElementsOf(expected);
+        assertThat(ModelChoice.chatModels(provider, null)).isEmpty();
+    }
 }

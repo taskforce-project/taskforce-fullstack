@@ -59,7 +59,7 @@
         "shell",
         "git.commit", "git.push", "git.merge",
         "pr.open", "pr.merge", "pr.close",
-        "issue.read", "issue.create", "issue.update", "comment.create",
+        "issue.read", "issue.create", "issue.update", "issue.delete", "comment.create",
         "project.create",
         "knowledge.search", "knowledge.create", "knowledge.write",
         "web.search", "web.fetch",
