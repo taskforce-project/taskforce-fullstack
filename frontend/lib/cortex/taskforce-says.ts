@@ -7,14 +7,25 @@
  *
  * Un bloc signé « TaskForce · models » parle du modèle qui répond (R113, R118) : la banque dit qu'il échoue à ce genre de
  * demande et qu'un autre le réussit, ou la personne a envoyé la demande à un autre modèle. Ce n'est pas une correction.
+ * Un bloc signé « TaskForce · asks » dit les questions que TaskForce pose avant un geste (R115), une par ligne : la
+ * conversation montre leur carte à sa place, et une conversation rouverte, sans la carte, les relit.
  */
+export type AnswerKind = "models" | "asks"
+
 export type AnswerPart =
   | { by: "cortex"; text: string }
-  | { by: "taskforce"; lines: string[]; kind?: "models" }
+  | { by: "taskforce"; lines: string[]; kind?: AnswerKind }
 
 const SIGNATURE = /^\s*>\s?\[!taskforce\]/i
 const QUOTED = /^\s*>\s?/
 const ABOUT_MODELS = /·\s*models\s*$/i
+const ASKS = /·\s*asks\s*$/i
+
+function kindOf(signature: string): AnswerKind | undefined {
+  if (ABOUT_MODELS.test(signature)) return "models"
+  if (ASKS.test(signature)) return "asks"
+  return undefined
+}
 
 /** Coupe une réponse en ce que Cortex a écrit et ce que TaskForce dit, dans l'ordre de la réponse. */
 export function splitAnswer(answer: string): AnswerPart[] {
@@ -30,9 +41,8 @@ export function splitAnswer(answer: string): AnswerPart[] {
     if (SIGNATURE.test(line)) {
       flush()
       taskforce = []
-      parts.push(ABOUT_MODELS.test(line)
-        ? { by: "taskforce", lines: taskforce, kind: "models" }
-        : { by: "taskforce", lines: taskforce })
+      const kind = kindOf(line)
+      parts.push(kind ? { by: "taskforce", lines: taskforce, kind } : { by: "taskforce", lines: taskforce })
     } else if (taskforce && QUOTED.test(line)) {
       const said = line.replace(QUOTED, "").trim()
       if (said) taskforce.push(said)

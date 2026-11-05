@@ -447,15 +447,14 @@ export function AgentChat({ onFold }: Readonly<{
 }
 
 /**
- * Un appel d'outil de la réponse, et la carte qui va avec : la question de TaskForce (R115), la carte d'une issue
- * préparée, d'une suppression, d'une action demandée, d'Undo ou d'une mission. Après la réponse à une question, la
- * suite du geste se rend ici à son tour, sous la question (`followUp`).
+ * Un appel d'outil de la réponse, et la carte qui va avec : les questions de TaskForce (R115), la carte d'une issue
+ * préparée, d'une suppression, d'une action demandée, d'Undo ou d'une mission. Après les réponses à une carte de
+ * questions, la suite du geste se rend ici à son tour, sous elle.
  */
-function ToolCallView({ slug, call, followUp = false }: { slug: string; call: AssistantToolCall; followUp?: boolean }) {
-  // TaskForce demande ce qu'il manque au geste (R115) : ses choix, et la suite sur le clic de la personne.
+function ToolCallView({ slug, call }: { slug: string; call: AssistantToolCall }) {
+  // TaskForce demande ce qu'il manque au geste (R115) : une carte de deux questions au plus, et la suite sur son envoi.
   if (isQuestionCard(call)) {
-    return <QuestionCard slug={slug} call={call} showText={followUp}
-      then={(next) => <ToolCallView slug={slug} call={next} followUp />} />
+    return <QuestionCard slug={slug} call={call} then={(next) => <ToolCallView slug={slug} call={next} />} />
   }
   // Cortex demande d'abord ce qui compte (R102) : rien n'est préparé, sa question est la réponse.
   if (isQuestion(call)) return null
@@ -486,6 +485,8 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
   // Le dossier de la réponse, que porte chacun de ses appels d'outil : il fait d'elle un cas de la banque (R61,
   // séance n°10). Une réponse sans outil que TaskForce a corrigée a le sien (R116).
   const record = answer.record ?? answer.toolCalls.find((tc) => tc.record)?.record
+  // Les questions de TaskForce se lisent sur leur carte (R115) : le texte de la réponse ne les répète pas au-dessus.
+  const asking = answer.toolCalls.some(isQuestionCard)
   return (
     <div className="group/answer space-y-1">
       {answer.steps.length > 0 && (
@@ -493,7 +494,7 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
       )}
       {answer.reasoning && <Reasoning content={answer.reasoning} />}
       {/* Ce que TaskForce dit à la place d'une phrase fausse se montre comme sa parole, pas celle du modèle (R116). */}
-      <AnswerText text={answer.answer} />
+      <AnswerText text={answer.answer} withCard={asking} />
       {answer.toolCalls.map((tc, i) => <ToolCallView key={i} slug={slug} call={tc} />)}
       {answer.sources.length > 0 && (
         <Sources items={answer.sources.map((s) => ({ title: s.title, snippet: s.domain, score: s.score ?? undefined }))} />

@@ -247,28 +247,33 @@ describe('assistant-service: the mission of an issue in the conversation (TF-J1-
       { message: 'supprime ça', conversationId: 4, screen: { projectId: 12, issueId: 34 } }, expect.anything());
   });
 
-  const question = { field: 'issue', text: 'Which issue should be deleted?', choices: [
-    { value: 'TESTTA-2', label: 'TESTTA-2 Ajouter (In review by AI)', recommended: true },
-  ] };
+  const questions = [
+    { field: 'name', header: 'Name', text: 'What should the project be called?', multiple: false, choices: [] },
+    { field: 'repository', header: 'Repository', text: 'Where does its code live?', multiple: false, choices: [
+      { value: 'new-private', label: 'A new private repository', description: 'Only the people you add see the code', recommended: true },
+    ] },
+  ];
 
   it.each([
-    ['a question of TaskForce, with its record and its ref', call({ status: 'question', record: 'r', ref: 'q', question }), true],
-    ['a question asked before R115, with no choices', call({ status: 'question', record: 'r', ref: 'q', question: null }), false],
-    ['a question without its ref', call({ status: 'question', record: 'r', ref: null, question }), false],
-    ['a pending gesture', call({ status: 'pending', record: 'r', ref: 'q', question }), false],
+    ['a card of TaskForce, with its record and its ref', call({ status: 'question', record: 'r', ref: 'q', questions }), true],
+    ['a question asked before R115, with no card', call({ status: 'question', record: 'r', ref: 'q', questions: null }), false],
+    ['a card with no question', call({ status: 'question', record: 'r', ref: 'q', questions: [] }), false],
+    ['a card without its ref', call({ status: 'question', record: 'r', ref: null, questions }), false],
+    ['a pending gesture', call({ status: 'pending', record: 'r', ref: 'q', questions }), false],
   ])('isQuestionCard: %s -> %s', (_label, toolCall, expected) => {
     expect(isQuestionCard(toolCall)).toBe(expected);
   });
 
-  it('answerQuestion: POST the answer with the record and the ref, and returns how the gesture goes on', async () => {
-    const next = call({ name: 'delete_issue', status: 'pending', record: 'r' });
+  it('answerQuestion: POST all the answers of the card with the record and the ref, and returns how the gesture goes on', async () => {
+    const next = call({ name: 'create_project', status: 'success', record: 'r', ref: 'sha256:r1' });
     vi.mocked(apiClient.post).mockResolvedValue(envelope(next));
+    const answers = [{ field: 'name', values: [], other: 'Atlas' }, { field: 'repository', values: ['new-private'] }];
 
-    const result = await answerQuestion(slug, call({ name: 'delete_issue', status: 'question', record: 'r', ref: 'q', question }),
-      'TESTTA-2');
+    const result = await answerQuestion(slug,
+      call({ name: 'create_project', status: 'question', record: 'r', ref: 'q', questions }), answers);
 
     expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.ACTION_ANSWER(slug),
-      { tool: 'delete_issue', record: 'r', ref: 'q', value: 'TESTTA-2' });
+      { tool: 'create_project', record: 'r', ref: 'q', answers });
     expect(result).toEqual(next);
   });
 });

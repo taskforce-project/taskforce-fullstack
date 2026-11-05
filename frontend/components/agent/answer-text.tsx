@@ -3,22 +3,23 @@
 import { ShieldCheck } from "lucide-react"
 
 import { Markdown } from "@/components/ui/lightweight-markdown"
-import { splitAnswer } from "@/lib/cortex/taskforce-says"
+import { splitAnswer, type AnswerKind } from "@/lib/cortex/taskforce-says"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 
 /**
  * Le texte d'une réponse de Cortex : son markdown, et ce que TaskForce y dit à la place d'une phrase où Cortex disait
- * avoir fait ce qu'aucune action du tour n'a fait (R116), ou à propos du modèle qui répond (R118), sous son nom et dans
- * son style, jamais mêlé aux mots du modèle.
+ * avoir fait ce qu'aucune action du tour n'a fait (R116), à propos du modèle qui répond (R118), ou les questions qu'il
+ * pose avant un geste (R115), sous son nom et dans son style, jamais mêlé aux mots du modèle. Quand la carte de ces
+ * questions est là (`withCard`), c'est elle qui les montre : le bloc ne les répète pas.
  */
-export function AnswerText({ text }: Readonly<{ text: string }>) {
+export function AnswerText({ text, withCard = false }: Readonly<{ text: string; withCard?: boolean }>) {
   return (
     <>
-      {splitAnswer(text).map((part, i) =>
-        part.by === "cortex"
-          ? <Markdown key={i} content={part.text} />
-          : <TaskForceSays key={i} lines={part.lines} kind={part.kind} />,
-      )}
+      {splitAnswer(text).map((part, i) => {
+        if (part.by === "cortex") return <Markdown key={i} content={part.text} />
+        if (part.kind === "asks" && withCard) return null
+        return <TaskForceSays key={i} lines={part.lines} kind={part.kind} />
+      })}
     </>
   )
 }
@@ -29,17 +30,21 @@ export function AnswerText({ text }: Readonly<{ text: string }>) {
  */
 export function TaskForceSays({ lines, kind, children }: Readonly<{
   lines: string[]
-  kind?: "models"
+  kind?: AnswerKind
   children?: React.ReactNode
 }>) {
   const t = usePreferencesStore((s) => s.t.cortex)
   const m = usePreferencesStore((s) => s.t.models)
-  const models = kind === "models"
+  const says = kind === "models"
+    ? { label: m.saysLabel, hint: m.saysHint, what: m.saysWhat }
+    : kind === "asks"
+      ? { label: t.taskforceAsksLabel, hint: t.taskforceAsksHint, what: t.taskforceAsksWhat }
+      : { label: t.taskforceSaysLabel, hint: t.taskforceSaysHint, what: t.taskforceSaysWhat }
   return (
     <div
       role="note"
-      aria-label={models ? m.saysLabel : t.taskforceSaysLabel}
-      title={models ? m.saysHint : t.taskforceSaysHint}
+      aria-label={says.label}
+      title={says.hint}
       data-by="taskforce"
       className="my-2 flex gap-2 border-l-2 border-primary bg-primary/[0.06] px-3 py-2"
     >
@@ -47,7 +52,7 @@ export function TaskForceSays({ lines, kind, children }: Readonly<{
       <div className="min-w-0 space-y-0.5 text-sm leading-relaxed">
         <p className="text-xs">
           <span className="font-semibold text-primary">{t.taskforceSays}</span>
-          <span className="text-muted-foreground"> · {models ? m.saysWhat : t.taskforceSaysWhat}</span>
+          <span className="text-muted-foreground"> · {says.what}</span>
         </p>
         {lines.map((line, i) => (
           <p key={i} className="text-foreground">{line}</p>
