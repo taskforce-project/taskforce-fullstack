@@ -436,6 +436,9 @@ export const CONSTANTS_EN = {
     useHint: "Cortex answers you with this model",
     useInstance: "Use the instance's model",
     instanceModel: "This instance's model for Cortex: {model}.",
+    // On Ollama, the gateway sizes the context window to each request, up to this many tokens.
+    instanceModelWindow: "This instance's model for Cortex: {model}, with a context window of up to {tokens} tokens.",
+    contextWindow: "context window of up to {tokens} tokens",
     yourChoice: "You chose {model} for Cortex.",
     noModels: "The AI of this instance serves no model right now.",
     proposalTitle: "TaskForce proposes",
