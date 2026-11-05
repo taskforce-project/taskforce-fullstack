@@ -1319,6 +1319,64 @@ class AgentServiceTest {
             .isEqualTo("> [!taskforce] TaskForce · asks\n> Who should take TF-12? Several members of TaskForce match \"ada\".\n");
     }
 
+    /**
+     * Test du CEO du 05/11/2026 : « supprime l'issue qu'il y a dans In review by AI ». Quand Cortex ne fait pas le geste
+     * (aucun outil, ou une lecture seulement), TaskForce le fait sur la demande : la colonne nommée désigne l'issue, et sa
+     * carte attend la personne, sans rien supprimer ; la réponse dit où décider.
+     */
+    @ParameterizedTest(name = "le modèle : {0}")
+    @ValueSource(strings = {"none", "list_issues"})
+    void taskforce_shows_the_card_of_the_issue_the_column_names(String modelDid) throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        if ("none".equals(modelDid)) {
+            when(llm.rawChat(anyList(), anyList(), anyString()))
+                .thenReturn(json.readTree("{\"content\":\"Laquelle voulez-vous supprimer ?\"}"));
+        } else {
+            gesture("list_issues", "issue.read");
+            when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
+                json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"list_issues\",\"arguments\":\"{}\"}}]}"),
+                json.readTree("{\"content\":\"TESTTA-1 et TESTTA-2 ont le meme titre.\"}"));
+        }
+        CortexGesture delete = Mockito.mock(CortexGesture.class);
+        lenient().when(delete.name()).thenReturn("delete_issue");
+        lenient().when(delete.action()).thenReturn("issue.delete");
+        when(tools.get("delete_issue")).thenReturn(delete);
+        when(delete.ask(any(), any())).thenReturn(Map.of("issue", "TESTTA-2", "projectId", 12, "issueId", 22));
+        when(delete.preview(any(), any())).thenReturn(new CortexGesture.Done("Deleting TESTTA-2, in In review by AI, removes "
+            + "it for good.", Map.of("issueId", 22, "key", "TESTTA-2", "column", "In review by AI"), null));
+
+        AssistantAnswer answer = service.run("acme", 7L, "supprime l'issue qu'il y a dans In review by AI", List.of(),
+            new Screen(12L, null));
+
+        AssistantToolCall card = answer.toolCalls().get(answer.toolCalls().size() - 1);
+        assertThat(card.name()).isEqualTo("delete_issue");
+        assertThat(card.status()).isEqualTo("pending");
+        assertThat(card.record()).isEqualTo(RECORD.toString());
+        assertThat(card.target()).containsEntry("key", "TESTTA-2").containsEntry("column", "In review by AI");
+        assertThat(json.readTree(card.input()).path("issueId").asInt()).isEqualTo(22); // l'accord reprend cette issue
+        assertThat(answer.answer()).isEqualTo(AgentService.CARD_ANSWERS.get("delete_issue"));
+        ArgumentCaptor<AgentContext> ctx = ArgumentCaptor.forClass(AgentContext.class);
+        verify(delete).ask(any(), ctx.capture());
+        assertThat(ctx.getValue().request()).isEqualTo("supprime l'issue qu'il y a dans In review by AI");
+        verify(delete, never()).perform(any(), any());
+    }
+
+    @Test
+    @DisplayName("une carte qui attend déjà la personne : TaskForce n'en ajoute pas une seconde")
+    void no_second_card_when_one_already_waits() throws Exception {
+        modelCalls("update_issue", "{\"issue\":\"TF-12\",\"assignee\":\"ada\"}", "Done.");
+        CortexGesture update = gesture("update_issue", "issue.update");
+        when(update.ask(any(), any())).thenThrow(new QuestionNeeded(Question.of("assignee", "Assignee", "Who?", List.of())));
+
+        AssistantAnswer answer = service.run("acme", 7L, "supprime TF-12 puis assigne-la a Ada");
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> assertThat(call.name()).isEqualTo("update_issue"));
+        verify(tools, never()).get("delete_issue");
+    }
+
     @Test
     @DisplayName("R115 : l'issue que le geste a résolue est celle que la carte montre et que l'accord reprend")
     void the_card_carries_the_issue_the_gesture_resolved() throws Exception {

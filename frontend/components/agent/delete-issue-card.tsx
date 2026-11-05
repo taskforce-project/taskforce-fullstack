@@ -26,9 +26,18 @@ function goesWith(target: AssistantTarget, t: Texts): string[] {
 
 type State = "idle" | "archiving" | "archived" | "restoring" | "deleting" | "deleted"
 
+/** Le titre de la carte : l'issue, sa colonne à côté de sa clé quand le serveur la donne, et son titre. */
+export function deletionTitle(target: AssistantTarget, t: Texts): string {
+  const key = target.key ?? ""
+  return target.column
+    ? fillText(t.deleteTitleIn, { key, column: target.column, title: target.title })
+    : fillText(t.deleteTitle, { key, title: target.title })
+}
+
 /**
- * « Supprime TF-12 » dans la conversation (TF-J1-5) : la règle delete-issue demande, et cette carte dit l'issue et ce
- * qui partirait avec elle. « Archive » d'abord : l'issue quitte le tableau, et « Undo » la remet. « Delete » ensuite :
+ * « Supprime TF-12 » dans la conversation (TF-J1-5) : la règle delete-issue demande, et cette carte dit l'issue, sa
+ * colonne (test du CEO du 05/11/2026 : la carte d'une autre issue au même titre doit se voir d'emblée) et ce qui
+ * partirait avec elle. « Archive » d'abord : l'issue quitte le tableau, et « Undo » la remet. « Delete » ensuite :
  * l'accord part avec le dossier de la réponse, où le serveur rejuge la suppression. Seul ce clic supprime, jamais un
  * « oui » écrit (R1).
  */
@@ -39,6 +48,7 @@ export function DeleteIssueCard({ slug, call, target }: Readonly<{ slug: string;
   const [problem, setProblem] = useState<string | null>(null)
   const [deleted, setDeleted] = useState<string | null>(null)
   const key = target.key ?? ""
+  const title = deletionTitle(target, t)
   const what = goesWith(target, t)
   const busy = state === "archiving" || state === "restoring" || state === "deleting"
 
@@ -78,9 +88,8 @@ export function DeleteIssueCard({ slug, call, target }: Readonly<{ slug: string;
   }
 
   return (
-    <div className="my-2 flex flex-col gap-2 border border-border p-2.5 text-xs" role="group"
-      aria-label={fillText(t.deleteTitle, { key, title: target.title })}>
-      <p className="font-medium text-foreground">{fillText(t.deleteTitle, { key, title: target.title })}</p>
+    <div className="my-2 flex flex-col gap-2 border border-border p-2.5 text-xs" role="group" aria-label={title}>
+      <p className="font-medium text-foreground">{title}</p>
       <p className="text-muted-foreground">
         {what.length > 0 ? fillText(t.deleteGoesWith, { what: what.join(", ") }) : t.deleteNothingElse}
       </p>

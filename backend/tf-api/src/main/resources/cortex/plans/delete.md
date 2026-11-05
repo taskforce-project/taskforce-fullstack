@@ -4,8 +4,8 @@ gestures: delete_issue, list_issues
 ask: delete_issue
 ---
 Plan to delete or archive an issue:
-1. Take the issue's key: one the person wrote, the open issue, or the issue On screen they name by its column or its title. Not on screen: list_issues gives it.
-2. Call delete_issue once with that key. Not sure which issue: call it without the issue, and TaskForce asks the person.
-3. Its card lets the person archive it (it can be undone) or delete it for good. Until they click, nothing is deleted: say so.
+1. Take the issue's key: one the person wrote, the open issue, or the issue On screen they name by its title. Not on screen: list_issues gives it.
+2. Call delete_issue once with that key. Named by its column ("the one in Done"), or not sure which issue: call it without the issue. TaskForce takes the issue in that column, or asks the person.
+3. Its card shows the issue's column and lets the person archive it (it can be undone) or delete it for good. Until they click, nothing is deleted: say so.
 Never prepare an issue (create_issue) for a deletion, and never look for a note.
 A project, a note or a column is deleted from its own page.

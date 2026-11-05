@@ -765,6 +765,8 @@ export const CONSTANTS_EN = {
     missionOf: "Mission of {key}: {title}",
     // Deleting an issue from the conversation asks first: archiving can be undone, deleting can't (TF-J1-5).
     deleteTitle: "Delete {key}: {title}?",
+    // The issue's column next to its key, so a card for another issue than the one meant shows at once (05/11/2026).
+    deleteTitleIn: "Delete {key} ({column}): {title}?",
     deleteGoesWith: "Goes with it: {what}.",
     deleteNothingElse: "Nothing else goes with it.",
     deleteOneComment: "1 comment",

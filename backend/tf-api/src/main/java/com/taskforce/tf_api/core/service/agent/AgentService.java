@@ -592,21 +592,33 @@ public class AgentService {
         if (plan != null) origin.put("plan", plan.id());
         Kernel kernel = new Kernel(ctx, message, origin);
         String answer = toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel);
-        return toolCalls.isEmpty() && plan != null && plan.ask() != null ? askedForCortex(plan.ask(), kernel, toolCalls, answer)
+        // Le geste du plan, quand Cortex ne l'a pas fait et que rien n'attend déjà la personne (une carte, une question).
+        boolean gestureMade = plan != null && toolCalls.stream().anyMatch(call -> call.name().equals(plan.ask())
+            || QUESTION.equals(call.status()) || "pending".equals(call.status()));
+        return plan != null && plan.ask() != null && !gestureMade ? askedForCortex(plan.ask(), kernel, toolCalls, answer)
             : answer;
     }
 
     /**
      * La demande appelle un geste que Cortex n'a pas fait : à « supprime ça », qwen3:8b répond « dites-moi laquelle »
-     * sans outil (04/11/2026). TaskForce pose alors lui-même ce que ce geste exige (R115), avec l'écran en choix, au
-     * dossier de la réponse ; rien n'est fait. Sans question à poser, la réponse de Cortex reste.
+     * sans outil (04/11/2026), ou lit les issues sans rien proposer. TaskForce fait alors lui-même ce geste, sur la
+     * demande de la personne (R115) : quand elle désigne l'issue (sa colonne, pour supprimer), sa carte, qui ne fait rien
+     * avant le clic ; sinon ce que le geste exige, avec l'écran en choix, au dossier de la réponse. Sans carte ni
+     * question, la réponse de Cortex reste.
      */
     private String askedForCortex(String name, Kernel kernel, List<AssistantToolCall> toolCalls, String answer) {
         AgentTool gesture = tools.get(name);
         if (!(gesture instanceof CortexGesture)) return answer;
         ToolOutcome outcome = kernel.apply(gesture, name, "{}");
-        if (outcome.questions() == null) return answer;
-        toolCalls.add(new AssistantToolCall(name, outcome.status(), "{}", outcome.result(), kernel.recordRef(), outcome.ref(),
+        String input = outcome.input() != null ? outcome.input() : "{}";
+        if (outcome.questions() == null) {
+            // Le geste a trouvé ce qu'il lui faut : sa carte attend la personne, la réponse dit où décider (cardAnswer).
+            if (!"pending".equals(outcome.status()) || outcome.target() == null) return answer;
+            toolCalls.add(new AssistantToolCall(name, outcome.status(), input, outcome.result(), kernel.recordRef(),
+                outcome.ref(), outcome.target()));
+            return answer;
+        }
+        toolCalls.add(new AssistantToolCall(name, outcome.status(), input, outcome.result(), kernel.recordRef(), outcome.ref(),
             outcome.target(), card(outcome.questions())));
         return asking(outcome.questions());
     }

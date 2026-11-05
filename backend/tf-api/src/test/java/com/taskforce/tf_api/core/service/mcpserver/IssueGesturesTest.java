@@ -401,6 +401,108 @@ class IssueGesturesTest {
             });
     }
 
+    // ------------------------------------------------------------------ la colonne que la demande nomme (supprimer)
+
+    private static final IssueStatusResponse DONE = column(5L, "Done", IssueStatusCategory.COMPLETED);
+    private static final String LTS = "Ajouter la version LTS actuelle de Node.js au README";
+    /**
+     * Le projet test-taskforce du CEO, le 05/11/2026 : TESTTA-1 dans Done et TESTTA-2 dans In review by AI portent le même
+     * titre ; deux issues dans Todo, dont une dont le titre dit « Done ».
+     */
+    private static final List<IssueResponse> TESTTA = List.of(
+        onBoard(21L, "TESTTA-1", LTS, DONE, 4),
+        onBoard(22L, "TESTTA-2", LTS, REVIEW, 1),
+        onBoard(23L, "TESTTA-3", "Corriger le login", TODO, 3),
+        onBoard(24L, "TESTTA-4", "Done page redesign", TODO, 2));
+
+    /** Un autre projet de l'espace, avec sa colonne « In review by AI » : sans tableau à l'écran, elle compte aussi. */
+    private static final IssueResponse OTHER_1 = IssueResponse.builder().id(31L).projectId(13L).identifier("OTHER-1")
+        .title("Mettre à jour la page d'accueil").status(REVIEW).updatedAt(LocalDateTime.of(2026, 11, 2, 12, 0).minusDays(6))
+        .build();
+
+    /**
+     * Test du CEO du 05/11/2026 : « supprime l'issue qu'il y a dans In review by AI » donnait la carte de TESTTA-1, dans
+     * Done, que le modèle avait choisie à son titre. Quand la demande nomme une colonne, l'issue vient de cette colonne,
+     * celle du tableau à l'écran, sinon de tous les projets que la personne voit : une seule, c'est elle ; plusieurs,
+     * celles dont la demande écrit le titre, sinon TaskForce demande avec elles ; aucune, avec l'écran. La clé que la
+     * personne écrit l'emporte, et les mots d'une colonne dits par le titre de l'issue choisie ne nomment pas de colonne.
+     */
+    @ParameterizedTest(name = "« {0} », le modèle {1}, écran {2} : {3}")
+    @CsvSource(delimiter = '|', quoteCharacter = '`', nullValues = "-", value = {
+        "supprime l'issue qu'il y a dans In review by AI        | TESTTA-1 | 12 | TESTTA-2 | -",
+        "supprime l'issue qu'il y a dans In review by AI        | -        | 12 | TESTTA-2 | -",
+        // Sans tableau : la colonne de chaque projet visible ; deux issues y sont, TaskForce demande.
+        "supprime l'issue qu'il y a dans In review by AI        | TESTTA-1 | -  | -        | 2 issues are in In review by AI.~TESTTA-2,OTHER-1",
+        // Sans tableau, le titre que la personne écrit départage, la colonne écarte TESTTA-1 au même titre.
+        "`supprime l'issue Ajouter la version LTS actuelle de Node.js au README, celle qu'il y a dans In review by AI` | `Ajouter la version LTS, In review by AI` | - | TESTTA-2 | -",
+        "delete the issue in in-review-by-ai                    | TESTTA-1 | 12 | TESTTA-2 | -",
+        "efface celle qui est dans Done                         | TESTTA-2 | 12 | TESTTA-1 | -",
+        "supprime l'issue de la colonne todo                    | TESTTA-3 | 12 | -        | 2 issues are in Todo.~TESTTA-4,TESTTA-3",
+        "supprime l'issue dans In Progress                      | TESTTA-1 | 12 | -        | No issue is in In Progress.~TESTTA-2,TESTTA-4,TESTTA-3,TESTTA-1",
+        // La personne a écrit la clé : elle l'emporte sur la colonne.
+        "supprime TESTTA-1 qui est dans In review by AI          | TESTTA-1 | 12 | TESTTA-1 | -",
+        "supprime testta 1 dans In review by AI                  | TESTTA-1 | 12 | TESTTA-1 | -",
+        // « Done » est dans le titre de l'issue choisie, pas une colonne.
+        "supprime l'issue Done page redesign                     | TESTTA-4 | 12 | TESTTA-4 | -",
+        // Entre guillemets : un titre cité.
+        "`supprime \"Done page redesign\"`                       | TESTTA-4 | 12 | TESTTA-4 | -",
+        // Deux colonnes : aucune ne désigne l'issue, celle du modèle reste.
+        "supprime celle de Todo, pas celle de Done               | TESTTA-3 | 12 | TESTTA-3 | -",
+        // Aucune colonne : celle du modèle reste.
+        "supprime l'issue sur le login                           | TESTTA-3 | 12 | TESTTA-3 | -",
+    })
+    void the_column_the_request_names_designates_the_issue(String request, String picked, Long screen, String resolved,
+                                                          String asked) throws Exception {
+        lenient().when(issueService.listIssues("acme", 12L, ME)).thenReturn(TESTTA);
+        lenient().when(issueService.listIssues("acme", 13L, ME)).thenReturn(List.of(OTHER_1));
+        lenient().when(projectService.listProjects("acme", ME)).thenReturn(List.of(
+            ProjectResponse.builder().id(12L).identifier("TESTTA").build(), ProjectResponse.builder().id(13L).identifier("OTHER").build()));
+        lenient().when(issueService.listMyIssues("acme", ME)).thenReturn(List.of(OTHER_1));
+        lenient().when(issueService.listStatuses("acme", 12L, ME)).thenReturn(List.of(TODO, DOING, REVIEW, DONE));
+        Project testta = Project.builder().id(12L).identifier("TESTTA").name("test-taskforce").build();
+        lenient().when(projects.findByWorkspaceIdAndIdentifier(1L, "TESTTA")).thenReturn(Optional.of(testta));
+        lenient().when(visibility.canView(testta, ME)).thenReturn(true);
+        for (IssueResponse issue : TESTTA) {
+            int number = Integer.parseInt(issue.getIdentifier().substring("TESTTA-".length()));
+            lenient().when(issues.findByProjectIdAndSequenceNumber(12L, number))
+                .thenReturn(Optional.of(Issue.builder().id(issue.getId()).build()));
+            lenient().when(issueService.getIssue("acme", 12L, issue.getId(), ME)).thenReturn(issue);
+        }
+        JsonNode body = args(picked == null ? "{}" : "{\"issue\": \"" + picked + "\"}");
+        Screen seen = screen == null ? Screen.NONE : new Screen(screen, null);
+
+        if (resolved != null) {
+            JsonNode out = gestures.issueOf("acme", ME, seen, body, "Which issue should be deleted?", request);
+            assertThat(out.path("issue").asText()).isEqualTo(resolved);
+            assertThat(out.path("issueId").asLong()).isEqualTo(
+                TESTTA.stream().filter(i -> i.getIdentifier().equals(resolved)).findFirst().orElseThrow().getId());
+            return;
+        }
+        String[] question = asked.split("~");
+        assertThatThrownBy(() -> gestures.issueOf("acme", ME, seen, body, "Which issue should be deleted?", request))
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> {
+                assertThat(needed.question().text()).isEqualTo(question[0] + " Which issue should be deleted?");
+                assertThat(needed.question().choices()).extracting(Question.Choice::value)
+                    .containsExactly(question[1].split(","));
+                // Chaque choix dit sa colonne : la personne voit tout de suite où est chacune.
+                assertThat(needed.question().choices()).allMatch(choice -> choice.description() != null);
+            });
+    }
+
+    @Test
+    @DisplayName("sans la demande (un agent extérieur, une réponse à une carte), la clé du modèle reste celle de l'issue")
+    void without_the_request_the_key_stays() throws Exception {
+        when(projects.findByWorkspaceIdAndIdentifier(1L, "TF")).thenReturn(Optional.of(PROJECT));
+        when(visibility.canView(PROJECT, ME)).thenReturn(true);
+        when(issues.findByProjectIdAndSequenceNumber(12L, 12)).thenReturn(Optional.of(Issue.builder().id(5L).build()));
+
+        JsonNode out = gestures.issueOf("acme", ME, new Screen(12L, null), args("{\"issue\": \"TF-12\"}"),
+            "Which issue should be deleted?", null);
+
+        assertThat(out.path("issueId").asLong()).isEqualTo(5L);
+        verify(issueService, never()).listIssues(any(), any(), any());
+    }
+
     @Test
     @DisplayName("sans projet à l'écran, les choix sont les issues de la personne")
     void without_a_project_on_screen_the_choices_are_my_issues() {
@@ -662,10 +764,12 @@ class IssueGesturesTest {
 
         IssueGestures.Gesture preview = gestures.preview("delete_issue", "acme", ME, args("{\"projectId\": 12, \"issueId\": 5}"));
 
-        assertThat(preview.summary()).isEqualTo("Deleting TF-12 \"Fix login\" removes it for good, with its 3 comments, its "
-            + "checklist of 2 items and its mission and the mission's record. Archiving hides it from the board and can be "
-            + "undone. The person chooses on the card below, Archive or Delete: do not ask them to confirm in writing.");
-        assertThat(preview.issue()).containsEntry("comments", 3).containsEntry("checklist", 2)
+        assertThat(preview.summary()).isEqualTo("Deleting TF-12 \"Fix login\", in Todo, removes it for good, with its 3 "
+            + "comments, its checklist of 2 items and its mission and the mission's record. Archiving hides it from the board "
+            + "and can be undone. The person chooses on the card below, Archive or Delete: do not ask them to confirm in "
+            + "writing.");
+        // La carte montre la colonne avec la clé et le titre : une autre issue que celle dont on parle se voit d'emblée.
+        assertThat(preview.issue()).containsEntry("column", "Todo").containsEntry("comments", 3).containsEntry("checklist", 2)
             .containsEntry("mission", "DONE").containsEntry("archived", false).containsEntry("runId", 100L);
         verify(issueService, never()).deleteIssue(any(), any(), any(), any());
         // Les autres gestes n'ont rien de plus à montrer que leur demande.

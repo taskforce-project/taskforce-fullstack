@@ -146,12 +146,14 @@ final class CortexMcpTool implements CortexGesture {
     /**
      * Les arguments avec les ids de l'issue, pour un geste qui en touche une : nommée par sa clé, ou par ce que la
      * personne lit à l'écran ; sinon la question de TaskForce, avec les issues de l'écran. Les autres gestes les gardent.
+     * Pour supprimer, la colonne que la demande nomme désigne l'issue, plutôt que le titre que le modèle a choisi.
      */
     private JsonNode resolved(Map<String, Object> args, AgentContext ctx) {
         JsonNode named = mapper.valueToTree(args == null ? Map.of() : args);
         McpTool.Need issue = tool.needs().stream().filter(need -> ISSUE.equals(need.field())).findFirst().orElse(null);
         if (issue == null) return gestures.withIds(ctx.slug(), ctx.userId(), named);
-        return gestures.issueOf(ctx.slug(), ctx.userId(), ctx.screen(), named, issue.question());
+        String request = IssueGestures.NAMED_BY_COLUMN.contains(tool.name()) ? ctx.request() : null;
+        return gestures.issueOf(ctx.slug(), ctx.userId(), ctx.screen(), named, issue.question(), request);
     }
 
     private String write(Object value) {

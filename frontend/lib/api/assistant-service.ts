@@ -76,6 +76,8 @@ export interface AssistantTarget {
   projectId: number
   key: string | null
   title: string
+  /** La colonne où est l'issue, que la carte d'une suppression montre avec sa clé (test du CEO du 05/11/2026). */
+  column?: string | null
   runId?: number | null
   /** Pour une suppression demandée : ce qui partirait avec l'issue, et si elle est déjà archivée. */
   comments?: number

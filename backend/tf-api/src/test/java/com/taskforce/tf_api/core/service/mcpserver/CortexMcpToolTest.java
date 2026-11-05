@@ -34,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -57,7 +58,7 @@ class CortexMcpToolTest {
         mcp = new TaskforceMcpTools(mapper, mock(ProjectService.class), mock(IssueService.class), mock(SmartAssignService.class),
             mock(BrainSearchService.class), mock(AnalyticsService.class), mock(AgentService.class), gestures, projects);
         lenient().when(gestures.withIds(eq("acme"), eq(7L), any())).thenAnswer(inv -> inv.getArgument(2));
-        lenient().when(gestures.issueOf(eq("acme"), eq(7L), any(), any(), any())).thenAnswer(inv -> inv.getArgument(3));
+        lenient().when(gestures.issueOf(eq("acme"), eq(7L), any(), any(), any(), any())).thenAnswer(inv -> inv.getArgument(3));
     }
 
     @Mock private ProjectGestures projects;
@@ -133,7 +134,7 @@ class CortexMcpToolTest {
     @Test
     @DisplayName("R115 : « commente ça » sans issue ni texte demande les deux dans la même carte, l'issue d'abord")
     void the_issue_and_the_comment_are_asked_in_one_card() {
-        when(gestures.issueOf(eq("acme"), eq(7L), any(), any(), eq("Which issue should get the comment?")))
+        when(gestures.issueOf(eq("acme"), eq(7L), any(), any(), eq("Which issue should get the comment?"), isNull()))
             .thenThrow(new QuestionNeeded(Question.of("issue", "Issue", "Which issue should get the comment?",
                 List.of(Question.Choice.recommended("TF-12", "TF-12 Fix login", "Todo")))));
 
@@ -203,12 +204,31 @@ class CortexMcpToolTest {
     @DisplayName("R115 : l'issue se résout parmi celles de l'écran, qui va avec chaque appel")
     void the_issue_is_resolved_with_the_screen() {
         AgentContext seeing = new AgentContext("acme", 1L, 7L, new Screen(12L, 5L));
-        when(gestures.issueOf(eq("acme"), eq(7L), eq(new Screen(12L, 5L)), any(), eq("Which issue should be deleted?")))
+        when(gestures.issueOf(eq("acme"), eq(7L), eq(new Screen(12L, 5L)), any(), eq("Which issue should be deleted?"), isNull()))
             .thenReturn(mapper.createObjectNode().put("issue", "TF-12").put("projectId", 12).put("issueId", 5));
 
         Map<String, Object> resolved = ((CortexGesture) tool("delete_issue")).ask(Map.of("issue", "the open one"), seeing);
 
         assertThat(resolved).containsEntry("issue", "TF-12").containsEntry("issueId", 5);
+    }
+
+    /**
+     * Test du CEO du 05/11/2026 : pour supprimer, la demande de la personne part avec l'issue, pour que la colonne qu'elle
+     * nomme la désigne ; pour déplacer, la colonne nommée est celle où l'issue va : la demande ne part pas.
+     */
+    @ParameterizedTest(name = "{0} : la demande part {1}")
+    @CsvSource({"delete_issue, true", "update_issue, false", "add_comment, false", "delegate_issue, false"})
+    void the_request_names_the_column_only_for_a_deletion(String name, boolean withRequest) {
+        String request = "supprime l'issue qu'il y a dans In review by AI";
+        AgentContext asking = new AgentContext("acme", 1L, 7L, new Screen(12L, null), request);
+        org.mockito.ArgumentCaptor<String> sent = org.mockito.ArgumentCaptor.forClass(String.class);
+        when(gestures.issueOf(eq("acme"), eq(7L), any(), any(), any(), sent.capture()))
+            .thenReturn(mapper.createObjectNode().put("issue", "TESTTA-2").put("projectId", 12).put("issueId", 22)
+                .put("content", "x").put("status", "Done"));
+
+        ((CortexGesture) tool(name)).ask(Map.of("issue", "TESTTA-1"), asking);
+
+        assertThat(sent.getValue()).isEqualTo(withRequest ? request : null);
     }
 
     @Test
