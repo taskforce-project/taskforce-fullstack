@@ -10,11 +10,12 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
-> **▶ MAJ 05/11/2026 - Release 1.10.0 EN PROD : un seul moteur de règles, un chat qui voit, demande et dit vrai ; desktop 1.7.0 en construction.** `[release]`
+> **▶ MAJ 05/11/2026 - Release 1.10.0 EN PROD : un seul moteur de règles, un chat qui voit, demande et dit vrai ; desktop 1.7.0 publiée.** `[release]`
 > - **Décision du CEO** : « corrige et go release » (la fenêtre de contexte d'Ollama d'abord) ; « deux question au plus », comme les questions de Claude.
 > - **En prod** : `chore(desktop)` 1.7.0 (`0c01b63e`) ; release #488 vers `main` (`c417a3b2`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.10.0 en plomberie ; étiquettes `minor`). Dedans : le moteur unique (#479, R90 b) ; les gestes du chat (#480, TF-J1-5) ; TaskForce dit ce qui a été fait (#483, R116, R118) ; le chat sans carte (#482) ; Cortex voit l'écran et TaskForce demande (#484, R114, R115, R117) ; les questions comme celles de Claude (#486) ; la table des capacités, l'escalade et l'essai de R51 (#485, TF-J1-4) ; la fenêtre de contexte d'Ollama (#487). Migrations V115 et V116.
 > - **Vérifié** : l'API a redémarré à 10:34:54 UTC (35 s de coupure, puis `readyz` 200 : V115 et V116 passées) ; la webapp affiche 1.10.0 à 10:35:51. Pas vérifié : le journal du backend sur VM1 (Tailscale SSH demande une nouvelle validation) ; la passerelle de la prod garde Groq, que #487 ne touche pas.
-> - **Suite** : la desktop 1.7.0 (run 42012064742), puis le site ; le test du CEO sur la boucle complète depuis la barre ; la liste de lancement ; la revue de J1 au Conseil.
+> - **Desktop 1.7.0 publiée** : run 42012064742 depuis `main`, vert, VirusTotal compris ; `desktop-v1.7.0` (préversion, comme les précédentes) et `desktop-latest`, dont `latest.yml` annonce 1.7.0 aux apps installées ; le site est reconstruit pour la proposer.
+> - **Suite** : le test du CEO sur la boucle complète depuis la barre ; la liste de lancement ; la revue de J1 au Conseil.
 
 > **▶ MAJ 05/11/2026 - J1 : Ollama reçoit la fenêtre de contexte dont Cortex a besoin, taillée à chaque requête par la passerelle de modèles.** `[backend + frontend]`
 > - **Origine** : TF-J1-4 (#485) a mesuré sur le poste de la Présidence qu'Ollama faisait tourner Cortex avec sa fenêtre par défaut, 4 096 jetons, alors que le prompt de Cortex en fait environ 2 800 avant la demande (consignes, outils, l'écran depuis #484, puis les notes du Brain OS et l'historique) : Ollama coupait le début de ce qui dépassait, les consignes de Cortex comprises, et tous les modèles perdaient le document de 3 000 mots des cas de capacité.
