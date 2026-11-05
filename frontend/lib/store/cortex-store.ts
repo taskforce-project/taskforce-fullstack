@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import {
   answerQuestion as sendAnswer, sendAgentMessage, type AssistantAnswer, type AssistantToolCall, type ModelEscalation,
+  type QuestionAnswer,
 } from "@/lib/api/assistant-service";
 import {
   deleteConversation, getConversation, listConversations,
@@ -70,11 +71,11 @@ interface CortexState {
   removeConversation: (slug: string, id: number) => Promise<boolean>;
   setOpen: (open: boolean) => void;
   /**
-   * Répond à une question de TaskForce (R115) : la suite du geste (une autre question, sa carte, ce qu'il a fait), ou
-   * null en cas d'échec, et la raison dans `questionProblem`.
+   * Envoie les réponses d'une carte de TaskForce (R115), toutes à la fois : la suite du geste (d'autres questions, sa
+   * carte, ce qu'il a fait), ou null en cas d'échec, et la raison dans `questionProblem`.
    */
-  answerQuestion: (slug: string, call: AssistantToolCall, value: string) => Promise<AssistantToolCall | null>;
-  /** Pourquoi la dernière réponse à une question n'est pas passée, dans les mots du serveur ; null sinon. */
+  answerQuestion: (slug: string, call: AssistantToolCall, answers: QuestionAnswer[]) => Promise<AssistantToolCall | null>;
+  /** Pourquoi les dernières réponses à une carte ne sont pas passées, dans les mots du serveur ; null sinon. */
   questionProblem: string | null;
 }
 
@@ -242,9 +243,12 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
 
   questionProblem: null,
 
-  answerQuestion: async (slug, call, value) => {
-    const said = value.trim();
-    if (!slug || !said) return null;
+  answerQuestion: async (slug, call, answers) => {
+    // Une réponse vide ne part pas : ni choix coché, ni mot tapé.
+    const said = answers
+      .map((answer) => ({ field: answer.field, values: answer.values, other: answer.other?.trim() || undefined }))
+      .filter((answer) => answer.values.length > 0 || answer.other);
+    if (!slug || said.length === 0) return null;
     set({ questionProblem: null });
     try {
       return await sendAnswer(slug, call, said);

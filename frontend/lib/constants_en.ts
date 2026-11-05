@@ -761,14 +761,23 @@ export const CONSTANTS_EN = {
     deleteDeleted: "Deleted.",
     deleteFailed: "Nothing was deleted: {why}",
     archiveFailed: "Couldn't archive the issue. Try again in a moment.",
-    // R115: TaskForce asks what a gesture needs, one question at a time, with choices and a free answer.
-    questionChoices: "Choose an answer",
-    questionDefault: "Default",
-    questionFree: "Or type your answer",
-    questionSend: "Answer",
+    // R115: TaskForce asks what a gesture needs, like Claude asks: up to two questions on one card, each with its
+    // choices and what they mean, the recommended one first, "Other" to type an answer, and one Send for the card.
+    questionCard: "Questions from TaskForce",
+    questionWhat: "asks before it acts",
+    questionRecommended: "Recommended",
+    questionSeveral: "Choose one or more.",
+    questionOther: "Other",
+    questionOtherPlaceholder: "Type your answer",
+    questionOtherLabel: "Your own answer: {question}",
+    questionSend: "Send",
     questionSending: "Sending…",
     questionAnswered: "Your answer: {value}",
-    questionFailed: "Your answer didn't go through: {why}",
+    questionAnswers: "Your answers: {value}",
+    questionFailed: "Your answers didn't go through: {why}",
+    taskforceAsksWhat: "asked before it acted",
+    taskforceAsksLabel: "Questions from TaskForce",
+    taskforceAsksHint: "TaskForce, not the model, asked what this action needed. Nothing was done until the answers were sent.",
   },
 } as const
 

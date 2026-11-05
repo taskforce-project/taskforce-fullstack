@@ -228,27 +228,36 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
     window.history.pushState({}, "", "/");
   });
 
-  // R115 : la réponse à une question de TaskForce reprend le geste ; un refus dit pourquoi.
-  const question: AssistantToolCall = {
-    name: "delete_issue", status: "question", input: "{}", output: "", record: "r", ref: "q",
-    question: { field: "issue", text: "Which issue should be deleted?", choices: [] },
+  // R115 : les réponses d'une carte de TaskForce partent ensemble et reprennent le geste ; un refus dit pourquoi.
+  const card: AssistantToolCall = {
+    name: "create_project", status: "question", input: "{}", output: "", record: "r", ref: "q",
+    questions: [
+      { field: "name", header: "Name", text: "What should the project be called?", multiple: false, choices: [] },
+      { field: "repository", header: "Repository", text: "Where does its code live?", multiple: false, choices: [] },
+    ],
   };
 
-  it("answers a question and returns how the gesture goes on", async () => {
-    const next: AssistantToolCall = { name: "delete_issue", status: "pending", input: "{\"issue\":\"TESTTA-2\"}", output: "", record: "r" };
+  it("sends all the answers of a card at once, typed words trimmed, and returns how the gesture goes on", async () => {
+    const next: AssistantToolCall = { name: "create_project", status: "success", input: "{}", output: "Project created.", record: "r" };
     vi.mocked(answerQuestion).mockResolvedValue(next);
 
-    await expect(useCortexStore.getState().answerQuestion("acme", question, "  TESTTA-2 ")).resolves.toEqual(next);
-    expect(answerQuestion).toHaveBeenCalledWith("acme", question, "TESTTA-2");
+    await expect(useCortexStore.getState().answerQuestion("acme", card, [
+      { field: "name", values: [], other: "  Atlas " }, { field: "repository", values: ["new-private"], other: "  " },
+    ])).resolves.toEqual(next);
+    expect(answerQuestion).toHaveBeenCalledWith("acme", card, [
+      { field: "name", values: [], other: "Atlas" }, { field: "repository", values: ["new-private"], other: undefined },
+    ]);
     expect(useCortexStore.getState().questionProblem).toBeNull();
   });
 
-  it("returns null with the server's reason when the answer fails, and sends nothing empty", async () => {
+  it("returns null with the server's reason when the answers fail, and sends nothing empty", async () => {
     vi.mocked(answerQuestion).mockRejectedValue(httpError(400, { message: "This question is already answered." }));
 
-    await expect(useCortexStore.getState().answerQuestion("acme", question, "TESTTA-2")).resolves.toBeNull();
+    await expect(useCortexStore.getState().answerQuestion("acme", card, [{ field: "name", values: ["Atlas"] }])).resolves.toBeNull();
     expect(useCortexStore.getState().questionProblem).toBe("This question is already answered.");
-    await expect(useCortexStore.getState().answerQuestion("acme", question, "   ")).resolves.toBeNull();
+    await expect(useCortexStore.getState().answerQuestion("acme", card, [{ field: "name", values: [], other: "   " }]))
+      .resolves.toBeNull();
+    await expect(useCortexStore.getState().answerQuestion("", card, [{ field: "name", values: ["Atlas"] }])).resolves.toBeNull();
     expect(answerQuestion).toHaveBeenCalledTimes(1);
   });
 

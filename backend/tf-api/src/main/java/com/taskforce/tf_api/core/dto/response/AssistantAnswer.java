@@ -47,12 +47,12 @@ public record AssistantAnswer(
      * demande : rien n'est préparé). {@code record} : le dossier de la réponse, que l'accord prolonge. {@code ref} :
      * l'empreinte du résultat de cet appel au dossier, que « Undo » nomme pour défaire celui-là (R77). {@code target} :
      * l'issue que touche un geste du MCP TaskForce ({@code issueId}, {@code projectId}, {@code key}, {@code title}, et
-     * {@code runId} de sa mission), dont la conversation montre les cartes (ADR-024). {@code question} : ce que TaskForce
-     * demande à la personne avant le geste (R115), avec un statut question ; la carte montre ses choix, et
-     * {@code ref} nomme alors la question à laquelle la réponse se rattache.
+     * {@code runId} de sa mission), dont la conversation montre les cartes (ADR-024). {@code questions} : ce que
+     * TaskForce demande à la personne avant le geste (R115), deux questions au plus dans la même carte, avec un statut
+     * question ; la carte montre leurs choix, et {@code ref} nomme alors la carte à laquelle les réponses se rattachent.
      */
     public record AssistantToolCall(String name, String status, String input, String output, String record, String ref,
-                                    Map<String, Object> target, AssistantQuestion question) {
+                                    Map<String, Object> target, List<AssistantQuestion> questions) {
         /** Un appel sans question de TaskForce. */
         public AssistantToolCall(String name, String status, String input, String output, String record, String ref,
                                  Map<String, Object> target) {
@@ -66,13 +66,18 @@ public record AssistantAnswer(
     }
 
     /**
-     * Une question de TaskForce avant un geste (R115) : l'argument que la réponse remplit, la question, et ses choix, le
-     * défaut d'abord ({@code recommended}) quand il y en a un. Une réponse libre est toujours possible.
+     * Une question de TaskForce avant un geste (R115), dans la forme des questions de Claude : l'argument que la réponse
+     * remplit, son titre court, la question, si plusieurs choix se cochent ({@code multiple}), et ses choix, quatre au
+     * plus, le recommandé d'abord. Une réponse libre (« Other ») est toujours possible.
      */
-    public record AssistantQuestion(String field, String text, List<AssistantChoice> choices) {}
+    public record AssistantQuestion(String field, String header, String text, boolean multiple,
+                                    List<AssistantChoice> choices) {}
 
-    /** Un choix d'une question : la valeur que reçoit le geste, ce que la carte en montre, s'il est le défaut. */
-    public record AssistantChoice(String value, String label, boolean recommended) {}
+    /**
+     * Un choix d'une question : la valeur que reçoit le geste, ce que la carte en montre, ce qu'il veut dire en une ligne
+     * (null quand le libellé suffit), s'il est recommandé.
+     */
+    public record AssistantChoice(String value, String label, String description, boolean recommended) {}
 
     /** Tokens réellement consommés par ce tour (cumulés sur les appels LLM). */
     public record AssistantUsage(long promptTokens, long completionTokens, long totalTokens) {

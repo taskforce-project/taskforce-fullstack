@@ -25,6 +25,7 @@ import com.taskforce.tf_api.core.service.agent.AgentService;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.core.service.agent.AgentToolRegistry;
 import com.taskforce.tf_api.core.service.agent.CortexGesture;
+import com.taskforce.tf_api.core.service.agent.Question;
 import com.taskforce.tf_api.core.service.agent.QuestionNeeded;
 import com.taskforce.tf_api.core.service.agent.Screen;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
@@ -118,12 +119,55 @@ class CortexMcpToolTest {
 
         assertThatThrownBy(() -> comment.ask(Map.of("issue", "TF-12"), ctx))
             .isInstanceOfSatisfying(QuestionNeeded.class, needed -> {
-                assertThat(needed.question().field()).isEqualTo("content");
-                assertThat(needed.question().text()).isEqualTo("What should the comment say?");
-                assertThat(needed.question().choices()).isEmpty();
+                assertThat(needed.questions()).singleElement().satisfies(question -> {
+                    assertThat(question.field()).isEqualTo("content");
+                    assertThat(question.header()).isEqualTo("Comment");
+                    assertThat(question.text()).isEqualTo("What should the comment say?");
+                    assertThat(question.choices()).isEmpty();
+                });
             });
         assertThat(comment.ask(Map.of("issue", "TF-12", "content", "Done in #12"), ctx))
             .containsEntry("content", "Done in #12");
+    }
+
+    @Test
+    @DisplayName("R115 : « commente ça » sans issue ni texte demande les deux dans la même carte, l'issue d'abord")
+    void the_issue_and_the_comment_are_asked_in_one_card() {
+        when(gestures.issueOf(eq("acme"), eq(7L), any(), any(), eq("Which issue should get the comment?")))
+            .thenThrow(new QuestionNeeded(Question.of("issue", "Issue", "Which issue should get the comment?",
+                List.of(Question.Choice.recommended("TF-12", "TF-12 Fix login", "Todo")))));
+
+        assertThatThrownBy(() -> ((CortexGesture) tool("add_comment")).ask(Map.of(), ctx))
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> assertThat(needed.questions())
+                .extracting(question -> question.header() + ": " + question.text())
+                .containsExactly("Issue: Which issue should get the comment?", "Comment: What should the comment say?"));
+    }
+
+    @Test
+    @DisplayName("R115 : le nom inventé par le modèle et où vit le code, dans la même carte, sa proposition en premier")
+    void the_invented_name_and_the_repository_are_asked_in_one_card() {
+        when(projects.questions(eq("acme"), any())).thenReturn(List.of(
+            Question.of("name", "Name", "What should the project be called?",
+                List.of(Question.Choice.of("Next.js app", "Next.js app", "Suggested from your request"))),
+            Question.of("repository", "Repository", "Where does its code live?",
+                List.of(Question.Choice.recommended("new-private", "A new private repository", "Only you see it")))));
+        AgentContext asking = new AgentContext("acme", 1L, 7L, Screen.NONE, "crée un projet Next.js");
+
+        assertThatThrownBy(() -> ((CortexGesture) tool("create_project"))
+                .ask(Map.of("name", "Web Application", "stack", "Next.js"), asking))
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> {
+                assertThat(needed.questions()).extracting(Question::field).containsExactly("name", "repository");
+                assertThat(needed.question().choices()).extracting(Question.Choice::value)
+                    .containsExactly("Web Application", "Next.js app");
+                assertThat(needed.question().choices().get(0).description())
+                    .isEqualTo("Cortex's suggestion: your request gives none");
+                assertThat(needed.question().choices()).noneMatch(Question.Choice::recommended);
+            });
+        // Le geste lit la demande sans le nom que le modèle a inventé : il demande le nom, avec ce que la demande dit.
+        org.mockito.ArgumentCaptor<JsonNode> seen = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
+        org.mockito.Mockito.verify(projects).questions(eq("acme"), seen.capture());
+        assertThat(seen.getValue().has("name")).isFalse();
+        assertThat(seen.getValue().path("stack").asText()).isEqualTo("Next.js");
     }
 
     /**

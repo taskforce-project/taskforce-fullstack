@@ -43,6 +43,7 @@ import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.dto.response.UserSummaryResponse;
 import com.taskforce.tf_api.core.enums.CycleStatus;
 import com.taskforce.tf_api.core.enums.IssuePriority;
+import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.Workspace;
@@ -229,10 +230,10 @@ public class IssueGestures {
         }
         List<IssueResponse> shown = named.isEmpty() ? candidates : named;
         Long open = screen == null ? null : screen.issueId();
-        throw new QuestionNeeded(new Question("issue", question, shown.stream()
+        throw new QuestionNeeded(Question.of("issue", "Issue", question, shown.stream()
             .map(issue -> Objects.equals(open, issue.getId())
-                ? Question.Choice.recommended(issue.getIdentifier(), choiceLabel(issue))
-                : Question.Choice.of(issue.getIdentifier(), choiceLabel(issue)))
+                ? Question.Choice.recommended(issue.getIdentifier(), choiceLabel(issue), whereItIs(issue))
+                : Question.Choice.of(issue.getIdentifier(), choiceLabel(issue), whereItIs(issue)))
             .toList()));
     }
 
@@ -278,8 +279,32 @@ public class IssueGestures {
 
     private static String choiceLabel(IssueResponse issue) {
         String title = issue.getTitle() == null ? "" : issue.getTitle().replaceAll("\\s+", " ").strip();
-        return issue.getIdentifier() + " " + clip(title, 50)
-            + (issue.getStatus() == null ? "" : " (" + issue.getStatus().getName() + ")");
+        return (issue.getIdentifier() + " " + clip(title, 50)).strip();
+    }
+
+    /** Ce qu'une colonne veut dire sur le tableau, en une ligne, pour un choix de colonne. */
+    private static String stage(IssueStatusCategory category) {
+        if (category == null) return null;
+        return switch (category) {
+            case BACKLOG -> "Not planned yet";
+            case UNSTARTED -> "Planned, not started";
+            case STARTED -> "Work in progress";
+            case COMPLETED -> "Done";
+            case CANCELLED -> "Dropped";
+        };
+    }
+
+    /** Deux noms lus par {@link IssueFields#key} se ressemblent quand l'un contient l'autre. */
+    private static boolean looksLike(String name, String wanted) {
+        return wanted.length() >= 3 && !name.isEmpty() && (name.contains(wanted) || wanted.contains(name));
+    }
+
+    /** Ce qu'un choix d'issue dit en une ligne : sa colonne, et qui la prend. */
+    private static String whereItIs(IssueResponse issue) {
+        String column = issue.getStatus() == null ? null : issue.getStatus().getName();
+        String who = issue.getAssignee() == null ? null : "assigned to " + name(issue.getAssignee());
+        if (column == null) return who;
+        return who == null ? column : column + ", " + who;
     }
 
     private static LocalDateTime changedAt(IssueResponse issue) {
@@ -306,11 +331,16 @@ public class IssueGestures {
         } else {
             why = "No member of " + project.getName() + " matches \"" + clip(asked, 40) + "\".";
         }
-        List<Question.Choice> choices = new ArrayList<>((several ? matching : members).stream()
-            .map(m -> Question.Choice.of(m.getEmail() != null ? m.getEmail() : IssueFields.name(m), IssueFields.name(m)))
+        // « Nobody » garde sa place sur la carte quand l'issue a un assigné.
+        int room = Question.MAX_CHOICES - (before.getAssignee() != null ? 1 : 0);
+        List<Question.Choice> choices = new ArrayList<>((several ? matching : members).stream().limit(room)
+            .map(m -> Question.Choice.of(m.getEmail() != null ? m.getEmail() : IssueFields.name(m), IssueFields.name(m),
+                m.getEmail() != null && !m.getEmail().equals(IssueFields.name(m)) ? m.getEmail() : "Member of " + project.getName()))
             .toList());
-        if (before.getAssignee() != null) choices.add(Question.Choice.of(NO_VALUE, "Nobody"));
-        return new Question("assignee", "Who should take " + before.getIdentifier() + "? " + why, choices);
+        if (before.getAssignee() != null) {
+            choices.add(Question.Choice.of(NO_VALUE, "Nobody", "Unassigns " + before.getIdentifier()));
+        }
+        return Question.of("assignee", "Assignee", "Who should take " + before.getIdentifier() + "? " + why, choices);
     }
 
     // ------------------------------------------------------------------ changer les champs, déplacer, assigner
@@ -392,11 +422,14 @@ public class IssueGestures {
                 + ". Its columns are: " + IssueFields.listed(columns, IssueStatusResponse::getName) + ".");
         }
         if (column == null) {
-            // R115 : une colonne nommée qui n'existe pas ne s'invente pas, TaskForce demande, avec celles du projet.
-            throw new QuestionNeeded(new Question("status", "Which column should " + before.getIdentifier() + " move to? \""
-                + clip(asked.strip(), 40) + "\" isn't a column of " + project.getName() + ".", columns.stream()
+            // R115 : une colonne nommée qui n'existe pas ne s'invente pas, TaskForce demande, avec celles du projet : celles
+            // dont le nom ressemble à ce qui est écrit d'abord (« review » : In Review, In review by AI), puis le tableau.
+            String wanted = IssueFields.key(asked);
+            throw new QuestionNeeded(Question.of("status", "Column", "Which column should " + before.getIdentifier()
+                + " move to? \"" + clip(asked.strip(), 40) + "\" isn't a column of " + project.getName() + ".", columns.stream()
                     .filter(c -> !c.getId().equals(current))
-                    .map(c -> Question.Choice.of(c.getName(), c.getName()))
+                    .sorted(Comparator.comparing((IssueStatusResponse c) -> !looksLike(IssueFields.key(c.getName()), wanted)))
+                    .map(c -> Question.Choice.of(c.getName(), c.getName(), stage(c.getCategory())))
                     .toList()));
         }
         if (column.getId().equals(current)) return;
@@ -444,7 +477,7 @@ public class IssueGestures {
         List<String> remove = names(args, "removeLabels");
         if (add.isEmpty() && remove.isEmpty()) return;
         Found<List<ProjectLabelResponse>> added = fields.labels(project, add, slug, userId);
-        if (!added.ok()) throw new McpArgs.InvalidArgumentException(added.problem());
+        if (!added.ok()) throw whichLabels(slug, userId, project, before, add, added.problem());
         Found<List<ProjectLabelResponse>> removed = fields.labels(project, remove, slug, userId);
         if (!removed.ok()) throw new McpArgs.InvalidArgumentException(removed.problem());
         List<ProjectLabelResponse> current = before.getLabels() == null ? List.of() : before.getLabels();
@@ -458,6 +491,36 @@ public class IssueGestures {
         request.setLabelIds(to);
         changes.add(new Change("labels", labelNames(current), labelNames(next.values().stream().toList())));
         undo.put("labels", pair(from, to));
+    }
+
+    /**
+     * Un label à ajouter qui n'existe pas (R115) : il ne s'invente pas, TaskForce demande lesquels, parmi ceux du projet
+     * que l'issue n'a pas encore, et plusieurs se cochent : les labels ne s'excluent pas. Ceux que la demande nomme et qui
+     * existent viennent d'abord, recommandés. Sans label à proposer, l'erreur reste, qui le dit.
+     */
+    private RuntimeException whichLabels(String slug, Long userId, ProjectResponse project, IssueResponse before,
+                                         List<String> asked, String problem) {
+        List<ProjectLabelResponse> existing = projectService.listLabels(slug, project.getId(), userId);
+        Set<Long> has = before.getLabels() == null ? Set.of()
+            : before.getLabels().stream().map(ProjectLabelResponse::getId).collect(Collectors.toSet());
+        Set<String> named = asked.stream().map(name -> name.toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
+        List<ProjectLabelResponse> offered = existing.stream().filter(label -> !has.contains(label.getId()))
+            .sorted(Comparator.comparing((ProjectLabelResponse label) -> !named.contains(label.getName().toLowerCase(Locale.ROOT))))
+            .toList();
+        String unknown = asked.stream()
+            .filter(name -> existing.stream().noneMatch(label -> name.equalsIgnoreCase(label.getName())))
+            .findFirst().orElse(null);
+        if (offered.isEmpty() || unknown == null) return new McpArgs.InvalidArgumentException(problem);
+        return new QuestionNeeded(Question.several("addLabels", "Labels", "Which labels should " + before.getIdentifier()
+            + " get? \"" + clip(unknown, 40) + "\" isn't a label of " + project.getName() + ".", offered.stream()
+                .map(label -> {
+                    String about = label.getDescription() == null || label.getDescription().isBlank() ? null
+                        : clip(label.getDescription().strip(), 80);
+                    return named.contains(label.getName().toLowerCase(Locale.ROOT))
+                        ? Question.Choice.recommended(label.getName(), label.getName(), about)
+                        : Question.Choice.of(label.getName(), label.getName(), about);
+                })
+                .toList()));
     }
 
     /** L'estimation, de 1 à 100 ; 0 ou « none » la retire. */

@@ -24,6 +24,8 @@ import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.AiConversationService;
 import com.taskforce.tf_api.core.service.agent.AgentService;
 import com.taskforce.tf_api.core.service.agent.ModelCapabilityService;
+import com.taskforce.tf_api.core.service.agent.Question;
+import com.taskforce.tf_api.core.service.agent.QuestionNeeded;
 import com.taskforce.tf_api.core.service.agent.Screen;
 import com.taskforce.tf_api.core.service.ai.ChosenModel;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
@@ -32,6 +34,8 @@ import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
@@ -138,9 +142,9 @@ public class AssistantController {
     }
 
     /**
-     * La réponse de la personne à une question de TaskForce (R115) : un choix cliqué ou une réponse tapée. Le geste
-     * reprend sans le modèle, rejugé par les règles de l'espace, et rend la suite : une autre question, sa carte, ou ce
-     * qu'il a fait.
+     * Les réponses de la personne à une carte de questions de TaskForce (R115), toutes à la fois : pour chaque question,
+     * les choix cochés ou la réponse tapée. Le geste reprend sans le modèle, rejugé par les règles de l'espace, et rend la
+     * suite : d'autres questions, sa carte, ou ce qu'il a fait.
      */
     @PostMapping(value = "/actions/answer", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<AssistantToolCall>> answerQuestion(
@@ -149,8 +153,11 @@ public class AssistantController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         Long userId = resolveUserId(jwt);
+        List<Question.Answer> answers = body.answers().stream()
+            .map(answer -> new Question.Answer(answer.field(), answer.values(), answer.other()))
+            .toList();
         return ResponseEntity.ok(ApiResponse.success(
-            agentService.answer(slug, userId, body.tool(), body.record(), body.ref(), body.value())));
+            agentService.answer(slug, userId, body.tool(), body.record(), body.ref(), answers)));
     }
 
     // -------------------------------------------------------------------------
@@ -177,14 +184,24 @@ public class AssistantController {
     public record ScreenRequest(@Positive Long projectId, @Positive Long issueId) {}
 
     /**
-     * La réponse à une question de TaskForce : l'outil et le dossier de la réponse qui l'a posée, {@code ref} l'empreinte
-     * de la question, {@code value} la valeur du choix cliqué ou la réponse tapée.
+     * Les réponses à une carte de questions de TaskForce : l'outil et le dossier de la réponse qui l'a posée, {@code ref}
+     * l'empreinte de la carte, et une réponse par question, deux au plus.
      */
     public record AssistantAnswerRequest(
         @NotBlank @Size(max = 128) String tool,
         @NotBlank @Size(max = 64) String record,
         @NotBlank @Size(max = 80) String ref,
-        @NotBlank @Size(max = 2000) String value
+        @NotEmpty @Size(max = QuestionNeeded.MAX_QUESTIONS) List<@NotNull @Valid QuestionAnswer> answers
+    ) {}
+
+    /**
+     * La réponse à une question de la carte, nommée par l'argument qu'elle remplit : les valeurs des choix cochés (un
+     * seul pour une question à un seul choix), et ce qui est tapé dans « Other ».
+     */
+    public record QuestionAnswer(
+        @NotBlank @Size(max = 64) String field,
+        @Size(max = Question.MAX_CHOICES) List<@NotBlank @Size(max = 200) String> values,
+        @Size(max = 2000) String other
     ) {}
 
     /** L'action proposée, telle que la réponse l'a rendue : son outil, ses arguments, le dossier qui l'a vue naître. */

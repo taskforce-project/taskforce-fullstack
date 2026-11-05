@@ -165,15 +165,38 @@ public class CortexRecordService {
     }
 
     /**
-     * Garde la réponse de la personne à une question de TaskForce (R115), si le dossier l'attend encore : la question de
-     * cet outil que nomme {@code ref} (l'empreinte de son résultat), à laquelle personne n'a répondu. La réponse entre au
-     * dossier comme une décision de la personne ; rend ce que la question a gardé (les arguments du geste, la question,
-     * l'écran). Vide si la question n'est pas là, déjà répondue, ou si le dossier est plein ; le verrou du dossier sépare
-     * deux clics.
+     * La carte de questions de TaskForce (R115) que le dossier attend encore : celle de cet outil que nomme {@code ref}
+     * (l'empreinte de son résultat), à laquelle personne n'a répondu. Rend ce qu'elle a gardé (les arguments du geste,
+     * ses questions, l'écran), pour juger les réponses avant de les garder ; vide si elle n'est pas là ou déjà répondue.
+     */
+    @Transactional(readOnly = true)
+    public Optional<JsonNode> question(UUID recordId, String tool, String ref) {
+        return open(recordId, tool, ref);
+    }
+
+    /**
+     * Garde les réponses de la personne à une carte de TaskForce (R115), si le dossier l'attend encore : elles entrent au
+     * dossier comme une seule décision de la personne, chaque argument avec ce qu'il a reçu. Rend ce que la carte a
+     * gardé. Vide si la carte n'est pas là, déjà répondue, ou si le dossier est plein ; le verrou du dossier sépare deux
+     * envois.
      */
     @Transactional
-    public Optional<JsonNode> answer(UUID recordId, String tool, String ref, Long userId, String answer) {
+    public Optional<JsonNode> answer(UUID recordId, String tool, String ref, Long userId, Map<String, String> answers) {
         records.findByIdForUpdate(recordId).orElseThrow(() -> new ResourceNotFoundException("Cortex record not found"));
+        Optional<JsonNode> asked = open(recordId, tool, ref);
+        if (asked.isEmpty()) return Optional.empty();
+        Map<String, Object> said = new LinkedHashMap<>();
+        answers.forEach((field, answer) -> said.put(field, shorten(answer)));
+        Map<String, Object> decision = new LinkedHashMap<>();
+        decision.put("tool", tool);
+        decision.put("decision", "answered");
+        decision.put("ref", ref);
+        decision.put("answers", said);
+        return append(recordId, "human.decision", Actor.person(userId), decision).isPresent() ? asked : Optional.empty();
+    }
+
+    /** La carte de cet outil que nomme {@code ref}, si personne n'y a répondu. */
+    private Optional<JsonNode> open(UUID recordId, String tool, String ref) {
         if (ref == null || ref.isBlank()) return Optional.empty();
         JsonNode asked = null;
         boolean answered = false;
@@ -189,15 +212,7 @@ public class CortexRecordService {
                 answered = true;
             }
         }
-        if (asked == null || answered) return Optional.empty();
-        Map<String, Object> decision = new LinkedHashMap<>();
-        decision.put("tool", tool);
-        decision.put("decision", "answered");
-        decision.put("ref", ref);
-        decision.put("field", asked.path("question").path("field").asText());
-        decision.put("answer", shorten(answer));
-        return append(recordId, "human.decision", Actor.person(userId), decision).isPresent()
-            ? Optional.of(asked) : Optional.empty();
+        return asked == null || answered ? Optional.empty() : Optional.of(asked);
     }
 
     /**
