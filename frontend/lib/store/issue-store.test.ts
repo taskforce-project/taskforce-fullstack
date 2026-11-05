@@ -228,6 +228,25 @@ describe('issue-store', () => {
     expect(useIssueStore.getState().activeIssue).toEqual(updated);
   });
 
+  it('updateIssue sends unassign and clearDueDate, and keeps the issue the server returns', async () => {
+    const original = makeIssue({
+      id: 5,
+      assignee: { id: 2, email: 'b@c.d', displayName: 'B', avatarUrl: null },
+      dueDate: '2026-11-20',
+    });
+    act(() => useIssueStore.setState({ issues: [original], activeIssue: original }));
+    const cleared = makeIssue({ id: 5, assignee: null, dueDate: null });
+    vi.mocked(svc.updateIssue).mockResolvedValue(cleared);
+
+    await act(async () => {
+      await useIssueStore.getState().updateIssue('ws', 10, 5, { unassign: true, clearDueDate: true });
+    });
+
+    expect(svc.updateIssue).toHaveBeenCalledWith('ws', 10, 5, { unassign: true, clearDueDate: true });
+    expect(useIssueStore.getState().issues[0]).toMatchObject({ assignee: null, dueDate: null });
+    expect(useIssueStore.getState().activeIssue).toMatchObject({ assignee: null, dueDate: null });
+  });
+
   // WS-10 : un échec d'édition ne doit PAS poser `store.error`. Un refus (ex. VIEWER en lecture
   // seule) polluait la bannière passive du board, invisible sous l'overlay du sheet puis révélée à
   // sa fermeture. L'échec se signale par le retour `null` ; c'est l'appelant qui affiche un toast.
