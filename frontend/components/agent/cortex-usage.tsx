@@ -6,18 +6,20 @@ import { useParams } from "next/navigation"
 import { Sparkles, ExternalLink, ChevronDown, ChevronRight, RefreshCw } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { contextGauge, formatTokens, toneOf, type GaugeTone } from "@/lib/cortex/context-gauge"
-import { fillText } from "@/lib/delivery/result-card"
+import { contextGauge } from "@/lib/cortex/context-gauge"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { useCortexStore } from "@/lib/store/cortex-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
 
+const fmt = (n: number) =>
+  n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n)
+
 const pctOf = (used: number, total: number) =>
   total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
 
-function Bar({ pct, tone = "blue" }: { pct: number; tone?: GaugeTone }) {
+function Bar({ pct, tone = "blue" }: { pct: number; tone?: "blue" | "amber" | "rose" }) {
   const color =
     tone === "rose"
       ? "bg-shape-red"
@@ -36,7 +38,7 @@ function Ring({ pct }: { pct: number }) {
   const r = 6
   const c = 2 * Math.PI * r
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" className="shrink-0 -rotate-90" aria-hidden>
+    <svg width="16" height="16" viewBox="0 0 16 16" className="shrink-0 -rotate-90">
       <circle cx="8" cy="8" r={r} fill="none" strokeWidth="2" className="stroke-muted" />
       <circle
         cx="8" cy="8" r={r} fill="none" strokeWidth="2" strokeLinecap="round"
@@ -48,11 +50,13 @@ function Ring({ pct }: { pct: number }) {
 }
 
 /**
- * Modal « façon Claude » sous l'input du chat : la **fenêtre de contexte** et la **consommation du mois** (vs le plafond
- * de l'instance s'il y en a un, avec réinitialisation), modèle + refresh en pied. La jauge de contexte montre ce que Cortex
- * a envoyé au modèle pour sa dernière réponse, contre la fenêtre que la passerelle a donnée à cette requête, avec une
- * ligne qui dit ce que c'est (test du CEO du 05/11/2026 : le cumul de la conversation contre une fenêtre écrite en dur
- * donnait « 45k / 33k (100%) », sans rien dire).
+ * Modal « façon Claude » sous l'input du chat : **fenêtre de contexte** + **consommation du mois**
+ * (vs le plafond de l'instance s'il y en a un, avec réinitialisation), modèle + refresh en pied.
+ * Auto-porté (pas de portail) pour rester bien positionné dans le panneau flottant.
+ *
+ * La jauge de contexte compare ce que Cortex a envoyé au modèle pour sa dernière réponse à la fenêtre que la
+ * passerelle a donnée à cette requête, et le dit en une ligne (test du CEO de la 1.10.0 : le cumul de la conversation
+ * contre une fenêtre écrite en dur donnait « 45k / 33k (100%) », sans rien dire).
  */
 export function CortexUsage({ className }: { className?: string }) {
   const params = useParams()
@@ -62,7 +66,6 @@ export function CortexUsage({ className }: { className?: string }) {
   const context = useCortexStore((s) => s.context)
   // La plus grande fenêtre que la passerelle donne au modèle de Cortex (Ollama), que la ligne de la jauge dit.
   const maximum = useAiStatusStore((s) => s.status?.fastContextWindow ?? s.status?.contextWindow ?? null)
-  const fetchAiStatus = useAiStatusStore((s) => s.fetchStatus)
 
   const [open, setOpen] = useState(false)
   const [usage, setUsage] = useState<AiUsage | null>(null)
@@ -89,7 +92,6 @@ export function CortexUsage({ className }: { className?: string }) {
     try {
       await Promise.all([
         getAiUsage(slug).then(setUsage),
-        fetchAiStatus(),
         minSpin ? new Promise((resolve) => setTimeout(resolve, 550)) : Promise.resolve(),
       ])
     } catch {
@@ -97,7 +99,7 @@ export function CortexUsage({ className }: { className?: string }) {
     } finally {
       setRefreshing(false)
     }
-  }, [slug, fetchAiStatus])
+  }, [slug])
 
   useEffect(() => {
     if (open) void load()
@@ -107,9 +109,9 @@ export function CortexUsage({ className }: { className?: string }) {
     if (!open) return
     place()
     const onDown = (e: MouseEvent) => {
-      const target = e.target as Node
+      const t = e.target as Node
       // Clic hors du trigger ET hors du popover porté → ferme.
-      if (!ref.current?.contains(target) && !popRef.current?.contains(target)) setOpen(false)
+      if (!ref.current?.contains(t) && !popRef.current?.contains(t)) setOpen(false)
     }
     document.addEventListener("mousedown", onDown)
     window.addEventListener("resize", place)
@@ -124,6 +126,7 @@ export function CortexUsage({ className }: { className?: string }) {
   const gauge = contextGauge(context, maximum, t)
   const unlimited = usage ? usage.limitTokens < 0 : false
   const usePct = usage && !unlimited ? pctOf(usage.usedTokens, usage.limitTokens) : 0
+  const useTone = usePct >= 90 ? "rose" : usePct >= 70 ? "amber" : "blue"
   const openDetails = () => { setOpen(false); openSettings("usage") }
 
   return (
@@ -132,8 +135,7 @@ export function CortexUsage({ className }: { className?: string }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        title={t.usageTitle}
-        aria-label={t.usageTitle}
+        title="Context window & usage"
       >
         <Ring pct={gauge.pct} />
         <span className="font-medium">Cortex</span>
@@ -146,13 +148,20 @@ export function CortexUsage({ className }: { className?: string }) {
           style={{ position: "fixed", left: coords.left, bottom: coords.bottom, transform: "translateX(-100%)" }}
           className="z-[120] w-80 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg"
         >
-          {/* Fenêtre de contexte : la dernière demande contre la fenêtre qu'elle a eue */}
+          {/* Fenêtre de contexte */}
           <div className="p-3">
-            <div className="flex w-full items-center justify-between text-xs">
-              <span className="text-muted-foreground">{t.contextTitle}</span>
-              {gauge.value && <span className="tabular-nums font-medium">{gauge.value}</span>}
-            </div>
-            {gauge.value && context?.window ? <div className="mt-1.5"><Bar pct={gauge.pct} tone={gauge.tone} /></div> : null}
+            <button
+              type="button"
+              onClick={openDetails}
+              className="flex w-full items-center justify-between text-left text-xs transition-colors hover:text-foreground"
+            >
+              <span className="text-muted-foreground">Context window</span>
+              <span className="flex items-center gap-1 tabular-nums font-medium">
+                {gauge.value}
+                <ChevronRight className="size-3 text-muted-foreground" />
+              </span>
+            </button>
+            {context?.window ? <div className="mt-1.5"><Bar pct={gauge.pct} tone={gauge.tone} /></div> : null}
             <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">{gauge.line}</p>
           </div>
 
@@ -165,30 +174,28 @@ export function CortexUsage({ className }: { className?: string }) {
               onClick={openDetails}
               className="flex w-full items-center justify-between text-left text-xs font-semibold transition-colors hover:text-foreground"
             >
-              <span>{t.usageMonthly}</span>
+              <span>Monthly usage</span>
               <ChevronRight className="size-3 text-muted-foreground" />
             </button>
 
             <div className="mt-2 space-y-1">
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-muted-foreground">{t.usageThisMonth}</span>
+                <span className="text-muted-foreground">This month</span>
                 <span className="tabular-nums">
                   {usage
-                    ? <>{fillText(t.usageResets, { date: usage.resetAt })} · <span className="font-medium">{unlimited ? t.usageUnlimited : `${usePct}%`}</span></>
+                    ? (unlimited
+                      ? <>Resets {usage.resetAt} · <span className="font-medium">unlimited</span></>
+                      : <>Resets {usage.resetAt} · <span className="font-medium">{usePct}%</span></>)
                     : "…"}
                 </span>
               </div>
-              <Bar pct={unlimited ? 4 : usePct} tone={unlimited ? "blue" : toneOf(usePct)} />
+              <Bar pct={unlimited ? 4 : usePct} tone={unlimited ? "blue" : useTone} />
               {usage && (
                 <div className="flex items-center justify-between text-[10px] text-muted-foreground/70">
                   <span className="tabular-nums">
-                    {unlimited
-                      ? fillText(t.usageTokens, { used: formatTokens(usage.usedTokens) })
-                      : fillText(t.usageTokensOf, { used: formatTokens(usage.usedTokens), limit: formatTokens(usage.limitTokens) })}
+                    {fmt(usage.usedTokens)} {unlimited ? "" : `/ ${fmt(usage.limitTokens)} `}tokens
                   </span>
-                  <span className="tabular-nums">
-                    {usage.promptTokens.toLocaleString("en-US")}↑ · {usage.completionTokens.toLocaleString("en-US")}↓ · {fillText(t.usageRequests, { count: usage.requestCount })}
-                  </span>
+                  <span className="tabular-nums">{usage.promptTokens.toLocaleString("en-US")}↑ · {usage.completionTokens.toLocaleString("en-US")}↓ · {usage.requestCount} req.</span>
                 </div>
               )}
             </div>
@@ -206,8 +213,7 @@ export function CortexUsage({ className }: { className?: string }) {
                 type="button"
                 onClick={() => void load(true)}
                 className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                title={t.usageRefresh}
-                aria-label={t.usageRefresh}
+                title="Actualiser"
               >
                 <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
               </button>
@@ -216,7 +222,7 @@ export function CortexUsage({ className }: { className?: string }) {
                 onClick={openDetails}
                 className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium transition-colors hover:bg-muted"
               >
-                <ExternalLink className="size-3" /> {t.usageDetails}
+                <ExternalLink className="size-3" /> Details
               </button>
             </div>
           </div>

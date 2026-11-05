@@ -804,23 +804,12 @@ export const CONSTANTS_EN = {
     taskforceAsksHint: "TaskForce, not the model, asked what this action needed. Nothing was done until the answers were sent.",
     // The gauge under the conversation: what Cortex sent the model for its last answer, against the context window the
     // AI gateway gave that request (CEO's test of 1.10.0: it showed the whole conversation against a fixed window).
-    contextTitle: "Context window",
     contextLine: "What Cortex sent the model for its last answer (instructions, tools, the screen, notes and this conversation), against the window it got.",
     contextLineUpTo: "What Cortex sent the model for its last answer, against the window it got. The window grows with the request, up to {max}.",
     contextFull: "Nearly full: a longer conversation would lose its start. A new conversation starts empty.",
     contextProvider: "What Cortex sent the model for its last answer. The AI provider sets the window.",
     contextNone: "Shows after Cortex's next answer: what it sends the model, against the window the model gets.",
     contextTokens: "{tokens} tokens",
-    usageTitle: "Context window and usage",
-    usageMonthly: "Monthly usage",
-    usageThisMonth: "This month",
-    usageResets: "Resets {date}",
-    usageUnlimited: "unlimited",
-    usageTokens: "{used} tokens",
-    usageTokensOf: "{used} / {limit} tokens",
-    usageRequests: "{count} req.",
-    usageRefresh: "Refresh",
-    usageDetails: "Details",
     // Under each answer: the model that wrote it, as the AI gateway called it (CEO's test of 1.10.0).
     answeredWith: "Answered by {model}",
   },
