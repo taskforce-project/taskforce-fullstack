@@ -72,6 +72,7 @@ class CortexPlansTest {
         "qu'est-ce qui a changé cette semaine dans test taskforce ? | what-changed",
         "quoi de neuf sur le projet ?                             | what-changed",
         "résume le projet test taskforce                          | summarize",
+        "prend OPS-35 et propose moi un resume dans les commentaire stp | summarize",
         "Summarize this board                                     | summarize",
         "où en est la mission de TF-12 ?                          | summarize",
         "supprime TF-12 et résume le projet                       | delete",

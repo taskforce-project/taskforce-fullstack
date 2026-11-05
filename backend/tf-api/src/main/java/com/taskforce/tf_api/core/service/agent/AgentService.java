@@ -85,6 +85,7 @@ public class AgentService {
     private final CortexRecordService records;
     private final CortexUndo          undo;
     private final ScreenContext       screens;
+    private final IssueMaterial       material;
 
     // Tier des tours avec outils externes MCP. Défaut "fast" ; "standard" pour plus de fiabilité
     // multi-outils si le matériel suit.
@@ -602,14 +603,20 @@ public class AgentService {
         String screen = ctx.screen().isEmpty() ? null : screens.describe(ctx);
         if (screen == null) screen = "";
         CortexPlans.Plan plan = CortexPlans.forRequest(message).orElse(null);
+        // Résumer une issue : TaskForce la lit et la donne au modèle avant qu'il écrive, au lieu d'espérer qu'il la lise
+        // (test du CEO du 05/11/2026 : qwen3:8b commentait OPS-35 avec ce qu'elle ne dit pas).
+        String issue = plan != null && CortexPlans.SUMMARIZE.equals(plan.id()) ? material.describe(ctx, message) : "";
+        if (issue == null) issue = "";
+        String seen = issue.isEmpty() ? screen : screen.isEmpty() ? issue : screen.strip() + "\n\n" + issue;
         List<Map<String, Object>> messages = withHistory(
-            systemPrompt(plan, screen, hits, external, LocalDate.now(ZoneOffset.UTC)), history, message);
+            systemPrompt(plan, seen, hits, external, LocalDate.now(ZoneOffset.UTC)), history, message);
         List<Map<String, Object>> toolDefs = tools.toolDefinitions(external);
         String tier = external.isEmpty() ? "fast" : mcpToolTier;
         // Le noyau (R35) : les règles de l'espace et le dossier de la réponse, ouverts au premier outil. Le dossier garde
         // ce que le modèle a vu de l'écran et le plan qu'il a reçu.
         Map<String, Object> origin = origin(tier, hits);
         if (!screen.isEmpty()) origin.put("screen", screen);
+        if (!issue.isEmpty()) origin.put("issue", CortexRecordService.shorten(issue));
         if (plan != null) origin.put("plan", plan.id());
         Kernel kernel = new Kernel(ctx, message, origin);
         String answer = toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel);

@@ -87,6 +87,7 @@ class AgentServiceTest {
     @Mock private HarnessRuleSetRepository ruleSets;
     @Mock private WorkspaceRepository workspaces;
     @Mock private ScreenContext screens;
+    @Mock private IssueMaterial material;
 
     @InjectMocks private AgentService service;
 
@@ -1375,6 +1376,36 @@ class AgentServiceTest {
 
         assertThat(answer.toolCalls()).singleElement().satisfies(call -> assertThat(call.name()).isEqualTo("update_issue"));
         verify(tools, never()).get("delete_issue");
+    }
+
+    /**
+     * Test du CEO du 05/11/2026 : « prend OPS-35 et propose moi un resume dans les commentaire stp ». Pour résumer, TaskForce
+     * lit l'issue nommée et la donne au modèle avant qu'il écrive, après le plan. Une autre demande ne la lit pas.
+     */
+    @ParameterizedTest(name = "« {0} » : lue {1}")
+    @CsvSource(delimiter = '|', value = {
+        "prend OPS-35 et propose moi un resume dans les commentaire stp | true",
+        "liste moi les issues de OPS                                     | false",
+    })
+    void a_summary_reads_the_issue_first(String message, boolean read) throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"OK\"}"));
+        lenient().when(material.describe(any(), eq(message))).thenReturn(IssueMaterial.HEADER
+            + "OPS-35 \"Iteration #35\": in Done, unassigned.\nDescription: none.\n");
+
+        service.run("acme", 7L, message);
+
+        String system = systemPrompt();
+        if (!read) {
+            assertThat(system).doesNotContain("The issue to summarize");
+            verify(material, never()).describe(any(), any());
+            return;
+        }
+        assertThat(system.indexOf("The issue to summarize")).isGreaterThan(system.indexOf("Plan to summarize:"));
+        assertThat(system).contains("OPS-35 \"Iteration #35\": in Done, unassigned.");
     }
 
     /**

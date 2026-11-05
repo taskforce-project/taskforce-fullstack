@@ -26,8 +26,11 @@ import java.util.regex.Pattern;
  */
 public final class CortexPlans {
 
+    /** Résumer : une issue nommée s'y lit avant le modèle ({@link IssueMaterial}). */
+    public static final String SUMMARIZE = "summarize";
+
     /** Les plans, dans l'ordre qui départage deux plans nommés au même endroit du message. */
-    static final List<String> IDS = List.of("delete", "create-project", "move-assign", "what-changed", "summarize");
+    static final List<String> IDS = List.of("delete", "create-project", "move-assign", "what-changed", SUMMARIZE);
     /** Un plan tient sur un écran : la condition de Rus au vote de R117. */
     static final int MAX_LINES = 12;
     static final int MAX_CHARS = 1000;
