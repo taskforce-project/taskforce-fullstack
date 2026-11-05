@@ -14838,6 +14838,9 @@
           },
           "record": {
             "type": "string"
+          },
+          "model": {
+            "type": "string"
           }
         }
       },
@@ -14957,6 +14960,14 @@
           "totalTokens": {
             "type": "integer",
             "format": "int64"
+          },
+          "lastPromptTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "contextWindow": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -19414,6 +19425,9 @@
             "format": "int64"
           },
           "createdAt": {
+            "type": "string"
+          },
+          "model": {
             "type": "string"
           }
         }
