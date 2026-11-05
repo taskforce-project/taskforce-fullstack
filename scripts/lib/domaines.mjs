@@ -64,8 +64,16 @@ export const DOMAINES = [
   },
   {
     id: "4.8", titre: "Délégation aux agents de code",
-    intro: "Les tickets confiés à un agent de code (Claude Code par le runner local, ou GitHub Copilot) : chaque exécution, sa chronologie, et les actions de l'agent qui attendent la décision de la personne qui a délégué.",
-    tables: ["delivery_runs", "delivery_run_events", "delivery_run_approvals"],
+    intro: "Les tickets confiés à un agent de code (Claude Code par le runner local, ou GitHub Copilot) : chaque exécution, sa chronologie, les actions de l'agent qui attendent la décision de la personne qui a délégué, et le dossier de preuve de la mission. Ce dossier est un journal chaîné, ajouté et jamais modifié : chaque événement porte l'empreinte du précédent, et celle du dernier, posée sur `delivery_runs.evidence_root`, le scelle.",
+    tables: ["delivery_runs", "delivery_run_events", "delivery_run_approvals", "delivery_run_evidence"],
+  },
+  {
+    id: "4.9", titre: "Règles du harnais, dossiers de Cortex et évaluations",
+    intro: "Ce qui encadre les agents au-delà d'une mission. Les règles de l'espace, versionnées, jugent à la fois les actions des agents de code et les outils que Cortex veut lancer ; sans version enregistrée, la table par défaut s'applique. Chaque réponse de Cortex qui appelle un outil garde un dossier chaîné, au format de celui d'une mission, et la banque d'évaluations fige des cas tirés de ces dossiers pour les rejouer avec un modèle nommé, sans jamais toucher l'espace.",
+    tables: [
+      "harness_rule_sets", "cortex_records", "cortex_record_events",
+      "eval_cases", "eval_runs", "eval_results", "eval_bank_settings",
+    ],
   },
 ];
 
