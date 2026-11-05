@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.dto.response.AssistantActionResult;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
@@ -195,12 +196,15 @@ public class AgentService {
     }
 
     /**
-     * La réponse de la personne à une question de TaskForce (R115, séance n°17) : un choix cliqué ou une réponse tapée
-     * remplit ce que la question demandait, puis le geste reprend comme dans la réponse qui l'a posée, sans le modèle :
-     * rejugé par les règles de l'espace (elles ont pu changer), gardé au même dossier, avec les droits de la personne. Une
-     * question ne se répond qu'une fois. Le geste peut alors poser la question suivante, montrer sa carte, ou se faire.
+     * Les réponses de la personne à une carte de TaskForce (R115, séance n°17), envoyées ensemble (décision du CEO,
+     * 05/11/2026) : pour chaque question, les choix cochés ou la réponse tapée remplissent ce qu'elle demandait, puis le
+     * geste reprend comme dans la réponse qui l'a posée, sans le modèle : rejugé par les règles de l'espace (elles ont pu
+     * changer), gardé au même dossier, avec les droits de la personne. Ce sont ses clics et ses mots sur la carte, jamais
+     * une décision lue dans un message (R1). Une carte ne se répond qu'une fois, et toutes ses questions à la fois. Le
+     * geste peut alors poser les questions suivantes, montrer sa carte, ou se faire.
      */
-    public AssistantToolCall answer(String slug, Long userId, String toolName, String recordRef, String ref, String value) {
+    public AssistantToolCall answer(String slug, Long userId, String toolName, String recordRef, String ref,
+                                    List<Question.Answer> answers) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         UUID record = recordId(recordRef);
         if (!records.owns(record, new AgentContext(slug, ws.getId(), userId))) {
@@ -210,47 +214,107 @@ public class AgentService {
         if (tool == null) {
             throw new BusinessException("This action is no longer available.");
         }
-        String said = value == null ? "" : value.strip();
-        if (said.isEmpty()) {
-            throw new BusinessException("Pick one of the choices, or write your answer.");
+        JsonNode asked = records.question(record, toolName, ref)
+            .orElseThrow(() -> new BusinessException("This question is already answered."));
+        ObjectNode args;
+        try {
+            JsonNode before = objectMapper.readTree(asked.path("arguments").asText("{}"));
+            args = before.isObject() ? (ObjectNode) before : objectMapper.createObjectNode();
+        } catch (JsonProcessingException e) {
+            throw new BusinessException("The arguments of this action are not readable.");
         }
-        JsonNode asked = records.answer(record, toolName, ref, userId, said)
+        // Tout se juge avant d'entrer au dossier : une réponse refusée laisse la carte ouverte, à corriger.
+        Map<String, String> said = filled(args, questionsOf(asked), answers == null ? List.of() : answers);
+        records.answer(record, toolName, ref, userId, said)
             .orElseThrow(() -> new BusinessException("This question is already answered."));
         JsonNode where = asked.path("screen");
         AgentContext ctx = new AgentContext(slug, ws.getId(), userId,
             new Screen(longOrNull(where.path("projectId")), longOrNull(where.path("issueId"))));
-        String argsJson;
-        try {
-            JsonNode before = objectMapper.readTree(asked.path("arguments").asText("{}"));
-            ObjectNode args = before.isObject() ? (ObjectNode) before : objectMapper.createObjectNode();
-            args.put(asked.path("question").path("field").asText(), chosen(asked.path("question"), said));
-            argsJson = objectMapper.writeValueAsString(args);
-        } catch (JsonProcessingException e) {
-            throw new BusinessException("The arguments of this action are not readable.");
-        }
+        String argsJson = args.toString();
         ToolOutcome outcome = new Kernel(ctx, record).apply(tool, toolName, argsJson);
         String shown = outcome.input() != null ? outcome.input() : argsJson;
         return new AssistantToolCall(toolName, outcome.status(), shown, outcome.result(), record.toString(), outcome.ref(),
-            outcome.target(), card(outcome.question()));
+            outcome.target(), card(outcome.questions()));
     }
 
     /**
-     * Ce que reçoit le geste : la valeur du choix cliqué, ou la réponse tapée lue parmi les choix (« testta-2 », « le
-     * login » : le seul choix qui le contient). Sinon, la réponse telle qu'elle est écrite : le geste la juge.
+     * Les questions de la carte gardées au dossier ; une carte d'avant le 05/11/2026 n'en a qu'une, sous {@code question},
+     * sans titre ni lignes qui disent ses choix.
      */
-    static String chosen(JsonNode question, String said) {
-        List<JsonNode> choices = new ArrayList<>();
-        question.path("choices").forEach(choices::add);
-        for (JsonNode choice : choices) {
-            if (said.equalsIgnoreCase(choice.path("value").asText()) || said.equalsIgnoreCase(choice.path("label").asText())) {
-                return choice.path("value").asText();
+    private List<Question> questionsOf(JsonNode asked) {
+        List<Question> questions = new ArrayList<>();
+        JsonNode kept = asked.path("questions").isArray() ? asked.path("questions")
+            : objectMapper.createArrayNode().add(asked.path("question"));
+        for (JsonNode question : kept) {
+            if (question.isObject()) questions.add(objectMapper.convertValue(question, Question.class));
+        }
+        if (questions.isEmpty()) throw new BusinessException("This question can't be read anymore: ask again.");
+        return questions;
+    }
+
+    /**
+     * Remplit les arguments du geste avec les réponses de la carte, et rend ce que chacune dit, pour le dossier. Chaque
+     * question a sa réponse : un choix coché, ou la réponse tapée, pour une question à un seul choix ; des choix cochés et
+     * la réponse tapée (ses parties séparées par des virgules) pour une question dont plusieurs se cochent, qui remplit
+     * une liste. Un choix coché est un choix de la question ; une réponse tapée se lit parmi les choix ({@link #chosen}).
+     */
+    static Map<String, String> filled(ObjectNode args, List<Question> questions, List<Question.Answer> answers) {
+        Map<String, Question.Answer> byField = new LinkedHashMap<>();
+        for (Question.Answer answer : answers) {
+            boolean asked = questions.stream().anyMatch(question -> question.field().equals(answer.field()));
+            if (!asked || byField.putIfAbsent(answer.field(), answer) != null) {
+                throw new BusinessException("This card has no other question to answer.");
             }
         }
+        Map<String, String> said = new LinkedHashMap<>();
+        for (Question question : questions) {
+            Question.Answer answer = byField.get(question.field());
+            String named = question.header() == null || question.header().isBlank() ? "this question" : question.header();
+            if (answer == null || (answer.values().isEmpty() && answer.other().isEmpty())) {
+                throw new BusinessException("Answer " + named + ": pick one of the choices, or write your answer.");
+            }
+            for (String value : answer.values()) {
+                if (question.choices().stream().noneMatch(choice -> choice.value().equals(value))) {
+                    throw new BusinessException("\"" + clipped(value, 40) + "\" isn't a choice of " + named
+                        + ": write it as your own answer.");
+                }
+            }
+            if (!question.multiple()) {
+                if (answer.values().size() + (answer.other().isEmpty() ? 0 : 1) > 1) {
+                    throw new BusinessException("Pick one answer for " + named + ".");
+                }
+                String value = answer.other().isEmpty() ? answer.values().get(0) : chosen(question, answer.other());
+                args.put(question.field(), value);
+                said.put(question.field(), value);
+            } else {
+                List<String> values = new ArrayList<>(answer.values());
+                for (String part : answer.other().split(",")) {
+                    if (!part.isBlank()) values.add(chosen(question, part.strip()));
+                }
+                List<String> kept = values.stream().distinct().toList();
+                ArrayNode list = args.putArray(question.field());
+                kept.forEach(list::add);
+                said.put(question.field(), String.join(", ", kept));
+            }
+        }
+        return said;
+    }
+
+    /**
+     * Ce que reçoit le geste d'une réponse tapée : lue parmi les choix (« testta-2 », « le login », « todo » : la valeur,
+     * le libellé, ou le seul choix dont le libellé ou la ligne qui le dit la contient). Sinon, la réponse telle qu'elle
+     * est écrite : le geste la juge.
+     */
+    static String chosen(Question question, String said) {
+        for (Question.Choice choice : question.choices()) {
+            if (said.equalsIgnoreCase(choice.value()) || said.equalsIgnoreCase(choice.label())) return choice.value();
+        }
         String wanted = said.toLowerCase(Locale.ROOT);
-        List<JsonNode> containing = wanted.length() < 2 ? List.of() : choices.stream()
-            .filter(choice -> choice.path("label").asText().toLowerCase(Locale.ROOT).contains(wanted))
+        List<Question.Choice> containing = wanted.length() < 2 ? List.of() : question.choices().stream()
+            .filter(choice -> choice.label().toLowerCase(Locale.ROOT).contains(wanted)
+                || (choice.description() != null && choice.description().toLowerCase(Locale.ROOT).contains(wanted)))
             .toList();
-        return containing.size() == 1 ? containing.get(0).path("value").asText() : said;
+        return containing.size() == 1 ? containing.get(0).value() : said;
     }
 
     private static Long longOrNull(JsonNode node) {
@@ -541,10 +605,10 @@ public class AgentService {
         AgentTool gesture = tools.get(name);
         if (!(gesture instanceof CortexGesture)) return answer;
         ToolOutcome outcome = kernel.apply(gesture, name, "{}");
-        if (outcome.question() == null) return answer;
+        if (outcome.questions() == null) return answer;
         toolCalls.add(new AssistantToolCall(name, outcome.status(), "{}", outcome.result(), kernel.recordRef(), outcome.ref(),
-            outcome.target(), card(outcome.question())));
-        return outcome.question().text();
+            outcome.target(), card(outcome.questions())));
+        return asking(outcome.questions());
     }
 
     /**
@@ -593,11 +657,12 @@ public class AgentService {
 
     /**
      * {@code input} : les arguments que la carte montre, quand le serveur les a résolus ; null, ceux de Cortex.
-     * {@code ref} : l'empreinte d'un résultat réussi au dossier, que « Undo » nomme, ou de la question posée, que la
-     * réponse nomme. {@code target} : l'issue d'un geste. {@code question} : ce que TaskForce demande d'abord (R115).
+     * {@code ref} : l'empreinte d'un résultat réussi au dossier, que « Undo » nomme, ou de la carte de questions posée,
+     * que la réponse nomme. {@code target} : l'issue d'un geste. {@code questions} : ce que TaskForce demande d'abord,
+     * deux questions au plus dans la même carte (R115) ; null sans question.
      */
     private record ToolOutcome(String status, String result, String input, String ref, Map<String, Object> target,
-                               Question question) {
+                               List<Question> questions) {
         ToolOutcome(String status, String result) {
             this(status, result, null, null, null, null);
         }
@@ -661,7 +726,7 @@ public class AgentService {
                 return msg.path("content").asText("");
             }
             messages.add(objectMapper.convertValue(msg, new TypeReference<Map<String, Object>>() {}));
-            Question asked = null;
+            List<Question> asked = null;
             for (JsonNode call : calls) {
                 String id = call.path("id").asText();
                 String name = call.path("function").path("name").asText();
@@ -672,13 +737,13 @@ public class AgentService {
                     : step.apply(tool, name, argsJson);
                 String shown = outcome.input() != null ? outcome.input() : argsJson;
                 toolCalls.add(new AssistantToolCall(name, outcome.status(), shown, outcome.result(), step.recordRef(),
-                    outcome.ref(), outcome.target(), card(outcome.question())));
+                    outcome.ref(), outcome.target(), card(outcome.questions())));
                 messages.add(Map.of("role", "tool", "tool_call_id", id, "content", outcome.result()));
-                if (asked == null) asked = outcome.question();
+                if (asked == null) asked = outcome.questions();
             }
-            // R115 : TaskForce pose sa question, et la réponse s'arrête là. Le modèle ne devine pas la réponse, et sa
-            // phrase ne remplace pas la question : c'est elle que la personne lit, au-dessus de ses choix.
-            if (asked != null) return asked.text();
+            // R115 : TaskForce pose ses questions, et la réponse s'arrête là. Le modèle ne devine pas les réponses, et sa
+            // phrase ne remplace pas les questions : ce sont elles que la personne lit, sur la carte de leurs choix.
+            if (asked != null) return asking(asked);
         }
         return "Answer interrupted (too many tool steps).";
     }
@@ -688,12 +753,20 @@ public class AgentService {
         return resolved == null || resolved.isEmpty() ? args : resolved;
     }
 
-    /** La question telle que la carte la montre ; null sans question. */
-    static AssistantQuestion card(Question question) {
-        if (question == null) return null;
-        return new AssistantQuestion(question.field(), question.text(), question.choices().stream()
-            .map(choice -> new AssistantChoice(choice.value(), choice.label(), choice.recommended()))
-            .toList());
+    /** Les questions d'une carte telles que la réponse les dit : une par ligne, dans l'ordre de la carte. */
+    static String asking(List<Question> questions) {
+        return questions.stream().map(Question::text).collect(Collectors.joining("\n"));
+    }
+
+    /** Les questions telles que la carte les montre ; null sans question. */
+    static List<AssistantQuestion> card(List<Question> questions) {
+        if (questions == null || questions.isEmpty()) return null;
+        return questions.stream()
+            .map(question -> new AssistantQuestion(question.field(), question.header(), question.text(), question.multiple(),
+                question.choices().stream()
+                    .map(choice -> new AssistantChoice(choice.value(), choice.label(), choice.description(), choice.recommended()))
+                    .toList()))
+            .toList();
     }
 
     /** Ce qui a répondu : le tier et les notes servies ; le modèle s'y ajoute à l'ouverture du dossier. */
@@ -786,7 +859,7 @@ public class AgentService {
             String status = "success";
             String shown = null;
             CortexGesture.Done done = null;
-            Question asked = null;
+            List<Question> asked = null;
             try {
                 CortexGate.Verdict verdict = judge(tool, argsJson);
                 if (verdict.denied()) {
@@ -836,10 +909,10 @@ public class AgentService {
                     }
                 }
             } catch (QuestionNeeded needed) {
-                // R115 : le geste attend une réponse que seule la personne peut donner. Rien n'est écrit ; TaskForce
-                // pose la question, en choix, et le geste reprend sur son clic.
-                asked = needed.question();
-                result = QUESTION_ASKED + asked.asText();
+                // R115 : le geste attend des réponses que seule la personne peut donner. Rien n'est écrit ; TaskForce
+                // pose ses questions, deux au plus dans la même carte, et le geste reprend sur son envoi.
+                asked = needed.questions();
+                result = QUESTION_ASKED + needed.getMessage();
                 status = QUESTION;
                 done = null;
             } catch (Exception e) {
@@ -867,11 +940,11 @@ public class AgentService {
         }
 
         /**
-         * La question au dossier, avec ce que le geste reprendra : ses arguments tels que Cortex les a passés (en entier,
-         * le geste en a besoin), et l'écran, dont viendront les choix d'une question suivante. Son empreinte est ce que
-         * la réponse nomme ; sans dossier, la question ne se répond pas.
+         * La carte de questions au dossier, avec ce que le geste reprendra : ses arguments tels que Cortex les a passés
+         * (en entier, le geste en a besoin), et l'écran, dont viendront les choix d'une question suivante. Son empreinte
+         * est ce que la réponse nomme ; sans dossier, la carte ne se répond pas.
          */
-        private String asked(String tool, String argsJson, String output, Question asked) {
+        private String asked(String tool, String argsJson, String output, List<Question> asked) {
             if (record == null) return null;
             try {
                 Map<String, Object> data = new LinkedHashMap<>();
@@ -879,7 +952,7 @@ public class AgentService {
                 data.put("status", QUESTION);
                 data.put("output", CortexRecordService.shorten(output));
                 data.put("arguments", argsJson == null || argsJson.isBlank() ? "{}" : argsJson);
-                data.put("question", objectMapper.convertValue(asked, new TypeReference<Map<String, Object>>() {}));
+                data.put("questions", objectMapper.convertValue(asked, new TypeReference<List<Map<String, Object>>>() {}));
                 Map<String, Object> screen = new LinkedHashMap<>();
                 screen.put("projectId", ctx.screen().projectId());
                 screen.put("issueId", ctx.screen().issueId());
@@ -1082,7 +1155,10 @@ public class AgentService {
                 case "refused" -> said.add("Nothing was done: the rules of this workspace refuse it.");
                 case "error" -> said.add("An action failed, so nothing was done: "
                     + clipped(output.replaceFirst("^Tool \\S+ failed: ", ""), MAX_SAID));
-                case QUESTION -> said.add(call.question() != null ? call.question().text() : "TaskForce asks a question below.");
+                case QUESTION -> {
+                    if (call.questions() == null || call.questions().isEmpty()) said.add("TaskForce asks a question below.");
+                    else call.questions().forEach(question -> said.add(question.text()));
+                }
                 default -> { /* un résultat défait ou inconnu : rien de plus à dire */ }
             }
         }
@@ -1090,22 +1166,33 @@ public class AgentService {
     }
 
     /**
-     * La réponse d'un tour qui s'arrête sur la question d'un geste (R115) : la question est celle de TaskForce, pas du
-     * modèle, et se montre signée comme ses corrections (R116) ; la carte en dessous porte ses choix.
+     * La signature des questions de TaskForce (R115) : l'app montre la carte à leur place, et une conversation rouverte,
+     * sans sa carte, les relit sous le nom de TaskForce, comme le modèle dans son historique.
+     */
+    static final String ASKS = ActionClaimCheck.SIGNATURE + " · asks";
+
+    /**
+     * La réponse d'un tour qui s'arrête sur les questions d'un geste (R115) : ce sont celles de TaskForce, pas du modèle,
+     * une par ligne, sous sa signature ; la carte porte leurs choix.
      */
     static String askedAnswer(String answer, List<AssistantToolCall> toolCalls) {
         if (answer == null) return null;
         return toolCalls.stream()
-            .filter(call -> QUESTION.equals(call.status()) && call.question() != null
-                && answer.strip().equals(call.question().text()))
-            .map(call -> signed(List.of(call.question().text())))
+            .filter(call -> QUESTION.equals(call.status()) && call.questions() != null && !call.questions().isEmpty())
+            .map(call -> call.questions().stream().map(AssistantQuestion::text).toList())
+            .filter(texts -> answer.strip().equals(String.join("\n", texts)))
+            .map(texts -> signed(ASKS, texts))
             .findFirst()
             .orElse(answer);
     }
 
     /** Un bloc de TaskForce, tel que l'app le montre comme sa parole (R116) : la signature, puis une ligne par phrase. */
     private static String signed(List<String> lines) {
-        StringBuilder block = new StringBuilder(ActionClaimCheck.SIGNATURE);
+        return signed(ActionClaimCheck.SIGNATURE, lines);
+    }
+
+    private static String signed(String signature, List<String> lines) {
+        StringBuilder block = new StringBuilder(signature);
         lines.forEach(line -> block.append("\n> ").append(line));
         return block.append('\n').toString();
     }

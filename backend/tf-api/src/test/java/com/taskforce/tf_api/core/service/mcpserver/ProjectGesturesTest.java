@@ -28,6 +28,7 @@ import com.taskforce.tf_api.shared.exception.BusinessException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -36,7 +37,8 @@ import static org.mockito.Mockito.when;
 
 /**
  * Créer un projet, geste du MCP TaskForce (R115, séance n°17) : « crée un projet Next.js », l'exemple de la Présidence,
- * demande le nom, puis où vit son code, sa visibilité dans le même choix ; deux questions au plus, rien n'est créé avant.
+ * demande le nom et où vit son code dans la même carte, sa visibilité dans le même choix ; deux questions au plus, rien
+ * n'est créé avant.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Créer un projet depuis la conversation")
@@ -54,7 +56,7 @@ class ProjectGesturesTest {
         gestures = new ProjectGestures(projectService, repoService, repoHost);
         lenient().when(repoHost.createsRepos("acme")).thenReturn(true);
         lenient().when(repoHost.linksRepos("acme")).thenReturn(true);
-        lenient().when(repoHost.recentRepos("acme", 3)).thenReturn(List.of("acme/web"));
+        lenient().when(repoHost.recentRepos(eq("acme"), anyInt())).thenReturn(List.of("acme/web", "acme/api", "acme/site"));
         lenient().when(projectService.createProject(eq("acme"), eq(7L), any())).thenAnswer(inv -> {
             CreateProjectRequest request = inv.getArgument(2);
             return ProjectResponse.builder().id(31L).identifier(request.getIdentifier()).name(request.getName()).build();
@@ -66,14 +68,62 @@ class ProjectGesturesTest {
     }
 
     private Question asked(String body) {
+        return card(body).get(0);
+    }
+
+    /** La carte que le geste lève sur ces arguments : ses questions, dans l'ordre où la personne les lit. */
+    private List<Question> card(String body) {
         try {
             gestures.create("acme", 7L, args(body));
         } catch (QuestionNeeded needed) {
-            return needed.question();
+            return needed.questions();
         } catch (Exception e) {
             throw new AssertionError(e);
         }
         throw new AssertionError("no question for " + body);
+    }
+
+    /**
+     * Ce qui manque se demande dans une seule carte, deux questions au plus (décision du CEO, 05/11/2026) : « crée un
+     * projet Next.js » demande le nom et où vit son code d'un coup. Cortex lit les mêmes questions avant le geste, et rien
+     * n'est créé avant leurs réponses.
+     */
+    @ParameterizedTest(name = "{0} : {1}")
+    @CsvSource(delimiter = '|', value = {
+        "{}                                              | Name: What should the project be called?",
+        "{\"stack\": \"Next.js\"}                        | Name: What should the project be called?~Repository: Where does its code live?",
+        "{\"name\": \"Next.js\"}                         | Name: What should the project be called?~Repository: Where does its code live?",
+        "{\"stack\": \"Next.js\", \"repository\": \"new\"} | Name: What should the project be called?~Visibility: Who can see the new repository?",
+        "{\"name\": \"Atlas\", \"stack\": \"Next.js\"}   | Repository: Where does the code of Atlas live?",
+        "{\"name\": \"Atlas\", \"repository\": \"new\"}  | Visibility: Who can see the new repository of Atlas?",
+    })
+    void what_is_missing_is_asked_in_one_card(String body, String asked) throws Exception {
+        List<Question> card = card(body);
+
+        assertThat(card).extracting(question -> question.header() + ": " + question.text())
+            .containsExactly(asked.split("~"));
+        assertThat(gestures.questions("acme", args(body))).isEqualTo(card);
+        assertThat(card).noneMatch(Question::multiple); // un nom, un dépôt : une seule réponse chacun
+        verify(projectService, never()).createProject(any(), any(), any());
+        verify(repoService, never()).linkRepo(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("chaque choix se dit en une ligne, le dépôt privé recommandé en premier, quatre choix au plus")
+    void each_choice_says_what_it_means() {
+        List<Question> card = card("{\"stack\": \"Next.js\"}");
+
+        assertThat(card.get(0).choices()).singleElement().satisfies(choice -> {
+            assertThat(choice.value()).isEqualTo("Next.js app");
+            assertThat(choice.description()).isEqualTo("Suggested from your request");
+            assertThat(choice.recommended()).isFalse(); // un nom n'a pas de défaut sûr
+        });
+        Question repository = card.get(1);
+        assertThat(repository.choices()).hasSize(Question.MAX_CHOICES).allMatch(choice -> choice.description() != null);
+        assertThat(repository.choices()).extracting(Question.Choice::label)
+            .containsExactly("A new private repository", "A new public repository", "acme/web", "No repository for now");
+        assertThat(repository.choices()).filteredOn(Question.Choice::recommended).extracting(Question.Choice::value)
+            .containsExactly("new-private");
     }
 
     /** Le nom manque, ou ne dit que la pile : TaskForce le demande, avant de rien créer. */
@@ -114,7 +164,7 @@ class ProjectGesturesTest {
     @ParameterizedTest(name = "crée {0}, lie {1} : {2}")
     @CsvSource(delimiter = '|', value = {
         "true  | false | new-private,new-public,none",
-        "false | true  | acme/web,none",
+        "false | true  | acme/web,acme/api,acme/site,none",
     })
     void the_choices_are_what_taskforce_can_do_here(boolean creates, boolean links, String choices) {
         when(repoHost.createsRepos("acme")).thenReturn(creates);
