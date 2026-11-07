@@ -44,6 +44,19 @@ const CATALOG: IntegrationCatalog = {
 
 const row = (name: string) => screen.getByRole("button", { name: new RegExp(`^${name}`) })
 
+/** Une fenêtre de `width` pixels de large : les requêtes `min-width` y répondent. */
+function widthOf(width: number) {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: (query: string) => ({
+      matches: width >= Number(/min-width: (\d+)px/.exec(query)?.[1] ?? 0),
+      media: query, onchange: null, addListener: vi.fn(), removeListener: vi.fn(),
+      addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+    }),
+  })
+}
+
 /** La zone de droite (R122) : six lignes repliées, chacune avec son nombre ; ici l'environnement, le contexte, les connecteurs. */
 describe("RightPanel", () => {
   const fetchConnectors = vi.fn().mockResolvedValue(true)
@@ -51,8 +64,10 @@ describe("RightPanel", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.restoreAllMocks()
+    widthOf(1440)
     nav.pathname = "/acme/projects/3"
-    useWindowStore.setState({ rightOpen: true, rows: {} })
+    useWindowStore.setState({ rightOpen: true, rightDrawer: false, rows: {} })
     useWorkspaceStore.setState({ activeWorkspace: { name: "Acme", slug: "acme" } as Workspace })
     useProjectStore.setState({
       projects: [{ id: 3, name: "Website", identifier: "WEB", repoFullName: "acme/website" } as Project],
@@ -63,6 +78,23 @@ describe("RightPanel", () => {
     useIssueStore.setState({ issues: [], activeIssue: null })
     useIntegrationStore.setState({ connectors: null, fetchConnectors })
     useSettingsStore.setState({ openSettings })
+  })
+
+  // Sous `lg`, la zone de droite est un tiroir (« Le dessin », séance n°18), fermé tant qu'on ne l'ouvre pas.
+  it("is a drawer under lg, closed until it is opened", () => {
+    widthOf(800)
+    useWindowStore.setState({ rightOpen: true, rightDrawer: false })
+    const { rerender } = render(<RightPanel />)
+    expect(screen.queryByRole("complementary")).toBeNull()
+    expect(screen.queryByRole("dialog")).toBeNull()
+
+    useWindowStore.setState({ rightDrawer: true })
+    rerender(<RightPanel />)
+    const drawer = screen.getByRole("dialog", { name: "Around the conversation" })
+    expect(within(drawer).getByRole("button", { name: /^Environment/ })).toBeInTheDocument()
+
+    fireEvent.keyDown(drawer, { key: "Escape" })
+    expect(useWindowStore.getState().rightDrawer).toBe(false)
   })
 
   it("is not there when folded", () => {

@@ -6,6 +6,8 @@ import { useParams, usePathname } from "next/navigation"
 import { catalogForThisApp } from "@/components/integrations/integrations-catalog"
 import { PANEL_ITEM, PanelRow } from "@/components/layout/panel-row"
 import { ChangesRow, MissionsRow, ResultsRow } from "@/components/layout/work-rows"
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
+import { useMinWidth } from "@/hooks/use-min-width"
 import { formatTokens } from "@/lib/cortex/context-gauge"
 import { screenFrom } from "@/lib/cortex/screen"
 import { fillText } from "@/lib/delivery/result-card"
@@ -162,24 +164,53 @@ function ConnectorsRow() {
   )
 }
 
-/**
- * La zone de droite de la fenêtre (R122, séance n°18) : ce qui entoure la conversation, en six lignes repliées par
- * défaut, chacune avec son nombre. 320 px ; elle s'ouvre et se replie depuis la ligne du haut, et se replie seule quand
- * un volet s'ouvre sous 1 600 px de large. Elle ne montre que le travail de la personne, chaque ligne menant à son
- * objet (R57). Sous `lg`, elle n'apparaît pas.
- */
-export function RightPanel() {
-  const open = useWindowStore((s) => s.rightOpen)
-  const label = usePreferencesStore((s) => s.t.window.rightPanel)
-  if (!open) return null
+function Rows() {
   return (
-    <aside aria-label={label} className="hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-border lg:flex">
+    <>
       <EnvironmentRow />
       <ContextRow />
       <ConnectorsRow />
       <ResultsRow />
       <ChangesRow />
       <MissionsRow />
+    </>
+  )
+}
+
+/**
+ * La zone de droite de la fenêtre (R122, séance n°18) : ce qui entoure la conversation, en six lignes repliées par
+ * défaut, chacune avec son nombre. 320 px ; elle s'ouvre et se replie depuis la ligne du haut, et se replie seule quand
+ * un volet s'ouvre sous 1 600 px de large. Elle ne montre que le travail de la personne, chaque ligne menant à son
+ * objet (R57). Sous `lg`, c'est un tiroir, qui s'ouvre depuis le même bouton et se ferme au choix d'une ligne.
+ */
+export function RightPanel() {
+  const wide = useMinWidth(1024)
+  const open = useWindowStore((s) => s.rightOpen)
+  const drawer = useWindowStore((s) => s.rightDrawer)
+  const setDrawer = useWindowStore((s) => s.setRightDrawer)
+  const label = usePreferencesStore((s) => s.t.window.rightPanel)
+
+  if (!wide) {
+    return (
+      <Sheet open={drawer} onOpenChange={setDrawer}>
+        <SheetContent side="right" className="w-80 gap-0 p-0 sm:max-w-80">
+          <SheetTitle className="sr-only">{label}</SheetTitle>
+          <SheetDescription className="sr-only">{label}</SheetDescription>
+          {/* Un lien choisi ouvre son volet, qui couvre l'écran : le tiroir se ferme. */}
+          <div
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-11"
+            onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setDrawer(false) }}
+          >
+            <Rows />
+          </div>
+        </SheetContent>
+      </Sheet>
+    )
+  }
+  if (!open) return null
+  return (
+    <aside aria-label={label} className="hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-border lg:flex">
+      <Rows />
     </aside>
   )
 }

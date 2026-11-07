@@ -1,7 +1,8 @@
 /**
  * Le volet de la fenêtre (R119, R120, séance n°18) : la page de la route, ouverte à côté de la conversation. L'accueil
- * de l'espace (`/{slug}`) n'a pas de volet : seule la conversation s'y montre, centrée. Le volet ne se lit que dans la
- * route, et reste un emplacement générique : les lots suivants y ouvriront d'autres vues (l'issue, la vue du travail).
+ * de l'espace (`/{slug}`) n'a pas de volet : seule la conversation s'y montre, centrée. Le volet se lit dans la route ;
+ * l'issue s'y ouvre par-dessus l'écran qui la liste (`?issue=`, `lib/window/address.ts`), la vue du travail d'une
+ * mission a la sienne (`/{slug}/missions/{runId}`).
  */
 export interface PaneRoute {
   /** Le premier segment après l'espace : dashboard, inbox, my-work, projects, analytics… */
@@ -26,7 +27,7 @@ export const homePath = (slug: string): string => `/${slug}`
 /** Le tableau d'un projet. */
 export const boardPath = (slug: string, projectId: number): string => `/${slug}/projects/${projectId}`
 
-/** Une issue, ouverte sur le tableau de son projet : sa fiche, et sa carte de résultat quand une mission a fini. */
+/** Une issue, dans le volet, par-dessus le tableau de son projet : sa carte de résultat comprise quand une mission a fini. */
 export const issuePath = (slug: string, projectId: number, issueId: number): string =>
   `${boardPath(slug, projectId)}?issue=${issueId}`
 

@@ -8,6 +8,8 @@ import { useDeliveryStore } from "@/lib/store/delivery-store";
 import { useUserStore } from "@/lib/store/user-store";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const nav = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: nav.push, back: vi.fn() }), useParams: () => ({ workspace: "acme" }) }));
 
 const TARGET: AssistantTarget = { issueId: 28, projectId: 3, key: "TF-28", title: "Fix the footer links", runId: 100 };
 
@@ -72,11 +74,21 @@ describe("MissionInChat : la mission d'une issue, dans la conversation", () => {
     await waitFor(() => expect(applyRun).toHaveBeenCalledWith("acme", 28, 100, undefined));
   });
 
+  // Son nom, et le pouls de la mission, ouvrent sa vue du travail dans le volet (R95, point 3).
+  it("opens the work view of the mission from its name and from its pulse", () => {
+    render(<MissionInChat slug="acme" target={TARGET} />);
+
+    fireEvent.click(screen.getByRole("link", { name: "Mission of TF-28: Fix the footer links" }));
+    expect(nav.push).toHaveBeenCalledWith("/acme/missions/100", { scroll: false });
+    expect(screen.getByRole("link", { name: "Work view" })).toHaveAttribute("href", "/acme/missions/100");
+  });
+
   it("an issue without a mission shows no card to decide on", () => {
     useDeliveryStore.setState({ runs: { 28: null } });
     render(<MissionInChat slug="acme" target={{ ...TARGET, runId: null }} />);
 
     expect(screen.getByRole("group", { name: "Mission of TF-28: Fix the footer links" })).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 });

@@ -16,11 +16,13 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageContainer } from "@/components/layout/page-shell"
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table"
 import { RefreshControl } from "@/components/ui/refresh-control"
-import { IssueSheetLoader, parseIssueTarget, type IssueSheetTarget } from "@/components/sheets/issue-sheet-loader"
 import { cn } from "@/lib/utils"
 import { useNotificationStore } from "@/lib/store/notification-store"
 import type { Signal, Urgency } from "@/lib/store/notification-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
+import { issueRefOfUrl } from "@/lib/window/address"
+import { issuePath } from "@/lib/window/pane"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -149,7 +151,7 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
 
 
   const [activeTab, setActiveTab] = useState<NotifTab>(defaultTab)
-  const [sheetTarget, setSheetTarget] = useState<IssueSheetTarget | null>(null)
+  const { openIssue } = usePaneNavigation()
 
   useEffect(() => {
     if (slug) fetchNotifications(slug)
@@ -160,22 +162,22 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
   const unreadCount = signals.filter((s) => !s.read).length
   const acknowledgedCount = signals.filter((s) => s.acknowledged).length
 
-  // Clic sur la ligne : on reste dans la liste de triage → sheet latéral, la liste reste derrière.
+  // Clic sur la ligne : l'issue s'ouvre dans le volet, par-dessus la liste de triage, qui reste dessous telle qu'elle était.
   // Un signal qui ne pointe pas sur une issue (ex. surcharge → fiche d'un membre) navigue normalement.
   function openSignal(s: Signal) {
     if (slug) markAsRead(slug, s.id)
-    const target = parseIssueTarget(s.issueUrl)
-    if (target) setSheetTarget(target)
+    const target = issueRefOfUrl(s.issueUrl)
+    if (target) openIssue(target)
     else if (s.issueUrl) router.push(s.issueUrl)
     else if (s.operationUrl) router.push(s.operationUrl) // repli : au moins le contexte projet
   }
 
-  // Bouton « ↗ » : sortie explicite vers le board avec le sheet ouvert (`?issue=`) - la page pleine
-  // a été retirée (redondante avec le sheet). Reste le seul chemin qui QUITTE la liste de triage.
+  // Bouton « ↗ » : sortie explicite vers le board, l'issue ouverte par-dessus (`?issue=`). Reste le seul chemin qui
+  // QUITTE la liste de triage.
   function openSignalFullPage(s: Signal) {
     if (slug) markAsRead(slug, s.id)
-    const target = parseIssueTarget(s.issueUrl)
-    if (target) { router.push(`/${slug}/projects/${target.projectId}?issue=${target.issueId}`); return }
+    const target = issueRefOfUrl(s.issueUrl)
+    if (target?.issueId != null && slug) { router.push(issuePath(slug, target.projectId, target.issueId)); return }
     if (s.operationUrl) router.push(s.operationUrl) // repli : au moins le contexte projet
   }
 
@@ -335,15 +337,6 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
             onRowClick={openSignal}
             isRowClickable={hasDestination}
           />
-
-          {/* Sheet ouvert en place : le triage continue sans quitter la liste. */}
-          {slug && (
-            <IssueSheetLoader
-              slug={slug}
-              target={sheetTarget}
-              onClose={() => setSheetTarget(null)}
-            />
-          )}
         </div>
       )}
     </PageContainer>

@@ -1,11 +1,14 @@
 "use client"
 
 import { useEffect } from "react"
-import { Ban, Loader2, CircleCheck, TriangleAlert } from "lucide-react"
+import { Activity, Ban, Loader2, CircleCheck, TriangleAlert } from "lucide-react"
 
+import { PaneLink } from "@/components/layout/pane-link"
 import { RunActivity } from "@/components/sheets/run-activity"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { missionPath } from "@/lib/window/address"
 
 /**
  * État d'un run de délégation sur une issue (TF-AGENT-DELIVERY A2).
@@ -22,6 +25,8 @@ export function DelegateAgentControl({
   goal,
 }: Readonly<{ workspaceSlug: string; projectId: number; issueId: number; goal?: string }>) {
   const r = usePreferencesStore((s) => s.t.missions.result)
+  const workView = usePreferencesStore((s) => s.t.window.workView)
+  const { openMission } = usePaneNavigation()
   const run = useDeliveryStore((s) => s.runs[issueId])
   const fetchRun = useDeliveryStore((s) => s.fetchRun)
   const activity = useDeliveryStore((s) => (run ? s.activity[run.id] : undefined))
@@ -54,30 +59,40 @@ export function DelegateAgentControl({
 
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs">
-      {active ? (
-        <span className="flex items-center gap-1.5 text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin" />
-          {run.status === "QUEUED" ? "Waiting for your runner to pick it up" : "Agent working on it"} ({run.providerKey})…
-        </span>
-      ) : run.status === "DONE" ? (
-        // Le résultat se relit sur sa carte, sous le titre de l'issue (R78) ; ici, où il en est.
-        <span className="flex items-center gap-1.5 font-medium text-ink-green">
-          <CircleCheck className="size-3.5" />
-          {run.outcome === "APPLIED" ? r.applied
-            : run.outcome === "DISCARDED" ? r.discarded
-            : run.outcome === "MARKED_DONE" ? r.markedDone
-            : r.readyAbove}
-        </span>
-      ) : run.refused ? (
-        // Une règle a refusé la mission au départ : ce n'est pas une panne, la raison dit quoi faire (R38).
-        <span className="flex items-center gap-1.5 text-muted-foreground">
-          <Ban className="size-3.5" /> Not started{run.error ? ` - ${run.error}` : ""}
-        </span>
-      ) : (
-        <span className="flex items-center gap-1.5 text-destructive">
-          <TriangleAlert className="size-3.5" /> Agent failed{run.error ? ` - ${run.error}` : ""}
-        </span>
-      )}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        {active ? (
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <Loader2 className="size-3.5 animate-spin" />
+            {run.status === "QUEUED" ? "Waiting for your runner to pick it up" : "Agent working on it"} ({run.providerKey})…
+          </span>
+        ) : run.status === "DONE" ? (
+          // Le résultat se relit sur sa carte, sous le titre de l'issue (R78) ; ici, où il en est.
+          <span className="flex items-center gap-1.5 font-medium text-ink-green">
+            <CircleCheck className="size-3.5" />
+            {run.outcome === "APPLIED" ? r.applied
+              : run.outcome === "DISCARDED" ? r.discarded
+              : run.outcome === "MARKED_DONE" ? r.markedDone
+              : r.readyAbove}
+          </span>
+        ) : run.refused ? (
+          // Une règle a refusé la mission au départ : ce n'est pas une panne, la raison dit quoi faire (R38).
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <Ban className="size-3.5" /> Not started{run.error ? ` - ${run.error}` : ""}
+          </span>
+        ) : (
+          <span className="flex items-center gap-1.5 text-destructive">
+            <TriangleAlert className="size-3.5" /> Agent failed{run.error ? ` - ${run.error}` : ""}
+          </span>
+        )}
+        {/* Le pouls de la mission mène à sa vue du travail, dans le volet (R95, point 3). */}
+        <PaneLink
+          href={missionPath(workspaceSlug, run.id)}
+          open={() => openMission(run.id)}
+          className="flex shrink-0 items-center gap-1 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+        >
+          <Activity className="size-3.5" /> {workView}
+        </PaneLink>
+      </div>
       <RunActivity slug={workspaceSlug} runId={run.id} activity={activity} live={running} goal={goal} />
     </div>
   )

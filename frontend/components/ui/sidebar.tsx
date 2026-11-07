@@ -57,6 +57,7 @@ function SidebarProvider({
   defaultOpen = true,
   open: openProp,
   onOpenChange: setOpenProp,
+  mobile,
   className,
   style,
   children,
@@ -65,8 +66,11 @@ function SidebarProvider({
   defaultOpen?: boolean
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  /** La barre est un tiroir : la fenêtre le décide (sous `lg` dans la webapp), sinon la largeur d'un téléphone. */
+  mobile?: boolean
 }) {
-  const isMobile = useIsMobile()
+  const narrow = useIsMobile()
+  const isMobile = mobile || narrow
   const [openMobile, setOpenMobile] = React.useState(false)
 
   // This is the internal state of the sidebar.

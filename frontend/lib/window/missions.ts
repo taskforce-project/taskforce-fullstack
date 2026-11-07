@@ -1,5 +1,6 @@
 import type { AnalysisJob, JobStatus } from "@/lib/api/analysis-service"
 import type { DeliveryRun, DeliveryRunStatus } from "@/lib/api/delivery-service"
+import type { Change } from "@/lib/window/changes"
 import { parseServerDate } from "@/lib/utils/server-date"
 
 /**
@@ -76,4 +77,23 @@ export function elapsedMinutes(since: string | null | undefined, now: number): n
 /** Ce qu'une mission montre : la clé et le titre de son issue, ou à défaut son numéro. */
 export function runLabel(run: Pick<DeliveryRun, "issueKey" | "issueTitle" | "issueId">): string {
   return [run.issueKey, run.issueTitle].filter(Boolean).join(" ") || `#${run.issueId}`
+}
+
+/**
+ * La mission que la conversation a lancée et qui tourne encore, la plus récente : la ligne du haut ouvre sa vue du travail
+ * (« Le dessin », séance n°18). Celles de la personne seulement (R57) ; null quand aucune ne tourne.
+ */
+export function conversationMission(
+  changes: readonly Change[],
+  runs: readonly DeliveryRun[],
+  me: string | number | null | undefined,
+): DeliveryRun | null {
+  for (const change of changes) {
+    const target = change.kind === "delegated" ? change.call.target : null
+    if (!target) continue
+    const run = runs.find((r) => (target.runId ? r.id === target.runId : r.issueId === target.issueId)
+      && isActiveRun(r.status) && isMine(r, me))
+    if (run) return run
+  }
+  return null
 }
