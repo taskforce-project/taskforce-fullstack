@@ -204,6 +204,38 @@ describe("AppShell : la fenêtre", () => {
     expect(screen.getByText("the board").parentElement).toHaveAttribute("aria-hidden", "true")
   })
 
+  // « Le dessin » : Échap referme ce qui vient de s'ouvrir, une chose à la fois.
+  it("closes with Escape the answer unfolded in full width, then the issue, back to its board", () => {
+    widthOf(1920)
+    nav.pathname = "/acme/projects/3"
+    nav.search = "c=9&issue=34"
+    globalThis.history.replaceState(null, "", "/acme/projects/3?c=9&issue=34")
+    useWindowStore.setState({ paneFull: true })
+    render(<AppShell><p /></AppShell>)
+    act(() => { useCortexStore.setState({ open: true }) })
+
+    act(() => { fireEvent.keyDown(window, { key: "Escape" }) })
+    expect(useCortexStore.getState().open).toBe(false)
+    expect(nav.push).not.toHaveBeenCalled()
+
+    act(() => { fireEvent.keyDown(window, { key: "Escape" }) })
+    expect(nav.push).toHaveBeenCalledWith("/acme/projects/3?c=9", { scroll: false })
+  })
+
+  it("never closes the issue under a typing cursor, nor after a dialog took the key", () => {
+    widthOf(1920)
+    nav.pathname = "/acme/projects/3"
+    nav.search = "issue=34"
+    render(<AppShell><input aria-label="comment" /></AppShell>)
+
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "comment", hidden: true }), { key: "Escape" })
+    const taken = new KeyboardEvent("keydown", { key: "Escape", cancelable: true })
+    taken.preventDefault()
+    act(() => { window.dispatchEvent(taken) })
+
+    expect(nav.push).not.toHaveBeenCalled()
+  })
+
   it.each([
     [1440, "/acme/dashboard", false],
     [1920, "/acme/dashboard", true],

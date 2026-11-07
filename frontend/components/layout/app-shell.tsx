@@ -23,6 +23,7 @@ import { useMinWidth } from "@/hooks/use-min-width"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { useMissionsSync } from "@/lib/hooks/use-missions-sync"
 import { useNotificationsSync } from "@/lib/hooks/use-notifications-sync"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { useCortexStore } from "@/lib/store/cortex-store"
 import { useProjectStore } from "@/lib/store/project-store"
@@ -74,6 +75,35 @@ function useSearchShortcut() {
   }, [setSearchOpen])
 }
 
+/** Un champ où l'on écrit : Échap y appartient au champ. */
+function typing(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)
+}
+
+/**
+ * Échap referme ce qui vient de s'ouvrir, une chose à la fois (« Le dessin », séance n°18) : la réponse dépliée au-dessus
+ * du compositeur en pleine largeur, puis l'issue, qui rend son tableau. Jamais sous un curseur de saisie : le champ garde
+ * sa touche, et le compositeur replie lui-même sa conversation. Une fenêtre de dialogue ouverte se ferme d'abord.
+ */
+function useEscape(folded: boolean, issueOpen: boolean, closeIssue: () => void) {
+  React.useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape" || e.defaultPrevented || typing(e.target)) return
+      const cortex = useCortexStore.getState()
+      if (folded && cortex.open) {
+        e.preventDefault()
+        cortex.setOpen(false)
+      } else if (issueOpen) {
+        e.preventDefault()
+        closeIssue()
+      }
+    }
+    globalThis.addEventListener("keydown", onKey)
+    return () => globalThis.removeEventListener("keydown", onKey)
+  }, [folded, issueOpen, closeIssue])
+}
+
 /**
  * La fenêtre (R119, séance n°18) : `[barre de gauche] [conversation] [volet] [zone de droite]`, sous une ligne de 44 px.
  * La conversation avec Cortex vit ici, la même d'un écran à l'autre ; le volet est la page de la route (`children`), à
@@ -99,6 +129,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
   const searchOpen = useWindowStore((s) => s.searchOpen)
   const setSearchOpen = useWindowStore((s) => s.setSearchOpen)
   const setOpen = useCortexStore((s) => s.setOpen)
+  const { closeIssue } = usePaneNavigation()
   const splitRef = React.useRef<HTMLDivElement>(null)
   const space = useElementWidth(splitRef)
   // Pendant le geste sur la poignée, la largeur suit le pointeur ; elle se retient à la fin.
@@ -115,6 +146,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
   // Sous 1 600 px, un volet qui s'ouvre replie la zone de droite ; un clic la rouvre, jusqu'au prochain volet.
   const crowded = route !== null && !roomy
   React.useEffect(() => { if (crowded) setRightOpen(false) }, [crowded, setRightOpen])
+  useEscape(folded, route !== null && issue !== null, closeIssue)
 
   // La conversation ne change pas avec la largeur du volet : elle ne se redessine pas pendant le geste sur la poignée.
   const conversation = React.useMemo(() => <Conversation />, [])
