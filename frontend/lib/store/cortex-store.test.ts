@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 
-import { messagesToTurns, useCortexStore } from "./cortex-store";
+import { messagesToTurns, undoKey, useCortexStore } from "./cortex-store";
 import { useScreenStore } from "./screen-store";
 import {
-  answerQuestion, sendAgentMessage, type AssistantAnswer, type AssistantToolCall,
+  answerQuestion, sendAgentMessage, undoAction, type AssistantAnswer, type AssistantToolCall,
 } from "@/lib/api/assistant-service";
 import {
   deleteConversation, getConversation, listConversations, type ConversationSummary,
 } from "@/lib/api/ai-conversation-service";
 
 // Aucun réseau : la réponse de Cortex et les conversations sont simulées ; les erreurs passent par le vrai client.
-vi.mock("@/lib/api/assistant-service", () => ({ sendAgentMessage: vi.fn(), answerQuestion: vi.fn() }));
+vi.mock("@/lib/api/assistant-service", () => ({ sendAgentMessage: vi.fn(), answerQuestion: vi.fn(), undoAction: vi.fn() }));
 vi.mock("@/lib/api/ai-conversation-service", () => ({
   listConversations: vi.fn(), getConversation: vi.fn(), deleteConversation: vi.fn(),
 }));
@@ -284,6 +284,16 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
       { field: "name", values: [], other: "Atlas" }, { field: "repository", values: ["new-private"], other: undefined },
     ]);
     expect(useCortexStore.getState().questionProblem).toBeNull();
+    // Le geste a abouti après les questions : « Changes » le montre (R122).
+    expect(useCortexStore.getState().done).toEqual([next]);
+  });
+
+  it("keeps out of Changes what the answers to a card only ask further", async () => {
+    vi.mocked(answerQuestion).mockResolvedValue({ ...card, status: "question" });
+
+    await useCortexStore.getState().answerQuestion("acme", card, [{ field: "name", values: ["Atlas"] }]);
+
+    expect(useCortexStore.getState().done).toEqual([]);
   });
 
   it("returns null with the server's reason when the answers fail, and sends nothing empty", async () => {
@@ -339,5 +349,57 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
 
     expect(useCortexStore.getState().turns.at(-1)).toMatchObject({ role: "assistant", kind: "quota" });
     expect(useCortexStore.getState().sentAt).toBeNull();
+  });
+});
+
+describe("useCortexStore : les gestes faits sur leurs cartes, et leur « Undo » partagé (R122)", () => {
+  const created: AssistantToolCall = {
+    name: "create_issue", status: "success", input: '{"title":"Pricing page"}', output: "Created TF-14", record: "rec-1",
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useCortexStore.setState({ ...initial, turns: [], conversations: [], done: [], undos: {} });
+  });
+
+  it("keeps a gesture done on its card for Changes, until the conversation changes", () => {
+    useCortexStore.getState().noteDone(created);
+    expect(useCortexStore.getState().done).toEqual([created]);
+
+    useCortexStore.getState().newConversation();
+    expect(useCortexStore.getState().done).toEqual([]);
+  });
+
+  it("undoes a gesture once, and both places read the same state", async () => {
+    vi.mocked(undoAction).mockResolvedValue({ tool: "create_issue", status: "success", output: "TF-14 is gone." });
+
+    const undone = useCortexStore.getState().undo("acme", created);
+    expect(useCortexStore.getState().undos[undoKey(created)]).toEqual({ status: "running" });
+    await expect(undone).resolves.toBe(true);
+
+    expect(undoAction).toHaveBeenCalledWith("acme", created);
+    expect(useCortexStore.getState().undos[undoKey(created)]).toEqual({ status: "done", output: "TF-14 is gone." });
+    // Déjà défait : un second clic, d'ailleurs, ne repart pas.
+    await expect(useCortexStore.getState().undo("acme", created)).resolves.toBe(false);
+    expect(undoAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("says why the server refuses to undo, and lets the person try again", async () => {
+    vi.mocked(undoAction).mockRejectedValueOnce(httpError(409, { message: "TF-14 has comments now." }));
+
+    await expect(useCortexStore.getState().undo("acme", created)).resolves.toBe(false);
+    expect(useCortexStore.getState().undos[undoKey(created)]).toEqual({ status: "error", output: "TF-14 has comments now." });
+
+    vi.mocked(undoAction).mockResolvedValueOnce({ tool: "create_issue", status: "success", output: "Undone." });
+    await expect(useCortexStore.getState().undo("acme", created)).resolves.toBe(true);
+    await expect(useCortexStore.getState().undo("", { ...created, record: "other" })).resolves.toBe(false);
+  });
+
+  it.each([
+    [{ record: "r", ref: "x", name: "update_issue" }, "r:x"],
+    [{ record: "r", ref: null, name: "create_issue" }, "r:create_issue"],
+    [{ record: null, name: "add_comment" }, ":add_comment"],
+  ])("names a gesture by its record and its print: %o", (call, key) => {
+    expect(undoKey(call)).toBe(key);
   });
 });

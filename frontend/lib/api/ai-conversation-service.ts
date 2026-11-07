@@ -11,6 +11,8 @@ export interface ConversationSummary {
   updatedAt: string | null
   messageCount: number
   totalTokens: number
+  /** Le projet à l'écran quand la conversation a commencé (R121) ; null sans projet, absent d'un serveur plus ancien. */
+  projectId?: number | null
 }
 
 export interface ConversationMessage {
