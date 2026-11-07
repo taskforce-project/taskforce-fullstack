@@ -13,21 +13,23 @@ import { homePath, paneTitle, type PaneRoute } from "@/lib/window/pane"
 const ICON_BUTTON =
   "flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
 
-/** À côté de la conversation, le volet prend la moitié de la place à droite de la barre de gauche, 480 px au moins. */
+/** À côté de la conversation, avant toute mesure : la moitié de la place à droite de la barre de gauche, 480 px au moins. */
 const BESIDE: CSSProperties = { flex: "0 1 max(480px, 50%)" }
 
 /**
  * Le volet de la fenêtre (R119, R120) : la page de la route, entière, avec tous ses gestes, à côté de la conversation.
  * Son en-tête porte son titre, la pleine largeur et la fermeture, qui mène à l'accueil de l'espace. En pleine largeur
- * (ou sous `lg`), la conversation se replie dans son compositeur, en bas du volet. L'emplacement reste générique : la
- * page de la route aujourd'hui, d'autres vues ensuite.
+ * (ou sous `lg`), la conversation se replie dans son compositeur, en bas du volet. À côté d'elle, une poignée règle sa
+ * largeur. L'emplacement reste générique : la page de la route aujourd'hui, d'autres vues ensuite.
  */
-export function Pane({ route, full, wide, children, composer }: Readonly<{
+export function Pane({ route, full, wide, width, children, composer }: Readonly<{
   route: PaneRoute
   /** Le volet prend toute la largeur : la personne l'a voulu, ou la fenêtre est étroite. */
   full: boolean
   /** La fenêtre peut montrer le volet à côté de la conversation (`lg`) : le bouton de la pleine largeur s'y montre. */
   wide: boolean
+  /** À côté de la conversation, la largeur réglée à la poignée (px) ; sans mesure, la moitié de la place. */
+  width?: number | null
   children: ReactNode
   /** La conversation repliée dans son compositeur, en bas du volet. */
   composer?: ReactNode
@@ -53,8 +55,8 @@ export function Pane({ route, full, wide, children, composer }: Readonly<{
     <section
       aria-label={title}
       data-width={full ? "full" : "beside"}
-      className={cn("relative flex min-h-0 min-w-0 flex-col", full ? "flex-1" : "border-l border-border")}
-      style={full ? undefined : BESIDE}
+      className="relative flex min-h-0 min-w-0 flex-col"
+      style={full ? { flex: "1 1 0%" } : width ? { flex: `0 0 ${width}px` } : BESIDE}
     >
       <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border pl-4 pr-2">
         <h2 className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">{title}</h2>

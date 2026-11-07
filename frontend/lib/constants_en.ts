@@ -565,6 +565,9 @@ export const CONSTANTS_EN = {
     fullWidth: "Full width",
     sideBySide: "Beside the conversation",
     closePane: "Close",
+    // The handle between the conversation and the pane.
+    resizePane: "Resize the pane",
+    resizeHint: "Drag to resize the pane, double-click to give it half the width",
     // The right panel: what surrounds the conversation, six rows folded by default.
     rightPanel: "Around the conversation",
     rows: {

@@ -2,9 +2,9 @@ import { create } from "zustand"
 import { createJSONStorage, persist } from "zustand/middleware"
 
 // ---------------------------------------------------------------------------
-// La fenêtre (R119 à R122, séance n°18) : ce que la personne en règle, hors de la route. Le volet en pleine largeur et
-// la zone de droite se retiennent pour elle, dans le navigateur (le motif de l'app : `persist`) ; les lignes de la zone
-// de droite repartent repliées, et la recherche fermée. La route, elle, dit quel volet est ouvert.
+// La fenêtre (R119 à R122, séance n°18) : ce que la personne en règle, hors de la route. Le volet en pleine largeur, sa
+// largeur à la poignée et la zone de droite se retiennent pour elle, dans le navigateur (le motif de l'app : `persist`) ;
+// les lignes de la zone de droite repartent repliées, et la recherche fermée. La route, elle, dit quel volet est ouvert.
 // ---------------------------------------------------------------------------
 
 /** Les six lignes de la zone de droite (R122), dans leur ordre. */
@@ -14,6 +14,8 @@ export type WindowRow = (typeof WINDOW_ROWS)[number]
 interface WindowState {
   /** Le volet prend toute la largeur ; la conversation se replie dans le compositeur (R120). */
   paneFull: boolean
+  /** La largeur du volet à côté de la conversation, réglée à la poignée (px) ; null : la moitié de la place. */
+  paneWidth: number | null
   /** La zone de droite est ouverte (R122). */
   rightOpen: boolean
   /** Les lignes dépliées de la zone de droite, repliées par défaut. */
@@ -22,6 +24,8 @@ interface WindowState {
   searchOpen: boolean
 
   togglePaneFull: () => void
+  /** Retient la largeur du volet ; null la ramène à la moitié de la place (double-clic sur la poignée). */
+  setPaneWidth: (width: number | null) => void
   setRightOpen: (open: boolean) => void
   toggleRight: () => void
   toggleRow: (row: WindowRow) => void
@@ -34,11 +38,13 @@ export const useWindowStore = create<WindowState>()(
   persist(
     (set) => ({
       paneFull: false,
+      paneWidth: null,
       rightOpen: true,
       rows: {},
       searchOpen: false,
 
       togglePaneFull: () => set((s) => ({ paneFull: !s.paneFull })),
+      setPaneWidth: (width) => set({ paneWidth: width === null ? null : Math.round(width) }),
       setRightOpen: (open) => set({ rightOpen: open }),
       toggleRight: () => set((s) => ({ rightOpen: !s.rightOpen })),
       toggleRow: (row) => set((s) => ({ rows: { ...s.rows, [row]: !s.rows[row] } })),
@@ -48,7 +54,7 @@ export const useWindowStore = create<WindowState>()(
     {
       name: "tf-window",
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ paneFull: s.paneFull, rightOpen: s.rightOpen }),
+      partialize: (s) => ({ paneFull: s.paneFull, paneWidth: s.paneWidth, rightOpen: s.rightOpen }),
     },
   ),
 )

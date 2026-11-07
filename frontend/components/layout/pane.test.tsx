@@ -31,6 +31,15 @@ describe("Pane", () => {
     expect(screen.getByRole("heading", { name: "Website" })).toBeInTheDocument()
   })
 
+  it("takes the width the handle gave it beside the conversation, half of the place before any measure", () => {
+    const { unmount } = render(<Pane route={{ section: "dashboard", projectId: null }} full={false} wide width={640}><p /></Pane>)
+    expect(screen.getByRole("region", { name: "Dashboard" }).style.flexBasis).toBe("640px")
+
+    unmount()
+    render(<Pane route={{ section: "dashboard", projectId: null }} full={false} wide width={null}><p /></Pane>)
+    expect(screen.getByRole("region", { name: "Dashboard" }).style.flexBasis).not.toBe("640px")
+  })
+
   it("puts the pane in full width and back, beside the conversation", () => {
     render(<Pane route={{ section: "dashboard", projectId: null }} full={false} wide><p /></Pane>)
 
