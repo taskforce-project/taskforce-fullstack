@@ -14,7 +14,7 @@ import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
 import { toolsStatus } from "./tools";
 import { readMove, readWorkspaceMove, Transfer, type LocalApi } from "./transfer";
-import { check, installNow, startUpdater, updateState } from "./updater";
+import { check, installNow, restartApp, startUpdater, updateState } from "./updater";
 import {
   integratedTitleBar,
   MAIN_TITLE_BAR_HEIGHT,
@@ -84,8 +84,13 @@ async function main(): Promise<void> {
     refreshed = refreshAccount(account);
   }
   await openApp(account, signInWin);
-  // Session fermée en ligne : traitée une fois la pile démarrée, pour qu'elle s'arrête proprement.
-  if ((await refreshed) === "ended") await sessionEnded();
+  // Session fermée en ligne : traitée une fois la pile démarrée, pour qu'elle s'arrête proprement. Les mises à jour
+  // attendent l'app relancée : démarrées pendant l'arrêt, elles pourraient retrouver une version téléchargée lors d'un
+  // lancement précédent, qui s'installerait en quittant et fermerait l'app relancée.
+  if ((await refreshed) === "ended") {
+    await sessionEnded();
+    return;
+  }
   startUpdater();
 }
 
@@ -107,7 +112,11 @@ async function refreshAccount(account: Account): Promise<"valid" | "ended" | "of
   }
 }
 
-/** Session fermée en ligne : l'app le dit, oublie le compte sur ce poste et revient à l'écran de connexion. */
+/**
+ * Session fermée en ligne : l'app le dit, oublie le compte sur ce poste et revient à l'écran de connexion. Le compte
+ * s'efface avant le redémarrage : l'app rouverte, par la relance ou par l'installeur d'une mise à jour prête (cf.
+ * `restartApp`), montre la connexion.
+ */
 async function sessionEnded(): Promise<void> {
   log.info("Session ended online: signing out of this computer");
   settings.clearAccount();
@@ -117,8 +126,7 @@ async function sessionEnded(): Promise<void> {
     message: "You're signed out of this computer",
     detail: "Your session ended, or this computer was signed out from your account settings. Sign in again to keep using TaskForce here. Your projects stay on this computer.",
   });
-  app.relaunch();
-  app.quit();
+  await restartApp(prepareUpdate);
 }
 
 /** Écran de connexion : se résout une fois le compte connecté, la fenêtre encore ouverte (cf. `openApp`). */
@@ -439,10 +447,11 @@ function registerIpc(): void {
       const sessionToken = settings.secret(account.subject, "sessionToken");
       if (sessionToken) await revoke(sessionToken).catch((error: Error) => log.warn(`Revoke failed: ${error.message}`));
     }
+    // Le compte s'efface avant le redémarrage : l'app rouverte, par la relance ou par l'installeur d'une mise à jour
+    // prête (cf. `restartApp`), montre la connexion.
     settings.clearAccount();
     log.info("Signed out");
-    app.relaunch();
-    app.quit();
+    await restartApp(prepareUpdate);
   });
 }
 
