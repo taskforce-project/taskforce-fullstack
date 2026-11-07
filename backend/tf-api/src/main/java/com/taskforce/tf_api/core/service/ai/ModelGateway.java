@@ -89,8 +89,17 @@ public class ModelGateway {
                            boolean think) {
     }
 
-    /** La réponse : le modèle qui a répondu, le message assistant (qui peut porter des {@code tool_calls}), l'usage. */
-    public record ChatReply(String model, ObjectNode message, LlmUsage usage) {
+    /**
+     * La réponse : le modèle qui a répondu, le message assistant (qui peut porter des {@code tool_calls}), l'usage, et la
+     * fenêtre de contexte que la passerelle a donnée à la requête ({@code num_ctx} d'Ollama), null quand le fournisseur
+     * la tient lui-même.
+     */
+    public record ChatReply(String model, ObjectNode message, LlmUsage usage, Integer contextWindow) {
+
+        /** Une réponse d'un fournisseur qui tient lui-même sa fenêtre de contexte. */
+        public ChatReply(String model, ObjectNode message, LlmUsage usage) {
+            this(model, message, usage, null);
+        }
     }
 
     /** Une conversation, chez le fournisseur des réglages. */
@@ -224,13 +233,14 @@ public class ModelGateway {
         ObjectNode body = OllamaProtocol.request(mapper, call.messages(), model, call.think(), call.jsonMode(), TEMPERATURE);
         List<JsonNode> attempt = tools;
         withTools(body, attempt, AiProvider.OLLAMA);
-        ((ObjectNode) body.path("options")).put("num_ctx", sizeWindow(settings, base, headers, call, body));
+        int window = sizeWindow(settings, base, headers, call, body);
+        ((ObjectNode) body.path("options")).put("num_ctx", window);
         while (true) {
             ModelHttp.Reply reply = send(base + "/api/chat", headers, body, settings.timeout());
             if (reply.ok()) {
                 JsonNode payload = read(reply.body());
                 ObjectNode message = OllamaProtocol.message(mapper, payload);
-                return new ChatReply(model, OpenAiProtocol.stripThinking(message), OllamaProtocol.usage(payload));
+                return new ChatReply(model, OpenAiProtocol.stripThinking(message), OllamaProtocol.usage(payload), window);
             }
             if ((reply.status() == 400 || reply.status() == 413) && !attempt.isEmpty()) {
                 attempt = fewerTools(reply.status(), attempt);

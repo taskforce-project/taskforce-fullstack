@@ -288,7 +288,7 @@ public class TaskforceMcpTools {
                     Need.byDefault("identifier", "from the name"),
                     Need.byDefault("visibility", "the project's members only"))
                 // Le nom et le dépôt dans la même carte (R115, décision du CEO du 05/11/2026), avant que rien ne s'écrive.
-                .asking((slug, userId, args) -> projectGestures.questions(slug, args)),
+                .asking((slug, userId, args, request) -> projectGestures.questions(slug, args, request)),
 
             new McpTool("smart_assign", "Recommend an assignee",
                 "Recommend the best assignee for an issue (workload, skills, history), with the reasons. It does not assign: "

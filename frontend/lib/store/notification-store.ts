@@ -18,7 +18,10 @@ import { parseServerDate } from "../utils/server-date";
 // Types
 // ---------------------------------------------------------------------------
 
-export type NotifType = "mention" | "assigned" | "commented" | "statusChanged" | "dueSoon" | "overdue" | "completed";
+/** Les types que le serveur envoie, ceux des agents compris (une demande d'accord, une mission finie, en échec, refusée). */
+export type NotifType =
+  | "mention" | "assigned" | "commented" | "statusChanged" | "dueSoon" | "overdue" | "completed" | "overload"
+  | "agentApproval" | "agentDone" | "agentFailed" | "agentNotStarted";
 export type Urgency   = "critical" | "warning" | "info" | "low";
 
 export interface Signal {

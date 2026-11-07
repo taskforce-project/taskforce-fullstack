@@ -20,6 +20,10 @@ import {
   regenerateWebhookSecret,
   testWebhook,
   getWebhookDeliveries,
+  getIntegrationCatalog,
+  getMcpServers,
+  type IntegrationCatalog,
+  type McpServerStatus,
   type IntegrationStatus,
   type GitHubRepo,
   type GitHubLink,
@@ -45,6 +49,14 @@ interface IntegrationState {
   githubRepos:   GitHubRepo[];
   /** Incrémenté à chaque déconnexion : le catalogue, qui garde son propre état, se relit. */
   changes:       number;
+  /**
+   * Les connecteurs que « Connectors » montre (R122) : le catalogue de l'espace, et l'état des serveurs MCP connectés
+   * (un serveur injoignable est à reconnecter). `null` = pas encore lus.
+   */
+  connectors:    { catalog: IntegrationCatalog; servers: McpServerStatus[] } | null;
+
+  /** Relit le catalogue et les serveurs MCP ; false si le catalogue ne se lit pas (les serveurs, eux, peuvent manquer). */
+  fetchConnectors: (slug: string) => Promise<boolean>;
 
   // GitHub
   fetchGitHubStatus:  (slug: string) => Promise<void>;
@@ -86,6 +98,22 @@ export const useIntegrationStore = create<IntegrationState>((set) => ({
   githubLinks:   {},
   githubRepos:   [],
   changes:       0,
+  connectors:    null,
+
+  fetchConnectors: async (slug) => {
+    if (!slug) return false;
+    try {
+      const [catalog, servers] = await Promise.all([
+        getIntegrationCatalog(slug),
+        // Sans serveur MCP joignable ni intégration (409), le catalogue suffit.
+        getMcpServers(slug).catch(() => [] as McpServerStatus[]),
+      ]);
+      set({ connectors: { catalog, servers } });
+      return true;
+    } catch {
+      return false;
+    }
+  },
 
   // ---------------------------------------------------------------------------
   // GitHub

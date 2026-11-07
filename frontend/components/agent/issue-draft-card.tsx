@@ -13,6 +13,7 @@ import {
   issueDraftInput, localDay, memberName, namedColumn, openCycles, readIssueDraft,
   type DraftPriority, type DraftProblem, type IssueDraft,
 } from "@/lib/cortex/issue-draft"
+import { useCortexStore } from "@/lib/store/cortex-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { cn } from "@/lib/utils"
@@ -48,6 +49,7 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
   const t = usePreferencesStore((s) => s.t.cortex)
   const projects = useProjectStore((s) => s.projects)
   const fetchProjects = useProjectStore((s) => s.fetchProjects)
+  const noteDone = useCortexStore((s) => s.noteDone)
   const [draft, setDraft] = useState<IssueDraft>(() => readIssueDraft(call.input))
   const [editing, setEditing] = useState(false)
   const [columns, setColumns] = useState<IssueStatus[]>([])
@@ -105,7 +107,10 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
       const result = await approveAction(slug, { ...call, input: issueDraftInput(sent) })
       setOutput(result.output)
       // L'outil dit ce qui l'arrête dans sa sortie : seule « Created … » est une issue créée.
-      setState(result.status === "success" && result.output.startsWith("Created ") ? "created" : "failed")
+      const created = result.status === "success" && result.output.startsWith("Created ")
+      setState(created ? "created" : "failed")
+      // La fenêtre la montre dans « Changes » (R122), avec le même « Undo » que la carte.
+      if (created) noteDone({ ...call, input: issueDraftInput(sent), status: "success", output: result.output })
     } catch (e) {
       setOutput(getErrorMessage(e))
       setState("failed")

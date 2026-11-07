@@ -23,6 +23,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.dto.response.AssistantActionResult;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
@@ -39,6 +40,7 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.LlmClient;
+import com.taskforce.tf_api.core.service.LlmContext;
 import com.taskforce.tf_api.core.service.LlmToolsRefusedException;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
@@ -84,6 +86,7 @@ public class AgentService {
     private final CortexRecordService records;
     private final CortexUndo          undo;
     private final ScreenContext       screens;
+    private final IssueMaterial       material;
 
     // Tier des tours avec outils externes MCP. Défaut "fast" ; "standard" pour plus de fiabilité
     // multi-outils si le matériel suit.
@@ -224,7 +227,9 @@ public class AgentService {
             throw new BusinessException("The arguments of this action are not readable.");
         }
         // Tout se juge avant d'entrer au dossier : une réponse refusée laisse la carte ouverte, à corriger.
-        Map<String, String> said = filled(args, questionsOf(asked), answers == null ? List.of() : answers);
+        List<Question> questions = questionsOf(asked);
+        Map<String, String> said = filled(args, questions, answers == null ? List.of() : answers);
+        markAnswered(args, questions);
         records.answer(record, toolName, ref, userId, said)
             .orElseThrow(() -> new BusinessException("This question is already answered."));
         JsonNode where = asked.path("screen");
@@ -298,6 +303,24 @@ public class AgentService {
             }
         }
         return said;
+    }
+
+    /**
+     * Note dans les arguments les questions auxquelles la personne vient de répondre ({@link Question#ANSWERED}), après
+     * celles des cartes d'avant : le geste qui reprend ne redemande pas ce qu'elle a dit, et sait qu'une carte a déjà été
+     * montrée (test du CEO du 05/11/2026).
+     */
+    static void markAnswered(ObjectNode args, List<Question> questions) {
+        JsonNode before = args.get(Question.ANSWERED);
+        ArrayNode answered = JsonNodeFactory.instance.arrayNode();
+        // Les questions déjà notées, en textes ; une valeur d'une autre forme ne compte pas.
+        if (before != null && before.isArray()) {
+            before.forEach(field -> {
+                if (field.isTextual()) answered.add(field.asText());
+            });
+        }
+        questions.forEach(question -> answered.add(question.field()));
+        args.set(Question.ANSWERED, answered);
     }
 
     /**
@@ -426,23 +449,25 @@ public class AgentService {
             LlmUsage usage = llm.currentUsage();
             recordUsage(ws.getId(), usage);
             return new AssistantAnswer(answer, null, toolCalls.isEmpty() ? "fast" : "deep",
-                sources, steps, toolCalls, toUsage(usage), record);
+                sources, steps, toolCalls, usage(usage), record, llm.currentModel());
         } catch (LlmToolsRefusedException ex) {
             log.warn("Cortex (slug={}) : le fournisseur refuse les outils", LogSafe.of(slug));
             LlmUsage usage = llm.currentUsage();
             recordUsage(ws.getId(), usage);
-            if (!toolCalls.isEmpty()) return stopped(steps, sources, toolCalls, usage, "The AI provider refused Cortex's tools");
+            if (!toolCalls.isEmpty()) {
+                return stopped(steps, sources, toolCalls, usage(usage), llm.currentModel(), "The AI provider refused Cortex's tools");
+            }
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
                 "The AI provider refused Cortex's tools: nothing was done"));
-            return new AssistantAnswer(toolsRefusedAnswer(hits), null, "fallback", sources, steps, List.of(), toUsage(usage));
+            return new AssistantAnswer(toolsRefusedAnswer(hits), null, "fallback", sources, steps, List.of(), usage(usage));
         } catch (Exception ex) {
             log.warn("Agent LLM indisponible (slug={}): {}", LogSafe.of(slug), LogSafe.of(ex.getMessage()));
             LlmUsage usage = llm.currentUsage(); // usage partiel réel (appels déjà faits avant l'échec)
             recordUsage(ws.getId(), usage);
-            if (!toolCalls.isEmpty()) return stopped(steps, sources, toolCalls, usage, "The model stopped answering");
+            if (!toolCalls.isEmpty()) return stopped(steps, sources, toolCalls, usage(usage), llm.currentModel(), "The model stopped answering");
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
                 "The model did not answer: here are the notes of your workspace"));
-            return new AssistantAnswer(fallbackAnswer(hits), null, "fallback", sources, steps, List.of(), toUsage(usage));
+            return new AssistantAnswer(fallbackAnswer(hits), null, "fallback", sources, steps, List.of(), usage(usage));
         } finally {
             llm.endUsageCapture();
         }
@@ -453,11 +478,12 @@ public class AgentService {
      * que la personne le voie et ne le redemande pas (une issue déjà créée ne doit pas passer pour « rien n'a été fait »).
      */
     private static AssistantAnswer stopped(List<AssistantStep> steps, List<AssistantSource> sources,
-                                           List<AssistantToolCall> toolCalls, LlmUsage usage, String cause) {
+                                           List<AssistantToolCall> toolCalls, AssistantUsage usage, String model,
+                                           String cause) {
         steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", cause + ": Cortex stopped before the end"));
         String answer = "> [!warning] Cortex stopped before the end\n> " + cause
             + ". What it had already done shows in its steps: check it before asking again, so nothing is done twice.";
-        return new AssistantAnswer(answer, null, "deep", sources, steps, toolCalls, toUsage(usage));
+        return new AssistantAnswer(answer, null, "deep", sources, steps, toolCalls, usage, null, model);
     }
 
     /**
@@ -485,9 +511,15 @@ public class AgentService {
         return used.isEmpty() ? "Answered directly (no tool needed)" : "Tools: " + used;
     }
 
-    private static AssistantUsage toUsage(LlmUsage u) {
+    /**
+     * L'usage du tour, et ce que le modèle a lu à son dernier appel : la taille de ce prompt et la fenêtre que la passerelle
+     * lui a donnée, que la jauge de contexte compare (test du CEO du 05/11/2026).
+     */
+    private AssistantUsage usage(LlmUsage u) {
         if (u == null) return AssistantUsage.NONE; // garde défensive (mocks)
-        return new AssistantUsage(u.promptTokens(), u.completionTokens(), u.totalTokens());
+        LlmContext last = llm.currentContext();
+        return new AssistantUsage(u.promptTokens(), u.completionTokens(), u.totalTokens(),
+            last == null ? 0 : last.promptTokens(), last == null ? null : last.window());
     }
 
     /** Enregistre la conso IA (best-effort : ne casse jamais la réponse de l'agent). */
@@ -545,13 +577,13 @@ public class AgentService {
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", "Answered directly"));
             LlmUsage usage = llm.currentUsage();
             recordUsage(workspaceId, usage);
-            return new AssistantAnswer(answer, null, "fast", List.of(), steps, List.of(), toUsage(usage));
+            return new AssistantAnswer(answer, null, "fast", List.of(), steps, List.of(), usage(usage), null, llm.currentModel());
         } catch (Exception ex) {
             log.warn("Cortex (conversation) indisponible : {}", ex.getMessage());
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", "The model did not answer"));
             LlmUsage usage = llm.currentUsage();
             recordUsage(workspaceId, usage);
-            return new AssistantAnswer(smallTalkFallback(), null, "fallback", List.of(), steps, List.of(), toUsage(usage));
+            return new AssistantAnswer(smallTalkFallback(), null, "fallback", List.of(), steps, List.of(), usage(usage));
         } finally {
             llm.endUsageCapture();
         }
@@ -581,32 +613,50 @@ public class AgentService {
         String screen = ctx.screen().isEmpty() ? null : screens.describe(ctx);
         if (screen == null) screen = "";
         CortexPlans.Plan plan = CortexPlans.forRequest(message).orElse(null);
+        // Résumer une issue : TaskForce la lit et la donne au modèle avant qu'il écrive, au lieu d'espérer qu'il la lise
+        // (test du CEO du 05/11/2026 : qwen3:8b commentait OPS-35 avec ce qu'elle ne dit pas).
+        String issue = plan != null && CortexPlans.SUMMARIZE.equals(plan.id()) ? material.describe(ctx, message) : "";
+        if (issue == null) issue = "";
+        String seen = issue.isEmpty() ? screen : screen.isEmpty() ? issue : screen.strip() + "\n\n" + issue;
         List<Map<String, Object>> messages = withHistory(
-            systemPrompt(plan, screen, hits, external, LocalDate.now(ZoneOffset.UTC)), history, message);
+            systemPrompt(plan, seen, hits, external, LocalDate.now(ZoneOffset.UTC)), history, message);
         List<Map<String, Object>> toolDefs = tools.toolDefinitions(external);
         String tier = external.isEmpty() ? "fast" : mcpToolTier;
         // Le noyau (R35) : les règles de l'espace et le dossier de la réponse, ouverts au premier outil. Le dossier garde
         // ce que le modèle a vu de l'écran et le plan qu'il a reçu.
         Map<String, Object> origin = origin(tier, hits);
         if (!screen.isEmpty()) origin.put("screen", screen);
+        if (!issue.isEmpty()) origin.put("issue", CortexRecordService.shorten(issue));
         if (plan != null) origin.put("plan", plan.id());
         Kernel kernel = new Kernel(ctx, message, origin);
         String answer = toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel);
-        return toolCalls.isEmpty() && plan != null && plan.ask() != null ? askedForCortex(plan.ask(), kernel, toolCalls, answer)
+        // Le geste du plan, quand Cortex ne l'a pas fait et que rien n'attend déjà la personne (une carte, une question).
+        boolean gestureMade = plan != null && toolCalls.stream().anyMatch(call -> call.name().equals(plan.ask())
+            || QUESTION.equals(call.status()) || "pending".equals(call.status()));
+        return plan != null && plan.ask() != null && !gestureMade ? askedForCortex(plan.ask(), kernel, toolCalls, answer)
             : answer;
     }
 
     /**
      * La demande appelle un geste que Cortex n'a pas fait : à « supprime ça », qwen3:8b répond « dites-moi laquelle »
-     * sans outil (04/11/2026). TaskForce pose alors lui-même ce que ce geste exige (R115), avec l'écran en choix, au
-     * dossier de la réponse ; rien n'est fait. Sans question à poser, la réponse de Cortex reste.
+     * sans outil (04/11/2026), ou lit les issues sans rien proposer. TaskForce fait alors lui-même ce geste, sur la
+     * demande de la personne (R115) : quand elle désigne l'issue (sa colonne, pour supprimer), sa carte, qui ne fait rien
+     * avant le clic ; sinon ce que le geste exige, avec l'écran en choix, au dossier de la réponse. Sans carte ni
+     * question, la réponse de Cortex reste.
      */
     private String askedForCortex(String name, Kernel kernel, List<AssistantToolCall> toolCalls, String answer) {
         AgentTool gesture = tools.get(name);
         if (!(gesture instanceof CortexGesture)) return answer;
         ToolOutcome outcome = kernel.apply(gesture, name, "{}");
-        if (outcome.questions() == null) return answer;
-        toolCalls.add(new AssistantToolCall(name, outcome.status(), "{}", outcome.result(), kernel.recordRef(), outcome.ref(),
+        String input = outcome.input() != null ? outcome.input() : "{}";
+        if (outcome.questions() == null) {
+            // Le geste a trouvé ce qu'il lui faut : sa carte attend la personne, la réponse dit où décider (cardAnswer).
+            if (!"pending".equals(outcome.status()) || outcome.target() == null) return answer;
+            toolCalls.add(new AssistantToolCall(name, outcome.status(), input, outcome.result(), kernel.recordRef(),
+                outcome.ref(), outcome.target()));
+            return answer;
+        }
+        toolCalls.add(new AssistantToolCall(name, outcome.status(), input, outcome.result(), kernel.recordRef(), outcome.ref(),
             outcome.target(), card(outcome.questions())));
         return asking(outcome.questions());
     }

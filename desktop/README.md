@@ -29,7 +29,12 @@ This folder holds the Electron shell. The app itself is the rest of the reposito
 - **Claude Code.** The shell starts the runner with a secret drawn at each start. Claude Code must be installed and
   signed in on the computer.
 - **Updates.** The app checks the `desktop-latest` release at start and every six hours, downloads in the background
-  and installs on quit. The Microsoft Store version leaves its updates to the Store.
+  and installs on quit. The installer never shows a window for an update: on quit it installs silently; with
+  "Restart now", the app shows its own update screen while it stops, then the installer installs silently (`/S`) and
+  opens the app again (`--force-run`). `installer.nsh` makes every update (`--updated`) silent, also when an older
+  version of the app starts it. The app notes the version it installs (`update-pending.json` in its folder): if the
+  next start still runs the version before, the update toast says it didn't install and offers to restart again. The
+  Microsoft Store version leaves its updates to the Store.
 
 The full design is in the docs repository: `v1/03-architecture/Specification_App_Desktop.md`.
 
@@ -63,8 +68,9 @@ the Store version. Variables read by a development build:
 
 ## Package and release
 
-`npm run dist:win` builds the Windows installer (per user, no administrator rights) and `npm run dist:linux` the .deb
-and AppImage, in `release/`. `npm run icon` draws the app icon from the brand mark first, with the logos of the
+`npm run dist:win` builds the Windows installer (per user, no administrator rights, one click: a small window with the
+app icon and a progress bar for the first install, none for an update) and `npm run dist:linux` the .deb and AppImage,
+in `release/`. `npm run icon` draws the app icon from the brand mark first, with the logos of the
 Microsoft Store package (`build/appx`).
 
 `npm run dist:store` builds the Microsoft Store package (`release/TaskForce-<version>-store.appx`), with the identity

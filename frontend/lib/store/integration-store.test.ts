@@ -30,6 +30,8 @@ vi.mock('../api/integration-service', () => ({
   regenerateWebhookSecret: vi.fn(),
   testWebhook: vi.fn(),
   getWebhookDeliveries: vi.fn(),
+  getIntegrationCatalog: vi.fn(),
+  getMcpServers: vi.fn(),
 }));
 
 function makeStatus(overrides: Partial<IntegrationStatus> = {}): IntegrationStatus {
@@ -389,5 +391,41 @@ describe('integration-store', () => {
       await useIntegrationStore.getState().removeWebhook('acme', 1);
     });
     expect(useIntegrationStore.getState().webhookDeliveries).toEqual({});
+  });
+});
+
+// « Connectors » dans la zone de droite de la fenêtre (R122) : le catalogue, et les serveurs MCP qu'il faut reconnecter.
+describe('integration-store - connectors of the window', () => {
+  const catalog = { total: 1, connected: 1, categories: [] };
+  const server = { connectorKey: 'notion', name: null, url: 'https://mcp.notion.com', reachable: false, tools: [], error: 'timeout' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    act(() => useIntegrationStore.setState({ connectors: null }));
+  });
+
+  it('reads the catalog and the MCP servers together', async () => {
+    vi.mocked(svc.getIntegrationCatalog).mockResolvedValue(catalog);
+    vi.mocked(svc.getMcpServers).mockResolvedValue([server]);
+
+    await expect(useIntegrationStore.getState().fetchConnectors('acme')).resolves.toBe(true);
+    expect(useIntegrationStore.getState().connectors).toEqual({ catalog, servers: [server] });
+  });
+
+  it('keeps the catalog when the MCP servers cannot be read', async () => {
+    vi.mocked(svc.getIntegrationCatalog).mockResolvedValue(catalog);
+    vi.mocked(svc.getMcpServers).mockRejectedValue(new Error('409'));
+
+    await expect(useIntegrationStore.getState().fetchConnectors('acme')).resolves.toBe(true);
+    expect(useIntegrationStore.getState().connectors).toEqual({ catalog, servers: [] });
+  });
+
+  it('returns false when the catalog cannot be read, and without a workspace', async () => {
+    vi.mocked(svc.getIntegrationCatalog).mockRejectedValue(new Error('500'));
+    vi.mocked(svc.getMcpServers).mockResolvedValue([]);
+
+    await expect(useIntegrationStore.getState().fetchConnectors('acme')).resolves.toBe(false);
+    await expect(useIntegrationStore.getState().fetchConnectors('')).resolves.toBe(false);
+    expect(useIntegrationStore.getState().connectors).toBeNull();
   });
 });

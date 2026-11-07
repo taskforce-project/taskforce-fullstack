@@ -41,6 +41,20 @@ describe("DeleteIssueCard : supprimer une issue depuis la conversation", () => {
     expect(archiveIssue).not.toHaveBeenCalled();
   });
 
+  // Test du CEO de la 1.10.0 : la carte de TESTTA-1, dans Done, au titre de TESTTA-2 ; la colonne se lit avec la clé.
+  it("says the issue's column next to its key, archived or not", async () => {
+    archiveIssue.mockResolvedValue({ id: 55 } as Issue);
+    show({ ...TARGET, column: "In review by AI" });
+
+    const title = "Delete TESTTA-2 (In review by AI): Fix the footer?";
+    expect(screen.getByRole("group", { name: title })).toBeInTheDocument();
+    expect(screen.getByText(title)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    await waitFor(() => expect(screen.getByText("Archived: TESTTA-2 no longer shows on the board.")).toBeInTheDocument());
+    expect(screen.getByText(title)).toBeInTheDocument();
+  });
+
   it("Archive hides the issue, and Undo puts it back", async () => {
     archiveIssue.mockResolvedValue({ id: 55 } as Issue);
     show();

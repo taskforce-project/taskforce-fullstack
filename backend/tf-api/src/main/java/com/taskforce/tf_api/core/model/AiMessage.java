@@ -43,6 +43,10 @@ public class AiMessage {
     @Column(name = "total_tokens", nullable = false)
     private long totalTokens;
 
+    /** Le modèle qui a écrit la réponse, tel que la passerelle l'a appelé (V117) ; null pour une demande ou un repli. */
+    @Column(length = 128)
+    private String model;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

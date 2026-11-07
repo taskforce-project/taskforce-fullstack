@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 
-import { messagesToTurns, useCortexStore } from "./cortex-store";
+import { messagesToTurns, undoKey, useCortexStore } from "./cortex-store";
 import { useScreenStore } from "./screen-store";
 import {
-  answerQuestion, sendAgentMessage, type AssistantAnswer, type AssistantToolCall,
+  answerQuestion, sendAgentMessage, undoAction, type AssistantAnswer, type AssistantToolCall,
 } from "@/lib/api/assistant-service";
 import {
   deleteConversation, getConversation, listConversations, type ConversationSummary,
 } from "@/lib/api/ai-conversation-service";
 
 // Aucun réseau : la réponse de Cortex et les conversations sont simulées ; les erreurs passent par le vrai client.
-vi.mock("@/lib/api/assistant-service", () => ({ sendAgentMessage: vi.fn(), answerQuestion: vi.fn() }));
+vi.mock("@/lib/api/assistant-service", () => ({ sendAgentMessage: vi.fn(), answerQuestion: vi.fn(), undoAction: vi.fn() }));
 vi.mock("@/lib/api/ai-conversation-service", () => ({
   listConversations: vi.fn(), getConversation: vi.fn(), deleteConversation: vi.fn(),
 }));
@@ -174,6 +174,17 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
     expect(useCortexStore.getState().conversationId).toBe(4);
   });
 
+  // Test du CEO de la 1.10.0 : quel modèle a répondu ? Une réponse rouverte le dit encore, quand il a été gardé.
+  it("reopens an answer with the model that wrote it, when it was kept", () => {
+    const turns = messagesToTurns([
+      { id: 9, role: "assistant", content: "ok", mode: "deep", totalTokens: 3, createdAt: null, model: "qwen3:8b" },
+      { id: 10, role: "assistant", content: "ok", mode: "deep", totalTokens: 3, createdAt: null },
+    ]);
+
+    expect(turns[0].answer?.model).toBe("qwen3:8b");
+    expect(turns[1].answer?.model).toBeNull();
+  });
+
   it("deletes a conversation, and starts afresh when it was the open one", async () => {
     vi.mocked(deleteConversation).mockResolvedValue(undefined);
     useCortexStore.setState({ conversationId: 4, turns: [{ id: "u1", role: "user", text: "x" }], conversations: [summary(4, "a"), summary(5, "b")] });
@@ -214,6 +225,31 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
     expect(turns[0].answer).toMatchObject({ mode: "fast", usage: { totalTokens: 3 } });
   });
 
+  /**
+   * Test du CEO de la 1.10.0 : la jauge montrait le cumul de la conversation contre une fenêtre écrite en dur (« 45k / 33k
+   * (100%) »). Elle garde ce que le modèle a lu à la dernière demande : son prompt et la fenêtre que la passerelle lui a
+   * donnée ; un repli ne mesure rien, une conversation neuve ou rouverte repart sans mesure.
+   */
+  it("keeps what the model read at the last request, not the sum of the conversation", async () => {
+    const measured = (prompt: number, window: number | null, total: number): AssistantAnswer => ({
+      ...answer("ok", total), usage: { promptTokens: total - 20, completionTokens: 20, totalTokens: total, lastPromptTokens: prompt, contextWindow: window },
+    });
+    vi.mocked(sendAgentMessage)
+      .mockResolvedValueOnce({ conversationId: 7, title: "t", answer: measured(2900, 8192, 6000) })
+      .mockResolvedValueOnce({ conversationId: 7, title: "t", answer: measured(3400, 8192, 7000) })
+      .mockResolvedValueOnce({ conversationId: 7, title: "t", answer: { ...answer("fallback", 0), mode: "fallback" } });
+
+    for (const text of ["one", "two", "three"]) {
+      useCortexStore.getState().setDraft(text);
+      await useCortexStore.getState().send("acme");
+    }
+
+    expect(useCortexStore.getState().tokens).toBe(13_000);
+    expect(useCortexStore.getState().context).toEqual({ tokens: 3400, window: 8192 });
+    useCortexStore.getState().newConversation();
+    expect(useCortexStore.getState().context).toBeNull();
+  });
+
   // R114 : la barre envoie ce que la personne voit.
   it("sends the screen: the project of the route and the issue whose sheet is open", async () => {
     vi.mocked(sendAgentMessage).mockResolvedValue({ conversationId: 3, title: "t", answer: answer("ok") });
@@ -248,6 +284,16 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
       { field: "name", values: [], other: "Atlas" }, { field: "repository", values: ["new-private"], other: undefined },
     ]);
     expect(useCortexStore.getState().questionProblem).toBeNull();
+    // Le geste a abouti après les questions : « Changes » le montre (R122).
+    expect(useCortexStore.getState().done).toEqual([next]);
+  });
+
+  it("keeps out of Changes what the answers to a card only ask further", async () => {
+    vi.mocked(answerQuestion).mockResolvedValue({ ...card, status: "question" });
+
+    await useCortexStore.getState().answerQuestion("acme", card, [{ field: "name", values: ["Atlas"] }]);
+
+    expect(useCortexStore.getState().done).toEqual([]);
   });
 
   it("returns null with the server's reason when the answers fail, and sends nothing empty", async () => {
@@ -303,5 +349,57 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
 
     expect(useCortexStore.getState().turns.at(-1)).toMatchObject({ role: "assistant", kind: "quota" });
     expect(useCortexStore.getState().sentAt).toBeNull();
+  });
+});
+
+describe("useCortexStore : les gestes faits sur leurs cartes, et leur « Undo » partagé (R122)", () => {
+  const created: AssistantToolCall = {
+    name: "create_issue", status: "success", input: '{"title":"Pricing page"}', output: "Created TF-14", record: "rec-1",
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useCortexStore.setState({ ...initial, turns: [], conversations: [], done: [], undos: {} });
+  });
+
+  it("keeps a gesture done on its card for Changes, until the conversation changes", () => {
+    useCortexStore.getState().noteDone(created);
+    expect(useCortexStore.getState().done).toEqual([created]);
+
+    useCortexStore.getState().newConversation();
+    expect(useCortexStore.getState().done).toEqual([]);
+  });
+
+  it("undoes a gesture once, and both places read the same state", async () => {
+    vi.mocked(undoAction).mockResolvedValue({ tool: "create_issue", status: "success", output: "TF-14 is gone." });
+
+    const undone = useCortexStore.getState().undo("acme", created);
+    expect(useCortexStore.getState().undos[undoKey(created)]).toEqual({ status: "running" });
+    await expect(undone).resolves.toBe(true);
+
+    expect(undoAction).toHaveBeenCalledWith("acme", created);
+    expect(useCortexStore.getState().undos[undoKey(created)]).toEqual({ status: "done", output: "TF-14 is gone." });
+    // Déjà défait : un second clic, d'ailleurs, ne repart pas.
+    await expect(useCortexStore.getState().undo("acme", created)).resolves.toBe(false);
+    expect(undoAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("says why the server refuses to undo, and lets the person try again", async () => {
+    vi.mocked(undoAction).mockRejectedValueOnce(httpError(409, { message: "TF-14 has comments now." }));
+
+    await expect(useCortexStore.getState().undo("acme", created)).resolves.toBe(false);
+    expect(useCortexStore.getState().undos[undoKey(created)]).toEqual({ status: "error", output: "TF-14 has comments now." });
+
+    vi.mocked(undoAction).mockResolvedValueOnce({ tool: "create_issue", status: "success", output: "Undone." });
+    await expect(useCortexStore.getState().undo("acme", created)).resolves.toBe(true);
+    await expect(useCortexStore.getState().undo("", { ...created, record: "other" })).resolves.toBe(false);
+  });
+
+  it.each([
+    [{ record: "r", ref: "x", name: "update_issue" }, "r:x"],
+    [{ record: "r", ref: null, name: "create_issue" }, "r:create_issue"],
+    [{ record: null, name: "add_comment" }, ":add_comment"],
+  ])("names a gesture by its record and its print: %o", (call, key) => {
+    expect(undoKey(call)).toBe(key);
   });
 });

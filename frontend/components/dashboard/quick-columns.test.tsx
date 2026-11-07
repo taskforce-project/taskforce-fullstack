@@ -11,15 +11,19 @@ vi.mock("@/lib/api/notification-service", () => ({
   acknowledgeAll: vi.fn(),
 }))
 vi.mock("@/lib/api/dashboard-card-service", () => ({ listMyIssuesQuiet: vi.fn(() => Promise.resolve([])) }))
-// La cloche s'abonne au temps réel (STOMP) : hors sujet ici.
+// « Waiting for you » s'abonne au temps réel (STOMP) : hors sujet ici.
 vi.mock("@/lib/hooks/use-notifications-realtime", () => ({ useNotificationsRealtime: vi.fn() }))
 
 import * as notificationService from "@/lib/api/notification-service"
 import { QuickColumns } from "./quick-columns"
-import { NotificationBell } from "@/components/layout/topbar/notification-bell"
+import { useNotificationsSync } from "@/lib/hooks/use-notifications-sync"
 import { useNotificationStore } from "@/lib/store/notification-store"
-import { useWorkspaceStore } from "@/lib/store/workspace-store"
-import type { Workspace } from "@/lib/api/workspace-service"
+
+/** Ce que la fenêtre monte pour « Waiting for you » (R121), à la place de la cloche du topbar. */
+function WaitingSync({ slug }: Readonly<{ slug: string }>) {
+  useNotificationsSync(slug)
+  return null
+}
 
 function notif(id: number, createdAt: string, urgency = "info"): NotificationResponse {
   return {
@@ -42,8 +46,8 @@ function notif(id: number, createdAt: string, urgency = "info"): NotificationRes
 const recentColumn = () => screen.getByText("Recent").closest("[data-slot='card']") as HTMLElement
 
 /**
- * Colonne « Recent » du dashboard : elle lit la liste de la cloche du topbar au lieu de la recharger.
- * Avant, `/notifications` partait deux fois à chaque arrivée sur le dashboard (cloche + colonne).
+ * Colonne « Recent » du dashboard : elle lit la liste que la fenêtre tient pour « Waiting for you » au lieu de la
+ * recharger. Avant, `/notifications` partait deux fois à chaque arrivée sur le dashboard (cloche + colonne).
  */
 describe("QuickColumns - colonne Recent", () => {
   beforeEach(() => {
@@ -59,14 +63,13 @@ describe("QuickColumns - colonne Recent", () => {
     })
   })
 
-  it("montée avec la cloche, un seul appel pour les deux", async () => {
+  it("montée avec « Waiting for you », un seul appel pour les deux", async () => {
     vi.mocked(notificationService.listNotifications).mockResolvedValue([notif(1, "2026-10-18T21:41:00")])
-    useWorkspaceStore.setState({ activeWorkspace: { slug: "acme" } as Workspace })
 
     await act(async () => {
       render(
         <>
-          <NotificationBell />
+          <WaitingSync slug="acme" />
           <QuickColumns slug="acme" />
         </>,
       )

@@ -14,7 +14,7 @@ describe("window chrome", () => {
   it("hides the system title bar and lays the system buttons over the interface", () => {
     assert.deepEqual(titleBarOptions("win32", false, MAIN_TITLE_BAR_HEIGHT), {
       titleBarStyle: "hidden",
-      titleBarOverlay: { color: "#00000000", symbolColor: "#191715", height: 64 },
+      titleBarOverlay: { color: "#00000000", symbolColor: "#191715", height: 52 },
     });
   });
 

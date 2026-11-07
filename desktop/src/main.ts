@@ -14,7 +14,7 @@ import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
 import { toolsStatus } from "./tools";
 import { readMove, readWorkspaceMove, Transfer, type LocalApi } from "./transfer";
-import { check, installNow, startUpdater, updateState } from "./updater";
+import { check, installNow, restartApp, startUpdater, updateState } from "./updater";
 import {
   integratedTitleBar,
   MAIN_TITLE_BAR_HEIGHT,
@@ -84,8 +84,13 @@ async function main(): Promise<void> {
     refreshed = refreshAccount(account);
   }
   await openApp(account, signInWin);
-  // Session fermée en ligne : traitée une fois la pile démarrée, pour qu'elle s'arrête proprement.
-  if ((await refreshed) === "ended") await sessionEnded();
+  // Session fermée en ligne : traitée une fois la pile démarrée, pour qu'elle s'arrête proprement. Les mises à jour
+  // attendent l'app relancée : démarrées pendant l'arrêt, elles pourraient retrouver une version téléchargée lors d'un
+  // lancement précédent, qui s'installerait en quittant et fermerait l'app relancée.
+  if ((await refreshed) === "ended") {
+    await sessionEnded();
+    return;
+  }
   startUpdater();
 }
 
@@ -107,7 +112,11 @@ async function refreshAccount(account: Account): Promise<"valid" | "ended" | "of
   }
 }
 
-/** Session fermée en ligne : l'app le dit, oublie le compte sur ce poste et revient à l'écran de connexion. */
+/**
+ * Session fermée en ligne : l'app le dit, oublie le compte sur ce poste et revient à l'écran de connexion. Le compte
+ * s'efface avant le redémarrage : l'app rouverte, par la relance ou par l'installeur d'une mise à jour prête (cf.
+ * `restartApp`), montre la connexion.
+ */
 async function sessionEnded(): Promise<void> {
   log.info("Session ended online: signing out of this computer");
   settings.clearAccount();
@@ -117,8 +126,7 @@ async function sessionEnded(): Promise<void> {
     message: "You're signed out of this computer",
     detail: "Your session ended, or this computer was signed out from your account settings. Sign in again to keep using TaskForce here. Your projects stay on this computer.",
   });
-  app.relaunch();
-  app.quit();
+  await restartApp(prepareUpdate);
 }
 
 /** Écran de connexion : se résout une fois le compte connecté, la fenêtre encore ouverte (cf. `openApp`). */
@@ -173,7 +181,8 @@ function openBrowser(url: string): Promise<void> {
   return shell.openExternal(url);
 }
 
-function splashWindow(): BrowserWindow {
+/** L'écran d'attente : au démarrage, ses étapes arrivent ensuite (cf. `openApp`) ; pour une mise à jour, `hash` les donne. */
+function splashWindow(hash?: string): BrowserWindow {
   const window = new BrowserWindow({
     width: 420,
     height: 280,
@@ -186,9 +195,28 @@ function splashWindow(): BrowserWindow {
     backgroundColor: "#fbfbfc",
     webPreferences: { contextIsolation: true, sandbox: true },
   });
-  void window.loadFile(staticPage("splash.html"));
+  void window.loadFile(staticPage("splash.html"), hash ? { hash } : undefined);
   window.once("ready-to-show", () => window.show());
   return window;
+}
+
+/**
+ * Avant d'installer une mise à jour (« Restart now », cf. `installNow` dans updater.ts) : l'écran d'attente de l'app, à
+ * ses couleurs, remplace la fenêtre pendant que la pile s'arrête proprement. L'installeur, lui, ne montre plus rien.
+ */
+async function prepareUpdate(version: string): Promise<void> {
+  quitting = true;
+  const splash = splashWindow(new URLSearchParams({
+    step: `Installing TaskForce ${version}`,
+    note: "TaskForce closes, installs it, then opens again.",
+  }).toString());
+  // La fenêtre se ferme une fois l'écran affiché : l'app n'a jamais zéro fenêtre, ce qui la ferait quitter.
+  await new Promise<void>((resolve) => {
+    splash.once("show", () => resolve());
+    setTimeout(resolve, 2_000).unref();
+  });
+  mainWindow?.close();
+  await stopStack();
 }
 
 /**
@@ -336,7 +364,7 @@ function registerIpc(): void {
   ipcMain.handle("desktop:check-updates", () => check());
   // Le toast de la mise à jour lit l'état à son ouverture, puis le reçoit à chaque changement (cf. updater.ts).
   ipcMain.handle("desktop:update-state", () => updateState());
-  ipcMain.handle("desktop:install-update", () => installNow());
+  ipcMain.handle("desktop:install-update", () => installNow(prepareUpdate));
   ipcMain.handle("desktop:open-logs", () => shell.openPath(appLogDir()));
   // Copies de la base faites avant chaque mise à jour (cf. backup.ts).
   ipcMain.handle("desktop:open-backups", () => {
@@ -419,10 +447,11 @@ function registerIpc(): void {
       const sessionToken = settings.secret(account.subject, "sessionToken");
       if (sessionToken) await revoke(sessionToken).catch((error: Error) => log.warn(`Revoke failed: ${error.message}`));
     }
+    // Le compte s'efface avant le redémarrage : l'app rouverte, par la relance ou par l'installeur d'une mise à jour
+    // prête (cf. `restartApp`), montre la connexion.
     settings.clearAccount();
     log.info("Signed out");
-    app.relaunch();
-    app.quit();
+    await restartApp(prepareUpdate);
   });
 }
 
@@ -500,15 +529,20 @@ function buildMenu(): Menu {
 }
 
 /** Arrêt propre : l'interface, le backend puis la base, avant de rendre la main au système. */
-app.on("before-quit", (event) => {
-  if (quitting || !stack) return;
-  event.preventDefault();
-  quitting = true;
+async function stopStack(): Promise<void> {
+  if (!stack) return;
   githubSignIn.cancel();
   const current = stack;
   stack = null;
   log.info("Stopping");
-  void current.stop().finally(() => app.quit());
+  await current.stop();
+}
+
+app.on("before-quit", (event) => {
+  if (quitting || !stack) return;
+  event.preventDefault();
+  quitting = true;
+  void stopStack().finally(() => app.quit());
 });
 
 app.on("window-all-closed", () => app.quit());

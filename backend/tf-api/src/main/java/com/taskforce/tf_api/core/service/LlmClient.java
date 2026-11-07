@@ -49,4 +49,7 @@ public interface LlmClient {
 
     /** Le modèle qui a répondu au dernier appel depuis {@link #beginUsageCapture()}, s'il est connu. */
     default String currentModel() { return null; }
+
+    /** Ce que le modèle a lu au dernier appel depuis {@link #beginUsageCapture()} (son prompt, sa fenêtre), s'il y en a eu. */
+    default LlmContext currentContext() { return null; }
 }

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as service from "../api/model-capability-service";
 import { getRetryAfterSeconds } from "../api/client";
-import { useModelCapabilityStore } from "./model-capability-store";
+import { measuredFully, useModelCapabilityStore } from "./model-capability-store";
 
 vi.mock("../api/model-capability-service", () => ({
   chooseModel: vi.fn(),
@@ -28,7 +28,7 @@ const RESULT = (caseKey: string, passed: boolean) => ({
 describe("useModelCapabilityStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useModelCapabilityStore.setState({ table: null, progress: null, results: [], error: null });
+    useModelCapabilityStore.setState({ table: null, progress: null, results: [], error: null, autoMeasured: [] });
     vi.mocked(service.getModelCapabilities).mockResolvedValue(TABLE);
   });
 
@@ -92,6 +92,95 @@ describe("useModelCapabilityStore", () => {
     expect(await measuring).toBe(true);
     expect(service.measureModelCase).toHaveBeenCalledTimes(1);
     expect(service.startModelMeasure).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * Test du CEO de la 1.10.0 : la table restait vide jusqu'à « Measure ». Le modèle de Cortex sans mesure complète se
+   * mesure une fois, sans clic ; les autres restent à la demande.
+   */
+  describe("the model of Cortex, measured once without a click", () => {
+    const score = (measured: number) => ({
+      capability: "tools", passed: measured, measured, total: 2, capable: measured === 2, heldWords: null, measuredAt: null,
+    });
+    const row = (model: string, measured: number) => ({
+      model, current: false, measuredAt: measured ? "2026-11-05T10:00:00" : null, scores: [score(measured), score(measured)],
+    });
+    const table = (current: string, measured: number) => ({
+      ...TABLE, current, models: [row("qwen3:8b", measured), row("qwen3:14b", 0)],
+    });
+
+    beforeEach(() => {
+      vi.mocked(service.startModelMeasure).mockResolvedValue({ ...STARTED, model: "qwen3:8b", cases: ["tools-move"] });
+      vi.mocked(service.measureModelCase).mockResolvedValue(RESULT("tools-move", true));
+    });
+
+    it.each([
+      ["never measured", 0, true],
+      ["partly measured", 1, true],
+      ["fully measured", 2, false],
+    ])("%s: measured %s", async (_state, measured, runs) => {
+      useModelCapabilityStore.setState({ table: table("qwen3:8b", measured) });
+
+      expect(await useModelCapabilityStore.getState().measureCortexModel("acme")).toBe(runs);
+
+      expect(service.startModelMeasure).toHaveBeenCalledTimes(runs ? 1 : 0);
+      if (runs) expect(service.startModelMeasure).toHaveBeenCalledWith("acme", "qwen3:8b");
+    });
+
+    it("once a session: the table read again after the measure does not start another", async () => {
+      useModelCapabilityStore.setState({ table: table("qwen3:8b", 0) });
+      vi.mocked(service.getModelCapabilities).mockResolvedValue(table("qwen3:8b", 0));
+
+      expect(await useModelCapabilityStore.getState().measureCortexModel("acme")).toBe(true);
+      expect(await useModelCapabilityStore.getState().measureCortexModel("acme")).toBe(false);
+
+      expect(service.startModelMeasure).toHaveBeenCalledTimes(1);
+      expect(useModelCapabilityStore.getState().autoMeasured).toEqual(["qwen3:8b"]);
+    });
+
+    it("says it is the model of Cortex while it measures", async () => {
+      useModelCapabilityStore.setState({ table: table("qwen3:8b", 0) });
+      vi.mocked(service.measureModelCase).mockImplementationOnce(async (_slug, _run, caseKey) => {
+        expect(useModelCapabilityStore.getState().progress).toMatchObject({ model: "qwen3:8b", auto: true });
+        return RESULT(caseKey, true);
+      });
+
+      await useModelCapabilityStore.getState().measureCortexModel("acme");
+
+      expect(service.measureModelCase).toHaveBeenCalledTimes(1);
+    });
+
+    it("measures the new model after the person changes Cortex's model", async () => {
+      useModelCapabilityStore.setState({ table: table("qwen3:8b", 2) });
+      expect(await useModelCapabilityStore.getState().measureCortexModel("acme")).toBe(false);
+      vi.mocked(service.chooseModel).mockResolvedValueOnce(table("qwen3:14b", 2));
+      vi.mocked(service.startModelMeasure).mockResolvedValue({ ...STARTED, cases: ["tools-move"] });
+
+      await useModelCapabilityStore.getState().choose("acme", "qwen3:14b");
+      expect(await useModelCapabilityStore.getState().measureCortexModel("acme")).toBe(true);
+
+      expect(service.startModelMeasure).toHaveBeenCalledWith("acme", "qwen3:14b");
+    });
+
+    it("does nothing without a table, while a measure runs, or for a model the table doesn't list", async () => {
+      expect(await useModelCapabilityStore.getState().measureCortexModel("acme")).toBe(false);
+      useModelCapabilityStore.setState({ table: table("gone:1b", 0) });
+      expect(await useModelCapabilityStore.getState().measureCortexModel("acme")).toBe(false);
+      useModelCapabilityStore.setState({
+        table: table("qwen3:8b", 0),
+        progress: { model: "qwen3:14b", done: 0, total: 8, waitSeconds: null, stopping: false, auto: false },
+      });
+      expect(await useModelCapabilityStore.getState().measureCortexModel("acme")).toBe(false);
+      expect(await useModelCapabilityStore.getState().measureCortexModel("")).toBe(false);
+
+      expect(service.startModelMeasure).not.toHaveBeenCalled();
+    });
+
+    it("a row is fully measured when each case of each capability has a note", () => {
+      expect(measuredFully(row("qwen3:8b", 2))).toBe(true);
+      expect(measuredFully(row("qwen3:8b", 1))).toBe(false);
+      expect(measuredFully({ model: "x", current: false, measuredAt: null, scores: [] })).toBe(false);
+    });
   });
 
   it("chooses the model of Cortex, or says why it can't", async () => {

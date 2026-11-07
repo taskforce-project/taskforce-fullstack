@@ -8,15 +8,20 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationSummary;
 import com.taskforce.tf_api.core.model.AiConversation;
 import com.taskforce.tf_api.core.model.AiMessage;
+import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.repository.AiConversationRepository;
 import com.taskforce.tf_api.core.repository.AiMessageRepository;
+import com.taskforce.tf_api.core.repository.ProjectRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,6 +46,7 @@ class AiConversationServiceTest {
     @Mock private AiMessageRepository messageRepository;
     @Mock private com.taskforce.tf_api.core.service.LlmClient llm;
     @Mock private AiMeter aiMeter;
+    @Mock private ProjectRepository projectRepository;
     @org.mockito.Spy private org.springframework.transaction.support.TransactionTemplate transactionTemplate =
         new com.taskforce.tf_api.util.InlineTransactionTemplate();
 
@@ -134,5 +140,65 @@ class AiConversationServiceTest {
         assertThat(history.get(2)).containsEntry("content", "Réponse récente");
         // Chemin résumé : on ne retombe pas sur les N derniers messages bruts.
         verify(messageRepository, never()).findByConversationIdOrderByCreatedAtDesc(anyLong(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @ParameterizedTest(name = "projet à l''écran {0}, de l''espace : {1} → rangée sous {2}")
+    @CsvSource(nullValues = "null", value = {
+        "12,   true,  12",   // le projet ouvert, de cet espace
+        "12,   false, null", // un projet d'un autre espace ne la range pas
+        "null, false, null", // rien à l'écran : une conversation hors projet
+    })
+    @DisplayName("getOrCreate : une conversation qui commence se range sous le projet à l'écran, s'il est de l'espace (R121)")
+    void getOrCreate_files_a_new_conversation_under_the_project_on_screen(Long projectId, boolean inWorkspace, Long expected) {
+        if (projectId != null) {
+            when(projectRepository.findByIdAndWorkspaceId(projectId, 1L))
+                .thenReturn(inWorkspace ? Optional.of(new Project()) : Optional.empty());
+        }
+        when(conversationRepository.save(any(AiConversation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AiConversation conv = service.getOrCreate(1L, 7L, null, projectId);
+
+        assertThat(conv.getProjectId()).isEqualTo(expected);
+        assertThat(conv.getWorkspaceId()).isEqualTo(1L);
+        assertThat(conv.getUserId()).isEqualTo(7L);
+        assertThat(conv.getTitle()).isEqualTo("New conversation");
+    }
+
+    @ParameterizedTest(name = "projet à l''écran {0}")
+    @CsvSource(nullValues = "null", value = {"null", "12"})
+    @DisplayName("getOrCreate : une conversation qui continue garde son projet, quel que soit l'écran")
+    void getOrCreate_keeps_the_project_of_an_existing_conversation(Long projectOnScreen) {
+        AiConversation existing = new AiConversation();
+        existing.setId(5L);
+        existing.setProjectId(3L);
+        when(conversationRepository.findByIdAndUserId(5L, 7L)).thenReturn(Optional.of(existing));
+
+        AiConversation conv = service.getOrCreate(1L, 7L, 5L, projectOnScreen);
+
+        assertThat(conv.getProjectId()).isEqualTo(3L);
+        verify(conversationRepository, never()).save(any());
+        verify(projectRepository, never()).findByIdAndWorkspaceId(anyLong(), anyLong());
+    }
+
+    @ParameterizedTest(name = "projet {0}")
+    @CsvSource(nullValues = "null", value = {"12", "null"})
+    @DisplayName("list : chaque conversation dit le projet où elle a commencé, pour la barre de gauche (R121)")
+    void list_returns_the_project_of_each_conversation(Long projectId) {
+        AiConversation conv = new AiConversation();
+        conv.setId(5L);
+        conv.setTitle("Plan the launch");
+        conv.setProjectId(projectId);
+        when(conversationRepository.findByWorkspaceIdAndUserIdOrderByUpdatedAtDesc(1L, 7L)).thenReturn(List.of(conv));
+        when(messageRepository.countByConversationId(5L)).thenReturn(2);
+        when(messageRepository.sumTokens(5L)).thenReturn(120L);
+
+        List<ConversationSummary> summaries = service.list(1L, 7L);
+
+        assertThat(summaries).singleElement().satisfies(summary -> {
+            assertThat(summary.projectId()).isEqualTo(projectId);
+            assertThat(summary.title()).isEqualTo("Plan the launch");
+            assertThat(summary.messageCount()).isEqualTo(2);
+            assertThat(summary.totalTokens()).isEqualTo(120L);
+        });
     }
 }

@@ -2,12 +2,15 @@ package com.taskforce.tf_api.core.service.mcpserver;
 
 import static com.taskforce.tf_api.core.service.mcpserver.McpArgs.optionalString;
 
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Component;
 
@@ -46,6 +49,11 @@ import com.taskforce.tf_api.shared.exception.BusinessException;
  * <p>Le reste a un défaut sûr et ne se demande jamais : la clé du projet vient de son nom, et le projet n'est visible
  * que de ses membres. Tout se juge avant d'écrire ; un dépôt refusé par GitHub laisse le projet créé, et la réponse le
  * dit.</p>
+ * <p>Une réponse donnée ne se redemande jamais (test du CEO du 05/11/2026, sur l'app desktop : la même carte revenait
+ * sur « test-taskforce est un repo normalement nan ? », puis le nom « Next.js app », que TaskForce proposait lui-même,
+ * se redemandait). Les dépôts proposés sont ceux de la personne, les plus proches du nom et de la demande d'abord ; une
+ * réponse tapée se lit parmi eux ({@link RepoMatch}) ; quand elle n'en nomme pas un seul, les plus proches se proposent
+ * une fois, puis le projet se crée sans dépôt, et la réponse dit pourquoi.</p>
  */
 @Component
 public class ProjectGestures {
@@ -55,6 +63,13 @@ public class ProjectGestures {
     static final String NEW_PRIVATE = "new-private";
     static final String NEW_PUBLIC = "new-public";
     static final String NONE = "none";
+    private static final String LINK = "LINK";
+    private static final String REPOSITORY = "repository";
+
+    /** Les dépôts lus pour la question : GitHub en rend cent au plus, les plus récemment actifs d'abord. */
+    static final int REPOSITORIES = 100;
+    /** Le temps d'une carte et de sa réponse : les dépôts ne se relisent pas à chaque question. */
+    private static final Duration REPOSITORIES_KEPT = Duration.ofSeconds(60);
 
     /**
      * Les piles qu'une demande nomme à la place d'un nom (« crée un projet Next.js »), lues par {@link IssueFields#key} :
@@ -71,13 +86,18 @@ public class ProjectGestures {
         "une", "le", "la", "new", "nouveau", "nouvelle", "my", "mon", "ma");
 
     private static final Set<String> NO_REPOSITORY = Set.of("none", "no", "non", "aucun", "aucune", "sans", "later",
-        "nope", "pasdedepot", "norepository", "norepositoryfornow", "rien");
+        "nope", "pasdedepot", "norepository", "norepositoryfornow", "rien", "norepo", "pasderepo", "sansrepo",
+        "aucunrepo", "sansdepot", "aucundepot", "nothing", "skip", "plustard", "pasmaintenant");
     private static final Set<String> PRIVATE = Set.of("private", "prive", "privee", "privé", "privée");
     private static final Set<String> PUBLIC = Set.of("public", "publique");
 
     private final ProjectService projectService;
     private final ProjectRepoService repoService;
     private final ProjectRepoHost repoHost;
+    /** Les dépôts de chaque espace, lus il y a moins de {@link #REPOSITORIES_KEPT}. */
+    private final Map<String, Read> repositories = new ConcurrentHashMap<>();
+
+    private record Read(List<String> repos, long at) {}
 
     public ProjectGestures(ProjectService projectService, ProjectRepoService repoService, ProjectRepoHost repoHost) {
         this.projectService = projectService;
@@ -85,9 +105,24 @@ public class ProjectGestures {
         this.repoHost = repoHost;
     }
 
-    /** Le dépôt choisi : aucun, un nouveau (et sa visibilité), ou un existant ({@code owner/name}). */
-    record Repository(String mode, boolean isPrivate, String fullName) {
-        static final Repository NONE_YET = new Repository(null, true, null);
+    /**
+     * Le dépôt choisi : aucun, un nouveau (et sa visibilité), ou un existant ({@code owner/name}). {@code note} : pourquoi
+     * il n'y en a pas, quand la personne en a nommé un que TaskForce n'a pas trouvé.
+     */
+    record Repository(String mode, boolean isPrivate, String fullName, String note) {
+        static final Repository NONE_YET = new Repository(null, true, null, null);
+
+        static Repository none(String note) {
+            return new Repository(null, true, null, note);
+        }
+
+        static Repository linked(String fullName) {
+            return new Repository(LINK, true, fullName, null);
+        }
+
+        static Repository created(boolean isPrivate) {
+            return new Repository(NEW, isPrivate, null, null);
+        }
 
         boolean none() {
             return mode == null;
@@ -96,21 +131,44 @@ public class ProjectGestures {
 
     /**
      * Ce que la demande dit du projet : son nom (vide quand elle ne dit que sa pile), sur quoi il est construit, son
-     * dépôt et la visibilité d'un nouveau dépôt.
+     * dépôt et la visibilité d'un nouveau dépôt, et les questions auxquelles la personne a déjà répondu
+     * ({@link Question#ANSWERED}, une fois par réponse).
      */
-    private record Wanted(String name, String stack, String repository, String visibility) {}
+    private record Wanted(String name, String stack, String repository, String visibility, List<String> answered) {
+
+        /** Combien de fois la personne a répondu à cette question. */
+        long answers(String field) {
+            return answered.stream().filter(field::equals).count();
+        }
+    }
 
     private static Wanted wanted(JsonNode args) {
+        List<String> answered = answered(args);
         String stack = text(optionalString(args, "stack", 60));
         String name = text(optionalString(args, "name", 150));
-        if (stack.isEmpty() && STACKS.contains(IssueFields.key(withoutFillers(name)))) {
-            stack = name;
-            name = "";
-        } else if (!stack.isEmpty() && onlyStack(name, stack)) {
-            name = "";
+        // Un nom que la personne a donné sur la carte est le sien, même quand il ne dit que la pile (« Next.js app », que
+        // TaskForce proposait lui-même) : il ne se redemande pas.
+        if (!answered.contains("name")) {
+            if (stack.isEmpty() && STACKS.contains(IssueFields.key(withoutFillers(name)))) {
+                stack = name;
+                name = "";
+            } else if (!stack.isEmpty() && onlyStack(name, stack)) {
+                name = "";
+            }
         }
-        return new Wanted(name, stack, text(optionalString(args, "repository", 200)),
-            text(optionalString(args, "repositoryVisibility", 20)));
+        return new Wanted(name, stack, text(optionalString(args, REPOSITORY, 200)),
+            text(optionalString(args, "repositoryVisibility", 20)), answered);
+    }
+
+    /** Les questions auxquelles la personne a répondu sur les cartes de TaskForce, notées par le serveur. */
+    static List<String> answered(JsonNode args) {
+        JsonNode marked = args == null ? null : args.get(Question.ANSWERED);
+        if (marked == null || !marked.isArray()) return List.of();
+        List<String> fields = new ArrayList<>();
+        marked.forEach(field -> {
+            if (field.isTextual()) fields.add(field.asText());
+        });
+        return fields;
     }
 
     /**
@@ -118,6 +176,14 @@ public class ProjectGestures {
      * Une lecture : rien n'est créé. Vide quand rien ne manque.
      */
     public List<Question> questions(String slug, JsonNode args) {
+        return questions(slug, args, null);
+    }
+
+    /**
+     * La même carte, les dépôts rangés par ce que dit aussi la demande de la personne ({@code request}, null sans demande
+     * à relire).
+     */
+    public List<Question> questions(String slug, JsonNode args, String request) {
         Wanted wanted = wanted(args);
         List<Question> asked = new ArrayList<>();
         if (wanted.name().isEmpty()) {
@@ -126,7 +192,7 @@ public class ProjectGestures {
                 : List.of(Question.Choice.of(suggested, suggested, "Suggested from your request"))));
         }
         try {
-            repository(slug, wanted);
+            repository(slug, wanted, request);
         } catch (QuestionNeeded needed) {
             asked.addAll(needed.questions());
         }
@@ -143,7 +209,7 @@ public class ProjectGestures {
         if (!asked.isEmpty()) throw new QuestionNeeded(asked);
         Wanted wanted = wanted(args);
         String name = wanted.name();
-        Repository repository = repository(slug, wanted);
+        Repository repository = repository(slug, wanted, null);
 
         CreateProjectRequest request = new CreateProjectRequest();
         request.setName(name);
@@ -167,6 +233,8 @@ public class ProjectGestures {
                 said.append(" The repository was not ").append(NEW.equals(repository.mode()) ? "created" : "linked")
                     .append(": ").append(e.getMessage()).append(". Link one from the project's page.");
             }
+        } else if (repository.note() != null) {
+            said.append(' ').append(repository.note());
         } else if (!wanted.stack().isEmpty() && !repoHost.createsRepos(slug) && !repoHost.linksRepos(slug)) {
             said.append(" To give it a repository, connect GitHub in Settings > Integrations, then link one from the "
                 + "project's page.");
@@ -188,68 +256,150 @@ public class ProjectGestures {
 
     /**
      * Où vit le code du projet. Pour un projet de code dont la demande ne le dit pas, TaskForce demande, avec ce qu'il
-     * peut faire ici : un nouveau dépôt (privé d'abord), un dépôt récent, ou aucun ; une réponse libre nomme un dépôt
-     * {@code owner/name}. Un nouveau dépôt dont la visibilité n'est pas dite se demande aussi : public, son code serait
-     * visible de tous, et cela ne se défait pas d'ici. Le nom peut manquer encore : la question dit alors « son code ».
+     * peut faire ici : un nouveau dépôt (privé d'abord), les dépôts de la personne les plus proches du nom et de la
+     * demande, ou aucun. Une réponse tapée se lit parmi ses dépôts, sans la casse, les espaces, les tirets ni le
+     * propriétaire : un seul, c'est lui ; plusieurs ou aucun, les plus proches se proposent une fois, avec une phrase,
+     * puis le projet se crée sans dépôt, et la réponse dit pourquoi. Un nouveau dépôt dont la visibilité n'est pas dite se
+     * demande aussi : public, son code serait visible de tous, et cela ne se défait pas d'ici. Le nom peut manquer
+     * encore : la question dit alors « son code ».
      */
-    Repository repository(String slug, Wanted wanted) {
+    Repository repository(String slug, Wanted wanted, String request) {
         String asked = wanted.repository();
         String code = wanted.name().isEmpty() ? "its code" : "the code of " + wanted.name();
         String said = IssueFields.key(asked);
-        if (asked.isEmpty()) {
-            if (wanted.stack().isEmpty()) return Repository.NONE_YET;
-            boolean creates = repoHost.createsRepos(slug);
-            boolean links = repoHost.linksRepos(slug);
-            if (!creates && !links) return Repository.NONE_YET;
-            throw new QuestionNeeded(whereItLives(slug, creates, links, "Where does " + code + " live?"));
-        }
+        // Un projet qui n'est pas de code, sans dépôt nommé : rien à demander, ni à l'hôte des dépôts (R102).
+        if (asked.isEmpty() && wanted.stack().isEmpty()) return Repository.NONE_YET;
         if (NO_REPOSITORY.contains(said)) return Repository.NONE_YET;
+        if (NEW.equals(said) || IssueFields.key(NEW_PRIVATE).equals(said) || IssueFields.key(NEW_PUBLIC).equals(said)) {
+            return created(slug, wanted, said, code);
+        }
+        boolean creates = repoHost.createsRepos(slug);
+        boolean links = repoHost.linksRepos(slug);
+        if (asked.isEmpty()) {
+            if (!creates && !links) return Repository.NONE_YET;
+            List<String> mine = links ? repositories(slug) : List.of();
+            throw new QuestionNeeded(whereItLives(creates, mine, wanted, request, "Where does " + code + " live?"));
+        }
+        if (!links) {
+            // Rien ne se lie ici : le projet se crée, et la réponse dit comment lui en donner un (jamais la même carte).
+            return creates && RepoMatch.wantsNew(asked) ? created(slug, wanted, said, code)
+                : Repository.none("TaskForce can't link a repository here: connect GitHub in Settings > Integrations, "
+                    + "then link one from the project's page.");
+        }
+        List<String> mine = repositories(slug);
         if (GitHubRepoNames.isFullName(asked)) {
-            if (!repoHost.linksRepos(slug)) throw new QuestionNeeded(whereItLives(slug, false, false,
-                "TaskForce can't link a repository here: connect GitHub in Settings > Integrations. Go on without one?"));
-            return new Repository("LINK", true, asked);
+            return Repository.linked(mine.stream().filter(asked::equalsIgnoreCase).findFirst().orElse(asked));
         }
-        boolean wantsNew = NEW.equals(said) || IssueFields.key(NEW_PRIVATE).equals(said) || IssueFields.key(NEW_PUBLIC).equals(said);
-        if (!wantsNew) {
-            throw new QuestionNeeded(whereItLives(slug, repoHost.createsRepos(slug), repoHost.linksRepos(slug),
-                "\"" + clip(asked) + "\" isn't a repository: write it as owner/name. Where does " + code + " live?"));
+        List<String> matching = RepoMatch.matching(asked, mine);
+        if (matching.size() == 1) return Repository.linked(matching.get(0));
+        if (matching.isEmpty() && creates && RepoMatch.wantsNew(asked)) return created(slug, wanted, said, code);
+        String project = wanted.name().isEmpty() ? "the project" : wanted.name();
+        if (wanted.answers(REPOSITORY) > 1) {
+            // Les plus proches ont déjà été proposés : la carte ne revient pas, le projet se crée sans dépôt.
+            String why = mine.isEmpty() ? "TaskForce can't see your repositories here"
+                : "\"" + clip(asked) + "\"" + (matching.isEmpty() ? " isn't one of your repositories"
+                    : " matches several of your repositories");
+            return Repository.none("No repository is linked: " + why + ". Link it from the page of " + project + ".");
         }
+        throw new QuestionNeeded(closest(asked, matching, mine));
+    }
+
+    /**
+     * Un nouveau dépôt : privé ou public selon ce qui est dit ; sinon sa visibilité se demande. Là où TaskForce n'en crée
+     * pas, la question du dépôt le dit, avec les dépôts de la personne.
+     */
+    private Repository created(String slug, Wanted wanted, String said, String code) {
         if (!repoHost.createsRepos(slug)) {
-            throw new QuestionNeeded(whereItLives(slug, false, repoHost.linksRepos(slug),
+            List<String> mine = repoHost.linksRepos(slug) ? repositories(slug) : List.of();
+            if (wanted.answers(REPOSITORY) > 1) {
+                return Repository.none("TaskForce can't create a repository here: create one from the project's page.");
+            }
+            throw new QuestionNeeded(whereItLives(false, mine, wanted, null,
                 "TaskForce can't create a repository here. Where does " + code + " live?"));
         }
-        if (IssueFields.key(NEW_PRIVATE).equals(said)) return new Repository(NEW, true, null);
-        if (IssueFields.key(NEW_PUBLIC).equals(said)) return new Repository(NEW, false, null);
+        if (IssueFields.key(NEW_PRIVATE).equals(said)) return Repository.created(true);
+        if (IssueFields.key(NEW_PUBLIC).equals(said)) return Repository.created(false);
         String seen = IssueFields.key(wanted.visibility());
         if (PRIVATE.contains(seen) || PRIVATE.contains(wanted.visibility().toLowerCase(Locale.ROOT))) {
-            return new Repository(NEW, true, null);
+            return Repository.created(true);
         }
-        if (PUBLIC.contains(seen)) return new Repository(NEW, false, null);
-        throw new QuestionNeeded(Question.of("repository", "Visibility", "Who can see the new repository"
+        if (PUBLIC.contains(seen)) return Repository.created(false);
+        String typed = RepoMatch.visibility(wanted.repository());
+        if (typed != null) return Repository.created("private".equals(typed));
+        throw new QuestionNeeded(Question.of(REPOSITORY, "Visibility", "Who can see the new repository"
             + (wanted.name().isEmpty() ? "" : " of " + wanted.name()) + "?", List.of(
                 Question.Choice.recommended(NEW_PRIVATE, "Private", "Only the people you add see its code"),
                 Question.Choice.of(NEW_PUBLIC, "Public", "Anyone on the internet sees its code"))));
     }
 
     /**
-     * La question du dépôt : ce que TaskForce peut faire ici, le nouveau dépôt privé recommandé ; les dépôts récents
-     * prennent la place qui reste sur la carte, à côté d'aucun.
+     * La question du dépôt : ce que TaskForce peut faire ici, le nouveau dépôt privé recommandé ; les dépôts de la
+     * personne prennent la place qui reste sur la carte, à côté d'aucun, ceux qui ressemblent au nom, à la pile ou à la
+     * demande d'abord, puis les plus récemment actifs. Un dépôt qui porte déjà le nom du projet vient en tête, recommandé :
+     * un nouveau dépôt de ce nom ne pourrait pas se créer.
      */
-    private Question whereItLives(String slug, boolean creates, boolean links, String text) {
+    private Question whereItLives(boolean creates, List<String> mine, Wanted wanted, String request, String text) {
         List<Question.Choice> choices = new ArrayList<>();
+        String same = wanted.name().isEmpty() ? null : RepoMatch.named(wanted.name(), mine);
+        if (same != null) {
+            choices.add(Question.Choice.recommended(same, same, "Your repository with this project's name, linked as it is"));
+        }
         if (creates) {
-            choices.add(Question.Choice.recommended(NEW_PRIVATE, "A new private repository",
-                "TaskForce creates it on GitHub; only the people you add see the code"));
+            Question.Choice fresh = Question.Choice.of(NEW_PRIVATE, "A new private repository",
+                "TaskForce creates it on GitHub; only the people you add see the code");
+            choices.add(same == null ? Question.Choice.recommended(fresh.value(), fresh.label(), fresh.description()) : fresh);
             choices.add(Question.Choice.of(NEW_PUBLIC, "A new public repository",
                 "TaskForce creates it on GitHub; anyone on the internet sees the code"));
         }
         int room = Question.MAX_CHOICES - choices.size() - 1;
-        if (links && room > 0) {
-            repoHost.recentRepos(slug, room).stream().limit(room)
-                .forEach(repo -> choices.add(Question.Choice.of(repo, repo, "An existing repository, linked as it is")));
-        }
+        RepoMatch.ranked(mine, Arrays.asList(wanted.name(), wanted.stack(), request)).stream()
+            .filter(repo -> !repo.equals(same))
+            .limit(Math.max(room, 0))
+            .forEach(repo -> choices.add(Question.Choice.of(repo, repo, "An existing repository, linked as it is")));
         choices.add(Question.Choice.of(NONE, "No repository for now", "Link one later from the project's page"));
-        return Question.of("repository", "Repository", text, choices);
+        return Question.of(REPOSITORY, "Repository", text, choices);
+    }
+
+    /**
+     * Une réponse tapée qui ne nomme pas un seul de ses dépôts : une phrase, puis ceux qu'elle nomme, ou les plus proches
+     * de ce qu'elle a écrit, et aucun. Cette carte ne se montre qu'une fois.
+     */
+    private static Question closest(String asked, List<String> matching, List<String> mine) {
+        int room = Question.MAX_CHOICES - 1;
+        String text;
+        List<String> offered;
+        if (!matching.isEmpty()) {
+            text = "Several of your repositories match \"" + clip(asked) + "\": which one is it?";
+            offered = matching.stream().limit(room).toList();
+        } else if (mine.isEmpty()) {
+            text = "TaskForce can't see your repositories here: write it as owner/name, or go on without one.";
+            offered = List.of();
+        } else {
+            text = "None of your repositories is called \"" + clip(asked) + "\": is it one of these?";
+            offered = RepoMatch.closest(asked, mine, room);
+        }
+        List<Question.Choice> choices = new ArrayList<>();
+        offered.forEach(repo -> choices.add(Question.Choice.of(repo, repo, "An existing repository, linked as it is")));
+        choices.add(Question.Choice.of(NONE, "No repository for now", "Link one later from the project's page"));
+        return Question.of(REPOSITORY, "Repository", text, choices);
+    }
+
+    /**
+     * Les dépôts de la personne, du plus récemment actif au plus ancien, gardés le temps d'une carte et de sa réponse ; vide
+     * quand l'hôte ne les connaît pas (GitHub non connecté, injoignable).
+     */
+    private List<String> repositories(String slug) {
+        long now = System.nanoTime();
+        Read kept = repositories.get(slug);
+        if (kept != null && now - kept.at() < REPOSITORIES_KEPT.toNanos()) return kept.repos();
+        List<String> read;
+        try {
+            read = repoHost.recentRepos(slug, REPOSITORIES).stream().filter(GitHubRepoNames::isFullName).toList();
+        } catch (RuntimeException unreadable) {
+            read = List.of();
+        }
+        if (!read.isEmpty()) repositories.put(slug, new Read(read, now));
+        return read;
     }
 
     private static ProjectRepoLinkRequest linkRequest(Repository repository, String name) {
