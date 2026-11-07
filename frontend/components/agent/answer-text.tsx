@@ -2,7 +2,9 @@
 
 import { ShieldCheck } from "lucide-react"
 
+import { useAnswerLinks } from "@/components/agent/answer-links"
 import { Markdown } from "@/components/ui/lightweight-markdown"
+import type { AssistantToolCall } from "@/lib/api/assistant-service"
 import { splitAnswer, type AnswerKind } from "@/lib/cortex/taskforce-says"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 
@@ -10,13 +12,19 @@ import { usePreferencesStore } from "@/lib/store/preferences-store"
  * Le texte d'une réponse de Cortex : son markdown, et ce que TaskForce y dit à la place d'une phrase où Cortex disait
  * avoir fait ce qu'aucune action du tour n'a fait (R116), à propos du modèle qui répond (R118), ou les questions qu'il
  * pose avant un geste (R115), sous son nom et dans son style, jamais mêlé aux mots du modèle. Quand la carte de ces
- * questions est là (`withCard`), c'est elle qui les montre : le bloc ne les répète pas.
+ * questions est là (`withCard`), c'est elle qui les montre : le bloc ne les répète pas. Les issues et les projets que
+ * Cortex nomme sont des liens vers leur volet (R120) ; les gestes de la réponse (`toolCalls`) disent quelles issues.
  */
-export function AnswerText({ text, withCard = false }: Readonly<{ text: string; withCard?: boolean }>) {
+export function AnswerText({ text, withCard = false, toolCalls }: Readonly<{
+  text: string
+  withCard?: boolean
+  toolCalls?: readonly AssistantToolCall[]
+}>) {
+  const links = useAnswerLinks(toolCalls)
   return (
     <>
       {splitAnswer(text).map((part, i) => {
-        if (part.by === "cortex") return <Markdown key={i} content={part.text} />
+        if (part.by === "cortex") return <Markdown key={i} content={part.text} renderText={links} />
         if (part.kind === "asks" && withCard) return null
         return <TaskForceSays key={i} lines={part.lines} kind={part.kind} />
       })}

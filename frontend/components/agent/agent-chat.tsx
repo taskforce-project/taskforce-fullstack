@@ -509,7 +509,7 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
       )}
       {answer.reasoning && <Reasoning content={answer.reasoning} />}
       {/* Ce que TaskForce dit à la place d'une phrase fausse se montre comme sa parole, pas celle du modèle (R116). */}
-      <AnswerText text={answer.answer} withCard={asking} />
+      <AnswerText text={answer.answer} withCard={asking} toolCalls={answer.toolCalls} />
       {answer.toolCalls.map((tc, i) => <ToolCallView key={i} slug={slug} call={tc} />)}
       {answer.sources.length > 0 && (
         <Sources items={answer.sources.map((s) => ({ title: s.title, snippet: s.domain, score: s.score ?? undefined }))} />

@@ -25,6 +25,11 @@ export interface MarkdownProps {
    * Utiliser {@link toggleTaskInMarkdown} pour reconstruire le markdown côté appelant.
    */
   onToggleTask?: (taskIndex: number, checked: boolean) => void
+  /**
+   * Rend le texte courant (hors code et liens) : la conversation y fait des liens de ce qu'il nomme, une issue ou un
+   * projet, qui ouvrent leur volet (R120). Sans elle, le texte reste tel quel.
+   */
+  renderText?: (text: string, key: string) => ReactNode
 }
 
 // Détection d'un item de checklist markdown : `- [ ] …`, `* [x] …`, `+ [X] …`.
@@ -81,9 +86,10 @@ function renderInline(text: string, keyPrefix: string, opts: MarkdownProps): Rea
   let last = 0
   let m: RegExpExecArray | null
   let i = 0
+  const plain = (s: string, k: string): ReactNode => (opts.renderText ? opts.renderText(s, k) : s)
   INLINE_RE.lastIndex = 0
   while ((m = INLINE_RE.exec(text)) !== null) {
-    if (m.index > last) out.push(text.slice(last, m.index))
+    if (m.index > last) out.push(plain(text.slice(last, m.index), `${keyPrefix}-t${i}`))
     const token = m[0]
     const key = `${keyPrefix}-${i++}`
     if (token.startsWith("`")) {
@@ -106,7 +112,7 @@ function renderInline(text: string, keyPrefix: string, opts: MarkdownProps): Rea
     } else if (token.startsWith("==")) {
       out.push(<mark key={key} className="rounded bg-shape-yellow/30 px-0.5">{token.slice(2, -2)}</mark>)
     } else if (token.startsWith("**")) {
-      out.push(<strong key={key}>{token.slice(2, -2)}</strong>)
+      out.push(<strong key={key}>{plain(token.slice(2, -2), `${key}-b`)}</strong>)
     } else if (token.startsWith("*") || token.startsWith("_")) {
       out.push(<em key={key}>{token.slice(1, -1)}</em>)
     } else if (token.startsWith("#")) {
@@ -127,7 +133,7 @@ function renderInline(text: string, keyPrefix: string, opts: MarkdownProps): Rea
     }
     last = m.index + token.length
   }
-  if (last < text.length) out.push(text.slice(last))
+  if (last < text.length) out.push(plain(text.slice(last), `${keyPrefix}-t${i}`))
   return out
 }
 

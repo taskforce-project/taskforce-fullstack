@@ -8,6 +8,8 @@ import { useIssueStore } from "@/lib/store/issue-store";
 
 // Aucun réseau : l'accord est simulé ; l'archivage passe par le vrai store, son action simulée.
 vi.mock("@/lib/api/assistant-service", () => ({ approveAction: vi.fn() }));
+const nav = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: nav.push, back: vi.fn() }), useParams: () => ({ workspace: "acme" }) }));
 
 const RECORD = "00000000-0000-0000-0000-0000000000aa";
 const TARGET: AssistantTarget = {
@@ -102,6 +104,15 @@ describe("DeleteIssueCard : supprimer une issue depuis la conversation", () => {
 
     await waitFor(() => expect(screen.getByText(said)).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+  });
+
+  // R123 : la carte qui agit sur une issue l'ouvre dans le volet, sans quitter la conversation.
+  it("opens the issue in the pane from its title", () => {
+    show({ ...TARGET, column: "In review by AI" });
+
+    fireEvent.click(screen.getByRole("link", { name: "Delete TESTTA-2 (In review by AI): Fix the footer?" }));
+
+    expect(nav.push).toHaveBeenCalledWith("/acme/projects/3?issue=55", { scroll: false });
   });
 
   it("an issue already archived only offers Delete, and nothing else goes with a bare issue", () => {

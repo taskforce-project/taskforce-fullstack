@@ -3,13 +3,16 @@
 import { useState } from "react"
 import { Archive, Loader2, Trash2, Undo2 } from "lucide-react"
 
+import { PaneLink } from "@/components/layout/pane-link"
 import { Button } from "@/components/ui/button"
 import { approveAction, type AssistantTarget, type AssistantToolCall } from "@/lib/api/assistant-service"
 import { getErrorMessage } from "@/lib/api/client"
 import type { TranslationKeys } from "@/lib/constants_en"
 import { fillText } from "@/lib/delivery/result-card"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { issuePath } from "@/lib/window/pane"
 
 type Texts = TranslationKeys["cortex"]
 
@@ -37,12 +40,14 @@ export function deletionTitle(target: AssistantTarget, t: Texts): string {
 /**
  * « Supprime TF-12 » dans la conversation (TF-J1-5) : la règle delete-issue demande, et cette carte dit l'issue, sa
  * colonne (test du CEO du 05/11/2026 : la carte d'une autre issue au même titre doit se voir d'emblée) et ce qui
- * partirait avec elle. « Archive » d'abord : l'issue quitte le tableau, et « Undo » la remet. « Delete » ensuite :
- * l'accord part avec le dossier de la réponse, où le serveur rejuge la suppression. Seul ce clic supprime, jamais un
- * « oui » écrit (R1).
+ * partirait avec elle ; son titre ouvre l'issue dans le volet (R123). « Archive » d'abord : l'issue quitte le tableau, et
+ * « Undo » la remet. « Delete » ensuite : l'accord part avec le dossier de la réponse, où le serveur rejuge la
+ * suppression. Seul ce clic supprime, jamais un « oui » écrit (R1).
  */
 export function DeleteIssueCard({ slug, call, target }: Readonly<{ slug: string; call: AssistantToolCall; target: AssistantTarget }>) {
   const t = usePreferencesStore((s) => s.t.cortex)
+  const openText = usePreferencesStore((s) => s.t.window.openIssue)
+  const { openIssue } = usePaneNavigation()
   const archiveIssue = useIssueStore((s) => s.archiveIssue)
   const [state, setState] = useState<State>("idle")
   const [problem, setProblem] = useState<string | null>(null)
@@ -89,7 +94,14 @@ export function DeleteIssueCard({ slug, call, target }: Readonly<{ slug: string;
 
   return (
     <div className="my-2 flex flex-col gap-2 border border-border p-2.5 text-xs" role="group" aria-label={title}>
-      <p className="font-medium text-foreground">{title}</p>
+      <PaneLink
+        href={issuePath(slug, target.projectId, target.issueId)}
+        open={() => openIssue({ projectId: target.projectId, issueId: target.issueId })}
+        title={fillText(openText, { key })}
+        className="w-fit font-medium text-foreground underline-offset-2 hover:underline"
+      >
+        {title}
+      </PaneLink>
       <p className="text-muted-foreground">
         {what.length > 0 ? fillText(t.deleteGoesWith, { what: what.join(", ") }) : t.deleteNothingElse}
       </p>
