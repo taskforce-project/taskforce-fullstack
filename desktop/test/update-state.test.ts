@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { IDLE, reduceUpdate, type UpdateEvent, type UpdateState } from "../src/update-state";
+import { IDLE, reduceUpdate, restartBy, type UpdateEvent, type UpdateState } from "../src/update-state";
 
 const downloading = (percent: number): UpdateState => ({ status: "downloading", version: "1.3.3", percent });
 const ready: UpdateState = { status: "ready", version: "1.3.3" };
@@ -28,5 +28,20 @@ describe("update state, as the interface shows it", () => {
   ];
   for (const [label, state, event, expected] of cases) {
     it(label, () => assert.deepEqual(reduceUpdate(state, event), expected));
+  }
+});
+
+describe("how the app restarts by itself, after a sign-out or a session ended online", () => {
+  const cases: [string, UpdateState, "update" | "relaunch"][] = [
+    ["no update: a plain relaunch", IDLE, "relaunch"],
+    ["a download under way installs nothing on quit: a plain relaunch", downloading(40), "relaunch"],
+    ["a failed download installs nothing either", { status: "failed", version: "1.3.3", message: "net::ERR_CONNECTION_RESET" },
+      "relaunch"],
+    ["a version ready: through the update, so that the installer opens the app again", ready, "update"],
+    ["a version that did not install last time: through the update too", { status: "ready", version: "1.3.3", retry: true },
+      "update"],
+  ];
+  for (const [label, state, expected] of cases) {
+    it(label, () => assert.equal(restartBy(state), expected));
   }
 });

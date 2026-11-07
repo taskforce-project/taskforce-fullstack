@@ -44,3 +44,14 @@ export function reduceUpdate(state: UpdateState, event: UpdateEvent): UpdateStat
       return state.status === "downloading" ? { status: "failed", version: state.version, message: event.message } : null;
   }
 }
+
+/**
+ * Comment l'app redémarre d'elle-même (déconnexion, session fermée en ligne). Avec une version prête, une simple relance
+ * la faisait disparaître : en quittant, electron-updater lance l'installeur en silence, sans `--force-run` ; l'installeur
+ * ferme de force tout ce qui tourne depuis le dossier de l'app, l'instance relancée comprise, et ne rouvre rien. Elle
+ * redémarre alors par la mise à jour, comme avec « Restart now » : l'installeur la rouvre à la fin. Sans version prête,
+ * rien ne s'installe en quittant : une simple relance suffit.
+ */
+export function restartBy(state: UpdateState): "update" | "relaunch" {
+  return state.status === "ready" ? "update" : "relaunch";
+}
