@@ -74,7 +74,7 @@ class AssistantControllerWebMvcTest {
         when(access.resolveAndAuthorize(anyString(), anyLong())).thenReturn(ws);
         var conv = org.mockito.Mockito.mock(com.taskforce.tf_api.core.model.AiConversation.class);
         when(conv.getId()).thenReturn(1L);
-        when(conversationService.getOrCreate(anyLong(), anyLong(), any())).thenReturn(conv);
+        when(conversationService.getOrCreate(anyLong(), anyLong(), any(), any())).thenReturn(conv);
         when(conversationService.recentHistory(anyLong())).thenReturn(java.util.List.of());
         when(conversationService.autoTitle(anyLong(), anyString())).thenReturn("Move");
         AtomicReference<String> model = new AtomicReference<>();
@@ -154,7 +154,7 @@ class AssistantControllerWebMvcTest {
         when(access.resolveAndAuthorize(anyString(), anyLong())).thenReturn(ws);
         var conv = org.mockito.Mockito.mock(com.taskforce.tf_api.core.model.AiConversation.class);
         when(conv.getId()).thenReturn(1L);
-        when(conversationService.getOrCreate(anyLong(), anyLong(), any())).thenReturn(conv);
+        when(conversationService.getOrCreate(anyLong(), anyLong(), any(), any())).thenReturn(conv);
         when(conversationService.recentHistory(anyLong())).thenReturn(java.util.List.of());
         when(conversationService.autoTitle(anyLong(), anyString())).thenReturn("Bonjour");
         when(agentService.run(anyString(), anyLong(), anyString(), any(), any())).thenReturn(
@@ -175,13 +175,13 @@ class AssistantControllerWebMvcTest {
         "{\"projectId\":12,\"issueId\":34}  | 12   | 34",
         "{\"issueId\":34}                   |      | ",   // une issue sans son projet ne se lit pas
     })
-    @DisplayName("POST assistant avec l'écran (R114) : le projet et l'issue ouverts partent à Cortex")
+    @DisplayName("POST assistant avec l'écran (R114) : le projet et l'issue ouverts partent à Cortex, le projet range la conversation")
     void chat_passes_the_screen(String screen, Long projectId, Long issueId) throws Exception {
         var ws = com.taskforce.tf_api.core.model.Workspace.builder().id(1L).slug("acme").name("Acme").build();
         when(access.resolveAndAuthorize(anyString(), anyLong())).thenReturn(ws);
         var conv = org.mockito.Mockito.mock(com.taskforce.tf_api.core.model.AiConversation.class);
         when(conv.getId()).thenReturn(1L);
-        when(conversationService.getOrCreate(anyLong(), anyLong(), any())).thenReturn(conv);
+        when(conversationService.getOrCreate(anyLong(), anyLong(), any(), any())).thenReturn(conv);
         when(conversationService.recentHistory(anyLong())).thenReturn(java.util.List.of());
         when(agentService.run(anyString(), anyLong(), anyString(), any(), any())).thenReturn(
             new com.taskforce.tf_api.core.dto.response.AssistantAnswer(
@@ -193,6 +193,8 @@ class AssistantControllerWebMvcTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"supprime ça\",\"screen\":" + screen + "}"))
             .andExpect(status().isOk());
         verify(agentService).run(eq("acme"), eq(7L), eq("supprime ça"), any(), eq(new Screen(projectId, issueId)));
+        // Une conversation qui commence sur un projet se range sous lui (R121) ; sans projet à l'écran, sous aucun.
+        verify(conversationService).getOrCreate(eq(1L), eq(7L), any(), eq(projectId));
     }
 
     @Test

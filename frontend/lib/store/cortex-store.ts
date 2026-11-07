@@ -1,8 +1,8 @@
 import { create } from "zustand";
 
 import {
-  answerQuestion as sendAnswer, sendAgentMessage, type AssistantAnswer, type AssistantToolCall, type ModelEscalation,
-  type QuestionAnswer,
+  answerQuestion as sendAnswer, sendAgentMessage, undoAction, type AssistantAnswer, type AssistantToolCall,
+  type ModelEscalation, type QuestionAnswer,
 } from "@/lib/api/assistant-service";
 import {
   deleteConversation, getConversation, listConversations,
@@ -14,10 +14,10 @@ import { screenFrom } from "@/lib/cortex/screen";
 import { useScreenStore } from "@/lib/store/screen-store";
 
 // ---------------------------------------------------------------------------
-// Store de la barre unique (R76, séance n°13) et de la conversation qu'elle ouvre. La conversation vit ici, pas dans
-// un composant : elle se déplie au-dessus de la barre et s'y replie sans rien perdre, d'un écran à l'autre (revue UX
-// du 01/11/2026). Depuis le 02/11/2026, elle est toujours en bas, jamais sur le côté : rien d'autre à retenir dans le
-// navigateur. Un domaine = un store ; rien ne part tant que la personne n'envoie pas.
+// Store de la conversation avec Cortex et de son compositeur (R76, séance n°13). La conversation vit ici, pas dans un
+// composant : depuis la fenêtre (R119, séance n°18), elle tient la colonne du centre, et se replie dans le compositeur
+// quand le volet prend toute la largeur, où elle se déplie au-dessus de lui (R120, le motif du 02/11/2026) ; elle ne
+// perd rien d'un écran à l'autre. Un domaine = un store ; rien ne part tant que la personne n'envoie pas.
 // ---------------------------------------------------------------------------
 
 export interface CortexTurn {
@@ -33,6 +33,16 @@ export interface CortexTurn {
   /** Le modèle vers lequel la personne a envoyé la demande, d'un clic : sur sa demande et sur la réponse. */
   sentTo?: string | null;
 }
+
+/** Où en est « Undo » d'un geste : la conversation et « Changes » (R122) montrent le même état. */
+export type UndoState =
+  | { status: "running" }
+  | { status: "done"; output: string }
+  | { status: "error"; output: string };
+
+/** Un geste se nomme par le dossier de sa réponse et son empreinte, ou son outil quand il n'en a pas. */
+export const undoKey = (call: Pick<AssistantToolCall, "record" | "ref" | "name">): string =>
+  `${call.record ?? ""}:${call.ref ?? call.name}`;
 
 interface CortexState {
   /** Le texte de la barre, que la personne écrit ou qu'une suggestion remplit. */
@@ -57,6 +67,13 @@ interface CortexState {
   open: boolean;
   /** Une réponse est arrivée pendant que la conversation était repliée. */
   unread: boolean;
+  /**
+   * Les gestes faits hors des tours, sur leurs cartes : une issue préparée puis créée, une action accordée, la suite
+   * d'une carte de questions. « Changes » les montre avec ceux des tours (R122).
+   */
+  done: AssistantToolCall[];
+  /** « Undo » de chaque geste, par `undoKey`. */
+  undos: Record<string, UndoState>;
 
   setDraft: (text: string) => void;
   /** L'espace affiché : en changer repart d'une conversation neuve, celle de l'autre espace reste dans son historique. */
@@ -83,6 +100,13 @@ interface CortexState {
   answerQuestion: (slug: string, call: AssistantToolCall, answers: QuestionAnswer[]) => Promise<AssistantToolCall | null>;
   /** Pourquoi les dernières réponses à une carte ne sont pas passées, dans les mots du serveur ; null sinon. */
   questionProblem: string | null;
+  /** Garde un geste abouti sur sa carte, pour « Changes ». */
+  noteDone: (call: AssistantToolCall) => void;
+  /**
+   * Défait un geste de Cortex (R77), une fois : false si le serveur refuse (l'issue a changé depuis), la raison dans
+   * `undos`, ou si « Undo » de ce geste est déjà parti.
+   */
+  undo: (slug: string, call: AssistantToolCall) => Promise<boolean>;
 }
 
 let lastId = 0;
@@ -113,7 +137,7 @@ export function messagesToTurns(messages: ConversationMessage[]): CortexTurn[] {
   );
 }
 
-const EMPTY_CONVERSATION = { turns: [], conversationId: null, tokens: 0, context: null, lastMs: null, unread: false };
+const EMPTY_CONVERSATION = { turns: [], conversationId: null, tokens: 0, context: null, lastMs: null, unread: false, done: [] };
 
 /**
  * Le tour d'une demande qui n'a pas abouti. 409 : le plafond de tokens de l'instance, une carte d'information plutôt
@@ -136,6 +160,7 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
   conversations: [],
   sentAt: null,
   open: false,
+  undos: {},
 
   setDraft: (text) => set({ draft: text }),
 
@@ -261,10 +286,29 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
     if (!slug || said.length === 0) return null;
     set({ questionProblem: null });
     try {
-      return await sendAnswer(slug, call, said);
+      const next = await sendAnswer(slug, call, said);
+      if (next.status === "success") get().noteDone(next);
+      return next;
     } catch (e) {
       set({ questionProblem: getErrorMessage(e) });
       return null;
+    }
+  },
+
+  noteDone: (call) => set((s) => ({ done: [...s.done, call] })),
+
+  undo: async (slug, call) => {
+    const key = undoKey(call);
+    const known = get().undos[key];
+    if (!slug || known?.status === "running" || known?.status === "done") return false;
+    set((s) => ({ undos: { ...s.undos, [key]: { status: "running" } } }));
+    try {
+      const result = await undoAction(slug, call);
+      set((s) => ({ undos: { ...s.undos, [key]: { status: "done", output: result.output } } }));
+      return true;
+    } catch (e) {
+      set((s) => ({ undos: { ...s.undos, [key]: { status: "error", output: getErrorMessage(e) } } }));
+      return false;
     }
   },
 }));

@@ -20,6 +20,7 @@ import { IssueSheetLoader, parseIssueTarget, type IssueSheetTarget } from "@/com
 import { cn } from "@/lib/utils"
 import { useNotificationStore } from "@/lib/store/notification-store"
 import type { Signal, Urgency } from "@/lib/store/notification-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -144,6 +145,7 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
 
   const { signals, isLoading, error, lastSyncAt, fetchNotifications, markAsRead, markAllAsRead, acknowledgeAll, acknowledge: acknowledgeNotif } =
     useNotificationStore()
+  const title = usePreferencesStore((s) => s.t.window.waitingForYou)
 
 
   const [activeTab, setActiveTab] = useState<NotifTab>(defaultTab)
@@ -270,7 +272,8 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Signal Center</h1>
+          {/* « Waiting for you » remplace l'Inbox et la cloche (R121) : la page garde son nom. */}
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           <p className="text-sm text-muted-foreground">
             Operational alerts and mentions, sorted by urgency. What is assigned to you lives in My Work.
           </p>
