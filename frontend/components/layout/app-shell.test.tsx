@@ -73,13 +73,14 @@ describe("AppShell : la fenêtre", () => {
   const loadConversations = vi.fn().mockResolvedValue(true)
   const fetchProjects = vi.fn().mockResolvedValue([])
   const fetchStatus = vi.fn().mockResolvedValue(null)
+  const openConversation = vi.fn().mockResolvedValue(true)
 
   beforeEach(() => {
     vi.clearAllMocks()
     nav.pathname = "/acme"
     nav.search = ""
     globalThis.history.replaceState(null, "", "/acme")
-    useCortexStore.setState({ ...cortex, open: false, conversationId: null, enterWorkspace, loadConversations })
+    useCortexStore.setState({ ...cortex, open: false, conversationId: null, enterWorkspace, loadConversations, openConversation })
     useProjectStore.setState({ ...projects, fetchProjects })
     useAiStatusStore.setState({ ...ai, fetchStatus })
     useWindowStore.setState({ paneFull: false, paneWidth: null, rightOpen: true, rightDrawer: false, rows: {}, searchOpen: false })

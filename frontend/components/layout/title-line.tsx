@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { useParams, usePathname, useRouter } from "next/navigation"
+import { useParams, usePathname } from "next/navigation"
 import { LayoutGrid, PanelRight } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -9,6 +9,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { fillText } from "@/lib/delivery/result-card"
 import { desktopBridge, IS_DESKTOP } from "@/lib/desktop"
 import { useDesktopNavigation } from "@/lib/hooks/use-desktop-navigation"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { useCortexStore } from "@/lib/store/cortex-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useProjectStore } from "@/lib/store/project-store"
@@ -33,7 +34,6 @@ const ICON_BUTTON =
 export function TitleLine() {
   const pathname = usePathname()
   const params = useParams()
-  const router = useRouter()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const t = usePreferencesStore((s) => s.t.window)
   const untitled = usePreferencesStore((s) => s.t.shell.chatNew)
@@ -43,6 +43,7 @@ export function TitleLine() {
   const projects = useProjectStore((s) => s.projects)
   const rightOpen = useWindowStore((s) => s.rightOpen)
   const toggleRight = useWindowStore((s) => s.toggleRight)
+  const { openBoard } = usePaneNavigation()
 
   // App desktop : les boutons du système aux couleurs du thème, sur la hauteur de cette ligne.
   useEffect(() => {
@@ -67,7 +68,7 @@ export function TitleLine() {
         {project && board && pathname !== board && (
           <button
             type="button"
-            onClick={() => router.push(board)}
+            onClick={() => openBoard(project.id)}
             title={fillText(t.boardOf, { project: project.name })}
             className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[13px] text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
           >

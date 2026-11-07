@@ -21,6 +21,7 @@ import { DesktopUpdateToast } from "@/components/desktop/desktop-update-toast"
 import { useElementWidth } from "@/hooks/use-element-width"
 import { useMinWidth } from "@/hooks/use-min-width"
 import { IS_DESKTOP } from "@/lib/desktop"
+import { useConversationAddress } from "@/lib/hooks/use-conversation-address"
 import { useMissionsSync } from "@/lib/hooks/use-missions-sync"
 import { useNotificationsSync } from "@/lib/hooks/use-notifications-sync"
 import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
@@ -111,7 +112,7 @@ function useEscape(folded: boolean, issueOpen: boolean, closeIssue: () => void) 
  * centrée. Quand la place manque pour les deux (en pleine largeur, sous `lg`, ou à moins de 480 px de volet et 360 px de
  * conversation), le volet prend toute la place et la conversation se replie dans son compositeur, en bas, d'où sa
  * réponse se déplie au-dessus (le motif du 02/11/2026).
- * L'adresse dit le volet par son chemin, et l'issue ouverte par-dessus par `?issue=`.
+ * L'adresse dit tout : le chemin le volet, `?issue=` l'issue par-dessus, `?c=` la conversation.
  */
 export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname()
@@ -138,6 +139,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
 
   useWindowData(slug)
   useSearchShortcut()
+  useConversationAddress(slug)
 
   // Le volet prend toute la largeur : la conversation se replie dans le compositeur.
   const folded = route !== null && (paneFull || !wide || split.narrow)

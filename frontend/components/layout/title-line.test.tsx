@@ -48,7 +48,7 @@ describe("TitleLine", () => {
 
     expect(screen.getByText("Plan the launch")).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Board" }))
-    expect(nav.push).toHaveBeenCalledWith("/acme/projects/3")
+    expect(nav.push).toHaveBeenCalledWith("/acme/projects/3", { scroll: false })
   })
 
   it.each([
