@@ -908,9 +908,8 @@ textarea:not([disabled]) { cursor: text; }
 .cortex-composer:focus-within {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--ring) 55%, transparent), var(--shadow-window);
 }
-/* Le dégradé, celui du parcours du site (.flow-glow) : une ellipse posée au bas de l'écran, sous la barre, qui monte
-   au-dessus du texte. Presque plein au centre, il s'efface vers les bords et vers le haut ; il ne capte aucun clic. À
-   côté d'un panneau ouvert, il s'arrête à son bord. */
+/* Le dégradé, celui du parcours du site (.flow-glow) : une ellipse posée au bas du volet, sous la barre, qui monte
+   au-dessus du texte. Presque plein au centre, il s'efface vers les bords et vers le haut ; il ne capte aucun clic. */
 .cortex-wash {
   position: absolute;
   inset: calc(-1 * var(--cortex-rise)) 0 -4.5rem;
@@ -922,12 +921,6 @@ textarea:not([disabled]) { cursor: text; }
     color-mix(in srgb, var(--background) 78%, transparent) 84%,
     transparent 100%
   );
-}
-@media (min-width: 768px) {
-  .cortex-wash {
-    left: var(--cortex-left, 0px);
-    right: var(--cortex-right, 0px);
-  }
 }
 /* Derrière la colonne du texte, comme derrière le texte d'une étape sur le site (.flow-panels::before) : le fond plus
    plein, aux côtés fondus, qui s'éteint vers le haut. Sans bord net, ce n'est pas une carte. */
@@ -996,13 +989,35 @@ textarea:not([disabled]) { cursor: text; }
   background: color-mix(in srgb, var(--foreground) 6%, var(--background));
   color: var(--foreground);
 }
+/* La conversation dans sa colonne (R119, R124) : une police, trois tailles. Les tours à une taille de lecture, titres
+   compris, la demande de la personne avec eux ; l'accueil au-dessus ; le reste (outils, cartes, la ligne sous le
+   compositeur) au petit corps de l'app. Rien ne passe sous le texte : ni liseré, ni tour d'avant pâli. */
+.cortex-column .cortex-thread [data-role="assistant"] > * > [data-markdown] {
+  --text-sm: 0.9375rem;
+  --text-base: 0.9375rem;
+  --text-lg: 0.9375rem;
+  --text-xl: 0.9375rem;
+  line-height: 1.65;
+  letter-spacing: normal;
+  text-shadow: none;
+}
+.cortex-column .cortex-say {
+  text-shadow: none;
+}
+.cortex-column .cortex-thread [data-role="user"] {
+  font-size: 0.9375rem;
+}
+.cortex-column .cortex-earlier :is([data-role="assistant"] > * > [data-markdown], [data-role="user"]) {
+  color: var(--foreground);
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    APP DESKTOP - haut de la fenêtre dessiné par l'interface
    ─────────────────────────────────────────────────────────────────────────
-   La coque n'a ni barre de titre ni menu du système (desktop/src/window-chrome.ts) : la barre du haut et
-   l'en-tête de la barre latérale déplacent la fenêtre, leurs contrôles restent cliquables, et la barre du
-   haut laisse à droite la place des boutons du système (Window Controls Overlay : titlebar-area-*).
+   La coque n'a ni barre de titre ni menu du système (desktop/src/window-chrome.ts) : la ligne du haut de la
+   fenêtre (44 px, R119) et l'en-tête de la barre de gauche déplacent la fenêtre, leurs contrôles restent
+   cliquables, et la ligne du haut laisse à droite la place des boutons du système (Window Controls Overlay :
+   titlebar-area-*).
    ══════════════════════════════════════════════════════════════════════════ */
 .desktop-titlebar,
 .desktop-drag {

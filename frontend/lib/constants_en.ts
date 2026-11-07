@@ -334,35 +334,6 @@ export const CONSTANTS_EN = {
     tryAgain: "Try again",
   },
 
-  // Navigation (sidebar)
-  nav: {
-    dashboard: "Dashboard",
-    myWork: "My Queue",
-    inbox: "Signals",
-    projects: "Operations",
-    issues: "Issues",
-    cycles: "Sprints",
-    roadmap: "Roadmap",
-    teams: "Teams",
-    members: "Members",
-    skills: "Skills",
-    analytics: "Intelligence",
-    agents: "Agents",
-    messages: "Messages",
-    discussions: "Discussions",
-    settings: "Settings",
-    help: "Help",
-    createProject: "New Project",
-    sub: {
-      myAll: "All my queues",
-      myIssues: "Issues",
-      myCycles: "Sprints",
-      allNotifications: "All Signals",
-      mentions: "Mentions",
-      alerts: "Alerts",
-    },
-  },
-
   // Dashboard page
   projects: {
     title: "Projects",
@@ -407,13 +378,11 @@ export const CONSTANTS_EN = {
     },
   },
 
-  // AI Workflows panel: an analysis is followed by its status alone, without the fixed plan of steps (TF-J1-3).
+  // An analysis is followed by its status alone, in Missions on the right (R122), since the AI Workflows panels left.
   workflows: {
-    analysisQueued: "Waiting to start.",
-    analysisRunning: "The analysis is running. Its result will show on the Intelligence page.",
     // Banner of the decision board while an analysis of its project is under way.
-    analysisFollow: "Analysis running: follow it in AI Workflows",
-    analysisNeedsAnswer: "The AI needs a clarification from you: open AI Workflows",
+    analysisFollow: "Analysis running: follow it in Missions",
+    analysisNeedsAnswer: "The AI needs a clarification from you",
   },
 
   // My Work page
@@ -500,17 +469,13 @@ export const CONSTANTS_EN = {
     slackDesktopHelp: "Slack can't be connected in the desktop app yet.",
   },
 
-  // App shell - footer, top bar, workspace switcher (rendered on every authenticated screen).
+  // App shell - the person's menu, the composer, workspaces (rendered on every authenticated screen).
   shell: {
-    // Footer
+    // What the footer held, in the person's menu
     privacy: "Privacy",
     legalNotices: "Legal notices",
     manageCookies: "Manage cookies",
-    // Top bar
-    search: "Search…",
-    searchAria: "Search",
-    openCommandPalette: "Open command palette",
-    // The single bar at the bottom of every screen (R76): write, then send; nothing leaves before that.
+    // The composer at the bottom of the conversation (R76): write, then send; nothing leaves before that.
     barPlaceholder: "What do you want done?",
     barReply: "Reply to Cortex…",
     barSend: "Send",
@@ -519,7 +484,7 @@ export const CONSTANTS_EN = {
     barHideConversation: "Minimize the conversation",
     barNewAnswer: "A new answer from Cortex is waiting",
     barSuggestions: "Suggestions for this screen",
-    // The conversation opens above the bar, its text on the bar's gradient, never on the side (02/11/2026).
+    // The conversation, in its column; folded into the composer, it opens above it, on its gradient (02/11/2026).
     chatLabel: "Conversation with Cortex",
     chatNew: "New conversation",
     chatNone: "No conversations yet.",
