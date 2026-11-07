@@ -10,6 +10,12 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 07/11/2026 - Release 1.11.0 EN PROD : la fenêtre façon Claude Code (lot 1), Cortex après le test de la 1.10.0 ; desktop 1.8.0 en construction.** `[release]`
+> - **Décision du CEO** : « on sort tout ensemble », puis « ok go release quand le lot 1 est prêt » ; il teste sur l'app desktop.
+> - **En prod** : `chore(desktop)` 1.8.0 (`47fc0661`) ; release #494 vers `main` (`b3a1dbd2`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.11.0 en plomberie ; étiquettes `minor`). Dedans : la fenêtre, lot 1 (#493, R119 à R122 et R124, séance n°18) ; Cortex après le test de la 1.10.0 (#491) ; les mises à jour sans fenêtre Windows et les commentaires rendus (#490) ; la déconnexion avec une mise à jour prête (#492). Migrations V117 et V118.
+> - **Vérifié** : l'API a redémarré à 21:14:59 UTC (32 s de coupure, puis `readyz` 200 : V117 et V118 passées) ; la webapp affiche 1.11.0 à 21:15:43. Pas vérifié : la fenêtre connectée, avec des données (la Présidence la teste sur l'app desktop) ; le journal du backend sur VM1.
+> - **Suite** : la desktop 1.8.0 (run 42414818531), puis le site ; le test du CEO ; les lots 2 et 3 de la fenêtre.
+
 > **▶ MAJ 07/11/2026 - J1 : la fenêtre, lot 1 (R119 à R122, R124) : la conversation au centre, l'écran de la route en volet à côté, le travail à gauche, ce qui l'entoure à droite.** `[frontend + backend + desktop]`
 > - **Origine** : la saisine du CEO après son test de la 1.10.0 (« full chat avec un endroit ou justement on peut voir les interfaces [...] Et evidemment pouvoir tout de mm call le chat quand on est sur les board »), puis l'atelier de la fenêtre (séance n°18, R119 à R126), tranché par Jobs et validé d'avance, sans maquette. C'est le lot 1 de TF-J1-9 ; ADR-026 (brouillon) dans `taskforce-docs`.
 > - **Fait** (branche `feat/window-lot1`, PR #493 vers `dev`, étiquettes `frontend:release:minor` et `backend:release:minor`, pas fusionnée) :
