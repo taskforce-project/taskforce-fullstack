@@ -84,8 +84,13 @@ async function main(): Promise<void> {
     refreshed = refreshAccount(account);
   }
   await openApp(account, signInWin);
-  // Session fermée en ligne : traitée une fois la pile démarrée, pour qu'elle s'arrête proprement.
-  if ((await refreshed) === "ended") await sessionEnded();
+  // Session fermée en ligne : traitée une fois la pile démarrée, pour qu'elle s'arrête proprement. Les mises à jour
+  // attendent l'app relancée : démarrées pendant l'arrêt, elles pourraient retrouver une version téléchargée lors d'un
+  // lancement précédent, qui s'installerait en quittant et fermerait l'app relancée.
+  if ((await refreshed) === "ended") {
+    await sessionEnded();
+    return;
+  }
   startUpdater();
 }
 
