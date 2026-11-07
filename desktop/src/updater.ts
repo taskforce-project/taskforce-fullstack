@@ -4,7 +4,7 @@ import { autoUpdater, BaseUpdater } from "electron-updater";
 import { log } from "./log";
 import { fromStore } from "./paths";
 import { pendingOutcome, savePending, takePending } from "./update-pending";
-import { IDLE, reduceUpdate, type UpdateEvent, type UpdateState } from "./update-state";
+import { IDLE, reduceUpdate, restartBy, type UpdateEvent, type UpdateState } from "./update-state";
 
 /** Fréquence des vérifications pendant que l'app reste ouverte. */
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
@@ -53,11 +53,23 @@ export async function installNow(prepare: (version: string) => Promise<void>): P
   // journal du CEO), et une fenêtre qui ne répond plus deviendrait « Not Responding ».
   for (const window of BrowserWindow.getAllWindows()) window.hide();
   // `install(isSilent, isForceRunAfter)` (installeurs de Windows et de Linux, les cibles de l'app) lance l'installeur avec
-  // `--updated /S --force-run` et rend la main sans quitter.
+  // `--updated /S --force-run` et rend la main sans quitter. Il marque d'abord l'installation comme partie
+  // (`quitAndInstallCalled`), même si l'installeur ne part pas : à la fermeture, electron-updater n'en lance pas une
+  // autre, qui fermerait l'app relancée ci-dessous ; sans installeur téléchargé, il n'aurait rien à lancer.
   if (!(autoUpdater instanceof BaseUpdater && autoUpdater.install(true, true))) {
     log.warn(`Update ${version} did not start: TaskForce opens again on ${app.getVersion()}`);
     app.relaunch();
   }
+  app.quit();
+}
+
+/**
+ * Redémarre l'app (déconnexion, session fermée en ligne) : par la mise à jour quand une version est prête, l'installeur
+ * rouvrant l'app à la fin, sinon par une simple relance (cf. `restartBy`).
+ */
+export async function restartApp(prepare: (version: string) => Promise<void>): Promise<void> {
+  if (restartBy(state) === "update") return installNow(prepare);
+  app.relaunch();
   app.quit();
 }
 
