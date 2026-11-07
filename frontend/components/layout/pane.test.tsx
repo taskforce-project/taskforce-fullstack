@@ -1,11 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen } from "@testing-library/react"
 
-const nav = vi.hoisted(() => ({ pathname: "/acme/projects/3", push: vi.fn() }))
+const nav = vi.hoisted(() => ({ pathname: "/acme/projects/3", push: vi.fn(), back: vi.fn() }))
 vi.mock("next/navigation", () => ({
   usePathname: () => nav.pathname,
   useParams: () => ({ workspace: "acme" }),
-  useRouter: () => ({ push: nav.push }),
+  useRouter: () => ({ push: nav.push, back: nav.back }),
+}))
+// L'issue a ses propres tests (issue-pane.test.tsx) : ici, ce que le volet lui donne.
+vi.mock("@/components/layout/issue-pane", () => ({
+  IssuePane: ({ target, under, actions, onBack }: {
+    target: { issueId: number | null; key: string | null }
+    under: string
+    actions: React.ReactNode
+    onBack: () => void
+  }) => (
+    <div role="article" aria-label={`issue ${target.issueId ?? target.key} over ${under}`}>
+      <button type="button" onClick={onBack}>back</button>
+      {actions}
+    </div>
+  ),
 }))
 
 import { Pane } from "./pane"
@@ -20,6 +34,7 @@ describe("Pane", () => {
     nav.pathname = "/acme/projects/3"
     useProjectStore.setState({ projects: [{ id: 3, name: "Website" } as Project] })
     useWindowStore.setState({ paneFull: false })
+    globalThis.history.replaceState(null, "", "/acme/projects/3?c=9")
   })
   afterEach(() => vi.restoreAllMocks())
 
@@ -55,11 +70,47 @@ describe("Pane", () => {
     expect(screen.getByRole("region", { name: "Dashboard" })).toHaveTextContent("composer")
   })
 
-  it("closes to the workspace home, where only the conversation shows", () => {
+  it("closes to the workspace home, where only the conversation shows, the conversation kept", () => {
     render(<Pane route={{ section: "inbox", projectId: null }} full={false} wide><p /></Pane>)
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }))
-    expect(nav.push).toHaveBeenCalledWith("/acme")
+    expect(nav.push).toHaveBeenCalledWith("/acme?c=9", { scroll: false })
+  })
+
+  // R120 : l'issue s'ouvre par-dessus le tableau, dans le même volet ; le tableau reste monté dessous, caché.
+  it("opens the issue over the board, the board kept below out of reach, and goes back to it", () => {
+    globalThis.history.replaceState(null, "", "/acme/projects/3?c=9&issue=34")
+    render(
+      <Pane route={{ section: "projects", projectId: 3 }} full={false} wide issue={{ projectId: 3, issueId: 34, key: null }}>
+        <p>the board</p>
+      </Pane>,
+    )
+
+    const issue = screen.getByRole("article", { name: "issue 34 over Board" })
+    expect(issue).toContainElement(screen.getByRole("button", { name: "Full width" }))
+    expect(screen.getByText("the board").parentElement).toHaveAttribute("aria-hidden", "true")
+    expect(screen.queryByRole("heading", { name: "Website" })).toBeNull()
+
+    fireEvent.click(screen.getByRole("button", { name: "back" }))
+    expect(nav.push).toHaveBeenCalledWith("/acme/projects/3?c=9", { scroll: false })
+  })
+
+  it("names the screen under the issue: the list of a project, the screen of the workspace", () => {
+    nav.pathname = "/acme/projects/3/list"
+    const { rerender } = render(
+      <Pane route={{ section: "projects", projectId: 3 }} full={false} wide issue={{ projectId: 3, issueId: null, key: "WEB-4" }}>
+        <p />
+      </Pane>,
+    )
+    expect(screen.getByRole("article", { name: "issue WEB-4 over List" })).toBeInTheDocument()
+
+    nav.pathname = "/acme/inbox"
+    rerender(
+      <Pane route={{ section: "inbox", projectId: null }} full={false} wide issue={{ projectId: 3, issueId: 34, key: null }}>
+        <p />
+      </Pane>,
+    )
+    expect(screen.getByRole("article", { name: "issue 34 over Waiting for you" })).toBeInTheDocument()
   })
 
   it("opens another screen at its top, without animation", () => {

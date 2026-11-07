@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useParams, usePathname } from "next/navigation"
+import { useParams, usePathname, useSearchParams } from "next/navigation"
 
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/sidebar/app-sidebar"
@@ -28,6 +28,7 @@ import { useCortexStore } from "@/lib/store/cortex-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useWindowStore } from "@/lib/store/window-store"
 import { cn } from "@/lib/utils"
+import { issueOf } from "@/lib/window/address"
 import { paneOf } from "@/lib/window/pane"
 import { paneSplit } from "@/lib/window/split"
 
@@ -80,12 +81,15 @@ function useSearchShortcut() {
  * centrée. Quand la place manque pour les deux (en pleine largeur, sous `lg`, ou à moins de 480 px de volet et 360 px de
  * conversation), le volet prend toute la place et la conversation se replie dans son compositeur, en bas, d'où sa
  * réponse se déplie au-dessus (le motif du 02/11/2026).
+ * L'adresse dit le volet par son chemin, et l'issue ouverte par-dessus par `?issue=`.
  */
 export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname()
   const params = useParams()
+  const search = useSearchParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const route = paneOf(pathname)
+  const issue = issueOf(pathname, search)
   const wide = useMinWidth(SIDE_BY_SIDE)
   const roomy = useMinWidth(ROOMY)
   const paneFull = useWindowStore((s) => s.paneFull)
@@ -148,6 +152,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
                 full={folded}
                 wide={wide}
                 width={folded ? null : split.width}
+                issue={issue}
                 composer={folded ? <CommandBar /> : undefined}
               >
                 {children}

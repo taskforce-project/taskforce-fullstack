@@ -1,14 +1,17 @@
 "use client"
 
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react"
-import { useParams, usePathname, useRouter } from "next/navigation"
+import { useParams, usePathname } from "next/navigation"
 import { Maximize2, Minimize2, X } from "lucide-react"
 
+import { IssuePane } from "@/components/layout/issue-pane"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useWindowStore } from "@/lib/store/window-store"
 import { cn } from "@/lib/utils"
-import { homePath, paneTitle, type PaneRoute } from "@/lib/window/pane"
+import { screenUnder, type IssueTarget } from "@/lib/window/address"
+import { paneTitle, type PaneRoute } from "@/lib/window/pane"
 
 const ICON_BUTTON =
   "flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
@@ -18,11 +21,12 @@ const BESIDE: CSSProperties = { flex: "0 1 max(480px, 50%)" }
 
 /**
  * Le volet de la fenêtre (R119, R120) : la page de la route, entière, avec tous ses gestes, à côté de la conversation.
- * Son en-tête porte son titre, la pleine largeur et la fermeture, qui mène à l'accueil de l'espace. En pleine largeur
- * (ou sous `lg`), la conversation se replie dans son compositeur, en bas du volet. À côté d'elle, une poignée règle sa
- * largeur. L'emplacement reste générique : la page de la route aujourd'hui, d'autres vues ensuite.
+ * Son en-tête porte son titre, la pleine largeur et la fermeture, qui mène à l'accueil de l'espace. Une issue s'y ouvre
+ * par-dessus l'écran qui la liste (`?issue=`),
+ * avec son retour : l'écran reste monté dessous, caché, et se retrouve tel qu'il était. En pleine largeur (ou sous
+ * `lg`), la conversation se replie dans son compositeur, en bas du volet.
  */
-export function Pane({ route, full, wide, width, children, composer }: Readonly<{
+export function Pane({ route, full, wide, width, issue, children, composer }: Readonly<{
   route: PaneRoute
   /** Le volet prend toute la largeur : la personne l'a voulu, ou la fenêtre est étroite. */
   full: boolean
@@ -30,26 +34,52 @@ export function Pane({ route, full, wide, width, children, composer }: Readonly<
   wide: boolean
   /** À côté de la conversation, la largeur réglée à la poignée (px) ; sans mesure, la moitié de la place. */
   width?: number | null
+  /** L'issue que l'adresse ouvre par-dessus l'écran du volet. */
+  issue?: IssueTarget | null
   children: ReactNode
   /** La conversation repliée dans son compositeur, en bas du volet. */
   composer?: ReactNode
 }>) {
   const params = useParams()
   const pathname = usePathname()
-  const router = useRouter()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const t = usePreferencesStore((s) => s.t.window)
   const projects = useProjectStore((s) => s.projects)
   const paneFull = useWindowStore((s) => s.paneFull)
   const togglePaneFull = useWindowStore((s) => s.togglePaneFull)
+  const { closeIssue, closePane } = usePaneNavigation()
   const contentRef = useRef<HTMLDivElement>(null)
   const title = paneTitle(route, projects, t.screens)
   const fullLabel = paneFull ? t.sideBySide : t.fullWidth
+  const under = screenUnder(pathname)
+  const underLabel = (t.under as Readonly<Record<string, string>>)[under] ?? title
+  const covered = issue !== null && issue !== undefined
 
-  // Un autre écran s'ouvre en haut, sans animation : le volet reste, sa page change.
+  // Un autre écran s'ouvre en haut, sans animation : le volet reste, sa page change. Une issue qui s'ouvre ou se ferme
+  // ne change pas le chemin : l'écran d'en dessous garde son défilement.
   useEffect(() => {
     contentRef.current?.scrollTo?.({ top: 0 })
   }, [pathname])
+
+  const actions = (
+    <>
+      {wide && (
+        <button
+          type="button"
+          onClick={togglePaneFull}
+          aria-pressed={paneFull}
+          aria-label={fullLabel}
+          title={fullLabel}
+          className={ICON_BUTTON}
+        >
+          {paneFull ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+        </button>
+      )}
+      <button type="button" onClick={closePane} aria-label={t.closePane} title={t.closePane} className={ICON_BUTTON}>
+        <X className="size-4" />
+      </button>
+    </>
+  )
 
   return (
     <section
@@ -58,32 +88,28 @@ export function Pane({ route, full, wide, width, children, composer }: Readonly<
       className="relative flex min-h-0 min-w-0 flex-col"
       style={full ? { flex: "1 1 0%" } : width ? { flex: `0 0 ${width}px` } : BESIDE}
     >
-      <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border pl-4 pr-2">
-        <h2 className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">{title}</h2>
-        {wide && (
-          <button
-            type="button"
-            onClick={togglePaneFull}
-            aria-pressed={paneFull}
-            aria-label={fullLabel}
-            title={fullLabel}
-            className={ICON_BUTTON}
-          >
-            {paneFull ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => router.push(homePath(slug))}
-          aria-label={t.closePane}
-          title={t.closePane}
-          className={ICON_BUTTON}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div
+          className={cn("flex h-10 shrink-0 items-center gap-1 border-b border-border pl-4 pr-2", covered && "invisible")}
+          aria-hidden={covered || undefined}
+          inert={covered}
         >
-          <X className="size-4" />
-        </button>
-      </div>
-      <div ref={contentRef} className="flex min-h-0 min-w-0 flex-1 flex-col gap-6 overflow-y-auto p-6 md:p-8">
-        {children}
+          <h2 className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">{title}</h2>
+          {!covered && actions}
+        </div>
+        <div
+          ref={contentRef}
+          className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-6 overflow-y-auto p-6 md:p-8", covered && "invisible")}
+          aria-hidden={covered || undefined}
+          inert={covered}
+        >
+          {children}
+        </div>
+        {covered && (
+          <div className="absolute inset-0 z-10 flex min-h-0 flex-col bg-background">
+            <IssuePane slug={slug} target={issue} under={underLabel} actions={actions} onBack={closeIssue} />
+          </div>
+        )}
       </div>
       {composer}
     </section>

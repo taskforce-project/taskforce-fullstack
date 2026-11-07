@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, useRef } from "react"
-import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useParams } from "next/navigation"
 import {
   Circle,
   RefreshCw,
@@ -28,7 +28,6 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core"
 
-import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
 import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -54,6 +53,7 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { useProjectRealtime } from "@/lib/hooks/use-project-realtime"
 import { downloadProjectBundle, downloadProjectExport } from "@/lib/api/project-service"
 import { SendToWebDialog } from "@/components/desktop/project-transfer"
@@ -90,32 +90,6 @@ function extractParam(p: string | string[] | undefined): string {
   if (typeof p === "string") return p
   if (Array.isArray(p)) return p[0] ?? ""
   return ""
-}
-
-function toSheetIssue(issue: Issue): SheetIssue {
-  const priorityMap: Record<IssuePriority, SheetIssue["priority"]> = {
-    NONE: "NONE", URGENT: "URGENT", HIGH: "HIGH", MEDIUM: "MEDIUM", LOW: "LOW",
-  }
-  return {
-    id:             String(issue.id),
-    identifier:     issue.identifier,
-    title:          issue.title,
-    description:    issue.description ?? undefined,
-    priority:       priorityMap[issue.priority],
-    statusId:       issue.status.id,
-    statusName:     issue.status.name,
-    statusCategory: issue.status.category,
-    assignee:       issue.assignee
-      ? { name: issue.assignee.displayName ?? issue.assignee.email, userId: issue.assignee.id, email: issue.assignee.email }
-      : null,
-    assigneeId:     issue.assignee?.id ?? null,
-    labels:         issue.labels,
-    pinned:         issue.pinned,
-    archived:       issue.archived,
-    dueDate:        issue.dueDate,
-    storyPoints:    issue.storyPoints,
-    createdAt:      issue.createdAt,
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -603,14 +577,9 @@ function AddColumnPopover({
 export default function ProjectBoardPage() {
   const { t } = useTranslation()
   const params = useParams()
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+  const { openIssue } = usePaneNavigation()
   const workspace = extractParam(params.workspace)
   const projectId = Number(extractParam(params.id))
-
-  /** Deep-link `?issue=<id>` : on arrive sur le board et l'issue s'ouvre en sheet. */
-  const deepLinkedIssueId = searchParams.get("issue")
 
   const { issues, statuses, error, fetchIssues, fetchStatuses, createStatus, clearIssues, updateIssue, deleteStatus, updateStatus } = useIssueStore()
 
@@ -629,7 +598,6 @@ export default function ProjectBoardPage() {
   }), [projectId])
 
   const [initializing, setInitializing] = useState(true)
-  const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
   const [overColumnId, setOverColumnId] = useState<number | null>(null)
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null)
   const [filters, setFilters] = useState<IssueFilterState>(EMPTY_ISSUE_FILTERS)
@@ -640,22 +608,6 @@ export default function ProjectBoardPage() {
     // Distance d'activation : un simple clic ouvre l'issue, un glissé > 6px déclenche le drag
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   )
-
-  // `?issue=<id>` → ouvre la sheet dès que les issues sont chargées. Un lien vers une issue
-  // (décision IA, notification, lien copié) ramène donc sur le board, pas sur une page isolée.
-  //
-  // Le lien est consommé **une seule fois**, et le paramètre retiré aussitôt : sans cela, le
-  // temps réel (`useProjectRealtime`) rafraîchit `issues`, l'effet se rejoue, et rouvre l'issue
-  // du lien par-dessus celle que l'utilisateur venait d'ouvrir.
-  const deepLinkConsumed = useRef(false)
-  useEffect(() => {
-    if (!deepLinkedIssueId || deepLinkConsumed.current) return
-    const target = issues.find((i) => String(i.id) === deepLinkedIssueId)
-    if (!target) return
-    deepLinkConsumed.current = true
-    setSelectedIssue(toSheetIssue(target))
-    router.replace(pathname, { scroll: false })
-  }, [deepLinkedIssueId, issues, router, pathname])
 
   useEffect(() => {
     if (!workspace || !projectId) return
@@ -877,7 +829,7 @@ export default function ProjectBoardPage() {
                 onDeleteStatus={handleDeleteStatus}
                 onRenameStatus={handleRenameStatus}
                 onChangeColor={handleChangeColor}
-                onOpenIssue={(issue) => setSelectedIssue(toSheetIssue(issue))}
+                onOpenIssue={(issue) => openIssue({ projectId, issueId: issue.id })}
                 isOver={overColumnId === status.id}
                 arrivedId={arrivedId}
                 onArrived={() => setArrivedId(null)}
@@ -893,14 +845,6 @@ export default function ProjectBoardPage() {
           </DragOverlay>
         </DndContext>
       )}
-
-      <IssueSheet
-        issue={selectedIssue}
-        open={selectedIssue !== null}
-        onOpenChange={(open) => { if (!open) setSelectedIssue(null) }}
-        workspaceSlug={workspace}
-        projectId={projectId}
-      />
     </div>
   )
 }

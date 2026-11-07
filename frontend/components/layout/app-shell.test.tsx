@@ -2,16 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 // La fenêtre seule : ses zones sont remplacées par leur nom, l'espace et ses listes ne partent pas sur le réseau.
-const nav = vi.hoisted(() => ({ pathname: "/acme", push: vi.fn() }))
+const nav = vi.hoisted(() => ({ pathname: "/acme", search: "", push: vi.fn(), replace: vi.fn(), back: vi.fn() }))
 vi.mock("next/navigation", () => ({
   usePathname: () => nav.pathname,
   useParams: () => ({ workspace: "acme" }),
-  useRouter: () => ({ push: nav.push }),
+  useSearchParams: () => new URLSearchParams(nav.search),
+  useRouter: () => ({ push: nav.push, replace: nav.replace, back: nav.back }),
 }))
 vi.mock("@/components/layout/sidebar/app-sidebar", () => ({ AppSidebar: () => <nav aria-label="left bar" /> }))
 vi.mock("@/components/layout/title-line", () => ({ TitleLine: () => <header aria-label="title line" /> }))
 vi.mock("@/components/layout/conversation", () => ({ Conversation: () => <section aria-label="conversation" /> }))
 vi.mock("@/components/layout/right-panel", () => ({ RightPanel: () => <aside aria-label="right panel" /> }))
+vi.mock("@/components/layout/issue-pane", () => ({
+  IssuePane: ({ target }: { target: { issueId: number } }) => <div role="article" aria-label={`issue ${target.issueId}`} />,
+}))
 vi.mock("@/components/agent/command-bar", () => ({ CommandBar: () => <div aria-label="folded composer" /> }))
 vi.mock("@/components/command-palette", () => ({
   CommandPalette: ({ open }: { open: boolean }) => (open ? <div role="dialog" aria-label="search" /> : null),
@@ -73,6 +77,8 @@ describe("AppShell : la fenêtre", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     nav.pathname = "/acme"
+    nav.search = ""
+    globalThis.history.replaceState(null, "", "/acme")
     useCortexStore.setState({ ...cortex, open: false, conversationId: null, enterWorkspace, loadConversations })
     useProjectStore.setState({ ...projects, fetchProjects })
     useAiStatusStore.setState({ ...ai, fetchStatus })
@@ -185,6 +191,17 @@ describe("AppShell : la fenêtre", () => {
     expect(screen.queryByRole("region", { name: "conversation" })).toBeNull()
     expect(screen.getByLabelText("folded composer")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Full width" })).toBeNull()
+  })
+
+  // R120 : l'issue de l'adresse s'ouvre dans le volet, par-dessus l'écran qui la liste.
+  it("opens the issue of the address in the pane, over its board", () => {
+    widthOf(1920)
+    nav.pathname = "/acme/projects/3"
+    nav.search = "issue=34"
+    render(<AppShell><p>the board</p></AppShell>)
+
+    expect(screen.getByRole("article", { name: "issue 34" })).toBeInTheDocument()
+    expect(screen.getByText("the board").parentElement).toHaveAttribute("aria-hidden", "true")
   })
 
   it.each([

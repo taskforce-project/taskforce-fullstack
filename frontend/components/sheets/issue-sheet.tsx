@@ -12,10 +12,6 @@ import {
 import { toast } from "sonner"
 
 import { getErrorMessage } from "@/lib/api/client"
-import {
-  Sheet, SheetContent, SheetClose, SheetTitle,
-} from "@/components/ui/sheet"
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -1133,17 +1129,24 @@ function RelationsTab({
   )
 }
 
-interface IssueSheetProps {
+interface IssueDetailProps {
   issue: SheetIssue | null
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  /** L'issue quitte le volet (supprimée, archivée) : il revient à l'écran qu'elle recouvrait. */
+  onClose: () => void
   /** Slug du workspace - requis pour les pièces jointes */
   workspaceSlug?: string
   /** ID numérique du projet - requis pour les pièces jointes */
   projectId?: number
 }
 
-export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId }: Readonly<IssueSheetProps>) {
+/**
+ * Une issue, entière, dans le volet de la fenêtre (R120, séance n°18) : par-dessus l'écran qui la liste, jamais
+ * par-dessus la fenêtre. C'est le contenu de l'ancienne fiche latérale, déplacé tel quel : ses champs, sa checklist, ses
+ * pièces jointes, ses relations, GitHub, son activité et ses commentaires, la carte de résultat. Le volet dit son retour.
+ */
+export function IssueDetail({ issue, onClose, workspaceSlug, projectId }: Readonly<IssueDetailProps>) {
+  // Le volet ne la monte qu'avec son issue : ses lectures partent dès qu'elle est là.
+  const open = issue !== null
   const { fetchComments, addComment, deleteComment, fetchActivity, updateIssue, deleteIssueWithUndo,
           archiveIssue, pinIssue, fetchStatuses, fetchIssue,
           comments: storeComments, activity: storeActivity, statuses: storeStatuses } = useIssueStore()
@@ -1324,7 +1327,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     // Suppression différée annulable : le store retire l'issue en optimiste + toast « Undo » (~6 s),
     // le vrai DELETE ne part qu'à l'expiration. On ferme le panneau ; un Undo restaure l'issue dans la liste.
     deleteIssueWithUndo(workspaceSlug, projectId, issueId)
-    onOpenChange(false)
+    onClose()
   }
 
   async function copyToClipboard(text: string, label: string) {
@@ -1350,7 +1353,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     const res = await archiveIssue(workspaceSlug, projectId, issueId, !(issue!.archived ?? false))
     if (res) {
       toast.success(res.archived ? "Issue archived" : "Issue unarchived")
-      if (res.archived) onOpenChange(false)
+      if (res.archived) onClose()
     } else {
       toast.error("Archive failed")
     }
@@ -1431,15 +1434,9 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        hideClose
-        className="w-full sm:max-w-4xl flex flex-col p-0 gap-0"
-      >
-        <VisuallyHidden>
-          <SheetTitle>{issue.title}</SheetTitle>
-        </VisuallyHidden>
+    // Ses colonnes suivent la largeur du volet, pas celle de l'écran : deux colonnes dès 42rem de volet.
+    <div className="@container flex min-h-0 flex-1 flex-col">
+      <article aria-label={issue.title} className="flex min-h-0 flex-1 flex-col">
 
         {/* ── Topbar (GitHub-style: breadcrumb + actions) ── */}
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border shrink-0 bg-muted/30">
@@ -1504,7 +1501,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-48">
-              {/* Le lien partagé rouvre le board avec la sheet (`?issue=`), pas la page isolée. */}
+              {/* Le lien partagé rouvre le board avec l'issue dans le volet (`?issue=`), pas la page isolée. */}
               <DropdownMenuItem className="gap-2 text-xs" onClick={() => copyToClipboard(`${window.location.origin}/${workspaceSlug}/projects/${projectId}?issue=${issue.id}`, "Link copied")}>
                 <LinkIcon className="size-3.5" /> Copy link
               </DropdownMenuItem>
@@ -1538,19 +1535,13 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
             confirmLabel="Delete"
             onConfirm={handleDelete}
           />
-
-          <SheetClose asChild>
-            <Button variant="ghost" size="icon" aria-label="Close" className="h-7 w-7 text-muted-foreground hover:text-foreground">
-              <X className="size-4" />
-            </Button>
-          </SheetClose>
         </div>
 
-        {/* ── Main body: deux colonnes en desktop, empilées + scroll unique en mobile (QA2-15) ── */}
-        <div className="flex flex-1 min-h-0 flex-col overflow-y-auto sm:flex-row sm:overflow-hidden">
+        {/* ── Main body: deux colonnes dans un volet large, empilées + scroll unique dans un volet étroit (QA2-15) ── */}
+        <div className="flex flex-1 min-h-0 flex-col overflow-y-auto @2xl:flex-row @2xl:overflow-hidden">
 
           {/* Left: title + description + comments (scrollable) */}
-          <div className="flex-1 min-w-0 px-6 py-5 flex flex-col gap-5 sm:overflow-y-auto">
+          <div className="flex-1 min-w-0 px-6 py-5 flex flex-col gap-5 @2xl:overflow-y-auto">
             {/* Title - inline editable */}
             {editingTitle ? (
               <input
@@ -1653,8 +1644,8 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
             </Section>
           </div>
 
-          {/* Right: metadata sidebar (fully editable) - empilée sous le contenu en mobile */}
-          <div className="w-full shrink-0 border-t border-border px-5 py-5 sm:w-96 sm:border-t-0 sm:border-l sm:overflow-y-auto">
+          {/* Right: metadata sidebar (fully editable) - empilée sous le contenu dans un volet étroit */}
+          <div className="w-full shrink-0 border-t border-border px-5 py-5 @2xl:w-72 @4xl:w-96 @2xl:border-t-0 @2xl:border-l @2xl:overflow-y-auto">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Details</p>
 
             {/* Priority */}
@@ -1894,7 +1885,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
             )}
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </article>
+    </div>
   )
 }

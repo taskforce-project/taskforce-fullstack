@@ -568,6 +568,18 @@ export const CONSTANTS_EN = {
     // The handle between the conversation and the pane.
     resizePane: "Resize the pane",
     resizeHint: "Drag to resize the pane, double-click to give it half the width",
+    // The issue, opened in the pane over the screen that lists it.
+    under: {
+      board: "Board",
+      list: "List",
+      backlog: "Backlog",
+    },
+    backTo: "Back to {screen}",
+    openIssue: "Open {key} in the pane",
+    issueLoading: "Opening the issue",
+    issueMissing: "{key} isn't on this board: it may be archived or deleted.",
+    issueFailed: "Couldn't open this issue.",
+    retry: "Try again",
     // The right panel: what surrounds the conversation, six rows folded by default.
     rightPanel: "Around the conversation",
     rows: {
