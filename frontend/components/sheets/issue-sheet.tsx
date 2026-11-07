@@ -46,6 +46,7 @@ import { useIssueRealtime } from "@/lib/hooks/use-issue-realtime"
 import { agentAtWork } from "@/lib/delivery/agent-at-work"
 import { IssueAiSpecPanel } from "@/components/issues/issue-ai-spec"
 import { IssueDescription } from "@/components/issues/issue-description"
+import { CommentBody } from "@/components/issues/comment-body"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { DatePicker } from "@/components/ui/date-picker"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
@@ -509,7 +510,7 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
                         </button>
                       )}
                     </div>
-                    <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5 text-sm leading-relaxed text-foreground whitespace-pre-wrap">{c.content}</div>
+                    <CommentBody content={c.content} />
                   </div>
                 </div>
               )

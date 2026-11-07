@@ -7,6 +7,7 @@ import {
   measureModelCase,
   startModelMeasure,
   type ModelCapabilityResult,
+  type ModelCapabilityRow,
   type ModelCapabilityTable,
 } from "../api/model-capability-service";
 
@@ -28,6 +29,8 @@ export interface ModelMeasureProgress {
   waitSeconds: number | null;
   /** La personne a demandé l'arrêt : la mesure s'arrête avant le cas suivant. */
   stopping: boolean;
+  /** La mesure du modèle de Cortex que TaskForce lance seul, une fois ; false pour une mesure demandée d'un clic. */
+  auto: boolean;
 }
 
 interface ModelCapabilityState {
@@ -38,16 +41,29 @@ interface ModelCapabilityState {
   /** Les notes de la dernière mesure, dans l'ordre des cas. */
   results: ModelCapabilityResult[];
   error: string | null;
+  /** Les modèles de Cortex que TaskForce a déjà mesurés seul pendant cette session : une fois chacun. */
+  autoMeasured: string[];
 
   fetchTable: (slug: string) => Promise<ModelCapabilityTable | null>;
   /** Rejoue les cas fixes sur un modèle, un par un ; false si la mesure s'est arrêtée sur une panne. */
-  measure: (slug: string, model: string) => Promise<boolean>;
+  measure: (slug: string, model: string, auto?: boolean) => Promise<boolean>;
+  /**
+   * Mesure le modèle de Cortex, une fois, sans clic, quand la table n'a pas de mesure complète pour lui : la première fois
+   * qu'elle s'ouvre, et après que la personne a changé de modèle (test du CEO de la 1.10.0 : la table restait vide jusqu'à
+   * « Measure »). Les autres modèles restent à la demande. false quand rien n'est lancé, ou sur une panne.
+   */
+  measureCortexModel: (slug: string) => Promise<boolean>;
   stop: () => void;
   /** Le modèle de Cortex pour la personne (webapp) ; null revient à celui de l'instance. */
   choose: (slug: string, model: string | null) => Promise<boolean>;
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Chaque cas de chaque capacité a une note : la mesure du modèle est complète (R113 : mesurée ici, jamais une fiche). */
+export function measuredFully(row: ModelCapabilityRow): boolean {
+  return row.scores.length > 0 && row.scores.every((score) => score.total > 0 && score.measured >= score.total);
+}
 
 export const useModelCapabilityStore = create<ModelCapabilityState>((set, get) => {
   const progress = (patch: Partial<ModelMeasureProgress>) =>
@@ -73,6 +89,7 @@ export const useModelCapabilityStore = create<ModelCapabilityState>((set, get) =
     progress: null,
     results: [],
     error: null,
+    autoMeasured: [],
 
     fetchTable: async (slug) => {
       try {
@@ -84,9 +101,9 @@ export const useModelCapabilityStore = create<ModelCapabilityState>((set, get) =
       }
     },
 
-    measure: async (slug, model) => {
+    measure: async (slug, model, auto = false) => {
       if (get().progress) return false;
-      set({ error: null, results: [], progress: { model, done: 0, total: 0, waitSeconds: null, stopping: false } });
+      set({ error: null, results: [], progress: { model, done: 0, total: 0, waitSeconds: null, stopping: false, auto } });
       let ok = true;
       try {
         const started = await startModelMeasure(slug, model);
@@ -105,6 +122,16 @@ export const useModelCapabilityStore = create<ModelCapabilityState>((set, get) =
         await get().fetchTable(slug);
       }
       return ok;
+    },
+
+    measureCortexModel: async (slug) => {
+      const { table, progress: running, autoMeasured } = get();
+      const model = table?.current;
+      if (!slug || !table || !model || running || autoMeasured.includes(model)) return false;
+      const row = table.models.find((candidate) => candidate.model === model);
+      if (!row || measuredFully(row)) return false;
+      set({ autoMeasured: [...autoMeasured, model] });
+      return get().measure(slug, model, true);
     },
 
     stop: () => progress({ stopping: true }),

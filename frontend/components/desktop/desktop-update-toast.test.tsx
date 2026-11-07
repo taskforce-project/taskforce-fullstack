@@ -84,6 +84,25 @@ describe("DesktopUpdateToast: the app update, inside the app", () => {
     expect(bridge.checkForUpdates).toHaveBeenCalled()
   })
 
+  it("says when the last install didn't take, and offers to restart again", async () => {
+    const { bridge, emit } = installBridge({ status: "idle" })
+    const { DesktopUpdateToast, toast } = await load()
+    render(<DesktopUpdateToast />)
+    await waitFor(() => expect(bridge.updater.onState).toHaveBeenCalled())
+
+    emit({ status: "ready", version: "1.3.3", retry: true })
+
+    expect(toast.success).not.toHaveBeenCalled()
+    const [title, options] = vi.mocked(toast.error).mock.calls[0]
+    expect(title).toBe("TaskForce 1.3.3 didn't install")
+    expect(options).toMatchObject({ id: "desktop-update", duration: Infinity })
+    expect((options as { description: string }).description).toContain("still on the previous version")
+    const action = (options as { action: { label: string; onClick: () => void } }).action
+    expect(action.label).toBe("Restart now")
+    action.onClick()
+    expect(bridge.updater.install).toHaveBeenCalled()
+  })
+
   it("shows nothing while there is no update", async () => {
     installBridge({ status: "idle" })
     const { DesktopUpdateToast, toast } = await load()

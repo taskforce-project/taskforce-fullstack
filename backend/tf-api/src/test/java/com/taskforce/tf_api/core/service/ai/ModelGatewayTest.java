@@ -169,6 +169,7 @@ class ModelGatewayTest {
             assertThat(reply.model()).isEqualTo(model);
             assertThat(reply.message().path("content").asText()).isEqualTo("ok");
             assertThat(reply.usage().totalTokens()).isEqualTo(4);
+            assertThat(reply.contextWindow()).isNull(); // le fournisseur tient sa fenêtre
         }
 
         @Test
@@ -391,9 +392,12 @@ class ModelGatewayTest {
         void window(Map<String, String> env, String show, String ps, int chars, boolean think, int expected) {
             http.read("/api/show", show).read("/api/ps", ps).reply(200, NATIVE);
 
-            gateway.chat(settings(env), new ModelGateway.ChatCall(document(chars), null, false, "qwen3:8b", think));
+            ModelGateway.ChatReply reply = gateway.chat(settings(env),
+                new ModelGateway.ChatCall(document(chars), null, false, "qwen3:8b", think));
 
             assertThat(sentOptions().path("num_ctx").asInt()).isEqualTo(expected);
+            // La réponse dit la fenêtre donnée à la requête : la jauge de contexte de la conversation la montre.
+            assertThat(reply.contextWindow()).isEqualTo(expected);
             assertThat(http.reads).extracting(FakeHttp.Sent::url)
                 .containsExactly("http://host.docker.internal:11434/api/show", "http://host.docker.internal:11434/api/ps");
             assertThat(http.reads.get(0).body().path("model").asText()).isEqualTo("qwen3:8b");

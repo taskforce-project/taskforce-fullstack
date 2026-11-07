@@ -317,33 +317,21 @@ export const CONSTANTS_EN = {
     skipToContent: "Skip to main content",
   },
 
-  // Navigation (sidebar)
-  nav: {
-    dashboard: "Dashboard",
-    myWork: "My Queue",
-    inbox: "Signals",
-    projects: "Operations",
-    issues: "Issues",
-    cycles: "Sprints",
-    roadmap: "Roadmap",
-    teams: "Teams",
-    members: "Members",
-    skills: "Skills",
-    analytics: "Intelligence",
-    agents: "Agents",
-    messages: "Messages",
-    discussions: "Discussions",
-    settings: "Settings",
-    help: "Help",
-    createProject: "New Project",
-    sub: {
-      myAll: "All my queues",
-      myIssues: "Issues",
-      myCycles: "Sprints",
-      allNotifications: "All Signals",
-      mentions: "Mentions",
-      alerts: "Alerts",
-    },
+  // Desktop app update, in one toast that stays (desktop-update-toast.tsx). Since 05/11/2026 the installer runs without
+  // a window: this toast is where an update that didn't install is told.
+  desktopUpdate: {
+    downloading: "Downloading TaskForce {version}",
+    progress: "{percent}% · Keep TaskForce open: the download starts over if you quit.",
+    progressLabel: "Update download",
+    ready: "TaskForce {version} is ready",
+    readyHint: "Restart to use it now. Otherwise it installs when you quit TaskForce.",
+    restart: "Restart now",
+    later: "Later",
+    notInstalled: "TaskForce {version} didn't install",
+    notInstalledHint: "TaskForce is still on the previous version. Restart to try again. If it fails again, download TaskForce from taskforce-project.fr.",
+    failed: "TaskForce {version} couldn't download",
+    failedHint: "Check your connection, then try again.",
+    tryAgain: "Try again",
   },
 
   // Dashboard page
@@ -390,13 +378,11 @@ export const CONSTANTS_EN = {
     },
   },
 
-  // AI Workflows panel: an analysis is followed by its status alone, without the fixed plan of steps (TF-J1-3).
+  // An analysis is followed by its status alone, in Missions on the right (R122), since the AI Workflows panels left.
   workflows: {
-    analysisQueued: "Waiting to start.",
-    analysisRunning: "The analysis is running. Its result will show on the Intelligence page.",
     // Banner of the decision board while an analysis of its project is under way.
-    analysisFollow: "Analysis running: follow it in AI Workflows",
-    analysisNeedsAnswer: "The AI needs a clarification from you: open AI Workflows",
+    analysisFollow: "Analysis running: follow it in Missions",
+    analysisNeedsAnswer: "The AI needs a clarification from you",
   },
 
   // My Work page
@@ -429,6 +415,8 @@ export const CONSTANTS_EN = {
     measure: "Measure",
     measureAgain: "Measure again",
     measuring: "Measuring {model}: {done} of {total}",
+    // Cortex's model is measured once, without a click, the first time this table opens without a measure for it.
+    autoMeasuring: "Measuring {model}, the model Cortex uses, once: {done} of {total}. The other models stay on demand.",
     waiting: "The AI allows a request per minute here: next case in {seconds} s",
     stop: "Stop",
     inUse: "Cortex uses it",
@@ -481,17 +469,13 @@ export const CONSTANTS_EN = {
     slackDesktopHelp: "Slack can't be connected in the desktop app yet.",
   },
 
-  // App shell - footer, top bar, workspace switcher (rendered on every authenticated screen).
+  // App shell - the person's menu, the composer, workspaces (rendered on every authenticated screen).
   shell: {
-    // Footer
+    // What the footer held, in the person's menu
     privacy: "Privacy",
     legalNotices: "Legal notices",
     manageCookies: "Manage cookies",
-    // Top bar
-    search: "Search…",
-    searchAria: "Search",
-    openCommandPalette: "Open command palette",
-    // The single bar at the bottom of every screen (R76): write, then send; nothing leaves before that.
+    // The composer at the bottom of the conversation (R76): write, then send; nothing leaves before that.
     barPlaceholder: "What do you want done?",
     barReply: "Reply to Cortex…",
     barSend: "Send",
@@ -500,7 +484,7 @@ export const CONSTANTS_EN = {
     barHideConversation: "Minimize the conversation",
     barNewAnswer: "A new answer from Cortex is waiting",
     barSuggestions: "Suggestions for this screen",
-    // The conversation opens above the bar, its text on the bar's gradient, never on the side (02/11/2026).
+    // The conversation, in its column; folded into the composer, it opens above it, on its gradient (02/11/2026).
     chatLabel: "Conversation with Cortex",
     chatNew: "New conversation",
     chatNone: "No conversations yet.",
@@ -524,6 +508,119 @@ export const CONSTANTS_EN = {
     workspaceActivityPlaceholder: "e.g. We build a CRM for independent craftspeople",
     workspaceActivityHint: "One sentence. It gives the AI your context.",
     creating: "Creating…",
+  },
+
+  // The window (R119 to R122, session 18 of the Council): the left bar, the title line, the conversation, the pane and
+  // the right panel. Its names enter the interface glossary (R22).
+  window: {
+    // Left bar: the work and its conversations.
+    newConversation: "New conversation",
+    search: "Search",
+    waitingForYou: "Waiting for you",
+    projects: "Projects",
+    newProject: "New project",
+    conversations: "Conversations",
+    showMore: "{count} more",
+    deleteConversation: "Delete this conversation",
+    more: "More",
+    myWork: "My work",
+    dashboard: "Dashboard",
+    roadmap: "Roadmap",
+    cycles: "Cycles",
+    members: "Members",
+    analytics: "Analytics",
+    // The four states of R57, on one dot.
+    states: {
+      working: "Working",
+      waiting: "Waiting for you",
+      failed: "Failed",
+      done: "Done",
+    },
+    // The person, at the bottom of the left bar.
+    workspaces: "Workspaces",
+    settings: "Settings",
+    help: "Help",
+    theme: "Theme",
+    light: "Light",
+    dark: "Dark",
+    system: "System",
+    // The title line.
+    toggleLeftBar: "Show or hide the sidebar",
+    board: "Board",
+    boardOf: "Open the board of {project}",
+    toggleRightPanel: "Show or hide what surrounds the conversation",
+    // The pane: the screen of the route, beside the conversation.
+    screens: {
+      dashboard: "Dashboard",
+      inbox: "Waiting for you",
+      "my-work": "My work",
+      projects: "Projects",
+      project: "Project",
+      analytics: "Analytics",
+      members: "Members",
+      roadmap: "Roadmap",
+      cycles: "Cycles",
+      settings: "Settings",
+    },
+    fullWidth: "Full width",
+    sideBySide: "Beside the conversation",
+    closePane: "Close",
+    // The right panel: what surrounds the conversation, six rows folded by default.
+    rightPanel: "Around the conversation",
+    rows: {
+      environment: "Environment",
+      context: "Context",
+      connectors: "Connectors",
+      results: "Results",
+      changes: "Changes",
+      missions: "Missions",
+    },
+    workspace: "Workspace",
+    project: "Project",
+    repository: "Repository",
+    model: "Model",
+    thisComputer: "This computer",
+    taskforce: "TaskForce",
+    provider: "Its provider",
+    noModel: "No model yet",
+    modelHere: "{model}, on this computer",
+    modelTaskforce: "{model}, on TaskForce",
+    modelProvider: "{model}, through its provider's API",
+    context: {
+      seesBoard: "Cortex sees the board of {project}",
+      seesIssue: "Cortex sees {issue} on the board of {project}",
+      seesNothing: "Cortex sees no board, only your workspace's knowledge",
+      room: "its last answer took {percent}% of {model}'s window ({tokens} tokens)",
+      roomTokens: "its last answer read {tokens} tokens",
+      theModel: "the model",
+      alone: "{sees}.",
+      joined: "{sees}, and {room}.",
+    },
+    connected: "Connected",
+    toReconnect: "To reconnect",
+    reconnectCount: "{count} to reconnect",
+    noConnectors: "No connector yet. Connect your tools in Settings.",
+    noResults: "No result waits for your review.",
+    noChanges: "This conversation hasn't changed anything in TaskForce yet.",
+    changeKinds: {
+      created: "Created",
+      moved: "Moved",
+      assigned: "Assigned",
+      commented: "Commented on",
+      changed: "Changed",
+      deleted: "Deleted",
+      delegated: "Handed to an agent",
+    },
+    pullRequest: "Pull request {repo}#{number}",
+    noMissions: "No mission running.",
+    doneCount: "Done: {count}",
+    minutes: "{minutes} min",
+    underAMinute: "Under a minute",
+    analysis: "Analysis of {project}",
+    reply: "Your reply",
+    sendReply: "Send the reply",
+    replyFailed: "Couldn't send the reply. Try again.",
+    canvas: "Open the workflow canvas",
   },
 
   // Delegated missions: what an agent asks while it works (R78, the Allow screen).
@@ -748,6 +845,8 @@ export const CONSTANTS_EN = {
     missionOf: "Mission of {key}: {title}",
     // Deleting an issue from the conversation asks first: archiving can be undone, deleting can't (TF-J1-5).
     deleteTitle: "Delete {key}: {title}?",
+    // The issue's column next to its key, so a card for another issue than the one meant shows at once (05/11/2026).
+    deleteTitleIn: "Delete {key} ({column}): {title}?",
     deleteGoesWith: "Goes with it: {what}.",
     deleteNothingElse: "Nothing else goes with it.",
     deleteOneComment: "1 comment",
@@ -781,6 +880,16 @@ export const CONSTANTS_EN = {
     taskforceAsksWhat: "asked before it acted",
     taskforceAsksLabel: "Questions from TaskForce",
     taskforceAsksHint: "TaskForce, not the model, asked what this action needed. Nothing was done until the answers were sent.",
+    // The gauge under the conversation: what Cortex sent the model for its last answer, against the context window the
+    // AI gateway gave that request (CEO's test of 1.10.0: it showed the whole conversation against a fixed window).
+    contextLine: "What Cortex sent the model for its last answer (instructions, tools, the screen, notes and this conversation), against the window it got.",
+    contextLineUpTo: "What Cortex sent the model for its last answer, against the window it got. The window grows with the request, up to {max}.",
+    contextFull: "Nearly full: a longer conversation would lose its start. A new conversation starts empty.",
+    contextProvider: "What Cortex sent the model for its last answer. The AI provider sets the window.",
+    contextNone: "Shows after Cortex's next answer: what it sends the model, against the window the model gets.",
+    contextTokens: "{tokens} tokens",
+    // Under each answer: the model that wrote it, as the AI gateway called it (CEO's test of 1.10.0).
+    answeredWith: "Answered by {model}",
   },
 } as const
 

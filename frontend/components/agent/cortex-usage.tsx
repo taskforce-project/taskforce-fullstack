@@ -6,11 +6,12 @@ import { useParams } from "next/navigation"
 import { Sparkles, ExternalLink, ChevronDown, ChevronRight, RefreshCw } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { contextGauge } from "@/lib/cortex/context-gauge"
+import { useAiStatusStore } from "@/lib/store/ai-status-store"
+import { useCortexStore } from "@/lib/store/cortex-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
-
-/** Fenêtre de contexte du modèle local (approx.) - sert la jauge « fenêtre de contexte ». */
-const CONTEXT_WINDOW = 32_768
 
 const fmt = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n)
@@ -52,11 +53,19 @@ function Ring({ pct }: { pct: number }) {
  * Modal « façon Claude » sous l'input du chat : **fenêtre de contexte** + **consommation du mois**
  * (vs le plafond de l'instance s'il y en a un, avec réinitialisation), modèle + refresh en pied.
  * Auto-porté (pas de portail) pour rester bien positionné dans le panneau flottant.
+ *
+ * La jauge de contexte compare ce que Cortex a envoyé au modèle pour sa dernière réponse à la fenêtre que la
+ * passerelle a donnée à cette requête, et le dit en une ligne (test du CEO de la 1.10.0 : le cumul de la conversation
+ * contre une fenêtre écrite en dur donnait « 45k / 33k (100%) », sans rien dire).
  */
-export function CortexUsage({ sessionTokens, className }: { sessionTokens: number; className?: string }) {
+export function CortexUsage({ className }: { className?: string }) {
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const openSettings = useSettingsStore((s) => s.openSettings)
+  const t = usePreferencesStore((s) => s.t.cortex)
+  const context = useCortexStore((s) => s.context)
+  // La plus grande fenêtre que la passerelle donne au modèle de Cortex (Ollama), que la ligne de la jauge dit.
+  const maximum = useAiStatusStore((s) => s.status?.fastContextWindow ?? s.status?.contextWindow ?? null)
 
   const [open, setOpen] = useState(false)
   const [usage, setUsage] = useState<AiUsage | null>(null)
@@ -114,7 +123,7 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
     }
   }, [open, place])
 
-  const ctxPct = pctOf(sessionTokens, CONTEXT_WINDOW)
+  const gauge = contextGauge(context, maximum, t)
   const unlimited = usage ? usage.limitTokens < 0 : false
   const usePct = usage && !unlimited ? pctOf(usage.usedTokens, usage.limitTokens) : 0
   const useTone = usePct >= 90 ? "rose" : usePct >= 70 ? "amber" : "blue"
@@ -128,7 +137,7 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
         className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         title="Context window & usage"
       >
-        <Ring pct={ctxPct} />
+        <Ring pct={gauge.pct} />
         <span className="font-medium">Cortex</span>
         <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} />
       </button>
@@ -148,11 +157,12 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
             >
               <span className="text-muted-foreground">Context window</span>
               <span className="flex items-center gap-1 tabular-nums font-medium">
-                {fmt(sessionTokens)} / {fmt(CONTEXT_WINDOW)} <span className="text-muted-foreground">({ctxPct}%)</span>
+                {gauge.value}
                 <ChevronRight className="size-3 text-muted-foreground" />
               </span>
             </button>
-            <div className="mt-1.5"><Bar pct={ctxPct} tone={ctxPct >= 90 ? "rose" : ctxPct >= 70 ? "amber" : "blue"} /></div>
+            {context?.window ? <div className="mt-1.5"><Bar pct={gauge.pct} tone={gauge.tone} /></div> : null}
+            <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">{gauge.line}</p>
           </div>
 
           <div className="h-px bg-border" />

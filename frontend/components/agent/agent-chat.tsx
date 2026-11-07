@@ -96,6 +96,7 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
   const [state, setState] = useState<"idle" | "running" | "success" | "refused" | "error">("idle")
   const [output, setOutput] = useState<string | null>(null)
   const [result, setResult] = useState<AssistantActionResult | null>(null)
+  const noteDone = useCortexStore((s) => s.noteDone)
   const external = call.name.includes("__")
   // Accordée et faite : l'appel tel qu'il a abouti, avec l'empreinte que « Undo » nomme et l'issue qu'il touche.
   const done: AssistantToolCall = { ...call, status: "success", output, ref: result?.ref ?? null, target: result?.target ?? null }
@@ -107,6 +108,10 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
       setOutput(approved.output)
       setResult(approved)
       setState(approved.status)
+      // La fenêtre la montre dans « Changes » (R122), avec le même « Undo » qu'ici.
+      if (approved.status === "success") {
+        noteDone({ ...call, status: "success", output: approved.output, ref: approved.ref ?? null, target: approved.target ?? null })
+      }
     } catch (e) {
       setOutput(getErrorMessage(e))
       setState("error")
@@ -148,17 +153,21 @@ const HEADER_BUTTON =
   "flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 
 /**
- * La conversation avec Cortex, toujours au-dessus de la barre : pas de carte, ses tours se lisent sur le dégradé qui
- * monte de la barre (`.cortex-wash`). La dernière réponse est en grand ; les tours d'avant, plus petits, s'effacent vers
- * le haut. Juste au-dessus de la barre, comme la ligne d'outils du composeur du site : les conversations, une nouvelle,
- * la jauge et le chevron qui la réduit. L'état vide dit ce qu'on peut demander. Elle se lit dans `useCortexStore` ; la
- * saisie reste la barre unique (R76). Les cartes qu'elle porte (l'issue préparée, Undo, l'accord, la mission) gardent
- * leur allure.
+ * La conversation avec Cortex. Dans la fenêtre (R119, séance n°18), elle tient sa colonne (`layout="column"`) : ses
+ * tours sur une colonne de 720 px au plus, centrée, au-dessus du compositeur ; son titre est dans la ligne du haut, les
+ * conversations à gauche, la jauge sous le compositeur. Quand le volet prend toute la largeur (`layout="folded"`), elle
+ * se déplie au-dessus du compositeur, comme depuis le 02/11/2026 : pas de carte, ses tours se lisent sur le dégradé qui
+ * monte de la barre (`.cortex-wash`), la dernière réponse en grand, et juste au-dessus de la barre la ligne d'outils du
+ * composeur du site (les conversations, une nouvelle, la jauge, le chevron qui la réduit). L'état vide dit ce qu'on
+ * peut demander. Elle se lit dans `useCortexStore` ; la saisie reste le compositeur (R76). Les cartes qu'elle porte
+ * (l'issue préparée, Undo, l'accord, la mission) gardent leur allure.
  */
-export function AgentChat({ onFold }: Readonly<{
-  /** Réduit la conversation dans la barre. */
-  onFold: () => void
+export function AgentChat({ onFold, layout = "folded" }: Readonly<{
+  /** Réduit la conversation dans le compositeur (repliée seulement). */
+  onFold?: () => void
+  layout?: "column" | "folded"
 }>) {
+  const column = layout === "column"
   const params = useParams()
   const pathname = usePathname()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
@@ -264,9 +273,10 @@ export function AgentChat({ onFold }: Readonly<{
   const recent = conversations.filter((c) => c.id !== conversationId).slice(0, 3)
 
   return (
-    <div className="flex min-h-0 flex-col">
-      <div ref={threadRef} className="cortex-thread min-h-0 overflow-y-auto px-3 md:px-4">
-        <div className="flex flex-col">
+    <div className={cn("flex min-h-0 flex-col", column && "flex-1")}>
+      <div ref={threadRef} className={cn("cortex-thread min-h-0 overflow-y-auto px-3 md:px-4", column && "flex flex-1 flex-col")}>
+        {/* En colonne, les tours se posent juste au-dessus du compositeur et montent à mesure. */}
+        <div className={cn("flex flex-col", column && "mx-auto mt-auto w-full max-w-[720px] pt-4")}>
           {turns.length === 0 && !thinking ? (
             <div className="flex flex-col gap-3 pb-2">
               <div>
@@ -282,7 +292,8 @@ export function AgentChat({ onFold }: Readonly<{
                   <PromptSuggestion key={s.label} onClick={() => suggest(s.text)} className="rounded-full">{s.label}</PromptSuggestion>
                 ))}
               </div>
-              {recent.length > 0 && (
+              {/* En colonne, la barre de gauche montre déjà les conversations. */}
+              {!column && recent.length > 0 && (
                 <div className="flex flex-col gap-1">
                   <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{t.chatRecent}</p>
                   {recent.map((c) => (
@@ -360,88 +371,91 @@ export function AgentChat({ onFold }: Readonly<{
         </div>
       </div>
 
-      {/* Les contrôles de la conversation, juste au-dessus de la barre, sans cadre : la ligne d'outils du composeur. */}
-      <div className="flex h-9 shrink-0 items-center gap-1 px-1">
-        <div
-          ref={listRef}
-          className="relative min-w-0"
-          onKeyDown={(e) => {
-            // Échap ferme d'abord la liste, puis seulement la conversation.
-            if (e.key === "Escape" && showList) { e.preventDefault(); setShowList(false) }
-          }}
-        >
-          <button
-            type="button"
-            aria-expanded={showList}
-            onClick={() => { setShowList((v) => !v); if (!showList) void loadConversations(slug) }}
-            className="flex max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-xs transition-colors hover:bg-muted"
+      {/* Les contrôles de la conversation, juste au-dessus de la barre, sans cadre : la ligne d'outils du composeur.
+          En colonne, chacun a sa place dans la fenêtre : le titre en haut, les conversations à gauche, la jauge dessous. */}
+      {!column && (
+        <div className="flex h-9 shrink-0 items-center gap-1 px-1">
+          <div
+            ref={listRef}
+            className="relative min-w-0"
+            onKeyDown={(e) => {
+              // Échap ferme d'abord la liste, puis seulement la conversation.
+              if (e.key === "Escape" && showList) { e.preventDefault(); setShowList(false) }
+            }}
           >
-            <Sparkles className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
-            <span className="truncate font-medium">{currentTitle}</span>
-            <ChevronUp className={cn("size-3 shrink-0 transition-transform", showList && "rotate-180")} />
+            <button
+              type="button"
+              aria-expanded={showList}
+              onClick={() => { setShowList((v) => !v); if (!showList) void loadConversations(slug) }}
+              className="flex max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-xs transition-colors hover:bg-muted"
+            >
+              <Sparkles className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+              <span className="truncate font-medium">{currentTitle}</span>
+              <ChevronUp className={cn("size-3 shrink-0 transition-transform", showList && "rotate-180")} />
+            </button>
+
+            {/* La liste s'ouvre vers le haut, au-dessus de la conversation : en dessous, il y a la barre. */}
+            {showList && (
+              <div className="absolute bottom-full left-0 z-50 mb-1 w-64 border border-border bg-popover p-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={startNew}
+                  className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-muted"
+                >
+                  <Plus className="size-3.5" /> {t.chatNew}
+                </button>
+                <div className="my-1 h-px bg-border" />
+                <div className="max-h-64 overflow-y-auto">
+                  {conversations.length === 0 ? (
+                    <p className="px-2 py-3 text-center text-xs text-muted-foreground">{t.chatNone}</p>
+                  ) : (
+                    conversations.map((c) => (
+                      <div
+                        key={c.id}
+                        className={cn("group flex items-center gap-1 px-2 py-1.5 transition-colors hover:bg-muted", c.id === conversationId && "bg-muted")}
+                      >
+                        <button type="button" onClick={() => void pick(c.id)} className="min-w-0 flex-1 text-left">
+                          <span className="block truncate text-xs">{c.title}</span>
+                          <span className="text-[10px] text-muted-foreground">{c.messageCount} message{c.messageCount > 1 ? "s" : ""}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void removeConversation(slug, c.id)}
+                          className="shrink-0 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+                          aria-label={t.chatDelete}
+                          title={t.chatDelete}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button type="button" onClick={startNew} aria-label={t.chatNew} title={t.chatNew} className={HEADER_BUTTON}>
+            <Plus className="size-4" />
           </button>
 
-          {/* La liste s'ouvre vers le haut, au-dessus de la conversation : en dessous, il y a la barre. */}
-          {showList && (
-            <div className="absolute bottom-full left-0 z-50 mb-1 w-64 border border-border bg-popover p-1 shadow-lg">
-              <button
-                type="button"
-                onClick={startNew}
-                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-muted"
-              >
-                <Plus className="size-3.5" /> {t.chatNew}
-              </button>
-              <div className="my-1 h-px bg-border" />
-              <div className="max-h-64 overflow-y-auto">
-                {conversations.length === 0 ? (
-                  <p className="px-2 py-3 text-center text-xs text-muted-foreground">{t.chatNone}</p>
-                ) : (
-                  conversations.map((c) => (
-                    <div
-                      key={c.id}
-                      className={cn("group flex items-center gap-1 px-2 py-1.5 transition-colors hover:bg-muted", c.id === conversationId && "bg-muted")}
-                    >
-                      <button type="button" onClick={() => void pick(c.id)} className="min-w-0 flex-1 text-left">
-                        <span className="block truncate text-xs">{c.title}</span>
-                        <span className="text-[10px] text-muted-foreground">{c.messageCount} message{c.messageCount > 1 ? "s" : ""}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void removeConversation(slug, c.id)}
-                        className="shrink-0 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
-                        aria-label={t.chatDelete}
-                        title={t.chatDelete}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
+          <div className="ml-auto flex min-w-0 items-center gap-2 pl-2 text-[10px] text-muted-foreground/70">
+            {thinking ? (
+              <span className="hidden tabular-nums text-primary/80 sm:inline">{t.chatThinking} · {elapsed.toFixed(1)} s</span>
+            ) : tokens > 0 ? (
+              <span className="hidden items-center gap-1.5 sm:flex">
+                <TokenMeter value={tokens} className="text-muted-foreground/70" />
+                {lastMs != null && <span className="tabular-nums">· {(lastMs / 1000).toFixed(1)} s</span>}
+              </span>
+            ) : null}
+            <CortexUsage />
+          </div>
+
+          <button type="button" onClick={onFold} aria-label={t.chatFold} title={t.chatFold} className={HEADER_BUTTON}>
+            <ChevronDown className="size-4" />
+          </button>
         </div>
-
-        <button type="button" onClick={startNew} aria-label={t.chatNew} title={t.chatNew} className={HEADER_BUTTON}>
-          <Plus className="size-4" />
-        </button>
-
-        <div className="ml-auto flex min-w-0 items-center gap-2 pl-2 text-[10px] text-muted-foreground/70">
-          {thinking ? (
-            <span className="hidden tabular-nums text-primary/80 sm:inline">{t.chatThinking} · {elapsed.toFixed(1)} s</span>
-          ) : tokens > 0 ? (
-            <span className="hidden items-center gap-1.5 sm:flex">
-              <TokenMeter value={tokens} className="text-muted-foreground/70" />
-              {lastMs != null && <span className="tabular-nums">· {(lastMs / 1000).toFixed(1)} s</span>}
-            </span>
-          ) : null}
-          <CortexUsage sessionTokens={tokens} />
-        </div>
-
-        <button type="button" onClick={onFold} aria-label={t.chatFold} title={t.chatFold} className={HEADER_BUTTON}>
-          <ChevronDown className="size-4" />
-        </button>
-      </div>
+      )}
     </div>
   )
 }
@@ -481,6 +495,7 @@ function ToolCallView({ slug, call }: { slug: string; call: AssistantToolCall })
  * below » ou « check the issue below », et c'est la dernière chose à décider.
  */
 function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: string }) {
+  const t = usePreferencesStore((s) => s.t.cortex)
   const hasBreakdown = answer.usage && (answer.usage.promptTokens > 0 || answer.usage.completionTokens > 0)
   // Le dossier de la réponse, que porte chacun de ses appels d'outil : il fait d'elle un cas de la banque (R61,
   // séance n°10). Une réponse sans outil que TaskForce a corrigée a le sien (R116).
@@ -504,10 +519,14 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
           <FeedbackBar onCopy={() => navigator.clipboard?.writeText(answer.answer)} />
           {record && <EvalCaseButton slug={slug} record={record} />}
         </div>
-        {/* Le mode et les tokens de la réponse : au survol, pour qui les cherche, sans peser sur la lecture. */}
+        {/* Le mode, le modèle et les tokens de la réponse : au survol, pour qui les cherche, sans peser sur la lecture. Le
+            modèle est celui que la passerelle a appelé (test du CEO du 05/11/2026 : « jsp avec quel model il a fait ca »). */}
         {answer.usage && answer.usage.totalTokens > 0 && (
           <span className="flex shrink-0 items-center gap-1.5 text-[10px] tabular-nums text-muted-foreground/60 opacity-0 transition-opacity group-hover/answer:opacity-100 group-focus-within/answer:opacity-100">
             <span className="bg-muted px-1 py-px font-medium uppercase tracking-wide">{answer.mode}</span>
+            {answer.model && (
+              <span className="font-mono normal-case" title={fillModelText(t.answeredWith, { model: answer.model })}>{answer.model}</span>
+            )}
             {answer.usage.totalTokens.toLocaleString("en-US")} tokens
             {hasBreakdown && <span className="opacity-70">({answer.usage.promptTokens}↑ {answer.usage.completionTokens}↓)</span>}
           </span>

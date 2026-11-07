@@ -11,6 +11,8 @@ export interface ConversationSummary {
   updatedAt: string | null
   messageCount: number
   totalTokens: number
+  /** Le projet à l'écran quand la conversation a commencé (R121) ; null sans projet, absent d'un serveur plus ancien. */
+  projectId?: number | null
 }
 
 export interface ConversationMessage {
@@ -20,6 +22,8 @@ export interface ConversationMessage {
   mode: string | null
   totalTokens: number
   createdAt: string | null
+  /** Le modèle qui a écrit la réponse ; absent d'une demande, d'un repli et des messages d'avant le 05/11/2026. */
+  model?: string | null
 }
 
 export interface ConversationDetail {

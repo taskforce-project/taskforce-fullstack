@@ -73,11 +73,13 @@ public record McpTool(
 
     /**
      * Les questions que le geste poserait sur ces arguments, avant d'écrire, deux au plus et dans l'ordre de la carte :
-     * une lecture, rien n'est changé ; vide quand il ne lui manque rien.
+     * une lecture, rien n'est changé ; vide quand il ne lui manque rien. {@code request} : la demande telle que la
+     * personne l'a écrite, qui range les choix (les dépôts qui ressemblent à ce qu'elle dit d'abord) ; null quand il n'y
+     * en a pas à relire (une réponse à une carte, un agent extérieur).
      */
     @FunctionalInterface
     public interface Asker {
-        List<Question> ask(String slug, Long userId, JsonNode args);
+        List<Question> ask(String slug, Long userId, JsonNode args, String request);
     }
 
     /**

@@ -6,8 +6,8 @@ import type { BrowserWindowConstructorOptions, TitleBarOverlayOptions } from "el
  * arrondit les coins. macOS garde son cadre tant qu'il n'y a pas de build mac.
  */
 
-/** Haut de la fenêtre principale : la marge de 8 px au-dessus du contenu, puis sa barre de 56 px. */
-export const MAIN_TITLE_BAR_HEIGHT = 64;
+/** Haut de la fenêtre principale : la marge de 8 px au-dessus du contenu, puis sa ligne de titre de 44 px (R119). */
+export const MAIN_TITLE_BAR_HEIGHT = 52;
 /** Haut de l'écran de connexion, où se posent les boutons du système. */
 export const SIGNIN_TITLE_BAR_HEIGHT = 44;
 

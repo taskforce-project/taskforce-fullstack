@@ -17,6 +17,7 @@ import com.taskforce.tf_api.core.model.AiConversation;
 import com.taskforce.tf_api.core.model.AiMessage;
 import com.taskforce.tf_api.core.repository.AiConversationRepository;
 import com.taskforce.tf_api.core.repository.AiMessageRepository;
+import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,7 @@ public class AiConversationService {
     private final LlmClient llm;
     private final AiMeter aiMeter; // gate quota + comptage de la conso tokens de la compression d'historique
     private final TransactionTemplate transactionTemplate;
+    private final ProjectRepository projectRepository;
 
     // ── Lecture ───────────────────────────────────────────────────────────────
 
@@ -58,7 +60,7 @@ public class AiConversationService {
                 c.getId(), c.getTitle(),
                 c.getUpdatedAt() != null ? c.getUpdatedAt().toString() : null,
                 messageRepository.countByConversationId(c.getId()),
-                messageRepository.sumTokens(c.getId())))
+                messageRepository.sumTokens(c.getId()), c.getProjectId()))
             .toList();
     }
 
@@ -67,7 +69,7 @@ public class AiConversationService {
         AiConversation conv = requireOwned(id, userId);
         List<MessageDto> messages = messageRepository.findByConversationIdOrderByCreatedAtAsc(id).stream()
             .map(m -> new MessageDto(m.getId(), m.getRole(), m.getContent(), m.getMode(), m.getTotalTokens(),
-                m.getCreatedAt() != null ? m.getCreatedAt().toString() : null))
+                m.getCreatedAt() != null ? m.getCreatedAt().toString() : null, m.getModel()))
             .toList();
         return new ConversationDetail(conv.getId(), conv.getTitle(),
             messageRepository.sumTokens(id), messages);
@@ -181,22 +183,29 @@ public class AiConversationService {
 
     // ── Écriture ────────────────────────────────────────────────────────────────
 
+    /** {@code projectId} : le projet à l'écran (R114), gardé seulement s'il est de cet espace ; null sinon. */
     @Transactional
-    public AiConversation create(Long workspaceId, Long userId, String title) {
+    public AiConversation create(Long workspaceId, Long userId, String title, Long projectId) {
         AiConversation conv = new AiConversation();
         conv.setWorkspaceId(workspaceId);
         conv.setUserId(userId);
         conv.setTitle(title != null && !title.isBlank() ? trim(title) : DEFAULT_TITLE);
+        if (projectId != null && projectRepository.findByIdAndWorkspaceId(projectId, workspaceId).isPresent()) {
+            conv.setProjectId(projectId);
+        }
         return conversationRepository.save(conv);
     }
 
-    /** Résout une conversation existante (bornée à l'utilisateur) ou en crée une nouvelle. */
+    /**
+     * Résout une conversation existante (bornée à l'utilisateur) ou en crée une nouvelle, rangée sous le projet à l'écran
+     * quand elle commence (R121) ; une conversation existante garde le sien.
+     */
     @Transactional
-    public AiConversation getOrCreate(Long workspaceId, Long userId, Long conversationId) {
+    public AiConversation getOrCreate(Long workspaceId, Long userId, Long conversationId, Long projectId) {
         if (conversationId != null && conversationId > 0) {
             return requireOwned(conversationId, userId);
         }
-        return create(workspaceId, userId, DEFAULT_TITLE);
+        return create(workspaceId, userId, DEFAULT_TITLE, projectId);
     }
 
     @Transactional
@@ -207,12 +216,19 @@ public class AiConversationService {
 
     @Transactional
     public void appendMessage(Long conversationId, String role, String content, String mode, long tokens) {
+        appendMessage(conversationId, role, content, mode, tokens, null);
+    }
+
+    /** Un message, avec le modèle qui a écrit la réponse (null pour une demande ou un repli). */
+    @Transactional
+    public void appendMessage(Long conversationId, String role, String content, String mode, long tokens, String model) {
         AiMessage m = new AiMessage();
         m.setConversationId(conversationId);
         m.setRole(role);
         m.setContent(content);
         m.setMode(mode);
         m.setTotalTokens(tokens);
+        m.setModel(model == null || model.isBlank() ? null : model.length() > 128 ? model.substring(0, 128) : model);
         messageRepository.save(m);
         // Remonte la conversation en tête de liste.
         conversationRepository.findById(conversationId).ifPresent(c -> {

@@ -14838,6 +14838,9 @@
           },
           "record": {
             "type": "string"
+          },
+          "model": {
+            "type": "string"
           }
         }
       },
@@ -14957,6 +14960,14 @@
           "totalTokens": {
             "type": "integer",
             "format": "int64"
+          },
+          "lastPromptTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "contextWindow": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -19350,6 +19361,10 @@
           "totalTokens": {
             "type": "integer",
             "format": "int64"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -19414,6 +19429,9 @@
             "format": "int64"
           },
           "createdAt": {
+            "type": "string"
+          },
+          "model": {
             "type": "string"
           }
         }
