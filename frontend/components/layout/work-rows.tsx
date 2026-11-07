@@ -83,14 +83,16 @@ export function ChangesRow() {
   const turns = useCortexStore((s) => s.turns)
   const done = useCortexStore((s) => s.done)
   const runs = useDeliveryStore((s) => s.workspaceRuns)
+  const me = useUserStore((s) => s.user?.id)
   const changes = useMemo(() => changesOf(turns, done), [turns, done])
+  // Les pull requests des missions que la conversation a confiées : celles de la personne, sur ces issues (R57).
   const pulls = useMemo(() => {
     const issues = new Set(changes.flatMap((change) => (change.kind === "delegated" && change.call.target ? [change.call.target.issueId] : [])))
     return runs
-      .filter((run) => issues.has(run.issueId))
+      .filter((run) => issues.has(run.issueId) && isMine(run, me))
       .map((run) => pullRequestOf(run.resultUrl))
       .filter((pull): pull is PullRequest => pull !== null)
-  }, [changes, runs])
+  }, [changes, runs, me])
 
   return (
     <PanelRow row="changes" value={changes.length > 0 ? changes.length : undefined}>
