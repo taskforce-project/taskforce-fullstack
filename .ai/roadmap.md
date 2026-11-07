@@ -10,6 +10,13 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 07/11/2026 - Release 1.11.0 EN PROD : la fenêtre façon Claude Code (lot 1), Cortex après le test de la 1.10.0 ; desktop 1.8.0 publiée.** `[release]`
+> - **Décision du CEO** : « on sort tout ensemble », puis « ok go release quand le lot 1 est prêt » ; il teste sur l'app desktop.
+> - **En prod** : `chore(desktop)` 1.8.0 (`47fc0661`) ; release #494 vers `main` (`b3a1dbd2`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.11.0 en plomberie ; étiquettes `minor`). Dedans : la fenêtre, lot 1 (#493, R119 à R122 et R124, séance n°18) ; Cortex après le test de la 1.10.0 (#491) ; les mises à jour sans fenêtre Windows et les commentaires rendus (#490) ; la déconnexion avec une mise à jour prête (#492). Migrations V117 et V118.
+> - **Vérifié** : l'API a redémarré à 21:14:59 UTC (32 s de coupure, puis `readyz` 200 : V117 et V118 passées) ; la webapp affiche 1.11.0 à 21:15:43. Pas vérifié : la fenêtre connectée, avec des données (la Présidence la teste sur l'app desktop) ; le journal du backend sur VM1.
+> - **Desktop 1.8.0 publiée** : run 42414818531 depuis `main`, vert, VirusTotal compris ; `desktop-v1.8.0` (préversion, comme les précédentes) et `desktop-latest`, dont `latest.yml` annonce 1.8.0 aux apps installées ; le site est reconstruit pour la proposer.
+> - **Suite** : le test du CEO ; les lots 2 et 3 de la fenêtre.
+
 > **▶ MAJ 07/11/2026 - J1 : la fenêtre, lot 1 (R119 à R122, R124) : la conversation au centre, l'écran de la route en volet à côté, le travail à gauche, ce qui l'entoure à droite.** `[frontend + backend + desktop]`
 > - **Origine** : la saisine du CEO après son test de la 1.10.0 (« full chat avec un endroit ou justement on peut voir les interfaces [...] Et evidemment pouvoir tout de mm call le chat quand on est sur les board »), puis l'atelier de la fenêtre (séance n°18, R119 à R126), tranché par Jobs et validé d'avance, sans maquette. C'est le lot 1 de TF-J1-9 ; ADR-026 (brouillon) dans `taskforce-docs`.
 > - **Fait** (branche `feat/window-lot1`, PR #493 vers `dev`, étiquettes `frontend:release:minor` et `backend:release:minor`, pas fusionnée) :
@@ -23,7 +30,7 @@
 > - **Pas vu** : la fenêtre connectée, avec les données du seed : `:5173` demande la connexion, que je ne fais pas (aucun mot de passe tapé) ; à regarder par le CEO. Une action archivée ou supprimée depuis la carte de suppression n'entre pas encore dans « Changes ».
 > - **Suite** : les lots 2 (la poignée du volet et sa largeur, l'issue en volet par-dessus le tableau, la vue du travail d'une mission, les adresses) et 3 (l'arrivée, « Progress », la ligne grise sous chaque réponse, le retrait du tour guidé).
 
-> **▶ MAJ 05/11/2026 - J1 : se déconnecter avec une mise à jour prête ne fait plus disparaître l'app, une session fermée en ligne non plus.** `[desktop]`
+> **▶ MAJ 07/11/2026 - J1 : se déconnecter avec une mise à jour prête ne fait plus disparaître l'app, une session fermée en ligne non plus.** `[desktop]`
 > - **Origine** : trouvé pendant la PR #490. La déconnexion (`desktop:sign-out`) et la session fermée en ligne (`sessionEnded()`) redémarraient l'app par `app.relaunch()` puis `app.quit()`. Avec une version téléchargée, `autoInstallOnAppQuit` lance alors l'installeur en silence, sans `--force-run` : il ferme de force tout ce qui tourne depuis le dossier de l'app, l'instance relancée comprise, et ne rouvre rien.
 > - **Fait** (branche `fix/desktop-relaunch-ready-update`, PR #492 vers `dev`, étiquette `backend:release:patch` puisque le contrôle des étiquettes en demande une, pas fusionnée) :
 >   - **redémarrer par la mise à jour** : avec une version prête, l'app redémarre comme avec « Restart now » (`installNow` de #490 : son écran de mise à jour, la pile arrêtée proprement, l'installeur en silence avec `--force-run`, qui rouvre l'app) ; sinon, simple relance, comme avant. Le choix est une fonction pure à côté de l'état de la mise à jour (`restartBy`, `update-state.ts`), appliquée par `restartApp` (`updater.ts`) aux deux endroits. Le compte s'efface toujours avant le redémarrage : l'app rouverte montre la connexion ;
