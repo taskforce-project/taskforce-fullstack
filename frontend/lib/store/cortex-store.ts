@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 import {
-  answerQuestion as sendAnswer, sendAgentMessage, undoAction, type AssistantAnswer, type AssistantToolCall,
+  answerQuestion as sendAnswer, approveAction, sendAgentMessage, undoAction, type AssistantAnswer, type AssistantToolCall,
   type ModelEscalation, type QuestionAnswer,
 } from "@/lib/api/assistant-service";
 import {
@@ -11,6 +11,7 @@ import {
 import { getErrorMessage, getErrorStatus } from "@/lib/api/client";
 import { contextFrom, type CortexContext } from "@/lib/cortex/context-gauge";
 import { screenFrom } from "@/lib/cortex/screen";
+import { useIssueStore } from "@/lib/store/issue-store";
 import { useScreenStore } from "@/lib/store/screen-store";
 
 // ---------------------------------------------------------------------------
@@ -44,6 +45,27 @@ export type UndoState =
 export const undoKey = (call: Pick<AssistantToolCall, "record" | "ref" | "name">): string =>
   `${call.record ?? ""}:${call.ref ?? call.name}`;
 
+/**
+ * Où en est la carte de suppression d'une issue (TF-J1-5) : archivée, rendue, supprimée. La carte et « Changes » (R122)
+ * lisent le même état, qui survit à la conversation repliée puis dépliée. `failed` dit pourquoi le dernier geste n'est
+ * pas passé : l'archivage, ou la suppression et la raison du serveur.
+ */
+export interface CardDeletion {
+  status: "idle" | "archiving" | "archived" | "restoring" | "deleting" | "deleted";
+  /** Ce que le serveur dit de la suppression faite. */
+  output?: string;
+  failed?: { gesture: "archive" } | { gesture: "delete"; why: string };
+}
+
+/** Le geste d'archiver depuis la carte de suppression, tel que « Changes » le montre. */
+export const ARCHIVE_GESTURE = "archive_issue";
+
+/** Une carte de suppression se nomme par le dossier de sa réponse et l'issue qu'elle touche. */
+export const deletionKey = (call: Pick<AssistantToolCall, "record" | "target" | "name">): string =>
+  `${call.record ?? ""}:${call.target?.issueId ?? call.name}`;
+
+const BUSY: ReadonlySet<CardDeletion["status"]> = new Set(["archiving", "restoring", "deleting", "deleted"]);
+
 interface CortexState {
   /** Le texte de la barre, que la personne écrit ou qu'une suggestion remplit. */
   draft: string;
@@ -74,6 +96,8 @@ interface CortexState {
   done: AssistantToolCall[];
   /** « Undo » de chaque geste, par `undoKey`. */
   undos: Record<string, UndoState>;
+  /** Les cartes de suppression de la conversation, par `deletionKey`. */
+  deletions: Record<string, CardDeletion>;
 
   setDraft: (text: string) => void;
   /** L'espace affiché : en changer repart d'une conversation neuve, celle de l'autre espace reste dans son historique. */
@@ -107,6 +131,16 @@ interface CortexState {
    * `undos`, ou si « Undo » de ce geste est déjà parti.
    */
   undo: (slug: string, call: AssistantToolCall) => Promise<boolean>;
+  /**
+   * Archive l'issue d'une carte de suppression, ou la rend (`archived` faux) : « Changes » montre l'archivage tant qu'il
+   * tient. false en cas d'échec, la raison dans `deletions`, ou pendant un autre geste de la même carte.
+   */
+  archiveFromCard: (slug: string, call: AssistantToolCall, archived: boolean) => Promise<boolean>;
+  /**
+   * Supprime l'issue d'une carte de suppression, par l'accord de la personne, que le serveur rejuge (R1) : « Changes » la
+   * montre. false sur un refus ou un échec, la raison dans `deletions`.
+   */
+  deleteFromCard: (slug: string, call: AssistantToolCall) => Promise<boolean>;
 }
 
 let lastId = 0;
@@ -137,7 +171,17 @@ export function messagesToTurns(messages: ConversationMessage[]): CortexTurn[] {
   );
 }
 
-const EMPTY_CONVERSATION = { turns: [], conversationId: null, tokens: 0, context: null, lastMs: null, unread: false, done: [] };
+const EMPTY_CONVERSATION = {
+  turns: [], conversationId: null, tokens: 0, context: null, lastMs: null, unread: false, done: [], deletions: {},
+};
+
+/** L'archivage d'une carte de suppression, gardé pour « Changes » sous le dossier et l'issue de sa carte. */
+const archivedCall = (call: AssistantToolCall): AssistantToolCall =>
+  ({ ...call, name: ARCHIVE_GESTURE, status: "success", output: null, ref: null });
+
+/** Les gestes de la conversation, sans l'archivage de cette carte : rendue ou supprimée, l'issue n'est plus archivée. */
+const withoutArchive = (done: AssistantToolCall[], key: string): AssistantToolCall[] =>
+  done.filter((call) => call.name !== ARCHIVE_GESTURE || deletionKey(call) !== key);
 
 /**
  * Le tour d'une demande qui n'a pas abouti. 409 : le plafond de tokens de l'instance, une carte d'information plutôt
@@ -161,6 +205,7 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
   sentAt: null,
   open: false,
   undos: {},
+  deletions: {},
 
   setDraft: (text) => set({ draft: text }),
 
@@ -251,9 +296,10 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
   openConversation: async (slug, id) => {
     try {
       const detail = await getConversation(slug, id);
+      // Les gestes faits sur les cartes restent à la conversation qui les a faits : « Changes » repart de celle-ci.
       set({
         workspace: slug, turns: messagesToTurns(detail.messages), conversationId: detail.id,
-        tokens: detail.totalTokens, context: null, lastMs: null, unread: false,
+        tokens: detail.totalTokens, context: null, lastMs: null, unread: false, done: [], deletions: {},
       });
       return true;
     } catch {
@@ -308,6 +354,49 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
       return true;
     } catch (e) {
       set((s) => ({ undos: { ...s.undos, [key]: { status: "error", output: getErrorMessage(e) } } }));
+      return false;
+    }
+  },
+
+  archiveFromCard: async (slug, call, archived) => {
+    const target = call.target;
+    const key = deletionKey(call);
+    const known = get().deletions[key]?.status ?? "idle";
+    if (!slug || !target || BUSY.has(known)) return false;
+    const put = (state: CardDeletion) => set((s) => ({ deletions: { ...s.deletions, [key]: state } }));
+    put({ status: archived ? "archiving" : "restoring" });
+    const issue = await useIssueStore.getState().archiveIssue(slug, target.projectId, target.issueId, archived);
+    if (!issue) {
+      put({ status: archived ? "idle" : "archived", failed: { gesture: "archive" } });
+      return false;
+    }
+    set((s) => ({
+      deletions: { ...s.deletions, [key]: { status: archived ? "archived" : "idle" } },
+      done: archived ? [...withoutArchive(s.done, key), archivedCall(call)] : withoutArchive(s.done, key),
+    }));
+    return true;
+  },
+
+  deleteFromCard: async (slug, call) => {
+    const key = deletionKey(call);
+    const known = get().deletions[key]?.status ?? "idle";
+    if (!slug || BUSY.has(known)) return false;
+    const put = (state: CardDeletion) => set((s) => ({ deletions: { ...s.deletions, [key]: state } }));
+    put({ status: "deleting" });
+    try {
+      const result = await approveAction(slug, call);
+      if (result.status !== "success") {
+        put({ status: known, failed: { gesture: "delete", why: result.output } });
+        return false;
+      }
+      // Supprimée, l'issue n'est plus archivée : « Changes » ne garde que la suppression.
+      set((s) => ({
+        deletions: { ...s.deletions, [key]: { status: "deleted", output: result.output } },
+        done: [...withoutArchive(s.done, key), { ...call, status: "success", output: result.output, ref: result.ref ?? null }],
+      }));
+      return true;
+    } catch (e) {
+      put({ status: known, failed: { gesture: "delete", why: getErrorMessage(e) } });
       return false;
     }
   },

@@ -21,6 +21,7 @@ import { undoAction, type AssistantToolCall } from "@/lib/api/assistant-service"
 import type { DeliveryRun } from "@/lib/api/delivery-service"
 import type { AuthUser } from "@/lib/auth"
 import { useCortexStore } from "@/lib/store/cortex-store"
+import { useIssueStore } from "@/lib/store/issue-store"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { useWindowStore } from "@/lib/store/window-store"
@@ -58,7 +59,7 @@ describe("les lignes du travail de la zone de droite", () => {
     useUserStore.setState({ user: { id: "7" } as AuthUser })
     useDeliveryStore.setState({ workspaceRuns: [] })
     useWorkflowStore.setState({ jobs: [] })
-    useCortexStore.setState({ turns: [], done: [], undos: {} })
+    useCortexStore.setState({ turns: [], done: [], undos: {}, deletions: {} })
   })
   afterEach(() => vi.useRealTimers())
 
@@ -115,6 +116,41 @@ describe("les lignes du travail de la zone de droite", () => {
     expect(undo).toHaveLength(1)
     fireEvent.click(undo[0])
     await waitFor(() => expect(screen.getByText("Undone. WEB-14 is gone.")).toBeInTheDocument())
+  })
+
+  // Ce que la carte de suppression fait entre dans « Changes » (R122), et l'archivage s'y défait comme sur la carte.
+  it("shows the archive and the deletion done on the delete card, the archive with its Undo", async () => {
+    const archiveIssue = vi.fn().mockResolvedValue({ id: 120 })
+    useIssueStore.setState({ archiveIssue })
+    const target = { issueId: 120, projectId: 3, key: "WEB-12", title: "Fix the login" }
+    const card = success("delete_issue", { status: "pending", record: "rec-2", target })
+    await useCortexStore.getState().archiveFromCard("acme", card, true)
+    useCortexStore.getState().noteDone(success("delete_issue", { record: "rec-3", target: { issueId: 90, projectId: 3, key: "WEB-9", title: "Old page" } }))
+    render(<ChangesRow />)
+
+    unfold("Changes")
+    expect(screen.getAllByRole("listitem").map((li) => li.querySelector("p")?.textContent)).toEqual([
+      "Deleted WEB-9 Old page", "Archived WEB-12 Fix the login",
+    ])
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }))
+
+    await waitFor(() => expect(archiveIssue).toHaveBeenLastCalledWith("acme", 3, 120, false))
+    await waitFor(() => expect(screen.getAllByRole("listitem").map((li) => li.querySelector("p")?.textContent)).toEqual(["Deleted WEB-9 Old page"]))
+    expect(useCortexStore.getState().deletions["rec-2:120"]).toEqual({ status: "idle" })
+  })
+
+  it("says when putting an archived issue back fails", async () => {
+    const archiveIssue = vi.fn().mockResolvedValueOnce({ id: 120 }).mockResolvedValueOnce(null)
+    useIssueStore.setState({ archiveIssue })
+    const card = success("delete_issue", { status: "pending", record: "rec-2", target: { issueId: 120, projectId: 3, key: "WEB-12", title: "Fix the login" } })
+    await useCortexStore.getState().archiveFromCard("acme", card, true)
+    render(<ChangesRow />)
+
+    unfold("Changes")
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }))
+
+    await waitFor(() => expect(screen.getByText("Couldn't put it back on the board. Try again.")).toBeInTheDocument())
+    expect(screen.getAllByRole("listitem").map((li) => li.querySelector("p")?.textContent)).toEqual(["Archived WEB-12 Fix the login"])
   })
 
   it("says when the conversation changed nothing yet", () => {

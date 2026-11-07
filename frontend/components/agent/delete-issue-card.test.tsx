@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { DeleteIssueCard } from "./delete-issue-card";
 import { approveAction, type AssistantTarget, type AssistantToolCall } from "@/lib/api/assistant-service";
 import type { Issue } from "@/lib/api/issue-service";
+import { useCortexStore } from "@/lib/store/cortex-store";
 import { useIssueStore } from "@/lib/store/issue-store";
 
 // Aucun réseau : l'accord est simulé ; l'archivage passe par le vrai store, son action simulée.
@@ -31,6 +32,7 @@ describe("DeleteIssueCard : supprimer une issue depuis la conversation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useIssueStore.setState({ archiveIssue });
+    useCortexStore.setState({ deletions: {}, done: [] });
   });
 
   it("says the issue and what goes with it, and deletes nothing before a click", () => {
@@ -113,6 +115,38 @@ describe("DeleteIssueCard : supprimer une issue depuis la conversation", () => {
     fireEvent.click(screen.getByRole("link", { name: "Delete TESTTA-2 (In review by AI): Fix the footer?" }));
 
     expect(nav.push).toHaveBeenCalledWith("/acme/projects/3?issue=55", { scroll: false });
+  });
+
+  // « Changes » voit chaque geste (R122) : l'archivage et la suppression faits ici sont lus du même store.
+  it("lifts the archive and the deletion into the store that Changes reads", async () => {
+    archiveIssue.mockResolvedValue({ id: 55 } as Issue);
+    vi.mocked(approveAction).mockResolvedValue({ tool: "delete_issue", status: "success", output: "Deleted TESTTA-2." });
+    show();
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    await waitFor(() => expect(useCortexStore.getState().done.map((c) => c.name)).toEqual(["archive_issue"]));
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(useCortexStore.getState().done).toEqual([]));
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.getByText("Deleted TESTTA-2.")).toBeInTheDocument());
+    expect(useCortexStore.getState().done).toEqual([
+      expect.objectContaining({ name: "delete_issue", status: "success", output: "Deleted TESTTA-2.", target: TARGET }),
+    ]);
+  });
+
+  it("keeps what it did when the conversation folds and unfolds", async () => {
+    archiveIssue.mockResolvedValue({ id: 55 } as Issue);
+    const { unmount } = render(<DeleteIssueCard slug="acme" call={CALL} target={TARGET} />);
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    await waitFor(() => expect(screen.getByText("Archived: TESTTA-2 no longer shows on the board.")).toBeInTheDocument());
+
+    unmount();
+    show();
+
+    expect(screen.getByText("Archived: TESTTA-2 no longer shows on the board.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
   });
 
   it("an issue already archived only offers Delete, and nothing else goes with a bare issue", () => {

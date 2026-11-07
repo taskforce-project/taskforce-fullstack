@@ -3,7 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { ArrowUp, ChevronRight, ExternalLink, Loader2, Network } from "lucide-react"
+import { ArrowUp, ChevronRight, ExternalLink, Loader2, Network, Undo2 } from "lucide-react"
 
 import { UndoAction } from "@/components/agent/undo-action"
 import { PANEL_ITEM, PanelRow } from "@/components/layout/panel-row"
@@ -16,14 +16,14 @@ import { isUndoable } from "@/lib/api/assistant-service"
 import type { DeliveryRun } from "@/lib/api/delivery-service"
 import { fillText, pullRequestOf, type PullRequest } from "@/lib/delivery/result-card"
 import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
-import { useCortexStore } from "@/lib/store/cortex-store"
+import { deletionKey, useCortexStore } from "@/lib/store/cortex-store"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { useWorkflowStore } from "@/lib/store/workflow-store"
 import { cn } from "@/lib/utils"
 import { missionPath } from "@/lib/window/address"
-import { changesOf } from "@/lib/window/changes"
+import { changesOf, type Change } from "@/lib/window/changes"
 import {
   elapsedMinutes, isActiveJob, isActiveRun, isMine, jobState, resultsToJudge, runLabel, runState,
 } from "@/lib/window/missions"
@@ -90,8 +90,33 @@ export function ResultsRow() {
 }
 
 /**
- * Changes : ce que la conversation a changé dans TaskForce (créé, déplacé, assigné, commenté, supprimé), avec « Undo »
- * là où la conversation l'offre déjà, et les pull requests ouvertes par ses missions.
+ * « Undo » d'un archivage fait sur la carte de suppression : l'issue revient sur son tableau, et la ligne part de
+ * « Changes ». Son état est celui de la carte, dans `useCortexStore`.
+ */
+function ArchiveUndo({ slug, change }: Readonly<{ slug: string; change: Change }>) {
+  const t = usePreferencesStore((s) => s.t.window)
+  const state = useCortexStore((s) => s.deletions[deletionKey(change.call)])
+  const archiveFromCard = useCortexStore((s) => s.archiveFromCard)
+  const running = state?.status === "restoring"
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => void archiveFromCard(slug, change.call, false)}
+        disabled={running}
+        className="my-1 flex h-6 w-fit items-center gap-1 border border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
+      >
+        <Undo2 className="size-3" /> {running ? t.undoingArchive : t.undoArchive}
+      </button>
+      {state?.failed?.gesture === "archive" && <p className="text-destructive">{t.undoArchiveFailed}</p>}
+    </>
+  )
+}
+
+/**
+ * Changes : ce que la conversation a changé dans TaskForce (créé, déplacé, assigné, commenté, archivé, supprimé), avec
+ * « Undo » là où la conversation l'offre, et les pull requests ouvertes par ses missions. L'archivage et la suppression
+ * faits sur la carte de suppression y entrent aussi : la carte tient son résultat dans le store.
  */
 export function ChangesRow() {
   const slug = useSlug()
@@ -122,6 +147,7 @@ export function ChangesRow() {
                 <span className="text-muted-foreground">{t.changeKinds[change.kind]}</span> {change.what}
               </p>
               {isUndoable(change.call) && <UndoAction slug={slug} call={change.call} />}
+              {change.kind === "archived" && <ArchiveUndo slug={slug} change={change} />}
             </li>
           ))}
         </ul>
