@@ -80,7 +80,8 @@ public class AssistantController {
     ) {
         Long userId = resolveUserId(jwt);
         Workspace ws = access.resolveAndAuthorize(slug, userId);
-        AiConversation conv = conversationService.getOrCreate(ws.getId(), userId, body.conversationId());
+        AiConversation conv = conversationService.getOrCreate(ws.getId(), userId, body.conversationId(),
+            body.screenOf().projectId());
 
         // Compression de contexte : condense les anciens échanges si le fil est trop long (avant de lire l'historique).
         conversationService.compressIfNeeded(conv.getId());

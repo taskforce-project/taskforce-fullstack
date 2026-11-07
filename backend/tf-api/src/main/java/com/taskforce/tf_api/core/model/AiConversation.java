@@ -40,4 +40,8 @@ public class AiConversation extends AuditableEntity {
     /** Filigrane : id du dernier message déjà intégré au résumé (les messages d'id supérieur restent verbatim). */
     @Column(name = "summary_upto_id")
     private Long summaryUptoId;
+
+    /** Le projet à l'écran quand elle a commencé (R114) : la barre de gauche la range sous lui (R121). Null sans projet. */
+    @Column(name = "project_id")
+    private Long projectId;
 }

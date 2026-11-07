@@ -7,8 +7,9 @@ public final class ConversationDtos {
 
     private ConversationDtos() {}
 
-    /** Résumé pour la liste (historique). */
-    public record ConversationSummary(Long id, String title, String updatedAt, int messageCount, long totalTokens) {}
+    /** Résumé pour la liste (historique) ; {@code projectId} : le projet où elle a commencé, null sans projet. */
+    public record ConversationSummary(Long id, String title, String updatedAt, int messageCount, long totalTokens,
+                                      Long projectId) {}
 
     /** Message d'une conversation ; {@code model} : celui qui a écrit la réponse, null pour une demande ou un repli. */
     public record MessageDto(Long id, String role, String content, String mode, long totalTokens, String createdAt,
