@@ -14,9 +14,14 @@ vi.mock("@/lib/desktop", () => ({ IS_DESKTOP: true, desktopBridge: () => desktop
 
 import { TitleLine } from "./title-line"
 import { SidebarProvider } from "@/components/ui/sidebar"
+import type { AssistantToolCall } from "@/lib/api/assistant-service"
+import type { DeliveryRun } from "@/lib/api/delivery-service"
 import type { Project } from "@/lib/api/project-service"
+import type { AuthUser } from "@/lib/auth"
 import { useCortexStore } from "@/lib/store/cortex-store"
+import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { useProjectStore } from "@/lib/store/project-store"
+import { useUserStore } from "@/lib/store/user-store"
 import { useWindowStore } from "@/lib/store/window-store"
 
 const renderLine = () => render(<SidebarProvider><TitleLine /></SidebarProvider>)
@@ -34,15 +39,28 @@ function widthOf(width: number) {
   })
 }
 
-/** La ligne du haut (R119) : la barre de gauche, le titre de la conversation, « Board », la zone de droite. */
+const RUN: DeliveryRun = {
+  id: 100, issueId: 28, issueKey: "WEB-28", issueTitle: "Fix the footer", projectId: 3, projectName: "Website",
+  providerKey: "claude-code", model: null, status: "RUNNING", summary: null, resultUrl: null, error: null, startedById: 7,
+  createdAt: null, updatedAt: null, outcome: null,
+}
+
+const DELEGATED: AssistantToolCall = {
+  name: "delegate_issue", status: "success", input: null, output: "Handed WEB-28 to Claude Code.", record: "rec",
+  target: { issueId: 28, projectId: 3, key: "WEB-28", title: "Fix the footer", runId: 100 },
+}
+
+/** La ligne du haut (R119) : la barre de gauche, le titre de la conversation, « Board », « Work view », la zone de droite. */
 describe("TitleLine", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     widthOf(1440)
     nav.pathname = "/acme"
-    useCortexStore.setState({ conversations: [], conversationId: null })
+    useCortexStore.setState({ conversations: [], conversationId: null, turns: [], done: [] })
     useProjectStore.setState({ projects: [{ id: 3, name: "Website" } as Project] })
     useWindowStore.setState({ rightOpen: true, rightDrawer: false })
+    useDeliveryStore.setState({ workspaceRuns: [] })
+    useUserStore.setState({ user: { id: "7" } as AuthUser })
   })
   afterEach(() => vi.restoreAllMocks())
 
@@ -74,6 +92,25 @@ describe("TitleLine", () => {
     renderLine()
 
     expect(screen.queryByRole("button", { name: "Board" }) !== null).toBe(offered)
+  })
+
+  // « Le dessin » : la vue du travail, à droite, quand une mission lancée depuis la conversation tourne.
+  it("opens the work view of the mission this conversation started, while it runs", () => {
+    useCortexStore.setState({ done: [DELEGATED] })
+    useDeliveryStore.setState({ workspaceRuns: [RUN] })
+    const { rerender } = renderLine()
+
+    fireEvent.click(screen.getByRole("button", { name: "Work view" }))
+    expect(nav.push).toHaveBeenCalledWith("/acme/missions/100", { scroll: false })
+
+    // Déjà dans le volet, elle n'a plus de bouton ; finie, non plus.
+    nav.pathname = "/acme/missions/100"
+    rerender(<SidebarProvider><TitleLine /></SidebarProvider>)
+    expect(screen.queryByRole("button", { name: "Work view" })).toBeNull()
+    nav.pathname = "/acme"
+    useDeliveryStore.setState({ workspaceRuns: [{ ...RUN, status: "DONE" }] })
+    rerender(<SidebarProvider><TitleLine /></SidebarProvider>)
+    expect(screen.queryByRole("button", { name: "Work view" })).toBeNull()
   })
 
   it("folds and unfolds the right panel", () => {

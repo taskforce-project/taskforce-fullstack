@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 
+const nav = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock("next/navigation", () => ({
   usePathname: () => "/acme",
   useParams: () => ({ workspace: "acme" }),
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: nav.push }),
 }))
 vi.mock("@/components/workflows/workflow-canvas-dialog", () => ({
   WorkflowCanvasDialog: ({ open }: { open: boolean }) => (open ? <div role="dialog" aria-label="workflow canvas" /> : null),
@@ -69,7 +70,10 @@ describe("les lignes du travail de la zone de droite", () => {
 
     expect(screen.getByRole("button", { name: /^Results/ })).toHaveTextContent("1")
     unfold("Results")
-    expect(screen.getByRole("link", { name: /WEB-1 Issue 1/ })).toHaveAttribute("href", "/acme/projects/3?issue=10")
+    const result = screen.getByRole("link", { name: /WEB-1 Issue 1/ })
+    expect(result).toHaveAttribute("href", "/acme/projects/3?issue=10")
+    fireEvent.click(result)
+    expect(nav.push).toHaveBeenCalledWith("/acme/projects/3?issue=10", { scroll: false })
   })
 
   it("says when no result waits", () => {
@@ -128,14 +132,19 @@ describe("les lignes du travail de la zone de droite", () => {
 
     expect(screen.getByRole("button", { name: /^Missions/ })).toHaveTextContent("2")
     unfold("Missions")
-    expect(screen.getByRole("link", { name: /WEB-1 Issue 1/ })).toHaveTextContent("8 min")
+    // Une mission ouvre sa vue du travail (R95, point 3).
+    const working = screen.getByRole("link", { name: /WEB-1 Issue 1/ })
+    expect(working).toHaveTextContent("8 min")
+    expect(working).toHaveAttribute("href", "/acme/missions/1")
+    fireEvent.click(working)
+    expect(nav.push).toHaveBeenCalledWith("/acme/missions/1", { scroll: false })
     expect(screen.getByRole("link", { name: /Analysis of Website/ })).toHaveTextContent("Under a minute")
     expect(screen.queryByRole("link", { name: /WEB-2/ })).toBeNull()
     expect(screen.queryByRole("link", { name: /WEB-3/ })).toBeNull()
     expect(screen.queryByRole("button", { name: "Stop" })).toBeNull()
 
     fireEvent.click(screen.getByRole("button", { name: "Done: 2" }))
-    expect(screen.getByRole("link", { name: /WEB-2 Issue 2/ })).toHaveAttribute("href", "/acme/projects/3?issue=20")
+    expect(screen.getByRole("link", { name: /WEB-2 Issue 2/ })).toHaveAttribute("href", "/acme/missions/2")
     expect(screen.getAllByRole("link", { name: /Analysis of Website/ })[1]).toHaveAttribute("href", "/acme/analytics")
   })
 

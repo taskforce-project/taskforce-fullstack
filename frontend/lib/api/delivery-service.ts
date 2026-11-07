@@ -198,6 +198,37 @@ export async function downloadEvidence(slug: string, runId: number, format: "jso
   saveBlob(res.data as Blob, `evidence-run-${runId}.${format}`);
 }
 
+/** Un événement du dossier de preuve (`taskforce-evidence/1`) : chaîné au précédent par son empreinte. */
+export interface MissionEvidenceEvent {
+  seq: number;
+  /** UTC, avec son « Z ». */
+  at: string;
+  /** `mission.started`, `action.requested`, `action.decided`, `human.decision`, `test.result`, `mission.ended`... */
+  type: string;
+  actor: { kind: string; id: string };
+  data: Record<string, unknown> | null;
+  prev: string;
+  hash: string;
+}
+
+/** Le dossier de preuve d'une mission, tel qu'il se construit : ses événements et l'empreinte du dernier. */
+export interface MissionEvidence {
+  format: string;
+  events: MissionEvidenceEvent[];
+  root: string;
+}
+
+/**
+ * Le dossier de preuve d'un run, en JSON, lu pour la vue du travail (R95, point 3) ; la même route que le
+ * téléchargement. Une erreur (un run sans dossier : 404) remonte à l'appelant.
+ */
+export async function getEvidence(slug: string, runId: number): Promise<MissionEvidence> {
+  const res = await apiClient.get<MissionEvidence>(DELIVERY_ROUTES.EVIDENCE(slug, runId), {
+    params: { format: "json" }, silentError: true,
+  });
+  return res.data;
+}
+
 /** Runner local de l'utilisateur (ADR-013), tel que le serveur le connaît. Ne contient jamais de secret. */
 export interface RunnerStatus {
   /** Une identité de runner est déjà provisionnée pour cet utilisateur. */

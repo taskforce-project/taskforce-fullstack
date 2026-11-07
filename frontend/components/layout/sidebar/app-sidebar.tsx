@@ -9,6 +9,7 @@ import {
   Users, type LucideIcon,
 } from "lucide-react"
 
+import { PaneLink } from "@/components/layout/pane-link"
 import { NavUser } from "@/components/layout/sidebar/nav-user"
 import { WorkDot } from "@/components/layout/work-dot"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -38,6 +39,7 @@ import type { DeliveryRun } from "@/lib/api/delivery-service"
 import { fillText } from "@/lib/delivery/result-card"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { useModKeyLabel } from "@/lib/hooks/use-mod-key"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { useCortexStore } from "@/lib/store/cortex-store"
 import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
@@ -48,8 +50,9 @@ import { useUserStore } from "@/lib/store/user-store"
 import { useWindowStore } from "@/lib/store/window-store"
 import { cn } from "@/lib/utils"
 import { groupConversations, leftBarProjects } from "@/lib/window/left-bar"
+import { missionPath } from "@/lib/window/address"
 import { liveRuns, runLabel, runState, type WorkState } from "@/lib/window/missions"
-import { boardPath, issuePath } from "@/lib/window/pane"
+import { boardPath } from "@/lib/window/pane"
 import { waitingCount } from "@/lib/window/waiting"
 
 const LOGO_SRC = "/assets/logo/logo_taskforce_tp.png"
@@ -114,16 +117,17 @@ function ConversationItem({ conversation, state, active, onPick, onDelete, sub }
   )
 }
 
-/** Une mission en cours sous son projet : son état en un point ; un clic ouvre son issue dans le volet. */
+/** Une mission en cours sous son projet : son état en un point ; un clic ouvre sa vue du travail dans le volet. */
 function MissionItem({ slug, run, onPick }: Readonly<{ slug: string; run: DeliveryRun; onPick: () => void }>) {
+  const { openMission } = usePaneNavigation()
   if (run.projectId === null) return null
   return (
     <SidebarMenuSubItem>
       <SidebarMenuSubButton asChild size="sm">
-        <Link href={issuePath(slug, run.projectId, run.issueId)} onClick={onPick}>
+        <PaneLink href={missionPath(slug, run.id)} open={() => { onPick(); openMission(run.id) }}>
           <WorkDot state={runState(run)} />
           <span>{runLabel(run)}</span>
-        </Link>
+        </PaneLink>
       </SidebarMenuSubButton>
     </SidebarMenuSubItem>
   )
@@ -145,8 +149,9 @@ function MoreItems({ count, onShow, sub }: Readonly<{ count: number; onShow: () 
  * La barre de gauche de la fenêtre (R121, séance n°18) : le travail et ses conversations. En haut, « New
  * conversation », « Search » (Ctrl+K) et « Waiting for you » avec son nombre, qui remplace l'Inbox et la cloche. Puis
  * chaque projet : son nom ouvre son tableau dans le volet ; dessous, ses conversations et ses missions en cours, chacune
- * avec son état en un point. Puis les conversations sans projet, puis « More », replié. En bas, la personne. 16rem ;
- * Ctrl+B la replie. Sous `lg` dans la webapp, c'est un tiroir, qui se ferme au choix d'une ligne.
+ * avec son état en un point ; une mission ouvre sa vue du travail. Puis les conversations sans projet, puis « More »,
+ * replié. En bas, la personne. 16rem ; Ctrl+B la replie. Sous `lg` dans la webapp, c'est un tiroir, qui se ferme au
+ * choix d'une ligne.
  */
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()

@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen, within } from "@testing-library/react"
 
-const nav = vi.hoisted(() => ({ pathname: "/acme/projects/3" }))
+const nav = vi.hoisted(() => ({ pathname: "/acme/projects/3", push: vi.fn() }))
 vi.mock("next/navigation", () => ({
   usePathname: () => nav.pathname,
   useParams: () => ({ workspace: "acme" }),
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: nav.push }),
 }))
 vi.mock("next/image", () => ({ default: () => null }))
 // La personne, en bas, a son propre test (nav-user.test.tsx).
@@ -92,16 +92,20 @@ describe("AppSidebar", () => {
     expect(openCreateProject).toHaveBeenCalled()
   })
 
+  // Une mission ouvre sa vue du travail dans le volet (R95, point 3).
   it("puts under each project its conversations and the person's running missions, each with its state", () => {
     renderBar()
 
     const website = screen.getByRole("link", { name: "Website" }).closest("li") as HTMLElement
     const footer = within(website).getByRole("link", { name: /WEB-28 Fix the footer/ })
-    expect(footer).toHaveAttribute("href", "/acme/projects/3?issue=28")
+    expect(footer).toHaveAttribute("href", "/acme/missions/1")
     expect(within(footer).getByRole("img", { name: "Working" })).toBeInTheDocument()
     expect(within(website).getByRole("button", { name: /Plan the launch/ })).toBeInTheDocument()
     // La mission d'une autre personne ne s'y montre pas (R57).
     expect(within(website).getAllByRole("link")).toHaveLength(2)
+
+    fireEvent.click(footer)
+    expect(nav.push).toHaveBeenCalledWith("/acme/missions/1", { scroll: false })
   })
 
   it("lists the conversations without a project, and those of a project it doesn't show", () => {
