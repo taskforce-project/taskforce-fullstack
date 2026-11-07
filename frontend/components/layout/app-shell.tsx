@@ -111,7 +111,7 @@ function useEscape(folded: boolean, issueOpen: boolean, closeIssue: () => void) 
  * côté d'elle, une poignée entre les deux ; l'accueil de l'espace n'a pas de volet, la conversation y est seule,
  * centrée. Quand la place manque pour les deux (en pleine largeur, sous `lg`, ou à moins de 480 px de volet et 360 px de
  * conversation), le volet prend toute la place et la conversation se replie dans son compositeur, en bas, d'où sa
- * réponse se déplie au-dessus (le motif du 02/11/2026).
+ * réponse se déplie au-dessus (le motif du 02/11/2026). Sous `lg`, dans la webapp, les deux barres sont des tiroirs.
  * L'adresse dit tout : le chemin le volet, `?issue=` l'issue par-dessus, `?c=` la conversation.
  */
 export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -154,7 +154,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
   const conversation = React.useMemo(() => <Conversation />, [])
 
   return (
-    <SidebarProvider className="h-full">
+    <SidebarProvider className="h-full" mobile={!IS_DESKTOP && !wide}>
       {/* App desktop, façon Claude Desktop : le contenu est une carte arrondie dans le cadre de la barre de gauche. */}
       {IS_DESKTOP && <div className="desktop-top-drag" aria-hidden="true" />}
       {/* Mise à jour de l'app : avancement du téléchargement, puis « Restart now », dans un toast qui reste. */}

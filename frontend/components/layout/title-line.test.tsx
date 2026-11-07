@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen } from "@testing-library/react"
 
 const nav = vi.hoisted(() => ({ pathname: "/acme", push: vi.fn() }))
@@ -21,15 +21,30 @@ import { useWindowStore } from "@/lib/store/window-store"
 
 const renderLine = () => render(<SidebarProvider><TitleLine /></SidebarProvider>)
 
+/** Une fenêtre de `width` pixels de large : les requêtes `min-width` y répondent. */
+function widthOf(width: number) {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: (query: string) => ({
+      matches: width >= Number(/min-width: (\d+)px/.exec(query)?.[1] ?? 0),
+      media: query, onchange: null, addListener: vi.fn(), removeListener: vi.fn(),
+      addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+    }),
+  })
+}
+
 /** La ligne du haut (R119) : la barre de gauche, le titre de la conversation, « Board », la zone de droite. */
 describe("TitleLine", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    widthOf(1440)
     nav.pathname = "/acme"
     useCortexStore.setState({ conversations: [], conversationId: null })
     useProjectStore.setState({ projects: [{ id: 3, name: "Website" } as Project] })
-    useWindowStore.setState({ rightOpen: true })
+    useWindowStore.setState({ rightOpen: true, rightDrawer: false })
   })
+  afterEach(() => vi.restoreAllMocks())
 
   it("titles a new conversation, and offers no board without a project in view", () => {
     renderLine()
@@ -68,6 +83,16 @@ describe("TitleLine", () => {
     expect(toggle).toHaveAttribute("aria-pressed", "true")
     fireEvent.click(toggle)
     expect(useWindowStore.getState().rightOpen).toBe(false)
+  })
+
+  it("opens the right panel's drawer under lg", () => {
+    widthOf(800)
+    renderLine()
+
+    const toggle = screen.getByRole("button", { name: "Show or hide what surrounds the conversation" })
+    expect(toggle).toHaveAttribute("aria-pressed", "false")
+    fireEvent.click(toggle)
+    expect(useWindowStore.getState()).toMatchObject({ rightDrawer: true, rightOpen: true })
   })
 
   it("is the desktop app's title bar: the system buttons take the theme, on 52 px", () => {

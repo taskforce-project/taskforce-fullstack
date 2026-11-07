@@ -192,6 +192,7 @@ describe("AppShell : la fenêtre", () => {
     expect(screen.queryByRole("region", { name: "conversation" })).toBeNull()
     expect(screen.getByLabelText("folded composer")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Full width" })).toBeNull()
+    expect(screen.getByRole("button", { name: "Back to the conversation" })).toBeInTheDocument()
   })
 
   // R120 : l'issue de l'adresse s'ouvre dans le volet, par-dessus l'écran qui la liste.

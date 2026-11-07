@@ -63,11 +63,14 @@ describe("Pane", () => {
     expect(screen.getByRole("button", { name: "Beside the conversation" })).toHaveAttribute("aria-pressed", "true")
   })
 
-  it("has no full width toggle when the window is too narrow for the conversation beside it", () => {
+  it("covers the conversation on a narrow screen, with a back arrow to it", () => {
     render(<Pane route={{ section: "dashboard", projectId: null }} full wide={false} composer={<p>composer</p>}><p /></Pane>)
 
     expect(screen.queryByRole("button", { name: "Full width" })).toBeNull()
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull()
     expect(screen.getByRole("region", { name: "Dashboard" })).toHaveTextContent("composer")
+    fireEvent.click(screen.getByRole("button", { name: "Back to the conversation" }))
+    expect(nav.push).toHaveBeenCalledWith("/acme?c=9", { scroll: false })
   })
 
   it("closes to the workspace home, where only the conversation shows, the conversation kept", () => {

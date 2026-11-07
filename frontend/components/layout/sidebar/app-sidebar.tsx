@@ -146,7 +146,7 @@ function MoreItems({ count, onShow, sub }: Readonly<{ count: number; onShow: () 
  * conversation », « Search » (Ctrl+K) et « Waiting for you » avec son nombre, qui remplace l'Inbox et la cloche. Puis
  * chaque projet : son nom ouvre son tableau dans le volet ; dessous, ses conversations et ses missions en cours, chacune
  * avec son état en un point. Puis les conversations sans projet, puis « More », replié. En bas, la personne. 16rem ;
- * Ctrl+B la replie. Sur un téléphone, c'est un tiroir, qui se ferme au choix d'une ligne.
+ * Ctrl+B la replie. Sous `lg` dans la webapp, c'est un tiroir, qui se ferme au choix d'une ligne.
  */
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()

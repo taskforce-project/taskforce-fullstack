@@ -12,7 +12,7 @@ vi.mock("next/image", () => ({ default: () => null }))
 vi.mock("@/components/layout/sidebar/nav-user", () => ({ NavUser: () => <div>the person</div> }))
 
 import { AppSidebar } from "./app-sidebar"
-import { SidebarProvider } from "@/components/ui/sidebar"
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import type { ConversationSummary } from "@/lib/api/ai-conversation-service"
 import type { DeliveryRun } from "@/lib/api/delivery-service"
 import type { Project } from "@/lib/api/project-service"
@@ -153,6 +153,18 @@ describe("AppSidebar", () => {
     expect(["My work", "Dashboard", "Roadmap", "Cycles", "Members", "Analytics"].map(
       (name) => screen.getByRole("link", { name }).getAttribute("href"),
     )).toEqual(["/acme/my-work", "/acme/dashboard", "/acme/roadmap", "/acme/cycles", "/acme/members", "/acme/analytics"])
+  })
+
+  // Sous `lg` dans la webapp, la barre est un tiroir (« Le dessin », séance n°18) : fermé, il s'ouvre par son bouton,
+  // et un choix le referme.
+  it("is a drawer when the window says so, closed by a choice", () => {
+    render(<SidebarProvider mobile><SidebarTrigger aria-label="left bar" /><AppSidebar /></SidebarProvider>)
+    expect(screen.queryByRole("button", { name: "New conversation" })).toBeNull()
+
+    fireEvent.click(screen.getByRole("button", { name: "left bar" }))
+    expect(screen.getByRole("dialog")).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("link", { name: "Waiting for you" }))
+    expect(screen.queryByRole("dialog")).toBeNull()
   })
 
   it("unfolds More when one of its screens is open", () => {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react"
 import { useParams, usePathname } from "next/navigation"
-import { Maximize2, Minimize2, X } from "lucide-react"
+import { ArrowLeft, Maximize2, Minimize2, X } from "lucide-react"
 
 import { IssuePane } from "@/components/layout/issue-pane"
 import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
@@ -21,8 +21,8 @@ const BESIDE: CSSProperties = { flex: "0 1 max(480px, 50%)" }
 
 /**
  * Le volet de la fenêtre (R119, R120) : la page de la route, entière, avec tous ses gestes, à côté de la conversation.
- * Son en-tête porte son titre, la pleine largeur et la fermeture, qui mène à l'accueil de l'espace. Une issue s'y ouvre
- * par-dessus l'écran qui la liste (`?issue=`),
+ * Son en-tête porte son titre, la pleine largeur et la fermeture, qui mène à l'accueil de l'espace ; sur un écran étroit,
+ * il couvre la conversation et une flèche y ramène. Une issue s'y ouvre par-dessus l'écran qui la liste (`?issue=`),
  * avec son retour : l'écran reste monté dessous, caché, et se retrouve tel qu'il était. En pleine largeur (ou sous
  * `lg`), la conversation se replie dans son compositeur, en bas du volet.
  */
@@ -75,9 +75,11 @@ export function Pane({ route, full, wide, width, issue, children, composer }: Re
           {paneFull ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
         </button>
       )}
-      <button type="button" onClick={closePane} aria-label={t.closePane} title={t.closePane} className={ICON_BUTTON}>
-        <X className="size-4" />
-      </button>
+      {wide && (
+        <button type="button" onClick={closePane} aria-label={t.closePane} title={t.closePane} className={ICON_BUTTON}>
+          <X className="size-4" />
+        </button>
+      )}
     </>
   )
 
@@ -90,11 +92,23 @@ export function Pane({ route, full, wide, width, issue, children, composer }: Re
     >
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div
-          className={cn("flex h-10 shrink-0 items-center gap-1 border-b border-border pl-4 pr-2", covered && "invisible")}
+          className={cn("flex h-10 shrink-0 items-center gap-1 border-b border-border pr-2", wide ? "pl-4" : "pl-2", covered && "invisible")}
           aria-hidden={covered || undefined}
           inert={covered}
         >
-          <h2 className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">{title}</h2>
+          {/* Sur un écran étroit, le volet couvre la conversation : la flèche y ramène. */}
+          {!wide && (
+            <button
+              type="button"
+              onClick={closePane}
+              aria-label={t.backToConversation}
+              title={t.backToConversation}
+              className={ICON_BUTTON}
+            >
+              <ArrowLeft className="size-4" />
+            </button>
+          )}
+          <h2 className="min-w-0 flex-1 truncate px-1 text-[13px] font-medium text-foreground">{title}</h2>
           {!covered && actions}
         </div>
         <div

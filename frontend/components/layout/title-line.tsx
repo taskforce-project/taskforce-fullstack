@@ -6,6 +6,7 @@ import { LayoutGrid, PanelRight } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { useMinWidth } from "@/hooks/use-min-width"
 import { fillText } from "@/lib/delivery/result-card"
 import { desktopBridge, IS_DESKTOP } from "@/lib/desktop"
 import { useDesktopNavigation } from "@/lib/hooks/use-desktop-navigation"
@@ -28,8 +29,8 @@ const ICON_BUTTON =
  * La ligne du haut de la fenêtre (R119, séance n°18), 44 px, à la place de la barre du haut. À gauche, le bouton de la
  * barre de gauche (Ctrl+B), puis le titre de la conversation. À droite, « Board » quand un projet est en vue (celui du
  * volet, sinon celui de la conversation) et que son tableau n'est pas déjà le volet, puis le bouton de la zone de
- * droite. Dans l'app desktop, c'est la zone qu'on saisit pour déplacer la fenêtre ; ses boutons restent cliquables, et
- * les boutons de Windows se posent après eux.
+ * droite, un tiroir sous `lg`. Dans l'app desktop, c'est la zone qu'on saisit pour déplacer la fenêtre ; ses boutons
+ * restent cliquables, et les boutons de Windows se posent après eux.
  */
 export function TitleLine() {
   const pathname = usePathname()
@@ -38,11 +39,14 @@ export function TitleLine() {
   const t = usePreferencesStore((s) => s.t.window)
   const untitled = usePreferencesStore((s) => s.t.shell.chatNew)
   const { resolvedTheme } = useTheme()
+  const wide = useMinWidth(1024)
   const conversations = useCortexStore((s) => s.conversations)
   const conversationId = useCortexStore((s) => s.conversationId)
   const projects = useProjectStore((s) => s.projects)
   const rightOpen = useWindowStore((s) => s.rightOpen)
+  const rightDrawer = useWindowStore((s) => s.rightDrawer)
   const toggleRight = useWindowStore((s) => s.toggleRight)
+  const setRightDrawer = useWindowStore((s) => s.setRightDrawer)
   const { openBoard } = usePaneNavigation()
 
   // App desktop : les boutons du système aux couleurs du thème, sur la hauteur de cette ligne.
@@ -55,6 +59,7 @@ export function TitleLine() {
   const conversation = conversations.find((c) => c.id === conversationId)
   const project = projectInView(pathname, conversation, projects)
   const board = project && slug ? boardPath(slug, project.id) : null
+  const panelOpen = wide ? rightOpen : rightDrawer
 
   return (
     <header
@@ -78,11 +83,11 @@ export function TitleLine() {
         )}
         <button
           type="button"
-          onClick={toggleRight}
-          aria-pressed={rightOpen}
+          onClick={() => (wide ? toggleRight() : setRightDrawer(!rightDrawer))}
+          aria-pressed={panelOpen}
           aria-label={t.toggleRightPanel}
           title={t.toggleRightPanel}
-          className={cn(ICON_BUTTON, "hidden lg:flex", rightOpen && "text-foreground")}
+          className={cn(ICON_BUTTON, panelOpen && "text-foreground")}
         >
           <PanelRight className="size-4" />
         </button>
