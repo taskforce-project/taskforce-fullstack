@@ -19361,6 +19361,10 @@
           "totalTokens": {
             "type": "integer",
             "format": "int64"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
