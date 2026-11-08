@@ -591,6 +591,8 @@ export const CONSTANTS_EN = {
     newConversation: "New conversation",
     search: "Search",
     waitingForYou: "Waiting for you",
+    // R128: unread mentions are counted apart from what blocks an agent: a quiet dot beside the number.
+    unreadMentions: "Unread mentions: {count}",
     projects: "Projects",
     newProject: "New project",
     conversations: "Conversations",

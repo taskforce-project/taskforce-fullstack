@@ -9,6 +9,7 @@ vi.mock('../api/delivery-service', () => ({
   getDeliveryProviders: vi.fn(),
   getIssueRun: vi.fn(),
   listWorkspaceRuns: vi.fn(),
+  listOpenApprovals: vi.fn(),
   delegateIssue: vi.fn(),
   getRunnerStatus: vi.fn(),
   provisionRunner: vi.fn(),
@@ -38,7 +39,68 @@ const PROVIDERS: DeliveryProvider[] = [
 describe('delivery-store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    act(() => useDeliveryStore.setState({ providers: [], projectProviders: {}, providersLoading: false, runs: {}, workspaceRuns: [], runner: null, activity: {} }));
+    act(() => useDeliveryStore.setState({ providers: [], projectProviders: {}, providersLoading: false, runs: {}, workspaceRuns: [], openApprovals: [], runner: null, activity: {} }));
+    vi.mocked(svc.listOpenApprovals).mockResolvedValue([]);
+  });
+
+  // ---- ce qui attend la personne (R128) ----
+
+  const open = (runId: number, requests: number) => ({ runId, issueId: runId * 10, issueKey: `WEB-${runId}`, issueTitle: 'Fix', projectId: 12, requests });
+
+  it('fetchOpenApprovals reads what waits for the person; a failure keeps the list and returns null', async () => {
+    vi.mocked(svc.listOpenApprovals).mockResolvedValueOnce([open(1, 2)]);
+    await act(async () => { await useDeliveryStore.getState().fetchOpenApprovals('acme'); });
+    expect(svc.listOpenApprovals).toHaveBeenCalledWith('acme');
+    expect(useDeliveryStore.getState().openApprovals).toEqual([open(1, 2)]);
+
+    vi.mocked(svc.listOpenApprovals).mockRejectedValueOnce(new Error('down'));
+    let res: unknown = 'unset';
+    await act(async () => { res = await useDeliveryStore.getState().fetchOpenApprovals('acme'); });
+    expect(res).toBeNull();
+    expect(useDeliveryStore.getState().openApprovals).toEqual([open(1, 2)]);
+  });
+
+  it('answering a request lowers the number at once, before the server is read again', async () => {
+    act(() => useDeliveryStore.setState({ openApprovals: [open(100, 2), open(101, 1)] }));
+    vi.mocked(svc.decideApproval).mockResolvedValue(undefined);
+    vi.mocked(svc.getRunActivity).mockResolvedValue({ events: [], approvals: [] });
+    let during: number[] = [];
+    vi.mocked(svc.listOpenApprovals).mockImplementationOnce(async () => {
+      during = useDeliveryStore.getState().openApprovals.map((row) => row.requests);
+      return [open(100, 1), open(101, 1)];
+    });
+
+    await act(async () => { await useDeliveryStore.getState().decideApproval('acme', 100, 9, true); });
+
+    expect(during).toEqual([1, 1]);
+    expect(useDeliveryStore.getState().openApprovals).toEqual([open(100, 1), open(101, 1)]);
+  });
+
+  it('the last request of a mission takes its line away', async () => {
+    act(() => useDeliveryStore.setState({ openApprovals: [open(100, 1)] }));
+    vi.mocked(svc.decideApproval).mockResolvedValue(undefined);
+    vi.mocked(svc.getRunActivity).mockResolvedValue({ events: [], approvals: [] });
+    let during: unknown[] = [];
+    vi.mocked(svc.listOpenApprovals).mockImplementationOnce(async () => {
+      during = useDeliveryStore.getState().openApprovals;
+      return [];
+    });
+
+    await act(async () => { await useDeliveryStore.getState().decideApproval('acme', 100, 9, false); });
+
+    expect(during).toEqual([]);
+  });
+
+  it('a refused answer reads the truth again: the request had already closed', async () => {
+    act(() => useDeliveryStore.setState({ openApprovals: [open(100, 1)] }));
+    vi.mocked(svc.decideApproval).mockRejectedValue(new Error('expired'));
+    vi.mocked(svc.listOpenApprovals).mockResolvedValueOnce([]);
+
+    let ok = true;
+    await act(async () => { ok = await useDeliveryStore.getState().decideApproval('acme', 100, 9, true); });
+
+    expect(ok).toBe(false);
+    expect(useDeliveryStore.getState().openApprovals).toEqual([]);
   });
 
   it('fetchProviders loads the providers', async () => {
