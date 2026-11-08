@@ -103,6 +103,17 @@ export function caseLines(item: Pick<EvalHistoryCase, "grades">, runs: readonly 
   return lines
 }
 
+/** La dernière note d'un cas, tous modèles confondus, et son modèle : le signe de sa ligne (R129) ; null sans rejeu. */
+export function lastMark(lines: readonly CaseLine[]): (CaseMark & { readonly model: string }) | null {
+  let last: (CaseMark & { model: string }) | null = null
+  for (const line of lines) {
+    for (const mark of line.marks) {
+      if (last === null || mark.runId > last.runId) last = { ...mark, model: line.model }
+    }
+  }
+  return last
+}
+
 /** D'où vient un cas, dans les mots du volet : l'origine, et pour un incident ce que le modèle a dit et ce qui a été montré. */
 export interface CaseOrigin {
   readonly origin: string

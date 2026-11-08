@@ -135,6 +135,20 @@ class ModelCapabilityServiceTest {
     }
 
     @Test
+    @DisplayName("chaque ligne dit quels cas sont ratés à leur dernière note, dans l'ordre de la suite (R130)")
+    void rowsSayWhichCasesFailed() {
+        measure(1L, "qwen3:8b", MEASURED.minusDays(1), List.of("tools-move", "tools-list"));
+        measure(2L, "qwen3:8b", MEASURED, List.of("french-read", "context-long"));
+
+        ModelCapabilityResponse table = service.table("acme", 7L);
+
+        // La mesure d'hier ratait les outils : sa dernière note les réussit, ils ne sont plus ratés.
+        assertThat(table.models().get(0).failedCases()).containsExactly("context-long", "french-read");
+        assertThat(table.models().stream().filter(row -> row.model().equals("qwen3:14b")).findFirst().orElseThrow().failedCases())
+            .as("un modèle pas mesuré n'a rien de raté").isEmpty();
+    }
+
+    @Test
     @DisplayName("chaque ligne porte ce que dit la fiche du modèle chez son fournisseur, et rien quand elle ne dit rien")
     void rowsCarryTheModelCard() {
         ModelGateway.ModelCard described = new ModelGateway.ModelCard("14.8B", 40960, true);

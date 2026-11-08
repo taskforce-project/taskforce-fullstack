@@ -32,6 +32,8 @@ interface WindowState {
   places: Record<string, string>
   /** Le dernier espace de chaque personne, que le démarrage rouvre. */
   lastSpaces: Record<string, string>
+  /** L'onglet du volet « Progress » de chaque personne (R130) : le contrôle segmenté se rouvre où elle l'a laissé. */
+  progressTabs: Record<string, string>
 
   togglePaneFull: () => void
   /** Retient la largeur du volet ; null la ramène à la moitié de la place (double-clic sur la poignée). */
@@ -45,6 +47,8 @@ interface WindowState {
   setSearchOpen: (open: boolean) => void
   /** Retient l'adresse de la fenêtre pour cette personne dans cet espace, et cet espace comme son dernier. */
   rememberPlace: (person: string, slug: string, address: string) => void
+  /** Retient l'onglet de « Progress » pour cette personne. */
+  setProgressTab: (person: string, tab: string) => void
 }
 
 /** Les adresses retenues au plus : les plus anciennes partent. */
@@ -64,6 +68,7 @@ export const useWindowStore = create<WindowState>()(
       searchOpen: false,
       places: {},
       lastSpaces: {},
+      progressTabs: {},
 
       togglePaneFull: () => set((s) => ({ paneFull: !s.paneFull })),
       setPaneWidth: (width) => set({ paneWidth: width === null ? null : Math.round(width) }),
@@ -83,12 +88,14 @@ export const useWindowStore = create<WindowState>()(
           lastSpaces: { ...s.lastSpaces, [person]: slug },
         }
       }),
+      setProgressTab: (person, tab) => set((s) => ({ progressTabs: { ...s.progressTabs, [person]: tab } })),
     }),
     {
       name: "tf-window",
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
         paneFull: s.paneFull, paneWidth: s.paneWidth, rightOpen: s.rightOpen, places: s.places, lastSpaces: s.lastSpaces,
+        progressTabs: s.progressTabs,
       }),
     },
   ),

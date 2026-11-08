@@ -15,6 +15,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.taskforce.tf_api.core.dto.response.DeliveryOpenApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryProviderResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunActivityResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
@@ -167,6 +168,23 @@ class DeliveryControllerWebMvcTest {
 
         verify(deliveryRunner, never()).refresh(anyLong());
         verify(deliveryService, times(1)).listRuns(anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("GET /delivery/approvals/open : ce qui attend la personne, une ligne par mission (R128)")
+    void openApprovals_200() throws Exception {
+        var a = auth();
+        when(activityService.openApprovals("acme", 7L)).thenReturn(List.of(
+            new DeliveryOpenApprovalResponse(100L, 55L, "OPS-12", "Fix the footer", 12L, 3)));
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/approvals/open").with(a))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].runId").value(100))
+            .andExpect(jsonPath("$.data[0].issueId").value(55))
+            .andExpect(jsonPath("$.data[0].issueKey").value("OPS-12"))
+            .andExpect(jsonPath("$.data[0].issueTitle").value("Fix the footer"))
+            .andExpect(jsonPath("$.data[0].projectId").value(12))
+            .andExpect(jsonPath("$.data[0].requests").value(3));
     }
 
     @Test

@@ -22,8 +22,7 @@ export function BankCurveChart({ curve, label, passedText }: Readonly<{
 }>) {
   return (
     <figure aria-label={label} className="flex flex-col gap-2">
-      <figcaption className="text-[11px] text-muted-foreground">{label}</figcaption>
-      <div className="h-40 w-full">
+      <div className="h-40 w-full" title={label}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={[...curve.points]} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
             <XAxis

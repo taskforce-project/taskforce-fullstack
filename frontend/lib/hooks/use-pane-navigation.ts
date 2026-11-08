@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation"
 import {
   closeIssueHref, issueHref, missionPath, previousAddress, sameAddress, withConversation, type IssueRef,
 } from "@/lib/window/address"
-import { boardPath, homePath } from "@/lib/window/pane"
+import { boardPath, homePath, waitingPath } from "@/lib/window/pane"
 
 /** L'adresse de maintenant, lue au moment du geste : le volet, et ce que sa requête ouvre (l'issue, la conversation). */
 function here(): { pathname: string; search: string } {
@@ -22,6 +22,8 @@ export interface PaneNavigation {
   openMission: (runId: number) => void
   /** Ouvre le tableau d'un projet. */
   openBoard: (projectId: number) => void
+  /** Ouvre « Waiting for you » dans le volet (R127). */
+  openWaiting: () => void
   /** Ferme le volet : l'accueil de l'espace, où la conversation est seule. */
   closePane: () => void
 }
@@ -52,6 +54,7 @@ export function usePaneNavigation(): PaneNavigation {
       },
       openMission: (runId) => go(withConversation(missionPath(slug, runId), here().search)),
       openBoard: (projectId) => go(withConversation(boardPath(slug, projectId), here().search)),
+      openWaiting: () => go(withConversation(waitingPath(slug), here().search)),
       closePane: () => go(withConversation(homePath(slug), here().search)),
     }
   }, [router, slug])

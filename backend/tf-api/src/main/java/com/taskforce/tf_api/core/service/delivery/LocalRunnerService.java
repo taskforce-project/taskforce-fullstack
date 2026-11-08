@@ -200,8 +200,7 @@ public class LocalRunnerService {
         // Les faits de la carte de résultat (R78) : la fin, et pour un travail rendu la branche, les commits, les tests.
         run.setEndedAt(LocalDateTime.now());
         if (done) recordFacts(run, result);
-        // Les demandes sans réponse vont au dossier de preuve avant sa clôture, faite par DeliveryRunner.
-        activityService.closeApprovals(run);
+        // DeliveryRunner clôt le dossier de preuve et les demandes sans réponse, quelle que soit la fin de la mission.
         deliveryRunner.complete(runId, poll);
     }
 

@@ -44,9 +44,11 @@ public record ModelCapabilityResponse(
     /**
      * Une ligne : un modèle servi, s'il répond à Cortex pour la personne, sa dernière mesure, et ce que dit sa fiche chez
      * le fournisseur ({@code card}, sur Ollama ; {@code null} ailleurs). Le volet « Progress » montre la fiche comme
-     * telle tant que le modèle n'est pas mesuré, jamais comme une note (R113, R125).
+     * telle tant que le modèle n'est pas mesuré, jamais comme une note (R113, R125). {@code failedCases} : les clés des
+     * cas ratés à leur dernière note, dans l'ordre de la suite, pour le détail de la ligne (R130).
      */
-    public record ModelRow(String model, boolean current, LocalDateTime measuredAt, List<Score> scores, Card card) {
+    public record ModelRow(String model, boolean current, LocalDateTime measuredAt, List<Score> scores, Card card,
+                           List<String> failedCases) {
     }
 
     /**

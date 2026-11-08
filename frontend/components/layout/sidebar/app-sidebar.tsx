@@ -53,7 +53,7 @@ import { groupConversations, leftBarProjects } from "@/lib/window/left-bar"
 import { missionPath } from "@/lib/window/address"
 import { liveRuns, runLabel, runState, type WorkState } from "@/lib/window/missions"
 import { PROGRESS, boardPath } from "@/lib/window/pane"
-import { waitingCount } from "@/lib/window/waiting"
+import { unreadMentions, waitingCount } from "@/lib/window/waiting"
 
 const LOGO_SRC = "/assets/logo/logo_taskforce_tp.png"
 /** Les conversations montrées sous un projet, puis sans projet, avant « N more ». */
@@ -176,6 +176,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const removeConversation = useCortexStore((s) => s.removeConversation)
   const setOpen = useCortexStore((s) => s.setOpen)
   const runs = useDeliveryStore((s) => s.workspaceRuns)
+  const approvals = useDeliveryStore((s) => s.openApprovals)
   const signals = useNotificationStore((s) => s.signals)
   const me = useUserStore((s) => s.user?.id)
   const setSearchOpen = useWindowStore((s) => s.setSearchOpen)
@@ -185,7 +186,9 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const shown = React.useMemo(() => leftBarProjects(projects), [projects])
   const groups = React.useMemo(() => groupConversations(conversations, shown), [conversations, shown])
   const live = React.useMemo(() => liveRuns(runs, me, now), [runs, me, now])
-  const waiting = waitingCount(signals, runs, me)
+  const waiting = waitingCount(approvals, runs, me)
+  const mentions = unreadMentions(signals).length
+  const mentionsName = mentions > 0 ? fillText(t.unreadMentions, { count: mentions }) : undefined
   const href = (path: string) => `/${slug}${path}`
   const isAt = (path: string) => pathname === href(path) || pathname.startsWith(`${href(path)}/`)
   const inMore = MORE.some((item) => isAt(item.path))
@@ -267,12 +270,19 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={isAt("/inbox")}>
-                <Link href={href("/inbox")} onClick={done}>
+                <Link href={href("/inbox")} onClick={done} title={mentionsName}>
                   <Inbox />
                   <span>{t.waitingForYou}</span>
                 </Link>
               </SidebarMenuButton>
-              {waiting > 0 && <SidebarMenuBadge>{waiting}</SidebarMenuBadge>}
+              {/* Le nombre compte ce qui bloque un agent ou attend un jugement, jamais rouge ni animé ; une mention non lue
+                  est un point discret (R128). */}
+              {(waiting > 0 || mentions > 0) && (
+                <SidebarMenuBadge className="gap-1.5">
+                  {mentions > 0 && <span role="img" aria-label={mentionsName} className="size-1.5 rounded-full bg-muted-foreground/70" />}
+                  {waiting > 0 && waiting}
+                </SidebarMenuBadge>
+              )}
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
