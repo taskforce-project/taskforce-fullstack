@@ -275,7 +275,7 @@ public class ModelCapabilityService {
 
     /** La dernière note de chaque cas, pour les modèles servis, dans l'ordre de la table. */
     private record Measures(List<String> order, Map<String, Map<Capability, Score>> scores,
-                            Map<String, LocalDateTime> measuredAt) {
+                            Map<String, LocalDateTime> measuredAt, Map<String, List<String>> failedCases) {
     }
 
     private record Latest(boolean passed, LocalDateTime at) {
@@ -299,6 +299,7 @@ public class ModelCapabilityService {
         }
         Map<String, Map<Capability, Score>> scores = new LinkedHashMap<>();
         Map<String, LocalDateTime> measuredAt = new HashMap<>();
+        Map<String, List<String>> failedCases = new HashMap<>();
         for (String model : order) {
             Map<String, Latest> byCase = latest.getOrDefault(model, Map.of());
             Map<Capability, Score> cells = new LinkedHashMap<>();
@@ -308,8 +309,11 @@ public class ModelCapabilityService {
             scores.put(model, cells);
             byCase.values().stream().map(Latest::at).max(LocalDateTime::compareTo)
                 .ifPresent(at -> measuredAt.put(model, at));
+            failedCases.put(model, CapabilitySuite.cases().stream().map(CapabilityCase::key)
+                .filter(key -> byCase.containsKey(key) && !byCase.get(key).passed())
+                .toList());
         }
-        return new Measures(order, scores, measuredAt);
+        return new Measures(order, scores, measuredAt, failedCases);
     }
 
     private static Score score(Capability capability, Map<String, Latest> byCase) {
@@ -341,7 +345,7 @@ public class ModelCapabilityService {
 
         List<ModelRow> rows = measures.order().stream()
             .map(model -> new ModelRow(model, model.equals(current), measures.measuredAt().get(model),
-                List.copyOf(measures.scores().get(model).values()), card(model)))
+                List.copyOf(measures.scores().get(model).values()), card(model), measures.failedCases().get(model)))
             .toList();
         List<Proposal> proposals = new ArrayList<>();
         for (Capability capability : Capability.values()) {
