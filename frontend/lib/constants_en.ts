@@ -420,9 +420,6 @@ export const CONSTANTS_EN = {
     waiting: "The AI allows a request per minute here: next case in {seconds} s",
     stop: "Stop",
     inUse: "Cortex uses it",
-    use: "Use for Cortex",
-    useHint: "Cortex answers you with this model",
-    useInstance: "Use the instance's model",
     instanceModel: "This instance's model for Cortex: {model}.",
     // On Ollama, the gateway sizes the context window to each request, up to this many tokens.
     instanceModelWindow: "This instance's model for Cortex: {model}, with a context window of up to {tokens} tokens.",
@@ -439,7 +436,6 @@ export const CONSTANTS_EN = {
     partial: "{passed} of {measured} measured",
     caseFailed: "Failed: {title}",
     lastMeasure: "Last measure of {model}: {passed} of {total} cases passed.",
-    desktopUse: "Use for Cortex sets the conversation and quick answer models below: save to apply.",
     // R118: TaskForce's words under an answer when the bank says the model failed this kind of request.
     saysWhat: "about the model that answers",
     saysLabel: "TaskForce, about the model that answers",
@@ -529,6 +525,7 @@ export const CONSTANTS_EN = {
     cycles: "Cycles",
     members: "Members",
     analytics: "Analytics",
+    progress: "Progress",
     // The four states of R57, on one dot.
     states: {
       working: "Working",
@@ -564,6 +561,7 @@ export const CONSTANTS_EN = {
       cycles: "Cycles",
       settings: "Settings",
       missions: "Work view",
+      progress: "Progress",
     },
     fullWidth: "Full width",
     sideBySide: "Beside the conversation",
@@ -703,6 +701,73 @@ export const CONSTANTS_EN = {
       person: "person",
     },
     result: "Result",
+  },
+
+  // The pane "Progress" (R125, session 18 of the Council): what Cortex knows and how it improves, measured here. It
+  // shows what the agent knows and what improves, never its activity, never a ranking (R57).
+  progress: {
+    intro: "What Cortex can do and how it improves, measured here, and what it reads in this workspace. Nothing here comes from a vendor's benchmark.",
+    // 1. What each model can do, measured here (R113): the table keeps its title and hint in `models`.
+    notMeasuredYet: "Not measured yet.",
+    // A model not measured yet: what its own description says, labelled as such, never a score.
+    fromDescription: "Its description says: {card}.",
+    cardParameters: "{parameters} parameters",
+    cardWindow: "a context window of {tokens} tokens",
+    cardTools: "takes tools",
+    cardNoTools: "takes no tools",
+    chooseModel: "Choose Cortex's model in Settings > AI",
+    // 2. How it does over time: the test bank (R61, R118).
+    overTime: "How it does over time",
+    overTimeHint: "The test bank: questions your team asked Cortex, replayed on a model and graded by code.",
+    noCases: "The test bank has no case yet. Under an answer of Cortex, choose Add to test bank.",
+    noRuns: "Not replayed yet.",
+    replay: "Replay {count} cases on {model}",
+    replayOne: "Replay 1 case on {model}",
+    replayHint: "A replay never touches your workspace, and counts in your AI usage like an answer.",
+    replaying: "Replaying case {done} of {total}…",
+    replayStarting: "Starting the replay…",
+    replayWaiting: "The AI allows a request per minute here: next case in {seconds} s",
+    stop: "Stop",
+    stopping: "Stopping…",
+    cortexModel: "Cortex's model",
+    defaultModel: "Default model",
+    curve: "Share of the test bank passed, by model",
+    passed: "{passed} of {total} passed",
+    partial: "{graded} of {total} graded",
+    // 3. What improved it: each correction turned into a case, where it came from (E17), and its result since.
+    improved: "What improved it",
+    improvedHint: "Each case someone added with Add to test bank, where it came from, and its result since.",
+    originIncident: "From a trust incident on {date}: TaskForce corrected the answer.",
+    originSaid: "Cortex said: {text}",
+    originShown: "TaskForce showed: {text}",
+    originAnswer: "From an answer of Cortex on {date}.",
+    originUnknown: "Asked on {date}.",
+    addedByYou: "Added on {date} by you.",
+    added: "Added on {date}.",
+    notReplayed: "Not replayed since it was added.",
+    gradePassed: "{model}, {date}: passed",
+    gradeFailed: "{model}, {date}: failed",
+    lastPassed: "passed on {date}",
+    lastFailed: "failed on {date}",
+    // 4. What it knows of this workspace: the sources Cortex reads for the person, counted and dated.
+    knows: "What it knows of this workspace",
+    knowsHint: "What Cortex can read for you here, counted, with the date of the latest change.",
+    sources: {
+      projects: "Projects",
+      issues: "Issues",
+      comments: "Comments",
+      notes: "Notes",
+      documents: "Documents",
+      connectors: "Connected tools",
+    },
+    changed: "changed {date}",
+    none: "None yet",
+    reading: "Reading…",
+    // Settings > AI keeps the model choice, and opens Progress.
+    seeProgress: "See what each model can do in Progress",
+    choiceLabel: "Cortex's model",
+    choiceHint: "Cortex answers you with this model. TaskForce proposes one from what it measured here; you choose.",
+    instanceChoice: "{model} (this instance's model)",
   },
 
   // Delegated missions: what an agent asks while it works (R78, the Allow screen).
