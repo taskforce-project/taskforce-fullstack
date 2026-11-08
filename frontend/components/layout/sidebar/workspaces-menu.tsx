@@ -26,6 +26,8 @@ import { Label } from "@/components/ui/label"
 import { WorkspaceAvatar } from "@/components/ui/workspace-avatar"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
+// Un espace s'ouvre sur son accueil, où la fenêtre reprend là où la personne l'a laissé (R123).
+import { homePath } from "@/lib/window/pane"
 
 /**
  * Le choix de l'espace, dans le menu de la personne en bas de la barre de gauche (R121) : « Vos espaces » (le flag
@@ -52,7 +54,7 @@ export function WorkspacesSubmenu({ onCreate }: Readonly<{ onCreate: () => void 
   const item = (ws: (typeof workspaces)[number]) => (
     <DropdownMenuItem
       key={ws.uuid}
-      onClick={() => router.push(`/${ws.slug}/dashboard`)}
+      onClick={() => router.push(homePath(ws.slug))}
       className="gap-2"
       data-active={ws.slug === activeWorkspace?.slug}
     >
@@ -110,7 +112,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Readonly<{ open: b
       onOpenChange(false)
       setName("")
       setActivity("")
-      router.push(`/${workspace.slug}/dashboard`)
+      router.push(homePath(workspace.slug))
     } else {
       toast.error("Couldn't create the workspace. Please try again.")
     }

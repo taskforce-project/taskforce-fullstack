@@ -22,6 +22,7 @@ import { useElementWidth } from "@/hooks/use-element-width"
 import { useMinWidth } from "@/hooks/use-min-width"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { useConversationAddress } from "@/lib/hooks/use-conversation-address"
+import { useLastPlace } from "@/lib/hooks/use-last-place"
 import { useMissionsSync } from "@/lib/hooks/use-missions-sync"
 import { useNotificationsSync } from "@/lib/hooks/use-notifications-sync"
 import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
@@ -140,6 +141,8 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
   useWindowData(slug)
   useSearchShortcut()
   useConversationAddress(slug)
+  // Au démarrage, la fenêtre reprend là où la personne l'a laissée (R123) ; ensuite, chaque adresse se retient.
+  useLastPlace(slug)
 
   // Le volet prend toute la largeur : la conversation se replie dans le compositeur.
   const folded = route !== null && (paneFull || !wide || split.narrow)

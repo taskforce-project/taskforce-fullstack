@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { useWindowStore, WINDOW_ROWS } from "./window-store"
+import { placeKey, useWindowStore, WINDOW_ROWS } from "./window-store"
 
 const initial = useWindowStore.getState()
 
@@ -8,7 +8,10 @@ const initial = useWindowStore.getState()
 describe("useWindowStore", () => {
   beforeEach(() => {
     localStorage.clear()
-    useWindowStore.setState({ ...initial, paneFull: false, paneWidth: null, rightOpen: true, rightDrawer: false, rows: {}, searchOpen: false })
+    useWindowStore.setState({
+      ...initial, paneFull: false, paneWidth: null, rightOpen: true, rightDrawer: false, rows: {}, searchOpen: false,
+      places: {}, lastSpaces: {},
+    })
   })
 
   it("starts beside the conversation, the right panel open with its six rows folded", () => {
@@ -77,6 +80,35 @@ describe("useWindowStore", () => {
 
     const writes = vi.mocked(localStorage.setItem).mock.calls.filter(([key]) => key === "tf-window")
     const saved = JSON.parse(writes.at(-1)?.[1] ?? "{}") as { state?: Record<string, unknown> }
-    expect(saved.state).toEqual({ paneFull: true, paneWidth: 700, rightOpen: false })
+    expect(saved.state).toEqual({ paneFull: true, paneWidth: 700, rightOpen: false, places: {}, lastSpaces: {} })
+  })
+
+  // R123 : la fenêtre s'ouvre là où la personne l'a laissée, par personne et par espace.
+  it("remembers where each person left each space, and their last space", () => {
+    const { rememberPlace } = useWindowStore.getState()
+    rememberPlace("7", "acme", "/acme/projects/3?c=4")
+    rememberPlace("7", "partner", "/partner?c=9")
+    rememberPlace("8", "acme", "/acme/roadmap")
+
+    expect(useWindowStore.getState().places).toEqual({
+      [placeKey("7", "acme")]: "/acme/projects/3?c=4",
+      [placeKey("7", "partner")]: "/partner?c=9",
+      [placeKey("8", "acme")]: "/acme/roadmap",
+    })
+    expect(useWindowStore.getState().lastSpaces).toEqual({ 7: "partner", 8: "acme" })
+
+    const before = useWindowStore.getState()
+    rememberPlace("8", "acme", "/acme/roadmap")
+    expect(useWindowStore.getState()).toBe(before)
+  })
+
+  it("keeps the last twenty places: the oldest ones leave", () => {
+    const { rememberPlace } = useWindowStore.getState()
+    for (let i = 0; i < 25; i++) rememberPlace("7", `space-${i}`, `/space-${i}?c=${i}`)
+
+    const places = useWindowStore.getState().places
+    expect(Object.keys(places)).toHaveLength(20)
+    expect(places[placeKey("7", "space-0")]).toBeUndefined()
+    expect(places[placeKey("7", "space-24")]).toBe("/space-24?c=24")
   })
 })
