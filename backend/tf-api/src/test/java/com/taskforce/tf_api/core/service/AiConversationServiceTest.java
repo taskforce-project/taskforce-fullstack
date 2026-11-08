@@ -218,6 +218,20 @@ class AiConversationServiceTest {
     }
 
     @Test
+    @DisplayName("fit : quand ce qui est joint prend toute la place, aucun résumé ne partirait : pas d'appel au modèle")
+    void fit_no_summary_when_no_room_for_history() {
+        when(llm.isConfigured()).thenReturn(true);
+        holding(thread(3));
+        ContextBudget full = new ContextBudget(new ModelWindow("qwen3:8b", 8_192, false, 2_048), 5_012, 0, 1_000, 100);
+
+        TurnHistory.Fitted fitted = service.fit(1L, full, "fast");
+
+        assertThat(fitted.messages()).isEmpty();
+        assertThat(fitted.leftOut()).isEqualTo(3);
+        verify(llm, never()).chatCompletion(anyString(), anyString(), anyBoolean(), anyString());
+    }
+
+    @Test
     @DisplayName("fit : sans IA disponible, l'historique se coupe, sans chercher à condenser")
     void fit_does_not_condense_without_ai() {
         when(llm.isConfigured()).thenReturn(false);

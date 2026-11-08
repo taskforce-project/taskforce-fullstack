@@ -238,6 +238,9 @@ public class AiConversationService {
      * un appel au modèle alors que l'historique tient encore. Un résumé devenu trop long pour ce modèle se raccourcit aussi.
      */
     private Condensation due(Kept kept, ContextBudget budget) {
+        if (budget.historyRoom() == 0) {
+            return null; // ce que la personne a joint prend toute la place : un résumé ne partirait pas davantage
+        }
         int summary = kept.summary() == null ? 0 : tokensOf(summaryMessage(kept.summary()));
         int[] sizes = sizes(kept.messages());
         int total = summary + sum(sizes, sizes.length);
