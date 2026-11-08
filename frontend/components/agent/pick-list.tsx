@@ -44,7 +44,7 @@ export function PickList({ id, options, active, searching, onPick, onActive, cla
       className={cn("max-h-72 overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-lg", className)}
     >
       {options.length === 0 && (
-        <p className="px-2 py-1.5 text-[13px] text-muted-foreground">{searching ? t.searching : t.attachNone}</p>
+        <p className="px-2 py-1.5 text-sm text-muted-foreground">{searching ? t.searching : t.attachNone}</p>
       )}
       {groups.map((group) => {
         const Icon = ICONS[group]
@@ -62,7 +62,7 @@ export function PickList({ id, options, active, searching, onPick, onActive, cla
                 onClick={() => onPick(option)}
                 onMouseEnter={() => onActive(index)}
                 className={cn(
-                  "flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-[13px] transition-colors duration-150 motion-reduce:transition-none",
+                  "flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-sm transition-colors duration-150 motion-reduce:transition-none",
                   index === active ? "bg-muted text-foreground" : "text-foreground/90",
                 )}
               >

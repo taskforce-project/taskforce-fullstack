@@ -109,7 +109,7 @@ export function AttachMenu({ slug, onDone }: Readonly<{
             aria-autocomplete="list"
             aria-activedescendant={current ? optionDomId(listId, current) : undefined}
             className={cn(
-              "h-9 w-full rounded-lg border border-border bg-popover px-2.5 text-[13px] outline-none",
+              "h-9 w-full rounded-lg border border-border bg-popover px-2.5 text-sm outline-none",
               "placeholder:text-muted-foreground/60 focus-visible:border-primary",
             )}
           />
