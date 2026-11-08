@@ -7,7 +7,7 @@
 param(
   [Parameter(Mandatory)]
   [ValidateSet('versions', 'download', 'clean-install', 'first-start', 'first-database', 'update', 'updated-database',
-    'without-account', 'no-visual-cpp', 'uninstall', 'verdict')]
+    'without-account', 'no-visual-cpp', 'runtime-fix', 'uninstall', 'verdict')]
   [string] $Step
 )
 
@@ -53,6 +53,9 @@ $DbUser = 'taskforce'
 $Database = 'taskforce'
 $Connection = @('-h', '127.0.0.1', '-p', "$DbPort", '-U', $DbUser)
 $ChecklistRows = 2000
+$PostgresTools = 'initdb', 'pg_ctl', 'postgres', 'pg_dump', 'pg_restore', 'psql'
+# The first desktop version whose PostgreSQL brings its own Visual C++ runtime (desktop/scripts/postgres-runtime.mjs).
+$RuntimeBroughtFrom = [version] '1.10.0'
 
 $ExpectedFiles = @(
   'TaskForce.exe',
@@ -366,18 +369,18 @@ function Set-DatabaseEnvironment {
 
 # As EmbeddedPostgres.start (desktop/src/postgres.ts). Through files and not this step's output: pg_ctl hands its output
 # to the server it starts, which would hold it open as long as the server runs.
-function Start-Database([string] $Bin) {
+function Start-Database([string] $Bin, [string] $Data = $Cluster, [string] $Log = $DbLog) {
   $options = "-p $DbPort -h 127.0.0.1 -c unix_socket_directories= -c max_connections=30 -c shared_buffers=64MB"
   $process = Start-Process -FilePath (Join-Path $Bin 'pg_ctl.exe') -NoNewWindow -PassThru `
-    -ArgumentList @('-D', "`"$Cluster`"", '-o', "`"$options`"", '-l', "`"$DbLog`"", '-w', '-t', '60', 'start') `
+    -ArgumentList @('-D', "`"$Data`"", '-o', "`"$options`"", '-l', "`"$Log`"", '-w', '-t', '60', 'start') `
     -RedirectStandardOutput (Join-Path $Work 'pg_ctl.out') -RedirectStandardError (Join-Path $Work 'pg_ctl.err')
   $null = $process.Handle
   if (-not $process.WaitForExit(90 * 1000)) { throw 'pg_ctl was still starting the database after 90 s' }
-  if ($process.ExitCode -ne 0) { throw "The database did not start (pg_ctl exit code $($process.ExitCode))" }
+  if ($process.ExitCode -ne 0) { throw "The database did not start (pg_ctl exit code 0x$('{0:X8}' -f $process.ExitCode))" }
 }
 
-function Stop-Database([string] $Bin) {
-  Invoke-Tool 'Stopping the database' (Join-Path $Bin 'pg_ctl.exe') @('-D', $Cluster, '-m', 'fast', '-w', '-t', '30', 'stop')
+function Stop-Database([string] $Bin, [string] $Data = $Cluster) {
+  Invoke-Tool 'Stopping the database' (Join-Path $Bin 'pg_ctl.exe') @('-D', $Data, '-m', 'fast', '-w', '-t', '30', 'stop')
 }
 
 function Invoke-Sql([string] $Bin, [string] $Name, [string] $Sql) {
@@ -499,8 +502,43 @@ function Test-Program([string] $Path) {
   'exit code 0x{0:X8}' -f $process.ExitCode
 }
 
+# So that a program that cannot load fails at once instead of waiting behind a system dialog.
+function Disable-LoadErrorDialogs {
+  Add-Type -Namespace Checklist -Name Native -MemberDefinition '[System.Runtime.InteropServices.DllImport("kernel32.dll")] public static extern uint SetErrorMode(uint mode);'
+  [void] [Checklist.Native]::SetErrorMode(1)
+}
+
+# With the runtime hidden: the six tools load, initdb creates a cluster with the app's options, PostgreSQL starts and
+# loads the extensions the migrations create.
+function Confirm-PostgresWithoutRuntime([string] $Postgres) {
+  $bin = Join-Path $Postgres 'bin'
+  $results = foreach ($tool in $PostgresTools) { [pscustomobject] @{ Tool = $tool; Result = Test-Program (Join-Path $bin "$tool.exe") } }
+  $results | Format-Table -AutoSize | Out-Host
+  $broken = @($results | Where-Object Result -NE 'ok')
+  if ($broken) {
+    $failures = ($broken | Group-Object Result | ForEach-Object { "$($_.Group.Tool -join ', ') ($($_.Name))" }) -join '; '
+    throw "$($broken.Count) of the $($PostgresTools.Count) tools of its PostgreSQL cannot load: $failures. 0xC0000135 means a DLL is missing: the Visual C++ runtime, which neither the installer nor the bundle brings."
+  }
+
+  $data = Join-Path $Work 'cluster-without-runtime'
+  $log = Join-Path $Evidence 'postgres-without-runtime.log'
+  Invoke-Tool 'initdb, with the Visual C++ runtime hidden,' (Join-Path $bin 'initdb.exe') @('-D', $data, '-U', $DbUser, '-A', 'scram-sha-256', "--pwfile=$PasswordFile",
+    '-E', 'UTF8', '--locale-provider=builtin', '--builtin-locale=C.UTF-8')
+  Start-Database $bin $data $log
+  try {
+    $answer = Invoke-Sql $bin 'postgres' @'
+CREATE EXTENSION vector; CREATE EXTENSION "uuid-ossp"; SELECT ('[1,2,3]'::vector <=> '[1,2,4]'::vector) IS NOT NULL AND uuid_generate_v4() IS NOT NULL
+'@
+    if (@($answer)[-1] -ne 't') { throw "PostgreSQL did not answer with its extensions: $answer" }
+  } finally {
+    Stop-Database $bin $data
+  }
+}
+
 # -------------------------------------------------- The steps --------------------------------------------------
 
+# Node is a tool of this checklist, nothing the app relies on: it is looked up before the bare environment hides it.
+$Node = Get-Command node -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
 if ($Step -notin 'versions', 'download', 'verdict') { Use-BareEnvironment }
 
 switch ($Step) {
@@ -515,6 +553,7 @@ switch ($Step) {
       foreach ($version in $previous, $next) { if ($version -notin $published) { throw "Desktop $version is not published" } }
       if ($previous -ge $next) { throw "The update must go forward: $previous to $next" }
       Add-Content -LiteralPath $env:GITHUB_ENV -Value "FROM_VERSION=$previous", "TO_VERSION=$next"
+      Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "predates-runtime=$(if ($next -lt $RuntimeBroughtFrom) { 'true' } else { 'false' })"
       Add-Summary "# Desktop launch checklist: $previous to $next"
       Add-Summary ''
       "From $previous to $next, on a fresh $((Get-CimInstance Win32_OperatingSystem).Caption) runner, with only what is published on GitHub."
@@ -698,30 +737,49 @@ switch ($Step) {
 
   'no-visual-cpp' {
     Invoke-Check 'On a computer without the Visual C++ runtime' {
-      # So that a program that cannot load fails at once instead of waiting behind a system dialog.
-      Add-Type -Namespace Checklist -Name Native -MemberDefinition '[System.Runtime.InteropServices.DllImport("kernel32.dll")] public static extern uint SetErrorMode(uint mode);'
-      [void] [Checklist.Native]::SetErrorMode(1)
-
-      $bin = Join-Path $Resources 'postgres\bin'
-      $tools = 'initdb', 'pg_ctl', 'postgres', 'pg_dump', 'pg_restore', 'psql'
+      Disable-LoadErrorDialogs
+      Set-DatabaseEnvironment
       $hidden = Hide-VisualCppRuntime
       try {
-        $results = foreach ($tool in $tools) { [pscustomobject] @{ Tool = $tool; Result = Test-Program (Join-Path $bin "$tool.exe") } }
-        $java = Test-Program (Join-Path $Resources 'jre\bin\java.exe')
         $window = Test-Start $To "3-sign-in-without-visual-cpp"
+        Write-Host "Hidden: $($hidden -join ', ')"
+        Write-Host "App: $window"
+        $java = Test-Program (Join-Path $Resources 'jre\bin\java.exe')
+        if ($java -ne 'ok') { throw "With the Visual C++ runtime hidden, the installed Java does not start ($java)" }
+        try {
+          Confirm-PostgresWithoutRuntime (Join-Path $Resources 'postgres')
+        } catch {
+          throw "With the Visual C++ runtime hidden, as on a computer that never installed it, the app and its Java still start, but $($_.Exception.Message) On such a computer the app would stop right after sign-in, when it creates its database. $(if ([version] $To -lt $RuntimeBroughtFrom) { "The next step shows the fix of $RuntimeBroughtFrom on these same files." })"
+        }
       } finally {
         Restore-VisualCppRuntime $hidden
       }
-      $results | Format-Table -AutoSize | Out-Host
-      Write-Host "Hidden: $($hidden -join ', ')"
-      Write-Host "App: $window"
-      if ($java -ne 'ok') { throw "With the Visual C++ runtime hidden, the installed Java does not start ($java)" }
-      $broken = @($results | Where-Object Result -NE 'ok')
-      if ($broken) {
-        $failures = ($broken | Group-Object Result | ForEach-Object { "$($_.Group.Tool -join ', ') ($($_.Name))" }) -join '; '
-        throw "With the Visual C++ runtime hidden, as on a computer that never installed it, the app and its Java still start, but $($broken.Count) of the $($tools.Count) tools of its PostgreSQL cannot load: $failures. 0xC0000135 means a DLL is missing: the runtime, which neither the installer nor the bundle brings. On such a computer the app would stop right after sign-in, when it creates its database."
+      "With the Visual C++ runtime hidden, as on a computer that never installed it, the app reaches its sign-in window, its Java runs, the six tools of its PostgreSQL load, initdb creates a cluster, and PostgreSQL starts and loads pgvector and uuid-ossp: the program brings what it needs."
+    }
+  }
+
+  'runtime-fix' {
+    Invoke-Check "The fix of $RuntimeBroughtFrom applied to the published files" {
+      if (-not $Node) { throw 'Node.js is not on this runner: the code of the build cannot run' }
+      $postgres = Join-Path $Work 'postgres-with-runtime'
+      Copy-Item -LiteralPath (Join-Path $Resources 'postgres') -Destination $postgres -Recurse -Force
+      $script = Join-Path $env:GITHUB_WORKSPACE 'desktop\scripts\postgres-runtime.mjs'
+      # What the build runs (desktop/scripts/prepare-resources.mjs), on a copy of the published files of $To.
+      $output = & $Node $script $postgres (Join-Path $Resources 'jre\bin') 2>&1
+      if ($LASTEXITCODE -ne 0) { throw "The code of the build refused the published files: $output" }
+      $applied = $output | ConvertFrom-Json
+      Set-Content -LiteralPath (Join-Path $Evidence 'runtime-fix.json') -Value ($applied | ConvertTo-Json -Depth 4)
+
+      Disable-LoadErrorDialogs
+      Set-DatabaseEnvironment
+      $hidden = Hide-VisualCppRuntime
+      try {
+        Confirm-PostgresWithoutRuntime $postgres
+      } finally {
+        Restore-VisualCppRuntime $hidden
       }
-      "With the Visual C++ runtime hidden, as on a computer that never installed it, the app reaches its sign-in window, its Java runs and the six tools of its PostgreSQL load: the program brings what it needs."
+      $brought = ($applied.copied | ForEach-Object { "$($_.name) $($_.version)" }) -join ', '
+      "On a copy of the published files of $To, the code of the build reads the imports of every PostgreSQL binary, finds that they need $($applied.needed -join ', ') (at least as new as their toolset, $($applied.minimum)), and copies $brought from $($applied.source). With the Visual C++ runtime hidden, the six tools load, initdb creates a cluster, and PostgreSQL starts and loads pgvector and uuid-ossp."
     }
   }
 

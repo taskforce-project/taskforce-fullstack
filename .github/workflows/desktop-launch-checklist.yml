@@ -20,12 +20,17 @@ on:
         description: 'Version it updates to (empty: the latest published desktop version)'
         type: string
         default: ''
+      runner:
+        description: 'Windows image to run on (windows-2022 is the one the app is built on)'
+        type: string
+        default: 'windows-latest'
   # So that it can run from its own branch, before the workflow exists on the default branch.
   push:
     branches: [chore/desktop-launch-checklist]
     paths:
       - '.github/workflows/desktop-launch-checklist.yml'
       - '.github/scripts/desktop-launch-checklist.ps1'
+      - 'desktop/scripts/postgres-runtime.mjs'
 
 permissions:
   contents: read
@@ -37,7 +42,7 @@ concurrency:
 jobs:
   checklist:
     name: Install, update, uninstall
-    runs-on: windows-latest
+    runs-on: ${{ inputs.runner || 'windows-latest' }}
     timeout-minutes: 20
     defaults:
       run:
@@ -45,7 +50,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: .github/scripts
+          sparse-checkout: |
+            .github/scripts
+            desktop/scripts
           persist-credentials: false
 
       - name: Which versions
@@ -94,14 +101,21 @@ jobs:
         timeout-minutes: 4
         run: ./.github/scripts/desktop-launch-checklist.ps1 without-account
 
-      # The runner has this runtime and Windows does not guarantee it, so this step hides it. Its result is about another
-      # machine than the runner: it says what it finds without stopping the checklist, and the last step repeats it. Once
-      # the app brings its own runtime, remove continue-on-error so that it stays that way.
+      # The runner has this runtime and Windows does not guarantee it, so this step hides it. The app brings it from 1.10.0
+      # on: from that version the step is fatal. For the published versions before it, it says what it finds without
+      # stopping the checklist, and the last step repeats it.
       - name: On a computer without the Visual C++ runtime
         id: no-visual-cpp
         timeout-minutes: 3
-        continue-on-error: true
+        continue-on-error: ${{ steps.versions.outputs.predates-runtime == 'true' }}
         run: ./.github/scripts/desktop-launch-checklist.ps1 no-visual-cpp
+
+      # For the versions before the fix only: the code of the build, on a copy of the published files, proves it works.
+      - name: The runtime fix on the published files
+        id: runtime-fix
+        if: steps.versions.outputs.predates-runtime == 'true'
+        timeout-minutes: 3
+        run: ./.github/scripts/desktop-launch-checklist.ps1 runtime-fix
 
       - name: Uninstall
         id: uninstall
