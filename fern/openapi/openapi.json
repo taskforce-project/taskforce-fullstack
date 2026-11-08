@@ -5038,6 +5038,45 @@
         }
       }
     },
+    "/api/workspaces/{slug}/ai/conversations/{id}/compact": {
+      "post": {
+        "tags": [
+          "AI assistant"
+        ],
+        "operationId": "compact",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCompaction"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/ai/benchmark/trials": {
       "post": {
         "tags": [
@@ -15619,6 +15658,9 @@
           "notes": {
             "type": "integer",
             "format": "int32"
+          },
+          "context": {
+            "$ref": "#/components/schemas/ContextRead"
           }
         }
       },
@@ -15706,6 +15748,9 @@
           "contextWindow": {
             "type": "integer",
             "format": "int32"
+          },
+          "contextEstimated": {
+            "type": "boolean"
           }
         }
       },
@@ -15742,6 +15787,23 @@
           },
           "sentTo": {
             "type": "string"
+          }
+        }
+      },
+      "ContextRead": {
+        "type": "object",
+        "properties": {
+          "summarized": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "leftOut": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toolResults": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -16320,6 +16382,33 @@
           "promptTokens": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "ApiResponseCompaction": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Compaction"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Compaction": {
+        "type": "object",
+        "properties": {
+          "summarized": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
