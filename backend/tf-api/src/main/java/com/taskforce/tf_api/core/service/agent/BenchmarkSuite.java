@@ -57,8 +57,11 @@ public final class BenchmarkSuite {
      * personne (« 14:05 » comptait pour deux) ; « retour en arrière » est un retour arrière (plan-migration-fr) ; « passer la
      * base de production » est la bascule du même cas ; une checklist d'une ligne par chose n'exige pas de puce quand la demande
      * n'en parle pas (plan-checklist-en) ; {@code /^[-]+|-+$/} retire bien les tirets des bords (code-slugify-ts).</p>
+     *
+     * <p>3 (08/11/2026), au passage réel suivant, pour la même raison : « sont tous absents » dit bien qu'une issue ne dit rien
+     * (summarize-thin-fr) ; « reprise en arrière » est un retour en arrière (plan-migration-fr).</p>
      */
-    public static final int VERSION = 2;
+    public static final int VERSION = 3;
 
     /** La date que le modèle lit : fixe, pour que deux passages posent la même question. */
     public static final LocalDate ASKED_ON = LocalDate.of(2026, 11, 9);
@@ -278,7 +281,7 @@ public final class BenchmarkSuite {
             IssueMaterial.HEADER + OPS_35,
             "prend OPS-35 et propose moi un résumé",
             inLanguage("fr"), atMostWords(40),
-            says("says the issue says little", "aucun|aucune|pas de|sans|peu d|ne contient|ne dit|ne precise|vide|n'a ni"),
+            says("says the issue says little", "aucun|aucune|pas de|sans|peu d|ne contient|ne dit|ne precise|vide|n'a ni|absent|manqu"),
             doesNotSay("adds no feature or plan", "connexion|securite|refonte|interface|fonctionnalit|amelior|optimis|performance"
                 + "|utilisateur|deploi|livraison|correctif"),
             inventsNothing()),
@@ -396,7 +399,7 @@ public final class BenchmarkSuite {
             inLanguage("fr"), numberedSteps(4, 7), linesOfAtMostWords(25),
             says("rehearses on the pre-production", "pre-?prod"),
             says("backs up", "sauvegard"),
-            says("plans the way back", "retour (en )?arriere|revenir en arriere|rollback|restaur"),
+            says("plans the way back", "en arriere|retour arriere|rollback|restaur|retablir|version precedente"),
             before("rehearses before touching production", "pre-?prod", PRODUCTION_SWITCH),
             before("backs up before the switch", "sauvegard", PRODUCTION_SWITCH),
             inventsNothing()),

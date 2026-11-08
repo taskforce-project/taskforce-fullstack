@@ -77,6 +77,8 @@ class BenchmarkSuiteTest {
                 + "the postmortem and the alert are open and " + "the team is working on it and nobody knows why yet and ".repeat(8)),
 
             good("summarize-thin-fr", "OPS-35 « Itération #35 » ne contient ni description, ni checklist, ni commentaire : il n'y a rien à résumer."),
+            // Version 3 : « absents » dit bien qu'elle ne dit rien.
+            good("summarize-thin-fr", "OPS-35 est une tâche non attribuée, dont la description, la liste de contrôle et les commentaires sont tous absents."),
             bad("summarize-thin-fr", "adds no feature or plan", "Cette itération porte sur la refonte de l'interface de connexion et des mesures "
                 + "de sécurité renforcées."),
             bad("summarize-thin-fr", "answers in French", "OPS-35 is an empty issue: it has no description."),
@@ -161,6 +163,9 @@ class BenchmarkSuiteTest {
             good("plan-migration-fr", "1. Sauvegarder la base de production avec le script existant.\n2. Répéter la migration de PostgreSQL 14 à 17 en "
                 + "préproduction.\n3. Mesurer la coupure en préproduction pour vérifier qu'elle reste sous 5 minutes.\n4. Préparer la procédure de retour "
                 + "arrière.\n5. Basculer la production sur PostgreSQL 17.\n6. Vérifier la production après la bascule."),
+            // Version 3 : « reprise en arrière » est un retour en arrière.
+            good("plan-migration-fr", "1. Sauvegarder la base de production.\n2. Répéter la montée de version en préproduction.\n3. Tester la reprise en arrière en cas "
+                + "d'échec de la bascule.\n4. Basculer la production."),
             // Version 2 : « retour en arrière » est un retour arrière, « passer la base de production » est la bascule.
             good("plan-migration-fr", "1. Sauvegarder la base de production.\n2. Répéter la montée de version en préproduction.\n3. Préparer la procédure de retour en "
                 + "arrière.\n4. Passer la base de production de PostgreSQL 14 à 17."),
