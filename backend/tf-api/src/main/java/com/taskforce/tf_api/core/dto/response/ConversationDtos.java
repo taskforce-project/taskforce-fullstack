@@ -20,4 +20,7 @@ public final class ConversationDtos {
 
     /** Détail : conversation + messages + empreinte tokens (jauge de contexte). */
     public record ConversationDetail(Long id, String title, long totalTokens, List<MessageDto> messages) {}
+
+    /** Ce que « /compact » a fait : les messages condensés dans le résumé ; 0 quand il n'y avait rien à condenser. */
+    public record Compaction(int summarized) {}
 }

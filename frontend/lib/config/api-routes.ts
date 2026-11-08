@@ -398,6 +398,7 @@ export const AI_ROUTES = {
   USAGE: (slug: string) => `/api/workspaces/${slug}/ai/usage`,
   CONVERSATIONS: (slug: string) => `/api/workspaces/${slug}/ai/conversations`,
   CONVERSATION: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}`,
+  CONVERSATION_COMPACT: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}/compact`,
 } as const;
 
 /**

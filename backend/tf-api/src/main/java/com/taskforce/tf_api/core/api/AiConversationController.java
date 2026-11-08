@@ -12,12 +12,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.taskforce.tf_api.core.dto.response.ConversationDtos.Compaction;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationDetail;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationSummary;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.AiConversationService;
+import com.taskforce.tf_api.core.service.agent.ModelCapabilityService;
+import com.taskforce.tf_api.core.service.ai.ChosenModel;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -36,6 +39,7 @@ public class AiConversationController {
     private final AiConversationService service;
     private final BrainAccessGuard access;
     private final UserRepository userRepository;
+    private final ModelCapabilityService capabilities;
 
     private record Ctx(Long workspaceId, Long userId) {}
 
@@ -58,6 +62,18 @@ public class AiConversationController {
         @PathVariable String slug, @PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
         Ctx c = ctx(slug, jwt);
         return ResponseEntity.ok(ApiResponse.success(service.detail(id, c.userId())));
+    }
+
+    /**
+     * « /compact » (TF-J1-13) : condense maintenant les messages anciens dans le résumé de la conversation, même sous le
+     * seuil, avec le modèle que la personne a choisi (R113), et le dit dans la conversation.
+     */
+    @PostMapping("/{id}/compact")
+    public ResponseEntity<ApiResponse<Compaction>> compact(
+        @PathVariable String slug, @PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
+        Ctx c = ctx(slug, jwt);
+        int summarized = ChosenModel.using(capabilities.chosenModel(c.userId()), () -> service.compact(id, c.userId()));
+        return ResponseEntity.ok(ApiResponse.success(new Compaction(summarized)));
     }
 
     @DeleteMapping("/{id}")

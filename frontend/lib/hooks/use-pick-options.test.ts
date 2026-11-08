@@ -80,6 +80,14 @@ describe("usePickOptions", () => {
     expect(result.current.searching).toBe(false)
   })
 
+  it("« /compact » est un geste comme les autres : il remplit le compositeur, il n'envoie rien", () => {
+    const { result } = renderHook(() => usePickOptions("acme", "gesture", "compact"))
+
+    expect(result.current.options).toEqual([{
+      id: "gesture:compact", group: "gestures", label: "Compact this conversation", detail: null, insert: "/compact", attach: null,
+    }])
+  })
+
   it("aucune liste : rien à proposer ni à chercher", () => {
     const { result } = renderHook(() => usePickOptions("acme", null, "x"))
 
