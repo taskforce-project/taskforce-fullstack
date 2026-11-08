@@ -16,11 +16,11 @@ import { usePickOptions } from "@/lib/hooks/use-pick-options"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { useCortexStore } from "@/lib/store/cortex-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { insertDictation } from "@/lib/voice/dictation"
 import { withConversation } from "@/lib/window/address"
 import { cortexModel } from "@/lib/window/environment"
 // Le volet « Progress » (R125) : ce que le modèle sait, et comment il progresse.
 import { progressPath } from "@/lib/window/pane"
-import { insertDictation } from "@/lib/voice/dictation"
 
 /**
  * Le compositeur (R76, R123) : écrire ce qu'on veut faire, puis l'envoyer. Rien ne part tant que la personne n'envoie

@@ -253,6 +253,40 @@ describe("useVoiceStore", () => {
       expect(useVoiceStore.getState().notice).toBe("engine")
     })
 
+    it("a second click or Escape while the state is read starts nothing", async () => {
+      const { voice } = installBridge()
+      openMic()
+      let answer: (value: DesktopVoiceStatus) => void = () => undefined
+      voice.status.mockReturnValue(new Promise((done) => (answer = done)))
+      const { useVoiceStore } = await loadStore()
+
+      const first = useVoiceStore.getState().press("7", vi.fn())
+      await useVoiceStore.getState().press("7", vi.fn())
+      expect(voice.status).toHaveBeenCalledTimes(1)
+      expect(useVoiceStore.getState().phase).toBe("starting")
+
+      useVoiceStore.getState().cancel()
+      answer(READY)
+      await first
+
+      expect(recorder.openRecorder).not.toHaveBeenCalled()
+      expect(useVoiceStore.getState().phase).toBe("idle")
+    })
+
+    it("stays quiet about a failed read after Escape", async () => {
+      const { voice } = installBridge()
+      let fail: (error: unknown) => void = () => undefined
+      voice.status.mockReturnValue(new Promise((_done, reject) => (fail = reject)))
+      const { useVoiceStore } = await loadStore()
+
+      const first = useVoiceStore.getState().press("7", vi.fn())
+      useVoiceStore.getState().cancel()
+      fail(new Error("?"))
+      await first
+
+      expect(useVoiceStore.getState().notice).toBeNull()
+    })
+
     it("says that the status could not be read", async () => {
       const { voice } = installBridge()
       voice.status.mockRejectedValue(new Error("no handler"))

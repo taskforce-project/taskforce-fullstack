@@ -13,7 +13,7 @@ const NO_VOICE_ON_SERVER = (): VoiceKind => null
  * et le micro refermé quand le compositeur s'en va. `kind` reste nul au rendu serveur : le micro n'apparaît qu'une fois la
  * page dans le navigateur, où l'on sait ce qui existe.
  */
-export function useVoiceInput(onText: (text: string) => void): { kind: VoiceKind; phase: VoicePhase; person: string | null; press: () => void } {
+export function useVoiceInput(onText: (text: string) => void): { kind: VoiceKind; phase: VoicePhase; press: () => void } {
   const kind = useSyncExternalStore(NEVER_CHANGES, voiceKind, NO_VOICE_ON_SERVER)
   const phase = useVoiceStore((s) => s.phase)
   const me = useUserStore((s) => s.user?.id)
@@ -45,5 +45,5 @@ export function useVoiceInput(onText: (text: string) => void): { kind: VoiceKind
 
   useEffect(() => () => useVoiceStore.getState().cancel(), [])
 
-  return { kind, phase, person, press }
+  return { kind, phase, press }
 }

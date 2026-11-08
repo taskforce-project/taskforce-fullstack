@@ -27,7 +27,7 @@ export function VoiceLine() {
   const me = useUserStore((s) => s.user?.id)
   const person = me === null || me === undefined ? null : String(me)
 
-  const line = "flex min-h-6 items-center gap-3 px-3.5 pt-2 text-xs text-muted-foreground"
+  const line = "flex min-h-7 items-center gap-3 px-3.5 pt-2 text-xs text-muted-foreground"
 
   if (phase === "consent") {
     return (

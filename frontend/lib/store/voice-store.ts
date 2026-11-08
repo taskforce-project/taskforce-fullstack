@@ -191,16 +191,22 @@ export const useVoiceStore = create<VoiceState>()(
             set({ phase: "consent" })
             return
           }
-          const bridge = desktopBridge()?.voice
+          // Le micro ne s'ouvre qu'une fois : un second clic, ou Échap, pendant cette lecture ne relance rien.
+          const mine = generation
+          set({ phase: "starting" })
           try {
-            const status = await bridge?.status()
+            const status = await desktopBridge()?.voice?.status()
+            if (mine !== generation) return
             if (status?.state === "ready") return listen()
+            set({ phase: "idle" })
             if (status?.state === "downloading") {
               await get().startDownload()
               return
             }
             if (status) set({ phase: "offer", model: { bytes: status.bytes, received: status.received } })
           } catch {
+            if (mine !== generation) return
+            set({ phase: "idle" })
             say("engine")
           }
         },

@@ -44,7 +44,6 @@ describe("useVoiceInput", () => {
     write("Hello")
 
     expect(press).toHaveBeenCalledWith("7", expect.any(Function))
-    expect(result.current.person).toBe("7")
     expect(first).not.toHaveBeenCalled()
     expect(second).toHaveBeenCalledWith("Hello")
   })
