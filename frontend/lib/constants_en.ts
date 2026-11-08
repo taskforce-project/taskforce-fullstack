@@ -561,6 +561,33 @@ export const CONSTANTS_EN = {
     readNothing: "read nothing in TaskForce",
   },
 
+  // The search of the window (Ctrl+K, R121 and R124): issues by key and title, projects, conversations, and the screens
+  // that left the first look, each opened in the pane with the conversation kept.
+  search: {
+    title: "Search",
+    placeholder: "Search issues, projects, conversations, screens…",
+    none: "No results found.",
+    searching: "Searching issues…",
+    issues: "Issues",
+    projects: "Projects",
+    conversations: "Conversations",
+    screens: "Screens",
+    actions: "Actions",
+    appearance: "Appearance",
+    askCortex: "Ask Cortex: {query}",
+    newConversation: "New conversation",
+    createProject: "Create a project",
+    settings: "Settings",
+    profile: "Your profile",
+    reportIssue: "Report an issue on GitHub",
+    light: "Light theme",
+    dark: "Dark theme",
+    system: "Theme of the system",
+    navigate: "to navigate",
+    select: "to open",
+    close: "to close",
+  },
+
   // The window (R119 to R122, session 18 of the Council): the left bar, the title line, the conversation, the pane and
   // the right panel. Its names enter the interface glossary (R22).
   window: {

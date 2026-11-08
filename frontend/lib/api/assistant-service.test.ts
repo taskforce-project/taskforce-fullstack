@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  sendAgentMessage, sendAssistantMessage, isApprovable, isDeletion, isMission, isPreparedIssue, isQuestion, approveAction, isUndoable,
+  sendAgentMessage, isApprovable, isDeletion, isMission, isPreparedIssue, isQuestion, approveAction, isUndoable,
   undoAction, answerQuestion, isQuestionCard,
   type AssistantToolCall,
 } from './assistant-service';
@@ -61,16 +61,6 @@ describe('assistant-service', () => {
 
     expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.CHAT(slug), { message: 'hi', conversationId: 7, model: 'qwen3:8b' },
       expect.anything());
-  });
-
-  it('sendAssistantMessage: returns only the answer markdown string', async () => {
-    const turn = buildTurn();
-    vi.mocked(apiClient.post).mockResolvedValue(envelope(turn));
-
-    const result = await sendAssistantMessage(slug, 'hi');
-
-    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.CHAT(slug), { message: 'hi', conversationId: null }, expect.anything());
-    expect(result).toBe('Hello there');
   });
 
   it('sendAgentMessage: sends what the person attached from the composer, only when there is something (R123)', async () => {

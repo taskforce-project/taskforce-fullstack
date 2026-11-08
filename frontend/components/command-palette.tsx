@@ -1,294 +1,273 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "react"
-import { useRouter, useParams } from "next/navigation"
-import { TextShimmerWave } from "@/components/ui/text-shimmer-wave"
+import { useEffect, useState } from "react"
+import { useParams, useRouter } from "next/navigation"
 import {
-  LayoutDashboard,
-  Inbox,
-  ClipboardCheck,
-  FolderKanban,
-  CircleDot,
-  Repeat,
-  CalendarRange,
-  Users,
-  Activity,
-  Settings,
-  Plus,
-  User,
-  Bell,
-  Sun,
-  Moon,
-  Search,
-  Sparkles,
-  Loader2,
-  CornerDownLeft,
-  ArrowLeft,
-  ArrowRight,
-  Bug,
-  Compass,
+  Activity, ArrowRight, Bug, CalendarRange, CircleDot, FolderKanban, Inbox, LayoutDashboard, ListChecks, MessageSquare,
+  Monitor, Moon, Plus, Repeat, Settings, Sparkles, Sun, User, Users, type LucideIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
-import { useCreateProjectStore } from "@/lib/store/create-project-store"
-import { useSettingsStore } from "@/lib/store/settings-store"
-import { sendAssistantMessage } from "@/lib/api/assistant-service"
-import { IS_DESKTOP } from "@/lib/desktop"
-
 import {
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
+  CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator,
 } from "@/components/ui/command"
+import { fillText } from "@/lib/delivery/result-card"
+import { IS_DESKTOP } from "@/lib/desktop"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
+import { SEARCH_DELAY_MS } from "@/lib/hooks/use-pick-options"
+import { useCortexStore } from "@/lib/store/cortex-store"
+import { useCreateProjectStore } from "@/lib/store/create-project-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { useProjectStore } from "@/lib/store/project-store"
+import { searchKey, useSearchStore } from "@/lib/store/search-store"
+import { useSettingsStore } from "@/lib/store/settings-store"
+import { withConversation } from "@/lib/window/address"
+import { homePath } from "@/lib/window/pane"
 
 /** Les bugs et idées se signalent sur le dépôt du projet (open source), pas dans l'instance. */
 const REPORT_ISSUE_URL = "https://github.com/taskforce-project/taskforce-fullstack/issues/new/choose"
 
-// ─── Hook IA - appelle le VRAI assistant (Cortex), plus de mock ──────────────
-//
-// ⚠️ Ce hook renvoyait auparavant une phrase FIGÉE (« Cette réponse sera bientôt connectée à l'API »)
-// avec un faux streaming mot-à-mot. C'était un mensonge servi à l'utilisateur sur le différenciateur du
-// produit (règle d'or n°7). Il tape désormais l'endpoint réel via `sendAssistantMessage`, le même que
-// le panneau Cortex. Pas de vrai token-streaming (le back répond en une fois) → on montre un loader
-// puis la réponse. Cf. PC-029.
-function useAssistant(slug: string, query: string | null) {
-  const [text, setText] = useState("")
-  const [isRunning, setIsRunning] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+type ScreenKey = "waitingForYou" | "myWork" | "dashboard" | "projects" | "roadmap" | "cycles" | "members" | "analytics"
 
-  useEffect(() => {
-    if (!query || !slug) { setText(""); setIsRunning(false); setError(null); return }
-    let cancelled = false
-    setText(""); setError(null); setIsRunning(true)
-    sendAssistantMessage(slug, query)
-      .then((answer) => { if (!cancelled) setText(answer) })
-      .catch(() => { if (!cancelled) setError("The assistant is temporarily unavailable. Please try again.") })
-      .finally(() => { if (!cancelled) setIsRunning(false) })
-    return () => { cancelled = true }
-  }, [slug, query])
+/**
+ * Les écrans qui ont quitté le premier regard (R124, la règle de Norman), et ceux de la barre de gauche : chacun s'ouvre
+ * dans le volet, la conversation gardée.
+ */
+const SCREENS: readonly { key: ScreenKey; path: string; icon: LucideIcon }[] = [
+  { key: "waitingForYou", path: "/inbox", icon: Inbox },
+  { key: "myWork", path: "/my-work", icon: ListChecks },
+  { key: "dashboard", path: "/dashboard", icon: LayoutDashboard },
+  { key: "projects", path: "/projects", icon: FolderKanban },
+  { key: "roadmap", path: "/roadmap", icon: CalendarRange },
+  { key: "cycles", path: "/cycles", icon: Repeat },
+  // App desktop : pas de membres, on y travaille seul avec ses agents.
+  ...(IS_DESKTOP ? [] : [{ key: "members" as const, path: "/members", icon: Users }]),
+  { key: "analytics", path: "/analytics", icon: Activity },
+]
 
-  return { text, isRunning, error }
+const ITEM = "group gap-3"
+const ICON = "size-4 shrink-0 text-muted-foreground"
+
+/** La flèche de la ligne active, à droite. */
+function Go() {
+  return <ArrowRight className="ml-auto size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity duration-150 group-data-[selected=true]:opacity-100 motion-reduce:transition-none" />
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface CommandAction {
-  id: string
-  label: string
-  group: string
-  icon: React.ReactNode
-  action: () => void
-}
-
-interface CommandPaletteProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}
-
-export function CommandPalette({ open, onOpenChange }: Readonly<CommandPaletteProps>) {
+/**
+ * La recherche de la fenêtre (Ctrl+K ; R121, R124) : les issues par leur clé ou leur titre (la recherche de l'espace),
+ * les projets, les conversations, puis les écrans qui ont quitté le premier regard (Dashboard, My work, Members, Roadmap
+ * et les autres) et quelques gestes. Chaque écran et chaque issue s'ouvrent dans le volet, la conversation gardée ; une
+ * conversation s'ouvre au centre. « Ask Cortex » remplit le compositeur : rien ne part sans envoi (R76).
+ */
+export function CommandPalette({ open, onOpenChange }: Readonly<{ open: boolean; onOpenChange: (open: boolean) => void }>) {
   const router = useRouter()
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
+  const t = usePreferencesStore((s) => s.t.search)
+  const w = usePreferencesStore((s) => s.t.window)
+  const projects = useProjectStore((s) => s.projects)
+  const conversations = useCortexStore((s) => s.conversations)
+  const openConversation = useCortexStore((s) => s.openConversation)
+  const newConversation = useCortexStore((s) => s.newConversation)
+  const setDraft = useCortexStore((s) => s.setDraft)
+  const setChatOpen = useCortexStore((s) => s.setOpen)
   const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
   const openSettings = useSettingsStore((s) => s.openSettings)
+  const find = useSearchStore((s) => s.find)
+  const { openIssue, openBoard } = usePaneNavigation()
   const { setTheme } = useTheme()
+  const [query, setQuery] = useState("")
+  const typed = query.trim()
+  const hits = useSearchStore((s) => (typed ? s.hits[searchKey(slug, typed)] : undefined))
+  const searching = useSearchStore((s) => (typed ? Boolean(s.pending[searchKey(slug, typed)]) : false))
 
-  // ─── État mode IA ──────────────────────────────────────────────────────────
-  const [aiMode, setAiMode] = useState(false)
-  const [aiInput, setAiInput] = useState("")
-  const [aiQuery, setAiQuery] = useState<string | null>(null)
-  const aiInputRef = useRef<HTMLTextAreaElement>(null)
-  const { text: aiText, isRunning, error: aiError } = useAssistant(slug, aiQuery)
-
-  // Reset à chaque ouverture/fermeture
+  // Les issues se cherchent sur le serveur, après une courte pause : une recherche par mot, pas par touche.
   useEffect(() => {
-    if (!open) {
-      setAiMode(false)
-      setAiInput("")
-      setAiQuery(null)
-    }
-  }, [open])
+    if (!open || !slug || !typed) return
+    const id = setTimeout(() => { void find(slug, typed) }, SEARCH_DELAY_MS)
+    return () => clearTimeout(id)
+  }, [open, slug, typed, find])
 
-  // Focus textarea en mode IA
-  useEffect(() => {
-    if (aiMode) setTimeout(() => aiInputRef.current?.focus(), 50)
-  }, [aiMode])
-
-  function enterAiMode() { setAiMode(true); setAiInput(""); setAiQuery(null) }
-  function exitAiMode() { setAiMode(false); setAiInput(""); setAiQuery(null) }
-
-  const handleAiKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      const q = aiInput.trim()
-      if (q && !isRunning) setAiQuery(q)
-    }
-  }, [aiInput, isRunning])
-
-  // Échap en mode IA, où que soit le focus (la zone de saisie disparaît une fois la question posée) :
-  // efface d'abord la réponse, puis revient aux commandes. La palette ne se ferme qu'en mode commandes.
-  const handleEscape = (e: globalThis.KeyboardEvent) => {
-    if (!aiMode) return
-    e.preventDefault()
-    if (aiQuery) { setAiQuery(null); setAiInput("") } else { exitAiMode() }
+  const close = () => {
+    onOpenChange(false)
+    setQuery("")
   }
 
-  // ─── Navigation ────────────────────────────────────────────────────────────
-  // Les routes sont scopées au workspace (/{slug}/…) - on préfixe le slug courant. (QA Q-24)
-  function go(path: string) { router.push(slug ? `/${slug}${path}` : path); onOpenChange(false) }
-  // Réglages et profil s'ouvrent en place, comme depuis la barre latérale. Passer par les routes
-  // `/settings` ou `/profile` (qui ouvrent le modal puis renvoient au dashboard) démontait la page
-  // courante, le <main> de l'AppShell étant indexé sur le chemin, et relançait tous ses chargements.
-  function openSettingsHere(section?: string) { openSettings(section); onOpenChange(false) }
+  const focusComposer = () => {
+    setChatOpen(true)
+    requestAnimationFrame(() => document.getElementById("command-bar-input")?.focus())
+  }
 
-  const ACTIONS: CommandAction[] = [
-    // Navigation
-    { id: "dashboard",     label: "Go to Dashboard",    group: "Navigation", icon: <LayoutDashboard className="h-4 w-4" />, action: () => go("/dashboard") },
-    { id: "inbox",         label: "Go to Inbox",         group: "Navigation", icon: <Inbox className="h-4 w-4" />, action: () => go("/inbox") },
-    { id: "my-work",       label: "Go to My Work",       group: "Navigation", icon: <ClipboardCheck className="h-4 w-4" />, action: () => go("/my-work") },
-    { id: "projects",      label: "Go to Projects",      group: "Navigation", icon: <FolderKanban className="h-4 w-4" />, action: () => go("/projects") },
-    { id: "issues",        label: "Go to Issues",        group: "Navigation", icon: <CircleDot className="h-4 w-4" />, action: () => go("/my-work/issues") },
-    { id: "cycles",        label: "Go to Cycles",        group: "Navigation", icon: <Repeat className="h-4 w-4" />, action: () => go("/cycles") },
-    { id: "roadmap",       label: "Go to Roadmap",       group: "Navigation", icon: <CalendarRange className="h-4 w-4" />, action: () => go("/roadmap") },
-    // App desktop : pas de membres, on y travaille seul avec ses agents.
-    ...(IS_DESKTOP ? [] : [{ id: "members", label: "Go to Members", group: "Navigation", icon: <Users className="h-4 w-4" />, action: () => go("/members") }]),
-    { id: "settings",      label: "Go to Settings",      group: "Navigation", icon: <Settings className="h-4 w-4" />, action: () => openSettingsHere() },
-    { id: "profile",       label: "View my profile",     group: "Navigation", icon: <User className="h-4 w-4" />, action: () => openSettingsHere("profile") },
-    { id: "intelligence",  label: "Go to Intelligence",  group: "Navigation", icon: <Activity className="h-4 w-4" />, action: () => go("/analytics") },
-    // Actions
-    { id: "ask-ai",        label: "Ask AI",              group: "Actions",    icon: <Sparkles className="h-4 w-4" />,   action: enterAiMode },
-    // La création d'issue est propre à un projet : on mène à la liste des projets, où chacun porte
-    // son propre bouton « New issue » - plutôt qu'un dialogue de création sans projet.
-    { id: "new-issue",     label: "Create issue",     group: "Actions",    icon: <Plus className="h-4 w-4" />,   action: () => go("/projects") },
-    { id: "new-project",   label: "Create project",     group: "Actions",    icon: <Plus className="h-4 w-4" />,                             action: () => { openCreateProject(); onOpenChange(false) } },
-    { id: "notifications", label: "Open notifications", group: "Actions", icon: <Bell className="h-4 w-4" />,                          action: () => go("/inbox") },
-    { id: "tour",          label: "Replay the product tour", group: "Actions", icon: <Compass className="h-4 w-4" />, action: () => go("/dashboard?tour=1") },
-    { id: "report-issue",  label: "Report an issue on GitHub", group: "Actions", icon: <Bug className="h-4 w-4" />, action: () => { window.open(REPORT_ISSUE_URL, "_blank", "noopener,noreferrer"); onOpenChange(false) } },
-    // Appearance
-    { id: "theme-light",   label: "Switch to light mode", group: "Appearance", icon: <Sun className="h-4 w-4" />,    action: () => { setTheme("light"); onOpenChange(false) } },
-    { id: "theme-dark",    label: "Switch to dark mode",  group: "Appearance", icon: <Moon className="h-4 w-4" />,   action: () => { setTheme("dark"); onOpenChange(false) } },
-    { id: "theme-system",  label: "Use system theme",     group: "Appearance", icon: <Search className="h-4 w-4" />, action: () => { setTheme("system"); onOpenChange(false) } },
-  ]
+  /** Un écran dans le volet, la conversation de la fenêtre gardée (`?c=`). */
+  const go = (path: string) => {
+    if (slug) router.push(withConversation(`${homePath(slug)}${path}`, globalThis.location?.search ?? ""), { scroll: false })
+    close()
+  }
 
-  const groups = [...new Set(ACTIONS.map((a) => a.group))]
+  const run = (action: () => void) => () => {
+    action()
+    close()
+  }
+
+  const liveProjects = projects.filter((project) => project.status !== "ARCHIVED")
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange} onEscapeKeyDown={handleEscape} showCloseButton={false} className="max-w-2xl overflow-hidden rounded-xl border shadow-2xl">
-      {/* ── Mode IA ────────────────────────────────────────────────────────── */}
-      {aiMode ? (
-        <div className="flex flex-col">
-          {/* Header */}
-          <div className="flex items-center gap-3 px-4 h-14 border-b border-border">
-            <button
-              onClick={exitAiMode}
-              className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
-              aria-label="Back"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-            <Sparkles className="h-4 w-4 text-primary shrink-0" />
-            <span className="text-sm font-medium text-foreground">Ask AI</span>
-            <span className="text-xs text-muted-foreground/50 ml-auto">ESC to go back</span>
-          </div>
+    <CommandDialog
+      open={open}
+      onOpenChange={(next) => (next ? onOpenChange(true) : close())}
+      title={t.title}
+      description={t.placeholder}
+      showCloseButton={false}
+      className="max-w-2xl overflow-hidden rounded-xl border shadow-2xl"
+    >
+      <CommandInput placeholder={t.placeholder} value={query} onValueChange={setQuery} />
+      <CommandList>
+        <CommandEmpty>{searching ? t.searching : t.none}</CommandEmpty>
 
-          {/* Réponse streamée */}
-          {aiQuery && (
-            <div className="px-4 py-3 border-b border-border">
-              <div className="flex items-start gap-2.5">
-                <div className="size-5 rounded-md bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  {isRunning
-                    ? <Loader2 className="size-3 text-primary animate-spin" />
-                    : <Sparkles className="size-3 text-primary" />
-                  }
-                </div>
-                <p className="text-sm leading-relaxed flex-1">
-                  {aiError
-                    ? <span className="text-destructive">{aiError}</span>
-                    : <span className="text-foreground">{aiText || (isRunning ? <TextShimmerWave>Cortex is thinking…</TextShimmerWave> : "")}</span>}
-                </p>
-              </div>
-              {!isRunning && (
-                <button
-                  onClick={() => { setAiQuery(null); setAiInput("") }}
-                  className="mt-2 ml-7 text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors"
-                >
-                  ← New question
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Input */}
-          {!aiQuery && (
-            <div className="px-4 py-3">
-              <textarea
-                ref={aiInputRef}
-                value={aiInput}
-                onChange={(e) => setAiInput(e.target.value)}
-                onKeyDown={handleAiKeyDown}
-                placeholder="Ask your question…"
-                rows={3}
-                className="w-full resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none border-none"
-              />
-              <div className="flex items-center justify-end mt-1">
-                <span className="text-[10px] text-muted-foreground/40 flex items-center gap-1">
-                  <CornerDownLeft className="size-3" /> Enter to send
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        /* ── Mode commandes (défaut) ────────────────────────────────────────── */
-        <>
-          <CommandInput placeholder="Search commands, pages, actions…" />
-          <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
-            {groups.map((group, gi) => (
-              <div key={group}>
-                {gi > 0 && <CommandSeparator />}
-                <CommandGroup heading={group}>
-                  {ACTIONS.filter((a) => a.group === group).map((action) => (
-                    <CommandItem
-                      key={action.id}
-                      onSelect={action.action}
-                      className="group gap-3"
-                    >
-                      <span className={action.id === "ask-ai" ? "text-primary" : "text-muted-foreground"}>
-                        {action.icon}
-                      </span>
-                      <span className={action.id === "ask-ai" ? "font-medium" : ""}>{action.label}</span>
-                      {/* Côté droit façon Cloudflare : flèche visible sur la ligne active */}
-                      <ArrowRight className="ml-auto size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-data-[selected=true]:opacity-100" />
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </div>
+        {typed && (hits?.length ?? 0) > 0 && (
+          <CommandGroup heading={t.issues}>
+            {hits?.map((hit) => (
+              <CommandItem
+                key={`issue-${hit.id}`}
+                value={`issue ${hit.key} ${hit.title}`}
+                // Le serveur a déjà trouvé l'issue (« ops 35 » pour OPS-35) : la palette ne la filtre pas une seconde fois.
+                keywords={[typed]}
+                onSelect={run(() => openIssue({ projectId: hit.projectId, issueId: hit.id }))}
+                className={ITEM}
+              >
+                <CircleDot className={ICON} />
+                <span className="shrink-0 font-medium">{hit.key}</span>
+                <span className="min-w-0 truncate text-muted-foreground">{hit.title}</span>
+                <Go />
+              </CommandItem>
             ))}
+          </CommandGroup>
+        )}
 
-          </CommandList>
+        {liveProjects.length > 0 && (
+          <CommandGroup heading={t.projects}>
+            {liveProjects.map((project) => (
+              <CommandItem
+                key={`project-${project.id}`}
+                value={`project ${project.name} ${project.identifier ?? ""}`}
+                onSelect={run(() => openBoard(project.id))}
+                className={ITEM}
+              >
+                <FolderKanban className={ICON} />
+                <span className="truncate">{project.name}</span>
+                <Go />
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
 
-          {/* Pied façon Cloudflare : rappels clavier */}
-          <div className="flex items-center gap-4 border-t border-border px-4 py-2.5 text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <kbd className="inline-flex size-4 items-center justify-center rounded border border-border bg-muted text-[10px]">↑</kbd>
-              <kbd className="inline-flex size-4 items-center justify-center rounded border border-border bg-muted text-[10px]">↓</kbd>
-              to navigate
-            </span>
-            <span className="flex items-center gap-1.5">
-              <kbd className="inline-flex h-4 items-center justify-center rounded border border-border bg-muted px-1 text-[10px]">↵</kbd>
-              to select
-            </span>
-            <span className="ml-auto flex items-center gap-1.5">
-              <kbd className="inline-flex h-4 items-center justify-center rounded border border-border bg-muted px-1 text-[10px]">esc</kbd>
-              to close
-            </span>
-          </div>
-        </>
-      )}
+        {conversations.length > 0 && (
+          <CommandGroup heading={t.conversations}>
+            {conversations.slice(0, 20).map((conversation) => (
+              <CommandItem
+                key={`conversation-${conversation.id}`}
+                value={`conversation ${conversation.id} ${conversation.title}`}
+                onSelect={run(() => {
+                  void openConversation(slug, conversation.id)
+                  focusComposer()
+                })}
+                className={ITEM}
+              >
+                <MessageSquare className={ICON} />
+                <span className="truncate">{conversation.title}</span>
+                <Go />
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        <CommandSeparator />
+        <CommandGroup heading={t.screens}>
+          {SCREENS.map(({ key, path, icon: Icon }) => (
+            <CommandItem key={key} value={`screen ${w[key]}`} onSelect={() => go(path)} className={ITEM}>
+              <Icon className={ICON} />
+              <span>{w[key]}</span>
+              <Go />
+            </CommandItem>
+          ))}
+        </CommandGroup>
+
+        <CommandSeparator />
+        <CommandGroup heading={t.actions}>
+          {typed && (
+            <CommandItem
+              value={`ask cortex ${typed}`}
+              keywords={[typed]}
+              onSelect={run(() => {
+                setDraft(typed)
+                focusComposer()
+              })}
+              className={ITEM}
+            >
+              <Sparkles className="size-4 shrink-0 text-primary" />
+              <span className="truncate">{fillText(t.askCortex, { query: typed })}</span>
+              <Go />
+            </CommandItem>
+          )}
+          <CommandItem value={t.newConversation} onSelect={run(() => { newConversation(); focusComposer() })} className={ITEM}>
+            <Plus className={ICON} />
+            <span>{t.newConversation}</span>
+          </CommandItem>
+          <CommandItem value={t.createProject} onSelect={run(openCreateProject)} className={ITEM}>
+            <Plus className={ICON} />
+            <span>{t.createProject}</span>
+          </CommandItem>
+          <CommandItem value={t.settings} onSelect={run(() => openSettings())} className={ITEM}>
+            <Settings className={ICON} />
+            <span>{t.settings}</span>
+          </CommandItem>
+          <CommandItem value={t.profile} onSelect={run(() => openSettings("profile"))} className={ITEM}>
+            <User className={ICON} />
+            <span>{t.profile}</span>
+          </CommandItem>
+          <CommandItem
+            value={t.reportIssue}
+            onSelect={run(() => { window.open(REPORT_ISSUE_URL, "_blank", "noopener,noreferrer") })}
+            className={ITEM}
+          >
+            <Bug className={ICON} />
+            <span>{t.reportIssue}</span>
+          </CommandItem>
+        </CommandGroup>
+
+        <CommandSeparator />
+        <CommandGroup heading={t.appearance}>
+          <CommandItem value={t.light} onSelect={run(() => setTheme("light"))} className={ITEM}>
+            <Sun className={ICON} />
+            <span>{t.light}</span>
+          </CommandItem>
+          <CommandItem value={t.dark} onSelect={run(() => setTheme("dark"))} className={ITEM}>
+            <Moon className={ICON} />
+            <span>{t.dark}</span>
+          </CommandItem>
+          <CommandItem value={t.system} onSelect={run(() => setTheme("system"))} className={ITEM}>
+            <Monitor className={ICON} />
+            <span>{t.system}</span>
+          </CommandItem>
+        </CommandGroup>
+      </CommandList>
+
+      {/* Les rappels du clavier. */}
+      <div className="flex items-center gap-4 border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <kbd className="inline-flex size-4 items-center justify-center rounded border border-border bg-muted text-xs">↑</kbd>
+          <kbd className="inline-flex size-4 items-center justify-center rounded border border-border bg-muted text-xs">↓</kbd>
+          {t.navigate}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <kbd className="inline-flex h-4 items-center justify-center rounded border border-border bg-muted px-1 text-xs">↵</kbd>
+          {t.select}
+        </span>
+        <span className="ml-auto flex items-center gap-1.5">
+          <kbd className="inline-flex h-4 items-center justify-center rounded border border-border bg-muted px-1 text-xs">esc</kbd>
+          {t.close}
+        </span>
+      </div>
     </CommandDialog>
   )
 }

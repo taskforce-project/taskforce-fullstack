@@ -188,11 +188,6 @@ export async function sendAgentMessage(
   return res.data.data
 }
 
-/** Variante texte (compat) : renvoie seulement la réponse markdown. */
-export async function sendAssistantMessage(slug: string, message: string): Promise<string> {
-  return (await sendAgentMessage(slug, message)).answer.answer
-}
-
 /**
  * Une carte de questions de TaskForce que la personne peut répondre (R115) : elle porte ses questions, le dossier de la
  * réponse et l'empreinte de la carte, que les réponses nomment. Une question d'avant R115 n'a que sa phrase, dans la
