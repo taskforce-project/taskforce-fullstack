@@ -94,19 +94,19 @@ public class AssistantController {
         String sentTo = capabilities.requestedModel(body.model());
         String chosen = sentTo != null ? sentTo : capabilities.chosenModel(userId);
         AssistantAnswer answer = ChosenModel.using(chosen, () -> agentService.run(slug, userId, body.message(), history,
-            body.screenOf()));
+            body.screenOf(), body.attachedOf()));
         // Ce que TaskForce dit sous la réponse : la proposition d'un modèle plus fort, ou la demande envoyée à un autre.
         ChatTurnResponse.Escalation escalation = sentTo != null ? null
             : capabilities.offer(body.message(), history, capabilities.cortexModel(chosen)).orElse(null);
         String notice = sentTo != null ? ModelCapabilityService.sentNotice(sentTo)
             : escalation != null ? escalation.text() : null;
 
-        // Persiste le tour dans la conversation (multi-conversation + historique), avec ce que TaskForce y a dit : une
-        // conversation rouverte se relit pareil.
+        // Persiste le tour dans la conversation (multi-conversation + historique), avec ce que TaskForce y a dit et ce qu'il
+        // a donné à lire au modèle (la ligne grise, R123) : une conversation rouverte se relit pareil.
         conversationService.appendMessage(conv.getId(), "user", body.message(), null, 0);
         conversationService.appendMessage(conv.getId(), "assistant",
             notice == null ? answer.answer() : answer.answer() + ModelCapabilityService.block(notice), answer.mode(),
-            answer.usage() != null ? answer.usage().totalTokens() : 0, answer.model());
+            answer.usage() != null ? answer.usage().totalTokens() : 0, answer.model(), answer.read());
         String title = conversationService.autoTitle(conv.getId(), body.message());
 
         return ResponseEntity.ok(ApiResponse.success(new ChatTurnResponse(conv.getId(), title, answer, escalation, sentTo)));
@@ -168,20 +168,32 @@ public class AssistantController {
     /**
      * {@code screen} : ce que la personne voit quand elle écrit (R114) ; absent, Cortex répond sans l'écran.
      * {@code model} : le modèle vers lequel la personne envoie cette demande, d'un clic sur la proposition de TaskForce
-     * (R118).
+     * (R118). {@code attach} : ce qu'elle a joint depuis le compositeur (R123), trois au plus : une issue (son projet et
+     * son id), que TaskForce lit comme avant un résumé, ou un projet (sans issue), dont il montre le tableau.
      */
     public record AssistantRequest(
         @NotBlank @Size(max = 4000) String message,
         Long conversationId,
         @Valid ScreenRequest screen,
-        @Size(max = 128) String model
+        @Size(max = 128) String model,
+        @Size(max = 3) List<@NotNull @Valid ScreenRequest> attach
     ) {
         Screen screenOf() {
             return screen == null ? Screen.NONE : new Screen(screen.projectId(), screen.issueId());
         }
+
+        /** Les pièces jointes, chacune dans son projet : une issue sans projet ne se lit pas. */
+        List<Screen> attachedOf() {
+            if (attach == null) return List.of();
+            return attach.stream().filter(item -> item.projectId() != null)
+                .map(item -> new Screen(item.projectId(), item.issueId())).toList();
+        }
     }
 
-    /** Le projet ouvert et l'issue ouverte, par leurs ids ; ce qu'ils montrent se relit avec les droits de la personne. */
+    /**
+     * Le projet ouvert et l'issue ouverte, par leurs ids, ou ce que la personne a joint ; ce qu'ils montrent se relit avec
+     * ses droits.
+     */
     public record ScreenRequest(@Positive Long projectId, @Positive Long issueId) {}
 
     /**

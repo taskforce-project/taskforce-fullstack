@@ -10,6 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationDetail;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationSummary;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.MessageDto;
@@ -38,6 +41,10 @@ public class AiConversationService {
     private static final int COMPRESS_THRESHOLD = 12;
     /** Nb de messages récents gardés verbatim (le reste est condensé dans le résumé glissant). */
     private static final int KEEP_RECENT = 6;
+
+    /** Ce que le modèle a lu, gardé en JSON avec la réponse (V120), et relu tel quel. */
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final TypeReference<Map<String, Object>> READING = new TypeReference<>() {};
 
     private static final String SUMMARY_SYSTEM =
         "You condense the history of a conversation between a user and the Cortex assistant. "
@@ -69,10 +76,20 @@ public class AiConversationService {
         AiConversation conv = requireOwned(id, userId);
         List<MessageDto> messages = messageRepository.findByConversationIdOrderByCreatedAtAsc(id).stream()
             .map(m -> new MessageDto(m.getId(), m.getRole(), m.getContent(), m.getMode(), m.getTotalTokens(),
-                m.getCreatedAt() != null ? m.getCreatedAt().toString() : null, m.getModel()))
+                m.getCreatedAt() != null ? m.getCreatedAt().toString() : null, m.getModel(), readOf(m)))
             .toList();
         return new ConversationDetail(conv.getId(), conv.getTitle(),
             messageRepository.sumTokens(id), messages);
+    }
+
+    /** Ce que TaskForce a donné à lire au modèle pour ce message ; null sans lecture gardée, ou illisible. */
+    private static AssistantRead readOf(AiMessage message) {
+        if (message.getReading() == null) return null;
+        try {
+            return JSON.convertValue(message.getReading(), AssistantRead.class);
+        } catch (IllegalArgumentException unreadable) {
+            return null;
+        }
     }
 
     /**
@@ -222,7 +239,18 @@ public class AiConversationService {
     /** Un message, avec le modèle qui a écrit la réponse (null pour une demande ou un repli). */
     @Transactional
     public void appendMessage(Long conversationId, String role, String content, String mode, long tokens, String model) {
+        appendMessage(conversationId, role, content, mode, tokens, model, null);
+    }
+
+    /**
+     * Un message, avec le modèle qui a écrit la réponse et ce que TaskForce lui a donné à lire (la ligne grise, R123) ;
+     * null pour une demande ou un repli.
+     */
+    @Transactional
+    public void appendMessage(Long conversationId, String role, String content, String mode, long tokens, String model,
+                              AssistantRead read) {
         AiMessage m = new AiMessage();
+        m.setReading(read == null ? null : JSON.convertValue(read, READING));
         m.setConversationId(conversationId);
         m.setRole(role);
         m.setContent(content);
