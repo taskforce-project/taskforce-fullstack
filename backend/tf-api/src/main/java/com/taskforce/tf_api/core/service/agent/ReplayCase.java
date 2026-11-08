@@ -44,6 +44,11 @@ public record ReplayCase(String question, LocalDate askedOn, List<FrozenNote> no
         }
     }
 
+    /** La cassette répond à tout appel de cet outil, y compris une écriture : le banc fait croire qu'elle a réussi. */
+    public boolean simulates(String tool) {
+        return cassette.stream().anyMatch(entry -> entry.tool().equals(tool) && ANY.equals(entry.arguments()));
+    }
+
     /** Ce que la cassette a rendu pour cet appel, s'il a été fait à l'époque. */
     public String served(String tool, String argsJson) {
         String wanted = canonical(argsJson);

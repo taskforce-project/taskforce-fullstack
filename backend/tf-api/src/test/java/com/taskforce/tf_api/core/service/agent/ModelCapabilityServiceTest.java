@@ -81,7 +81,7 @@ class ModelCapabilityServiceTest {
         AiStatusService.AiStatus status = new AiStatusService.AiStatus(true, true, "qwen3:8b", "qwen3:8b", true, "bge-m3");
         lenient().when(aiStatus.snapshot()).thenReturn(new AiStatusService.Snapshot(settings, status, true, SERVED, SERVED));
         lenient().when(aiStatus.current()).thenReturn(status);
-        lenient().when(runs.findTop500BySuiteVersionOrderByStartedAtDesc(CapabilitySuite.VERSION)).thenReturn(measured);
+        lenient().when(runs.findTop500BySuiteAndSuiteVersionOrderByStartedAtDesc(ModelCapabilityRun.CAPABILITY, CapabilitySuite.VERSION)).thenReturn(measured);
         lenient().when(results.findRowsByRunIdIn(anyCollection())).thenReturn(notes);
         lenient().when(choices.findById(7L)).thenReturn(Optional.empty());
     }
