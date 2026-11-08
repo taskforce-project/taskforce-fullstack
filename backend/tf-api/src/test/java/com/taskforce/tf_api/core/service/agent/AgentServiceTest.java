@@ -1967,6 +1967,55 @@ class AgentServiceTest {
         assertThat(answer.read().context()).isNull();
     }
 
+    @Test
+    @DisplayName("TF-J1-13 : un résultat d'outil trop long ne fait pas déborder la fenêtre : le modèle lit ce qui tient et le sait, la ligne grise aussi")
+    void a_long_tool_result_stays_inside_the_window() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.contextWindow("fast")).thenReturn(new ModelWindow("qwen3:8b", 8_192, false, 2_048));
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"search_brain\",\"arguments\":\"{}\"}}]}"),
+            json.readTree("{\"content\":\"Final answer\"}"));
+        AgentTool tool = Mockito.mock(AgentTool.class);
+        when(tool.name()).thenReturn("search_brain");
+        when(tools.get(eq("search_brain"), anyList())).thenReturn(tool);
+        when(tool.execute(any(), any())).thenReturn("r".repeat(60_000));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Analyze the project and propose a plan");
+
+        assertThat(answer.answer()).isEqualTo("Final answer");
+        assertThat(answer.read().context()).isEqualTo(new AssistantRead.ContextRead(0, 0, 1));
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Map<String, Object>>> captor = ArgumentCaptor.forClass(List.class);
+        verify(llm, Mockito.times(2)).rawChat(captor.capture(), anyList(), anyString());
+        Map<String, Object> result = captor.getValue().stream().filter(m -> "tool".equals(m.get("role"))).findFirst().orElseThrow();
+        assertThat((String) result.get("content")).endsWith(ToolLoopFit.SHORTENED);
+    }
+
+    @Test
+    @DisplayName("TF-J1-13 : quand même raccourci rien ne tient plus, la boucle s'arrête et le dit, sans rien envoyer de trop")
+    void a_loop_that_no_longer_fits_stops_and_says_so() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.contextWindow("fast")).thenReturn(new ModelWindow("qwen3:8b", 8_192, false, 2_048));
+        // Un appel d'outil dont les arguments, écrits par le modèle, dépassent à eux seuls la fenêtre.
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"search_brain\",\"arguments\":\"{\\\"q\\\":\\\"" + "x".repeat(30_000) + "\\\"}\"}}]}"));
+        AgentTool tool = Mockito.mock(AgentTool.class);
+        when(tool.name()).thenReturn("search_brain");
+        when(tools.get(eq("search_brain"), anyList())).thenReturn(tool);
+        when(tool.execute(any(), any())).thenReturn("short");
+
+        AssistantAnswer answer = service.run("acme", 7L, "Analyze the project and propose a plan");
+
+        assertThat(answer.answer()).contains("no longer fits this model's context");
+        verify(llm, Mockito.times(1)).rawChat(anyList(), anyList(), anyString());
+    }
+
     /** Une carte de deux questions se dit en deux lignes, signées par TaskForce, que la conversation rouverte relit. */
     @Test
     void the_card_is_said_in_the_answer_one_question_a_line() {

@@ -748,6 +748,8 @@ public class AgentService {
         TurnHistory.Fitted fitted = memory.fit(budget, tier);
         reading.fitted(fitted);
         List<Map<String, Object>> messages = withHistory(system, fitted.messages(), message);
+        ToolLoopFit loopFit = new ToolLoopFit(objectMapper, budget, fitted.messages().size());
+        reading.watch(loopFit);
         // Le noyau (R35) : les règles de l'espace et le dossier de la réponse, ouverts au premier outil. Le dossier garde
         // ce que le modèle a vu de l'écran et le plan qu'il a reçu.
         Map<String, Object> origin = origin(tier, hits);
@@ -757,7 +759,7 @@ public class AgentService {
         if (plan != null) origin.put("plan", plan.id());
         Kernel kernel = new Kernel(ctx, message, origin);
         String answer = toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel,
-            reading);
+            reading, loopFit);
         // Le geste du plan, quand Cortex ne l'a pas fait et que rien n'attend déjà la personne (une carte, une question).
         boolean gestureMade = plan != null && toolCalls.stream().anyMatch(call -> call.name().equals(plan.ask())
             || QUESTION.equals(call.status()) || "pending".equals(call.status()));
@@ -809,7 +811,7 @@ public class AgentService {
                 (msgs, defs) -> model == null || model.isBlank()
                     ? llm.rawChat(msgs, defs, "fast")
                     : llm.rawChatWithModel(msgs, defs, model),
-                step, null);
+                step, null, null);
             // R116 : la banque note la réponse que la personne verrait, corrigée par TaskForce.
             List<ActionClaimCheck.Ran> ran = step.calls.stream()
                 .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList();
@@ -858,6 +860,7 @@ public class AgentService {
         private final Map<String, Integer> tools = new LinkedHashMap<>();
         private int summarized;
         private int leftOut;
+        private ToolLoopFit loop;
 
         Reading(int notes) {
             this.notes = notes;
@@ -867,6 +870,11 @@ public class AgentService {
         void fitted(TurnHistory.Fitted fitted) {
             summarized = fitted.summarized();
             leftOut = fitted.leftOut();
+        }
+
+        /** La boucle d'outils de ce tour : ce qu'elle raccourcit entre dans la ligne grise. */
+        void watch(ToolLoopFit fit) {
+            loop = fit;
         }
 
         void board(ScreenContext.Seen seen) {
@@ -882,7 +890,9 @@ public class AgentService {
         }
 
         AssistantRead read() {
-            ContextRead context = summarized == 0 && leftOut == 0 ? null : new ContextRead(summarized, leftOut, 0);
+            int out = leftOut + (loop == null ? 0 : loop.leftOut());
+            int shortened = loop == null ? 0 : loop.shortened();
+            ContextRead context = summarized == 0 && out == 0 && shortened == 0 ? null : new ContextRead(summarized, out, shortened);
             return new AssistantRead(issues, boards,
                 tools.entrySet().stream().map(e -> new AssistantRead.ToolRead(e.getKey(), e.getValue())).toList(), notes, context);
         }
@@ -938,12 +948,16 @@ public class AgentService {
 
     /**
      * La boucle : le modèle appelle des outils ou répond, cinq tours au plus. Un outil qui lit et aboutit entre dans ce que
-     * le modèle a lu ({@code reading}, nul au rejeu d'un cas de la banque).
+     * le modèle a lu ({@code reading}, nul au rejeu d'un cas de la banque). Avant chaque appel, {@code fit} fait tenir les
+     * messages dans la fenêtre du modèle (TF-J1-13 ; nul au rejeu, dont les cas sont courts).
      */
     private String toolLoop(List<Map<String, Object>> messages, List<Map<String, Object>> toolDefs,
                             List<AgentTool> external, List<AssistantToolCall> toolCalls, ModelCall model, ToolStep step,
-                            Reading reading) {
+                            Reading reading, ToolLoopFit fit) {
         for (int i = 0; i < MAX_TOOL_ITERS; i++) {
+            if (fit != null && !fit.apply(messages)) {
+                return "Answer interrupted: what the tools returned no longer fits this model's context.";
+            }
             JsonNode msg = model.call(messages, toolDefs);
             JsonNode calls = msg.path("tool_calls");
             if (!calls.isArray() || calls.isEmpty()) {
