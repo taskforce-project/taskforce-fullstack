@@ -792,6 +792,7 @@ export const CONSTANTS_EN = {
       seesIssue: "Cortex sees {issue} on the board of {project}",
       seesNothing: "Cortex sees no board, only your workspace's knowledge",
       room: "its last answer took {percent}% of {model}'s window ({tokens} tokens)",
+      roomEstimated: "its last answer took about {percent}% of {model}'s estimated window ({tokens} tokens)",
       roomTokens: "its last answer read {tokens} tokens",
       theModel: "the model",
       alone: "{sees}.",
