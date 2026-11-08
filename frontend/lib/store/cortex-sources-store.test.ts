@@ -14,22 +14,32 @@ const SOURCES = [
 describe("useCortexSourcesStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useCortexSourcesStore.setState({ sources: null, slug: null });
+    useCortexSourcesStore.setState({ sources: null, slug: null, failed: false });
   });
 
   it("reads the sources of the workspace", async () => {
     vi.mocked(service.getCortexSources).mockResolvedValue({ sources: SOURCES });
 
     expect(await useCortexSourcesStore.getState().fetchSources("acme")).toEqual(SOURCES);
-    expect(useCortexSourcesStore.getState()).toMatchObject({ sources: SOURCES, slug: "acme" });
+    expect(useCortexSourcesStore.getState()).toMatchObject({ sources: SOURCES, slug: "acme", failed: false });
   });
 
-  it("keeps what it read when a new read fails", async () => {
+  it("keeps what it read when a new read fails, and says the read failed", async () => {
     useCortexSourcesStore.setState({ sources: SOURCES, slug: "acme" });
     vi.mocked(service.getCortexSources).mockRejectedValue(new Error("down"));
 
     expect(await useCortexSourcesStore.getState().fetchSources("acme")).toBeNull();
-    expect(useCortexSourcesStore.getState().sources).toEqual(SOURCES);
+    expect(useCortexSourcesStore.getState()).toMatchObject({ sources: SOURCES, failed: true });
+  });
+
+  it("forgets a failure that belongs to the workspace it left", async () => {
+    vi.mocked(service.getCortexSources).mockRejectedValue(new Error("down"));
+
+    const late = useCortexSourcesStore.getState().fetchSources("beta");
+    useCortexSourcesStore.setState({ slug: "gamma" });
+    await late;
+
+    expect(useCortexSourcesStore.getState().failed).toBe(false);
   });
 
   it("starts from nothing in another workspace, and ignores a late answer for the one it left", async () => {

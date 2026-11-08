@@ -12,6 +12,8 @@ interface CortexSourcesState {
   sources: CortexSource[] | null;
   /** L'espace des sources lues : un autre espace repart de rien. */
   slug: string | null;
+  /** La dernière lecture a échoué : le volet le dit au lieu d'attendre. */
+  failed: boolean;
 
   fetchSources: (slug: string) => Promise<CortexSource[] | null>;
 }
@@ -19,14 +21,16 @@ interface CortexSourcesState {
 export const useCortexSourcesStore = create<CortexSourcesState>((set, get) => ({
   sources: null,
   slug: null,
+  failed: false,
 
   fetchSources: async (slug) => {
-    if (get().slug !== slug) set({ sources: null, slug });
+    if (get().slug !== slug) set({ sources: null, slug, failed: false });
     try {
       const { sources } = await getCortexSources(slug);
-      if (get().slug === slug) set({ sources });
+      if (get().slug === slug) set({ sources, failed: false });
       return sources;
     } catch {
+      if (get().slug === slug) set({ failed: true });
       return null;
     }
   },

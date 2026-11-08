@@ -21,6 +21,7 @@ import { usePreferencesStore } from "@/lib/store/preferences-store"
 export function BankHistory({ slug }: Readonly<{ slug: string }>) {
   const tp = usePreferencesStore((s) => s.t.progress)
   const history = useEvalStore((s) => s.history)
+  const failed = useEvalStore((s) => s.historyFailed)
   const progress = useEvalStore((s) => s.progress)
   const error = useEvalStore((s) => s.error)
   const fetchHistory = useEvalStore((s) => s.fetchHistory)
@@ -39,7 +40,7 @@ export function BankHistory({ slug }: Readonly<{ slug: string }>) {
   if (!history) {
     return (
       <ProgressSection title={tp.overTime}>
-        <p className="text-xs text-muted-foreground">{tp.reading}</p>
+        <p className="text-xs text-muted-foreground">{failed ? tp.readFailed : tp.reading}</p>
       </ProgressSection>
     )
   }

@@ -35,7 +35,7 @@ const CRITERIA = { tool: "create_issue", args: {}, effect: "" as const, forbid: 
 describe("useEvalStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useEvalStore.setState({ bank: null, run: null, progress: null, error: null, history: null });
+    useEvalStore.setState({ bank: null, run: null, progress: null, error: null, history: null, historyFailed: false });
   });
 
   afterEach(() => vi.useRealTimers());
@@ -145,9 +145,10 @@ describe("useEvalStore", () => {
     vi.mocked(service.getEvalHistory).mockResolvedValueOnce(history).mockRejectedValueOnce(new Error("down"));
 
     expect(await useEvalStore.getState().fetchHistory("acme")).toEqual(history);
-    expect(useEvalStore.getState().history).toEqual(history);
+    expect(useEvalStore.getState()).toMatchObject({ history, historyFailed: false });
     expect(await useEvalStore.getState().fetchHistory("acme")).toBeNull();
-    expect(useEvalStore.getState().history).toEqual(history);
+    // La dernière lue reste ; le volet sait que la lecture a échoué.
+    expect(useEvalStore.getState()).toMatchObject({ history, historyFailed: true });
   });
 
   it("runs one replay at a time", async () => {

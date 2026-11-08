@@ -14,6 +14,7 @@ import { usePreferencesStore } from "@/lib/store/preferences-store"
 export function CortexSources({ slug }: Readonly<{ slug: string }>) {
   const tp = usePreferencesStore((s) => s.t.progress)
   const sources = useCortexSourcesStore((s) => s.sources)
+  const failed = useCortexSourcesStore((s) => s.failed)
   const fetchSources = useCortexSourcesStore((s) => s.fetchSources)
 
   useEffect(() => {
@@ -23,7 +24,7 @@ export function CortexSources({ slug }: Readonly<{ slug: string }>) {
   return (
     <ProgressSection title={tp.knows} hint={tp.knowsHint}>
       {sources === null ? (
-        <p className="text-xs text-muted-foreground">{tp.reading}</p>
+        <p className="text-xs text-muted-foreground">{failed ? tp.readFailed : tp.reading}</p>
       ) : (
         <dl className="divide-y divide-border/50">
           {sourceLines(sources, tp).map((line) => (

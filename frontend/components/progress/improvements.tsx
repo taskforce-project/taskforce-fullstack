@@ -70,11 +70,12 @@ function CaseItem({ item, runs }: Readonly<{ item: EvalHistoryCase; runs: readon
 export function Improvements() {
   const tp = usePreferencesStore((s) => s.t.progress)
   const history = useEvalStore((s) => s.history)
+  const failed = useEvalStore((s) => s.historyFailed)
 
   if (!history) {
     return (
       <ProgressSection title={tp.improved}>
-        <p className="text-xs text-muted-foreground">{tp.reading}</p>
+        <p className="text-xs text-muted-foreground">{failed ? tp.readFailed : tp.reading}</p>
       </ProgressSection>
     )
   }

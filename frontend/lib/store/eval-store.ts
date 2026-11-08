@@ -48,6 +48,8 @@ interface EvalState {
   error: string | null;
   /** L'histoire de la banque (R125), pour le volet « Progress ». `null` = pas encore lue. */
   history: EvalHistory | null;
+  /** La dernière lecture de l'histoire a échoué : le volet le dit au lieu d'attendre. */
+  historyFailed: boolean;
 
   fetchBank: (slug: string) => Promise<EvalBank | null>;
   /** Relit l'histoire de la banque ; null si elle n'a pas pu l'être (la dernière lue reste). */
@@ -89,6 +91,7 @@ export const useEvalStore = create<EvalState>((set, get) => {
     progress: null,
     error: null,
     history: null,
+    historyFailed: false,
 
     fetchBank: async (slug) => {
       try {
@@ -103,9 +106,10 @@ export const useEvalStore = create<EvalState>((set, get) => {
     fetchHistory: async (slug) => {
       try {
         const history = await getEvalHistory(slug);
-        set({ history });
+        set({ history, historyFailed: false });
         return history;
       } catch {
+        set({ historyFailed: true });
         return null;
       }
     },

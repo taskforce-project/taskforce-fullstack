@@ -103,12 +103,16 @@ describe("BankHistory", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Starting the replay…")
   })
 
-  it("waits for the history, and says when the bank has no case", () => {
-    useEvalStore.setState({ history: null })
+  it("waits for the history, says a read that failed, and says when the bank has no case", () => {
+    useEvalStore.setState({ history: null, historyFailed: false })
     const { rerender } = render(<BankHistory slug="acme" />)
     expect(screen.getByText("Reading…")).toBeInTheDocument()
 
-    useEvalStore.setState({ history: { runs: [], cases: [] } })
+    useEvalStore.setState({ historyFailed: true })
+    rerender(<BankHistory slug="acme" />)
+    expect(screen.getByText(/TaskForce couldn't read this part/)).toBeInTheDocument()
+
+    useEvalStore.setState({ history: { runs: [], cases: [] }, historyFailed: false })
     rerender(<BankHistory slug="acme" />)
     expect(screen.getByText(/The test bank has no case yet/)).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /Replay/ })).not.toBeInTheDocument()

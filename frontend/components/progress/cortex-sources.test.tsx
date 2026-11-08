@@ -10,14 +10,18 @@ describe("CortexSources", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    useCortexSourcesStore.setState({ sources: null, fetchSources })
+    useCortexSourcesStore.setState({ sources: null, failed: false, fetchSources })
   })
 
-  it("reads the sources of the workspace, and waits for them", () => {
-    render(<CortexSources slug="acme" />)
+  it("reads the sources of the workspace, waits for them, and says a read that failed", () => {
+    const { rerender } = render(<CortexSources slug="acme" />)
 
     expect(fetchSources).toHaveBeenCalledWith("acme")
     expect(screen.getByText("Reading…")).toBeInTheDocument()
+
+    useCortexSourcesStore.setState({ failed: true })
+    rerender(<CortexSources slug="acme" />)
+    expect(screen.getByText(/TaskForce couldn't read this part/)).toBeInTheDocument()
   })
 
   it("counts and dates each source, and says one that is empty", () => {

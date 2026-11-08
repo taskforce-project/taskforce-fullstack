@@ -763,6 +763,7 @@ export const CONSTANTS_EN = {
     changed: "changed {date}",
     none: "None yet",
     reading: "Reading…",
+    readFailed: "TaskForce couldn't read this part. Open Progress again to retry.",
     // Settings > AI keeps the model choice, and opens Progress.
     seeProgress: "See what each model can do in Progress",
     choiceLabel: "Cortex's model",
