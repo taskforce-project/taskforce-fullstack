@@ -63,8 +63,8 @@ public class ModelGateway {
 
     private final ObjectMapper mapper;
     private final ModelHttp http;
-    /** Le maximum de chaque modèle d'Ollama ({@code /api/show}), par adresse : il ne change qu'avec le modèle. */
-    private final Map<String, Integer> modelMaximums = new ConcurrentHashMap<>();
+    /** La fiche de chaque modèle d'Ollama ({@code /api/show}), par adresse : elle ne change qu'avec le modèle. */
+    private final Map<String, ModelCard> modelCards = new ConcurrentHashMap<>();
 
     @Autowired
     public ModelGateway(ObjectMapper mapper) {
@@ -102,6 +102,21 @@ public class ModelGateway {
         }
     }
 
+    /**
+     * Ce que la fiche d'un modèle dit de lui chez son fournisseur, telle qu'Ollama la donne : sa taille (« 8.2B »), sa
+     * fenêtre de contexte en jetons, et s'il prend des outils ; chaque valeur est {@code null} quand la fiche ne la dit
+     * pas. Ce n'est pas une mesure : la table des capacités la montre comme telle tant que le modèle n'est pas mesuré ici
+     * (R113, R125).
+     */
+    public record ModelCard(String parameters, Integer contextLength, Boolean tools) {
+
+        static final ModelCard NONE = new ModelCard(null, null, null);
+
+        boolean empty() {
+            return parameters == null && contextLength == null && tools == null;
+        }
+    }
+
     /** Une conversation, chez le fournisseur des réglages. */
     public ChatReply chat(AiProviderSettings settings, ChatCall call) {
         if (!settings.enabled()) {
@@ -133,6 +148,18 @@ public class ModelGateway {
         String base = OllamaProtocol.nativeBase(settings.baseUrl());
         int maximum = modelMaximum(base, openAiHeaders(settings.apiKey()), model);
         return Optional.of(OllamaProtocol.ceiling(settings.ollamaMaxContext(), maximum));
+    }
+
+    /**
+     * Ce que la fiche d'un modèle dit de lui (sa taille, sa fenêtre, ses outils), pour la table des capacités tant qu'il
+     * n'est pas mesuré (R125) : sur Ollama, lue une fois dans {@code /api/show}. Ailleurs, ou sans fiche lisible : vide.
+     */
+    public Optional<ModelCard> describe(AiProviderSettings settings, String model) {
+        if (!settings.enabled() || settings.provider() != AiProvider.OLLAMA || model == null || model.isBlank()) {
+            return Optional.empty();
+        }
+        ModelCard card = card(OllamaProtocol.nativeBase(settings.baseUrl()), openAiHeaders(settings.apiKey()), model);
+        return card.empty() ? Optional.empty() : Optional.of(card);
     }
 
     /** Vecteurs des textes, dans l'ordre, chez le fournisseur des vecteurs. */
@@ -273,21 +300,30 @@ public class ModelGateway {
 
     /** Le maximum d'un modèle d'Ollama, lu une fois ; 0 s'il n'est pas lisible (le plafond des réglages vaut seul). */
     private int modelMaximum(String base, Map<String, String> headers, String model) {
+        Integer maximum = card(base, headers, model).contextLength();
+        return maximum == null ? 0 : maximum;
+    }
+
+    /**
+     * La fiche d'un modèle d'Ollama ({@code /api/show}), lue une fois et gardée quand elle dit quelque chose ; vide si
+     * elle n'est pas lisible, et relue la fois suivante.
+     */
+    private ModelCard card(String base, Map<String, String> headers, String model) {
         String key = base + " " + model;
-        Integer known = modelMaximums.get(key);
+        ModelCard known = modelCards.get(key);
         if (known != null) {
             return known;
         }
         try {
             ModelHttp.Reply reply = http.send("POST", base + "/api/show", headers,
                 write(mapper.createObjectNode().put("model", model)), PROBE_TIMEOUT);
-            int maximum = reply.ok() ? OllamaProtocol.contextLength(read(reply.body())) : 0;
-            if (maximum > 0) {
-                modelMaximums.put(key, maximum);
+            ModelCard card = reply.ok() ? OllamaProtocol.card(read(reply.body())) : ModelCard.NONE;
+            if (!card.empty()) {
+                modelCards.put(key, card);
             }
-            return maximum;
+            return card;
         } catch (IOException | RuntimeException unreadable) {
-            return 0;
+            return ModelCard.NONE;
         }
     }
 

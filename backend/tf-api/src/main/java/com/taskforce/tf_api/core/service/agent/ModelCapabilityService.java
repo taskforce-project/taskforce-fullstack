@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.dto.response.ChatTurnResponse;
 import com.taskforce.tf_api.core.dto.response.ModelCapabilityResponse;
 import com.taskforce.tf_api.core.dto.response.ModelCapabilityResponse.CapabilityInfo;
+import com.taskforce.tf_api.core.dto.response.ModelCapabilityResponse.Card;
 import com.taskforce.tf_api.core.dto.response.ModelCapabilityResponse.CaseInfo;
 import com.taskforce.tf_api.core.dto.response.ModelCapabilityResponse.CaseResult;
 import com.taskforce.tf_api.core.dto.response.ModelCapabilityResponse.ModelRow;
@@ -340,7 +341,7 @@ public class ModelCapabilityService {
 
         List<ModelRow> rows = measures.order().stream()
             .map(model -> new ModelRow(model, model.equals(current), measures.measuredAt().get(model),
-                List.copyOf(measures.scores().get(model).values())))
+                List.copyOf(measures.scores().get(model).values()), card(model)))
             .toList();
         List<Proposal> proposals = new ArrayList<>();
         for (Capability capability : Capability.values()) {
@@ -371,6 +372,13 @@ public class ModelCapabilityService {
     /** Le détail gardé avec une note. */
     record Details(List<EvalGrader.Check> checks, List<ReplayOutcome.ReplayCall> calls, String answer, String model,
                    long promptTokens) {
+    }
+
+    /** Ce que dit la fiche du modèle chez son fournisseur, ou {@code null} : une description, jamais une note (R113). */
+    private Card card(String model) {
+        return aiStatus.describe(model)
+            .map(card -> new Card(card.parameters(), card.contextLength(), card.tools()))
+            .orElse(null);
     }
 
     /** Un modèle de conversation que la passerelle sert maintenant ; sinon la personne apprend lesquels le sont. */

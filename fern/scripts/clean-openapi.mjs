@@ -47,6 +47,7 @@ const TAG_MAP = {
   "brain-attachment-controller": "Brain OS attachments",
   "ai-conversation-controller": "AI assistant",
   "assistant-controller": "AI assistant",
+  "cortex-sources-controller": "AI assistant",
   "eval-controller": "Test bank",
   "model-capability-controller": "Model capabilities",
   "skill-suggestion-controller": "Skill suggestions",

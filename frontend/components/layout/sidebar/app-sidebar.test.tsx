@@ -154,9 +154,11 @@ describe("AppSidebar", () => {
 
     expect(screen.queryByRole("link", { name: "My work" })).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: "More" }))
-    expect(["My work", "Dashboard", "Roadmap", "Cycles", "Members", "Analytics"].map(
+    expect(["My work", "Dashboard", "Roadmap", "Cycles", "Members", "Analytics", "Progress"].map(
       (name) => screen.getByRole("link", { name }).getAttribute("href"),
-    )).toEqual(["/acme/my-work", "/acme/dashboard", "/acme/roadmap", "/acme/cycles", "/acme/members", "/acme/analytics"])
+    )).toEqual([
+      "/acme/my-work", "/acme/dashboard", "/acme/roadmap", "/acme/cycles", "/acme/members", "/acme/analytics", "/acme/progress",
+    ])
   })
 
   // Sous `lg` dans la webapp, la barre est un tiroir (« Le dessin », séance n°18) : fermé, il s'ouvre par son bouton,

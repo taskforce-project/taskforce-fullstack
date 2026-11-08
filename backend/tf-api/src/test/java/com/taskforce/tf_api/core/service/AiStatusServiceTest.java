@@ -20,6 +20,7 @@ import com.taskforce.tf_api.core.service.ai.ModelGateway;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -55,6 +56,17 @@ class AiStatusServiceTest {
         assertThat(second).isSameAs(first);
         verify(gateway, times(1)).chatModels(any());
         verify(gateway, never()).embedModels(any());
+    }
+
+    @Test
+    @DisplayName("la fiche d'un modèle se demande à la passerelle, avec les réglages de l'état de l'IA")
+    void describesWithTheSnapshotSettings() {
+        when(gateway.chatModels(any())).thenReturn(Optional.of(INSTALLED));
+        ModelGateway.ModelCard card = new ModelGateway.ModelCard("8.2B", 40960, true);
+        when(gateway.describe(any(), eq("qwen3:8b"))).thenReturn(Optional.of(card));
+
+        assertThat(service.describe("qwen3:8b")).contains(card);
+        verify(gateway).describe(same(service.snapshot().settings()), eq("qwen3:8b"));
     }
 
     @Test

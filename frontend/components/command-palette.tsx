@@ -13,6 +13,7 @@ import {
   CalendarRange,
   Users,
   Activity,
+  TrendingUp,
   Settings,
   Plus,
   User,
@@ -34,6 +35,7 @@ import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { sendAssistantMessage } from "@/lib/api/assistant-service"
 import { IS_DESKTOP } from "@/lib/desktop"
+import { PROGRESS } from "@/lib/window/pane"
 
 import {
   CommandDialog,
@@ -158,6 +160,8 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
     { id: "settings",      label: "Go to Settings",      group: "Navigation", icon: <Settings className="h-4 w-4" />, action: () => openSettingsHere() },
     { id: "profile",       label: "View my profile",     group: "Navigation", icon: <User className="h-4 w-4" />, action: () => openSettingsHere("profile") },
     { id: "intelligence",  label: "Go to Intelligence",  group: "Navigation", icon: <Activity className="h-4 w-4" />, action: () => go("/analytics") },
+    // Ce que Cortex sait et comment il progresse (R125) : le volet « Progress ».
+    { id: "progress",      label: "Go to Progress",      group: "Navigation", icon: <TrendingUp className="h-4 w-4" />, action: () => go(`/${PROGRESS}`) },
     // Actions
     { id: "ask-ai",        label: "Ask AI",              group: "Actions",    icon: <Sparkles className="h-4 w-4" />,   action: enterAiMode },
     // La création d'issue est propre à un projet : on mène à la liste des projets, où chacun porte

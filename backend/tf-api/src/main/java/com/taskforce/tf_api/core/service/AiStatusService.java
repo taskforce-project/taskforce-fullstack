@@ -93,6 +93,14 @@ public class AiStatusService {
         }
     }
 
+    /**
+     * Ce que la fiche d'un modèle dit de lui chez le fournisseur de maintenant (Ollama seulement), pour la table des
+     * capacités tant qu'il n'est pas mesuré (R125) ; vide ailleurs.
+     */
+    public Optional<ModelGateway.ModelCard> describe(String model) {
+        return gateway.describe(snapshot().settings(), model);
+    }
+
     /** Oublie l'état en cache : le prochain appel relit le fournisseur (après un échec d'appel au modèle). */
     public void invalidate() {
         cached = null;
