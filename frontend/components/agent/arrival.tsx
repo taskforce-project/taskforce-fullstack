@@ -10,14 +10,17 @@ import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { searchKey, useSearchStore } from "@/lib/store/search-store"
 import { useUserStore } from "@/lib/store/user-store"
-import { ARRIVAL_ROWS, arrivalSuggestions, waitingItems } from "@/lib/window/arrival"
+import { ARRIVAL_ROWS, arrivalMayTakeFocus, arrivalSuggestions, waitingItems } from "@/lib/window/arrival"
 import { waitingCount } from "@/lib/window/waiting"
+
+const composer = () => document.getElementById("command-bar-input")
 
 /**
  * L'arrivée d'une nouvelle conversation (R123, séance n°18 ; R127, séance n°19), qui remplace le tour guidé (R124) :
  * jamais vide, et d'un regard. D'abord ce qui attend vraiment la personne, trois lignes au plus, chacune ouvrant son
  * issue dans le volet, puis « See all » et le total ; puis trois suggestions tirées de l'état réel de l'espace, qui
- * remplissent le compositeur sans rien envoyer. Rien à suggérer : une ligne le dit.
+ * remplissent le compositeur sans rien envoyer. Rien à suggérer : une ligne le dit. Quand elle s'ouvre et que la personne
+ * n'est nulle part ailleurs, le curseur attend dans le compositeur.
  */
 export function Arrival({ slug }: Readonly<{ slug: string }>) {
   const t = usePreferencesStore((s) => s.t.conversation)
@@ -42,6 +45,11 @@ export function Arrival({ slug }: Readonly<{ slug: string }>) {
     return () => { cancelled = true }
   }, [slug, find])
 
+  // Comme Raycast et Spotlight : à l'arrivée, le curseur attend dans le compositeur, sans le voler à personne (E18).
+  useEffect(() => {
+    if (arrivalMayTakeFocus()) composer()?.focus()
+  }, [])
+
   const waiting = useMemo(() => waitingItems(approvals, runs, me, t), [approvals, runs, me, t])
   const suggestions = useMemo(
     () => arrivalSuggestions({ issues: recent ?? [], runs, me, projects }, t),
@@ -53,7 +61,7 @@ export function Arrival({ slug }: Readonly<{ slug: string }>) {
   /** Une suggestion remplit le compositeur ; rien ne part tant que la personne n'envoie pas. */
   const suggest = (text: string) => {
     setDraft(text)
-    document.getElementById("command-bar-input")?.focus()
+    composer()?.focus()
   }
 
   return (

@@ -29,6 +29,12 @@ const approval = (patch: Partial<OpenApproval> = {}): OpenApproval => ({
   runId: 9, issueId: 12, issueKey: "OPS-12", issueTitle: "Fix the footer", projectId: 3, requests: 1, ...patch,
 })
 
+const composerField = () => {
+  const input = document.body.appendChild(document.createElement("input"))
+  input.id = "command-bar-input"
+  return input
+}
+
 /** L'arrivée d'une nouvelle conversation (R123, R127), qui remplace le tour guidé (R124) : jamais vide, d'un regard. */
 describe("Arrival", () => {
   beforeEach(() => {
@@ -95,6 +101,42 @@ describe("Arrival", () => {
   it("says nothing of a request that no longer waits: only what the store holds counts", async () => {
     render(<Arrival slug="acme" />)
     expect(screen.queryByRole("region", { name: "Waiting for you" })).not.toBeInTheDocument()
+  })
+
+  describe("the cursor waits in the composer (E18)", () => {
+    const finePointer = () => vi.spyOn(globalThis, "matchMedia").mockImplementation(
+      (query: string) => ({ matches: query === "(pointer: fine)" }) as MediaQueryList,
+    )
+
+    it("on the arrival of a new conversation, alone on the screen", () => {
+      finePointer()
+      const input = composerField()
+      render(<Arrival slug="acme" />)
+      expect(document.activeElement).toBe(input)
+    })
+
+    it("not with a pane open beside it", () => {
+      finePointer()
+      window.history.replaceState(null, "", "/acme/progress")
+      const input = composerField()
+      render(<Arrival slug="acme" />)
+      expect(document.activeElement).not.toBe(input)
+    })
+
+    it("not when the person is already in a field or a dialog", () => {
+      finePointer()
+      const input = composerField()
+      const other = document.body.appendChild(document.createElement("input"))
+      other.focus()
+      render(<Arrival slug="acme" />)
+      expect(document.activeElement).toBe(other)
+
+      other.remove()
+      const dialog = document.body.appendChild(document.createElement("div"))
+      dialog.setAttribute("role", "dialog")
+      render(<Arrival slug="acme" />)
+      expect(document.activeElement).not.toBe(input)
+    })
   })
 
   it("then three suggestions drawn from the space; a click fills the composer, it never sends", async () => {

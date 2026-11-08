@@ -5,6 +5,7 @@ import { fillText } from "@/lib/delivery/result-card"
 import type { Signal } from "@/lib/store/notification-store"
 import { issueRefOfUrl, type IssueRef } from "@/lib/window/address"
 import { isActiveRun, myRuns, resultsToJudge, runLabel } from "@/lib/window/missions"
+import { paneOf } from "@/lib/window/pane"
 import { unreadMentions } from "@/lib/window/waiting"
 
 type ConversationTexts = (typeof CONSTANTS_EN)["conversation"]
@@ -92,6 +93,19 @@ export function mentionItems(signals: readonly Signal[], t: ConversationTexts): 
       signalId: signal.id,
     }
   })
+}
+
+/**
+ * L'arrivée peut-elle mettre le curseur dans le compositeur, comme Raycast et Spotlight (E18) ? Seulement si la
+ * conversation est seule à l'écran et que personne n'est ailleurs : ni dans un volet, ni dans une fenêtre de dialogue, ni
+ * dans un champ ; et pas sur un écran tactile, où le clavier couvrirait l'arrivée. Lu au moment où l'arrivée s'ouvre.
+ */
+export function arrivalMayTakeFocus(): boolean {
+  if (paneOf(globalThis.location?.pathname) !== null) return false
+  if (!globalThis.matchMedia?.("(pointer: fine)").matches) return false
+  const active = document.activeElement
+  if (active && active !== document.body) return false
+  return document.querySelector('[role="dialog"], [role="alertdialog"]') === null
 }
 
 /** Une suggestion de l'arrivée : ce que son bouton dit, et ce qu'elle écrit dans le compositeur. */

@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { DeliveryRun, OpenApproval } from "@/lib/api/delivery-service"
 import type { IssueHit } from "@/lib/api/issue-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 import type { Signal } from "@/lib/store/notification-store"
-import { arrivalSuggestions, mentionItems, SUGGESTIONS, waitingItems } from "./arrival"
+import { arrivalMayTakeFocus, arrivalSuggestions, mentionItems, SUGGESTIONS, waitingItems } from "./arrival"
 
 const t = CONSTANTS_EN.conversation
 
@@ -79,6 +79,51 @@ describe("mentionItems", () => {
     expect(mention.issue).toBeNull()
     expect(mention.href).toBe("/acme/members")
     expect(mention.label).toBe("Fix the footer")
+  })
+})
+
+/** Le curseur dans le compositeur à l'arrivée (E18), comme Raycast et Spotlight, sans le voler à personne. */
+describe("arrivalMayTakeFocus", () => {
+  const pointer = (fine: boolean) =>
+    vi.spyOn(globalThis, "matchMedia").mockImplementation((query: string) => ({ matches: fine && query === "(pointer: fine)" }) as MediaQueryList)
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    document.body.innerHTML = ""
+  })
+
+  it("oui quand la conversation est seule et que personne n'est ailleurs", () => {
+    window.history.replaceState(null, "", "/acme")
+    pointer(true)
+    expect(arrivalMayTakeFocus()).toBe(true)
+  })
+
+  it("non avec un volet ouvert", () => {
+    window.history.replaceState(null, "", "/acme/progress")
+    pointer(true)
+    expect(arrivalMayTakeFocus()).toBe(false)
+  })
+
+  it("non sur un écran tactile : le clavier couvrirait l'arrivée", () => {
+    window.history.replaceState(null, "", "/acme")
+    pointer(false)
+    expect(arrivalMayTakeFocus()).toBe(false)
+  })
+
+  it("non quand la personne est dans un champ", () => {
+    window.history.replaceState(null, "", "/acme")
+    pointer(true)
+    const field = document.body.appendChild(document.createElement("input"))
+    field.focus()
+    expect(arrivalMayTakeFocus()).toBe(false)
+  })
+
+  it("non avec une fenêtre de dialogue ouverte", () => {
+    window.history.replaceState(null, "", "/acme")
+    pointer(true)
+    const dialog = document.body.appendChild(document.createElement("div"))
+    dialog.setAttribute("role", "dialog")
+    expect(arrivalMayTakeFocus()).toBe(false)
   })
 })
 
