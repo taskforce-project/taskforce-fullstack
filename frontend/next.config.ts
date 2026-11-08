@@ -126,7 +126,7 @@ const securityHeaders = [
   // COEP n'est délibérément PAS posé : `require-corp` bloquerait les vignettes servies par MinIO,
   // qui ne renvoie pas d'en-tête Cross-Origin-Resource-Policy.
   { key: "Cross-Origin-Opener-Policy",  value: "same-origin" },
-  { key: "Permissions-Policy",          value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
+  { key: "Permissions-Policy",          value: "camera=(), microphone=(self), geolocation=(), payment=(), usb=()" },
   { key: "Content-Security-Policy",     value: IS_DESKTOP ? desktopCspHeader : cspHeader },
 ];
 
