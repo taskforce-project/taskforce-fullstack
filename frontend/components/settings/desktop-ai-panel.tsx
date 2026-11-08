@@ -45,6 +45,7 @@ export function DesktopAiPanel() {
   const contextWindow = useAiStatusStore((s) => s.status?.contextWindow ?? null)
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug) ?? ""
   const fetchModels = useModelCapabilityStore((s) => s.fetchTable)
+  const instanceChanged = useModelCapabilityStore((s) => s.instanceChanged)
   const [view, setView] = useState<DesktopAiView | null>(null)
   const [draft, setDraft] = useState<DesktopAiSettings | null>(null)
   const [apiKey, setApiKey] = useState("")
@@ -96,7 +97,7 @@ export function DesktopAiPanel() {
     setSaved(true)
     // Cortex et les autres écrans relisent l'état tout de suite, sans attendre les caches.
     void fetchAiStatus(true)
-    if (slug) void fetchModels(slug)
+    if (slug) void instanceChanged(slug)
   }
 
   if (!draft || !view) {

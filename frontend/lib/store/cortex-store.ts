@@ -5,12 +5,12 @@ import {
   type ModelEscalation, type QuestionAnswer,
 } from "@/lib/api/assistant-service";
 import {
-  deleteConversation, getConversation, listConversations,
+  compactConversation, deleteConversation, getConversation, listConversations,
   type ConversationMessage, type ConversationSummary,
 } from "@/lib/api/ai-conversation-service";
 import { getErrorMessage, getErrorStatus } from "@/lib/api/client";
 import {
-  attachmentKey, toRequest, withAttachment, type ComposerAttachment,
+  attachmentKey, COMPACT_COMMAND, toRequest, withAttachment, type ComposerAttachment,
 } from "@/lib/cortex/composer-picker";
 import { contextFrom, type CortexContext } from "@/lib/cortex/context-gauge";
 import { screenFrom } from "@/lib/cortex/screen";
@@ -29,8 +29,10 @@ export interface CortexTurn {
   role: "user" | "assistant";
   text?: string;
   answer?: AssistantAnswer;
-  /** Tour spécial : plafond de tokens IA atteint, une carte d'information au lieu d'une réponse. */
-  kind?: "quota";
+  /** Tour spécial : plafond de tokens IA atteint (une carte d'information), ou la ligne calme de « /compact » (TF-J1-13). */
+  kind?: "quota" | "compact";
+  /** Les messages que « /compact » a condensés ; 0 quand il n'y avait rien à condenser. */
+  compacted?: number;
   /** Ce que TaskForce propose sous la réponse (R118) ; `escalated` une fois la demande envoyée au modèle proposé. */
   escalation?: ModelEscalation | null;
   escalated?: boolean;
@@ -115,6 +117,8 @@ interface CortexState {
   enterWorkspace: (slug: string) => void;
   /** Envoie le texte de la barre : false pour une barre vide, sans espace, ou pendant qu'une réponse est attendue. */
   send: (slug: string) => Promise<boolean>;
+  /** « /compact » (TF-J1-13) : condense maintenant la conversation, même sous le seuil, et le dit ; false si ça échoue. */
+  compact: (slug: string) => Promise<boolean>;
   /**
    * Envoie de nouveau la demande d'une réponse au modèle que TaskForce y propose (R118), d'un clic de la personne ; false
    * sans proposition, déjà envoyée, ou pendant qu'une réponse est attendue.
@@ -173,6 +177,8 @@ export function messagesToTurns(messages: ConversationMessage[]): CortexTurn[] {
   return messages.map((m) =>
     m.role === "user"
       ? { id: `m${m.id}`, role: "user", text: m.content }
+      : m.mode === "compact"
+      ? { id: `m${m.id}`, role: "assistant", kind: "compact", compacted: m.read?.context?.summarized ?? 0 }
       : {
           id: `m${m.id}`, role: "assistant",
           answer: {
@@ -244,6 +250,7 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
   send: async (slug) => {
     const text = get().draft.trim();
     if (!text || !slug || get().sentAt !== null) return false;
+    if (text.toLowerCase() === COMPACT_COMMAND) return get().compact(slug);
     // Une conversation appartient à son espace : une demande d'un autre espace en ouvre une neuve.
     get().enterWorkspace(slug);
     const sentAt = Date.now();
@@ -276,6 +283,37 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
       return false;
     } finally {
       // Repliée pendant l'attente : la barre signale qu'une réponse attend d'être lue.
+      set((s) => ({ sentAt: null, lastMs: Date.now() - sentAt, unread: !s.open }));
+    }
+  },
+
+  compact: async (slug) => {
+    if (!slug || get().sentAt !== null) return false;
+    get().enterWorkspace(slug);
+    const sentAt = Date.now();
+    set({ draft: "", sentAt, open: true, unread: false });
+    const say = (compacted: number) => (s: CortexState) => ({
+      turns: [...s.turns, { id: nextId("a"), role: "assistant" as const, kind: "compact" as const, compacted }],
+      // Le prochain prompt sera plus court : la jauge ne garde pas la mesure d'avant.
+      context: compacted > 0 ? null : s.context,
+    });
+    try {
+      const id = get().conversationId;
+      if (id === null) {
+        set(say(0));
+        return true;
+      }
+      const { summarized } = await compactConversation(slug, id);
+      set(say(summarized));
+      return true;
+    } catch (e) {
+      // 400 : ce que le serveur dit de son échec (rien n'a changé) ; le quota et le frein gardent leur tour.
+      const status = getErrorStatus(e);
+      set((s) => ({ turns: [...s.turns, status === 400
+        ? { id: nextId("a"), role: "assistant", answer: fallbackAnswer(getErrorMessage(e)) }
+        : failedTurn(e)] }));
+      return false;
+    } finally {
       set((s) => ({ sentAt: null, lastMs: Date.now() - sentAt, unread: !s.open }));
     }
   },

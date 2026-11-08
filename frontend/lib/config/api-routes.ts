@@ -58,6 +58,8 @@ export const DELIVERY_ROUTES = {
   RUN: (slug: string, issueId: number) => `/api/workspaces/${slug}/delivery/issues/${issueId}/run`,
   /** Runs de délégation du workspace (GET) - vue « workflow » (agents en parallèle). */
   RUNS: (slug: string) => `/api/workspaces/${slug}/delivery/runs`,
+  /** Ce qui attend la personne connectée (GET, R128) : ses demandes encore ouvertes, une ligne par mission. */
+  OPEN_APPROVALS: (slug: string) => `/api/workspaces/${slug}/delivery/approvals/open`,
   /** Chronologie en direct d'un run après l'événement `after`, et ses demandes de validation (GET, lot 5). */
   ACTIVITY: (slug: string, runId: number, after: number) =>
     `/api/workspaces/${slug}/delivery/runs/${runId}/activity?after=${after}`,
@@ -396,12 +398,30 @@ export const AI_ROUTES = {
   USAGE: (slug: string) => `/api/workspaces/${slug}/ai/usage`,
   CONVERSATIONS: (slug: string) => `/api/workspaces/${slug}/ai/conversations`,
   CONVERSATION: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}`,
+  CONVERSATION_COMPACT: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}/compact`,
 } as const;
 
 /**
  * Ce que sait faire chaque modèle (R113) : la table de l'instance, une mesure cas par cas, le modèle de Cortex choisi.
  * Backend: @RequestMapping("/api/workspaces/{slug}/ai/models").
  */
+/**
+ * Le banc des modèles (R131)
+ * Backend: /api/workspaces/{slug}/ai/benchmark
+ */
+export const AI_BENCHMARK_ROUTES = {
+  MATRIX: (slug: string) => `/api/workspaces/${slug}/ai/benchmark`,
+  DETAIL: (slug: string) => `/api/workspaces/${slug}/ai/benchmark/detail`,
+  RUNS: (slug: string) => `/api/workspaces/${slug}/ai/benchmark/runs`,
+  RUN_CASE: (slug: string, runId: number, caseKey: string) =>
+    `/api/workspaces/${slug}/ai/benchmark/runs/${runId}/cases/${encodeURIComponent(caseKey)}`,
+  VERDICT: (slug: string, resultId: number) => `/api/workspaces/${slug}/ai/benchmark/results/${resultId}/verdict`,
+  TRIALS: (slug: string) => `/api/workspaces/${slug}/ai/benchmark/trials`,
+  TRIAL_LETTER: (slug: string, trialId: number, letter: string) =>
+    `/api/workspaces/${slug}/ai/benchmark/trials/${trialId}/letters/${encodeURIComponent(letter)}`,
+  TRIAL_CHOICE: (slug: string, trialId: number) => `/api/workspaces/${slug}/ai/benchmark/trials/${trialId}/choice`,
+} as const;
+
 export const AI_MODEL_ROUTES = {
   TABLE: (slug: string) => `/api/workspaces/${slug}/ai/models`,
   RUNS: (slug: string) => `/api/workspaces/${slug}/ai/models/runs`,

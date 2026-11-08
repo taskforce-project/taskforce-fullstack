@@ -18,6 +18,7 @@ import com.taskforce.tf_api.core.service.AiStatusService.AiStatus;
 import com.taskforce.tf_api.core.service.ai.AiProviderSettings;
 import com.taskforce.tf_api.core.service.ai.ChosenModel;
 import com.taskforce.tf_api.core.service.ai.ModelGateway;
+import com.taskforce.tf_api.core.service.ai.ModelWindow;
 import com.taskforce.tf_api.core.service.ai.ModelProviderException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,6 +58,54 @@ class AiGatewayClientTest {
     private static ModelGateway.ChatReply reply(String model, String content) {
         ObjectNode message = new ObjectMapper().createObjectNode().put("role", "assistant").put("content", content);
         return new ModelGateway.ChatReply(model, message, new LlmUsage(3, 2, 5));
+    }
+
+    @Test
+    @DisplayName("la fenêtre : celle du modèle du palier, ou du modèle que la personne a choisi")
+    void theWindowOfTheTier() {
+        when(gateway.window(same(SETTINGS), org.mockito.ArgumentMatchers.eq("fast-one"), org.mockito.ArgumentMatchers.eq(false)))
+            .thenReturn(new ModelWindow("fast-one", 8_192, false, 2_048));
+        when(gateway.window(same(SETTINGS), org.mockito.ArgumentMatchers.eq("main"), org.mockito.ArgumentMatchers.eq(true)))
+            .thenReturn(new ModelWindow("main", 16_384, false, 8_192));
+        when(gateway.window(same(SETTINGS), org.mockito.ArgumentMatchers.eq("qwen3:14b"), org.mockito.ArgumentMatchers.eq(false)))
+            .thenReturn(new ModelWindow("qwen3:14b", 40_960, false, 2_048));
+
+        assertThat(client.contextWindow("fast").tokens()).isEqualTo(8_192);
+        assertThat(client.contextWindow("deep").tokens()).isEqualTo(16_384);
+        assertThat(ChosenModel.using("qwen3:14b", () -> client.contextWindow("fast")).tokens()).isEqualTo(40_960);
+    }
+
+    @Test
+    @DisplayName("un modèle plus grand à proposer : le plus petit qui tient, jamais d'après une estimation ni sans outils")
+    void aLargerModelToOffer() {
+        when(status.snapshot()).thenReturn(new AiStatusService.Snapshot(SETTINGS, READY, true,
+            List.of("fast-one", "too-small", "guess", "no-tools", "large", "larger", "bge-m3"), List.of()));
+        java.util.function.BiConsumer<String, ModelWindow> window = (name, value) -> when(
+            gateway.window(same(SETTINGS), org.mockito.ArgumentMatchers.eq(name), org.mockito.ArgumentMatchers.eq(false))).thenReturn(value);
+        window.accept("too-small", new ModelWindow("too-small", 8_192, false, 2_048));
+        window.accept("guess", new ModelWindow("guess", 64_000, true, 2_048));
+        window.accept("no-tools", new ModelWindow("no-tools", 32_768, false, 2_048));
+        window.accept("large", new ModelWindow("large", 40_960, false, 2_048));
+        window.accept("larger", new ModelWindow("larger", 128_000, false, 2_048));
+        when(gateway.describe(same(SETTINGS), org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.Optional.empty());
+        when(gateway.describe(same(SETTINGS), org.mockito.ArgumentMatchers.eq("no-tools")))
+            .thenReturn(java.util.Optional.of(new ModelGateway.ModelCard(null, 32_768, false)));
+
+        assertThat(client.largerWindow("fast", 20_000)).map(ModelWindow::model).contains("large");
+        assertThat(client.largerWindow("fast", 200_000)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("le dernier appel garde si sa fenêtre est une estimation")
+    void theContextSaysItsEstimate() {
+        ObjectNode message = new ObjectMapper().createObjectNode().put("role", "assistant").put("content", "ok");
+        when(gateway.chat(any(), any())).thenReturn(new ModelGateway.ChatReply("gpt", message, new LlmUsage(3, 2, 5), 16_384, true));
+        client.beginUsageCapture();
+
+        client.chatCompletion("s", "u", false, "fast");
+
+        assertThat(client.currentContext()).isEqualTo(new LlmContext(3, 16_384, true));
+        client.endUsageCapture();
     }
 
     static Stream<Arguments> tiers() {

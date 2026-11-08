@@ -406,12 +406,9 @@ export const CONSTANTS_EN = {
   // What each model can do (R113): measured on this computer or server by TaskForce's test cases, never taken from a
   // vendor's sheet. TaskForce proposes the first capable model; the person chooses. Then R118's offer in the conversation.
   models: {
-    title: "What each model can do",
     hint: "Measured here by TaskForce's test cases, not taken from the vendor. Measuring a model replays {cases} short cases with Cortex's tools and counts in your AI usage.",
-    model: "Model",
-    measured: "Measured",
     notMeasured: "Not measured",
-    never: "Never",
+    measuredOn: "Measured {date}",
     measure: "Measure",
     measureAgain: "Measure again",
     measuring: "Measuring {model}: {done} of {total}",
@@ -420,6 +417,10 @@ export const CONSTANTS_EN = {
     waiting: "The AI allows a request per minute here: next case in {seconds} s",
     stop: "Stop",
     inUse: "Cortex uses it",
+    useForCortex: "Use for Cortex",
+    // The detail of a model's line (R130): what TaskForce proposes it for, when it does.
+    proposedFor: "TaskForce proposes it for {capabilities}.",
+    proposedEverything: "TaskForce proposes it for everything measured.",
     instanceModel: "This instance's model for Cortex: {model}.",
     // On Ollama, the gateway sizes the context window to each request, up to this many tokens.
     instanceModelWindow: "This instance's model for Cortex: {model}, with a context window of up to {tokens} tokens.",
@@ -435,7 +436,6 @@ export const CONSTANTS_EN = {
     heldNone: "lost the shortest document",
     partial: "{passed} of {measured} measured",
     caseFailed: "Failed: {title}",
-    lastMeasure: "Last measure of {model}: {passed} of {total} cases passed.",
     // R118: TaskForce's words under an answer when the bank says the model failed this kind of request.
     saysWhat: "about the model that answers",
     saysLabel: "TaskForce, about the model that answers",
@@ -447,6 +447,56 @@ export const CONSTANTS_EN = {
     trial: "Trial",
     trialHint: "Answers in a comment. No code, no repository.",
     trialAgent: "TaskForce's own loop on {model}, on trial: it reads the issue, its project and the notes you can read, and answers in a comment, under its name and for you. Only for tasks without a repository: code stays with Claude Code.",
+  },
+
+  // R131: the model benchmark. A sign, a name on hover; the words live in the detail.
+  benchmark: {
+    reading: "Reading…",
+    noModels: "The AI of this instance serves no model right now.",
+    empty: "No model has been through the benchmark yet.",
+    model: "Model",
+    run: "Run",
+    stop: "Stop",
+    modelsToRun: "Models to run",
+    never: "Never",
+    inUse: "Cortex uses it",
+    verdicts: { give_it: "Give it", with_review: "With review", not_yet: "Not yet", none: "Not run" },
+    yourVerdict: "Your verdict",
+    memberVerdict: "A teammate's verdict",
+    cellVerdict: "{task}: {verdict}, {passed} of {total} cases",
+    cellEmpty: "{task}: {verdict}",
+    indicative: "Indicative, on {cases} cases.",
+    partly: "{measured} of {total} run",
+    passed: "Passed",
+    failed: "Failed",
+    pass: "Pass",
+    fail: "Fail",
+    noAnswer: "The model wrote nothing.",
+    calls: "What it called",
+    checks: "What was checked",
+    seconds: "{seconds} s",
+    minutesSeconds: "{minutes} min {seconds} s",
+    aboutMinutes: "About {minutes} min",
+    progress: "{model}: {done} of {total}",
+    waiting: "Next case in {seconds} s",
+    trialOpen: "Try on my work",
+    trialClose: "Close",
+    trialChange: "Change the issue",
+    trialSearch: "Find one of your issues",
+    trialTask: "Task",
+    trialModels: "Models",
+    trialGo: "Try",
+    trialAnswering: "{done} of {total} answers",
+    trialAnswer: "Answer {letter}",
+    trialChoose: "Choose",
+    trialChooseNone: "None of them",
+    trialChosen: "Chosen",
+    trialDone: "Done",
+    trialsTitle: "Your trials",
+    trialChoseThis: "You chose this model",
+    trialChoseOther: "You chose {model}",
+    trialChoseNone: "You chose none",
+    trialLineTitle: "{task}, between {models}",
   },
 
   // Integrations catalog (Settings > Integrations): GitHub, Slack and Plane next to the tried MCP presets.
@@ -508,6 +558,10 @@ export const CONSTANTS_EN = {
     waiting: "Waiting for you",
     reviewResult: "Review the result on {mission}",
     approve: "Approve or refuse: {title}",
+    approveMany: "Approve or refuse {count} requests: {title}",
+    mentioned: "Mentioned you: {title}",
+    seeAll: "See all",
+    seeAllName: "See all {total} waiting for you",
     suggestions: "Suggestions",
     nothingToSuggest: "Nothing to suggest yet: this space has no issue or project.",
     summarize: "Summarize {key}",
@@ -541,6 +595,7 @@ export const CONSTANTS_EN = {
       delete: { label: "Archive or delete an issue", text: "Delete " },
       changed: { label: "Ask what changed", text: "What changed this week?" },
       note: { label: "Write a note", text: "Write a note about " },
+      compact: { label: "Compact this conversation", text: "/compact" },
     },
     // The grey line under each answer: the model, then what TaskForce gave it to read, counted.
     readLine: "What the model read",
@@ -555,6 +610,55 @@ export const CONSTANTS_EN = {
     note: "1 note",
     notes: "{count} notes",
     readNothing: "read nothing in TaskForce",
+  },
+
+  // What TaskForce did so a request fits its model's context window (TF-J1-13): one quiet line in the conversation.
+  contextFit: {
+    summarized: "Earlier messages summarized to fit {model}'s context",
+    leftOut: "Earlier messages left out to fit {model}'s context",
+    toolResults: "Older tool results shortened to fit {model}'s context",
+    summarizedOne: "1 message summarized",
+    summarizedMany: "{count} messages summarized",
+    leftOutOne: "1 message left out",
+    leftOutMany: "{count} messages left out",
+    toolResultsOne: "1 tool result shortened",
+    toolResultsMany: "{count} tool results shortened",
+    compacted: "Conversation compacted",
+    nothingToCompact: "Nothing to compact yet",
+    nothingToCompactDetail: "The last exchange always stays as written",
+  },
+
+  // The microphone of the composer (R132, R76, R80): one click starts, one click stops, nothing is sent from it.
+  voice: {
+    start: "Voice input",
+    stop: "Stop listening",
+    writing: "Writing what you said…",
+    onDevice: "Audio stays on this computer",
+    inBrowser: "Your browser's speech service writes what you say",
+    consent: "Your browser sends your voice to its speech service. Turn on voice, or keep typing.",
+    turnOn: "Turn on voice",
+    keepTyping: "Keep typing",
+    offer: "Voice needs a one-time download: {size} MB.",
+    download: "Download",
+    retry: "Try again",
+    notNow: "Not now",
+    downloading: "Downloading voice: {percent}%",
+    cancel: "Cancel",
+    dismiss: "Dismiss",
+    notices: {
+      denied: "Microphone blocked in your settings.",
+      noDevice: "No microphone found.",
+      busy: "The microphone is in use.",
+      model: "The voice model is missing.",
+      engine: "Voice stopped working. Try again, or keep typing.",
+      service: "The speech service is out of reach.",
+      network: "The download stopped. Check your connection.",
+      checksum: "The download was damaged.",
+      disk: "Not enough disk space for voice.",
+      nothing: "Nothing heard.",
+      limit: "Stopped after two minutes.",
+      ready: "Voice is ready.",
+    },
   },
 
   // The search of the window (Ctrl+K, R121 and R124): issues by key and title, projects, conversations, and the screens
@@ -591,6 +695,8 @@ export const CONSTANTS_EN = {
     newConversation: "New conversation",
     search: "Search",
     waitingForYou: "Waiting for you",
+    // R128: unread mentions are counted apart from what blocks an agent: a quiet dot beside the number.
+    unreadMentions: "Unread mentions: {count}",
     projects: "Projects",
     newProject: "New project",
     conversations: "Conversations",
@@ -686,6 +792,7 @@ export const CONSTANTS_EN = {
       seesIssue: "Cortex sees {issue} on the board of {project}",
       seesNothing: "Cortex sees no board, only your workspace's knowledge",
       room: "its last answer took {percent}% of {model}'s window ({tokens} tokens)",
+      roomEstimated: "its last answer took about {percent}% of {model}'s estimated window ({tokens} tokens)",
       roomTokens: "its last answer read {tokens} tokens",
       theModel: "the model",
       alone: "{sees}.",
@@ -784,8 +891,16 @@ export const CONSTANTS_EN = {
   // The pane "Progress" (R125, session 18 of the Council): what Cortex knows and how it improves, measured here. It
   // shows what the agent knows and what improves, never its activity, never a ranking (R57).
   progress: {
-    intro: "What Cortex can do and how it improves, measured here, and what it reads in this workspace. Nothing here comes from a vendor's benchmark.",
-    // 1. What each model can do, measured here (R113): the table keeps its title and hint in `models`.
+    // The tabs (R130, session 19): one word each, the question each one answers on hover. A new tab: one entry here, and
+    // one line in TABS (components/progress/progress-pane.tsx).
+    tabs: {
+      models: { label: "Models", hint: "What each model can do, measured here. Nothing here comes from a vendor's benchmark." },
+      benchmark: { label: "Benchmark", hint: "What you can give each model, task by task, on real work. Indicative." },
+      history: { label: "History", hint: "How Cortex does over time, and what improved it." },
+      sources: { label: "Sources", hint: "What Cortex can read for you here, counted, with the date of the latest change." },
+    },
+    // 1. What each model can do, measured here (R113): the detail of a line, the rest of the texts in `models`.
+    setUpAi: "Set up AI",
     notMeasuredYet: "Not measured yet.",
     // A model not measured yet: what its own description says, labelled as such, never a score.
     fromDescription: "Its description says: {card}.",
@@ -793,12 +908,12 @@ export const CONSTANTS_EN = {
     cardWindow: "a context window of {tokens} tokens",
     cardTools: "takes tools",
     cardNoTools: "takes no tools",
-    chooseModel: "Choose Cortex's model in Settings > AI",
     // 2. How it does over time: the test bank (R61, R118).
-    overTime: "How it does over time",
+    overTime: "Over time",
     overTimeHint: "The test bank: questions your team asked Cortex, replayed on a model and graded by code.",
-    noCases: "The test bank has no case yet. Under an answer of Cortex, choose Add to test bank.",
+    noCases: "No test case yet: under an answer of Cortex, choose Add to test bank.",
     noRuns: "Not replayed yet.",
+    replayShort: "Replay",
     replay: "Replay {count} cases on {model}",
     replayOne: "Replay 1 case on {model}",
     replayHint: "A replay never touches your workspace, and counts in your AI usage like an answer.",
@@ -828,8 +943,8 @@ export const CONSTANTS_EN = {
     lastPassed: "passed on {date}",
     lastFailed: "failed on {date}",
     // 4. What it knows of this workspace: the sources Cortex reads for the person, counted and dated.
-    knows: "What it knows of this workspace",
-    knowsHint: "What Cortex can read for you here, counted, with the date of the latest change.",
+    noSources: "Nothing to read here yet.",
+    createProject: "Create a project",
     sources: {
       projects: "Projects",
       issues: "Issues",
@@ -839,7 +954,6 @@ export const CONSTANTS_EN = {
       connectors: "Connected tools",
     },
     changed: "changed {date}",
-    none: "None yet",
     reading: "Reading…",
     readFailed: "TaskForce couldn't read this part. Open Progress again to retry.",
     // Settings > AI keeps the model choice, and opens Progress.
@@ -1110,7 +1224,8 @@ export const CONSTANTS_EN = {
     // AI gateway gave that request (CEO's test of 1.10.0: it showed the whole conversation against a fixed window).
     contextLine: "What Cortex sent the model for its last answer (instructions, tools, the screen, notes and this conversation), against the window it got.",
     contextLineUpTo: "What Cortex sent the model for its last answer, against the window it got. The window grows with the request, up to {max}.",
-    contextFull: "Nearly full: a longer conversation would lose its start. A new conversation starts empty.",
+    contextFull: "Nearly full: earlier messages get summarized to make room.",
+    contextEstimated: "An estimate: the provider doesn't say this model's window.",
     contextProvider: "What Cortex sent the model for its last answer. The AI provider sets the window.",
     contextNone: "Shows after Cortex's next answer: what it sends the model, against the window the model gets.",
     contextTokens: "{tokens} tokens",

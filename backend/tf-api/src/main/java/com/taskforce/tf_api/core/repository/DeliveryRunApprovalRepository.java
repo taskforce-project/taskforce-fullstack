@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.taskforce.tf_api.core.enums.DeliveryApprovalStatus;
+import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.DeliveryRunApproval;
 
 @Repository
@@ -21,6 +23,43 @@ public interface DeliveryRunApprovalRepository extends JpaRepository<DeliveryRun
     Optional<DeliveryRunApproval> findByIdAndRunId(Long id, Long runId);
 
     long countByRunIdAndStatus(Long runId, DeliveryApprovalStatus status);
+
+    /** Une mission qui attend la personne, telle que « Waiting for you » la lit : son issue et ses demandes ouvertes. */
+    interface OpenRow {
+        Long getRunId();
+
+        Long getIssueId();
+
+        Long getProjectId();
+
+        String getProjectIdentifier();
+
+        Integer getSequenceNumber();
+
+        String getIssueTitle();
+
+        Long getRequests();
+    }
+
+    /**
+     * Ce qui attend vraiment cette personne (R128, séance n°19), une ligne par mission : ses demandes encore ouvertes,
+     * pas échues, sur une mission qui peut encore les recevoir, en cours et dont le runner donne signe de vie depuis
+     * {@code aliveSince} (un run « pull » perdu reste RUNNING tant que personne ne le relit). Seule la personne qui a
+     * délégué répond. La mission qui attend depuis le plus longtemps d'abord.
+     */
+    @Query("""
+        SELECT r.id AS runId, i.id AS issueId, p.id AS projectId, p.identifier AS projectIdentifier,
+               i.sequenceNumber AS sequenceNumber, i.title AS issueTitle, COUNT(a) AS requests
+        FROM DeliveryRunApproval a JOIN a.run r JOIN r.issue i JOIN i.project p
+        WHERE p.id IN :projectIds AND r.startedBy.id = :userId
+          AND a.status = :pending AND a.expiresAt > :now
+          AND r.status = :running AND (r.heartbeatAt IS NULL OR r.heartbeatAt >= :aliveSince)
+        GROUP BY r.id, i.id, p.id, p.identifier, i.sequenceNumber, i.title
+        ORDER BY MIN(a.createdAt) ASC
+        """)
+    List<OpenRow> findOpen(@Param("projectIds") Collection<Long> projectIds, @Param("userId") Long userId,
+                           @Param("pending") DeliveryApprovalStatus pending, @Param("now") LocalDateTime now,
+                           @Param("running") DeliveryRunStatus running, @Param("aliveSince") LocalDateTime aliveSince);
 
     /** Clôt les demandes encore ouvertes d'un run : expirées (run terminé, ou échéance passée). */
     @Modifying

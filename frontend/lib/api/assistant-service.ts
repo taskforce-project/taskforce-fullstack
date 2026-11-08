@@ -97,7 +97,8 @@ export interface AssistantActionResult {
 }
 /**
  * Tokens réellement consommés par le tour (usage LLM cumulé), et ce que le modèle a lu à son dernier appel : la taille de
- * ce prompt et la fenêtre de contexte que la passerelle lui a donnée (null quand le fournisseur la tient lui-même).
+ * ce prompt et sa fenêtre de contexte : celle que la passerelle a donnée (Ollama), celle que le fournisseur dit de ce
+ * modèle, ou la valeur prudente des réglages, dite comme telle par `contextEstimated` (TF-J1-13).
  */
 export interface AssistantUsage {
   promptTokens: number
@@ -105,6 +106,7 @@ export interface AssistantUsage {
   totalTokens: number
   lastPromptTokens?: number
   contextWindow?: number | null
+  contextEstimated?: boolean
 }
 export interface AssistantAnswer {
   answer: string
@@ -135,6 +137,18 @@ export interface AssistantRead {
   boards: { project: string; issues: number; open: string | null }[]
   tools: { name: string; calls: number }[]
   notes: number
+  /** Ce que TaskForce a dû faire pour tenir la fenêtre du modèle (TF-J1-13) ; absent quand rien n'a été touché. */
+  context?: ContextRead | null
+}
+
+/**
+ * Ce qui a changé pour que la requête tienne la fenêtre du modèle : les messages condensés dans le résumé pour ce tour,
+ * ceux qui n'ont pas pu partir, les résultats d'outils raccourcis pendant la boucle. Jamais en silence.
+ */
+export interface ContextRead {
+  summarized: number
+  leftOut: number
+  toolResults: number
 }
 
 /** Ce que la personne joint à sa demande depuis le compositeur (R123) : une issue (son projet et son id), ou un projet. */

@@ -28,6 +28,7 @@ import com.taskforce.tf_api.core.service.agent.Question;
 import com.taskforce.tf_api.core.service.agent.QuestionNeeded;
 import com.taskforce.tf_api.core.service.agent.Screen;
 import com.taskforce.tf_api.core.service.ai.ChosenModel;
+import com.taskforce.tf_api.core.service.ai.TurnHistory;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -83,20 +84,21 @@ public class AssistantController {
         AiConversation conv = conversationService.getOrCreate(ws.getId(), userId, body.conversationId(),
             body.screenOf().projectId());
 
-        // Compression de contexte : condense les anciens échanges si le fil est trop long (avant de lire l'historique).
-        conversationService.compressIfNeeded(conv.getId());
-
-        // Mémoire multi-tours : historique de la conversation AVANT d'ajouter le tour courant. L'écran de la personne
-        // (R114) : Cortex le lit avant les notes, avec ses droits.
+        // La taille de la conversation AVANT d'ajouter le tour courant, que la proposition d'un modèle compare (R118).
         List<Map<String, Object>> history = conversationService.recentHistory(conv.getId());
+        // Mémoire multi-tours : ce qui part au modèle se choisit quand la requête est construite, selon sa fenêtre, et les
+        // messages les plus anciens se condensent d'abord si elle passerait 80 % (TF-J1-13). L'écran de la personne
+        // (R114) : Cortex le lit avant les notes, avec ses droits.
+        TurnHistory memory = (budget, tier) -> conversationService.fit(conv.getId(), budget, tier);
         // Le modèle : celui vers lequel la personne envoie la demande d'un clic (R118), sinon celui qu'elle a choisi
         // (R113), sinon celui de l'instance. TaskForce ne change jamais de modèle sans elle.
         String sentTo = capabilities.requestedModel(body.model());
         String chosen = sentTo != null ? sentTo : capabilities.chosenModel(userId);
-        AssistantAnswer answer = ChosenModel.using(chosen, () -> agentService.run(slug, userId, body.message(), history,
+        AssistantAnswer answer = ChosenModel.using(chosen, () -> agentService.run(slug, userId, body.message(), memory,
             body.screenOf(), body.attachedOf()));
-        // Ce que TaskForce dit sous la réponse : la proposition d'un modèle plus fort, ou la demande envoyée à un autre.
-        ChatTurnResponse.Escalation escalation = sentTo != null ? null
+        // Ce que TaskForce dit sous la réponse : un modèle qui tient une demande trop grande (TF-J1-13), la proposition d'un
+        // modèle plus fort, ou la demande envoyée à un autre.
+        ChatTurnResponse.Escalation escalation = sentTo != null ? null : answer.offer() != null ? answer.offer()
             : capabilities.offer(body.message(), history, capabilities.cortexModel(chosen)).orElse(null);
         String notice = sentTo != null ? ModelCapabilityService.sentNotice(sentTo)
             : escalation != null ? escalation.text() : null;

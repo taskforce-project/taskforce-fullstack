@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +15,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -48,6 +56,45 @@ class DesktopConfigTest {
     @DisplayName("des réglages incomplets arrêtent le démarrage")
     void incomplete_settings_stop_startup(String label, DesktopProperties properties) {
         assertThatThrownBy(() -> DesktopConfig.validate(properties)).isInstanceOf(IllegalStateException.class);
+    }
+
+    /** Ce que la coque pose au lancement (desktop/src/backend.ts) pour les réglages que le démarrage vérifie. */
+    private static final Map<String, String> SHELL_VARIABLES = Map.of(
+        "TF_DESKTOP_LAUNCH_TOKEN", TOKEN,
+        "TF_DESKTOP_DATA_DIR", "C:/data",
+        "TF_DESKTOP_ACCOUNT_SUBJECT", "sub-1",
+        "TF_DESKTOP_ACCOUNT_EMAIL", "ada@example.com");
+
+    /** Le vrai application-desktop.yml, lié à ces variables d'environnement seules, comme au démarrage. */
+    private static DesktopProperties settingsOf(Map<String, String> variables) throws IOException {
+        MockEnvironment environment = new MockEnvironment();
+        variables.forEach(environment::setProperty);
+        new YamlPropertySourceLoader().load("application-desktop", new ClassPathResource("application-desktop.yml"))
+            .forEach(environment.getPropertySources()::addLast);
+        return Binder.get(environment).bind("desktop", DesktopProperties.class).get();
+    }
+
+    @Test
+    @DisplayName("toutes les variables de la coque présentes laissent démarrer")
+    void all_shell_variables_pass() throws IOException {
+        DesktopProperties settings = settingsOf(SHELL_VARIABLES);
+
+        assertThat(settings.account().subject()).isEqualTo("sub-1");
+        assertThatCode(() -> DesktopConfig.validate(settings)).doesNotThrowAnyException();
+    }
+
+    /** Sans défaut dans le YAML, Spring garderait le texte « ${VARIABLE} », qui n'est pas vide : le démarrage passerait. */
+    @ParameterizedTest(name = "sans {0} : démarrage refusé")
+    @ValueSource(strings = {
+        "TF_DESKTOP_LAUNCH_TOKEN", "TF_DESKTOP_DATA_DIR", "TF_DESKTOP_ACCOUNT_SUBJECT", "TF_DESKTOP_ACCOUNT_EMAIL"
+    })
+    @DisplayName("une variable de la coque absente compte comme vide : le démarrage est refusé")
+    void an_absent_shell_variable_stops_startup(String variable) throws IOException {
+        Map<String, String> variables = new HashMap<>(SHELL_VARIABLES);
+        variables.remove(variable);
+        DesktopProperties settings = settingsOf(variables);
+
+        assertThatThrownBy(() -> DesktopConfig.validate(settings)).isInstanceOf(IllegalStateException.class);
     }
 
     @ParameterizedTest(name = "Host {0} → {1}")

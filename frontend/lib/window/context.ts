@@ -11,6 +11,8 @@ export interface ContextTexts {
   readonly seesIssue: string
   readonly seesNothing: string
   readonly room: string
+  /** Quand le fournisseur ne dit pas la fenêtre : une part estimée, dite comme telle (TF-J1-13). */
+  readonly roomEstimated: string
   readonly roomTokens: string
   readonly theModel: string
   /** La phrase : ce que Cortex voit, seul ou suivi de la place prise. */
@@ -45,6 +47,6 @@ export function contextSentence(input: ContextInput, t: ContextTexts): string {
   const tokens = formatTokens(input.context.tokens)
   const room = share === null
     ? fillText(t.roomTokens, { tokens })
-    : fillText(t.room, { percent: share, model: input.model ?? t.theModel, tokens })
+    : fillText(input.context.estimated ? t.roomEstimated : t.room, { percent: share, model: input.model ?? t.theModel, tokens })
   return fillText(t.joined, { sees, room })
 }

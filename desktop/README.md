@@ -28,6 +28,11 @@ This folder holds the Electron shell. The app itself is the rest of the reposito
   it in memory only.
 - **Claude Code.** The shell starts the runner with a secret drawn at each start. Claude Code must be installed and
   signed in on the computer.
+- **Voice.** The microphone of the composer records in the window and the shell transcribes on the computer, in a
+  utility process (`src/voice.ts`, `src/voice-worker.ts`), with sherpa-onnx (npm, prebuilt N-API binaries, unpacked
+  from the app's archive) and Parakeet TDT 0.6b v3 by NVIDIA (CC BY 4.0, int8 export for sherpa-onnx, 671 MB). The model
+  is downloaded once from Hugging Face at the person's first click, from a pinned revision, checked against SHA-256 and
+  kept in the app's folder (`voice/`). Audio never leaves the computer; the log keeps durations, never the text.
 - **Updates.** The app checks the `desktop-latest` release at start and every six hours, downloads in the background
   and installs on quit. The installer never shows a window for an update: on quit it installs silently; with
   "Restart now", the app shows its own update screen while it stops, then the installer installs silently (`/S`) and
@@ -81,6 +86,7 @@ SmartScreen nor Smart App Control stops it. In this version:
 - the data goes in the package's folder, `%LOCALAPPDATA%\Packages\<package family>\LocalState`, which Windows deletes
   when the app is uninstalled; it stays separate from the data of the version from the website;
 - the notifications keep the identity of the package;
+- there is no microphone: the package would have to declare the capability, which cannot be tried without installing it;
 - the database starts without `cmd.exe`. In a Store package, a program of the package may start another one only
   directly: through `cmd.exe`, a system program, Windows refuses ("Access is denied"). `initdb` and `pg_ctl start` go
   through `cmd.exe`, and so does the server when it checks its own version at start. So the build prepares an empty

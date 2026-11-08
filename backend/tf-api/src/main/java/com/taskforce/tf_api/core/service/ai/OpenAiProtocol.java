@@ -20,8 +20,26 @@ final class OpenAiProtocol {
     /** Directive propre à Qwen3 : une réponse sans raisonnement, bien plus rapide. Tout autre modèle la lirait comme du texte. */
     static final String NO_THINK = "/no_think";
     private static final Pattern THINK_BLOCK = Pattern.compile("<think>.*?</think>\\s*", Pattern.DOTALL);
+    /**
+     * Où chaque fournisseur dit la fenêtre d'un modèle dans sa liste ({@code GET /models}) ; vérifié sur leur documentation
+     * ou une vraie réponse le 08/11/2026 : {@code context_window} chez Groq, {@code max_input_tokens} chez Anthropic,
+     * {@code max_context_length} chez Mistral, {@code context_length} chez OpenRouter. OpenAI n'en dit aucune.
+     */
+    private static final List<String> WINDOW_FIELDS =
+        List.of("context_window", "max_input_tokens", "max_context_length", "context_length");
 
     private OpenAiProtocol() {
+    }
+
+    /** La fenêtre d'un modèle, dans sa ligne de la liste du fournisseur ; 0 si elle n'y est pas. */
+    static int reportedWindow(JsonNode row) {
+        for (String field : WINDOW_FIELDS) {
+            JsonNode value = row.path(field);
+            if (value.isNumber() && value.asInt() > 0) {
+                return value.asInt();
+            }
+        }
+        return 0;
     }
 
     /** Vrai pour un modèle Qwen3 ({@code qwen3:8b}, {@code qwen/qwen3-32b}...), seul à comprendre {@code /no_think}. */

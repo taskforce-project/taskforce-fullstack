@@ -15,6 +15,8 @@ import {
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { requireVisualCppRuntime, runtimeSources } from "./postgres-runtime.mjs";
+
 const desktop = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repo = resolve(desktop, "..");
 const out = join(desktop, "resources");
@@ -121,10 +123,24 @@ if (step("postgres")) {
   } else execFileSync("tar", ["-xzf", bundle, "-C", dest], { stdio: "inherit" });
   if (!existsSync(join(dest, "bin"))) fail("the PostgreSQL bundle has no bin/ folder");
   if (process.platform === "win32") {
+    visualCppRuntime(dest);
     pgcmd(dest);
     emptyCluster(dest);
   }
   report("postgres");
+}
+
+/**
+ * La runtime Visual C++ de PostgreSQL, à côté de ses outils (scripts/postgres-runtime.mjs), depuis Visual Studio ou, s'il
+ * est assez récent, le Java embarqué. Une DLL absente ou trop ancienne arrête la construction en la nommant.
+ */
+function visualCppRuntime(dest) {
+  try {
+    const { copied, source } = requireVisualCppRuntime(dest, runtimeSources(join(out, "jre", "bin")));
+    console.log(`  Visual C++ runtime from ${source}: ${copied.map(({ name, version }) => `${name} ${version}`).join(", ")}`);
+  } catch (error) {
+    fail(error.message);
+  }
 }
 
 /**

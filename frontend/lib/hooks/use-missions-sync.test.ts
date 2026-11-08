@@ -4,6 +4,7 @@ import { act, renderHook } from "@testing-library/react"
 import type { AnalysisJob } from "@/lib/api/analysis-service"
 import type { DeliveryRun } from "@/lib/api/delivery-service"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
+import { useNotificationStore, type Signal } from "@/lib/store/notification-store"
 import { useWorkflowStore } from "@/lib/store/workflow-store"
 import { useMissionsSync } from "./use-missions-sync"
 
@@ -20,16 +21,20 @@ const job = (id: number, status: AnalysisJob["status"]): AnalysisJob => ({
 const deliveryInitial = useDeliveryStore.getState()
 const workflowInitial = useWorkflowStore.getState()
 
+const signal = (id: string, type: Signal["type"]) => ({ id, type, read: false }) as Signal
+
 /** Le travail des agents que la fenêtre montre, relu depuis le shell tant qu'il tourne (l'ancien bouton d'AI Workflows). */
 describe("useMissionsSync", () => {
   const fetchJobs = vi.fn().mockResolvedValue(undefined)
   const fetchWorkspaceRuns = vi.fn().mockResolvedValue([])
   const fetchRun = vi.fn().mockResolvedValue(null)
+  const fetchOpenApprovals = vi.fn().mockResolvedValue([])
 
   beforeEach(() => {
     vi.useFakeTimers()
     vi.clearAllMocks()
-    useDeliveryStore.setState({ ...deliveryInitial, workspaceRuns: [], fetchWorkspaceRuns, fetchRun })
+    useDeliveryStore.setState({ ...deliveryInitial, workspaceRuns: [], fetchWorkspaceRuns, fetchRun, fetchOpenApprovals })
+    useNotificationStore.setState({ signals: [] })
     useWorkflowStore.setState({ ...workflowInitial, jobs: [], fetchJobs })
   })
   afterEach(() => vi.useRealTimers())
@@ -39,6 +44,7 @@ describe("useMissionsSync", () => {
 
     expect(fetchJobs).toHaveBeenCalledWith("acme")
     expect(fetchWorkspaceRuns).toHaveBeenCalledWith("acme")
+    expect(fetchOpenApprovals).toHaveBeenCalledWith("acme")
     vi.advanceTimersByTime(20_000)
     expect(fetchJobs).toHaveBeenCalledTimes(1)
     expect(fetchRun).not.toHaveBeenCalled()
@@ -62,11 +68,28 @@ describe("useMissionsSync", () => {
 
     expect(fetchRun.mock.calls.map((call) => call[1])).toEqual([10, 20, 30, 40, 50])
     expect(fetchWorkspaceRuns).toHaveBeenCalledTimes(2)
+    // Les demandes ouvertes se relisent au même rythme, après que les missions ont avancé (R128).
+    expect(fetchOpenApprovals).toHaveBeenCalledTimes(2)
+  })
+
+  it("reads what waits again as soon as an agent signals something, even with no mission known to run", () => {
+    useNotificationStore.setState({ signals: [signal("5", "agentApproval"), signal("9", "mention")] })
+    renderHook(() => useMissionsSync("acme"))
+    expect(fetchOpenApprovals).toHaveBeenCalledTimes(1)
+
+    act(() => useNotificationStore.setState({ signals: [signal("6", "agentDone"), signal("5", "agentApproval")] }))
+    expect(fetchOpenApprovals).toHaveBeenCalledTimes(2)
+    expect(fetchWorkspaceRuns).toHaveBeenCalledTimes(2)
+
+    // Une mention n'y change rien.
+    act(() => useNotificationStore.setState({ signals: [signal("7", "mention"), signal("6", "agentDone"), signal("5", "agentApproval")] }))
+    expect(fetchOpenApprovals).toHaveBeenCalledTimes(2)
   })
 
   it("does nothing without a workspace", () => {
     renderHook(() => useMissionsSync(""))
     expect(fetchJobs).not.toHaveBeenCalled()
     expect(fetchWorkspaceRuns).not.toHaveBeenCalled()
+    expect(fetchOpenApprovals).not.toHaveBeenCalled()
   })
 })

@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.dto.request.RunnerApprovalRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
+import com.taskforce.tf_api.core.dto.response.DeliveryOpenApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunActivityResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
 import com.taskforce.tf_api.core.enums.DeliveryApprovalStatus;
@@ -22,12 +23,14 @@ import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.DeliveryRunApproval;
 import com.taskforce.tf_api.core.model.DeliveryRunEvent;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.DeliveryRunApprovalRepository;
 import com.taskforce.tf_api.core.repository.DeliveryRunEventRepository;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.NotificationService;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
+import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -58,6 +61,7 @@ public class DeliveryActivityService {
     private final DeliveryRunApprovalRepository approvalRepository;
     private final UserRepository userRepository;
     private final ProjectVisibilityGuard visibilityGuard;
+    private final BrainAccessGuard access;
     private final NotificationService notificationService;
     private final LocalRunnerSettings settings;
     private final MissionEvidenceService evidenceService;
@@ -181,9 +185,29 @@ public class DeliveryActivityService {
             }
         }
         approvalRepository.expirePending(run.getId(), LocalDateTime.now(), DeliveryApprovalStatus.PENDING, DeliveryApprovalStatus.EXPIRED);
+        notificationService.readAgentApprovals(run.getIssue(), run.getStartedBy());
     }
 
     // --------------------------------------------------------------------- personne connectée
+
+    /**
+     * Ce qui attend vraiment la personne dans l'espace (R128, séance n°19), une ligne par mission : ses demandes encore
+     * ouvertes, sur les projets qu'elle voit. La source de vérité est la demande, pas sa notification : rien ne marquait
+     * lue une notification dont la demande était tranchée, échue ou orpheline.
+     */
+    @Transactional(readOnly = true)
+    public List<DeliveryOpenApprovalResponse> openApprovals(String slug, Long userId) {
+        Workspace workspace = access.resolveAndAuthorize(slug, userId);
+        List<Long> projectIds = visibilityGuard.viewableProjectIds(workspace.getId(), userId);
+        if (projectIds.isEmpty()) return List.of();
+        LocalDateTime now = LocalDateTime.now();
+        return approvalRepository.findOpen(projectIds, userId, DeliveryApprovalStatus.PENDING, now,
+                DeliveryRunStatus.RUNNING, now.minus(settings.heartbeatTimeout())).stream()
+            .map(row -> new DeliveryOpenApprovalResponse(row.getRunId(), row.getIssueId(),
+                row.getSequenceNumber() == null ? null : row.getProjectIdentifier() + "-" + row.getSequenceNumber(),
+                row.getIssueTitle(), row.getProjectId(), row.getRequests()))
+            .toList();
+    }
 
     /** Chronologie après {@code after} et demandes du run, si le projet est visible par cette personne. */
     @Transactional
@@ -247,6 +271,7 @@ public class DeliveryActivityService {
         approval.setDecidedAt(now);
         approval.setDecidedBy(userRepository.getReferenceById(userId));
         approvalRepository.save(approval);
+        readNotificationsIfSettled(run);
         Map<String, Object> decided = approvalData(approval);
         decided.put("decision", approval.getStatus().name());
         decided.put("scope", approval.getScope());
@@ -261,6 +286,14 @@ public class DeliveryActivityService {
             approval.setStatus(DeliveryApprovalStatus.EXPIRED);
             approvalRepository.save(approval);
             recordUnanswered(approval.getRun(), approval, "No answer in time.");
+            readNotificationsIfSettled(approval.getRun());
+        }
+    }
+
+    /** La dernière demande ouverte du run vient de se clore : ses notifications d'accord ne restent pas non lues. */
+    private void readNotificationsIfSettled(DeliveryRun run) {
+        if (approvalRepository.countByRunIdAndStatus(run.getId(), DeliveryApprovalStatus.PENDING) == 0) {
+            notificationService.readAgentApprovals(run.getIssue(), run.getStartedBy());
         }
     }
 
