@@ -595,6 +595,7 @@ export const CONSTANTS_EN = {
       delete: { label: "Archive or delete an issue", text: "Delete " },
       changed: { label: "Ask what changed", text: "What changed this week?" },
       note: { label: "Write a note", text: "Write a note about " },
+      compact: { label: "Compact this conversation", text: "/compact" },
     },
     // The grey line under each answer: the model, then what TaskForce gave it to read, counted.
     readLine: "What the model read",
@@ -609,6 +610,22 @@ export const CONSTANTS_EN = {
     note: "1 note",
     notes: "{count} notes",
     readNothing: "read nothing in TaskForce",
+  },
+
+  // What TaskForce did so a request fits its model's context window (TF-J1-13): one quiet line in the conversation.
+  contextFit: {
+    summarized: "Earlier messages summarized to fit {model}'s context",
+    leftOut: "Earlier messages left out to fit {model}'s context",
+    toolResults: "Older tool results shortened to fit {model}'s context",
+    summarizedOne: "1 message summarized",
+    summarizedMany: "{count} messages summarized",
+    leftOutOne: "1 message left out",
+    leftOutMany: "{count} messages left out",
+    toolResultsOne: "1 tool result shortened",
+    toolResultsMany: "{count} tool results shortened",
+    compacted: "Conversation compacted",
+    nothingToCompact: "Nothing to compact yet",
+    nothingToCompactDetail: "The last exchange always stays as written",
   },
 
   // The microphone of the composer (R132, R76, R80): one click starts, one click stops, nothing is sent from it.
@@ -775,6 +792,7 @@ export const CONSTANTS_EN = {
       seesIssue: "Cortex sees {issue} on the board of {project}",
       seesNothing: "Cortex sees no board, only your workspace's knowledge",
       room: "its last answer took {percent}% of {model}'s window ({tokens} tokens)",
+      roomEstimated: "its last answer took about {percent}% of {model}'s estimated window ({tokens} tokens)",
       roomTokens: "its last answer read {tokens} tokens",
       theModel: "the model",
       alone: "{sees}.",
@@ -1206,7 +1224,8 @@ export const CONSTANTS_EN = {
     // AI gateway gave that request (CEO's test of 1.10.0: it showed the whole conversation against a fixed window).
     contextLine: "What Cortex sent the model for its last answer (instructions, tools, the screen, notes and this conversation), against the window it got.",
     contextLineUpTo: "What Cortex sent the model for its last answer, against the window it got. The window grows with the request, up to {max}.",
-    contextFull: "Nearly full: a longer conversation would lose its start. A new conversation starts empty.",
+    contextFull: "Nearly full: earlier messages get summarized to make room.",
+    contextEstimated: "An estimate: the provider doesn't say this model's window.",
     contextProvider: "What Cortex sent the model for its last answer. The AI provider sets the window.",
     contextNone: "Shows after Cortex's next answer: what it sends the model, against the window the model gets.",
     contextTokens: "{tokens} tokens",

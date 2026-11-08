@@ -26,6 +26,7 @@ import { useSettingsStore } from "@/lib/store/settings-store"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { AnswerText } from "./answer-text"
 import { Arrival } from "./arrival"
+import { CompactedNotice, ContextFitNotice } from "./context-fit-notice"
 import { CortexUsage } from "./cortex-usage"
 import { DeleteIssueCard } from "./delete-issue-card"
 import { EvalCaseButton } from "./eval-case-dialog"
@@ -284,6 +285,8 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
                   <Message role="assistant">
                     <QuotaNotice />
                   </Message>
+                ) : turn.kind === "compact" ? (
+                  <CompactedNotice compacted={turn.compacted ?? 0} />
                 ) : (
                   <Message role="assistant">
                     {turn.answer && <AgentAnswerView answer={turn.answer} slug={slug} />}
@@ -446,6 +449,8 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
         <Steps steps={answer.steps.map((s) => ({ title: s.label, status: s.status, description: s.description ?? undefined }))} />
       )}
       {answer.reasoning && <Reasoning content={answer.reasoning} />}
+      {/* Ce qu'il a fallu condenser ou couper pour tenir la fenêtre du modèle, avant que la requête parte (TF-J1-13). */}
+      <ContextFitNotice context={answer.read?.context} model={answer.model} />
       {/* Ce que TaskForce dit à la place d'une phrase fausse se montre comme sa parole, pas celle du modèle (R116). */}
       <AnswerText text={answer.answer} withCard={asking} toolCalls={answer.toolCalls} />
       {answer.toolCalls.map((tc, i) => <ToolCallView key={i} slug={slug} call={tc} />)}

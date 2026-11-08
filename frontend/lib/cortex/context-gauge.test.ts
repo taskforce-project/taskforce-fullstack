@@ -35,8 +35,12 @@ describe("the context gauge", () => {
     ["an answer before the gauge", { promptTokens: 6200, completionTokens: 40, totalTokens: 6240 }, null],
     ["Ollama, sized by the gateway", { promptTokens: 6200, completionTokens: 40, totalTokens: 6240, lastPromptTokens: 3400, contextWindow: 8192 },
       { tokens: 3400, window: 8192 }],
-    ["a hosted provider", { promptTokens: 6200, completionTokens: 40, totalTokens: 6240, lastPromptTokens: 3400, contextWindow: null },
+    ["a hosted provider, window unknown", { promptTokens: 6200, completionTokens: 40, totalTokens: 6240, lastPromptTokens: 3400, contextWindow: null },
       { tokens: 3400, window: null }],
+    ["a hosted provider that reports its window", { promptTokens: 6200, completionTokens: 40, totalTokens: 6240, lastPromptTokens: 3400, contextWindow: 131_072 },
+      { tokens: 3400, window: 131_072 }],
+    ["an estimated window", { promptTokens: 6200, completionTokens: 40, totalTokens: 6240, lastPromptTokens: 3400, contextWindow: 16_384, contextEstimated: true },
+      { tokens: 3400, window: 16_384, estimated: true }],
   ])("reads what the last request sent from %s", (_case, usage, context) => {
     expect(contextFrom(usage)).toEqual(context)
   })
@@ -52,6 +56,15 @@ describe("the context gauge", () => {
     // À son plafond, la fenêtre ne grandit plus : la ligne ne le promet pas.
     expect(contextGauge({ tokens: 9000, window: 16_384 }, 16_384, t)).toMatchObject({ pct: 55, line: t.contextLine })
     expect(contextGauge({ tokens: 9000, window: 16_384 }, null, t)).toMatchObject({ line: t.contextLine })
+  })
+
+  it("an estimated window reads as one: a tilde on the number, and the line says so, even nearly full", () => {
+    expect(contextGauge({ tokens: 3400, window: 16_384, estimated: true }, null, t)).toEqual({
+      value: "3.4k / ~16k (21%)", pct: 21, tone: "blue", line: t.contextEstimated,
+    })
+    expect(contextGauge({ tokens: 16_000, window: 16_384, estimated: true }, null, t)).toMatchObject({
+      pct: 98, tone: "rose", line: t.contextEstimated,
+    })
   })
 
   it("nearly full: red, and the line says what it means", () => {

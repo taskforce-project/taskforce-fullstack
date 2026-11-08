@@ -21,6 +21,28 @@ class AiProviderSettingsTest {
 
     private static final String HOST_OLLAMA = "http://host.docker.internal:11434/v1";
 
+    @ParameterizedTest(name = "{0} : plafond {1}, défaut {2}")
+    @MethodSource("contextWindows")
+    @DisplayName("les fenêtres chez les fournisseurs hébergés : le plafond (12 000 par défaut chez Groq) et la valeur supposée")
+    void hostedContext(Map<String, String> env, int ceiling, int defaultContext) {
+        AiProviderSettings s = settings(env);
+
+        assertThat(s.hostedMaxContext()).isEqualTo(ceiling);
+        assertThat(s.defaultContext()).isEqualTo(defaultContext);
+    }
+
+    static Stream<Arguments> contextWindows() {
+        return Stream.of(
+            Arguments.of(Map.of(), 0, 16_384),
+            Arguments.of(Map.of("AI_PROVIDER", "openai"), 0, 16_384),
+            Arguments.of(Map.of("AI_PROVIDER", "anthropic"), 0, 16_384),
+            Arguments.of(Map.of("AI_PROVIDER", "groq"), 12_000, 16_384),
+            Arguments.of(Map.of("GROQ_API_KEY", "k"), 12_000, 16_384),
+            Arguments.of(Map.of("AI_PROVIDER", "groq", "AI_HOSTED_MAX_CONTEXT", "131072"), 131_072, 16_384),
+            Arguments.of(Map.of("AI_PROVIDER", "openai", "AI_HOSTED_MAX_CONTEXT", "64000", "AI_DEFAULT_CONTEXT", "128000"), 64_000, 128_000),
+            Arguments.of(Map.of("AI_DEFAULT_CONTEXT", "abc", "AI_HOSTED_MAX_CONTEXT", "-1"), 0, 16_384));
+    }
+
     private static AiProviderSettings settings(Map<String, String> env) {
         return AiProviderSettings.from(env::get);
     }

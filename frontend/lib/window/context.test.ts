@@ -35,6 +35,10 @@ describe("le contexte de la conversation", () => {
       input({ context: { tokens: 4096, window: 32_768 }, model: null }),
       "Cortex sees the board of Website, and its last answer took 13% of the model's window (4.1k tokens).",
     ],
+    [
+      input({ context: { tokens: 4096, window: 16_384, estimated: true } }),
+      "Cortex sees the board of Website, and its last answer took about 25% of qwen3:8b's estimated window (4.1k tokens).",
+    ],
     [input({ context: { tokens: 12_400, window: null } }), "Cortex sees the board of Website, and its last answer read 12k tokens."],
     [input({ context: { tokens: 800, window: null } }), "Cortex sees the board of Website, and its last answer read 800 tokens."],
   ])("dit en une phrase : %o", (context, sentence) => {

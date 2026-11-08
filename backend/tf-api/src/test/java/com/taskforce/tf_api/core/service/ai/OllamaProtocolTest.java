@@ -55,17 +55,19 @@ class OllamaProtocolTest {
         assertThat(OllamaProtocol.window(needed, ceiling, loaded)).isEqualTo(expected);
     }
 
-    @ParameterizedTest(name = "{0} caractères, raisonnement {1} : {2} jetons demandés")
+    @ParameterizedTest(name = "{0} jetons, raisonnement {1}, plafond {2} : {3} jetons demandés")
     @CsvSource({
-        "0,     false, 2048",
-        "3000,  false, 3048",
-        "3001,  false, 3049",
-        "3000,  true,  9192",
-        "30000, false, 12048",
+        "0,     false, 16384, 2048",
+        "1000,  false, 16384, 3048",
+        "1000,  true,  16384, 9192",
+        "10000, false, 16384, 12048",
+        // Un petit plafond : la réponse garde un quart de la fenêtre, sa moitié si le modèle raisonne.
+        "1000,  false, 4096,  2024",
+        "1000,  true,  4096,  3048",
     })
-    @DisplayName("ce que demande une requête : trois caractères par jeton, plus la place de la réponse")
-    void needed(long chars, boolean think, int expected) {
-        assertThat(OllamaProtocol.needed(OllamaProtocol.tokens(chars), think)).isEqualTo(expected);
+    @DisplayName("ce que demande une requête : ses jetons, plus la place que le budget garde à la réponse")
+    void needed(int tokens, boolean think, int ceiling, int expected) {
+        assertThat(OllamaProtocol.needed(tokens, think, ceiling)).isEqualTo(expected);
     }
 
     @ParameterizedTest(name = "réglage {0}, maximum {1} : {2}")
