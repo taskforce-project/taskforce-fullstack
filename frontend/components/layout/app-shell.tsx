@@ -15,7 +15,6 @@ import { CommandBar } from "@/components/agent/command-bar"
 import { CommandPalette } from "@/components/command-palette"
 import { SettingsModal } from "@/components/settings/settings-modal"
 import { CreateProjectModal } from "@/components/dialogs/create-project-modal"
-import { ProductTour } from "@/components/tour/product-tour"
 import { PendingInvitationsBanner } from "@/components/invitations/pending-invitations-banner"
 import { DesktopUpdateToast } from "@/components/desktop/desktop-update-toast"
 import { useElementWidth } from "@/hooks/use-element-width"
@@ -209,9 +208,6 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
       {/* Modals globaux, ouvrables depuis n'importe quel CTA */}
       <SettingsModal />
       <CreateProjectModal />
-
-      {/* Tour produit (coach-marks), rendu conditionnel via son store ; cible les data-tour de la fenêtre */}
-      <ProductTour />
     </SidebarProvider>
   )
 }
