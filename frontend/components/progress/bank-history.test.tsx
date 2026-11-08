@@ -22,6 +22,7 @@ const TABLE = { current: "qwen3:8b" } as ModelCapabilityTable
 /** Comment Cortex fait dans le temps (R61, R118, R125) : la banque par modèle et par date, et sa courbe. */
 describe("BankHistory", () => {
   const fetchHistory = vi.fn()
+  const fetchTable = vi.fn()
   const runBank = vi.fn()
   const stopRun = vi.fn()
 
@@ -29,15 +30,21 @@ describe("BankHistory", () => {
     vi.clearAllMocks()
     runBank.mockResolvedValue(null)
     useEvalStore.setState({ history: { runs: [], cases: CASES }, progress: null, error: null, fetchHistory, runBank, stopRun })
-    useModelCapabilityStore.setState({ table: TABLE, progress: null })
+    useModelCapabilityStore.setState({ table: TABLE, progress: null, fetchTable })
   })
 
-  it("reads the history, and replays the bank on Cortex's model in a click", () => {
+  it("reads the history and the model of Cortex, and replays the bank on it in a click", () => {
     render(<BankHistory slug="acme" />)
 
     expect(fetchHistory).toHaveBeenCalledWith("acme")
+    // L'onglet peut s'ouvrir le premier : il lit lui-même le modèle sur lequel rejouer.
+    expect(fetchTable).toHaveBeenCalledWith("acme")
     expect(screen.getByText("Not replayed yet.")).toBeInTheDocument()
-    fireEvent.click(screen.getByRole("button", { name: "Replay 2 cases on qwen3:8b" }))
+    // Un mot sur le geste, le reste au survol et pour les lecteurs d'écran.
+    const replay = screen.getByRole("button", { name: "Replay 2 cases on qwen3:8b" })
+    expect(replay).toHaveTextContent(/^Replay$/)
+    expect(screen.queryByText(/A replay never touches your workspace/)).not.toBeInTheDocument()
+    fireEvent.click(replay)
     expect(runBank).toHaveBeenCalledWith("acme", "qwen3:8b")
   })
 
@@ -67,12 +74,15 @@ describe("BankHistory", () => {
     })
     render(<BankHistory slug="acme" />)
 
-    const items = within(screen.getByRole("list", { name: "How it does over time" })).getAllByRole("listitem")
+    const items = within(screen.getByRole("list", { name: "Over time" })).getAllByRole("listitem")
     expect(items.map((item) => item.textContent)).toEqual([
-      "qwen3:8b7 Nov3 of 11 graded",
-      "Default model5 Nov8 of 11 passed",
-      "qwen3:8b2 Nov5 of 11 passed",
+      "qwen3:8b7 Nov3/11",
+      "Default model5 Nov8/11",
+      "qwen3:8b2 Nov5/11",
     ])
+    // En mots au survol et pour les lecteurs d'écran : réussis, ou notés pour un rejeu partiel.
+    expect(screen.getByLabelText("3 of 11 graded")).toBeInTheDocument()
+    expect(screen.getByLabelText("8 of 11 passed")).toBeInTheDocument()
     const curve = screen.getByRole("figure", { name: "Share of the test bank passed, by model" })
     expect(within(curve).getByText("Default model")).toBeInTheDocument()
   })
@@ -89,12 +99,14 @@ describe("BankHistory", () => {
     const { rerender } = render(<BankHistory slug="acme" />)
 
     expect(screen.getByRole("status")).toHaveTextContent("Replaying case 2 of 11…")
+    expect(screen.getByText("2/11")).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Stop" }))
     expect(stopRun).toHaveBeenCalled()
 
     useEvalStore.setState({ progress: { done: 1, total: 11, waitSeconds: 42, stopping: true }, error: "The AI is busy" })
     rerender(<BankHistory slug="acme" />)
     expect(screen.getByRole("status")).toHaveTextContent("next case in 42 s")
+    expect(screen.getByText("42 s")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Stopping…" })).toBeDisabled()
     expect(screen.getByText("The AI is busy")).toBeInTheDocument()
 
@@ -114,7 +126,7 @@ describe("BankHistory", () => {
 
     useEvalStore.setState({ history: { runs: [], cases: [] }, historyFailed: false })
     rerender(<BankHistory slug="acme" />)
-    expect(screen.getByText(/The test bank has no case yet/)).toBeInTheDocument()
+    expect(screen.getByText("No test case yet: under an answer of Cortex, choose Add to test bank.")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /Replay/ })).not.toBeInTheDocument()
   })
 })

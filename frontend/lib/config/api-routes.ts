@@ -58,6 +58,8 @@ export const DELIVERY_ROUTES = {
   RUN: (slug: string, issueId: number) => `/api/workspaces/${slug}/delivery/issues/${issueId}/run`,
   /** Runs de délégation du workspace (GET) - vue « workflow » (agents en parallèle). */
   RUNS: (slug: string) => `/api/workspaces/${slug}/delivery/runs`,
+  /** Ce qui attend la personne connectée (GET, R128) : ses demandes encore ouvertes, une ligne par mission. */
+  OPEN_APPROVALS: (slug: string) => `/api/workspaces/${slug}/delivery/approvals/open`,
   /** Chronologie en direct d'un run après l'événement `after`, et ses demandes de validation (GET, lot 5). */
   ACTIVITY: (slug: string, runId: number, after: number) =>
     `/api/workspaces/${slug}/delivery/runs/${runId}/activity?after=${after}`,

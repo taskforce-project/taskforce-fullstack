@@ -54,8 +54,13 @@ interface ModelCapabilityState {
    */
   measureCortexModel: (slug: string) => Promise<boolean>;
   stop: () => void;
-  /** Le modèle de Cortex pour la personne (webapp) ; null revient à celui de l'instance. */
+  /** Le modèle de Cortex pour la personne ; null revient à celui de l'instance. */
   choose: (slug: string, model: string | null) => Promise<boolean>;
+  /**
+   * Le modèle de l'instance vient de changer dans les réglages d'IA de l'app desktop : le dernier geste gagne, « Use for
+   * Cortex » (R130) ne reste pas épinglé par-dessus. La table se relit dans tous les cas.
+   */
+  instanceChanged: (slug: string) => Promise<boolean>;
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -145,6 +150,11 @@ export const useModelCapabilityStore = create<ModelCapabilityState>((set, get) =
         set({ error: getErrorMessage(err) });
         return false;
       }
+    },
+
+    instanceChanged: async (slug) => {
+      if (get().table?.choice) return get().choose(slug, null);
+      return (await get().fetchTable(slug)) !== null;
     },
   };
 });

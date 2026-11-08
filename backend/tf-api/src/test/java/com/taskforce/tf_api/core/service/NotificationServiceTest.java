@@ -33,6 +33,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -387,6 +388,22 @@ class NotificationServiceTest {
             service.notifyAgentRunFinished(issue(null, null), null, "Claude Code", true, "x");
 
             verify(notificationRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("R128 : plus rien n'attend sur l'issue, ses notifications d'accord sont lues, pour la personne qui a délégué")
+        void reads_the_approvals_of_an_issue() {
+            service.readAgentApprovals(issue(null, null), user(40L, "delegator"));
+
+            verify(notificationRepository).markReadForIssue(40L, "APP-3", "agentApproval");
+        }
+
+        @Test
+        @DisplayName("R128 : sans personne qui a délégué, rien à marquer")
+        void reads_nothing_without_delegator() {
+            service.readAgentApprovals(issue(null, null), null);
+
+            verifyNoInteractions(notificationRepository);
         }
     }
 }

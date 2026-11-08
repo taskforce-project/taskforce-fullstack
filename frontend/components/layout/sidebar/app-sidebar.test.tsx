@@ -60,7 +60,10 @@ describe("AppSidebar", () => {
       conversationId: null, sentAt: null, unread: false, open: true,
       newConversation, openConversation, removeConversation,
     })
-    useDeliveryStore.setState({ workspaceRuns: [mission({}), mission({ id: 2, issueId: 29, startedById: 8 })] })
+    useDeliveryStore.setState({
+      workspaceRuns: [mission({}), mission({ id: 2, issueId: 29, startedById: 8 })],
+      openApprovals: [{ runId: 1, issueId: 28, issueKey: "WEB-28", issueTitle: "Fix", projectId: 3, requests: 1 }],
+    })
     useNotificationStore.setState({ signals: [signal("agentApproval"), signal("assigned")] })
     useUserStore.setState({ user: { id: "7" } as AuthUser })
     useWindowStore.setState({ searchOpen: false })
@@ -79,6 +82,25 @@ describe("AppSidebar", () => {
     const waiting = screen.getByRole("link", { name: "Waiting for you" })
     expect(waiting).toHaveAttribute("href", "/acme/inbox")
     expect(waiting.parentElement).toHaveTextContent("1")
+    expect(screen.queryByRole("img", { name: /Unread mentions/ })).toBeNull()
+  })
+
+  it("counts what truly waits: a notification of a request that no longer waits is not counted (R128)", () => {
+    useDeliveryStore.setState({ openApprovals: [] })
+    useNotificationStore.setState({ signals: Array.from({ length: 16 }, () => signal("agentApproval")) })
+    renderBar()
+
+    expect(screen.getByRole("link", { name: "Waiting for you" }).parentElement).not.toHaveTextContent(/\d/)
+  })
+
+  it("an unread mention is a quiet dot, apart from the number (R128)", () => {
+    useNotificationStore.setState({ signals: [signal("mention")] })
+    renderBar()
+
+    const link = screen.getByRole("link", { name: "Waiting for you" })
+    expect(link.parentElement).toHaveTextContent("1")
+    expect(screen.getByRole("img", { name: "Unread mentions: 1" })).toBeInTheDocument()
+    expect(link).toHaveAttribute("title", "Unread mentions: 1")
   })
 
   it("lists the living projects, favorites first, each opening its board", () => {
