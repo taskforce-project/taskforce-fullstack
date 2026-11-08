@@ -104,9 +104,69 @@ export interface EvalRunDetail {
   results: EvalResult[]
 }
 
+/** Un rejeu de la banque dans son histoire (R125) : le modèle demandé, celui qui a répondu, ses cas notés et réussis. */
+export interface EvalHistoryRun {
+  id: number
+  /** Le modèle demandé ; `default` quand le rejeu n'en nommait pas. */
+  model: string
+  /** Le modèle qui a répondu, lu dans la première note ; null avant elle. */
+  answeredBy: string | null
+  startedAt: string
+  /** null tant que tous les cas du rejeu ne sont pas notés. */
+  finishedAt: string | null
+  total: number
+  graded: number
+  passed: number
+}
+
+/**
+ * D'où vient un cas. `incident` : TaskForce a corrigé la réponse (R116, l'incident de confiance d'E17) ; `answer` : une
+ * réponse de Cortex dans une conversation ; `unknown` : le dossier n'est plus là, ou le cas a été écrit à la main.
+ */
+export interface EvalCaseOrigin {
+  kind: "incident" | "answer" | "unknown"
+  /** Ce que le modèle avait dit, que TaskForce a retiré. */
+  said: string[]
+  /** Ce que TaskForce a montré à la place. */
+  shown: string | null
+}
+
+/** La note d'un cas dans un rejeu. */
+export interface EvalGrade {
+  runId: number
+  passed: boolean
+}
+
+/** Un cas dans l'histoire de la banque : sa question, d'où il vient, et sa note à chaque rejeu depuis. */
+export interface EvalHistoryCase {
+  id: number
+  title: string
+  question: string
+  /** Le jour où la question a été posée (`YYYY-MM-DD`). */
+  askedOn: string
+  addedAt: string
+  mine: boolean
+  origin: EvalCaseOrigin
+  /** Dans l'ordre des rejeux. */
+  grades: EvalGrade[]
+}
+
+export interface EvalHistory {
+  /** Du plus ancien au plus récent. */
+  runs: EvalHistoryRun[]
+  /** Du plus récent au plus ancien. */
+  cases: EvalHistoryCase[]
+}
+
 /** La banque de l'espace. Appel de fond (ouverture du panneau) : jamais de toast. */
 export async function getEvalBank(slug: string): Promise<EvalBank> {
   const res = await apiClient.get<{ data: EvalBank }>(EVAL_ROUTES.BANK(slug), { silentError: true })
+  return res.data.data
+}
+
+/** L'histoire de la banque, pour le volet « Progress ». Appel de fond : jamais de toast. */
+export async function getEvalHistory(slug: string): Promise<EvalHistory> {
+  const res = await apiClient.get<{ data: EvalHistory }>(EVAL_ROUTES.HISTORY(slug), { silentError: true })
   return res.data.data
 }
 

@@ -9,6 +9,7 @@ vi.mock("../api/eval-service", () => ({
   createEvalCase: vi.fn(),
   draftEvalCase: vi.fn(),
   getEvalBank: vi.fn(),
+  getEvalHistory: vi.fn(),
   getEvalRun: vi.fn(),
   runEvalCase: vi.fn(),
   setEvalBankEnabled: vi.fn(),
@@ -34,7 +35,7 @@ const CRITERIA = { tool: "create_issue", args: {}, effect: "" as const, forbid: 
 describe("useEvalStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useEvalStore.setState({ bank: null, run: null, progress: null, error: null });
+    useEvalStore.setState({ bank: null, run: null, progress: null, error: null, history: null });
   });
 
   afterEach(() => vi.useRealTimers());
@@ -135,6 +136,18 @@ describe("useEvalStore", () => {
     expect(service.runEvalCase).toHaveBeenCalledTimes(1);
     expect(service.runEvalCase).toHaveBeenCalledWith("acme", 9, 40);
     expect(useEvalStore.getState()).toMatchObject({ run: DETAIL, progress: null, error: null });
+    // Le volet « Progress » relit l'histoire : la courbe et la note de chaque cas montrent ce rejeu.
+    expect(service.getEvalHistory).toHaveBeenCalledWith("acme");
+  });
+
+  it("reads the bank's history for the Progress pane, and keeps it when a read fails", async () => {
+    const history = { runs: [{ ...RUN, answeredBy: "llama3.2", graded: 0 }], cases: [] };
+    vi.mocked(service.getEvalHistory).mockResolvedValueOnce(history).mockRejectedValueOnce(new Error("down"));
+
+    expect(await useEvalStore.getState().fetchHistory("acme")).toEqual(history);
+    expect(useEvalStore.getState().history).toEqual(history);
+    expect(await useEvalStore.getState().fetchHistory("acme")).toBeNull();
+    expect(useEvalStore.getState().history).toEqual(history);
   });
 
   it("runs one replay at a time", async () => {

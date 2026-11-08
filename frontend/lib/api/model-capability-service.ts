@@ -35,12 +35,26 @@ export interface ModelCapabilityScore {
   measuredAt: string | null
 }
 
+/**
+ * Ce que la fiche d'un modèle dit de lui chez son fournisseur (Ollama) : sa taille, sa fenêtre de contexte, s'il prend
+ * des outils ; chaque valeur null quand la fiche ne la dit pas. Une description, jamais une mesure (R113, R125).
+ */
+export interface ModelCard {
+  /** « 8.2B ». */
+  parameters: string | null
+  /** En jetons. */
+  contextWindow: number | null
+  tools: boolean | null
+}
+
 export interface ModelCapabilityRow {
   model: string
   /** Cortex répond avec ce modèle à la personne. */
   current: boolean
   measuredAt: string | null
   scores: ModelCapabilityScore[]
+  /** La fiche du modèle ; null quand le fournisseur ne la donne pas, absente d'un serveur plus ancien. */
+  card?: ModelCard | null
 }
 
 export interface ModelCapabilityProposal {

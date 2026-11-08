@@ -6,6 +6,7 @@ import {
   createEvalCase,
   draftEvalCase,
   getEvalBank,
+  getEvalHistory,
   getEvalRun,
   runEvalCase,
   setEvalBankEnabled,
@@ -14,6 +15,7 @@ import {
   type EvalCaseSummary,
   type EvalCriteria,
   type EvalDraft,
+  type EvalHistory,
   type EvalRunDetail,
 } from "../api/eval-service";
 import { parseServerDate } from "../utils/server-date";
@@ -44,8 +46,12 @@ interface EvalState {
   /** Le rejeu en cours, null sinon : un seul à la fois. */
   progress: EvalProgress | null;
   error: string | null;
+  /** L'histoire de la banque (R125), pour le volet « Progress ». `null` = pas encore lue. */
+  history: EvalHistory | null;
 
   fetchBank: (slug: string) => Promise<EvalBank | null>;
+  /** Relit l'histoire de la banque ; null si elle n'a pas pu l'être (la dernière lue reste). */
+  fetchHistory: (slug: string) => Promise<EvalHistory | null>;
   draftCase: (slug: string, record: string) => Promise<EvalDraft | null>;
   addCase: (slug: string, record: string, title: string, criteria: EvalCriteria) => Promise<EvalCaseSummary | null>;
   archiveCase: (slug: string, caseId: number) => Promise<boolean>;
@@ -82,12 +88,23 @@ export const useEvalStore = create<EvalState>((set, get) => {
     run: null,
     progress: null,
     error: null,
+    history: null,
 
     fetchBank: async (slug) => {
       try {
         const bank = await getEvalBank(slug);
         set({ bank });
         return bank;
+      } catch {
+        return null;
+      }
+    },
+
+    fetchHistory: async (slug) => {
+      try {
+        const history = await getEvalHistory(slug);
+        set({ history });
+        return history;
       } catch {
         return null;
       }
@@ -175,6 +192,8 @@ export const useEvalStore = create<EvalState>((set, get) => {
       } finally {
         set({ progress: null });
         void get().fetchBank(slug);
+        // Le volet « Progress » montre ce rejeu dès qu'il est noté : sa courbe et la note de chaque cas.
+        void get().fetchHistory(slug);
       }
     },
 

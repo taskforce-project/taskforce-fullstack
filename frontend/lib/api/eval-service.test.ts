@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { AI_TIMEOUT_MS, apiClient } from "./client"
 import {
-  archiveEvalCase, createEvalCase, draftEvalCase, getEvalBank, getEvalRun, runEvalCase, setEvalBankEnabled,
-  startEvalRun, NO_TOOL, type EvalCriteria,
+  archiveEvalCase, createEvalCase, draftEvalCase, getEvalBank, getEvalHistory, getEvalRun, runEvalCase,
+  setEvalBankEnabled, startEvalRun, NO_TOOL, type EvalCriteria,
 } from "./eval-service"
 
 vi.mock("./client", () => ({
@@ -26,6 +26,14 @@ describe("eval-service", () => {
 
     expect(await getEvalBank("acme")).toEqual(bank)
     expect(apiClient.get).toHaveBeenCalledWith(BASE, { silentError: true })
+  })
+
+  it("reads the bank's history for the Progress pane, without a toast", async () => {
+    const history = { runs: [], cases: [] }
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(history))
+
+    expect(await getEvalHistory("acme")).toEqual(history)
+    expect(apiClient.get).toHaveBeenCalledWith(`${BASE}/history`, { silentError: true })
   })
 
   it("drafts a case from the record of an answer", async () => {
