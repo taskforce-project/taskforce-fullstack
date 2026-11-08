@@ -111,7 +111,7 @@ export function IssuePane({ slug, target, under, actions, onBack }: Readonly<{
           <button type="button" onClick={onBack} className="shrink-0 rounded px-1 text-muted-foreground transition-colors duration-150 hover:text-foreground">
             {under}
           </button>
-          <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span aria-current="page" className="min-w-0 truncate font-medium text-foreground">{shownKey}</span>
         </nav>
         {actions}
