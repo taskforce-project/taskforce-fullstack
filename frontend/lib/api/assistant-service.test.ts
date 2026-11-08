@@ -73,6 +73,19 @@ describe('assistant-service', () => {
     expect(result).toBe('Hello there');
   });
 
+  it('sendAgentMessage: sends what the person attached from the composer, only when there is something (R123)', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(buildTurn()));
+
+    await sendAgentMessage(slug, 'résume', null, { projectId: 3 }, null, [{ projectId: 3, issueId: 35 }, { projectId: 4 }]);
+    await sendAgentMessage(slug, 'hi', null, null, null, []);
+
+    expect(vi.mocked(apiClient.post).mock.calls[0][1]).toEqual({
+      message: 'résume', conversationId: null, screen: { projectId: 3 }, attach: [{ projectId: 3, issueId: 35 }, { projectId: 4 }],
+    });
+    expect(vi.mocked(apiClient.post).mock.calls[1][1]).toEqual({ message: 'hi', conversationId: null });
+  });
+
+
   it('sendAgentMessage: propagates errors', async () => {
     vi.mocked(apiClient.post).mockRejectedValue(new Error('boom'));
     await expect(sendAgentMessage(slug, 'hi')).rejects.toThrow('boom');

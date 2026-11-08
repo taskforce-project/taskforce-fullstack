@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { useParams, usePathname } from "next/navigation"
+import { useParams } from "next/navigation"
 import { useReducedMotion } from "framer-motion"
 import {
-  Sparkles, MessageSquare, ChevronDown, ChevronUp, Plus, Trash2, Plug, Play, CircleAlert,
+  Sparkles, ChevronDown, ChevronUp, Plus, Trash2, Play, CircleAlert,
 } from "lucide-react"
 import {
-  Message, Steps, Reasoning, Tool, Sources, ThinkingBar, FeedbackBar, PromptSuggestion, TokenMeter,
+  Message, Steps, Reasoning, Tool, Sources, ThinkingBar, FeedbackBar, TokenMeter,
   type ToolStatus,
 } from "@/components/chat"
 import { cn } from "@/lib/utils"
@@ -18,14 +18,14 @@ import {
   type AssistantAnswer, type AssistantToolCall,
 } from "@/lib/api/assistant-service"
 import { getErrorMessage } from "@/lib/api/client"
-import { getMcpServers } from "@/lib/api/integration-service"
-import { suggestionsFor } from "@/lib/cortex/suggestions"
+import { readLine } from "@/lib/cortex/read-line"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { useCortexStore } from "@/lib/store/cortex-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { AnswerText } from "./answer-text"
+import { Arrival } from "./arrival"
 import { CortexUsage } from "./cortex-usage"
 import { DeleteIssueCard } from "./delete-issue-card"
 import { EvalCaseButton } from "./eval-case-dialog"
@@ -44,7 +44,7 @@ function QuotaNotice() {
     <div className="flex flex-col gap-2 rounded-xl border border-primary/25 bg-primary/5 p-3">
       <div className="flex items-center gap-2">
         <div className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
-          <Sparkles className="size-3.5" />
+          <Sparkles className="size-4" />
         </div>
         <p className="text-sm font-medium text-foreground">Monthly AI limit reached</p>
       </div>
@@ -65,7 +65,7 @@ function AiUnavailableNotice() {
   return (
     <div className="flex w-full flex-col gap-1.5 border border-border bg-muted/40 p-3 text-left">
       <p className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-        <CircleAlert className="size-3.5 shrink-0 text-ink-yellow" /> AI is not configured
+        <CircleAlert className="size-4 shrink-0 text-ink-yellow" /> AI is not configured
       </p>
       <p className="text-xs leading-relaxed text-muted-foreground">
         {IS_DESKTOP
@@ -131,7 +131,7 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
           disabled={state === "running"}
           className="flex h-7 w-fit items-center gap-1.5 bg-primary px-2.5 font-medium text-primary-foreground shadow-key transition-colors hover:bg-primary-hover disabled:opacity-60"
         >
-          <Play className="size-3" /> {state === "running" ? "Running…" : "Approve and run"}
+          <Play className="size-4" /> {state === "running" ? "Running…" : "Approve and run"}
         </button>
       ) : (
         <>
@@ -158,9 +158,10 @@ const HEADER_BUTTON =
  * conversations à gauche, la jauge sous le compositeur. Quand le volet prend toute la largeur (`layout="folded"`), elle
  * se déplie au-dessus du compositeur, comme depuis le 02/11/2026 : pas de carte, ses tours se lisent sur le dégradé qui
  * monte de la barre (`.cortex-wash`), la dernière réponse en grand, et juste au-dessus de la barre la ligne d'outils du
- * composeur du site (les conversations, une nouvelle, la jauge, le chevron qui la réduit). L'état vide dit ce qu'on
- * peut demander. Elle se lit dans `useCortexStore` ; la saisie reste le compositeur (R76). Les cartes qu'elle porte
- * (l'issue préparée, Undo, l'accord, la mission) gardent leur allure.
+ * composeur du site (les conversations, une nouvelle, la jauge, le chevron qui la réduit). Une conversation neuve
+ * s'ouvre sur l'arrivée (R123) : ce qui attend la personne, puis trois suggestions tirées de l'espace. Sous chaque
+ * réponse, la ligne grise dit le modèle et ce qu'il a lu. Elle se lit dans `useCortexStore` ; la saisie reste le
+ * compositeur (R76). Les cartes qu'elle porte (l'issue préparée, Undo, l'accord, la mission) gardent leur allure.
  */
 export function AgentChat({ onFold, layout = "folded" }: Readonly<{
   /** Réduit la conversation dans le compositeur (repliée seulement). */
@@ -169,10 +170,10 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
 }>) {
   const column = layout === "column"
   const params = useParams()
-  const pathname = usePathname()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const t = usePreferencesStore((s) => s.t.shell)
   const models = usePreferencesStore((s) => s.t.models)
+  const attachedText = usePreferencesStore((s) => s.t.conversation.attached)
   const reduceMotion = useReducedMotion()
 
   const turns = useCortexStore((s) => s.turns)
@@ -181,7 +182,6 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
   const tokens = useCortexStore((s) => s.tokens)
   const sentAt = useCortexStore((s) => s.sentAt)
   const lastMs = useCortexStore((s) => s.lastMs)
-  const setDraft = useCortexStore((s) => s.setDraft)
   const loadConversations = useCortexStore((s) => s.loadConversations)
   const openConversation = useCortexStore((s) => s.openConversation)
   const newConversation = useCortexStore((s) => s.newConversation)
@@ -189,10 +189,6 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
 
   const [showList, setShowList] = useState(false)
   const [elapsed, setElapsed] = useState(0)
-  // Outils MCP externes live (serveurs connectés joignables) - surfacés dans l'état vide pour que la
-  // personne voie que Cortex peut AGIR, pas seulement lire. Best-effort : sans intégration (409) ou sans
-  // serveur MCP joignable, la liste reste vide et rien ne s'affiche.
-  const [mcpTools, setMcpTools] = useState<{ connector: string; name: string }[]>([])
   const threadRef = useRef<HTMLDivElement>(null)
   const askRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -207,22 +203,6 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
   useEffect(() => { void fetchAiStatus() }, [fetchAiStatus])
 
   useEffect(() => { void loadConversations(slug) }, [loadConversations, slug])
-
-  useEffect(() => {
-    if (!slug) return
-    let cancelled = false
-    getMcpServers(slug)
-      .then((servers) => {
-        if (cancelled) return
-        setMcpTools(
-          servers
-            .filter((s) => s.reachable)
-            .flatMap((s) => s.tools.map((name) => ({ connector: s.connectorKey, name }))),
-        )
-      })
-      .catch(() => { /* sans intégration (409) ou sans serveur MCP : rien à montrer */ })
-    return () => { cancelled = true }
-  }, [slug])
 
   // L'échange en cours reste en vue, juste au-dessus de la barre où la personne vient d'écrire. Plus haut que ce qui se
   // lit sous le fondu du haut (le retrait du fil), il se lit depuis son début : sa demande, juste sous le fondu.
@@ -261,16 +241,9 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
     newConversation()
   }
 
-  /** Une suggestion remplit la barre ; rien ne part tant que la personne n'envoie pas. */
-  const suggest = (text: string) => {
-    setDraft(text)
-    document.getElementById("command-bar-input")?.focus()
-  }
-
   const currentTitle = conversationId
     ? (conversations.find((c) => c.id === conversationId)?.title ?? "Conversation")
     : t.chatNew
-  const recent = conversations.filter((c) => c.id !== conversationId).slice(0, 3)
 
   return (
     <div className={cn("flex min-h-0 flex-col", column && "flex-1")}>
@@ -278,60 +251,11 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
         {/* En colonne, les tours se posent juste au-dessus du compositeur et montent à mesure. */}
         <div className={cn("flex flex-col", column && "mx-auto mt-auto w-full max-w-[720px] pt-4")}>
           {turns.length === 0 && !thinking ? (
+            // L'arrivée (R123) : ce qui attend la personne, puis trois suggestions tirées de l'espace ; le tour guidé
+            // n'existe plus (R124). Sans modèle joignable, la carte le dit d'abord.
             <div className="flex flex-col gap-3 pb-2">
-              <div>
-                <p className="flex items-center gap-2 text-xs font-medium text-ink-blue">
-                  <span className="size-1.5 rounded-full bg-shape-blue" aria-hidden="true" /> Cortex
-                </p>
-                <p className="cortex-say mt-1.5 text-balance text-lg font-medium leading-snug tracking-tight">{t.chatIntro}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{t.chatHint}</p>
-              </div>
               {aiStatus && !aiStatus.chatAvailable && <AiUnavailableNotice />}
-              <div className="flex flex-wrap gap-1.5" aria-label={t.barSuggestions}>
-                {suggestionsFor(pathname).map((s) => (
-                  <PromptSuggestion key={s.label} onClick={() => suggest(s.text)} className="rounded-full">{s.label}</PromptSuggestion>
-                ))}
-              </div>
-              {/* En colonne, la barre de gauche montre déjà les conversations. */}
-              {!column && recent.length > 0 && (
-                <div className="flex flex-col gap-1">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{t.chatRecent}</p>
-                  {recent.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => void pick(c.id)}
-                      className="flex w-full items-center gap-2 px-1.5 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                      <MessageSquare className="size-3.5 shrink-0" />
-                      <span className="truncate">{c.title}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Outils externes (MCP) live : montre que Cortex peut AGIR, pas seulement citer. */}
-              {mcpTools.length > 0 && (
-                <div className="w-full border border-border/60 bg-muted/30 p-2.5 text-left">
-                  <p className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-                    <Plug className="size-3 shrink-0" /> {t.chatTools}
-                  </p>
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {mcpTools.slice(0, 10).map((tool) => (
-                      <span
-                        key={`${tool.connector}-${tool.name}`}
-                        title={`${tool.connector}: ${tool.name}`}
-                        className="border border-border/60 bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                      >
-                        {tool.name}
-                      </span>
-                    ))}
-                    {mcpTools.length > 10 && (
-                      <span className="self-center text-[10px] text-muted-foreground">+{mcpTools.length - 10} more</span>
-                    )}
-                  </div>
-                </div>
-              )}
+              <Arrival slug={slug} />
             </div>
           ) : (
             turns.map((turn, i) => (
@@ -343,9 +267,15 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
                 {turn.role === "user" ? (
                   <>
                     <Message role="user" content={turn.text} />
+                    {/* Ce que la personne a joint à sa demande (R123) : Cortex en a reçu le contenu. */}
+                    {turn.attached && turn.attached.length > 0 && (
+                      <p className="mt-0.5 text-right text-xs text-muted-foreground">
+                        {attachedText}: {turn.attached.map((a) => a.label).join(", ")}
+                      </p>
+                    )}
                     {/* La demande renvoyée d'un clic au modèle que TaskForce proposait (R118) : on voit où elle part. */}
                     {turn.sentTo && (
-                      <p className="mt-0.5 text-right text-[10px] text-muted-foreground">
+                      <p className="mt-0.5 text-right text-xs text-muted-foreground">
                         {fillModelText(models.sentTo, { model: turn.sentTo })}
                       </p>
                     )}
@@ -389,9 +319,9 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
               onClick={() => { setShowList((v) => !v); if (!showList) void loadConversations(slug) }}
               className="flex max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-xs transition-colors hover:bg-muted"
             >
-              <Sparkles className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+              <Sparkles className="size-4 shrink-0 text-primary" aria-hidden="true" />
               <span className="truncate font-medium">{currentTitle}</span>
-              <ChevronUp className={cn("size-3 shrink-0 transition-transform", showList && "rotate-180")} />
+              <ChevronUp className={cn("size-4 shrink-0 transition-transform duration-150 motion-reduce:transition-none", showList && "rotate-180")} />
             </button>
 
             {/* La liste s'ouvre vers le haut, au-dessus de la conversation : en dessous, il y a la barre. */}
@@ -402,7 +332,7 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
                   onClick={startNew}
                   className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-muted"
                 >
-                  <Plus className="size-3.5" /> {t.chatNew}
+                  <Plus className="size-4" /> {t.chatNew}
                 </button>
                 <div className="my-1 h-px bg-border" />
                 <div className="max-h-64 overflow-y-auto">
@@ -416,7 +346,7 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
                       >
                         <button type="button" onClick={() => void pick(c.id)} className="min-w-0 flex-1 text-left">
                           <span className="block truncate text-xs">{c.title}</span>
-                          <span className="text-[10px] text-muted-foreground">{c.messageCount} message{c.messageCount > 1 ? "s" : ""}</span>
+                          <span className="text-xs text-muted-foreground">{c.messageCount} message{c.messageCount > 1 ? "s" : ""}</span>
                         </button>
                         <button
                           type="button"
@@ -425,7 +355,7 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
                           aria-label={t.chatDelete}
                           title={t.chatDelete}
                         >
-                          <Trash2 className="size-3.5" />
+                          <Trash2 className="size-4" />
                         </button>
                       </div>
                     ))
@@ -439,7 +369,7 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
             <Plus className="size-4" />
           </button>
 
-          <div className="ml-auto flex min-w-0 items-center gap-2 pl-2 text-[10px] text-muted-foreground/70">
+          <div className="ml-auto flex min-w-0 items-center gap-2 pl-2 text-xs text-muted-foreground">
             {thinking ? (
               <span className="hidden tabular-nums text-primary/80 sm:inline">{t.chatThinking} · {elapsed.toFixed(1)} s</span>
             ) : tokens > 0 ? (
@@ -496,7 +426,15 @@ function ToolCallView({ slug, call }: { slug: string; call: AssistantToolCall })
  */
 function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: string }) {
   const t = usePreferencesStore((s) => s.t.cortex)
-  const hasBreakdown = answer.usage && (answer.usage.promptTokens > 0 || answer.usage.completionTokens > 0)
+  const c = usePreferencesStore((s) => s.t.conversation)
+  // La ligne grise (R123) : le modèle qui a répondu et ce que TaskForce lui a donné à lire, compté par le serveur.
+  const line = readLine(answer.model, answer.read, c)
+  const usage = answer.usage && answer.usage.totalTokens > 0
+    ? `${answer.mode} · ${answer.usage.totalTokens.toLocaleString("en-US")} tokens`
+      + (answer.usage.promptTokens > 0 || answer.usage.completionTokens > 0
+        ? ` (${answer.usage.promptTokens}↑ ${answer.usage.completionTokens}↓)`
+        : "")
+    : null
   // Le dossier de la réponse, que porte chacun de ses appels d'outil : il fait d'elle un cas de la banque (R61,
   // séance n°10). Une réponse sans outil que TaskForce a corrigée a le sien (R116).
   const record = answer.record ?? answer.toolCalls.find((tc) => tc.record)?.record
@@ -514,23 +452,21 @@ function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: stri
       {answer.sources.length > 0 && (
         <Sources items={answer.sources.map((s) => ({ title: s.title, snippet: s.domain, score: s.score ?? undefined }))} />
       )}
-      <div className="mt-1 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1">
-          <FeedbackBar onCopy={() => navigator.clipboard?.writeText(answer.answer)} />
-          {record && <EvalCaseButton slug={slug} record={record} />}
-        </div>
-        {/* Le mode, le modèle et les tokens de la réponse : au survol, pour qui les cherche, sans peser sur la lecture. Le
-            modèle est celui que la passerelle a appelé (test du CEO du 05/11/2026 : « jsp avec quel model il a fait ca »). */}
-        {answer.usage && answer.usage.totalTokens > 0 && (
-          <span className="flex shrink-0 items-center gap-1.5 text-[10px] tabular-nums text-muted-foreground/60 opacity-0 transition-opacity group-hover/answer:opacity-100 group-focus-within/answer:opacity-100">
-            <span className="bg-muted px-1 py-px font-medium uppercase tracking-wide">{answer.mode}</span>
-            {answer.model && (
-              <span className="font-mono normal-case" title={fillModelText(t.answeredWith, { model: answer.model })}>{answer.model}</span>
-            )}
-            {answer.usage.totalTokens.toLocaleString("en-US")} tokens
-            {hasBreakdown && <span className="opacity-70">({answer.usage.promptTokens}↑ {answer.usage.completionTokens}↓)</span>}
-          </span>
-        )}
+      {/* Sous la réponse, une ligne grise et calme : le modèle qui a répondu (test du CEO du 05/11/2026 : « jsp avec quel
+          model il a fait ca ») et ce qu'il a lu (« qwen3:8b · read OPS-35 and 3 comments »), toujours visible ; le mode
+          et les tokens au survol, pour qui les cherche. Puis les gestes sur la réponse. */}
+      {line && (
+        <p
+          className="mt-1 truncate text-xs text-muted-foreground"
+          aria-label={`${c.readLine}: ${line}`}
+          title={[answer.model ? fillModelText(t.answeredWith, { model: answer.model }) : null, line, usage].filter(Boolean).join("\n")}
+        >
+          {line}
+        </p>
+      )}
+      <div className="flex items-center gap-1">
+        <FeedbackBar onCopy={() => navigator.clipboard?.writeText(answer.answer)} />
+        {record && <EvalCaseButton slug={slug} record={record} />}
       </div>
     </div>
   )

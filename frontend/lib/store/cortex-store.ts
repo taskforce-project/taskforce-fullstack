@@ -9,6 +9,9 @@ import {
   type ConversationMessage, type ConversationSummary,
 } from "@/lib/api/ai-conversation-service";
 import { getErrorMessage, getErrorStatus } from "@/lib/api/client";
+import {
+  attachmentKey, toRequest, withAttachment, type ComposerAttachment,
+} from "@/lib/cortex/composer-picker";
 import { contextFrom, type CortexContext } from "@/lib/cortex/context-gauge";
 import { screenFrom } from "@/lib/cortex/screen";
 import { useIssueStore } from "@/lib/store/issue-store";
@@ -33,6 +36,8 @@ export interface CortexTurn {
   escalated?: boolean;
   /** Le modèle vers lequel la personne a envoyé la demande, d'un clic : sur sa demande et sur la réponse. */
   sentTo?: string | null;
+  /** Ce que la personne a joint à sa demande depuis le compositeur (R123), montré sous elle. */
+  attached?: ComposerAttachment[];
 }
 
 /** Où en est « Undo » d'un geste : la conversation et « Changes » (R122) montrent le même état. */
@@ -69,6 +74,8 @@ const BUSY: ReadonlySet<CardDeletion["status"]> = new Set(["archiving", "restori
 interface CortexState {
   /** Le texte de la barre, que la personne écrit ou qu'une suggestion remplit. */
   draft: string;
+  /** Ce que la personne joint à sa prochaine demande (R123) : des issues et des projets, trois au plus. */
+  attachments: ComposerAttachment[];
   /** L'espace de la conversation en cours : changer d'espace repart d'une conversation neuve. */
   workspace: string | null;
   turns: CortexTurn[];
@@ -100,6 +107,10 @@ interface CortexState {
   deletions: Record<string, CardDeletion>;
 
   setDraft: (text: string) => void;
+  /** Joint une issue ou un projet à la prochaine demande : false quand il y est déjà, ou qu'il y en a trois. */
+  attach: (item: ComposerAttachment) => boolean;
+  /** Retire une pièce jointe, par `attachmentKey`. */
+  detach: (key: string) => void;
   /** L'espace affiché : en changer repart d'une conversation neuve, celle de l'autre espace reste dans son historique. */
   enterWorkspace: (slug: string) => void;
   /** Envoie le texte de la barre : false pour une barre vide, sans espace, ou pendant qu'une réponse est attendue. */
@@ -154,7 +165,10 @@ function fallbackAnswer(text: string): AssistantAnswer {
   };
 }
 
-/** Reconstruit des tours à partir des messages gardés par le serveur (l'historique d'une conversation). */
+/**
+ * Reconstruit des tours à partir des messages gardés par le serveur (l'historique d'une conversation) : le modèle et ce
+ * qu'il a lu restent avec chaque réponse, la ligne grise se relit pareil (R123).
+ */
 export function messagesToTurns(messages: ConversationMessage[]): CortexTurn[] {
   return messages.map((m) =>
     m.role === "user"
@@ -166,6 +180,7 @@ export function messagesToTurns(messages: ConversationMessage[]): CortexTurn[] {
             mode: (m.mode as AssistantAnswer["mode"] | null) ?? "fast",
             usage: { promptTokens: 0, completionTokens: 0, totalTokens: m.totalTokens },
             model: m.model ?? null,
+            read: m.read ?? null,
           },
         },
   );
@@ -199,6 +214,7 @@ function failedTurn(e: unknown): CortexTurn {
 
 export const useCortexStore = create<CortexState>()((set, get) => ({
   draft: "",
+  attachments: [],
   workspace: null,
   ...EMPTY_CONVERSATION,
   conversations: [],
@@ -209,9 +225,20 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
 
   setDraft: (text) => set({ draft: text }),
 
+  attach: (item) => {
+    const before = get().attachments;
+    const after = withAttachment(before, item);
+    if (after.length === before.length) return false;
+    set({ attachments: after });
+    return true;
+  },
+
+  detach: (key) => set((s) => ({ attachments: s.attachments.filter((a) => attachmentKey(a) !== key) })),
+
   enterWorkspace: (slug) => {
     if (!slug || get().workspace === slug) return;
-    set({ ...EMPTY_CONVERSATION, conversations: [], workspace: slug });
+    // Les pièces jointes d'un autre espace n'y ont pas de sens : elles partent avec sa conversation.
+    set({ ...EMPTY_CONVERSATION, conversations: [], workspace: slug, attachments: [] });
   },
 
   send: async (slug) => {
@@ -220,14 +247,21 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
     // Une conversation appartient à son espace : une demande d'un autre espace en ouvre une neuve.
     get().enterWorkspace(slug);
     const sentAt = Date.now();
-    set((s) => ({ draft: "", sentAt, open: true, unread: false, turns: [...s.turns, { id: nextId("u"), role: "user", text }] }));
+    // Ce qui est joint part avec la demande, et se montre sous elle (R123).
+    const attached = get().attachments;
+    set((s) => ({
+      draft: "", attachments: [], sentAt, open: true, unread: false,
+      turns: [...s.turns, { id: nextId("u"), role: "user", text, ...(attached.length > 0 ? { attached } : {}) }],
+    }));
     // Ce que la personne voit (R114) : le projet de la route, l'issue de la route ou de la fiche ouverte.
     const screen = screenFrom(typeof window === "undefined" ? null : window.location.pathname,
       useScreenStore.getState().openIssue);
     try {
-      const res = screen
-        ? await sendAgentMessage(slug, text, get().conversationId, screen)
-        : await sendAgentMessage(slug, text, get().conversationId);
+      const res = attached.length > 0
+        ? await sendAgentMessage(slug, text, get().conversationId, screen, null, toRequest(attached))
+        : screen
+          ? await sendAgentMessage(slug, text, get().conversationId, screen)
+          : await sendAgentMessage(slug, text, get().conversationId);
       set((s) => ({
         conversationId: res.conversationId,
         tokens: s.tokens + (res.answer.usage?.totalTokens ?? 0),
