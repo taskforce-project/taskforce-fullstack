@@ -54,7 +54,9 @@ server:
 
 desktop:
   # Jeton tiré par la coque à chaque lancement, exigé sur chaque requête (DesktopLaunchTokenAuthenticator).
-  launch-token: ${TF_DESKTOP_LAUNCH_TOKEN}
+  # Défaut vide pour ce que la coque doit fournir : une variable absente compte comme vide et DesktopConfig.validate
+  # refuse de démarrer. Sans défaut, Spring garderait le texte « ${VARIABLE} », qui n'est pas vide.
+  launch-token: ${TF_DESKTOP_LAUNCH_TOKEN:}
   # Secret du runner de Claude Code que la coque lance, tiré lui aussi à chaque lancement (DesktopRunnerTokens).
   runner-secret: ${TF_DESKTOP_RUNNER_SECRET:}
   # Secret de la coque seule, tiré à chaque lancement : elle change le fournisseur d'IA du backend quand la personne
@@ -62,7 +64,7 @@ desktop:
   # les variables AI_* du serveur, que la coque pose au lancement.
   shell-secret: ${TF_DESKTOP_SHELL_SECRET:}
   # Dossier de données de l'app (fichiers, pièces jointes, Brain OS), propre au compte connecté.
-  data-dir: ${TF_DESKTOP_DATA_DIR}
+  data-dir: ${TF_DESKTOP_DATA_DIR:}
   # Jeton GitHub de la personne (son GitHub CLI), servi par la coque sur 127.0.0.1 (DesktopGitHubTokenSource) :
   # Copilot et relecture des pull requests liées aux tickets.
   github:
@@ -70,8 +72,8 @@ desktop:
     token: ${TF_DESKTOP_GITHUB_TOKEN:}
   # Compte TaskForce connecté, lu par la coque dans le jeton du compte hébergé.
   account:
-    subject: ${TF_DESKTOP_ACCOUNT_SUBJECT}
-    email: ${TF_DESKTOP_ACCOUNT_EMAIL}
+    subject: ${TF_DESKTOP_ACCOUNT_SUBJECT:}
+    email: ${TF_DESKTOP_ACCOUNT_EMAIL:}
     given-name: ${TF_DESKTOP_ACCOUNT_GIVEN_NAME:}
     family-name: ${TF_DESKTOP_ACCOUNT_FAMILY_NAME:}
     profile: ${TF_DESKTOP_ACCOUNT_PROFILE:}
