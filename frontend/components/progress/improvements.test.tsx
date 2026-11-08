@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { render, screen, within } from "@testing-library/react"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 
 import { Improvements } from "./improvements"
 import type { EvalHistory } from "@/lib/api/eval-service"
@@ -24,15 +24,28 @@ const HISTORY: EvalHistory = {
   ],
 }
 
-/** Ce qui a amélioré Cortex (R125, E17) : chaque cas, d'où il vient, et sa note depuis. */
+const row = (title: string) => screen.getByText(title).closest("li") as HTMLElement
+const open = (title: string) => fireEvent.click(within(row(title)).getAllByRole("button")[0])
+
+/** Ce qui a amélioré Cortex (R125, E17) : une ligne par cas ; d'où il vient et sa note depuis, à un clic (R129). */
 describe("Improvements", () => {
   beforeEach(() => useEvalStore.setState({ history: HISTORY }))
 
-  it("tells where a case came from: the trust incident, what Cortex said and what TaskForce showed", () => {
+  it("shows one line per case and its last result; nothing else at first", () => {
     render(<Improvements />)
 
-    const incident = within(screen.getByRole("list", { name: "What improved it" })).getAllByRole("listitem")[1]
-    expect(within(incident).getByText("R118 4/6: delete TESTTA-2")).toBeInTheDocument()
+    expect(screen.getByRole("region", { name: "What improved it" })).toBeInTheDocument()
+    expect(within(row("R118 4/6: delete TESTTA-2")).getByRole("img", { name: "qwen3:8b, 7 Nov: passed" })).toBeInTheDocument()
+    expect(within(row("What changed this week")).getByRole("img", { name: "Not replayed since it was added." })).toBeInTheDocument()
+    expect(screen.queryByText("suprime testta 2")).not.toBeInTheDocument()
+    expect(screen.queryByText(/From a trust incident/)).not.toBeInTheDocument()
+  })
+
+  it("tells where a case came from, one click away: the trust incident, what Cortex said and what TaskForce showed", () => {
+    render(<Improvements />)
+
+    open("R118 4/6: delete TESTTA-2")
+    const incident = row("R118 4/6: delete TESTTA-2")
     expect(within(incident).getByText("From a trust incident on 2 Nov: TaskForce corrected the answer.")).toBeInTheDocument()
     expect(within(incident).getByText("suprime testta 2")).toBeInTheDocument()
     expect(within(incident).getByText("Cortex said: I deleted TESTTA-2.")).toBeInTheDocument()
@@ -43,32 +56,43 @@ describe("Improvements", () => {
   it("gives a case's result at each replay since, by model, and the last one", () => {
     render(<Improvements />)
 
-    const incident = within(screen.getByRole("list", { name: "What improved it" })).getAllByRole("listitem")[1]
+    open("R118 4/6: delete TESTTA-2")
+    const incident = row("R118 4/6: delete TESTTA-2")
     expect(within(incident).getByRole("img", { name: "qwen3:8b, 2 Nov: failed" })).toBeInTheDocument()
-    expect(within(incident).getByRole("img", { name: "qwen3:8b, 7 Nov: passed" })).toBeInTheDocument()
     expect(within(incident).getByText("passed on 7 Nov")).toBeInTheDocument()
   })
 
-  it("says a case not replayed since it was added, from an answer of someone else", () => {
+  it("says a case not replayed since it was added, from an answer of someone else; a click closes it", () => {
     render(<Improvements />)
 
-    const answer = within(screen.getByRole("list", { name: "What improved it" })).getAllByRole("listitem")[0]
+    open("What changed this week")
+    const answer = row("What changed this week")
     expect(within(answer).getByText("From an answer of Cortex on 2 Nov.")).toBeInTheDocument()
     expect(within(answer).getByText("Added on 2 Nov.")).toBeInTheDocument()
     expect(within(answer).getByText("Not replayed since it was added.")).toBeInTheDocument()
+
+    open("What changed this week")
+    expect(screen.queryByText("Added on 2 Nov.")).not.toBeInTheDocument()
   })
 
-  it("waits for the history, says a read that failed, and says when the bank has no case", () => {
-    useEvalStore.setState({ history: null, historyFailed: false })
-    const { rerender } = render(<Improvements />)
-    expect(screen.getByText("Reading…")).toBeInTheDocument()
+  it("a last result that failed says so", () => {
+    useEvalStore.setState({
+      history: { ...HISTORY, cases: [{ ...HISTORY.cases[1], grades: [{ runId: 8, passed: true }, { runId: 9, passed: false }] }] },
+    })
+    render(<Improvements />)
 
-    useEvalStore.setState({ historyFailed: true })
-    rerender(<Improvements />)
-    expect(screen.getByText(/TaskForce couldn't read this part/)).toBeInTheDocument()
+    expect(screen.getByRole("img", { name: "qwen3:8b, 7 Nov: failed" })).toBeInTheDocument()
+    open("R118 4/6: delete TESTTA-2")
+    expect(screen.getByText("failed on 7 Nov")).toBeInTheDocument()
+  })
+
+  it("leaves the empty and reading states to the line above it", () => {
+    useEvalStore.setState({ history: null, historyFailed: false })
+    const { container, rerender } = render(<Improvements />)
+    expect(container).toBeEmptyDOMElement()
 
     useEvalStore.setState({ history: { runs: [], cases: [] }, historyFailed: false })
     rerender(<Improvements />)
-    expect(screen.getByText(/The test bank has no case yet/)).toBeInTheDocument()
+    expect(container).toBeEmptyDOMElement()
   })
 })

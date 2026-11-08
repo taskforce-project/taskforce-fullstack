@@ -131,6 +131,25 @@ export async function listWorkspaceRuns(slug: string): Promise<DeliveryRun[]> {
   return res.data.data ?? [];
 }
 
+/**
+ * Une mission de la personne qui attend sa réponse (R128, séance n°19) : une ligne par mission, avec le nombre de ses
+ * demandes encore ouvertes. Lue de la demande elle-même, jamais de sa notification.
+ */
+export interface OpenApproval {
+  runId: number;
+  issueId: number;
+  issueKey: string | null;
+  issueTitle: string | null;
+  projectId: number | null;
+  requests: number;
+}
+
+/** Ce qui attend la personne dans l'espace, lu en arrière-plan : la mission qui attend depuis le plus longtemps d'abord. */
+export async function listOpenApprovals(slug: string): Promise<OpenApproval[]> {
+  const res = await apiClient.get<{ data: OpenApproval[] }>(DELIVERY_ROUTES.OPEN_APPROVALS(slug), { silentError: true });
+  return res.data.data ?? [];
+}
+
 /** Un événement de la chronologie d'un run du runner local (lot 5). */
 export interface DeliveryRunEvent {
   seq: number;
