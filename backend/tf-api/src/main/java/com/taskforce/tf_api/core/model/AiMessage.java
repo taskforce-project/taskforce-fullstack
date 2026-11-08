@@ -1,8 +1,11 @@
 package com.taskforce.tf_api.core.model;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -46,6 +49,15 @@ public class AiMessage {
     /** Le modèle qui a écrit la réponse, tel que la passerelle l'a appelé (V117) ; null pour une demande ou un repli. */
     @Column(length = 128)
     private String model;
+
+    /**
+     * Ce que TaskForce a donné à lire au modèle pour cette réponse, compté (V120) : la ligne grise sous la réponse (R123),
+     * aussi dans une conversation rouverte. La forme est celle de {@code AssistantAnswer.AssistantRead} ; null pour une
+     * demande, un repli, et les messages d'avant.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private Map<String, Object> reading;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

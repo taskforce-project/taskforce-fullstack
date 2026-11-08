@@ -134,12 +134,12 @@ export function CortexUsage({ className }: { className?: string }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground motion-reduce:transition-none"
         title="Context window & usage"
       >
         <Ring pct={gauge.pct} />
         <span className="font-medium">Cortex</span>
-        <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} />
+        <ChevronDown className={cn("size-4 transition-transform duration-150 motion-reduce:transition-none", open && "rotate-180")} />
       </button>
 
       {open && coords && typeof document !== "undefined" && createPortal(
@@ -158,11 +158,11 @@ export function CortexUsage({ className }: { className?: string }) {
               <span className="text-muted-foreground">Context window</span>
               <span className="flex items-center gap-1 tabular-nums font-medium">
                 {gauge.value}
-                <ChevronRight className="size-3 text-muted-foreground" />
+                <ChevronRight className="size-4 text-muted-foreground" />
               </span>
             </button>
             {context?.window ? <div className="mt-1.5"><Bar pct={gauge.pct} tone={gauge.tone} /></div> : null}
-            <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">{gauge.line}</p>
+            <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{gauge.line}</p>
           </div>
 
           <div className="h-px bg-border" />
@@ -175,11 +175,11 @@ export function CortexUsage({ className }: { className?: string }) {
               className="flex w-full items-center justify-between text-left text-xs font-semibold transition-colors hover:text-foreground"
             >
               <span>Monthly usage</span>
-              <ChevronRight className="size-3 text-muted-foreground" />
+              <ChevronRight className="size-4 text-muted-foreground" />
             </button>
 
             <div className="mt-2 space-y-1">
-              <div className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">This month</span>
                 <span className="tabular-nums">
                   {usage
@@ -191,7 +191,7 @@ export function CortexUsage({ className }: { className?: string }) {
               </div>
               <Bar pct={unlimited ? 4 : usePct} tone={unlimited ? "blue" : useTone} />
               {usage && (
-                <div className="flex items-center justify-between text-[10px] text-muted-foreground/70">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span className="tabular-nums">
                     {fmt(usage.usedTokens)} {unlimited ? "" : `/ ${fmt(usage.limitTokens)} `}tokens
                   </span>
@@ -206,7 +206,7 @@ export function CortexUsage({ className }: { className?: string }) {
           {/* Pied : modèle + refresh + actions (façon Claude « Opus 4.8 Max ») */}
           <div className="flex items-center justify-between gap-2 px-3 py-2">
             <span className="flex items-center gap-1.5 text-xs font-medium">
-              <Sparkles className="size-3.5 text-primary" /> Cortex
+              <Sparkles className="size-4 text-primary" /> Cortex
             </span>
             <div className="flex items-center gap-1">
               <button
@@ -215,14 +215,14 @@ export function CortexUsage({ className }: { className?: string }) {
                 className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 title="Actualiser"
               >
-                <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
+                <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
               </button>
               <button
                 type="button"
                 onClick={openDetails}
-                className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium transition-colors hover:bg-muted"
+                className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors duration-150 hover:bg-muted motion-reduce:transition-none"
               >
-                <ExternalLink className="size-3" /> Details
+                <ExternalLink className="size-4" /> Details
               </button>
             </div>
           </div>

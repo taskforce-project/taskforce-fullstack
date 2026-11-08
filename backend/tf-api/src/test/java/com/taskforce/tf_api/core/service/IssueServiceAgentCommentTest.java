@@ -135,6 +135,40 @@ class IssueServiceAgentCommentTest {
     }
 
     @Test
+    @DisplayName("Cortex dans la conversation (R123) : le commentaire et son activité gardent le modèle qui le faisait parler")
+    void cortex_keeps_the_model_with_its_comment() {
+        anIssueToComment();
+
+        var created = com.taskforce.tf_api.core.security.DelegatedAgent.withModel("qwen3:8b",
+            () -> com.taskforce.tf_api.core.security.DelegatedAgent.actingAs("Cortex",
+                () -> service.addComment("pierre", 3L, 55L, comment("## Summary\n\nNothing left."), 1L)));
+
+        ArgumentCaptor<IssueComment> kept = ArgumentCaptor.forClass(IssueComment.class);
+        verify(commentRepository).save(kept.capture());
+        assertThat(kept.getValue().getVia()).isEqualTo("Cortex");
+        assertThat(kept.getValue().getModel()).isEqualTo("qwen3:8b");
+        assertThat(created.getModel()).isEqualTo("qwen3:8b");
+        ArgumentCaptor<IssueActivity> logged = ArgumentCaptor.forClass(IssueActivity.class);
+        verify(activityRepository).save(logged.capture());
+        assertThat(logged.getValue().getVia()).isEqualTo("Cortex");
+        assertThat(logged.getValue().getModel()).isEqualTo("qwen3:8b");
+    }
+
+    @Test
+    @DisplayName("la personne qui commente elle-même ne porte aucun modèle, même si un modèle traîne sur le fil")
+    void a_person_comment_has_no_model() {
+        anIssueToComment();
+
+        com.taskforce.tf_api.core.security.DelegatedAgent.withModel("qwen3:8b",
+            () -> service.addComment("pierre", 3L, 55L, comment("Done on my side."), 1L));
+
+        ArgumentCaptor<IssueComment> kept = ArgumentCaptor.forClass(IssueComment.class);
+        verify(commentRepository).save(kept.capture());
+        assertThat(kept.getValue().getVia()).isNull();
+        assertThat(kept.getValue().getModel()).isNull();
+    }
+
+    @Test
     @DisplayName("hors transaction : l'activité est annoncée tout de suite")
     void outside_a_transaction_the_activity_is_announced_at_once() {
         service.logActivity(issue, pierre, IssueActivityType.MISSION_MARKED_DONE, null, null, null);

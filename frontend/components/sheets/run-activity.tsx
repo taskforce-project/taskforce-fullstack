@@ -18,7 +18,7 @@ import { parseServerDate } from "@/lib/utils/server-date"
  * machine) ; les autres voient la demande en attente.
  */
 
-const EVENT_ICON: Record<DeliveryRunEvent["kind"], React.ElementType> = {
+export const EVENT_ICON: Record<DeliveryRunEvent["kind"], React.ElementType> = {
   start: Play,
   text: MessageSquareText,
   tool: Wrench,
@@ -50,7 +50,7 @@ function Said({ label, children }: Readonly<{ label: string; children: React.Rea
  * pour le reste de la mission (R46) ; une demande de TaskForce lui-même (une sortie, un départ) vaut une fois. Sans
  * réponse, c'est non, et la chronologie le dit ensuite.
  */
-function PendingApproval({ slug, runId, approval, goal }: Readonly<{
+export function PendingApproval({ slug, runId, approval, goal }: Readonly<{
   slug: string
   runId: number
   approval: DeliveryRunApproval

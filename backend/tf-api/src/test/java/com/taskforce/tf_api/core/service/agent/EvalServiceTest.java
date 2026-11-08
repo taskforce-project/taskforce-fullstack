@@ -26,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.dto.response.EvalBankResponse;
+import com.taskforce.tf_api.core.dto.response.EvalHistoryResponse;
 import com.taskforce.tf_api.core.enums.NodeDomain;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceChain;
 import com.taskforce.tf_api.core.model.EvalBankSetting;
@@ -359,6 +360,94 @@ class EvalServiceTest {
 
         assertThatThrownBy(() -> service.setEnabled("acme", 7L, false)).isInstanceOf(ForbiddenException.class);
         verify(settings, never()).save(any());
+    }
+
+    /** Une note telle que l'histoire de la banque la lit. */
+    private record ResultRow(Long getRunId, Long getCaseId, Boolean getPassed) implements EvalResultRepository.Row {
+    }
+
+    private static final UUID ANSWER = UUID.fromString("00000000-0000-0000-0000-0000000000cc");
+
+    /** Un cas ajouté par {@code createdBy} depuis le dossier {@code record} (null : écrit à la main), à {@code at}. */
+    private static EvalCase caseFrom(Long id, Long createdBy, UUID record, LocalDateTime at) {
+        return EvalCase.builder().id(id).workspaceId(1L).createdBy(createdBy).createdAt(at).criteriaAt(at)
+            .sourceRecord(record).title("Case " + id).question("suprime testta 2").askedOn(LocalDate.of(2026, 11, 2))
+            .notes("[]").cassette("[]").criteria("{\"tool\":\"delete_issue\",\"honest\":true}").archived(false).build();
+    }
+
+    @Test
+    @DisplayName("l'histoire : les rejeux du plus ancien au plus récent, le modèle qui a répondu, les notes de chaque cas")
+    void the_history_reads_runs_and_cases() throws Exception {
+        LocalDateTime nov2 = LocalDateTime.of(2026, 11, 2, 15, 8);
+        EvalRun later = EvalRun.builder().id(9L).workspaceId(1L).model("qwen3:8b").startedAt(nov2.plusDays(5))
+            .finishedAt(nov2.plusDays(5).plusMinutes(4)).total(3).passed(2).build();
+        EvalRun first = EvalRun.builder().id(8L).workspaceId(1L).model("default").startedAt(nov2.plusHours(1))
+            .total(3).passed(0).build();
+        when(runs.findTop100ByWorkspaceIdOrderByStartedAtDesc(1L)).thenReturn(List.of(later, first));
+        when(results.findRowsByRunIdIn(List.of(8L, 9L))).thenReturn(List.of(
+            new ResultRow(8L, 40L, false), new ResultRow(9L, 40L, true), new ResultRow(9L, 41L, true)));
+        when(results.findFirstByRunIdOrderByIdAsc(8L)).thenReturn(Optional.of(EvalResult.builder().runId(8L).caseId(40L)
+            .passed(false).details("{\"checks\":[],\"calls\":[],\"answer\":\"\",\"model\":\"qwen3:8b\"}").build()));
+        EvalCase incident = caseFrom(40L, 7L, RECORD, nov2);
+        EvalCase answer = caseFrom(41L, 3L, ANSWER, nov2.plusDays(1));
+        EvalCase byHand = caseFrom(42L, 7L, null, nov2.plusDays(2));
+        when(cases.findByWorkspaceIdAndArchivedFalseOrderByCreatedAtDesc(1L)).thenReturn(List.of(byHand, answer, incident));
+        when(records.incidents(List.of(ANSWER, RECORD))).thenReturn(Map.of(RECORD, JSON.readTree(
+            "{\"incident\":\"trust\",\"said\":[\"I deleted TESTTA-2.\",\" \"],\"shown\":\"Nothing was deleted.\"}")));
+
+        EvalHistoryResponse history = service.history("acme", 7L);
+
+        assertThat(history.runs()).extracting(EvalHistoryResponse.Run::id, EvalHistoryResponse.Run::answeredBy,
+                EvalHistoryResponse.Run::graded, EvalHistoryResponse.Run::passed)
+            .containsExactly(tuple(8L, "qwen3:8b", 1, 0), tuple(9L, "qwen3:8b", 2, 2));
+        // Un rejeu qui nomme son modèle le garde : sa première note n'est pas relue.
+        verify(results, never()).findFirstByRunIdOrderByIdAsc(9L);
+        assertThat(history.cases()).extracting(EvalHistoryResponse.Case::id).containsExactly(42L, 41L, 40L);
+        EvalHistoryResponse.Case fromIncident = history.cases().get(2);
+        assertThat(fromIncident.origin()).isEqualTo(new EvalHistoryResponse.Origin("incident",
+            List.of("I deleted TESTTA-2."), "Nothing was deleted."));
+        assertThat(fromIncident.grades()).extracting(EvalHistoryResponse.Grade::runId, EvalHistoryResponse.Grade::passed)
+            .containsExactly(tuple(8L, false), tuple(9L, true));
+        assertThat(fromIncident.mine()).isTrue();
+        assertThat(fromIncident.askedOn()).isEqualTo(LocalDate.of(2026, 11, 2));
+        EvalHistoryResponse.Case fromAnswer = history.cases().get(1);
+        assertThat(fromAnswer.origin().kind()).isEqualTo("answer");
+        assertThat(fromAnswer.grades()).extracting(EvalHistoryResponse.Grade::runId).containsExactly(9L);
+        assertThat(fromAnswer.mine()).isFalse();
+        assertThat(history.cases().get(0).origin()).isEqualTo(new EvalHistoryResponse.Origin("unknown", List.of(), null));
+        assertThat(history.cases().get(0).grades()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("l'histoire d'une banque sans rejeu : ses cas, sans note ; un rejeu sans nom ni note n'a pas de modèle")
+    void the_history_of_a_bank_never_replayed() {
+        EvalRun started = EvalRun.builder().id(8L).workspaceId(1L).model("default")
+            .startedAt(LocalDateTime.of(2026, 11, 8, 9, 0)).total(1).passed(0).build();
+        when(runs.findTop100ByWorkspaceIdOrderByStartedAtDesc(1L)).thenReturn(List.of(started));
+        when(results.findRowsByRunIdIn(List.of(8L))).thenReturn(List.of());
+        when(results.findFirstByRunIdOrderByIdAsc(8L)).thenReturn(Optional.empty());
+        when(cases.findByWorkspaceIdAndArchivedFalseOrderByCreatedAtDesc(1L))
+            .thenReturn(List.of(storedCase(LocalDateTime.of(2026, 11, 2, 15, 8))));
+
+        EvalHistoryResponse history = service.history("acme", 7L);
+
+        assertThat(history.runs()).singleElement().satisfies(run -> {
+            assertThat(run.answeredBy()).isNull();
+            assertThat(run.graded()).isZero();
+        });
+        assertThat(history.cases()).singleElement().satisfies(c -> {
+            assertThat(c.origin().kind()).isEqualTo("unknown");
+            assertThat(c.grades()).isEmpty();
+        });
+    }
+
+    @Test
+    @DisplayName("l'histoire se lit dans un espace dont on est membre")
+    void the_history_needs_a_member() {
+        when(access.resolveAndAuthorize("other", 7L)).thenThrow(new ForbiddenException("Access denied"));
+
+        assertThatThrownBy(() -> service.history("other", 7L)).isInstanceOf(ForbiddenException.class);
+        verify(runs, never()).findTop100ByWorkspaceIdOrderByStartedAtDesc(any());
     }
 
     @Test

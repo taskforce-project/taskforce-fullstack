@@ -27,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.taskforce.tf_api.core.dto.response.ChecklistItemResponse;
 import com.taskforce.tf_api.core.dto.response.IssueActivityResponse;
 import com.taskforce.tf_api.core.dto.response.IssueCommentResponse;
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.dto.response.IssueStatusResponse;
 import com.taskforce.tf_api.core.dto.response.UserSummaryResponse;
@@ -172,5 +173,52 @@ class IssueMaterialTest {
         assertThat(material.describe(ctx(null), "résume OPS-35")).isEmpty();
         assertThat(material.describe(ctx(null), "")).isEmpty();
         verify(issueService, never()).listComments(anyString(), anyLong(), anyLong(), any());
+    }
+
+    private void ops35WithComments(int count) {
+        when(issueService.getIssue("acme", 30L, 350L, ME)).thenReturn(ops35().build());
+        when(issueService.listChecklist("acme", 30L, 350L, ME)).thenReturn(List.of());
+        when(issueService.listComments("acme", 30L, 350L, ME)).thenReturn(IntStream.range(0, count)
+            .mapToObj(i -> IssueCommentResponse.builder().id((long) i).author(PIERRE).content("Point " + i).createdAt(CREATED).build())
+            .toList());
+        when(issueService.listActivity("acme", 30L, 350L, ME)).thenReturn(List.of());
+    }
+
+    @Test
+    @DisplayName("la ligne grise (R123) : chaque issue lue, avec les commentaires vraiment donnés au modèle")
+    void what_was_read_is_counted() {
+        ops35WithComments(3);
+
+        IssueMaterial.Read read = material.read(ctx(null), "résume OPS-35", List.of(), true);
+
+        assertThat(read.text()).startsWith(IssueMaterial.HEADER).contains("Point 2");
+        assertThat(read.issues()).containsExactly(new AssistantRead.IssueRead("OPS-35", 3));
+    }
+
+    @Test
+    @DisplayName("une issue jointe par la personne (R123) : lue sans demande de résumé, sous le titre de ce qu'elle a joint")
+    void an_attached_issue_is_read_without_a_summary() {
+        ops35WithComments(1);
+
+        IssueMaterial.Read read = material.read(ctx(null), "qui devrait la prendre ?", List.of(new Screen(30L, 350L)), false);
+
+        assertThat(read.text()).startsWith(IssueMaterial.ATTACHED).contains("OPS-35 \"Itération #35\"");
+        assertThat(read.issues()).containsExactly(new AssistantRead.IssueRead("OPS-35", 1));
+        // Hors d'un résumé, la clé écrite dans la demande ne fait rien lire de plus.
+        verify(issueService, never()).getIssue("acme", 30L, 360L, ME);
+    }
+
+    @Test
+    @DisplayName("jointe et nommée : lue une fois ; un projet joint (sans issue) n'est pas une issue ; rien sans pièce")
+    void an_issue_attached_and_named_is_read_once() {
+        ops35WithComments(0);
+
+        IssueMaterial.Read read = material.read(ctx(null), "résume OPS-35",
+            List.of(new Screen(30L, 350L), new Screen(30L, null)), true);
+
+        assertThat(read.issues()).containsExactly(new AssistantRead.IssueRead("OPS-35", 0));
+        verify(issueService).getIssue("acme", 30L, 350L, ME);
+        assertThat(material.read(ctx(null), "bonjour", null, false)).isSameAs(IssueMaterial.Read.NOTHING);
+        assertThat(IssueMaterial.Read.NOTHING.isEmpty()).isTrue();
     }
 }

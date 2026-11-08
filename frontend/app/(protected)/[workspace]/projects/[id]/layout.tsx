@@ -19,7 +19,6 @@ import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
-import { ProjectIcon } from "@/components/ui/project-icon"
 import { ScrollableTabs } from "@/components/ui/scrollable-tabs"
 import {
   DropdownMenu,
@@ -101,19 +100,42 @@ export default function ProjectLayout({ children }: { readonly children: React.R
 
   return (
     <div className="mx-auto flex h-full w-full max-w-screen-2xl flex-col">
-      {/* Project header - pas de breadcrumb (le header de l'app suffit) ; largeur alignée sur le dashboard */}
-      <div className="shrink-0 border-b border-border">
-        {/* Project name + actions */}
-        <div className="flex items-center justify-between gap-4 mb-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <ProjectIcon iconUrl={project?.iconUrl ?? null} color={project?.color ?? null} size={36} />
-            <div className="min-w-0">
-              <h1 className="text-xl font-semibold text-foreground truncate">{project?.name ?? "…"}</h1>
-              <p className="text-xs text-muted-foreground truncate">{project?.description ?? ""}</p>
-            </div>
-          </div>
+      {/* L'en-tête du projet, dans son volet : le nom du projet est le titre du volet (R124, un titre par volet) ; restent
+          ses onglets et ses gestes, sur une seule ligne. */}
+      <div className="flex shrink-0 items-end gap-3 border-b border-border">
+        <div className="min-w-0 flex-1">
+          {/* Tab nav - bande scrollable avec chevrons (l'onglet Settings restait hors écran, QA3) */}
+          <ScrollableTabs>
+            {PROJECT_TABS.map(({ key, icon: Icon, pathSuffix }) => {
+              const active = isTabActive(pathSuffix)
+              return (
+                <Link
+                  key={key}
+                  href={basePath + pathSuffix}
+                  className={cn(
+                    "flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors duration-150 border-b-2 whitespace-nowrap motion-reduce:transition-none",
+                    active
+                      ? "border-primary text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {t(`projects.${key}`)}
+                  {key === "detail.board" && (project?.openIssues ?? 0) > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className="h-4 min-w-4 px-1 text-xs bg-muted text-muted-foreground border-0"
+                    >
+                      {project?.openIssues}
+                    </Badge>
+                  )}
+                </Link>
+              )
+            })}
+          </ScrollableTabs>
+        </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex shrink-0 items-center gap-2 pb-1.5">
             {/* Members avatars */}
             <div className="hidden sm:flex -space-x-2 mr-1">
               {(project?.members ?? []).slice(0, 3).map((m) => (
@@ -174,37 +196,6 @@ export default function ProjectLayout({ children }: { readonly children: React.R
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </div>
-
-        {/* Tab nav - bande scrollable avec chevrons (l'onglet Settings restait hors écran, QA3) */}
-        <ScrollableTabs>
-          {PROJECT_TABS.map(({ key, icon: Icon, pathSuffix }) => {
-            const active = isTabActive(pathSuffix)
-            return (
-              <Link
-                key={key}
-                href={basePath + pathSuffix}
-                className={cn(
-                  "flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-all border-b-2 whitespace-nowrap",
-                  active
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {t(`projects.${key}`)}
-                {key === "detail.board" && (project?.openIssues ?? 0) > 0 && (
-                  <Badge
-                    variant="secondary"
-                    className="h-4 min-w-4 px-1 text-[10px] bg-muted text-muted-foreground border-0"
-                  >
-                    {project?.openIssues}
-                  </Badge>
-                )}
-              </Link>
-            )
-          })}
-        </ScrollableTabs>
       </div>
 
       {/* Page content - one-screen : scroll interne ici (et par colonne sur le board) */}

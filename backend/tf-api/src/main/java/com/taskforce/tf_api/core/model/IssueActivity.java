@@ -76,6 +76,10 @@ public class IssueActivity {
     @Column(length = 60)
     private String via;
 
+    /** Le modèle qui faisait parler l'agent de {@code via} (« qwen3:8b » pour Cortex, V119) ; null sinon. */
+    @Column(length = 128)
+    private String model;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest"
 import type { AnalysisJob } from "@/lib/api/analysis-service"
 import type { DeliveryRun } from "@/lib/api/delivery-service"
 import {
-  awaitsJudgment, elapsedMinutes, isActiveJob, isActiveRun, isMine, jobState, liveRuns, myRuns, resultsToJudge, runLabel,
-  runState,
+  awaitsJudgment, conversationMission, elapsedMinutes, isActiveJob, isActiveRun, isMine, jobState, liveRuns, myRuns,
+  resultsToJudge, runLabel, runState,
 } from "./missions"
+import type { Change } from "./changes"
 
 const NOW = Date.parse("2026-11-05T12:00:00Z")
 
@@ -102,5 +103,27 @@ describe("les missions de la fenêtre", () => {
     [{ issueKey: null, issueTitle: null, issueId: 28 }, "#28"],
   ])("nomme la mission par son issue : %o", (mission, label) => {
     expect(runLabel(mission)).toBe(label)
+  })
+})
+
+/** La ligne du haut ouvre la vue du travail de la mission que la conversation a lancée, tant qu'elle tourne (« Le dessin »). */
+describe("conversationMission", () => {
+  const handed = (issueId: number, runId: number | null, id = `t:${issueId}`): Change => ({
+    id, kind: "delegated", what: `TF-${issueId}`,
+    call: { name: "delegate_issue", status: "success", input: null, output: null, target: { issueId, projectId: 3, key: `TF-${issueId}`, title: "", runId } },
+  })
+
+  it("finds the most recent mission handed by this conversation that still runs, the person's own", () => {
+    const runs = [run({ id: 10, issueId: 28 }), run({ id: 11, issueId: 29, status: "DONE" }), run({ id: 12, issueId: 30, startedById: 8 })]
+    expect(conversationMission([handed(29, 11), handed(28, null)], runs, 7)?.id).toBe(10)
+    expect(conversationMission([handed(28, 10)], runs, "7")?.id).toBe(10)
+  })
+
+  it("is null when none runs, another person handed it, or the conversation handed nothing", () => {
+    const created: Change = { id: "c", kind: "created", what: "TF-1", call: { name: "create_issue", status: "success", input: null, output: null } }
+    const bare: Change = { ...handed(28, null), call: { name: "delegate_issue", status: "success", input: null, output: null } }
+    expect(conversationMission([handed(29, 11)], [run({ id: 11, issueId: 29, status: "FAILED" })], 7)).toBeNull()
+    expect(conversationMission([handed(30, 12)], [run({ id: 12, issueId: 30, startedById: 8 })], 7)).toBeNull()
+    expect(conversationMission([created, bare], [run()], 7)).toBeNull()
   })
 })

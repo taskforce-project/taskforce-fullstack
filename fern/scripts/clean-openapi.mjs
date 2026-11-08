@@ -22,6 +22,7 @@ const SPEC = join(HERE, "..", "openapi", "openapi.json");
 // controller kebab -> nom de section lisible (anglais : la référence API décrit le modèle du code).
 const TAG_MAP = {
   "issue-controller": "Issues",
+  "issue-search-controller": "Issues",
   "project-controller": "Projects",
   "workspace-controller": "Workspaces",
   "cycle-controller": "Cycles",
@@ -47,6 +48,7 @@ const TAG_MAP = {
   "brain-attachment-controller": "Brain OS attachments",
   "ai-conversation-controller": "AI assistant",
   "assistant-controller": "AI assistant",
+  "cortex-sources-controller": "AI assistant",
   "eval-controller": "Test bank",
   "model-capability-controller": "Model capabilities",
   "skill-suggestion-controller": "Skill suggestions",

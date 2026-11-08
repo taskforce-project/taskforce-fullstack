@@ -256,6 +256,20 @@ class CortexRecordServiceTest {
             + "\"notes\":[{\"id\":12,\"title\":\"Release plan\"}],\"question\":\"Write the release notes\",\"tier\":\"fast\"}");
     }
 
+    @Test
+    @DisplayName("R123 : le modèle qui a répondu se relit à l'ouverture du dossier ; rien quand elle ne le dit pas")
+    void the_model_of_the_record_is_read_back() {
+        UUID answered = service.open(ctx, "Summarize OPS-35", Map.of("model", " qwen3:8b ", "tier", "fast"));
+        service.append(answered, "action.result", Actor.SERVER, Map.of("tool", "add_comment", "status", "pending"));
+
+        assertThat(service.model(answered)).contains("qwen3:8b");
+
+        stored.clear();
+        UUID silent = service.open(ctx, "Write the release notes", Map.of());
+        assertThat(service.model(silent)).isEmpty();
+        assertThat(service.model(null)).isEmpty();
+    }
+
     // -------------------------------------------------------------------------
     // « Undo » (R77, séance n°13)
     // -------------------------------------------------------------------------
@@ -356,5 +370,25 @@ class CortexRecordServiceTest {
         assertThat(records).containsKey(id);
         assertThat(stored).extracting(CortexRecordEvent::getType).containsExactly("mission.started", "note");
         assertThat(stored.getFirst().getData()).contains("\"question\":\"suprime testta 2\"").contains("qwen3:8b");
+    }
+
+    @Test
+    @DisplayName("l'incident de chaque dossier se relit d'un coup, pour l'histoire de la banque ; un autre ne compte pas")
+    void incidents_are_read_from_the_server_notes() {
+        UUID corrected = service.incident(ctx, null, "suprime testta 2", Map.of(),
+            Map.of("incident", "trust", "said", List.of("I deleted TESTTA-2."), "shown", "Nothing was deleted."));
+        UUID other = UUID.randomUUID();
+        when(eventRepository.findByRecordIdInAndTypeAndActorKindOrderBySeqAsc(List.of(corrected, other), "note", "server"))
+            .thenReturn(List.of(
+                stored.getLast(),
+                CortexRecordEvent.builder().recordId(other).seq(2).type("note").actorKind("server")
+                    .data("{\"about\":\"something else\"}").build()));
+
+        Map<UUID, com.fasterxml.jackson.databind.JsonNode> found = service.incidents(List.of(corrected, other));
+
+        assertThat(found).containsOnlyKeys(corrected);
+        assertThat(found.get(corrected).path("shown").asText()).isEqualTo("Nothing was deleted.");
+        assertThat(found.get(corrected).path("said").get(0).asText()).isEqualTo("I deleted TESTTA-2.");
+        assertThat(service.incidents(List.of())).isEmpty();
     }
 }

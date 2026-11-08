@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation"
 
 /**
- * La vue « page pleine » d'une issue a été retirée (redondante avec le sheet latéral).
- * On garde toutefois la route en REDIRECTION vers le board, sheet ouvert (`?issue=`), afin que
+ * La vue « page pleine » d'une issue a été retirée : l'issue s'ouvre dans le volet de la fenêtre, par-dessus le
+ * tableau de son projet (R120). On garde la route en REDIRECTION vers le board, l'issue ouverte (`?issue=`), afin que
  * les anciens liens directs / bookmarks vers `/projects/:id/issues/:issueId` ne renvoient pas 404.
  * Le lien partageable canonique reste `…/projects/:id?issue=:issueId`.
  */

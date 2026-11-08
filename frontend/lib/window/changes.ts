@@ -4,9 +4,11 @@ import type { CortexTurn } from "@/lib/store/cortex-store"
 /**
  * « Changes » (R122) : ce que la conversation a changé dans TaskForce, lu dans les résultats de ses gestes. Un geste
  * proposé, refusé ou en échec n'a rien changé ; seuls comptent ceux qui ont abouti, dans ses tours ou sur leurs cartes
- * (une issue préparée puis créée, une action accordée, la suite d'une carte de questions).
+ * (une issue préparée puis créée, une action accordée, la suite d'une carte de questions, l'archivage ou la
+ * suppression faits sur la carte de suppression).
  */
-export type ChangeKind = "created" | "moved" | "assigned" | "commented" | "changed" | "deleted" | "delegated"
+export type ChangeKind =
+  | "created" | "moved" | "assigned" | "commented" | "changed" | "archived" | "deleted" | "delegated"
 
 export interface Change {
   /** Une clé stable : le tour (ou la carte) et le rang du geste. */
@@ -22,6 +24,7 @@ const KINDS: Readonly<Record<string, ChangeKind>> = {
   create_project: "created",
   create_note: "created",
   add_comment: "commented",
+  archive_issue: "archived",
   delete_issue: "deleted",
   delegate_issue: "delegated",
 }

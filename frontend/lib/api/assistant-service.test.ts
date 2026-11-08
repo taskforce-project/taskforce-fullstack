@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  sendAgentMessage, sendAssistantMessage, isApprovable, isDeletion, isMission, isPreparedIssue, isQuestion, approveAction, isUndoable,
+  sendAgentMessage, isApprovable, isDeletion, isMission, isPreparedIssue, isQuestion, approveAction, isUndoable,
   undoAction, answerQuestion, isQuestionCard,
   type AssistantToolCall,
 } from './assistant-service';
@@ -63,15 +63,18 @@ describe('assistant-service', () => {
       expect.anything());
   });
 
-  it('sendAssistantMessage: returns only the answer markdown string', async () => {
-    const turn = buildTurn();
-    vi.mocked(apiClient.post).mockResolvedValue(envelope(turn));
+  it('sendAgentMessage: sends what the person attached from the composer, only when there is something (R123)', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(buildTurn()));
 
-    const result = await sendAssistantMessage(slug, 'hi');
+    await sendAgentMessage(slug, 'résume', null, { projectId: 3 }, null, [{ projectId: 3, issueId: 35 }, { projectId: 4 }]);
+    await sendAgentMessage(slug, 'hi', null, null, null, []);
 
-    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.CHAT(slug), { message: 'hi', conversationId: null }, expect.anything());
-    expect(result).toBe('Hello there');
+    expect(vi.mocked(apiClient.post).mock.calls[0][1]).toEqual({
+      message: 'résume', conversationId: null, screen: { projectId: 3 }, attach: [{ projectId: 3, issueId: 35 }, { projectId: 4 }],
+    });
+    expect(vi.mocked(apiClient.post).mock.calls[1][1]).toEqual({ message: 'hi', conversationId: null });
   });
+
 
   it('sendAgentMessage: propagates errors', async () => {
     vi.mocked(apiClient.post).mockRejectedValue(new Error('boom'));

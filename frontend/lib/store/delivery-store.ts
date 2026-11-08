@@ -12,14 +12,16 @@ import {
   markRunDone as markRunDoneApi,
   retryRun as retryRunApi,
   downloadEvidence as downloadEvidenceApi,
+  getEvidence,
   provisionRunner as provisionRunnerApi,
   type DeliveryProvider,
   type DeliveryRun,
   type DeliveryRunActivity,
+  type MissionEvidence,
   type RunnerProvision,
   type RunnerStatus,
 } from "../api/delivery-service";
-import { getErrorMessage } from "../api/client";
+import { getErrorMessage, getErrorStatus } from "../api/client";
 
 // ---------------------------------------------------------------------------
 // Store de délégation à un agent (TF-AGENT-DELIVERY). Un domaine = un store.
@@ -42,6 +44,8 @@ interface DeliveryState {
   activity: Record<number, DeliveryRunActivity>;
   /** Par runId : pourquoi le dernier geste sur la carte de résultat n'a pas abouti (GitHub refuse, conflits...). */
   resultErrors: Record<number, string>;
+  /** Le dossier de preuve par runId, tel que la vue du travail l'a lu ; `null` : pas (encore) de dossier. */
+  evidence: Record<number, MissionEvidence | null>;
 
   fetchProviders: (slug: string) => Promise<DeliveryProvider[]>;
   fetchProjectProviders: (slug: string, projectId: number) => Promise<DeliveryProvider[]>;
@@ -57,6 +61,11 @@ interface DeliveryState {
   decideApproval: (slug: string, runId: number, approvalId: number, allow: boolean, forMission?: boolean) => Promise<boolean>;
   /** Télécharge le dossier de preuve d'un run ; `false` si le run n'en a pas (run de la v1) ou en cas d'erreur. */
   downloadEvidence: (slug: string, runId: number, format: "json" | "md") => Promise<boolean>;
+  /**
+   * Relit le dossier de preuve d'un run, pour le montrer pendant qu'il se construit ; `null` sans dossier (rien d'écrit
+   * encore, run de la v1) ou en cas d'erreur, où le dossier lu d'avant reste.
+   */
+  fetchEvidence: (slug: string, runId: number) => Promise<MissionEvidence | null>;
   /** Les gestes de la carte de résultat (R78) ; `false` (ou `null`) en cas d'échec, la raison dans `resultErrors`. */
   applyRun: (slug: string, issueId: number, runId: number, reason?: string) => Promise<boolean>;
   discardRun: (slug: string, issueId: number, runId: number) => Promise<boolean>;
@@ -81,6 +90,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   runner: null,
   activity: {},
   resultErrors: {},
+  evidence: {},
 
   fetchProviders: async (slug) => {
     set({ providersLoading: true });
@@ -188,6 +198,18 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
       return true;
     } catch {
       return false;
+    }
+  },
+
+  fetchEvidence: async (slug, runId) => {
+    try {
+      const evidence = await getEvidence(slug, runId);
+      set((state) => ({ evidence: { ...state.evidence, [runId]: evidence } }));
+      return evidence;
+    } catch (e) {
+      // 404 : la mission n'a pas encore de dossier (ou n'en aura pas, run de la v1). Une autre erreur garde la lecture d'avant.
+      if (getErrorStatus(e) === 404) set((state) => ({ evidence: { ...state.evidence, [runId]: null } }));
+      return null;
     }
   },
 

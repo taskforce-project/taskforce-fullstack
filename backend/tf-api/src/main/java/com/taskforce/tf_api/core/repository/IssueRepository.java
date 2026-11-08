@@ -22,6 +22,21 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     @Query("SELECT COUNT(i) FROM Issue i WHERE i.project.workspace.id = :workspaceId")
     long countByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
+    /** Ce que porte un projet, compté, et quand le plus récent a changé : une ligne par projet. */
+    interface ProjectCount {
+        Long getProjectId();
+        Long getTotal();
+        LocalDateTime getChangedAt();
+    }
+
+    /** Les issues non archivées de chaque projet de l'espace, et leur dernier changement : ce que Cortex lit (R125). */
+    @Query("""
+        SELECT i.project.id AS projectId, COUNT(i) AS total, MAX(i.updatedAt) AS changedAt FROM Issue i
+        WHERE i.project.workspace.id = :workspaceId AND i.archivedAt IS NULL
+        GROUP BY i.project.id
+        """)
+    List<ProjectCount> countByProject(@Param("workspaceId") Long workspaceId);
+
     /** Issues actives d'un projet (hors archivées), épinglées d'abord puis sequence_number desc */
     @Query("""
         SELECT i FROM Issue i
@@ -101,6 +116,38 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         """)
     List<Issue> findByWorkspaceSlugAndAssigneeId(@Param("slug") String slug,
                                                  @Param("assigneeId") Long assigneeId);
+
+    /**
+     * La recherche de la fenêtre (Ctrl+K, le « @ » et le « + » du compositeur, R123 et R124) : les issues non archivées
+     * des projets donnés, par leur titre ou par leur clé (le préfixe du projet, puis le début du numéro), la clé exacte
+     * d'abord, puis les dernières changées.
+     */
+    @Query("""
+        SELECT i FROM Issue i
+        JOIN FETCH i.project p
+        LEFT JOIN FETCH i.status
+        WHERE p.id IN :projectIds
+          AND i.archivedAt IS NULL
+          AND (LOWER(i.title) LIKE :title ESCAPE '!'
+               OR (UPPER(p.identifier) = :prefix AND CAST(i.sequenceNumber AS String) LIKE :number))
+        ORDER BY CASE WHEN UPPER(p.identifier) = :prefix AND i.sequenceNumber = :exact THEN 0 ELSE 1 END,
+                 i.updatedAt DESC NULLS LAST, i.id DESC
+        """)
+    List<Issue> searchInProjects(@Param("projectIds") List<Long> projectIds, @Param("title") String title,
+                                 @Param("prefix") String prefix, @Param("number") String number,
+                                 @Param("exact") Integer exact, org.springframework.data.domain.Pageable page);
+
+    /** Les dernières issues changées des projets donnés, non archivées : la liste du « @ » avant le premier caractère. */
+    @Query("""
+        SELECT i FROM Issue i
+        JOIN FETCH i.project p
+        LEFT JOIN FETCH i.status
+        WHERE p.id IN :projectIds
+          AND i.archivedAt IS NULL
+        ORDER BY i.updatedAt DESC NULLS LAST, i.id DESC
+        """)
+    List<Issue> findRecentInProjects(@Param("projectIds") List<Long> projectIds,
+                                     org.springframework.data.domain.Pageable page);
 
     /** Issues ouvertes, assignées, dont l'échéance est <= horizon (job d'alertes dueSoon/overdue) */
     @Query("""

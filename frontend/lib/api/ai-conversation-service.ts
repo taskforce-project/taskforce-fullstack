@@ -3,6 +3,7 @@
  * `/api/workspaces/{slug}/ai/conversations`
  */
 import { apiClient } from "./client"
+import type { AssistantRead } from "./assistant-service"
 import { AI_ROUTES } from "../config/api-routes"
 
 export interface ConversationSummary {
@@ -24,6 +25,8 @@ export interface ConversationMessage {
   createdAt: string | null
   /** Le modèle qui a écrit la réponse ; absent d'une demande, d'un repli et des messages d'avant le 05/11/2026. */
   model?: string | null
+  /** Ce que TaskForce lui a donné à lire (la ligne grise, R123) ; absent des messages d'avant lot 3 de la fenêtre. */
+  read?: AssistantRead | null
 }
 
 export interface ConversationDetail {

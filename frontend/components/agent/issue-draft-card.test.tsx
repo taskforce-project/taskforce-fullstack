@@ -15,6 +15,8 @@ vi.mock("@/lib/api/assistant-service", () => ({ approveAction: vi.fn(), undoActi
 vi.mock("@/lib/api/issue-service", () => ({ listStatuses: vi.fn() }));
 vi.mock("@/lib/api/label-service", () => ({ listLabels: vi.fn() }));
 vi.mock("@/lib/api/cycle-service", () => ({ listCycles: vi.fn() }));
+const nav = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: nav.push, back: vi.fn() }), useParams: () => ({ workspace: "acme" }) }));
 vi.mock("@/lib/api/project-service", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api/project-service")>()),
   listProjectMembers: vi.fn(),
@@ -171,7 +173,12 @@ describe("IssueDraftCard : l'issue que Cortex prépare (R78)", () => {
     fireEvent.change(screen.getByLabelText("Checklist"), { target: { value: "Plan table\n\nFAQ" } });
     fireEvent.click(screen.getByRole("button", { name: "Create issue" }));
 
-    await waitFor(() => expect(screen.getByText(/Created WEB-14/)).toBeTruthy());
+    // La clé de l'issue créée l'ouvre dans le volet (R123), le projet son tableau.
+    const created = await screen.findByRole("link", { name: "WEB-14" });
+    expect(created).toHaveAttribute("href", "/acme/projects/3?issue=WEB-14");
+    expect(created.closest("p")).toHaveTextContent("Created WEB-14 \"Pricing plans\" in the project Website, in the column Backlog.");
+    fireEvent.click(created);
+    expect(nav.push).toHaveBeenCalledWith("/acme/projects/3?issue=WEB-14", { scroll: false });
     const sent = vi.mocked(approveAction).mock.calls[0][1];
     expect(sent.record).toBe(RECORD);
     expect(JSON.parse(sent.input ?? "{}")).toEqual({ project: "WEB", title: "Pricing plans", checklist: ["Plan table", "FAQ"] });

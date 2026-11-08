@@ -57,13 +57,4 @@ describe("desktop bridge", () => {
 
     expect(desktop.desktopBridge()).toBeNull();
   });
-
-  it("tells when the account was already set up on the web app, only in the desktop app", async () => {
-    (window as Window & { taskforceDesktop?: unknown }).taskforceDesktop = { ...bridge, onboardedOnline: true };
-    expect((await loadDesktop()).onboardedOnline()).toBe(false);
-    expect((await loadDesktop("true")).onboardedOnline()).toBe(true);
-
-    (window as Window & { taskforceDesktop?: unknown }).taskforceDesktop = bridge;
-    expect((await loadDesktop("true")).onboardedOnline()).toBe(false);
-  });
 });

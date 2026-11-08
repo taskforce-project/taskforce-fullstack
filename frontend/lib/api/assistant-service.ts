@@ -121,6 +121,26 @@ export interface AssistantAnswer {
   record?: string | null
   /** Le modèle qui a répondu, tel que la passerelle l'a appelé ; absent d'un repli. */
   model?: string | null
+  /** Ce que TaskForce a donné à lire à ce modèle, compté (R123, la ligne grise) ; absent d'un repli et des réponses d'avant. */
+  read?: AssistantRead | null
+}
+
+/**
+ * Ce que TaskForce a donné à lire au modèle pour une réponse (R123) : les issues lues en entier et leurs commentaires
+ * donnés, les tableaux montrés (l'écran, ceux joints) et l'issue ouverte, les outils qui lisent et ont abouti, les notes
+ * du Brain OS servies. Compté par le serveur au moment où il le donne, jamais deviné.
+ */
+export interface AssistantRead {
+  issues: { key: string; comments: number }[]
+  boards: { project: string; issues: number; open: string | null }[]
+  tools: { name: string; calls: number }[]
+  notes: number
+}
+
+/** Ce que la personne joint à sa demande depuis le compositeur (R123) : une issue (son projet et son id), ou un projet. */
+export interface AssistantAttachment {
+  projectId: number
+  issueId?: number | null
 }
 
 /**
@@ -155,11 +175,14 @@ export async function sendAgentMessage(
   conversationId?: number | null,
   screen?: AssistantScreen | null,
   model?: string | null,
+  attach?: readonly AssistantAttachment[] | null,
 ): Promise<ChatTurnResponse> {
   // L'écran part avec le message quand la personne regarde un projet (R114) : Cortex le lit avant les notes. Le
-  // modèle, quand la personne envoie la demande à celui que TaskForce propose (R118) ; sans lui, rien ne change.
+  // modèle, quand la personne envoie la demande à celui que TaskForce propose (R118) ; sans lui, rien ne change. Ce
+  // qu'elle a joint depuis le compositeur (R123), quand elle a joint quelque chose.
   const body = {
     message, conversationId: conversationId ?? null, ...(screen ? { screen } : {}), ...(model ? { model } : {}),
+    ...(attach && attach.length > 0 ? { attach } : {}),
   }
   const res = await apiClient.post<{ data: ChatTurnResponse }>(ASSISTANT_ROUTES.CHAT(slug), body, { timeout: AI_TIMEOUT_MS })
   return res.data.data
@@ -276,9 +299,4 @@ export function isMission(call: AssistantToolCall): call is AssistantToolCall & 
 export function isDeletion(call: AssistantToolCall): call is AssistantToolCall & { target: AssistantTarget } {
   return call.name === "delete_issue" && call.status === "pending" && Boolean(call.record)
     && typeof call.target?.issueId === "number"
-}
-
-/** Variante texte (compat) : renvoie seulement la réponse markdown. */
-export async function sendAssistantMessage(slug: string, message: string): Promise<string> {
-  return (await sendAgentMessage(slug, message)).answer.answer
 }

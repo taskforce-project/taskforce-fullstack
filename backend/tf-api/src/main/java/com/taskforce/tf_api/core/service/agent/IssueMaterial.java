@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead;
 import com.taskforce.tf_api.core.dto.response.ChecklistItemResponse;
 import com.taskforce.tf_api.core.dto.response.IssueActivityResponse;
 import com.taskforce.tf_api.core.dto.response.IssueCommentResponse;
@@ -66,6 +67,11 @@ public class IssueMaterial {
     static final String HEADER = "The issue to summarize, as TaskForce read it just now. It is all there is: summarize only "
         + "from it, never add a fact, a feature or a plan it does not state, and when it says little, say so in one "
         + "sentence.\n";
+    /** Les issues jointes par la personne à une demande qui n'est pas un résumé (R123). */
+    static final String ATTACHED = "Attached by the person to their request, as TaskForce read it just now. Use it as it "
+        + "is: never add a fact it does not state.\n";
+    /** Les issues jointes lues au plus : ce que le compositeur laisse joindre. */
+    static final int MAX_ATTACHED = 3;
 
     /** Une clé écrite dans la demande, avec son tiret ou une espace : « OPS-35 », « ops 35 ». */
     private static final Pattern KEY = Pattern.compile("(?<![\\p{L}\\p{N}])(\\p{L}[\\p{L}\\p{N}]{0,9})[-\\s](\\d{1,9})(?![\\p{L}\\p{N}])");
@@ -79,18 +85,47 @@ public class IssueMaterial {
     private final ProjectVisibilityGuard visibility;
     private final IssueService issueService;
 
+    /**
+     * Ce que le modèle a lu des issues (R123, la ligne grise) : le bloc, et chaque issue lue avec les commentaires donnés
+     * sous le plafond. Vide quand aucune n'a été lue.
+     */
+    public record Read(String text, List<AssistantRead.IssueRead> issues) {
+        public static final Read NOTHING = new Read("", List.of());
+
+        public boolean isEmpty() {
+            return text == null || text.isEmpty();
+        }
+    }
+
     /** Le bloc des issues que la demande nomme, pour le modèle ; vide quand elle n'en nomme aucune que la personne voit. */
     public String describe(AgentContext ctx, String request) {
+        return read(ctx, request, List.of(), true).text();
+    }
+
+    /**
+     * Les issues que la personne a jointes à sa demande (R123), puis, pour un résumé, celles que la demande nomme : lues
+     * avec ses droits, chacune une fois. Un résumé garde sa consigne (n'utiliser qu'elles) ; une pièce jointe dit qu'elle
+     * vient de la personne. Rien quand aucune ne se lit.
+     */
+    public Read read(AgentContext ctx, String request, List<Screen> attached, boolean summarize) {
+        Map<Long, Long> wanted = new LinkedHashMap<>();
+        for (Screen issue : attached == null ? List.<Screen>of() : attached) {
+            if (issue.issueId() != null && wanted.size() < MAX_ATTACHED) wanted.putIfAbsent(issue.issueId(), issue.projectId());
+        }
+        if (summarize) named(ctx, request).forEach(wanted::putIfAbsent);
         StringBuilder text = new StringBuilder();
-        for (Map.Entry<Long, Long> issue : named(ctx, request).entrySet()) {
+        List<AssistantRead.IssueRead> read = new ArrayList<>();
+        for (Map.Entry<Long, Long> issue : wanted.entrySet()) {
             try {
-                text.append(material(ctx, issue.getValue(), issue.getKey()));
+                Block block = material(ctx, issue.getValue(), issue.getKey());
+                text.append(block.text());
+                read.add(new AssistantRead.IssueRead(block.key(), block.comments()));
             } catch (RuntimeException e) {
                 // Une issue qu'elle ne voit pas (ou plus) : rien n'en est dit, la réponse se fait sans elle.
-                log.debug("Cortex : issue {} non lue pour un résumé : {}", issue.getKey(), LogSafe.of(e.getMessage()));
+                log.debug("Cortex : issue {} non lue : {}", issue.getKey(), LogSafe.of(e.getMessage()));
             }
         }
-        return text.isEmpty() ? "" : HEADER + text;
+        return text.isEmpty() ? Read.NOTHING : new Read((summarize ? HEADER : ATTACHED) + text, read);
     }
 
     /**
@@ -117,13 +152,16 @@ public class IssueMaterial {
         return named;
     }
 
-    private String material(AgentContext ctx, Long projectId, Long issueId) {
+    private Block material(AgentContext ctx, Long projectId, Long issueId) {
         IssueResponse issue = issueService.getIssue(ctx.slug(), projectId, issueId, ctx.userId());
         List<ChecklistItemResponse> checklist = issueService.listChecklist(ctx.slug(), projectId, issueId, ctx.userId());
         List<IssueCommentResponse> comments = issueService.listComments(ctx.slug(), projectId, issueId, ctx.userId());
         List<IssueActivityResponse> activity = issueService.listActivity(ctx.slug(), projectId, issueId, ctx.userId());
-        return text(issue, checklist, comments, activity);
+        return block(issue, checklist, comments, activity);
     }
+
+    /** Le bloc d'une issue, la clé de l'issue et les commentaires qu'il donne au modèle. */
+    private record Block(String text, String key, int comments) {}
 
     /**
      * Le bloc d'une issue, sous son plafond : tant qu'il dépasse, le plus ancien commentaire, puis la plus ancienne
@@ -131,6 +169,11 @@ public class IssueMaterial {
      */
     static String text(IssueResponse issue, List<ChecklistItemResponse> checklist, List<IssueCommentResponse> comments,
                        List<IssueActivityResponse> activity) {
+        return block(issue, checklist, comments, activity).text();
+    }
+
+    private static Block block(IssueResponse issue, List<ChecklistItemResponse> checklist,
+                               List<IssueCommentResponse> comments, List<IssueActivityResponse> activity) {
         List<IssueCommentResponse> said = new ArrayList<>(last(comments, MAX_COMMENTS));
         List<IssueActivityResponse> done = new ArrayList<>(last(activity, MAX_ACTIVITY));
         String text = text(issue, checklist, said, comments.size(), done);
@@ -139,7 +182,8 @@ public class IssueMaterial {
             else done.remove(0);
             text = text(issue, checklist, said, comments.size(), done);
         }
-        return text.length() > MAX_CHARS ? text.substring(0, MAX_CHARS) + "\n" : text;
+        String block = text.length() > MAX_CHARS ? text.substring(0, MAX_CHARS) + "\n" : text;
+        return new Block(block, issue.getIdentifier(), said.size());
     }
 
     private static String text(IssueResponse issue, List<ChecklistItemResponse> checklist, List<IssueCommentResponse> said,

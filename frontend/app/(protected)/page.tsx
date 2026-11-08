@@ -5,12 +5,16 @@ import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { useUserStore } from "@/lib/store/user-store"
+import { useWindowStore } from "@/lib/store/window-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useAuth } from "@/lib/contexts/auth-context"
+import { homePath } from "@/lib/window/pane"
 
 /**
- * Page racine des routes protégées.
- * Redirige vers le dashboard du premier workspace de l'utilisateur.
+ * Page racine des routes protégées. La fenêtre s'ouvre là où la personne l'a laissée (R123) : l'accueil de son dernier
+ * espace, sinon du premier, où elle reprend sa dernière conversation et son volet. Le tableau de bord n'est plus
+ * l'accueil (R124) : il s'ouvre en volet.
  */
 export default function ProtectedRootPage() {
   const router = useRouter()
@@ -18,24 +22,25 @@ export default function ProtectedRootPage() {
   const fetchWorkspaces = useWorkspaceStore((s) => s.fetchWorkspaces)
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const workspacesLoaded = useWorkspaceStore((s) => s.workspacesLoaded)
+  const me = useUserStore((s) => s.user?.id)
 
   useEffect(() => {
     if (!isAuthenticated || authLoading) return
+    const open = (list: readonly { slug: string }[]) => {
+      const last = me === null || me === undefined ? undefined : useWindowStore.getState().lastSpaces[String(me)]
+      router.replace(homePath(list.find((ws) => ws.slug === last)?.slug ?? list[0].slug))
+    }
 
     if (workspacesLoaded) {
-      if (workspaces.length > 0) {
-        router.replace(`/${workspaces[0].slug}/dashboard`)
-      }
+      if (workspaces.length > 0) open(workspaces)
       // workspacesLoaded=true mais liste vide → aucun workspace : on tombe sur l'état vide ci-dessous
       return
     }
 
     fetchWorkspaces().then((list) => {
-      if (list.length > 0) {
-        router.replace(`/${list[0].slug}/dashboard`)
-      }
+      if (list.length > 0) open(list)
     })
-  }, [isAuthenticated, authLoading, workspacesLoaded, workspaces, fetchWorkspaces, router])
+  }, [isAuthenticated, authLoading, workspacesLoaded, workspaces, fetchWorkspaces, router, me])
 
   // Cas limite (dernier workspace supprimé, invitation déclinée, hoquet backend) : la liste est
   // chargée mais vide. Sans ce garde, la page restait bloquée sur un spinner infini (cul-de-sac).

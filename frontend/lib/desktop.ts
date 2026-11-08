@@ -232,11 +232,3 @@ export function notifySystem(input: { title: string; body?: string | null; path?
     ...(input.path ? { path: input.path } : {}),
   });
 }
-
-/**
- * App desktop d'un compte déjà configuré en ligne : la personne connaît TaskForce, l'app ne lui remontre pas l'accueil
- * des nouveaux comptes (la visite guidée reste rejouable depuis Ctrl+K). Toujours faux sur la webapp.
- */
-export function onboardedOnline(): boolean {
-  return desktopBridge()?.onboardedOnline === true;
-}

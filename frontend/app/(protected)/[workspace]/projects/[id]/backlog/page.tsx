@@ -9,7 +9,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
 import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
 import { InlineIssueFilters } from "@/components/issues/issue-filters"
 import { type IssueFilterState, EMPTY_ISSUE_FILTERS, applyIssueFilters } from "@/lib/issue-filters"
@@ -19,44 +18,12 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { PRIORITY_DOT } from "@/lib/palette"
 import { useIssueStore } from "@/lib/store/issue-store"
-import type { Issue, IssuePriority } from "@/lib/api/issue-service"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
+import type { Issue } from "@/lib/api/issue-service"
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
-
-function formatDate(iso: string | null | undefined): string | undefined {
-  if (!iso) return undefined
-  try {
-    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-  } catch { return iso }
-}
-
-function toSheetIssue(issue: Issue): SheetIssue {
-  const priorityMap: Record<IssuePriority, SheetIssue["priority"]> = {
-    NONE: "NONE", URGENT: "URGENT", HIGH: "HIGH", MEDIUM: "MEDIUM", LOW: "LOW",
-  }
-  return {
-    id:             String(issue.id),
-    identifier:     issue.identifier,
-    title:          issue.title,
-    description:    issue.description ?? undefined,
-    priority:       priorityMap[issue.priority],
-    statusId:       issue.status.id,
-    statusName:     issue.status.name,
-    statusCategory: issue.status.category,
-    assignee:       issue.assignee
-      ? { name: issue.assignee.displayName ?? issue.assignee.email, email: issue.assignee.email, userId: issue.assignee.id }
-      : null,
-    assigneeId:     issue.assignee?.id ?? null,
-    labels:         issue.labels,
-    pinned:         issue.pinned,
-    archived:       issue.archived,
-    dueDate:        formatDate(issue.dueDate) ?? null,
-    storyPoints:    null,
-    createdAt:      issue.createdAt,
-  }
-}
 
 /** Taille de page pour l'infinite-scroll du backlog (QA2-33). */
 const PAGE_SIZE = 25
@@ -71,7 +38,7 @@ export default function ProjectBacklogPage() {
   const projectId = typeof params.id        === "string" ? Number(params.id)  : 0
 
   const { fetchIssues, issues, isLoading, statuses, fetchStatuses, updateIssue } = useIssueStore()
-  const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
+  const { openIssue } = usePaneNavigation()
   const [filters, setFilters] = useState<IssueFilterState>(EMPTY_ISSUE_FILTERS)
   const [visible, setVisible] = useState(PAGE_SIZE)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
@@ -155,8 +122,8 @@ export default function ProjectBacklogPage() {
             key={issue.id}
             role="button"
             tabIndex={0}
-            onClick={() => setSelectedIssue(toSheetIssue(issue))}
-            onKeyDown={(e) => e.key === "Enter" && setSelectedIssue(toSheetIssue(issue))}
+            onClick={() => openIssue({ projectId, issueId: issue.id })}
+            onKeyDown={(e) => e.key === "Enter" && openIssue({ projectId, issueId: issue.id })}
             className="group flex w-full cursor-pointer items-center gap-3 px-4 py-1.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0 text-left"
           >
             <div className={cn("h-2 w-2 rounded-full shrink-0", PRIORITY_DOT[issue.priority])} />
@@ -206,14 +173,6 @@ export default function ProjectBacklogPage() {
           </button>
         </CreateIssueDialog>
       </div>
-
-      <IssueSheet
-        issue={selectedIssue}
-        open={selectedIssue !== null}
-        onOpenChange={(open) => { if (!open) setSelectedIssue(null) }}
-        workspaceSlug={workspace}
-        projectId={projectId}
-      />
     </div>
   )
 }
