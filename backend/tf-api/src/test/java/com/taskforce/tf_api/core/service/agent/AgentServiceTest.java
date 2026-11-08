@@ -45,6 +45,9 @@ import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.LlmContext;
 import com.taskforce.tf_api.core.service.LlmToolsRefusedException;
 import com.taskforce.tf_api.core.service.LlmUsage;
+import com.taskforce.tf_api.core.service.ai.ContextBudget;
+import com.taskforce.tf_api.core.service.ai.ModelWindow;
+import com.taskforce.tf_api.core.service.ai.TurnHistory;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.core.service.brain.BrainViewer;
@@ -1500,7 +1503,7 @@ class AgentServiceTest {
         when(screens.attached(any(), eq(31L))).thenReturn(new ScreenContext.Seen(
             ScreenContext.ATTACHED + "Project WEB \"Website\".\n", "WEB", 4, null));
 
-        AssistantAnswer answer = service.run("acme", 7L, "qui devrait la prendre ?", List.of(), Screen.NONE, attached);
+        AssistantAnswer answer = service.run("acme", 7L, "qui devrait la prendre ?", TurnHistory.of(List.of()), Screen.NONE, attached);
 
         String system = systemPrompt();
         assertThat(system).contains("Project WEB \"Website\".").contains("OPS-35 \"Iteration #35\"");
@@ -1521,7 +1524,7 @@ class AgentServiceTest {
         when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"OK\"}"));
         when(screens.read(any())).thenReturn(new ScreenContext.Seen("On screen.\nProject OPS \"Ops\".\n", "OPS", 2, "OPS-35"));
 
-        AssistantAnswer answer = service.run("acme", 7L, "quoi de neuf ?", List.of(), new Screen(30L, 350L),
+        AssistantAnswer answer = service.run("acme", 7L, "quoi de neuf ?", TurnHistory.of(List.of()), new Screen(30L, 350L),
             List.of(new Screen(30L, null)));
 
         verify(screens, never()).attached(any(), any());
@@ -1831,6 +1834,137 @@ class AgentServiceTest {
     })
     void a_typed_answer_is_read_among_the_choices(String said, String value) {
         assertThat(AgentService.chosen(WHICH, said)).isEqualTo(value);
+    }
+
+    // -------------------------------------------------------------------------
+    // Le contexte selon le modèle (TF-J1-13)
+    // -------------------------------------------------------------------------
+
+    private void stubHeavyTools(String description) {
+        when(workspaceMcp.toolsFor(any())).thenReturn(List.of());
+        when(tools.toolDefinitions(anyList())).thenReturn(List.of(Map.of("type", "function",
+            "function", Map.of("name", "search_brain", "description", description))));
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+    }
+
+    @Test
+    @DisplayName("TF-J1-13 : une demande trop grande pour le modèle : TaskForce le dit, sans appel, avec la taille, la fenêtre et un modèle qui la tient")
+    void a_request_too_big_is_said_plainly() throws Exception {
+        stubWorkspace();
+        stubHeavyTools("d".repeat(12_000));
+        when(llm.contextWindow("fast")).thenReturn(new ModelWindow("tiny:1b", 4_096, false, 1_024));
+        when(llm.largerWindow(eq("fast"), anyInt())).thenReturn(Optional.of(new ModelWindow("qwen3:8b", 16_384, false, 2_048)));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Give me the status of the project");
+
+        assertThat(answer.mode()).isEqualTo("fallback");
+        assertThat(answer.model()).isNull();
+        assertThat(answer.answer()).startsWith(ActionClaimCheck.SIGNATURE).contains("This request is about ").contains(" tokens, and tiny:1b's context window is 4,096, so it wasn't sent.");
+        assertThat(answer.offer().from()).isEqualTo("tiny:1b");
+        assertThat(answer.offer().to()).isEqualTo("qwen3:8b");
+        assertThat(answer.offer().text()).contains("qwen3:8b's context window is 16,384").contains("send this request to qwen3:8b");
+        assertThat(answer.steps().get(answer.steps().size() - 1).status()).isEqualTo("error");
+        verify(llm, never()).rawChat(anyList(), anyList(), anyString());
+        verify(aiUsageService).record(eq(1L), any());
+    }
+
+    @Test
+    @DisplayName("TF-J1-13 : une fenêtre que le fournisseur ne dit pas se donne pour ce qu'elle est, et sans plus grand modèle, rien n'est proposé")
+    void an_unknown_window_is_said_as_an_estimate() throws Exception {
+        stubWorkspace();
+        stubHeavyTools("d".repeat(60_000));
+        when(llm.contextWindow("fast")).thenReturn(new ModelWindow("gpt-x", 16_384, true, 2_048));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Give me the status of the project");
+
+        assertThat(answer.answer()).contains("gpt-x's context window is about 16,384");
+        assertThat(answer.offer()).isNull();
+    }
+
+    @Test
+    @DisplayName("TF-J1-13 : l'historique vient du budget de cette requête, et ce qui a dû changer entre dans la ligne grise")
+    void the_history_comes_from_the_budget_of_the_request() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.contextWindow("fast")).thenReturn(new ModelWindow("qwen3:8b", 16_384, false, 2_048));
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Zephyr.\"}"));
+        List<ContextBudget> budgets = new ArrayList<>();
+        List<Map<String, Object>> history = List.of(Map.of("role", "system", "content", "Summary: Zephyr"));
+        TurnHistory memory = (budget, tier) -> {
+            budgets.add(budget);
+            return new TurnHistory.Fitted(history, 12, 3);
+        };
+
+        AssistantAnswer answer = service.run("acme", 7L, "Remind me of its name", memory, Screen.NONE, List.of());
+
+        assertThat(budgets).singleElement().satisfies(budget -> {
+            assertThat(budget.window().tokens()).isEqualTo(16_384);
+            assertThat(budget.system()).isPositive();
+            assertThat(budget.message()).isPositive();
+            assertThat(budget.attached()).isZero();
+        });
+        assertThat(answer.read().context()).isEqualTo(new AssistantRead.ContextRead(12, 3, 0));
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Map<String, Object>>> captor = ArgumentCaptor.forClass(List.class);
+        verify(llm).rawChat(captor.capture(), anyList(), eq("fast"));
+        assertThat(captor.getValue()).hasSize(3);
+        assertThat(captor.getValue().get(1)).containsEntry("content", "Summary: Zephyr");
+    }
+
+    @Test
+    @DisplayName("TF-J1-13 : ce que la personne a à l'écran compte comme ce qu'elle a joint")
+    void what_is_on_screen_counts_as_attached() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.contextWindow("fast")).thenReturn(new ModelWindow("qwen3:8b", 16_384, false, 2_048));
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"OK\"}"));
+        when(screens.read(any())).thenReturn(new ScreenContext.Seen("On screen.\nProject OPS \"Ops\".\n", "OPS", 2, null));
+        List<ContextBudget> budgets = new ArrayList<>();
+
+        service.run("acme", 7L, "quoi de neuf ?", (budget, tier) -> {
+            budgets.add(budget);
+            return TurnHistory.Fitted.NONE;
+        }, new Screen(30L, null), List.of());
+
+        assertThat(budgets.get(0).attached()).isEqualTo(ContextBudget.tokens("On screen.\nProject OPS \"Ops\".\n"));
+    }
+
+    @Test
+    @DisplayName("TF-J1-13 : une salutation passe par le même budget, sans outils")
+    void a_greeting_goes_through_the_same_budget() throws Exception {
+        stubWorkspace();
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.contextWindow("fast")).thenReturn(new ModelWindow("qwen3:8b", 8_192, false, 2_048));
+        when(llm.chat(anyList(), eq("fast"))).thenReturn("Hello!");
+        List<ContextBudget> budgets = new ArrayList<>();
+
+        AssistantAnswer answer = service.run("acme", 7L, "Hello", (budget, tier) -> {
+            budgets.add(budget);
+            return new TurnHistory.Fitted(List.of(), 4, 0);
+        }, Screen.NONE, List.of());
+
+        assertThat(answer.answer()).isEqualTo("Hello!");
+        assertThat(budgets.get(0).tools()).isZero();
+        assertThat(answer.read().context()).isEqualTo(new AssistantRead.ContextRead(4, 0, 0));
+    }
+
+    @Test
+    @DisplayName("TF-J1-13 : rien de condensé ni de coupé, rien de dit : la ligne grise n'a pas de contexte")
+    void nothing_fitted_nothing_said() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"OK\"}"));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Give me the status of the project");
+
+        assertThat(answer.read().context()).isNull();
     }
 
     /** Une carte de deux questions se dit en deux lignes, signées par TaskForce, que la conversation rouverte relit. */

@@ -3,6 +3,8 @@ package com.taskforce.tf_api.core.dto.response;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 /**
  * Réponse structurée de l'assistant agentique. Pensée pour un rendu riche (kit chat) :
  * étapes du raisonnement, outils appelés, sources Brain OS citées, plus la réponse markdown.
@@ -18,6 +20,9 @@ import java.util.Map;
  *
  * <p>{@code read} : ce que TaskForce a donné à lire à ce modèle, compté (R123, séance n°18 : la ligne grise, « qwen3:8b ·
  * read OPS-35 and 3 comments ») ; null quand aucun modèle n'a répondu.
+ *
+ * <p>{@code offer} : ce que TaskForce propose quand une demande est trop grande pour ce modèle (TF-J1-13) : un modèle
+ * servi dont la fenêtre la tient ; le contrôleur le rend avec le tour, jamais dans la réponse elle-même.
  */
 public record AssistantAnswer(
     String answer,
@@ -29,31 +34,39 @@ public record AssistantAnswer(
     AssistantUsage usage,
     String record,
     String model,
-    AssistantRead read
+    AssistantRead read,
+    @JsonIgnore ChatTurnResponse.Escalation offer
 ) {
+    /** Une réponse sans proposition d'un autre modèle. */
+    public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
+                           List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage,
+                           String record, String model, AssistantRead read) {
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read, null);
+    }
+
     /** Une réponse sans ce que le modèle a lu : un repli, ou une réponse d'avant la ligne grise. */
     public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
                            List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage,
                            String record, String model) {
-        this(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, null);
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, null, null);
     }
 
     /** Une réponse sans dossier à elle. */
     public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
                            List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage) {
-        this(answer, reasoning, mode, sources, steps, toolCalls, usage, null, null, null);
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, null, null, null, null);
     }
 
     /** Une réponse dont le modèle n'est pas connu. */
     public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
                            List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage,
                            String record) {
-        this(answer, reasoning, mode, sources, steps, toolCalls, usage, record, null, null);
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, record, null, null, null);
     }
 
     /** La même réponse, avec ce que TaskForce a donné à lire au modèle. */
     public AssistantAnswer withRead(AssistantRead read) {
-        return new AssistantAnswer(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read);
+        return new AssistantAnswer(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read, offer);
     }
 
     /**
@@ -61,14 +74,27 @@ public record AssistantAnswer(
      * deviné après coup. {@code issues} : les issues lues en entier (avant un résumé, ou jointes par la personne), avec le
      * nombre de commentaires donnés ; {@code boards} : les tableaux montrés (celui de l'écran, ceux joints), avec le nombre
      * d'issues montrées et l'issue ouverte ; {@code tools} : les outils qui lisent et ont abouti, avec leur nombre
-     * d'appels ; {@code notes} : les notes du Brain OS servies au modèle.
+     * d'appels ; {@code notes} : les notes du Brain OS servies au modèle ; {@code context} : ce que TaskForce a fait pour
+     * que la requête tienne la fenêtre de ce modèle (TF-J1-13), null quand rien n'a été touché.
      */
-    public record AssistantRead(List<IssueRead> issues, List<BoardRead> boards, List<ToolRead> tools, int notes) {
+    public record AssistantRead(List<IssueRead> issues, List<BoardRead> boards, List<ToolRead> tools, int notes,
+                                ContextRead context) {
         public AssistantRead {
             issues = issues == null ? List.of() : List.copyOf(issues);
             boards = boards == null ? List.of() : List.copyOf(boards);
             tools = tools == null ? List.of() : List.copyOf(tools);
         }
+
+        /** Ce qui a été lu, rien n'a dû être condensé ni coupé. */
+        public AssistantRead(List<IssueRead> issues, List<BoardRead> boards, List<ToolRead> tools, int notes) {
+            this(issues, boards, tools, notes, null);
+        }
+
+        /**
+         * Ce qui a dû changer pour tenir la fenêtre du modèle : les messages condensés dans le résumé pour ce tour, ceux qui
+         * n'ont pas pu partir, les résultats d'outils raccourcis pendant la boucle. Jamais en silence (la ligne grise).
+         */
+        public record ContextRead(int summarized, int leftOut, int toolResults) {}
 
         /** Une issue lue : sa clé, et les commentaires donnés avec elle. */
         public record IssueRead(String key, int comments) {}
@@ -132,17 +158,24 @@ public record AssistantAnswer(
 
     /**
      * Tokens réellement consommés par ce tour (cumulés sur les appels LLM), et ce que le modèle a lu au dernier appel :
-     * {@code lastPromptTokens}, la taille de ce prompt (0 sans appel), et {@code contextWindow}, la fenêtre de contexte
-     * que la passerelle lui a donnée (Ollama), null quand le fournisseur la tient lui-même. La jauge de contexte de la
-     * conversation compare ces deux-là, pas le cumul.
+     * {@code lastPromptTokens}, la taille de ce prompt (0 sans appel), et {@code contextWindow}, sa fenêtre de contexte :
+     * celle que la passerelle a donnée (Ollama), celle que le fournisseur dit de ce modèle, ou la valeur prudente des
+     * réglages, dite comme telle par {@code contextEstimated}. La jauge de contexte de la conversation compare ces deux-là,
+     * pas le cumul.
      */
     public record AssistantUsage(long promptTokens, long completionTokens, long totalTokens, long lastPromptTokens,
-                                 Integer contextWindow) {
+                                 Integer contextWindow, boolean contextEstimated) {
         public static final AssistantUsage NONE = new AssistantUsage(0, 0, 0);
 
         /** Un usage sans ce qu'a lu le dernier appel. */
         public AssistantUsage(long promptTokens, long completionTokens, long totalTokens) {
-            this(promptTokens, completionTokens, totalTokens, 0, null);
+            this(promptTokens, completionTokens, totalTokens, 0, null, false);
+        }
+
+        /** Un usage dont la fenêtre est connue. */
+        public AssistantUsage(long promptTokens, long completionTokens, long totalTokens, long lastPromptTokens,
+                              Integer contextWindow) {
+            this(promptTokens, completionTokens, totalTokens, lastPromptTokens, contextWindow, false);
         }
     }
 }
