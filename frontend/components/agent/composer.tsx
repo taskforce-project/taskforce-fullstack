@@ -16,10 +16,8 @@ import { useCortexStore } from "@/lib/store/cortex-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { withConversation } from "@/lib/window/address"
 import { cortexModel } from "@/lib/window/environment"
-import { homePath } from "@/lib/window/pane"
-
-/** Le volet « Progress » (R125) : ce que le modèle sait, et comment il progresse ; le lot 3b le construit. */
-const progressPath = (slug: string): string => `${homePath(slug)}/progress`
+// Le volet « Progress » (R125) : ce que le modèle sait, et comment il progresse.
+import { progressPath } from "@/lib/window/pane"
 
 /**
  * Le compositeur (R76, R123) : écrire ce qu'on veut faire, puis l'envoyer. Rien ne part tant que la personne n'envoie
