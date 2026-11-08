@@ -375,6 +375,16 @@ export const EVAL_ROUTES = {
   RUN_CASE: (slug: string, runId: number, caseId: number) =>
     `/api/workspaces/${slug}/evals/runs/${runId}/cases/${caseId}`,
   SETTINGS: (slug: string) => `/api/workspaces/${slug}/evals/settings`,
+  /** L'histoire de la banque (R125) : ses rejeux par modèle et par date, l'origine de chaque cas et ses notes. */
+  HISTORY: (slug: string) => `/api/workspaces/${slug}/evals/history`,
+} as const;
+
+/**
+ * Ce que Cortex peut lire dans un espace (R125), compté et daté, pour le volet « Progress ».
+ * Backend: @RequestMapping("/api/workspaces/{slug}/assistant/sources").
+ */
+export const CORTEX_SOURCE_ROUTES = {
+  SOURCES: (slug: string) => `/api/workspaces/${slug}/assistant/sources`,
 } as const;
 
 /**

@@ -31,6 +31,16 @@ export const boardPath = (slug: string, projectId: number): string => `/${slug}/
 export const issuePath = (slug: string, projectId: number, issueId: number): string =>
   `${boardPath(slug, projectId)}?issue=${issueId}`
 
+/** La section du volet « Progress » (R125) : ce que l'agent sait, et comment il progresse. */
+export const PROGRESS = "progress"
+
+/**
+ * Le volet « Progress » (R125, séance n°18) : ce que chaque modèle sait faire, mesuré ici, la banque d'évaluations dans
+ * le temps, ce qui a amélioré Cortex et ce qu'il lit dans l'espace. On l'ouvre depuis le nom du modèle sous le
+ * compositeur, depuis Settings > AI, depuis « More » et depuis la recherche.
+ */
+export const progressPath = (slug: string): string => `/${slug}/${PROGRESS}`
+
 /** Le titre du volet : le nom du projet de la route, sinon le nom de l'écran. */
 export function paneTitle(
   pane: PaneRoute,

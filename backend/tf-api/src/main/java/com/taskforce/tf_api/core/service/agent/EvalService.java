@@ -3,9 +3,12 @@ package com.taskforce.tf_api.core.service.agent;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -27,6 +30,7 @@ import com.taskforce.tf_api.core.dto.response.EvalBankResponse.DraftCall;
 import com.taskforce.tf_api.core.dto.response.EvalBankResponse.Result;
 import com.taskforce.tf_api.core.dto.response.EvalBankResponse.RunDetail;
 import com.taskforce.tf_api.core.dto.response.EvalBankResponse.RunSummary;
+import com.taskforce.tf_api.core.dto.response.EvalHistoryResponse;
 import com.taskforce.tf_api.core.model.EvalBankSetting;
 import com.taskforce.tf_api.core.model.EvalCase;
 import com.taskforce.tf_api.core.model.EvalResult;
@@ -76,6 +80,10 @@ public class EvalService {
     static final int MAX_TITLE = 200;
     /** Le modèle par défaut de l'instance (le tier rapide), quand le rejeu n'en nomme pas. */
     static final String DEFAULT_MODEL = "default";
+    /** D'où vient un cas, pour l'histoire de la banque (R125). */
+    static final String ORIGIN_INCIDENT = "incident";
+    static final String ORIGIN_ANSWER = "answer";
+    static final String ORIGIN_UNKNOWN = "unknown";
     private static final int MAX_ANSWER = 1000;
     private static final int MAX_NOTE = 2000;
     private static final int MAX_ARG_PROPOSED = 80;
@@ -106,6 +114,40 @@ public class EvalService {
             .map(EvalService::summary)
             .toList();
         return new EvalBankResponse(enabled(ws.getId()), authorization.isManager(ws.getId(), userId), active, recent);
+    }
+
+    /**
+     * L'histoire de la banque (R125) : ses cent derniers rejeux, du plus ancien au plus récent, chacun avec le modèle qui
+     * a répondu, et chaque cas actif avec son origine (l'incident de confiance d'E17, une réponse, ou rien de plus que sa
+     * question) et sa note à chaque rejeu. Tout membre de l'espace la lit, comme la banque.
+     */
+    @Transactional(readOnly = true)
+    public EvalHistoryResponse history(String slug, Long userId) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        List<EvalRun> recent = new ArrayList<>(runs.findTop100ByWorkspaceIdOrderByStartedAtDesc(ws.getId()));
+        Collections.reverse(recent);
+        Map<Long, Integer> graded = new HashMap<>();
+        Map<Long, Map<Long, Boolean>> byCase = new HashMap<>();
+        if (!recent.isEmpty()) {
+            for (EvalResultRepository.Row row : results.findRowsByRunIdIn(recent.stream().map(EvalRun::getId).toList())) {
+                graded.merge(row.getRunId(), 1, Integer::sum);
+                byCase.computeIfAbsent(row.getCaseId(), id -> new HashMap<>())
+                    .put(row.getRunId(), Boolean.TRUE.equals(row.getPassed()));
+            }
+        }
+        List<EvalHistoryResponse.Run> points = recent.stream()
+            .map(run -> new EvalHistoryResponse.Run(run.getId(), run.getModel(), answeredBy(run), run.getStartedAt(),
+                run.getFinishedAt(), run.getTotal(), graded.getOrDefault(run.getId(), 0), run.getPassed()))
+            .toList();
+        List<EvalCase> active = cases.findByWorkspaceIdAndArchivedFalseOrderByCreatedAtDesc(ws.getId());
+        Map<UUID, JsonNode> incidents = records.incidents(active.stream()
+            .map(EvalCase::getSourceRecord).filter(Objects::nonNull).distinct().toList());
+        List<EvalHistoryResponse.Case> history = active.stream()
+            .map(evalCase -> new EvalHistoryResponse.Case(evalCase.getId(), evalCase.getTitle(), evalCase.getQuestion(),
+                evalCase.getAskedOn(), evalCase.getCreatedAt(), userId.equals(evalCase.getCreatedBy()),
+                origin(evalCase, incidents), grades(recent, byCase.getOrDefault(evalCase.getId(), Map.of()))))
+            .toList();
+        return new EvalHistoryResponse(points, history);
     }
 
     /** Le brouillon d'un cas, tiré du dossier d'une réponse de la personne ; elle le confirme ou le corrige. */
@@ -435,6 +477,37 @@ public class EvalService {
     private static RunSummary summary(EvalRun run) {
         return new RunSummary(run.getId(), run.getModel(), run.getStartedAt(), run.getFinishedAt(), run.getTotal(),
             run.getPassed());
+    }
+
+    /** Le modèle qui a répondu à un rejeu : celui qu'il nomme, sinon celui que dit sa première note ; null avant elle. */
+    private String answeredBy(EvalRun run) {
+        if (!DEFAULT_MODEL.equals(run.getModel())) return run.getModel();
+        return results.findFirstByRunIdOrderByIdAsc(run.getId())
+            .map(first -> read(first.getDetails(), Details.class).model())
+            .filter(model -> model != null && !model.isBlank())
+            .orElse(null);
+    }
+
+    /** D'où vient un cas : l'incident de confiance que garde le dossier de sa réponse, cette réponse, ou rien de plus. */
+    private static EvalHistoryResponse.Origin origin(EvalCase evalCase, Map<UUID, JsonNode> incidents) {
+        UUID record = evalCase.getSourceRecord();
+        if (record == null) return new EvalHistoryResponse.Origin(ORIGIN_UNKNOWN, List.of(), null);
+        JsonNode incident = incidents.get(record);
+        if (incident == null) return new EvalHistoryResponse.Origin(ORIGIN_ANSWER, List.of(), null);
+        List<String> said = new ArrayList<>();
+        incident.path("said").forEach(sentence -> {
+            if (!sentence.asText("").isBlank()) said.add(sentence.asText());
+        });
+        String shown = incident.path("shown").asText("").strip();
+        return new EvalHistoryResponse.Origin(ORIGIN_INCIDENT, List.copyOf(said), shown.isEmpty() ? null : shown);
+    }
+
+    /** Les notes d'un cas, dans l'ordre des rejeux. */
+    private static List<EvalHistoryResponse.Grade> grades(List<EvalRun> recent, Map<Long, Boolean> byRun) {
+        return recent.stream()
+            .filter(run -> byRun.containsKey(run.getId()))
+            .map(run -> new EvalHistoryResponse.Grade(run.getId(), byRun.get(run.getId())))
+            .toList();
     }
 
     /** Le titre d'un cas : celui que la personne donne, sinon sa question, coupé à {@code max} caractères. */

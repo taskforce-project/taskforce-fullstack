@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { CircleAlert, CircleCheck, Loader2 } from "lucide-react"
 
 import { CopyableCode } from "@/components/settings/copyable-code"
-import { ModelCapabilityTable } from "@/components/settings/model-capability-table"
+import { ModelProposal } from "@/components/settings/cortex-model-choice"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -73,6 +73,10 @@ export function DesktopAiPanel() {
   useEffect(() => {
     void fetchAiStatus()
   }, [fetchAiStatus])
+  // La table des capacités dit ce que TaskForce propose ; elle se lit dans le volet « Progress » (R125).
+  useEffect(() => {
+    if (slug) void fetchModels(slug)
+  }, [slug, fetchModels])
 
   const save = async () => {
     const bridge = desktopBridge()
@@ -215,11 +219,11 @@ export function DesktopAiPanel() {
 
       <StatusLine view={view} contextWindow={contextWindow} />
 
-      {/* Ce que sait faire chaque modèle de l'ordinateur (R113) : « Use for Cortex » remplit les deux modèles de
-          conversation ci-dessus (Cortex répond avec le rapide), et la personne enregistre. */}
+      {/* Ce que TaskForce propose d'après ce qu'il a mesuré sur l'ordinateur (R113), et le lien vers « Progress », où
+          se lit ce que sait faire chaque modèle (R125). Le choix reste ici, dans les modèles ci-dessus. */}
       {slug && draft.provider !== "off" && state.reachable && (
         <div className="border-t border-border/60 pt-6">
-          <ModelCapabilityTable slug={slug} onUse={(model) => update({ model, modelFast: model })} />
+          <ModelProposal />
         </div>
       )}
 

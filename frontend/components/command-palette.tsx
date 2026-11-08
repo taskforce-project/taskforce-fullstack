@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
   Activity, ArrowRight, Bug, CalendarRange, CircleDot, FolderKanban, Inbox, LayoutDashboard, ListChecks, MessageSquare,
-  Monitor, Moon, Plus, Repeat, Settings, Sparkles, Sun, User, Users, type LucideIcon,
+  Monitor, Moon, Plus, Repeat, Settings, Sparkles, Sun, TrendingUp, User, Users, type LucideIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -22,12 +22,13 @@ import { useProjectStore } from "@/lib/store/project-store"
 import { searchKey, useSearchStore } from "@/lib/store/search-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { withConversation } from "@/lib/window/address"
-import { homePath } from "@/lib/window/pane"
+import { homePath, PROGRESS } from "@/lib/window/pane"
 
 /** Les bugs et idées se signalent sur le dépôt du projet (open source), pas dans l'instance. */
 const REPORT_ISSUE_URL = "https://github.com/taskforce-project/taskforce-fullstack/issues/new/choose"
 
-type ScreenKey = "waitingForYou" | "myWork" | "dashboard" | "projects" | "roadmap" | "cycles" | "members" | "analytics"
+type ScreenKey =
+  | "waitingForYou" | "myWork" | "dashboard" | "projects" | "roadmap" | "cycles" | "members" | "analytics" | "progress"
 
 /**
  * Les écrans qui ont quitté le premier regard (R124, la règle de Norman), et ceux de la barre de gauche : chacun s'ouvre
@@ -43,6 +44,8 @@ const SCREENS: readonly { key: ScreenKey; path: string; icon: LucideIcon }[] = [
   // App desktop : pas de membres, on y travaille seul avec ses agents.
   ...(IS_DESKTOP ? [] : [{ key: "members" as const, path: "/members", icon: Users }]),
   { key: "analytics", path: "/analytics", icon: Activity },
+  // Ce que Cortex sait et comment il progresse (R125) : le volet « Progress ».
+  { key: "progress", path: `/${PROGRESS}`, icon: TrendingUp },
 ]
 
 const ITEM = "group gap-3"

@@ -190,6 +190,25 @@ final class OllamaProtocol {
         return length.isNumber() && length.asInt() > 0 ? length.asInt() : 0;
     }
 
+    /**
+     * Ce que la fiche d'un modèle dit de lui, dans la réponse de {@code /api/show} (R113, R125) : sa taille
+     * ({@code details.parameter_size}, « 8.2B »), sa fenêtre de contexte, et s'il prend des outils ({@code capabilities},
+     * qu'Ollama donne depuis 0.6 ; {@code null} quand la fiche ne le dit pas). Une description, jamais une mesure.
+     */
+    static ModelGateway.ModelCard card(JsonNode show) {
+        String size = show.path("details").path("parameter_size").asText("").strip();
+        int window = contextLength(show);
+        JsonNode capabilities = show.path("capabilities");
+        Boolean tools = null;
+        if (capabilities.isArray()) {
+            tools = false;
+            for (JsonNode capability : capabilities) {
+                if ("tools".equals(capability.asText())) tools = true;
+            }
+        }
+        return new ModelGateway.ModelCard(size.isEmpty() ? null : size, window > 0 ? window : null, tools);
+    }
+
     /** La fenêtre du modèle chargé, dans la réponse de {@code /api/ps} ; 0 s'il n'est pas chargé. */
     static int loadedWindow(JsonNode ps, String model) {
         for (JsonNode row : ps.path("models")) {

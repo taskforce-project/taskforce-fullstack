@@ -28,6 +28,7 @@ import com.taskforce.tf_api.core.service.AiStatusService;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.ai.AiProviderSettings;
+import com.taskforce.tf_api.core.service.ai.ModelGateway;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -35,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -130,6 +132,24 @@ class ModelCapabilityServiceTest {
         assertThat(table.cases()).hasSize(CapabilitySuite.cases().size());
         assertThat(table.capabilities()).extracting(ModelCapabilityResponse.CapabilityInfo::key)
             .containsExactly("tools", "context", "code", "french", "english");
+    }
+
+    @Test
+    @DisplayName("chaque ligne porte ce que dit la fiche du modèle chez son fournisseur, et rien quand elle ne dit rien")
+    void rowsCarryTheModelCard() {
+        ModelGateway.ModelCard described = new ModelGateway.ModelCard("14.8B", 40960, true);
+        when(aiStatus.describe(anyString()))
+            .thenAnswer(call -> "qwen3:14b".equals(call.getArgument(0)) ? Optional.of(described) : Optional.empty());
+
+        ModelCapabilityResponse table = service.table("acme", 7L);
+
+        ModelCapabilityResponse.ModelRow unmeasured = table.models().stream()
+            .filter(row -> row.model().equals("qwen3:14b")).findFirst().orElseThrow();
+        assertThat(unmeasured.measuredAt()).isNull();
+        assertThat(unmeasured.card()).isEqualTo(new ModelCapabilityResponse.Card("14.8B", 40960, true));
+        // Une fiche n'est pas une mesure : la cellule reste « non mesurée ».
+        assertThat(cell(table, "qwen3:14b", "tools").measured()).isZero();
+        assertThat(table.models().get(0).card()).isNull();
     }
 
     @Test

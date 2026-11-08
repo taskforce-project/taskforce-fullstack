@@ -22,6 +22,21 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     @Query("SELECT COUNT(i) FROM Issue i WHERE i.project.workspace.id = :workspaceId")
     long countByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
+    /** Ce que porte un projet, compté, et quand le plus récent a changé : une ligne par projet. */
+    interface ProjectCount {
+        Long getProjectId();
+        Long getTotal();
+        LocalDateTime getChangedAt();
+    }
+
+    /** Les issues non archivées de chaque projet de l'espace, et leur dernier changement : ce que Cortex lit (R125). */
+    @Query("""
+        SELECT i.project.id AS projectId, COUNT(i) AS total, MAX(i.updatedAt) AS changedAt FROM Issue i
+        WHERE i.project.workspace.id = :workspaceId AND i.archivedAt IS NULL
+        GROUP BY i.project.id
+        """)
+    List<ProjectCount> countByProject(@Param("workspaceId") Long workspaceId);
+
     /** Issues actives d'un projet (hors archivées), épinglées d'abord puis sequence_number desc */
     @Query("""
         SELECT i FROM Issue i

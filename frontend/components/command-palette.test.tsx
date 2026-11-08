@@ -68,6 +68,8 @@ describe("CommandPalette", () => {
     ["Roadmap", "/acme/roadmap?c=12"],
     ["Members", "/acme/members?c=12"],
     ["Waiting for you", "/acme/inbox?c=12"],
+    // Ce que Cortex sait et comment il progresse (R125) : le volet « Progress » reste par la recherche.
+    ["Progress", "/acme/progress?c=12"],
   ])("finds « %s », which left the first look, and opens it in the pane with the conversation kept", async (label, href) => {
     render(<CommandPalette open onOpenChange={vi.fn()} />)
 

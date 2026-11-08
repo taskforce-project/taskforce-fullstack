@@ -499,6 +499,40 @@ class ModelGatewayTest {
         }
 
         @Test
+        @DisplayName("la fiche d'un modèle se lit une fois dans /api/show, et sert aussi sa fenêtre")
+        void describesAModelOnce() {
+            http.read("/api/show", "{\"details\":{\"parameter_size\":\"8.2B\"},\"model_info\":{\"general.architecture\":"
+                + "\"qwen3\",\"qwen3.context_length\":40960},\"capabilities\":[\"completion\",\"tools\"]}");
+
+            assertThat(gateway.describe(settings(OLLAMA), "qwen3:8b"))
+                .contains(new ModelGateway.ModelCard("8.2B", 40960, true));
+            assertThat(gateway.describe(settings(OLLAMA), "qwen3:8b")).isPresent();
+            assertThat(gateway.contextWindow(settings(OLLAMA), "qwen3:8b")).contains(16_384);
+
+            assertThat(http.reads).hasSize(1);
+            assertThat(http.reads.get(0).body().path("model").asText()).isEqualTo("qwen3:8b");
+        }
+
+        @Test
+        @DisplayName("une fiche illisible ne dit rien, et se relit la fois suivante")
+        void anUnreadableCardSaysNothing() {
+            assertThat(gateway.describe(settings(OLLAMA), "qwen3:8b")).isEmpty();
+            assertThat(gateway.describe(settings(OLLAMA), "qwen3:8b")).isEmpty();
+
+            assertThat(http.reads).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("ailleurs qu'Ollama, ou sans IA ni modèle, la passerelle ne dit pas de fiche")
+        void noCardElsewhere() {
+            assertThat(gateway.describe(settings(COMPATIBLE), "qwen3:8b")).isEmpty();
+            assertThat(gateway.describe(settings(Map.of("AI_PROVIDER", "anthropic")), "claude-opus-5-5")).isEmpty();
+            assertThat(gateway.describe(settings(Map.of("AI_PROVIDER", "none")), "qwen3:8b")).isEmpty();
+            assertThat(gateway.describe(settings(OLLAMA), " ")).isEmpty();
+            assertThat(http.reads).isEmpty();
+        }
+
+        @Test
         @DisplayName("ailleurs qu'Ollama, ou sans IA ni modèle, la passerelle ne dit pas de fenêtre")
         void noContextWindowElsewhere() {
             assertThat(gateway.contextWindow(settings(COMPATIBLE), "qwen3:8b")).isEmpty();

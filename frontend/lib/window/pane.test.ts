@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { boardPath, homePath, issuePath, paneOf, paneTitle } from "./pane"
+import { PROGRESS, boardPath, homePath, issuePath, paneOf, paneTitle, progressPath } from "./pane"
 
 const SCREENS = { dashboard: "Dashboard", inbox: "Waiting for you", "my-work": "My work", project: "Project" }
 const PROJECTS = [{ id: 3, name: "Website" }]
@@ -45,5 +45,11 @@ describe("les adresses de la fenêtre", () => {
     expect(homePath("acme")).toBe("/acme")
     expect(boardPath("acme", 3)).toBe("/acme/projects/3")
     expect(issuePath("acme", 3, 34)).toBe("/acme/projects/3?issue=34")
+  })
+
+  it("ouvre « Progress » dans le volet, avec son titre (R125)", () => {
+    expect(progressPath("acme")).toBe("/acme/progress")
+    expect(paneOf(progressPath("acme"))).toEqual({ section: PROGRESS, projectId: null })
+    expect(paneTitle({ section: PROGRESS, projectId: null }, PROJECTS, { ...SCREENS, progress: "Progress" })).toBe("Progress")
   })
 })
