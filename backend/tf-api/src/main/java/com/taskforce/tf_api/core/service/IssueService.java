@@ -29,6 +29,7 @@ import com.taskforce.tf_api.core.dto.request.UpdateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueStatusRequest;
 import com.taskforce.tf_api.core.dto.response.IssueActivityResponse;
 import com.taskforce.tf_api.core.dto.response.IssueCommentResponse;
+import com.taskforce.tf_api.core.dto.response.IssueHitResponse;
 import com.taskforce.tf_api.core.dto.response.IssueRelationResponse;
 import com.taskforce.tf_api.core.dto.request.CreateChecklistItemRequest;
 import com.taskforce.tf_api.core.dto.request.LogWorkRequest;
@@ -276,6 +277,57 @@ public class IssueService {
         return issueRepository.findByWorkspaceSlugAndAssigneeId(slug, userId).stream()
             .map(this::toResponse)
             .toList();
+    }
+
+    /** Les issues que la recherche de la fenêtre montre au plus. */
+    public static final int SEARCH_MAX = 20;
+    /** Une clé tapée en entier ou en partie : « OPS-35 », « ops 35 », « OPS-3 », « OPS ». */
+    private static final Pattern SEARCH_KEY = Pattern.compile("^([A-Za-z][A-Za-z0-9]{0,9})(?:[-\\s]+(\\d{0,9}))?$");
+
+    /**
+     * La recherche de la fenêtre (Ctrl+K, le « @ » et le « + » du compositeur ; R123, R124) : les issues des projets que
+     * la personne voit, par leur clé (« OPS-35 », « ops 35 », « OPS » pour celles du projet) ou par leur titre, la clé
+     * exacte d'abord ; sans texte, les dernières changées. Les archivées n'y sont pas ; {@code limit} est borné à
+     * {@link #SEARCH_MAX}.
+     */
+    @Transactional(readOnly = true)
+    public List<IssueHitResponse> searchIssues(String slug, Long userId, String query, int limit) {
+        var ws = workspaceRepository.findBySlug(slug)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
+        assertWorkspaceMember(ws.getId(), userId);
+        List<Long> visible = projectRepository.findByWorkspaceIdOrderByCreatedAtDesc(ws.getId()).stream()
+            .filter(project -> visibilityGuard.canView(project, userId))
+            .map(Project::getId)
+            .toList();
+        if (visible.isEmpty()) return List.of();
+        var page = org.springframework.data.domain.PageRequest.of(0, Math.min(Math.max(limit, 1), SEARCH_MAX));
+        String text = query == null ? "" : query.strip();
+        List<Issue> found;
+        if (text.isEmpty()) {
+            found = issueRepository.findRecentInProjects(visible, page);
+        } else {
+            Matcher key = SEARCH_KEY.matcher(text);
+            boolean typed = key.matches();
+            String prefix = typed ? key.group(1).toUpperCase(java.util.Locale.ROOT) : "";
+            String digits = typed && key.group(2) != null ? key.group(2) : "";
+            Integer exact = digits.isEmpty() ? -1 : Integer.valueOf(digits);
+            found = issueRepository.searchInProjects(visible, "%" + likeEscaped(text.toLowerCase(java.util.Locale.ROOT)) + "%",
+                prefix, digits + "%", exact, page);
+        }
+        return found.stream().map(IssueService::toHit).toList();
+    }
+
+    /** Un texte cherché tel quel dans un LIKE : ses jokers et le caractère d'échappement ({@code !}) échappés. */
+    static String likeEscaped(String text) {
+        return text.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+    }
+
+    private static IssueHitResponse toHit(Issue issue) {
+        IssueStatus status = issue.getStatus();
+        return new IssueHitResponse(issue.getId(), issue.getProject().getId(),
+            issue.getProject().getIdentifier() + "-" + issue.getSequenceNumber(), issue.getTitle(),
+            status == null ? null : status.getName(),
+            status == null || status.getCategory() == null ? null : status.getCategory().name());
     }
 
     /**
