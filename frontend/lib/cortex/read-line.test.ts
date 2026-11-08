@@ -13,6 +13,11 @@ describe("readLine", () => {
     expect(readLine("qwen3:8b", read({ issues: [{ key: "OPS-35", comments: 3 }] }), t)).toBe("qwen3:8b · read OPS-35 and 3 comments")
   })
 
+  it("sépare chaque lecture d'un point, comme le modèle", () => {
+    expect(readLine("qwen3:8b", read({ issues: [{ key: "OPS-35", comments: 3 }], boards: [{ project: "OPS", issues: 12, open: null }], notes: 2 }), t))
+      .toBe("qwen3:8b · read OPS-35 and 3 comments · saw the OPS board, 12 issues · 2 notes")
+  })
+
   it("dit aussi qu'un modèle n'a rien lu : un résumé écrit sans lire se voit", () => {
     expect(readLine("qwen3:8b", read({}), t)).toBe("qwen3:8b · read nothing in TaskForce")
   })

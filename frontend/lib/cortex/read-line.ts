@@ -16,7 +16,7 @@ export function readLine(model: string | null | undefined, read: AssistantRead |
   // Une réponse d'avant la ligne grise ne dit pas ce qu'elle a lu : le modèle seul, sans rien affirmer de plus.
   if (!read) return name
   const parts = readParts(read, t)
-  return [name, parts.length > 0 ? parts.join(", ") : t.readNothing].join(" · ")
+  return [name, ...(parts.length > 0 ? parts : [t.readNothing])].join(" · ")
 }
 
 /** Ce que le modèle a lu, chaque chose en quelques mots, dans l'ordre de la ligne. */
