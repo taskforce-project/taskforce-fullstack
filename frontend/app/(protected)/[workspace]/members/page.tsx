@@ -652,10 +652,10 @@ export default function MembersPage() {
   return (
     <PageContainer>
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      {/* Le titre est celui du volet (R124) : la page dit ce qu'elle compte. */}
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <p className="text-sm text-muted-foreground">
             {memberCountLabel}
           </p>
         </div>

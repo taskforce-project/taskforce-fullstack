@@ -200,6 +200,62 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
     expect(turns[1].answer?.model).toBeNull();
   });
 
+  it("keeps what the model read with each answer of a reopened conversation: the grey line reads the same (R123)", () => {
+    const read = { issues: [{ key: "OPS-35", comments: 3 }], boards: [], tools: [], notes: 0 };
+    const turns = messagesToTurns([
+      { id: 9, role: "assistant", content: "ok", mode: "deep", totalTokens: 3, createdAt: null, model: "qwen3:8b", read },
+      { id: 10, role: "assistant", content: "ok", mode: "deep", totalTokens: 3, createdAt: null },
+    ]);
+
+    expect(turns[0].answer?.read).toEqual(read);
+    expect(turns[1].answer?.read).toBeNull();
+  });
+
+  // R123 : « + » et « @ » joignent une issue ou un projet ; la demande les emporte, et le fil les montre sous elle.
+  it("attaches issues and projects to the next request, three at most, each once", () => {
+    const issue = (id: number) => ({ kind: "issue" as const, projectId: 3, issueId: id, label: `OPS-${id}`, title: "T" });
+    const { attach, detach } = useCortexStore.getState();
+
+    expect(attach(issue(35))).toBe(true);
+    expect(attach(issue(35))).toBe(false);
+    expect(attach({ kind: "project", projectId: 4, issueId: null, label: "Website", title: null })).toBe(true);
+    expect(attach(issue(36))).toBe(true);
+    expect(attach(issue(37))).toBe(false);
+    expect(useCortexStore.getState().attachments.map((a) => a.label)).toEqual(["OPS-35", "Website", "OPS-36"]);
+
+    detach("project:4");
+    expect(useCortexStore.getState().attachments.map((a) => a.label)).toEqual(["OPS-35", "OPS-36"]);
+  });
+
+  it("sends what is attached with the request, shows it under the request, and empties the composer", async () => {
+    vi.mocked(sendAgentMessage).mockResolvedValue({ conversationId: 7, title: "t", answer: answer("ok") });
+    useCortexStore.setState({
+      workspace: "acme",
+      attachments: [
+        { kind: "issue", projectId: 3, issueId: 35, label: "OPS-35", title: "Iteration #35" },
+        { kind: "project", projectId: 4, issueId: null, label: "Website", title: null },
+      ],
+    });
+    useCortexStore.getState().setDraft("Summarize OPS-35");
+
+    await expect(useCortexStore.getState().send("acme")).resolves.toBe(true);
+
+    expect(sendAgentMessage).toHaveBeenCalledWith("acme", "Summarize OPS-35", null, null, null,
+      [{ projectId: 3, issueId: 35 }, { projectId: 4 }]);
+    expect(useCortexStore.getState().attachments).toEqual([]);
+    expect(useCortexStore.getState().turns[0].attached?.map((a) => a.label)).toEqual(["OPS-35", "Website"]);
+  });
+
+  it("leaves the attachments of another workspace behind", () => {
+    useCortexStore.setState({
+      workspace: "acme", attachments: [{ kind: "project", projectId: 4, issueId: null, label: "Website", title: null }],
+    });
+
+    useCortexStore.getState().enterWorkspace("partner");
+
+    expect(useCortexStore.getState().attachments).toEqual([]);
+  });
+
   it("deletes a conversation, and starts afresh when it was the open one", async () => {
     vi.mocked(deleteConversation).mockResolvedValue(undefined);
     useCortexStore.setState({ conversationId: 4, turns: [{ id: "u1", role: "user", text: "x" }], conversations: [summary(4, "a"), summary(5, "b")] });

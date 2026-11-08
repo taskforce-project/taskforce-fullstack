@@ -256,6 +256,20 @@ class CortexRecordServiceTest {
             + "\"notes\":[{\"id\":12,\"title\":\"Release plan\"}],\"question\":\"Write the release notes\",\"tier\":\"fast\"}");
     }
 
+    @Test
+    @DisplayName("R123 : le modèle qui a répondu se relit à l'ouverture du dossier ; rien quand elle ne le dit pas")
+    void the_model_of_the_record_is_read_back() {
+        UUID answered = service.open(ctx, "Summarize OPS-35", Map.of("model", " qwen3:8b ", "tier", "fast"));
+        service.append(answered, "action.result", Actor.SERVER, Map.of("tool", "add_comment", "status", "pending"));
+
+        assertThat(service.model(answered)).contains("qwen3:8b");
+
+        stored.clear();
+        UUID silent = service.open(ctx, "Write the release notes", Map.of());
+        assertThat(service.model(silent)).isEmpty();
+        assertThat(service.model(null)).isEmpty();
+    }
+
     // -------------------------------------------------------------------------
     // « Undo » (R77, séance n°13)
     // -------------------------------------------------------------------------

@@ -239,7 +239,6 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
       collapsible="offcanvas"
       variant={IS_DESKTOP ? "inset" : "sidebar"}
       className="overflow-x-hidden"
-      data-tour="sidebar"
       {...props}
     >
       {/* La marque, sur la hauteur de la ligne du haut ; dans l'app desktop, elle déplace la fenêtre. */}

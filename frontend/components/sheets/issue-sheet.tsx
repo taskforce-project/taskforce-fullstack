@@ -37,7 +37,7 @@ import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { useScreenStore } from "@/lib/store/screen-store"
-import { describeActivity } from "@/lib/issue-activity"
+import { agentName, describeActivity } from "@/lib/issue-activity"
 import { useIssueRealtime } from "@/lib/hooks/use-issue-realtime"
 import { agentAtWork } from "@/lib/delivery/agent-at-work"
 import { IssueAiSpecPanel } from "@/components/issues/issue-ai-spec"
@@ -486,14 +486,16 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
             if (entry.kind === "comment") {
               const c = entry.data
               const isMe = currentUser?.email === c.author.email
+              // L'agent qui l'a écrit, avec le modèle qui le faisait parler (R123) : « Cortex · qwen3:8b for Pierre ».
+              const agent = agentName(c.via, c.model)
               return (
                 <div key={`c-${c.id}`} className="flex gap-3">
                   <UserAvatar email={c.author.email} name={c.author.displayName ?? c.author.email} avatarUrl={c.author.avatarUrl} className="size-7 shrink-0 mt-0.5" fallbackClassName="text-[9px]" />
                   <div className="min-w-0 flex-1">
                     <div className="mb-1 flex items-center gap-2">
                       {/* Écrit par un agent pour son auteur (R51, #471) : « qwen3:8b for Pierre ». */}
-                      <span className="text-xs font-semibold text-foreground">{c.via?.trim() || (c.author.displayName ?? c.author.email)}</span>
-                      {c.via?.trim() && (
+                      <span className="text-xs font-semibold text-foreground">{agent || (c.author.displayName ?? c.author.email)}</span>
+                      {agent && (
                         <span className="text-xs text-muted-foreground/70">
                           {activityText.forWhom.replace("{who}", c.author.displayName ?? c.author.email)}
                         </span>

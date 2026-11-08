@@ -29,6 +29,7 @@ import com.taskforce.tf_api.core.dto.response.AssistantActionResult;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantChoice;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantQuestion;
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantSource;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantStep;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantToolCall;
@@ -37,6 +38,7 @@ import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.enums.NodeDomain;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.security.DelegatedAgent;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.LlmClient;
@@ -149,11 +151,14 @@ public class AgentService {
             } else {
                 Map<String, Object> args = objectMapper.readValue(argsJson == null || argsJson.isBlank() ? "{}" : argsJson,
                     new TypeReference<Map<String, Object>>() {});
+                // Ce que Cortex écrit sur l'accord de la personne garde le modèle qui l'a proposé, celui du dossier (R123).
+                String model = records.model(record).orElse(null);
+                AgentTool approved = tool;
                 if (tool instanceof CortexGesture gesture) {
-                    done = gesture.perform(args, ctx);
+                    done = DelegatedAgent.withModel(model, () -> gesture.perform(args, ctx));
                     output = done.text();
                 } else {
-                    output = tool.execute(args, ctx);
+                    output = DelegatedAgent.withModel(model, () -> approved.execute(args, ctx));
                 }
             }
         } catch (JsonProcessingException e) {
@@ -390,6 +395,16 @@ public class AgentService {
      * demander quelle issue propose d'abord celles de l'écran (R115).
      */
     public AssistantAnswer run(String slug, Long userId, String message, List<Map<String, Object>> history, Screen screen) {
+        return run(slug, userId, message, history, screen, List.of());
+    }
+
+    /**
+     * Avec ce que la personne a joint à sa demande depuis le compositeur (R123, séance n°18) : une issue
+     * ({@code issueId} posé) que TaskForce lit comme avant un résumé, ou un projet dont il montre le tableau comme
+     * l'écran. Chaque lecture passe par les droits de la personne ; ce qu'elle ne voit pas ne se lit pas.
+     */
+    public AssistantAnswer run(String slug, Long userId, String message, List<Map<String, Object>> history, Screen screen,
+                               List<Screen> attached) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         AgentContext ctx = new AgentContext(slug, ws.getId(), userId, screen, message);
         List<Map<String, Object>> hist = history == null ? List.of() : history;
@@ -422,10 +437,12 @@ public class AgentService {
         llm.beginUsageCapture();
         // Hors du try : si le modèle ou le fournisseur s'arrête après une écriture, la réponse doit encore la montrer.
         List<AssistantToolCall> toolCalls = new ArrayList<>();
+        // Ce que TaskForce donne à lire au modèle, compté à mesure : la ligne grise sous la réponse (R123).
+        Reading reading = new Reading(hits.size());
         try {
             steps.add(new AssistantStep(STEP_ANSWER, "active", "Cortex answers, with its tools if needed"));
             // Un geste qui se demande parle par sa carte : la phrase du modèle ne dit pas « je supprime » à sa place.
-            String modelAnswer = cardAnswer(runToolLoop(message, hits, ctx, toolCalls, hist), toolCalls);
+            String modelAnswer = cardAnswer(runToolLoop(message, hits, ctx, toolCalls, hist, attached, reading), toolCalls);
             // R116 : une phrase qui annonce une action sans son résultat d'outil est remplacée par la vérité, signée par
             // TaskForce, et l'incident entre au dossier de la réponse (E17).
             ActionClaimCheck.Checked checked = ActionClaimCheck.check(modelAnswer, ActionClaimCheck.Ran.of(toolCalls));
@@ -449,13 +466,14 @@ public class AgentService {
             LlmUsage usage = llm.currentUsage();
             recordUsage(ws.getId(), usage);
             return new AssistantAnswer(answer, null, toolCalls.isEmpty() ? "fast" : "deep",
-                sources, steps, toolCalls, usage(usage), record, llm.currentModel());
+                sources, steps, toolCalls, usage(usage), record, llm.currentModel(), reading.read());
         } catch (LlmToolsRefusedException ex) {
             log.warn("Cortex (slug={}) : le fournisseur refuse les outils", LogSafe.of(slug));
             LlmUsage usage = llm.currentUsage();
             recordUsage(ws.getId(), usage);
             if (!toolCalls.isEmpty()) {
-                return stopped(steps, sources, toolCalls, usage(usage), llm.currentModel(), "The AI provider refused Cortex's tools");
+                return stopped(steps, sources, toolCalls, usage(usage), llm.currentModel(), "The AI provider refused Cortex's tools")
+                    .withRead(reading.read());
             }
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
                 "The AI provider refused Cortex's tools: nothing was done"));
@@ -464,7 +482,10 @@ public class AgentService {
             log.warn("Agent LLM indisponible (slug={}): {}", LogSafe.of(slug), LogSafe.of(ex.getMessage()));
             LlmUsage usage = llm.currentUsage(); // usage partiel réel (appels déjà faits avant l'échec)
             recordUsage(ws.getId(), usage);
-            if (!toolCalls.isEmpty()) return stopped(steps, sources, toolCalls, usage(usage), llm.currentModel(), "The model stopped answering");
+            if (!toolCalls.isEmpty()) {
+                return stopped(steps, sources, toolCalls, usage(usage), llm.currentModel(), "The model stopped answering")
+                    .withRead(reading.read());
+            }
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
                 "The model did not answer: here are the notes of your workspace"));
             return new AssistantAnswer(fallbackAnswer(hits), null, "fallback", sources, steps, List.of(), usage(usage));
@@ -577,7 +598,9 @@ public class AgentService {
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", "Answered directly"));
             LlmUsage usage = llm.currentUsage();
             recordUsage(workspaceId, usage);
-            return new AssistantAnswer(answer, null, "fast", List.of(), steps, List.of(), usage(usage), null, llm.currentModel());
+            // Une salutation : le modèle n'a rien lu de l'espace, et la ligne grise le dit (R123).
+            return new AssistantAnswer(answer, null, "fast", List.of(), steps, List.of(), usage(usage), null, llm.currentModel(),
+                new Reading(0).read());
         } catch (Exception ex) {
             log.warn("Cortex (conversation) indisponible : {}", ex.getMessage());
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", "The model did not answer"));
@@ -599,7 +622,8 @@ public class AgentService {
     // -------------------------------------------------------------------------
 
     private String runToolLoop(String message, List<KnowledgeNode> hits, AgentContext ctx,
-                               List<AssistantToolCall> toolCalls, List<Map<String, Object>> history) {
+                               List<AssistantToolCall> toolCalls, List<Map<String, Object>> history,
+                               List<Screen> attached, Reading reading) {
         // Outils externes (serveurs MCP connectés sur le workspace), découverts par requête et bornés par
         // pertinence avant l'envoi : un gros serveur MCP envoyé en entier sature un petit modèle.
         List<AgentTool> external = relevantExternal(workspaceMcp.toolsFor(ctx), message);
@@ -610,14 +634,41 @@ public class AgentService {
         }
 
         // L'écran (R114) et le plan de la demande (R117), choisis par TaskForce avant le modèle : il n'a rien à deviner.
-        String screen = ctx.screen().isEmpty() ? null : screens.describe(ctx);
-        if (screen == null) screen = "";
+        ScreenContext.Seen onScreen = ctx.screen().isEmpty() ? null : screens.read(ctx);
+        String screen = onScreen == null || onScreen.isEmpty() ? "" : onScreen.text();
+        if (onScreen != null && !onScreen.isEmpty()) reading.board(onScreen);
+        // Ce que la personne a joint (R123) : le tableau d'un projet, lu comme l'écran ; une issue, lue comme avant un
+        // résumé. Le projet de l'écran n'est pas relu.
+        List<Screen> joined = attached == null ? List.of() : attached;
+        List<String> boards = new ArrayList<>();
+        joined.stream().filter(item -> item.issueId() == null && item.projectId() != null)
+            .map(Screen::projectId).distinct()
+            .filter(projectId -> !projectId.equals(ctx.screen().projectId()))
+            .limit(IssueMaterial.MAX_ATTACHED)
+            .forEach(projectId -> {
+                ScreenContext.Seen board = screens.attached(ctx, projectId);
+                if (board != null && !board.isEmpty()) {
+                    boards.add(board.text().strip());
+                    reading.board(board);
+                }
+            });
         CortexPlans.Plan plan = CortexPlans.forRequest(message).orElse(null);
         // Résumer une issue : TaskForce la lit et la donne au modèle avant qu'il écrive, au lieu d'espérer qu'il la lise
-        // (test du CEO du 05/11/2026 : qwen3:8b commentait OPS-35 avec ce qu'elle ne dit pas).
-        String issue = plan != null && CortexPlans.SUMMARIZE.equals(plan.id()) ? material.describe(ctx, message) : "";
-        if (issue == null) issue = "";
+        // (test du CEO du 05/11/2026 : qwen3:8b commentait OPS-35 avec ce qu'elle ne dit pas). Une issue jointe se lit
+        // aussi, résumé ou non.
+        boolean summarize = plan != null && CortexPlans.SUMMARIZE.equals(plan.id());
+        boolean anyIssue = joined.stream().anyMatch(item -> item.issueId() != null);
+        IssueMaterial.Read read = summarize || anyIssue ? material.read(ctx, message, joined, summarize) : null;
+        String issue = read == null || read.isEmpty() ? "" : read.text();
+        if (read != null) reading.issues(read.issues());
         String seen = issue.isEmpty() ? screen : screen.isEmpty() ? issue : screen.strip() + "\n\n" + issue;
+        if (!boards.isEmpty()) {
+            List<String> blocks = new ArrayList<>();
+            if (!screen.isEmpty()) blocks.add(screen.strip());
+            blocks.addAll(boards);
+            if (!issue.isEmpty()) blocks.add(issue.strip());
+            seen = String.join("\n\n", blocks) + "\n";
+        }
         List<Map<String, Object>> messages = withHistory(
             systemPrompt(plan, seen, hits, external, LocalDate.now(ZoneOffset.UTC)), history, message);
         List<Map<String, Object>> toolDefs = tools.toolDefinitions(external);
@@ -626,10 +677,12 @@ public class AgentService {
         // ce que le modèle a vu de l'écran et le plan qu'il a reçu.
         Map<String, Object> origin = origin(tier, hits);
         if (!screen.isEmpty()) origin.put("screen", screen);
+        if (!boards.isEmpty()) origin.put("attached", CortexRecordService.shorten(String.join("\n\n", boards)));
         if (!issue.isEmpty()) origin.put("issue", CortexRecordService.shorten(issue));
         if (plan != null) origin.put("plan", plan.id());
         Kernel kernel = new Kernel(ctx, message, origin);
-        String answer = toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel);
+        String answer = toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel,
+            reading);
         // Le geste du plan, quand Cortex ne l'a pas fait et que rien n'attend déjà la personne (une carte, une question).
         boolean gestureMade = plan != null && toolCalls.stream().anyMatch(call -> call.name().equals(plan.ask())
             || QUESTION.equals(call.status()) || "pending".equals(call.status()));
@@ -681,7 +734,7 @@ public class AgentService {
                 (msgs, defs) -> model == null || model.isBlank()
                     ? llm.rawChat(msgs, defs, "fast")
                     : llm.rawChatWithModel(msgs, defs, model),
-                step);
+                step, null);
             // R116 : la banque note la réponse que la personne verrait, corrigée par TaskForce.
             List<ActionClaimCheck.Ran> ran = step.calls.stream()
                 .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList();
@@ -715,6 +768,39 @@ public class AgentService {
                                List<Question> questions) {
         ToolOutcome(String status, String result) {
             this(status, result, null, null, null, null);
+        }
+    }
+
+    /**
+     * Ce que TaskForce donne à lire au modèle pendant une réponse, compté à mesure qu'il le lui donne (R123, la ligne
+     * grise) : les tableaux (l'écran, ceux joints), les issues lues en entier, les outils qui lisent et ont abouti, les
+     * notes servies. Rien n'est deviné après coup.
+     */
+    static final class Reading {
+        private final int notes;
+        private final List<AssistantRead.IssueRead> issues = new ArrayList<>();
+        private final List<AssistantRead.BoardRead> boards = new ArrayList<>();
+        private final Map<String, Integer> tools = new LinkedHashMap<>();
+
+        Reading(int notes) {
+            this.notes = notes;
+        }
+
+        void board(ScreenContext.Seen seen) {
+            if (seen.project() != null) boards.add(new AssistantRead.BoardRead(seen.project(), seen.issues(), seen.open()));
+        }
+
+        void issues(List<AssistantRead.IssueRead> read) {
+            issues.addAll(read);
+        }
+
+        void tool(String name) {
+            tools.merge(name, 1, Integer::sum);
+        }
+
+        AssistantRead read() {
+            return new AssistantRead(issues, boards,
+                tools.entrySet().stream().map(e -> new AssistantRead.ToolRead(e.getKey(), e.getValue())).toList(), notes);
         }
     }
 
@@ -766,9 +852,13 @@ public class AgentService {
             + " Do not try again; tell the user why it was not done.";
     }
 
-    /** La boucle : le modèle appelle des outils ou répond, cinq tours au plus. */
+    /**
+     * La boucle : le modèle appelle des outils ou répond, cinq tours au plus. Un outil qui lit et aboutit entre dans ce que
+     * le modèle a lu ({@code reading}, nul au rejeu d'un cas de la banque).
+     */
     private String toolLoop(List<Map<String, Object>> messages, List<Map<String, Object>> toolDefs,
-                            List<AgentTool> external, List<AssistantToolCall> toolCalls, ModelCall model, ToolStep step) {
+                            List<AgentTool> external, List<AssistantToolCall> toolCalls, ModelCall model, ToolStep step,
+                            Reading reading) {
         for (int i = 0; i < MAX_TOOL_ITERS; i++) {
             JsonNode msg = model.call(messages, toolDefs);
             JsonNode calls = msg.path("tool_calls");
@@ -788,6 +878,10 @@ public class AgentService {
                 String shown = outcome.input() != null ? outcome.input() : argsJson;
                 toolCalls.add(new AssistantToolCall(name, outcome.status(), shown, outcome.result(), step.recordRef(),
                     outcome.ref(), outcome.target(), card(outcome.questions())));
+                if (reading != null && tool != null && "success".equals(outcome.status())
+                        && CortexGate.READS.contains(CortexGate.facts(tool).get("action"))) {
+                    reading.tool(name);
+                }
                 messages.add(Map.of("role", "tool", "tool_call_id", id, "content", outcome.result()));
                 if (asked == null) asked = outcome.questions();
             }
@@ -951,11 +1045,14 @@ public class AgentService {
                     if (!resolved.equals(argsJson)) shown = resolved;
                 } else {
                     Map<String, Object> args = objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {});
+                    // Ce que Cortex écrit garde le modèle qui le fait parler (R123) : son commentaire dit « Cortex ·
+                    // qwen3:8b ». Une reprise après les réponses de la personne relit celui du dossier.
                     if (tool instanceof CortexGesture gesture) {
-                        done = gesture.perform(resolvedOr(args, gesture.ask(args, ctx)), ctx);
+                        Map<String, Object> resolved = resolvedOr(args, gesture.ask(args, ctx));
+                        done = DelegatedAgent.withModel(model(), () -> gesture.perform(resolved, ctx));
                         result = done.text();
                     } else {
-                        result = tool.execute(args, ctx);
+                        result = DelegatedAgent.withModel(model(), () -> tool.execute(args, ctx));
                     }
                 }
             } catch (QuestionNeeded needed) {
@@ -1040,6 +1137,17 @@ public class AgentService {
         @Override
         public String recordRef() {
             return record == null ? null : record.toString();
+        }
+
+        /**
+         * Le modèle qui fait parler Cortex pour ce geste : celui qui répond, sinon celui que le dossier a gardé à son
+         * ouverture (une reprise sur les réponses de la personne, sans appel au modèle) ; null quand ni l'un ni l'autre
+         * ne le dit.
+         */
+        private String model() {
+            String current = llm.currentModel();
+            if (current != null && !current.isBlank()) return current;
+            return record == null ? null : records.model(record).orElse(null);
         }
 
         /** Le modèle qui a répondu, connu dès le premier appel d'outil. */

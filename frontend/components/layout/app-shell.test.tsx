@@ -22,7 +22,6 @@ vi.mock("@/components/command-palette", () => ({
 }))
 vi.mock("@/components/settings/settings-modal", () => ({ SettingsModal: () => null }))
 vi.mock("@/components/dialogs/create-project-modal", () => ({ CreateProjectModal: () => null }))
-vi.mock("@/components/tour/product-tour", () => ({ ProductTour: () => null }))
 vi.mock("@/components/invitations/pending-invitations-banner", () => ({ PendingInvitationsBanner: () => null }))
 vi.mock("@/components/account/account-deletion-banner", () => ({ AccountDeletionBanner: () => null }))
 vi.mock("@/components/desktop/desktop-update-toast", () => ({ DesktopUpdateToast: () => null }))

@@ -22,6 +22,7 @@ const SPEC = join(HERE, "..", "openapi", "openapi.json");
 // controller kebab -> nom de section lisible (anglais : la référence API décrit le modèle du code).
 const TAG_MAP = {
   "issue-controller": "Issues",
+  "issue-search-controller": "Issues",
   "project-controller": "Projects",
   "workspace-controller": "Workspaces",
   "cycle-controller": "Cycles",

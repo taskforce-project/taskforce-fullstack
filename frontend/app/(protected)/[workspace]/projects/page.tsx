@@ -642,7 +642,6 @@ export default function ProjectsPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Active Operations"
         description="Real-time health and velocity across all workstreams"
         actions={
           <div className="flex items-center gap-2">

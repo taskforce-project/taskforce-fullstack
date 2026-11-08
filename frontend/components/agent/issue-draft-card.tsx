@@ -17,6 +17,7 @@ import { useCortexStore } from "@/lib/store/cortex-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { cn } from "@/lib/utils"
+import { Markdown } from "@/components/ui/lightweight-markdown"
 import { LinkedText } from "./answer-links"
 import { UndoAction } from "./undo-action"
 
@@ -190,7 +191,7 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
           {(editing || draft.description) && (
             <>
               <dt className="text-muted-foreground">{t.issueDescription}</dt>
-              <dd className="min-w-0 whitespace-pre-wrap break-words">
+              <dd className="min-w-0 break-words">
                 {editing ? (
                   <textarea
                     aria-label={t.issueDescription}
@@ -200,7 +201,8 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
                     className={cn(FIELD, "py-1")}
                   />
                 ) : (
-                  draft.description
+                  // Les mots de Cortex sont rendus, jamais en Markdown brut (R123, constat 14) ; le texte se modifie tel quel.
+                  <Markdown content={draft.description} compact className="space-y-1 text-sm leading-relaxed" />
                 )}
               </dd>
             </>

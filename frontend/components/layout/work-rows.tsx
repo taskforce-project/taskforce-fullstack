@@ -104,9 +104,9 @@ function ArchiveUndo({ slug, change }: Readonly<{ slug: string; change: Change }
         type="button"
         onClick={() => void archiveFromCard(slug, change.call, false)}
         disabled={running}
-        className="my-1 flex h-6 w-fit items-center gap-1 border border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
+        className="my-1 flex h-6 w-fit items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground disabled:opacity-60 motion-reduce:transition-none"
       >
-        <Undo2 className="size-3" /> {running ? t.undoingArchive : t.undoArchive}
+        <Undo2 className="size-4" /> {running ? t.undoingArchive : t.undoArchive}
       </button>
       {state?.failed?.gesture === "archive" && <p className="text-destructive">{t.undoArchiveFailed}</p>}
     </>

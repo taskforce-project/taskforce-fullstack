@@ -66,7 +66,8 @@ describe("NavUser", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "Acme" }))
     expect(await screen.findByText("Your workspaces")).toBeInTheDocument()
     fireEvent.click(screen.getByRole("menuitem", { name: /Partner/ }))
-    expect(push).toHaveBeenCalledWith("/partner/dashboard")
+    // Son accueil, où la fenêtre reprend là où la personne a laissé cet espace (R123).
+    expect(push).toHaveBeenCalledWith("/partner")
   })
 
   it("chooses the theme: light, dark, or the system's", async () => {

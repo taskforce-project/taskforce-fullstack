@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { IssueActivity } from "@/lib/api/issue-service";
 import { CONSTANTS_EN } from "@/lib/constants_en";
-import { describeActivity } from "./issue-activity";
+import { agentName, describeActivity } from "./issue-activity";
 
 const t = CONSTANTS_EN.issueActivity;
 
@@ -88,5 +88,24 @@ describe("describeActivity : qui a fait quoi sur une issue", () => {
     const line = describeActivity(activity({ action: "COMMENT_ADDED", actor: null, via: "Claude Code" }), t);
 
     expect(line).toMatchObject({ who: "Claude Code", what: "commented", forWhom: null });
+  });
+
+  // R123 : ce que Cortex écrit porte le modèle qui le faisait parler.
+  it("Cortex's comment says the model that made it speak, for the person", () => {
+    const line = describeActivity(activity({ action: "COMMENT_ADDED", via: "Cortex", model: "qwen3:8b" }), t);
+
+    expect(line).toMatchObject({ who: "Cortex · qwen3:8b", what: "commented", forWhom: "for Pierre" });
+    expect(describeActivity(activity({ via: "Cortex", model: "qwen3:8b" }), t).what).toBe("created, prepared by Cortex · qwen3:8b");
+  });
+});
+
+describe("agentName", () => {
+  it("names the agent, with its model when it says one that differs from its name", () => {
+    expect(agentName("Cortex", "qwen3:8b")).toBe("Cortex · qwen3:8b");
+    expect(agentName(" Cortex ", null)).toBe("Cortex");
+    // L'agent à l'essai de R51 porte déjà le nom de son modèle.
+    expect(agentName("qwen3:8b", "qwen3:8b")).toBe("qwen3:8b");
+    expect(agentName(null, "qwen3:8b")).toBeNull();
+    expect(agentName("  ", "qwen3:8b")).toBeNull();
   });
 });

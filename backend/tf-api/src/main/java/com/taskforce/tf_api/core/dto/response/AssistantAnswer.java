@@ -15,6 +15,9 @@ import java.util.Map;
  *
  * <p>{@code model} : le modèle qui a répondu, tel que la passerelle l'a appelé ; null quand aucun modèle n'a répondu (un
  * repli). Le pied de la réponse le montre (test du CEO du 05/11/2026 : « jsp avec quel model il a fait ca »).
+ *
+ * <p>{@code read} : ce que TaskForce a donné à lire à ce modèle, compté (R123, séance n°18 : la ligne grise, « qwen3:8b ·
+ * read OPS-35 and 3 comments ») ; null quand aucun modèle n'a répondu.
  */
 public record AssistantAnswer(
     String answer,
@@ -25,19 +28,56 @@ public record AssistantAnswer(
     List<AssistantToolCall> toolCalls,
     AssistantUsage usage,
     String record,
-    String model
+    String model,
+    AssistantRead read
 ) {
+    /** Une réponse sans ce que le modèle a lu : un repli, ou une réponse d'avant la ligne grise. */
+    public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
+                           List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage,
+                           String record, String model) {
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, null);
+    }
+
     /** Une réponse sans dossier à elle. */
     public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
                            List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage) {
-        this(answer, reasoning, mode, sources, steps, toolCalls, usage, null, null);
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, null, null, null);
     }
 
     /** Une réponse dont le modèle n'est pas connu. */
     public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
                            List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage,
                            String record) {
-        this(answer, reasoning, mode, sources, steps, toolCalls, usage, record, null);
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, record, null, null);
+    }
+
+    /** La même réponse, avec ce que TaskForce a donné à lire au modèle. */
+    public AssistantAnswer withRead(AssistantRead read) {
+        return new AssistantAnswer(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read);
+    }
+
+    /**
+     * Ce que TaskForce a donné à lire au modèle pour une réponse (R123) : compté au moment où il le lui donne, jamais
+     * deviné après coup. {@code issues} : les issues lues en entier (avant un résumé, ou jointes par la personne), avec le
+     * nombre de commentaires donnés ; {@code boards} : les tableaux montrés (celui de l'écran, ceux joints), avec le nombre
+     * d'issues montrées et l'issue ouverte ; {@code tools} : les outils qui lisent et ont abouti, avec leur nombre
+     * d'appels ; {@code notes} : les notes du Brain OS servies au modèle.
+     */
+    public record AssistantRead(List<IssueRead> issues, List<BoardRead> boards, List<ToolRead> tools, int notes) {
+        public AssistantRead {
+            issues = issues == null ? List.of() : List.copyOf(issues);
+            boards = boards == null ? List.of() : List.copyOf(boards);
+            tools = tools == null ? List.of() : List.copyOf(tools);
+        }
+
+        /** Une issue lue : sa clé, et les commentaires donnés avec elle. */
+        public record IssueRead(String key, int comments) {}
+
+        /** Un tableau montré : la clé du projet, les issues montrées, et l'issue ouverte à l'écran (null sans elle). */
+        public record BoardRead(String project, int issues, String open) {}
+
+        /** Un outil qui lit : son nom, et ses appels qui ont abouti. */
+        public record ToolRead(String name, int calls) {}
     }
 
     /** Une note Brain OS utilisée pour fonder la réponse (RAG). */
