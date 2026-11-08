@@ -561,6 +561,39 @@ export const CONSTANTS_EN = {
     readNothing: "read nothing in TaskForce",
   },
 
+  // The microphone of the composer (R132, R76, R80): one click starts, one click stops, nothing is sent from it.
+  voice: {
+    start: "Voice input",
+    stop: "Stop listening",
+    writing: "Writing what you said…",
+    onDevice: "Audio stays on this computer",
+    inBrowser: "Your browser's speech service writes what you say",
+    consent: "Your browser sends your voice to its speech service. Turn on voice, or keep typing.",
+    turnOn: "Turn on voice",
+    keepTyping: "Keep typing",
+    offer: "Voice needs a one-time download: {size} MB.",
+    download: "Download",
+    retry: "Try again",
+    notNow: "Not now",
+    downloading: "Downloading voice: {percent}%",
+    cancel: "Cancel",
+    dismiss: "Dismiss",
+    notices: {
+      denied: "Microphone blocked in your settings.",
+      noDevice: "No microphone found.",
+      busy: "The microphone is in use.",
+      model: "The voice model is missing.",
+      engine: "Voice stopped working. Try again, or keep typing.",
+      service: "The speech service is out of reach.",
+      network: "The download stopped. Check your connection.",
+      checksum: "The download was damaged.",
+      disk: "Not enough disk space for voice.",
+      nothing: "Nothing heard.",
+      limit: "Stopped after two minutes.",
+      ready: "Voice is ready.",
+    },
+  },
+
   // The search of the window (Ctrl+K, R121 and R124): issues by key and title, projects, conversations, and the screens
   // that left the first look, each opened in the pane with the conversation kept.
   search: {
