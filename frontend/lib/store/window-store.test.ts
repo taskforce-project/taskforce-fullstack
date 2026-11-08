@@ -10,9 +10,18 @@ describe("useWindowStore", () => {
     localStorage.clear()
     useWindowStore.setState({
       ...initial, paneFull: false, paneWidth: null, rightOpen: true, rightDrawer: false, rows: {}, searchOpen: false,
-      places: {}, lastSpaces: {},
+      places: {}, lastSpaces: {}, progressTabs: {},
     })
   })
+
+  it("remembers the tab of Progress for each person", () => {
+    useWindowStore.getState().setProgressTab("7", "history")
+    useWindowStore.getState().setProgressTab("8", "sources")
+    expect(useWindowStore.getState().progressTabs).toEqual({ "7": "history", "8": "sources" })
+    useWindowStore.getState().setProgressTab("7", "models")
+    expect(useWindowStore.getState().progressTabs).toEqual({ "7": "models", "8": "sources" })
+  })
+
 
   it("starts beside the conversation, the right panel open with its six rows folded", () => {
     expect(useWindowStore.getState()).toMatchObject({
@@ -80,7 +89,7 @@ describe("useWindowStore", () => {
 
     const writes = vi.mocked(localStorage.setItem).mock.calls.filter(([key]) => key === "tf-window")
     const saved = JSON.parse(writes.at(-1)?.[1] ?? "{}") as { state?: Record<string, unknown> }
-    expect(saved.state).toEqual({ paneFull: true, paneWidth: 700, rightOpen: false, places: {}, lastSpaces: {} })
+    expect(saved.state).toEqual({ paneFull: true, paneWidth: 700, rightOpen: false, places: {}, lastSpaces: {}, progressTabs: {} })
   })
 
   // R123 : la fenêtre s'ouvre là où la personne l'a laissée, par personne et par espace.

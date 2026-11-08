@@ -406,12 +406,9 @@ export const CONSTANTS_EN = {
   // What each model can do (R113): measured on this computer or server by TaskForce's test cases, never taken from a
   // vendor's sheet. TaskForce proposes the first capable model; the person chooses. Then R118's offer in the conversation.
   models: {
-    title: "What each model can do",
     hint: "Measured here by TaskForce's test cases, not taken from the vendor. Measuring a model replays {cases} short cases with Cortex's tools and counts in your AI usage.",
-    model: "Model",
-    measured: "Measured",
     notMeasured: "Not measured",
-    never: "Never",
+    measuredOn: "Measured {date}",
     measure: "Measure",
     measureAgain: "Measure again",
     measuring: "Measuring {model}: {done} of {total}",
@@ -420,6 +417,10 @@ export const CONSTANTS_EN = {
     waiting: "The AI allows a request per minute here: next case in {seconds} s",
     stop: "Stop",
     inUse: "Cortex uses it",
+    useForCortex: "Use for Cortex",
+    // The detail of a model's line (R130): what TaskForce proposes it for, when it does.
+    proposedFor: "TaskForce proposes it for {capabilities}.",
+    proposedEverything: "TaskForce proposes it for everything measured.",
     instanceModel: "This instance's model for Cortex: {model}.",
     // On Ollama, the gateway sizes the context window to each request, up to this many tokens.
     instanceModelWindow: "This instance's model for Cortex: {model}, with a context window of up to {tokens} tokens.",
@@ -435,7 +436,6 @@ export const CONSTANTS_EN = {
     heldNone: "lost the shortest document",
     partial: "{passed} of {measured} measured",
     caseFailed: "Failed: {title}",
-    lastMeasure: "Last measure of {model}: {passed} of {total} cases passed.",
     // R118: TaskForce's words under an answer when the bank says the model failed this kind of request.
     saysWhat: "about the model that answers",
     saysLabel: "TaskForce, about the model that answers",
@@ -790,8 +790,15 @@ export const CONSTANTS_EN = {
   // The pane "Progress" (R125, session 18 of the Council): what Cortex knows and how it improves, measured here. It
   // shows what the agent knows and what improves, never its activity, never a ranking (R57).
   progress: {
-    intro: "What Cortex can do and how it improves, measured here, and what it reads in this workspace. Nothing here comes from a vendor's benchmark.",
-    // 1. What each model can do, measured here (R113): the table keeps its title and hint in `models`.
+    // The tabs (R130, session 19): one word each, the question each one answers on hover. A new tab: one entry here, and
+    // one line in TABS (components/progress/progress-pane.tsx).
+    tabs: {
+      models: { label: "Models", hint: "What each model can do, measured here. Nothing here comes from a vendor's benchmark." },
+      history: { label: "History", hint: "How Cortex does over time, and what improved it." },
+      sources: { label: "Sources", hint: "What Cortex can read for you here, counted, with the date of the latest change." },
+    },
+    // 1. What each model can do, measured here (R113): the detail of a line, the rest of the texts in `models`.
+    setUpAi: "Set up AI",
     notMeasuredYet: "Not measured yet.",
     // A model not measured yet: what its own description says, labelled as such, never a score.
     fromDescription: "Its description says: {card}.",
@@ -799,12 +806,12 @@ export const CONSTANTS_EN = {
     cardWindow: "a context window of {tokens} tokens",
     cardTools: "takes tools",
     cardNoTools: "takes no tools",
-    chooseModel: "Choose Cortex's model in Settings > AI",
     // 2. How it does over time: the test bank (R61, R118).
-    overTime: "How it does over time",
+    overTime: "Over time",
     overTimeHint: "The test bank: questions your team asked Cortex, replayed on a model and graded by code.",
-    noCases: "The test bank has no case yet. Under an answer of Cortex, choose Add to test bank.",
+    noCases: "No test case yet: under an answer of Cortex, choose Add to test bank.",
     noRuns: "Not replayed yet.",
+    replayShort: "Replay",
     replay: "Replay {count} cases on {model}",
     replayOne: "Replay 1 case on {model}",
     replayHint: "A replay never touches your workspace, and counts in your AI usage like an answer.",
@@ -834,8 +841,8 @@ export const CONSTANTS_EN = {
     lastPassed: "passed on {date}",
     lastFailed: "failed on {date}",
     // 4. What it knows of this workspace: the sources Cortex reads for the person, counted and dated.
-    knows: "What it knows of this workspace",
-    knowsHint: "What Cortex can read for you here, counted, with the date of the latest change.",
+    noSources: "Nothing to read here yet.",
+    createProject: "Create a project",
     sources: {
       projects: "Projects",
       issues: "Issues",
@@ -845,7 +852,6 @@ export const CONSTANTS_EN = {
       connectors: "Connected tools",
     },
     changed: "changed {date}",
-    none: "None yet",
     reading: "Reading…",
     readFailed: "TaskForce couldn't read this part. Open Progress again to retry.",
     // Settings > AI keeps the model choice, and opens Progress.

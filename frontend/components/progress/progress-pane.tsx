@@ -1,37 +1,72 @@
 "use client"
 
+import type { ComponentType } from "react"
 import { useParams } from "next/navigation"
 
 import { BankHistory } from "@/components/progress/bank-history"
 import { CortexSources } from "@/components/progress/cortex-sources"
 import { Improvements } from "@/components/progress/improvements"
 import { ModelCapabilityTable } from "@/components/progress/model-capability-table"
+import { Named } from "@/components/progress/named"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import type { CONSTANTS_EN } from "@/lib/constants_en"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { useUserStore } from "@/lib/store/user-store"
+import { useWindowStore } from "@/lib/store/window-store"
+
+type ProgressTab = keyof (typeof CONSTANTS_EN)["progress"]["tabs"]
+
+/** La courbe de la banque et ce qui l'a amélioré : les deux se lisent ensemble. */
+function History({ slug }: Readonly<{ slug: string }>) {
+  return (
+    <div className="flex flex-col gap-4">
+      <BankHistory slug={slug} />
+      <Improvements />
+    </div>
+  )
+}
+
+/** Les onglets, dans leur ordre : un de plus, c'est une ligne ici et son mot dans `progress.tabs` (`constants_en.ts`). */
+const TABS: readonly { readonly key: ProgressTab; readonly Panel: ComponentType<Readonly<{ slug: string }>> }[] = [
+  { key: "models", Panel: ModelCapabilityTable },
+  { key: "history", Panel: History },
+  { key: "sources", Panel: CortexSources },
+]
 
 /**
- * Le volet « Progress » (R125, séance n°18) : ce que l'agent sait, et comment il progresse, mesuré ici.
- *
- * <ol>
- *   <li>Ce que chaque modèle sait faire (R113) : la table des capacités, et la fiche d'un modèle pas encore mesuré.</li>
- *   <li>Comment il fait dans le temps (R61, R118) : la banque d'évaluations par modèle et par date, et sa courbe.</li>
- *   <li>Ce qui l'a amélioré (E17) : chaque cas ajouté par « Add to test bank », d'où il vient, et sa note depuis.</li>
- *   <li>Ce qu'il sait de l'espace : ses sources, comptées et datées.</li>
- * </ol>
- *
- * Ce n'est pas un écran de surveillance (R57) : rien de l'activité de l'agent, aucun classement.
+ * Le volet « Progress » (R125, séance n°18 ; R130, séance n°19) : ce que l'agent sait, et comment il progresse, mesuré ici.
+ * Un contrôle segmenté en haut, un mot par onglet, une question chacun ; l'onglet se retient pour chaque personne. Ce n'est
+ * pas un écran de surveillance (R57) : rien de l'activité de l'agent, aucun classement.
  */
 export function ProgressPane() {
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
-  const intro = usePreferencesStore((s) => s.t.progress.intro)
+  const tabs = usePreferencesStore((s) => s.t.progress.tabs)
+  const me = useUserStore((s) => s.user?.id)
+  const person = me === null || me === undefined ? "" : String(me)
+  const remembered = useWindowStore((s) => s.progressTabs[person])
+  const setProgressTab = useWindowStore((s) => s.setProgressTab)
+
   if (!slug) return null
+  const active = TABS.find((tab) => tab.key === remembered)?.key ?? TABS[0].key
+
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-      <p className="text-xs text-muted-foreground">{intro}</p>
-      <ModelCapabilityTable slug={slug} />
-      <BankHistory slug={slug} />
-      <Improvements />
-      <CortexSources slug={slug} />
-    </div>
+    <Tabs value={active} onValueChange={(tab) => setProgressTab(person, tab)} className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+      <TabsList>
+        {TABS.map(({ key }) => (
+          // Le survol passe par un `span` : la bulle ne doit pas remplacer l'état de l'onglet (`data-state`).
+          <Named key={key} name={tabs[key].hint} wide>
+            <span className="inline-flex h-full">
+              <TabsTrigger value={key} aria-description={tabs[key].hint}>{tabs[key].label}</TabsTrigger>
+            </span>
+          </Named>
+        ))}
+      </TabsList>
+      {TABS.map(({ key, Panel }) => (
+        <TabsContent key={key} value={key}>
+          <Panel slug={slug} />
+        </TabsContent>
+      ))}
+    </Tabs>
   )
 }
