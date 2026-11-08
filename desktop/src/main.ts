@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, session, shell } from "electron";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -10,6 +10,7 @@ import { createRepo, DEVICE_PAGE, findRepo, GitHubSignIn, isNewRepoName, isRepoF
 import { initLog, log } from "./log";
 import { APP_ID, readNotice } from "./notify";
 import { appLogDir, fromStore, storeDataDir } from "./paths";
+import { applyPermissions } from "./permissions";
 import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
 import { toolsStatus } from "./tools";
@@ -65,6 +66,8 @@ async function main(): Promise<void> {
   Menu.setApplicationMenu(buildMenu());
   registerIpc();
   registerVoice(() => mainWindow);
+  // Micro pour la seule origine de la fenêtre ; ce que l'interface n'utilise pas est refusé (cf. permissions.ts).
+  applyPermissions(session.defaultSession, () => stack?.origin ?? null, voiceAvailable());
 
   // Un compte connecté par un autre service de comptes (développement, changement d'adresse) demande une reconnexion.
   let account = settings.account();
