@@ -130,7 +130,7 @@ public final class BenchmarkGrader {
 
     static Rule atMostWords(int max) {
         return seen -> {
-            int count = words(plain(seen.answer())).size();
+            int count = wordCount(seen.answer());
             return new EvalGrader.Check("at most " + max + " words", count > 0 && count <= max, count + " words");
         };
     }
@@ -162,6 +162,16 @@ public final class BenchmarkGrader {
         };
     }
 
+    /** De {@code min} à {@code max} lignes, une chose par ligne, avec ou sans puce ; ni titre ni phrase d'annonce (une ligne qui finit par « : »). */
+    static Rule lineItems(int min, int max) {
+        return seen -> {
+            List<String> lines = seen.answer().lines().filter(line -> !line.isBlank()).toList();
+            boolean announced = lines.stream().anyMatch(line -> line.strip().endsWith(":"));
+            return new EvalGrader.Check(range(min, max, "lines") + ", and nothing else", !announced && lines.size() >= min && lines.size() <= max,
+                lines.size() + " lines");
+        };
+    }
+
     /** De {@code min} à {@code max} lignes numérotées, et rien d'autre. */
     static Rule numberedSteps(int min, int max) {
         return seen -> {
@@ -177,10 +187,19 @@ public final class BenchmarkGrader {
     static Rule linesOfAtMostWords(int max) {
         return seen -> {
             int longest = seen.answer().lines().filter(line -> !line.isBlank())
-                .mapToInt(line -> words(plain(BULLET.matcher(line).replaceAll(""))).size()).max().orElse(0);
+                .mapToInt(line -> wordCount(BULLET.matcher(line).replaceAll(""))).max().orElse(0);
             return new EvalGrader.Check("each line at most " + max + " words", longest > 0 && longest <= max,
                 "longest line: " + longest + " words");
         };
+    }
+
+    /** Le nombre de mots tel qu'une personne le compte : ce qui est séparé par des blancs ; « 14:05 » et « 7.18.2 » sont un mot. */
+    static int wordCount(String text) {
+        int count = 0;
+        for (String token : plain(text).strip().split("\\s+")) {
+            if (token.codePoints().anyMatch(Character::isLetterOrDigit)) count++;
+        }
+        return count;
     }
 
     private static String range(int min, int max, String what) {

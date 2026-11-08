@@ -14,6 +14,7 @@ import static com.taskforce.tf_api.core.service.agent.BenchmarkGrader.inventsNot
 import static com.taskforce.tf_api.core.service.agent.BenchmarkGrader.jsonLabels;
 import static com.taskforce.tf_api.core.service.agent.BenchmarkGrader.jsonOnly;
 import static com.taskforce.tf_api.core.service.agent.BenchmarkGrader.jsonValue;
+import static com.taskforce.tf_api.core.service.agent.BenchmarkGrader.lineItems;
 import static com.taskforce.tf_api.core.service.agent.BenchmarkGrader.linesOfAtMostWords;
 import static com.taskforce.tf_api.core.service.agent.BenchmarkGrader.neverCalls;
 import static com.taskforce.tf_api.core.service.agent.BenchmarkGrader.noEmoji;
@@ -49,8 +50,15 @@ public final class BenchmarkSuite {
     /** Le nom de la suite dans {@code model_capability_runs}, à côté de celle des capacités (R113). */
     public static final String SUITE = "benchmark";
 
-    /** La version des cas ; un résultat n'est lu qu'avec les cas de sa version. */
-    public static final int VERSION = 1;
+    /**
+     * La version des cas ; un résultat n'est lu qu'avec les cas de sa version.
+     *
+     * <p>2 (08/11/2026), après le premier passage réel, seulement pour ce qui était injuste ou cassé : compter les mots comme une
+     * personne (« 14:05 » comptait pour deux) ; « retour en arrière » est un retour arrière (plan-migration-fr) ; « passer la
+     * base de production » est la bascule du même cas ; une checklist d'une ligne par chose n'exige pas de puce quand la demande
+     * n'en parle pas (plan-checklist-en) ; {@code /^[-]+|-+$/} retire bien les tirets des bords (code-slugify-ts).</p>
+     */
+    public static final int VERSION = 2;
 
     /** La date que le modèle lit : fixe, pour que deux passages posent la même question. */
     public static final LocalDate ASKED_ON = LocalDate.of(2026, 11, 9);
@@ -237,7 +245,7 @@ public final class BenchmarkSuite {
         + "|(pas|non)\\s+(precise|indique|mentionne|renseigne|specifie)|aucune? (information|indication|mention|precision)"
         + "|n'est pas (dit|donne)|ne figure pas|n'apparait pas|ne trouve pas";
     private static final String PRODUCTION_SWITCH = "bascul|mise a jour de la production|migr\\w*\\s+(de\\s+)?la\\s+(base\\s+(de\\s+)?)?production"
-        + "|en production";
+        + "|pass\\w*\\s+la\\s+base\\s+de\\s+production|en production";
     private static final String SUBMISSION = "(envoi|envoyer|soumettre|soumission)[^.]{0,40}(validation|apple)|validation[^.]{0,20}apple";
 
     private static final List<BenchmarkCase> CASES = List.of(
@@ -388,14 +396,14 @@ public final class BenchmarkSuite {
             inLanguage("fr"), numberedSteps(4, 7), linesOfAtMostWords(25),
             says("rehearses on the pre-production", "pre-?prod"),
             says("backs up", "sauvegard"),
-            says("plans the way back", "retour arriere|revenir en arriere|rollback|restaur"),
+            says("plans the way back", "retour (en )?arriere|revenir en arriere|rollback|restaur"),
             before("rehearses before touching production", "pre-?prod", PRODUCTION_SWITCH),
             before("backs up before the switch", "sauvegard", PRODUCTION_SWITCH),
             inventsNothing()),
         text("plan-checklist-en", BenchmarkTask.PLAN, "An issue's acceptance turned into a checklist",
             IssueMaterial.ATTACHED + GDPR_12,
             "Turn this issue into a checklist of 4 to 6 items, one line each, with nothing else. No owners, no dates.",
-            inLanguage("en"), onlyBullets(4, 6), linesOfAtMostWords(20),
+            inLanguage("en"), lineItems(4, 6), linesOfAtMostWords(20),
             says("covers the request in Settings", "settings"),
             says("covers the background build", "background|zip"),
             says("covers the e-mail with a link", "e-?mail|link"),
@@ -459,7 +467,7 @@ public final class BenchmarkSuite {
             codeHas("decomposes the accents", "normalize\\(\\s*['\"`]NFK?D['\"`]\\s*\\)"),
             codeHas("removes the accents", "\\\\u0300|\\\\p\\{M\\}|\\\\p\\{Diacritic\\}|\\\\p\\{Mn\\}"),
             codeHas("replaces runs of other characters", "\\[\\^[^\\]]*\\]\\+|\\\\W\\+"),
-            codeHas("no hyphen at either end", "(?s)\\^\\(?-.*-\\+?\\)?\\$|-\\+?\\)?\\$.*\\^\\(?-"
+            codeHas("no hyphen at either end", "(?s)\\^\\(?\\[?-.*-\\]?\\+?\\)?\\$|-\\]?\\+?\\)?\\$.*\\^\\(?\\[?-"
                 + "|\\.trim\\(\\)\\s*\\.replace\\(\\s*/(\\\\s\\+| \\+| )/"),
             codeLacks("uses no library", "\\bimport\\b|\\brequire\\(")));
 

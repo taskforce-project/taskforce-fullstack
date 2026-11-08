@@ -161,6 +161,9 @@ class BenchmarkSuiteTest {
             good("plan-migration-fr", "1. Sauvegarder la base de production avec le script existant.\n2. Répéter la migration de PostgreSQL 14 à 17 en "
                 + "préproduction.\n3. Mesurer la coupure en préproduction pour vérifier qu'elle reste sous 5 minutes.\n4. Préparer la procédure de retour "
                 + "arrière.\n5. Basculer la production sur PostgreSQL 17.\n6. Vérifier la production après la bascule."),
+            // Version 2 : « retour en arrière » est un retour arrière, « passer la base de production » est la bascule.
+            good("plan-migration-fr", "1. Sauvegarder la base de production.\n2. Répéter la montée de version en préproduction.\n3. Préparer la procédure de retour en "
+                + "arrière.\n4. Passer la base de production de PostgreSQL 14 à 17."),
             bad("plan-migration-fr", "backs up before the switch", "1. Basculer la production sur PostgreSQL 17.\n2. Sauvegarder la base.\n3. Répéter en "
                 + "préproduction.\n4. Prévoir le retour arrière."),
             bad("plan-migration-fr", "invents no person, date, number or name", "1. Sauvegarder la base.\n2. Répéter en préproduction avec Karim.\n"
@@ -169,6 +172,11 @@ class BenchmarkSuiteTest {
                 + "retour arrière.\n4. Basculer la production."),
             good("plan-checklist-en", "- Add the export request in Settings for owners\n- Build the ZIP of JSON files in the background\n- Send the owner an "
                 + "e-mail with a link\n- Make the link expire after 7 days\n- Write every export to the audit log"),
+            // Version 2 : une ligne par chose, sans puce, fait une checklist quand la demande n'en exige pas ; une annonce non.
+            good("plan-checklist-en", "Add the export request in Settings\nBuild the ZIP in the background\nSend an e-mail with a link\nMake the link expire\n"
+                + "Write it to the audit log"),
+            bad("plan-checklist-en", "4 to 6 lines, and nothing else", "Here is the checklist:\nAdd the export request in Settings\nBuild the ZIP in the background\n"
+                + "Send an e-mail with a link that expires\nWrite it to the audit log"),
             bad("plan-checklist-en", "covers the audit log", "- Add the export request in Settings for owners\n- Build the ZIP in the background\n- Send an "
                 + "e-mail with a link\n- Make the link expire after 7 days"),
             bad("plan-checklist-en", "invents no person, date, number or name", "- Sarah adds the request in Settings\n- Build the ZIP in the background\n- Send "
@@ -200,6 +208,9 @@ class BenchmarkSuiteTest {
                 + ".replace(/[^a-z0-9]+/g, ' ').trim().replace(/ +/g, '-');\n```"),
             bad("code-slugify-ts", "no hyphen at either end", "```ts\nexport function slugify(title: string): string {\n  return title.trim().normalize('NFD')"
                 + ".replace(/\\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-');\n}\n```"),
+            // Version 2 : `/^[-]+|-+$/` retire les tirets des bords.
+            good("code-slugify-ts", "```ts\nexport function slugify(title: string): string {\n  return title.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, \"\")"
+                + ".replace(/[^a-z0-9]+/g, '-').replace(/^[-]+|-+$/g, '');\n}\n```"),
             bad("code-slugify-ts", "decomposes the accents", "```ts\nexport function slugify(title: string): string {\n  return title.toLowerCase()"
                 + ".replace(/[^a-z0-9]+/g, \"-\").replace(/^-+|-+$/g, \"\");\n}\n```"),
             bad("code-slugify-ts", "uses no library", "```ts\nimport slug from 'slugify';\nexport function slugify(title: string): string {\n  return title"
@@ -319,6 +330,20 @@ class BenchmarkSuiteTest {
     @DisplayName("une phrase : une fin de phrase ou une ligne, ni une puce, ni « e.g. », ni un numéro de version")
     void countsSentences(String answer, int count) {
         assertThat(BenchmarkGrader.sentences(answer)).isEqualTo(count);
+    }
+
+    @ParameterizedTest(name = "« {0} » : {1}")
+    @MethodSource("wordCounts")
+    @DisplayName("un mot : ce que les blancs séparent, comme une personne le compte")
+    void countsWords(String text, int count) {
+        assertThat(BenchmarkGrader.wordCount(text)).isEqualTo(count);
+    }
+
+    static Stream<Arguments> wordCounts() {
+        return Stream.of(
+            Arguments.of("Between 14:05 and 14:38 UTC, release 7.18.2.", 7),
+            Arguments.of("- Une puce, l'export", 3),
+            Arguments.of("   ", 0));
     }
 
     static Stream<Arguments> sentenceCounts() {
