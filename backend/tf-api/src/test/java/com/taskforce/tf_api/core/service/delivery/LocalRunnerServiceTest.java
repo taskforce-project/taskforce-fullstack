@@ -327,8 +327,6 @@ class LocalRunnerServiceTest {
         assertThat(poll.getValue().status()).isEqualTo(DeliveryRunStatus.DONE);
         assertThat(poll.getValue().summary()).isEqualTo("PR opened");
         assertThat(poll.getValue().resultUrl()).isEqualTo("https://github.com/acme/website/pull/9");
-        // Run terminé : les demandes de validation encore ouvertes ne recevront plus de réponse utile.
-        verify(activityService).closeApprovals(held2);
     }
 
     @Test

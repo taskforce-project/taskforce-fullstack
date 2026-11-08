@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.taskforce.tf_api.core.dto.request.RunnerApprovalRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
+import com.taskforce.tf_api.core.dto.response.DeliveryOpenApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunActivityResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
 import com.taskforce.tf_api.core.enums.DeliveryApprovalStatus;
@@ -38,6 +39,7 @@ import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.NotificationService;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
+import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -65,6 +67,7 @@ class DeliveryActivityServiceTest {
     @Mock private DeliveryRunApprovalRepository approvalRepository;
     @Mock private UserRepository userRepository;
     @Mock private ProjectVisibilityGuard visibilityGuard;
+    @Mock private BrainAccessGuard access;
     @Mock private NotificationService notificationService;
     @Mock private MissionEvidenceService evidenceService;
 
@@ -77,7 +80,7 @@ class DeliveryActivityServiceTest {
     void setUp() {
         LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15, 10);
         service = new DeliveryActivityService(runRepository, eventRepository, approvalRepository, userRepository,
-            visibilityGuard, notificationService, settings, evidenceService);
+            visibilityGuard, access, notificationService, settings, evidenceService);
         delegator = User.builder().id(7L).email("ada@taskforce.dev").displayName("Ada").build();
         teammate = User.builder().id(8L).email("linus@taskforce.dev").build();
         Workspace workspace = Workspace.builder().slug("acme").build();
@@ -222,6 +225,80 @@ class DeliveryActivityServiceTest {
 
         verify(approvalRepository).expirePending(eq(100L), any(), eq(DeliveryApprovalStatus.PENDING), eq(DeliveryApprovalStatus.EXPIRED));
         verify(evidenceService).append(eq(run), eq("action.decided"), eq(MissionEvidenceService.Actor.SERVER), any());
+        verify(notificationService).readAgentApprovals(run.getIssue(), delegator);
+    }
+
+    // --------------------------------------------------------------------- ce qui attend la personne (R128)
+
+    private static DeliveryRunApprovalRepository.OpenRow row(Long runId, Integer sequence, long requests) {
+        return new DeliveryRunApprovalRepository.OpenRow() {
+            @Override public Long getRunId() { return runId; }
+            @Override public Long getIssueId() { return 55L; }
+            @Override public Long getProjectId() { return 12L; }
+            @Override public String getProjectIdentifier() { return "OPS"; }
+            @Override public Integer getSequenceNumber() { return sequence; }
+            @Override public String getIssueTitle() { return "Fix the footer"; }
+            @Override public Long getRequests() { return requests; }
+        };
+    }
+
+    @Test
+    void the_open_requests_are_those_of_the_person_on_the_projects_she_sees_and_on_a_live_mission() {
+        Workspace workspace = Workspace.builder().id(3L).slug("acme").build();
+        when(access.resolveAndAuthorize("acme", 7L)).thenReturn(workspace);
+        when(visibilityGuard.viewableProjectIds(3L, 7L)).thenReturn(List.of(12L));
+        when(approvalRepository.findOpen(eq(List.of(12L)), eq(7L), eq(DeliveryApprovalStatus.PENDING), any(),
+            eq(DeliveryRunStatus.RUNNING), any())).thenReturn(List.of(row(100L, 12, 3), row(101L, null, 1)));
+
+        assertThat(service.openApprovals("acme", 7L)).containsExactly(
+            new DeliveryOpenApprovalResponse(100L, 55L, "OPS-12", "Fix the footer", 12L, 3),
+            new DeliveryOpenApprovalResponse(101L, 55L, null, "Fix the footer", 12L, 1));
+
+        // Vivante : le signe de vie du runner remonte au plus au délai au-delà duquel il est tenu pour perdu (10 min ici).
+        ArgumentCaptor<LocalDateTime> now = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> aliveSince = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(approvalRepository).findOpen(any(), eq(7L), any(), now.capture(), any(), aliveSince.capture());
+        assertThat(aliveSince.getValue()).isEqualTo(now.getValue().minusMinutes(10));
+    }
+
+    @Test
+    void no_project_in_sight_means_nothing_to_answer_and_no_query() {
+        when(access.resolveAndAuthorize("acme", 7L)).thenReturn(Workspace.builder().id(3L).slug("acme").build());
+        when(visibilityGuard.viewableProjectIds(3L, 7L)).thenReturn(List.of());
+
+        assertThat(service.openApprovals("acme", 7L)).isEmpty();
+        verify(approvalRepository, never()).findOpen(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void someone_outside_the_workspace_reads_nothing() {
+        when(access.resolveAndAuthorize("acme", 8L)).thenThrow(new ForbiddenException("Not a member"));
+
+        assertThatThrownBy(() -> service.openApprovals("acme", 8L)).isInstanceOf(ForbiddenException.class);
+        verify(approvalRepository, never()).findOpen(any(), any(), any(), any(), any(), any());
+    }
+
+    @ParameterizedTest(name = "{0} demande(s) encore ouverte(s) : notifications lues = {1}")
+    @CsvSource({"0, true", "2, false"})
+    void answering_the_last_open_request_reads_its_notifications(long stillOpen, boolean read) {
+        DeliveryRunApproval approval = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        when(approvalRepository.findByIdAndRunId(9L, 100L)).thenReturn(Optional.of(approval));
+        when(approvalRepository.countByRunIdAndStatus(100L, DeliveryApprovalStatus.PENDING)).thenReturn(stillOpen);
+        when(userRepository.getReferenceById(7L)).thenReturn(delegator);
+
+        service.decide("acme", 100L, 9L, true, 7L);
+
+        verify(notificationService, org.mockito.Mockito.times(read ? 1 : 0)).readAgentApprovals(run.getIssue(), delegator);
+    }
+
+    @Test
+    void a_request_that_runs_out_of_time_reads_its_notifications_when_it_was_the_last() {
+        when(approvalRepository.findByIdAndRunId(9L, 100L))
+            .thenReturn(Optional.of(approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().minusSeconds(1))));
+
+        service.approvalStatus(run, 9L);
+
+        verify(notificationService).readAgentApprovals(run.getIssue(), delegator);
     }
 
     // --------------------------------------------------------------------- personne connectée

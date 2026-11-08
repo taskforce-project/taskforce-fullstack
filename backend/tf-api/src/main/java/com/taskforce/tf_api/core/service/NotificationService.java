@@ -283,6 +283,17 @@ public class NotificationService {
         dispatch(notif);
     }
 
+    /**
+     * Plus aucune demande n'attend la personne sur cette issue (R128, séance n°19) : tranchées, refusées faute de réponse
+     * ou mission arrêtée, leurs notifications ne restent pas « non lues ». La vérité du nombre est dans les demandes.
+     */
+    @Transactional
+    public void readAgentApprovals(Issue issue, User delegator) {
+        if (delegator == null) return;
+        notificationRepository.markReadForIssue(delegator.getId(),
+            issue.getProject().getIdentifier() + "-" + issue.getSequenceNumber(), "agentApproval");
+    }
+
     /** Run d'un agent de code terminé ou en échec (OSS-5.5), pour la personne qui a délégué. */
     @Transactional
     public void notifyAgentRunFinished(Issue issue, User delegator, String agentName, boolean done, String detail) {

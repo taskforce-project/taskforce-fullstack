@@ -63,6 +63,7 @@ public class DeliveryRunner {
     private final IssueGitHubLinkRepository linkRepository;
     private final MissionEvidenceService evidenceService;
     private final IssueService issueService;
+    private final DeliveryActivityService activityService;
 
     /** Adresse d'une pull request sur GitHub : le dépôt et le numéro. */
     private static final Pattern PULL_REQUEST =
@@ -222,9 +223,13 @@ public class DeliveryRunner {
 
     /**
      * Applique le résultat d'un poll au run : DONE -> « In review by AI », FAILED -> « Blocked », sinon RUNNING. Une
-     * mission qui a un dossier de preuve y est close ici, quelle que soit la fin : résultat du runner, runner perdu.
+     * mission qui a un dossier de preuve y est close ici, quelle que soit la fin : résultat du runner, runner perdu. Ses
+     * demandes encore ouvertes aussi : elles ne recevront plus de réponse utile (R128), et vont au dossier avant sa clôture.
      */
     private void applyPoll(DeliveryRun run, DeliveryPoll poll) {
+        if (poll.status() == DeliveryRunStatus.DONE || poll.status() == DeliveryRunStatus.FAILED) {
+            activityService.closeApprovals(run);
+        }
         switch (poll.status()) {
             case DONE -> {
                 run.setStatus(DeliveryRunStatus.DONE);
