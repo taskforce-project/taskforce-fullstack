@@ -130,6 +130,15 @@ export type DesktopUpdateState =
   | { status: "ready"; version: string; retry?: boolean }
   | { status: "failed"; version: string; message: string };
 
+/** État du modèle de la voix (cf. `desktop/src/voice.ts`) : sa taille, et ce qui en est déjà sur l'ordinateur. */
+export type DesktopVoiceStatus =
+  | { state: "missing"; bytes: number; received: number }
+  | { state: "downloading"; bytes: number; received: number }
+  | { state: "ready"; bytes: number };
+
+export type DesktopVoiceError = "model" | "engine" | "network" | "checksum" | "disk" | "cancelled";
+export type DesktopVoiceResult<T> = { ok: true; value: T } | { ok: false; error: DesktopVoiceError };
+
 /** Ce que la coque expose à la fenêtre de l'app. */
 export interface DesktopBridge {
   /** Jeton de la session de l'app, valable tant qu'elle reste ouverte. */
@@ -206,6 +215,19 @@ export interface DesktopBridge {
     sendWorkspace(input: { workspace: string }): Promise<DesktopResult<DesktopMovedWorkspace>>;
     /** Ouvre une adresse de la webapp dans le navigateur. */
     openWeb(url: string): Promise<void>;
+  };
+  /** La voix transcrite sur l'ordinateur (R80, R132). Absente là où le moteur n'est pas embarqué (version du Store). */
+  readonly voice?: {
+    status(): Promise<DesktopVoiceStatus>;
+    /** Télécharge le modèle, une fois, ou reprend là où il s'était arrêté. */
+    download(): Promise<DesktopVoiceResult<void>>;
+    cancelDownload(): Promise<void>;
+    /** Avancement du téléchargement ; rend de quoi arrêter l'écoute. */
+    onStatus(callback: (status: DesktopVoiceStatus) => void): () => void;
+    /** Charge le modèle pendant que la personne parle. */
+    prepare(): void;
+    /** Échantillons mono à 16 kHz ; rend le texte dit. */
+    transcribe(samples: Float32Array): Promise<DesktopVoiceResult<string>>;
   };
   /** Claude Code de la personne et le serveur MCP d'un espace : le jeton personnel va de la page à `claude`. */
   claude: {

@@ -1,15 +1,20 @@
 package com.taskforce.tf_api.core.service;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.taskforce.tf_api.core.service.AiStatusService.AiStatus;
 import com.taskforce.tf_api.core.service.ai.ChosenModel;
+import com.taskforce.tf_api.core.service.ai.ContextBudget;
+import com.taskforce.tf_api.core.service.ai.ModelChoice;
 import com.taskforce.tf_api.core.service.ai.ModelGateway;
 import com.taskforce.tf_api.core.service.ai.ModelProviderException;
+import com.taskforce.tf_api.core.service.ai.ModelWindow;
 import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.extern.slf4j.Slf4j;
@@ -85,7 +90,7 @@ public class AiGatewayClient implements LlmClient {
         if (usageAccumulator.get() == null) return;
         if (reply.model() != null && !reply.model().isBlank()) lastModel.set(reply.model());
         long prompt = reply.usage() == null ? 0 : reply.usage().promptTokens();
-        lastContext.set(new LlmContext(prompt, reply.contextWindow()));
+        lastContext.set(new LlmContext(prompt, reply.contextWindow(), reply.windowEstimated()));
     }
 
     @Override
@@ -107,6 +112,31 @@ public class AiGatewayClient implements LlmClient {
         return callChat(messages, tools, false, null, model);
     }
 
+    @Override
+    public ModelWindow contextWindow(String tier) {
+        AiStatusService.Snapshot snapshot = status.snapshot();
+        return gateway.window(snapshot.settings(), modelOf(tier, snapshot.status()), "deep".equals(tier));
+    }
+
+    @Override
+    public Optional<ModelWindow> largerWindow(String tier, int tokens) {
+        AiStatusService.Snapshot snapshot = status.snapshot();
+        String current = modelOf(tier, snapshot.status());
+        boolean think = "deep".equals(tier);
+        return ModelChoice.chatModels(snapshot.settings().provider(), snapshot.models()).stream()
+            .filter(model -> !model.equals(current))
+            .map(model -> gateway.window(snapshot.settings(), model, think))
+            .filter(window -> !window.estimated() && new ContextBudget(window, tokens, 0, 0, 0).fits())
+            .filter(window -> gateway.describe(snapshot.settings(), window.model())
+                .map(card -> !Boolean.FALSE.equals(card.tools())).orElse(true))
+            .min(Comparator.comparingInt(ModelWindow::tokens));
+    }
+
+    /** Le modèle de ce palier : celui que la personne a choisi pour cette action (R113, R118), sinon celui du palier. */
+    private static String modelOf(String tier, AiStatus current) {
+        return ChosenModel.current().orElseGet(() -> "fast".equals(tier) ? current.fastModel() : current.chatModel());
+    }
+
     private JsonNode callChat(List<?> messages, List<Map<String, Object>> tools, boolean jsonMode, String tier,
                               String model) {
         AiStatusService.Snapshot snapshot = status.snapshot();
@@ -116,8 +146,7 @@ public class AiGatewayClient implements LlmClient {
         }
         // Le modèle nommé d'abord (rejeu de la banque, R61), puis celui que la personne a choisi pour cette action
         // (R113, R118), sinon celui du palier.
-        String chosen = model != null && !model.isBlank() ? model
-            : ChosenModel.current().orElseGet(() -> "fast".equals(tier) ? current.fastModel() : current.chatModel());
+        String chosen = model != null && !model.isBlank() ? model : modelOf(tier, current);
         boolean think = "deep".equals(tier);
         try {
             ModelGateway.ChatReply reply = gateway.chat(snapshot.settings(),

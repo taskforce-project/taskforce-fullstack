@@ -173,10 +173,13 @@ services:
       AI_EMBED_API_KEY: ${AI_EMBED_API_KEY:-}
       AI_EMBED_MODEL: ${AI_EMBED_MODEL:-}
       # Délai d'une réponse du modèle (secondes) ; AI_MAX_TOKENS plafonne une réponse d'Anthropic ;
-      # AI_OLLAMA_MAX_CONTEXT, la fenêtre de contexte demandée à Ollama (vide : 16384 jetons).
+      # AI_OLLAMA_MAX_CONTEXT, la fenêtre de contexte demandée à Ollama (vide : 16384 jetons) ; AI_HOSTED_MAX_CONTEXT,
+      # le plafond chez un fournisseur hébergé ; AI_DEFAULT_CONTEXT, la fenêtre supposée quand il ne dit rien.
       AI_TIMEOUT: ${AI_TIMEOUT:-120}
       AI_MAX_TOKENS: ${AI_MAX_TOKENS:-}
       AI_OLLAMA_MAX_CONTEXT: ${AI_OLLAMA_MAX_CONTEXT:-}
+      AI_HOSTED_MAX_CONTEXT: ${AI_HOSTED_MAX_CONTEXT:-}
+      AI_DEFAULT_CONTEXT: ${AI_DEFAULT_CONTEXT:-}
       # Alias d'avant le lot 4, toujours lus : GROQ_* (chat sur Groq), OLLAMA_* (Ollama).
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-}

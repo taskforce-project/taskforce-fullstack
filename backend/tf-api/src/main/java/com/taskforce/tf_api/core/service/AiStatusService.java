@@ -94,8 +94,8 @@ public class AiStatusService {
     }
 
     /**
-     * Ce que la fiche d'un modèle dit de lui chez le fournisseur de maintenant (Ollama seulement), pour la table des
-     * capacités tant qu'il n'est pas mesuré (R125) ; vide ailleurs.
+     * Ce que la fiche d'un modèle dit de lui chez le fournisseur de maintenant, pour la table des capacités tant qu'il
+     * n'est pas mesuré (R125) : sur Ollama sa fiche, ailleurs la fenêtre que dit sa liste de modèles ; vide sans rien de lisible.
      */
     public Optional<ModelGateway.ModelCard> describe(String model) {
         return gateway.describe(snapshot().settings(), model);

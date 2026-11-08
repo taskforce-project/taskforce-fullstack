@@ -30,10 +30,12 @@ import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantChoice;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantQuestion;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead;
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead.ContextRead;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantSource;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantStep;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantToolCall;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage;
+import com.taskforce.tf_api.core.dto.response.ChatTurnResponse;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.enums.NodeDomain;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
@@ -45,6 +47,9 @@ import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.LlmContext;
 import com.taskforce.tf_api.core.service.LlmToolsRefusedException;
 import com.taskforce.tf_api.core.service.LlmUsage;
+import com.taskforce.tf_api.core.service.ai.ContextBudget;
+import com.taskforce.tf_api.core.service.ai.ModelWindow;
+import com.taskforce.tf_api.core.service.ai.TurnHistory;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.core.service.mcp.ExternalMcpTool;
@@ -395,23 +400,23 @@ public class AgentService {
      * demander quelle issue propose d'abord celles de l'écran (R115).
      */
     public AssistantAnswer run(String slug, Long userId, String message, List<Map<String, Object>> history, Screen screen) {
-        return run(slug, userId, message, history, screen, List.of());
+        return run(slug, userId, message, TurnHistory.of(history == null ? List.of() : history), screen, List.of());
     }
 
     /**
      * Avec ce que la personne a joint à sa demande depuis le compositeur (R123, séance n°18) : une issue
      * ({@code issueId} posé) que TaskForce lit comme avant un résumé, ou un projet dont il montre le tableau comme
-     * l'écran. Chaque lecture passe par les droits de la personne ; ce qu'elle ne voit pas ne se lit pas.
+     * l'écran. Chaque lecture passe par les droits de la personne ; ce qu'elle ne voit pas ne se lit pas. {@code memory}
+     * donne l'historique que le budget de la requête laisse partir (TF-J1-13), une fois la requête construite.
      */
-    public AssistantAnswer run(String slug, Long userId, String message, List<Map<String, Object>> history, Screen screen,
+    public AssistantAnswer run(String slug, Long userId, String message, TurnHistory memory, Screen screen,
                                List<Screen> attached) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         AgentContext ctx = new AgentContext(slug, ws.getId(), userId, screen, message);
-        List<Map<String, Object>> hist = history == null ? List.of() : history;
 
         // Salutation ou remerciement : réponse directe, sans recherche (pas de sources hors sujet).
         if (isConversational(message)) {
-            return runConversational(ws.getId(), message, hist);
+            return runConversational(ws.getId(), message, memory);
         }
 
         // ── Recherche (RAG), réelle avec ou sans IA, dans les notes que la personne lit ──
@@ -442,7 +447,7 @@ public class AgentService {
         try {
             steps.add(new AssistantStep(STEP_ANSWER, "active", "Cortex answers, with its tools if needed"));
             // Un geste qui se demande parle par sa carte : la phrase du modèle ne dit pas « je supprime » à sa place.
-            String modelAnswer = cardAnswer(runToolLoop(message, hits, ctx, toolCalls, hist, attached, reading), toolCalls);
+            String modelAnswer = cardAnswer(runToolLoop(message, hits, ctx, toolCalls, memory, attached, reading), toolCalls);
             // R116 : une phrase qui annonce une action sans son résultat d'outil est remplacée par la vérité, signée par
             // TaskForce, et l'incident entre au dossier de la réponse (E17).
             ActionClaimCheck.Checked checked = ActionClaimCheck.check(modelAnswer, ActionClaimCheck.Ran.of(toolCalls));
@@ -467,6 +472,13 @@ public class AgentService {
             recordUsage(ws.getId(), usage);
             return new AssistantAnswer(answer, null, toolCalls.isEmpty() ? "fast" : "deep",
                 sources, steps, toolCalls, usage(usage), record, llm.currentModel(), reading.read());
+        } catch (TooBig tooBig) {
+            log.info("Cortex (ws={}) : une demande d'environ {} jetons ne tient pas la fenêtre de {} ({})", ws.getId(),
+                tooBig.budget.fixed(), LogSafe.of(tooBig.budget.window().model()), tooBig.budget.window().tokens());
+            LlmUsage usage = llm.currentUsage();
+            recordUsage(ws.getId(), usage);
+            steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", TOO_BIG_STEP));
+            return tooBigAnswer(tooBig, sources, steps, usage(usage));
         } catch (LlmToolsRefusedException ex) {
             log.warn("Cortex (slug={}) : le fournisseur refuse les outils", LogSafe.of(slug));
             LlmUsage usage = llm.currentUsage();
@@ -533,14 +545,70 @@ public class AgentService {
     }
 
     /**
-     * L'usage du tour, et ce que le modèle a lu à son dernier appel : la taille de ce prompt et la fenêtre que la passerelle
-     * lui a donnée, que la jauge de contexte compare (test du CEO du 05/11/2026).
+     * L'usage du tour, et ce que le modèle a lu à son dernier appel : la taille de ce prompt et sa fenêtre, connue ou
+     * estimée, que la jauge de contexte compare (test du CEO du 05/11/2026).
      */
     private AssistantUsage usage(LlmUsage u) {
         if (u == null) return AssistantUsage.NONE; // garde défensive (mocks)
         LlmContext last = llm.currentContext();
         return new AssistantUsage(u.promptTokens(), u.completionTokens(), u.totalTokens(),
-            last == null ? 0 : last.promptTokens(), last == null ? null : last.window());
+            last == null ? 0 : last.promptTokens(), last == null ? null : last.window(), last != null && last.estimated());
+    }
+
+    // -------------------------------------------------------------------------
+    // Le contexte selon le modèle (TF-J1-13) : le budget de la requête, et une demande qui ne le tient pas
+    // -------------------------------------------------------------------------
+
+    /** Une demande qui ne tient pas la fenêtre de son modèle, même sans historique : rien ne part. */
+    private static final class TooBig extends RuntimeException {
+        private final transient ContextBudget budget;
+        private final String tier;
+
+        TooBig(ContextBudget budget, String tier) {
+            super("Too big for the context window", null, false, false);
+            this.budget = budget;
+            this.tier = tier;
+        }
+    }
+
+    private static final String TOO_BIG_STEP = "Too big for this model: nothing was sent";
+    /** La signature de TaskForce quand il parle du modèle qui répond : ce n'est pas une correction (R116). */
+    private static final String ABOUT_MODELS = ActionClaimCheck.SIGNATURE + " · models";
+
+    /** Le budget de cette requête, contre la fenêtre du modèle de son palier. */
+    private ContextBudget budget(String tier, String system, List<Map<String, Object>> toolDefs, String attached, String message) {
+        ModelWindow window = llm.contextWindow(tier);
+        int whole = ContextBudget.tokensOf(objectMapper, Map.of("role", "system", "content", system));
+        int joined = attached == null || attached.isBlank() ? 0 : ContextBudget.tokens(attached);
+        return new ContextBudget(window == null ? ModelWindow.UNBOUNDED : window, Math.max(0, whole - joined),
+            toolDefs.isEmpty() ? 0 : ContextBudget.tokensOf(objectMapper, toolDefs), joined,
+            ContextBudget.tokensOf(objectMapper, Map.of("role", "user", "content", message)));
+    }
+
+    /**
+     * Ce que TaskForce dit quand une demande ne tient pas (décision de la Présidence du 08/11/2026) : la réponse est la
+     * sienne, sans modèle ; elle dit la taille et la fenêtre, et propose un modèle servi qui la tient, s'il y en a un.
+     */
+    private AssistantAnswer tooBigAnswer(TooBig tooBig, List<AssistantSource> sources, List<AssistantStep> steps,
+                                         AssistantUsage usage) {
+        ContextBudget budget = tooBig.budget;
+        ModelWindow window = budget.window();
+        // La taille qui compte pour la personne, sa réponse comprise : sans elle, « 3 995 jetons pour une fenêtre de 4 096 »
+        // se lirait comme tenant.
+        String text = "This request needs about " + number(budget.fixed() + window.answerRoom()) + " tokens with its answer, and "
+            + window.model() + "'s context window is " + (window.estimated() ? "about " : "") + number(window.tokens())
+            + ", so it wasn't sent.";
+        ChatTurnResponse.Escalation offer = llm.largerWindow(tooBig.tier, budget.fixed())
+            .map(larger -> new ChatTurnResponse.Escalation(Capability.CONTEXT.key(), window.model(), larger.model(),
+                larger.model() + "'s context window is " + number(larger.tokens()) + ". You can send this request to "
+                    + larger.model() + "."))
+            .orElse(null);
+        return new AssistantAnswer(signed(ABOUT_MODELS, List.of(text)), null, "fallback", sources, steps, List.of(), usage, null, null,
+            null, offer);
+    }
+
+    private static String number(int tokens) {
+        return String.format(Locale.ENGLISH, "%,d", tokens);
     }
 
     /** Enregistre la conso IA (best-effort : ne casse jamais la réponse de l'agent). */
@@ -580,7 +648,7 @@ public class AgentService {
         return core.isEmpty() || SMALLTALK.contains(core);
     }
 
-    private AssistantAnswer runConversational(Long workspaceId, String message, List<Map<String, Object>> history) {
+    private AssistantAnswer runConversational(Long workspaceId, String message, TurnHistory memory) {
         List<AssistantStep> steps = new ArrayList<>();
         if (!llm.isConfigured()) {
             steps.add(new AssistantStep(STEP_ANSWER, "pending", "AI is not configured on this instance"));
@@ -594,13 +662,17 @@ public class AgentService {
         llm.beginUsageCapture();
         try {
             steps.add(new AssistantStep(STEP_ANSWER, "active", "Cortex answers"));
-            String answer = llm.chat(withHistory(CONVERSATIONAL_PROMPT, history, message), "fast");
+            Reading reading = new Reading(0);
+            ContextBudget budget = budget("fast", CONVERSATIONAL_PROMPT, List.of(), "", message);
+            TurnHistory.Fitted fitted = memory.fit(budget, "fast");
+            reading.fitted(fitted);
+            String answer = llm.chat(withHistory(CONVERSATIONAL_PROMPT, fitted.messages(), message), "fast");
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", "Answered directly"));
             LlmUsage usage = llm.currentUsage();
             recordUsage(workspaceId, usage);
             // Une salutation : le modèle n'a rien lu de l'espace, et la ligne grise le dit (R123).
             return new AssistantAnswer(answer, null, "fast", List.of(), steps, List.of(), usage(usage), null, llm.currentModel(),
-                new Reading(0).read());
+                reading.read());
         } catch (Exception ex) {
             log.warn("Cortex (conversation) indisponible : {}", ex.getMessage());
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", "The model did not answer"));
@@ -622,7 +694,7 @@ public class AgentService {
     // -------------------------------------------------------------------------
 
     private String runToolLoop(String message, List<KnowledgeNode> hits, AgentContext ctx,
-                               List<AssistantToolCall> toolCalls, List<Map<String, Object>> history,
+                               List<AssistantToolCall> toolCalls, TurnHistory memory,
                                List<Screen> attached, Reading reading) {
         // Outils externes (serveurs MCP connectés sur le workspace), découverts par requête et bornés par
         // pertinence avant l'envoi : un gros serveur MCP envoyé en entier sature un petit modèle.
@@ -669,10 +741,18 @@ public class AgentService {
             if (!issue.isEmpty()) blocks.add(issue.strip());
             seen = String.join("\n\n", blocks) + "\n";
         }
-        List<Map<String, Object>> messages = withHistory(
-            systemPrompt(plan, seen, hits, external, LocalDate.now(ZoneOffset.UTC)), history, message);
+        String system = systemPrompt(plan, seen, hits, external, LocalDate.now(ZoneOffset.UTC));
         List<Map<String, Object>> toolDefs = tools.toolDefinitions(external);
         String tier = external.isEmpty() ? "fast" : mcpToolTier;
+        // Le budget de la requête, contre la fenêtre de son modèle (TF-J1-13) : ce qui ne tient pas ne part pas, et
+        // l'historique ne prend que ce qu'il reste.
+        ContextBudget budget = budget(tier, system, toolDefs, seen, message);
+        if (!budget.fits()) throw new TooBig(budget, tier);
+        TurnHistory.Fitted fitted = memory.fit(budget, tier);
+        reading.fitted(fitted);
+        List<Map<String, Object>> messages = withHistory(system, fitted.messages(), message);
+        ToolLoopFit loopFit = new ToolLoopFit(objectMapper, budget, fitted.messages().size());
+        reading.watch(loopFit);
         // Le noyau (R35) : les règles de l'espace et le dossier de la réponse, ouverts au premier outil. Le dossier garde
         // ce que le modèle a vu de l'écran et le plan qu'il a reçu.
         Map<String, Object> origin = origin(tier, hits);
@@ -682,7 +762,7 @@ public class AgentService {
         if (plan != null) origin.put("plan", plan.id());
         Kernel kernel = new Kernel(ctx, message, origin);
         String answer = toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel,
-            reading);
+            reading, loopFit);
         // Le geste du plan, quand Cortex ne l'a pas fait et que rien n'attend déjà la personne (une carte, une question).
         boolean gestureMade = plan != null && toolCalls.stream().anyMatch(call -> call.name().equals(plan.ask())
             || QUESTION.equals(call.status()) || "pending".equals(call.status()));
@@ -734,12 +814,30 @@ public class AgentService {
                 (msgs, defs) -> model == null || model.isBlank()
                     ? llm.rawChat(msgs, defs, "fast")
                     : llm.rawChatWithModel(msgs, defs, model),
-                step, null);
+                step, null, null);
             // R116 : la banque note la réponse que la personne verrait, corrigée par TaskForce.
             List<ActionClaimCheck.Ran> ran = step.calls.stream()
                 .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList();
             return new ReplayOutcome(ActionClaimCheck.check(answer, ran).answer(), step.calls, llm.currentModel(),
                 llm.currentUsage());
+        } finally {
+            llm.endUsageCapture();
+        }
+    }
+
+    /**
+     * Une réponse sans outil, sur ce que TaskForce a lu pour le modèle (R131) : le banc des modèles et l'essai à l'aveugle. Rien
+     * ne s'écrit et rien ne s'exécute. Le quota et le frein de débit sont à l'appelant, comme pour un rejeu.
+     */
+    public ReplayOutcome answerFrom(String material, String question, LocalDate today, String model) {
+        String system = "You are Cortex, the AI copilot of a TaskForce workspace. Answer in the user's language, concisely. Use only "
+            + "what you are given here: never add a person, a date, a number or a fact it does not state. Today is "
+            + today.format(TODAY) + " (UTC).";
+        if (material != null && !material.isBlank()) system += "\n\n" + material.strip();
+        llm.beginUsageCapture();
+        try {
+            JsonNode reply = llm.rawChatWithModel(withHistory(system, List.of(), question), List.of(), model);
+            return new ReplayOutcome(reply.path("content").asText(""), List.of(), llm.currentModel(), llm.currentUsage());
         } finally {
             llm.endUsageCapture();
         }
@@ -781,9 +879,23 @@ public class AgentService {
         private final List<AssistantRead.IssueRead> issues = new ArrayList<>();
         private final List<AssistantRead.BoardRead> boards = new ArrayList<>();
         private final Map<String, Integer> tools = new LinkedHashMap<>();
+        private int summarized;
+        private int leftOut;
+        private ToolLoopFit loop;
 
         Reading(int notes) {
             this.notes = notes;
+        }
+
+        /** Ce qui a changé pour que l'historique tienne (TF-J1-13). */
+        void fitted(TurnHistory.Fitted fitted) {
+            summarized = fitted.summarized();
+            leftOut = fitted.leftOut();
+        }
+
+        /** La boucle d'outils de ce tour : ce qu'elle raccourcit entre dans la ligne grise. */
+        void watch(ToolLoopFit fit) {
+            loop = fit;
         }
 
         void board(ScreenContext.Seen seen) {
@@ -799,8 +911,11 @@ public class AgentService {
         }
 
         AssistantRead read() {
+            int out = leftOut + (loop == null ? 0 : loop.leftOut());
+            int shortened = loop == null ? 0 : loop.shortened();
+            ContextRead context = summarized == 0 && out == 0 && shortened == 0 ? null : new ContextRead(summarized, out, shortened);
             return new AssistantRead(issues, boards,
-                tools.entrySet().stream().map(e -> new AssistantRead.ToolRead(e.getKey(), e.getValue())).toList(), notes);
+                tools.entrySet().stream().map(e -> new AssistantRead.ToolRead(e.getKey(), e.getValue())).toList(), notes, context);
         }
     }
 
@@ -854,12 +969,16 @@ public class AgentService {
 
     /**
      * La boucle : le modèle appelle des outils ou répond, cinq tours au plus. Un outil qui lit et aboutit entre dans ce que
-     * le modèle a lu ({@code reading}, nul au rejeu d'un cas de la banque).
+     * le modèle a lu ({@code reading}, nul au rejeu d'un cas de la banque). Avant chaque appel, {@code fit} fait tenir les
+     * messages dans la fenêtre du modèle (TF-J1-13 ; nul au rejeu, dont les cas sont courts).
      */
     private String toolLoop(List<Map<String, Object>> messages, List<Map<String, Object>> toolDefs,
                             List<AgentTool> external, List<AssistantToolCall> toolCalls, ModelCall model, ToolStep step,
-                            Reading reading) {
+                            Reading reading, ToolLoopFit fit) {
         for (int i = 0; i < MAX_TOOL_ITERS; i++) {
+            if (fit != null && !fit.apply(messages)) {
+                return "Answer interrupted: what the tools returned no longer fits this model's context.";
+            }
             JsonNode msg = model.call(messages, toolDefs);
             JsonNode calls = msg.path("tool_calls");
             if (!calls.isArray() || calls.isEmpty()) {
@@ -960,6 +1079,9 @@ public class AgentService {
                     ? new ToolOutcome("error", "Not available in this test case: this read was not made when it was "
                         + "written. Answer from what you have.")
                     : new ToolOutcome("success", served);
+            } else if (replayCase.simulates(name)) {
+                // Le banc (R131) : l'écriture est dite réussie pour que la demande continue ; rien n'est exécuté.
+                outcome = new ToolOutcome("success", replayCase.served(name, argsJson));
             } else {
                 outcome = new ToolOutcome("pending", PROPOSED);
             }

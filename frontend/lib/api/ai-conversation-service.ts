@@ -2,7 +2,7 @@
  * Conversations Cortex (multi-conversation + historique).
  * `/api/workspaces/{slug}/ai/conversations`
  */
-import { apiClient } from "./client"
+import { AI_TIMEOUT_MS, apiClient } from "./client"
 import type { AssistantRead } from "./assistant-service"
 import { AI_ROUTES } from "../config/api-routes"
 
@@ -53,4 +53,15 @@ export async function createConversation(slug: string): Promise<ConversationSumm
 
 export async function deleteConversation(slug: string, id: number): Promise<void> {
   await apiClient.delete(AI_ROUTES.CONVERSATION(slug, id))
+}
+
+/** Ce que « /compact » a fait : les messages condensés dans le résumé de la conversation ; 0 sans rien à condenser. */
+export interface ConversationCompaction {
+  summarized: number
+}
+
+export async function compactConversation(slug: string, id: number): Promise<ConversationCompaction> {
+  // Le serveur demande au modèle un résumé : le temps d'une réponse de Cortex, pas celui d'une lecture.
+  const res = await apiClient.post<{ data: ConversationCompaction }>(AI_ROUTES.CONVERSATION_COMPACT(slug, id), undefined, { timeout: AI_TIMEOUT_MS })
+  return res.data.data
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import type { EvalHistoryCase, EvalHistoryRun } from "@/lib/api/eval-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 
-import { bankCurve, caseLines, caseOrigin, isFinished, passRate, runModel } from "./bank-history"
+import { bankCurve, caseLines, caseOrigin, isFinished, lastMark, passRate, runModel } from "./bank-history"
 
 const T = CONSTANTS_EN.progress
 
@@ -36,6 +36,16 @@ describe("the model of a run", () => {
 
   it.each([[5, 11, 45], [11, 11, 100], [0, 0, 0]])("passes %i of %i: %i%%", (passed, total, rate) => {
     expect(passRate({ passed, total })).toBe(rate)
+  })
+})
+
+describe("lastMark", () => {
+  it("is the latest replay of a case, whatever the model; null without a replay", () => {
+    expect(lastMark([])).toBeNull()
+    expect(lastMark([
+      { model: "qwen3:8b", marks: [{ runId: 1, passed: true, day: "2 Nov" }, { runId: 3, passed: false, day: "5 Nov" }] },
+      { model: "qwen3:14b", marks: [{ runId: 2, passed: true, day: "3 Nov" }] },
+    ])).toEqual({ runId: 3, passed: false, day: "5 Nov", model: "qwen3:8b" })
   })
 })
 

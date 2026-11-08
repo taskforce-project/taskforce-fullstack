@@ -4,6 +4,7 @@ import {
   delegateIssue,
   getIssueRun,
   listWorkspaceRuns,
+  listOpenApprovals,
   getRunnerStatus,
   provisionRunner,
   getRunActivity,
@@ -87,6 +88,16 @@ describe('delivery-service', () => {
     vi.mocked(apiClient.get).mockResolvedValue(envelope(null));
     const res = await listWorkspaceRuns(SLUG);
     expect(res).toEqual([]);
+  });
+
+  it('listOpenApprovals GET ce qui attend la personne (silentError, [] si vide)', async () => {
+    const rows = [{ runId: 9, issueId: 12, issueKey: 'WEB-12', issueTitle: 'Fix', projectId: 3, requests: 2 }];
+    vi.mocked(apiClient.get).mockResolvedValueOnce(envelope(rows));
+    await expect(listOpenApprovals(SLUG)).resolves.toEqual(rows);
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.OPEN_APPROVALS(SLUG), { silentError: true });
+
+    vi.mocked(apiClient.get).mockResolvedValueOnce(envelope(null));
+    await expect(listOpenApprovals(SLUG)).resolves.toEqual([]);
   });
 
   it('getRunnerStatus GET l’état du runner, en appel de fond (silentError)', async () => {

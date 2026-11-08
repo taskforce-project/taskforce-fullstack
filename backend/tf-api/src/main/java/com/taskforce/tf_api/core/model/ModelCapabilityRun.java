@@ -28,9 +28,17 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ModelCapabilityRun {
 
+    /** La suite d'une mesure de capacité (V121) ; celle du banc des modèles est {@code BenchmarkSuite.SUITE}. */
+    public static final String CAPABILITY = "capability";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    /** La suite de cas : les capacités (R113) ou le banc des modèles (R131). */
+    @Builder.Default
+    @Column(nullable = false, updatable = false, length = 32)
+    private String suite = CAPABILITY;
 
     @Column(name = "workspace_id", nullable = false, updatable = false)
     private Long workspaceId;

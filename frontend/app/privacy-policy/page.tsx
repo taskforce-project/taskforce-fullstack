@@ -27,7 +27,7 @@ export default function PrivacyPolicyPage() {
         </Link>
 
         <h1 className="text-3xl font-bold text-foreground mb-2">Privacy Policy</h1>
-        <p className="text-sm text-muted-foreground mb-10">Last updated: November 1, 2026</p>
+        <p className="text-sm text-muted-foreground mb-10">Last updated: November 8, 2026</p>
 
         <div className="max-w-none space-y-8 text-muted-foreground text-sm leading-relaxed">
 
@@ -79,6 +79,7 @@ export default function PrivacyPolicyPage() {
               <li><strong className="text-foreground">MinIO</strong> - file attachment storage (self-hosted or configured cloud region).</li>
               <li><strong className="text-foreground">PostHog</strong> (EU Cloud) - product analytics, only after you consent (hosted in the EU, no data leaves the EU).</li>
             </ul>
+            <p className="mt-2">Voice is optional. If you turn it on in the composer, your browser sends what you say to its own speech service, under its publisher&apos;s terms, and gives TaskForce only the text. TaskForce never receives the audio.</p>
           </section>
 
           <section>

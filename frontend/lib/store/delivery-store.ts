@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
   getDeliveryProviders,
   getIssueRun,
+  listOpenApprovals,
   listWorkspaceRuns,
   delegateIssue,
   getRunnerStatus,
@@ -18,6 +19,7 @@ import {
   type DeliveryRun,
   type DeliveryRunActivity,
   type MissionEvidence,
+  type OpenApproval,
   type RunnerProvision,
   type RunnerStatus,
 } from "../api/delivery-service";
@@ -38,6 +40,11 @@ interface DeliveryState {
   runs: Record<number, DeliveryRun | null>;
   /** Runs de délégation du workspace (vue « workflow »), les plus récents d'abord. */
   workspaceRuns: DeliveryRun[];
+  /**
+   * Ce qui attend la personne (R128, séance n°19) : ses demandes encore ouvertes, une ligne par mission. La liste de
+   * l'arrivée, le nombre de la barre de gauche et le volet « Waiting for you » lisent ceci, jamais les notifications.
+   */
+  openApprovals: OpenApproval[];
   /** Runner local de l'utilisateur (ADR-013). `null` = pas encore chargé. Jamais de secret ici. */
   runner: RunnerStatus | null;
   /** Activité par runId : chronologie cumulée (dans l'ordre) et demandes de validation du run (lot 5). */
@@ -51,6 +58,8 @@ interface DeliveryState {
   fetchProjectProviders: (slug: string, projectId: number) => Promise<DeliveryProvider[]>;
   fetchRun: (slug: string, issueId: number) => Promise<DeliveryRun | null>;
   fetchWorkspaceRuns: (slug: string) => Promise<DeliveryRun[]>;
+  /** Relit ce qui attend la personne ; `null` en cas d'échec, où la liste d'avant reste. */
+  fetchOpenApprovals: (slug: string) => Promise<OpenApproval[] | null>;
   delegate: (slug: string, issueId: number, providerKey: string, model?: string) => Promise<DeliveryRun | null>;
   fetchRunner: () => Promise<RunnerStatus | null>;
   /** Renvoie les identifiants (secret compris) à l'appelant SANS les garder : le secret ne vit pas dans l'état global. */
@@ -74,6 +83,13 @@ interface DeliveryState {
   retryRun: (slug: string, issueId: number, runId: number, note: string) => Promise<DeliveryRun | null>;
 }
 
+/** Une réponse donnée : la mission a une demande ouverte de moins, et quitte la liste à la dernière. */
+function answered(open: OpenApproval[], runId: number): OpenApproval[] {
+  return open
+    .map((row) => (row.runId === runId ? { ...row, requests: row.requests - 1 } : row))
+    .filter((row) => row.requests > 0);
+}
+
 /** Les raisons gardées, sans celle de cette mission. */
 function withoutError(errors: Record<number, string>, runId: number): Record<number, string> {
   const rest = { ...errors };
@@ -87,6 +103,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   providersLoading: false,
   runs: {},
   workspaceRuns: [],
+  openApprovals: [],
   runner: null,
   activity: {},
   resultErrors: {},
@@ -131,6 +148,16 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
       return runs;
     } catch {
       return [];
+    }
+  },
+
+  fetchOpenApprovals: async (slug) => {
+    try {
+      const openApprovals = await listOpenApprovals(slug);
+      set({ openApprovals });
+      return openApprovals;
+    } catch {
+      return null;
     }
   },
 
@@ -185,9 +212,13 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   decideApproval: async (slug, runId, approvalId, allow, forMission = false) => {
     try {
       await decideApprovalApi(slug, runId, approvalId, allow, forMission);
-      await get().fetchActivity(slug, runId);
+      // Répondre fait baisser le nombre aussitôt (R128) ; la relecture qui suit dit la vérité du serveur.
+      set((state) => ({ openApprovals: answered(state.openApprovals, runId) }));
+      await Promise.all([get().fetchActivity(slug, runId), get().fetchOpenApprovals(slug)]);
       return true;
     } catch {
+      // Refusée parce que la demande a expiré entre-temps : la liste n'était plus vraie.
+      await get().fetchOpenApprovals(slug);
       return false;
     }
   },

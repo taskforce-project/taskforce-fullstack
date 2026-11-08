@@ -5,7 +5,7 @@ import { CONSTANTS_EN } from "@/lib/constants_en"
 
 import { sourceLines } from "./sources"
 
-/** Ce que Cortex lit dans l'espace (R125) : chaque source comptée, avec son dernier changement. */
+/** Ce que Cortex lit dans l'espace (R125, R129) : chaque source comptée, avec le jour de son dernier changement. */
 describe("sourceLines", () => {
   it("names, counts and dates each source, in the server's order", () => {
     const sources: CortexSource[] = [
@@ -15,9 +15,9 @@ describe("sourceLines", () => {
     ]
 
     expect(sourceLines(sources, CONSTANTS_EN.progress)).toEqual([
-      { key: "issues", label: "Issues", count: "1,267", changed: "changed 7 Nov" },
-      { key: "notes", label: "Notes", count: "None yet", changed: null },
-      { key: "connectors", label: "Connected tools", count: "2", changed: null },
+      { key: "issues", label: "Issues", count: "1,267", day: "7 Nov", changed: "changed 7 Nov" },
+      { key: "notes", label: "Notes", count: "0", day: null, changed: null },
+      { key: "connectors", label: "Connected tools", count: "2", day: null, changed: null },
     ])
   })
 

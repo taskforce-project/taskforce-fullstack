@@ -5,7 +5,8 @@ import type { IssueHit } from "@/lib/api/issue-service"
  * Ce que le compositeur sait de ce qu'on tape (R123, séance n°18) : « + » joint une issue ou un projet ; « @ » ouvre la
  * liste des issues, des personnes et des projets, « / » en tête celle des gestes, dès le premier caractère. Une issue ou
  * un projet choisi se joint à la demande : Cortex reçoit son contenu, lu par TaskForce (la matière de l'issue, le tableau
- * du projet). Une personne s'écrit par son nom ; un geste remplit le compositeur, il n'envoie rien.
+ * du projet). Une personne s'écrit par son nom ; un geste remplit le compositeur, il n'envoie rien. « /compact » est le
+ * seul qui parle à TaskForce plutôt qu'à Cortex : envoyé, il condense la conversation.
  */
 
 /** Une pièce jointe du compositeur : une issue ou un projet, et ce que sa pastille montre. */
@@ -37,6 +38,9 @@ export function withAttachment(list: readonly ComposerAttachment[], item: Compos
 export function toRequest(list: readonly ComposerAttachment[]): AssistantAttachment[] {
   return list.map((a) => (a.kind === "issue" && a.issueId !== null ? { projectId: a.projectId, issueId: a.issueId } : { projectId: a.projectId }))
 }
+
+/** Le geste « /compact » (TF-J1-13) : il ne s'écrit pas à Cortex, TaskForce condense la conversation. */
+export const COMPACT_COMMAND = "/compact"
 
 /** Ce qui ouvre une liste dans le texte : « @ » (une mention) ou « / » en tête (un geste), et ce qui est tapé après. */
 export interface Trigger {

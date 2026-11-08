@@ -31,6 +31,9 @@ export const boardPath = (slug: string, projectId: number): string => `/${slug}/
 export const issuePath = (slug: string, projectId: number, issueId: number): string =>
   `${boardPath(slug, projectId)}?issue=${issueId}`
 
+/** « Waiting for you » (R121, R128) : ce qui attend la personne, qu'on ouvre depuis la barre de gauche et l'arrivée. */
+export const waitingPath = (slug: string): string => `/${slug}/inbox`
+
 /** La section du volet « Progress » (R125) : ce que l'agent sait, et comment il progresse. */
 export const PROGRESS = "progress"
 

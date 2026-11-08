@@ -35,6 +35,8 @@ import lombok.extern.slf4j.Slf4j;
  *   <li>avec Ollama, la conversation passe par son API ({@code /api/chat}), la seule où une requête choisit sa fenêtre
  *       de contexte : elle est taillée à chaque requête ({@link OllamaProtocol}), au lieu des 4 096 jetons par défaut
  *       où le prompt de Cortex perdait son début (J1-4, 04/11/2026) ;</li>
+ *   <li>la fenêtre des autres fournisseurs vient de leur liste de modèles, quand ils la disent ; sinon la valeur prudente
+ *       des réglages, marquée comme une estimation ({@link #window}) ;</li>
  *   <li>un bloc {@code <think>} resté dans une réponse est retiré ;</li>
  *   <li>un refus 400 ou 413 avec des outils : on redemande avec moitié moins d'outils (un serveur MCP riche dépasse la
  *       taille admise, ou expose un schéma refusé ; le backend les envoie triés par pertinence, on garde le début). Jamais
@@ -65,6 +67,8 @@ public class ModelGateway {
     private final ModelHttp http;
     /** La fiche de chaque modèle d'Ollama ({@code /api/show}), par adresse : elle ne change qu'avec le modèle. */
     private final Map<String, ModelCard> modelCards = new ConcurrentHashMap<>();
+    /** La fenêtre que chaque fournisseur hébergé dit de ses modèles, par adresse, relue avec sa liste (état de l'IA, 30 s). */
+    private final Map<String, Integer> reportedWindows = new ConcurrentHashMap<>();
 
     @Autowired
     public ModelGateway(ObjectMapper mapper) {
@@ -91,14 +95,19 @@ public class ModelGateway {
 
     /**
      * La réponse : le modèle qui a répondu, le message assistant (qui peut porter des {@code tool_calls}), l'usage, et la
-     * fenêtre de contexte que la passerelle a donnée à la requête ({@code num_ctx} d'Ollama), null quand le fournisseur
-     * la tient lui-même.
+     * fenêtre de contexte de cette requête : celle que la passerelle a donnée à Ollama ({@code num_ctx}), celle qu'un
+     * autre fournisseur dit de ce modèle, ou la valeur prudente des réglages ({@code windowEstimated}).
      */
-    public record ChatReply(String model, ObjectNode message, LlmUsage usage, Integer contextWindow) {
+    public record ChatReply(String model, ObjectNode message, LlmUsage usage, Integer contextWindow, boolean windowEstimated) {
 
-        /** Une réponse d'un fournisseur qui tient lui-même sa fenêtre de contexte. */
+        /** Une réponse dont personne ne dit la fenêtre. */
         public ChatReply(String model, ObjectNode message, LlmUsage usage) {
-            this(model, message, usage, null);
+            this(model, message, usage, null, false);
+        }
+
+        /** Une réponse dont on connaît la fenêtre. */
+        public ChatReply(String model, ObjectNode message, LlmUsage usage, Integer contextWindow) {
+            this(model, message, usage, contextWindow, false);
         }
     }
 
@@ -137,9 +146,36 @@ public class ModelGateway {
     }
 
     /**
+     * La fenêtre sur laquelle TaskForce compte pour une requête de ce modèle (TF-J1-13). Sur Ollama, ce que la passerelle
+     * lui donne au plus. Ailleurs, ce que le fournisseur dit dans sa liste de modèles, sous {@code AI_HOSTED_MAX_CONTEXT} ;
+     * s'il ne dit rien, {@code AI_DEFAULT_CONTEXT}, marquée comme une estimation. Chez Anthropic, la réponse a la place que
+     * lui donne {@code AI_MAX_TOKENS} : au-delà de la fenêtre, elle s'arrêterait en route (ses modèles récents), ou l'API
+     * refuserait la requête (les plus anciens).
+     */
+    public ModelWindow window(AiProviderSettings settings, String model, boolean think) {
+        if (settings.provider() == AiProvider.OLLAMA) {
+            String base = OllamaProtocol.nativeBase(settings.baseUrl());
+            int maximum = model == null || model.isBlank() ? 0 : modelMaximum(base, openAiHeaders(settings.apiKey()), model);
+            int ceiling = OllamaProtocol.ceiling(settings.ollamaMaxContext(), maximum);
+            return new ModelWindow(model, ceiling, false, ContextBudget.answerRoom(ceiling, think));
+        }
+        Integer reported = reportedWindow(settings, model);
+        int known = reported == null ? settings.defaultContext() : reported;
+        int tokens = settings.hostedMaxContext() > 0 ? Math.min(known, settings.hostedMaxContext()) : known;
+        int room = settings.provider() == AiProvider.ANTHROPIC
+            ? Math.min(settings.maxTokens(), tokens / 2) : ContextBudget.answerRoom(tokens, think);
+        return new ModelWindow(model, tokens, reported == null, room);
+    }
+
+    /** Ce que le fournisseur dit de la fenêtre de ce modèle, relu à chaque liste de ses modèles ; null s'il ne dit rien. */
+    private Integer reportedWindow(AiProviderSettings settings, String model) {
+        return model == null ? null : reportedWindows.get(settings.baseUrl() + " " + model);
+    }
+
+    /**
      * La plus grande fenêtre de contexte que la passerelle donne à ce modèle, en jetons, pour l'état de l'IA : sur
      * Ollama, {@code AI_OLLAMA_MAX_CONTEXT}, ou le maximum du modèle s'il est plus petit. Ailleurs, le fournisseur la
-     * tient : vide.
+     * tient : vide (la conversation lit {@link #window}).
      */
     public Optional<Integer> contextWindow(AiProviderSettings settings, String model) {
         if (!settings.enabled() || settings.provider() != AiProvider.OLLAMA || model == null || model.isBlank()) {
@@ -152,11 +188,16 @@ public class ModelGateway {
 
     /**
      * Ce que la fiche d'un modèle dit de lui (sa taille, sa fenêtre, ses outils), pour la table des capacités tant qu'il
-     * n'est pas mesuré (R125) : sur Ollama, lue une fois dans {@code /api/show}. Ailleurs, ou sans fiche lisible : vide.
+     * n'est pas mesuré (R125) : sur Ollama, lue une fois dans {@code /api/show} ; chez un autre fournisseur, la fenêtre
+     * qu'il dit dans sa liste de modèles. Sans rien de lisible : vide.
      */
     public Optional<ModelCard> describe(AiProviderSettings settings, String model) {
-        if (!settings.enabled() || settings.provider() != AiProvider.OLLAMA || model == null || model.isBlank()) {
+        if (!settings.enabled() || model == null || model.isBlank()) {
             return Optional.empty();
+        }
+        if (settings.provider() != AiProvider.OLLAMA) {
+            Integer reported = reportedWindow(settings, model);
+            return reported == null ? Optional.empty() : Optional.of(new ModelCard(null, reported, null));
         }
         ModelCard card = card(OllamaProtocol.nativeBase(settings.baseUrl()), openAiHeaders(settings.apiKey()), model);
         return card.empty() ? Optional.empty() : Optional.of(card);
@@ -191,14 +232,16 @@ public class ModelGateway {
     public Optional<List<String>> chatModels(AiProviderSettings settings) {
         if (settings.provider() == AiProvider.ANTHROPIC) {
             // Toute la liste d'un coup : sans limite, Anthropic n'en rend que vingt.
-            return models(settings.baseUrl() + "/models?limit=1000", anthropicHeaders(settings.apiKey()));
+            return models(settings.baseUrl() + "/models?limit=1000", anthropicHeaders(settings.apiKey()), settings.baseUrl());
         }
-        return models(settings.baseUrl() + "/models", openAiHeaders(settings.apiKey()));
+        // La liste d'Ollama (/v1/models) ne dit pas de fenêtre : la sienne vient de sa fiche.
+        return models(settings.baseUrl() + "/models", openAiHeaders(settings.apiKey()),
+            settings.provider() == AiProvider.OLLAMA ? null : settings.baseUrl());
     }
 
     /** Les modèles que le fournisseur des vecteurs annonce ; vide s'il ne répond pas. */
     public Optional<List<String>> embedModels(AiProviderSettings settings) {
-        return models(settings.embedBaseUrl() + "/models", openAiHeaders(settings.embedApiKey()));
+        return models(settings.embedBaseUrl() + "/models", openAiHeaders(settings.embedApiKey()), null);
     }
 
     // -------------------------------------------------------------------------
@@ -228,7 +271,9 @@ public class ModelGateway {
                 if (!choices.isArray() || choices.isEmpty() || !(choices.get(0).path("message") instanceof ObjectNode message)) {
                     throw new ModelProviderException("AI provider answered without choices");
                 }
-                return new ChatReply(model, OpenAiProtocol.stripThinking(message), usage(payload.path("usage")));
+                ModelWindow window = window(settings, model, call.think());
+                return new ChatReply(model, OpenAiProtocol.stripThinking(message), usage(payload.path("usage")),
+                    window.tokens(), window.estimated());
             }
             if (reply.status() == 400 && !attempt.isEmpty() && !retriedGeneration && reply.body().contains("tool_use_failed")) {
                 // Groq refuse une réponse où le modèle a mal formé un appel d'outil : on redemande une fois, mêmes outils.
@@ -284,9 +329,9 @@ public class ModelGateway {
         String model = call.model();
         int ceiling = OllamaProtocol.ceiling(settings.ollamaMaxContext(), modelMaximum(base, headers, model));
         int loaded = loadedWindow(base, headers, model);
-        long chars = write(body.path("messages")).length() + (body.has("tools") ? write(body.path("tools")).length() : 0);
-        int tokens = OllamaProtocol.tokens(chars);
-        int needed = OllamaProtocol.needed(tokens, call.think());
+        int tokens = ContextBudget.tokens(write(body.path("messages")))
+            + (body.has("tools") ? ContextBudget.tokens(write(body.path("tools"))) : 0);
+        int needed = OllamaProtocol.needed(tokens, call.think(), ceiling);
         int window = OllamaProtocol.window(needed, ceiling, loaded);
         if (needed > window) {
             log.warn("A request to {} needs about {} tokens, more than its context window of {}: Ollama drops the "
@@ -353,8 +398,9 @@ public class ModelGateway {
             ModelHttp.Reply reply = send(url, headers, body, settings.timeout());
             if (reply.ok()) {
                 JsonNode payload = read(reply.body());
+                ModelWindow window = window(settings, call.model(), call.think());
                 return new ChatReply(call.model(), AnthropicProtocol.message(mapper, payload, call.jsonMode()),
-                    usage(AnthropicProtocol.usage(mapper, payload)));
+                    usage(AnthropicProtocol.usage(mapper, payload)), window.tokens(), window.estimated());
             }
             String error = errorMessage(reply.body());
             if (reply.status() == 400 && !thinkingDropped && error.contains("signature")
@@ -424,7 +470,11 @@ public class ModelGateway {
         }
     }
 
-    private Optional<List<String>> models(String url, Map<String, String> headers) {
+    /**
+     * Les modèles d'une liste, en gardant la fenêtre de ceux qui la disent, quand {@code windowsOf} nomme l'adresse où
+     * les retrouver (les vecteurs n'en ont pas besoin).
+     */
+    private Optional<List<String>> models(String url, Map<String, String> headers, String windowsOf) {
         try {
             ModelHttp.Reply reply = http.send("GET", url, headers, null, PROBE_TIMEOUT);
             if (!reply.ok()) {
@@ -436,6 +486,10 @@ public class ModelGateway {
                 String id = row.path("id").asText("");
                 if (!id.isEmpty()) {
                     ids.add(id);
+                    int reported = OpenAiProtocol.reportedWindow(row);
+                    if (windowsOf != null && reported > 0) {
+                        reportedWindows.put(windowsOf + " " + id, reported);
+                    }
                 }
             });
             return Optional.of(List.copyOf(ids));

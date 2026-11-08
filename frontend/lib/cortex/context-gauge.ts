@@ -10,11 +10,13 @@ import type { CONSTANTS_EN } from "@/lib/constants_en"
 
 type CortexTexts = (typeof CONSTANTS_EN)["cortex"]
 
-/** Ce que le modèle a lu à la dernière demande : son prompt, et la fenêtre que la passerelle lui a donnée. */
+/** Ce que le modèle a lu à la dernière demande : son prompt, et sa fenêtre de contexte. */
 export interface CortexContext {
   tokens: number
-  /** null quand le fournisseur tient lui-même la fenêtre (une API hébergée). */
+  /** null quand personne ne la dit (une réponse d'un serveur plus ancien). */
   window: number | null
+  /** Vrai quand le fournisseur ne la dit pas : la valeur des réglages, montrée comme une estimation (TF-J1-13). */
+  estimated?: boolean
 }
 
 export type GaugeTone = "blue" | "amber" | "rose"
@@ -50,12 +52,13 @@ export function contextFrom(usage: AssistantUsage | null | undefined): CortexCon
   const tokens = usage?.lastPromptTokens ?? 0
   if (tokens <= 0) return null
   const window = usage?.contextWindow ?? null
-  return { tokens, window: window && window > 0 ? window : null }
+  return { tokens, window: window && window > 0 ? window : null, ...(usage?.contextEstimated ? { estimated: true } : {}) }
 }
 
 /**
  * La jauge : le prompt de la dernière demande contre sa fenêtre, en pourcentage, et sa ligne. {@code maximum} est la plus
- * grande fenêtre que la passerelle donne (l'état de l'IA, Ollama seulement) : la ligne dit jusqu'où elle grandit.
+ * grande fenêtre que la passerelle donne (l'état de l'IA, Ollama seulement) : la ligne dit jusqu'où elle grandit. Une
+ * fenêtre que le fournisseur ne dit pas se lit « ~16k », et la ligne dit que c'est une estimation.
  */
 export function contextGauge(context: CortexContext | null, maximum: number | null, t: CortexTexts): ContextGauge {
   if (!context) return { value: null, pct: 0, tone: "blue", line: t.contextNone }
@@ -63,8 +66,9 @@ export function contextGauge(context: CortexContext | null, maximum: number | nu
     return { value: fill(t.contextTokens, { tokens: formatTokens(context.tokens) }), pct: 0, tone: "blue", line: t.contextProvider }
   }
   const pct = Math.min(100, Math.round((context.tokens / context.window) * 100))
-  const value = `${formatTokens(context.tokens)} / ${formatTokens(context.window)} (${pct}%)`
-  const line = pct >= FULL ? t.contextFull
+  const value = `${formatTokens(context.tokens)} / ${context.estimated ? "~" : ""}${formatTokens(context.window)} (${pct}%)`
+  const line = context.estimated ? t.contextEstimated
+    : pct >= FULL ? t.contextFull
     : maximum && maximum > context.window ? fill(t.contextLineUpTo, { max: formatTokens(maximum) })
     : t.contextLine
   return { value, pct, tone: toneOf(pct), line }

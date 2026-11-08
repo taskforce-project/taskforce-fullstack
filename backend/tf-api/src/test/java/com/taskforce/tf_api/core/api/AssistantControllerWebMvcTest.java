@@ -111,6 +111,27 @@ class AssistantControllerWebMvcTest {
     }
 
     @Test
+    @DisplayName("POST assistant : une demande trop grande pour le modèle propose celui qui la tient, un champ à part dans la réponse")
+    void chat_offers_a_model_that_holds_a_request_too_big() throws Exception {
+        String text = "qwen3:14b's context window is 40,960. You can send this request to qwen3:14b.";
+        ChatTurnResponse.Escalation offer = new ChatTurnResponse.Escalation("context", "qwen3:8b", "qwen3:14b", text);
+        answering("Too big.");
+        when(agentService.run(anyString(), anyLong(), anyString(), any(), any(), any())).thenReturn(
+            new com.taskforce.tf_api.core.dto.response.AssistantAnswer("Too big.", null, "fallback", java.util.List.of(), java.util.List.of(),
+                java.util.List.of(), com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE, null, null, null, offer));
+
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Summarize\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.escalation.to").value("qwen3:14b"))
+            .andExpect(jsonPath("$.data.escalation.capability").value("context"))
+            .andExpect(jsonPath("$.data.answer.offer").doesNotExist());
+        verify(capabilities, never()).offer(anyString(), any(), anyString());
+        verify(conversationService).appendMessage(1L, "assistant", "Too big." + ModelCapabilityService.block(text), "fallback", 0, null, null);
+    }
+
+    @Test
     @DisplayName("POST assistant avec un modèle : la demande part à ce modèle, et TaskForce dit que la personne l'a demandé")
     void chat_sends_the_request_to_the_model_the_person_clicked() throws Exception {
         AtomicReference<String> used = answering("Moved.");
