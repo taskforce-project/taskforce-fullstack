@@ -9,6 +9,11 @@ vi.mock("next/navigation", () => ({
 }))
 vi.mock("./cortex-usage", () => ({ CortexUsage: () => <span>context gauge</span> }))
 vi.mock("@/lib/api/issue-service", () => ({ searchIssues: vi.fn().mockResolvedValue([]) }))
+const voice = vi.hoisted(() => ({ voiceKind: vi.fn() }))
+vi.mock("@/lib/store/voice-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/store/voice-store")>()),
+  voiceKind: voice.voiceKind,
+}))
 
 import { Composer } from "./composer"
 import type { AiStatus } from "@/lib/api/ai-status-service"
@@ -18,6 +23,7 @@ import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { useCortexStore } from "@/lib/store/cortex-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { searchKey, useSearchStore } from "@/lib/store/search-store"
+import { useVoiceStore } from "@/lib/store/voice-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 
 const initial = useCortexStore.getState()
@@ -36,6 +42,70 @@ describe("Composer", () => {
     useSearchStore.setState({ hits: { [searchKey("acme", "")]: [hit], [searchKey("acme", "ops")]: [hit] }, latest: {}, pending: {} })
     useProjectStore.setState({ projects: [{ id: 3, name: "Operations", identifier: "OPS", status: "ACTIVE" } as unknown as Project] })
     useWorkspaceStore.setState({ members: [], fetchMembers: vi.fn().mockResolvedValue([]) })
+    voice.voiceKind.mockReturnValue(null)
+    useVoiceStore.setState({ phase: "idle", notice: null })
+  })
+
+  describe("the microphone (R132)", () => {
+    /** La personne clique sur le micro ; le store rend ce qui a été dit à ce que le compositeur lui a confié. */
+    function dictate(said: string) {
+      const press = vi.fn(async (_person: string | null, onText: (text: string) => void) => onText(said))
+      useVoiceStore.setState({ press })
+      fireEvent.click(screen.getByRole("button", { name: "Voice input" }))
+      return press
+    }
+
+    it("has no microphone where no voice exists", () => {
+      render(<Composer variant="column" />)
+      expect(screen.queryByRole("button", { name: "Voice input" })).toBeNull()
+    })
+
+    it("sits just before the send button", () => {
+      voice.voiceKind.mockReturnValue("local")
+      render(<Composer variant="column" />)
+
+      const mic = screen.getByRole("button", { name: "Voice input" })
+      expect(mic.nextElementSibling).toBe(screen.getByRole("button", { name: "Send" }))
+    })
+
+    it("writes at the caret, where the text can be corrected, and sends nothing", () => {
+      voice.voiceKind.mockReturnValue("local")
+      useCortexStore.setState({ draft: "Move  to Done" })
+      render(<Composer variant="column" />)
+      const input = screen.getByLabelText("What do you want done?") as HTMLInputElement
+      input.setSelectionRange(5, 5)
+
+      dictate("WEB-12")
+
+      expect(useCortexStore.getState().draft).toBe("Move WEB-12 to Done")
+      expect(send).not.toHaveBeenCalled()
+    })
+
+    it("writes in what the person typed meanwhile", () => {
+      voice.voiceKind.mockReturnValue("local")
+      render(<Composer variant="column" />)
+      let write: (text: string) => void = () => undefined
+      useVoiceStore.setState({ press: vi.fn(async (_person: string | null, onText: (text: string) => void) => { write = onText }) })
+      fireEvent.click(screen.getByRole("button", { name: "Voice input" }))
+
+      act(() => useCortexStore.setState({ draft: "Hello" }))
+      ;(screen.getByLabelText("What do you want done?") as HTMLInputElement).setSelectionRange(5, 5)
+      act(() => write("there"))
+
+      expect(useCortexStore.getState().draft).toBe("Hello there")
+    })
+
+    it("shows its one line in the composer, which keeps working", () => {
+      voice.voiceKind.mockReturnValue("local")
+      useVoiceStore.setState({ notice: "denied" })
+      render(<Composer variant="column" />)
+
+      expect(screen.getByText("Microphone blocked in your settings.")).toBeInTheDocument()
+      const input = screen.getByLabelText("What do you want done?")
+      fireEvent.change(input, { target: { value: "Move WEB-12 to Done" } })
+      fireEvent.keyDown(input, { key: "Enter" })
+      expect(send).toHaveBeenCalledWith("acme")
+    })
   })
 
   it("in its column, shows the model, which opens Progress in the pane, and the context indicator, and no toggle", () => {

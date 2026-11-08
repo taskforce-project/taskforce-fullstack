@@ -7,6 +7,8 @@ import { ArrowUp, ChevronDown, CircleDot, FolderKanban, Loader2, MessageSquare, 
 import { AttachMenu } from "./attach-menu"
 import { CortexUsage } from "./cortex-usage"
 import { optionDomId, PickList } from "./pick-list"
+import { VoiceButton } from "./voice-button"
+import { VoiceLine } from "./voice-line"
 import { PaneLink } from "@/components/layout/pane-link"
 import { applyPick, attachmentKey, nextIndex, triggerAt, type PickOption } from "@/lib/cortex/composer-picker"
 import { fillText } from "@/lib/delivery/result-card"
@@ -18,6 +20,7 @@ import { withConversation } from "@/lib/window/address"
 import { cortexModel } from "@/lib/window/environment"
 // Le volet « Progress » (R125) : ce que le modèle sait, et comment il progresse.
 import { progressPath } from "@/lib/window/pane"
+import { insertDictation } from "@/lib/voice/dictation"
 
 /**
  * Le compositeur (R76, R123) : écrire ce qu'on veut faire, puis l'envoyer. Rien ne part tant que la personne n'envoie
@@ -26,7 +29,8 @@ import { progressPath } from "@/lib/window/pane"
  * gestes, dès le premier caractère, au clavier d'abord. Ce qui est joint se montre en pastilles et part avec la demande :
  * Cortex reçoit ce que TaskForce en lit. En bas de la colonne de la conversation, il porte dessous le modèle, qui ouvre
  * « Progress » dans le volet, et l'indicateur de contexte. Replié, quand le volet prend toute la largeur, il garde le
- * bouton qui déplie la conversation au-dessus de lui (le motif du 02/11/2026).
+ * bouton qui déplie la conversation au-dessus de lui (le motif du 02/11/2026). Le micro (R132) écrit ce qui est dit là où
+ * est le curseur ; il n'envoie jamais rien.
  */
 export function Composer({ variant, inputRef, onToggle }: Readonly<{
   variant: "column" | "folded"
@@ -81,6 +85,13 @@ export function Composer({ variant, inputRef, onToggle }: Readonly<{
     })
   }
 
+  // La transcription finit après le second clic : le texte et le curseur sont relus à ce moment-là, la personne a pu écrire.
+  const dictate = (said: string) => {
+    const current = useCortexStore.getState().draft
+    const next = insertDictation(current, ref.current?.selectionStart ?? current.length, said)
+    write(next.text, next.caret)
+  }
+
   const pick = (option: PickOption) => {
     if (!trigger) return
     if (option.attach) attach(option.attach)
@@ -128,6 +139,7 @@ export function Composer({ variant, inputRef, onToggle }: Readonly<{
             })}
           </ul>
         )}
+        <VoiceLine />
         <div className="flex h-13 items-center gap-1 px-2.5">
           {folded && (
             <button
@@ -185,6 +197,7 @@ export function Composer({ variant, inputRef, onToggle }: Readonly<{
             aria-activedescendant={current ? optionDomId(listId, current) : undefined}
             className="h-10 min-w-0 flex-1 bg-transparent px-1.5 text-sm outline-none placeholder:text-muted-foreground/60"
           />
+          <VoiceButton onText={dictate} />
           <button
             type="button"
             onClick={submit}
