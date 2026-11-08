@@ -170,8 +170,8 @@ class ModelGatewayTest {
             assertThat(reply.model()).isEqualTo(model);
             assertThat(reply.message().path("content").asText()).isEqualTo("ok");
             assertThat(reply.usage().totalTokens()).isEqualTo(4);
-            // Le fournisseur n'a rien dit de ce modèle : la valeur prudente des réglages, donnée comme une estimation.
-            assertThat(reply.contextWindow()).isEqualTo(16_384);
+            // Le fournisseur n'a rien dit de ce modèle : la valeur prudente des réglages, sous le plafond de Groq, une estimation.
+            assertThat(reply.contextWindow()).isEqualTo(env.containsKey("GROQ_API_KEY") ? 12_000 : 16_384);
             assertThat(reply.windowEstimated()).isTrue();
         }
 
