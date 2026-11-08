@@ -5,10 +5,11 @@ import { Loader2 } from "lucide-react"
 import { Named } from "@/components/progress/named"
 
 /**
- * Ce qui avance dans la ligne (R129) : un cercle qui tourne et « 3/8 » ; la phrase entière au survol. Elle est dite aux
- * lecteurs d'écran par un `role="status"` à part : le signe seul ne leur dirait rien.
+ * Ce qui avance dans une ligne (R129) : un cercle qui tourne et « 3/8 » ; la phrase entière au survol. Elle est dite aux
+ * lecteurs d'écran par un `role="status"` à part : le signe seul ne leur dirait rien. `announced={false}` quand la marque
+ * vit dans un bouton : le `status` se pose alors à côté du bouton, pour ne pas changer son nom.
  */
-export function BusyMark({ short, text }: Readonly<{ short: string; text: string }>) {
+export function BusyMark({ short, text, announced = true }: Readonly<{ short: string; text: string; announced?: boolean }>) {
   return (
     <>
       <Named name={text} wide>
@@ -17,7 +18,7 @@ export function BusyMark({ short, text }: Readonly<{ short: string; text: string
           {short}
         </span>
       </Named>
-      <span role="status" className="sr-only">{text}</span>
+      {announced && <span role="status" className="sr-only">{text}</span>}
     </>
   )
 }

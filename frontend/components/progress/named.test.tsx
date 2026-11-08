@@ -30,6 +30,12 @@ describe("BusyMark", () => {
     expect(screen.getByText("3/8")).toHaveAttribute("aria-hidden")
     expect(screen.getByRole("status")).toHaveTextContent("Measuring qwen3:8b: 3 of 8")
   })
+
+  it("leaves the announcement to its parent when it lives in a button", () => {
+    render(<BusyMark short="3/8" text="Measuring" announced={false} />)
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument()
+  })
 })
 
 describe("ProgressSection", () => {

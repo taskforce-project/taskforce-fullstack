@@ -11,6 +11,7 @@ import { failedCaseTitles, fillModelText, proposedFor, scoreLine, scoreSign, sco
 import type {
   ModelCapabilityInfo, ModelCapabilityRow, ModelCapabilityTable as Table,
 } from "@/lib/api/model-capability-service"
+import type { CONSTANTS_EN } from "@/lib/constants_en"
 import { dayOf } from "@/lib/progress/day"
 import { cardLine } from "@/lib/progress/model-card"
 import { useEvalStore } from "@/lib/store/eval-store"
@@ -38,13 +39,14 @@ function CapabilityHead({ capability }: Readonly<{ capability: ModelCapabilityIn
 }
 
 /** Ce que la ligne dit d'une mesure qui la concerne : « 3/8 », ou les secondes du frein de débit ; la phrase au survol. */
-function MeasureMark({ progress }: Readonly<{ progress: ModelMeasureProgress }>) {
-  const t = usePreferencesStore((s) => s.t.models)
-  const waiting = progress.waitSeconds !== null
-  const text = waiting
-    ? fillModelText(t.waiting, { seconds: progress.waitSeconds ?? 0 })
-    : fillModelText(progress.auto ? t.autoMeasuring : t.measuring, { model: progress.model, done: progress.done, total: progress.total })
-  return <BusyMark short={waiting ? `${progress.waitSeconds} s` : `${progress.done}/${progress.total}`} text={text} />
+function measureWords(progress: ModelMeasureProgress, t: (typeof CONSTANTS_EN)["models"]): { short: string; text: string } {
+  if (progress.waitSeconds !== null) {
+    return { short: `${progress.waitSeconds} s`, text: fillModelText(t.waiting, { seconds: progress.waitSeconds }) }
+  }
+  return {
+    short: `${progress.done}/${progress.total}`,
+    text: fillModelText(progress.auto ? t.autoMeasuring : t.measuring, { model: progress.model, done: progress.done, total: progress.total }),
+  }
 }
 
 /**
@@ -135,8 +137,11 @@ function ModelLine({ slug, table, row, open, onToggle }: Readonly<{
   const progress = useModelCapabilityStore((s) => s.progress)
   const detailId = useId()
   const nameOf = (capability: string) => table.capabilities.find((c) => c.key === capability)?.label ?? capability
+  const measuring = progress?.model === row.model ? measureWords(progress, t) : null
   return (
     <li>
+      {/* Dite une fois, hors du bouton de la ligne : son nom ne change pas pendant la mesure. */}
+      {measuring && <span role="status" className="sr-only">{measuring.text}</span>}
       <div className="flex h-9 items-center gap-1">
         <button
           type="button"
@@ -157,7 +162,7 @@ function ModelLine({ slug, table, row, open, onToggle }: Readonly<{
             )}
           </span>
           <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">{row.model}</span>
-          {progress?.model === row.model && <MeasureMark progress={progress} />}
+          {measuring && <BusyMark short={measuring.short} text={measuring.text} announced={false} />}
           <span className="flex shrink-0">
             {row.scores.map((score) => (
               <CapabilitySign
