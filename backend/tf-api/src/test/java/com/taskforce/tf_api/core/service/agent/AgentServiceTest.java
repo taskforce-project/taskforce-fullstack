@@ -994,6 +994,47 @@ class AgentServiceTest {
     }
 
     @Test
+    @DisplayName("au banc (R131), une écriture que la cassette simule est dite réussie, pour que la demande continue ; rien n'est lancé")
+    void a_benchmark_simulates_a_write() throws Exception {
+        AgentTool tool = stubReplayTool("update_issue");
+        ReplayCase simulated = new ReplayCase("Move it.", java.time.LocalDate.of(2026, 11, 9), List.of(),
+            List.of(new ReplayCase.CassetteEntry("update_issue", ReplayCase.ANY, "Done: the issue is updated.")));
+        when(llm.rawChatWithModel(anyList(), anyList(), eq("qwen3:8b"))).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"update_issue\",\"arguments\":\"{\\\"issue\\\":\\\"X-1\\\"}\"}}]}"),
+            json.readTree("{\"content\":\"Moved.\"}"));
+
+        ReplayOutcome outcome = service.replay(new AgentContext("acme", 1L, 7L), simulated, "qwen3:8b");
+
+        assertThat(outcome.calls()).singleElement().satisfies(call -> assertThat(call.status()).isEqualTo("success"));
+        verify(tool, never()).execute(any(), any());
+        verify(records, never()).open(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("une réponse sans outil (R131) : la matière dans le prompt, aucune définition d'outil, l'usage rendu ; l'espace n'est pas touché")
+    @SuppressWarnings("unchecked")
+    void an_answer_without_tools() throws Exception {
+        when(llm.rawChatWithModel(anyList(), anyList(), eq("qwen3:8b"))).thenReturn(json.readTree("{\"content\":\"Un résumé.\"}"));
+        when(llm.currentModel()).thenReturn("qwen3:8b");
+        when(llm.currentUsage()).thenReturn(new LlmUsage(50, 5, 55));
+
+        ReplayOutcome outcome = service.answerFrom("OPS-35: rien.", "Résume OPS-35.", java.time.LocalDate.of(2026, 11, 9), "qwen3:8b");
+
+        assertThat(outcome.answer()).isEqualTo("Un résumé.");
+        assertThat(outcome.calls()).isEmpty();
+        assertThat(outcome.model()).isEqualTo("qwen3:8b");
+        assertThat(outcome.usage().totalTokens()).isEqualTo(55);
+        ArgumentCaptor<List<Map<String, Object>>> messages = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<Map<String, Object>>> definitions = ArgumentCaptor.forClass(List.class);
+        verify(llm).rawChatWithModel(messages.capture(), definitions.capture(), eq("qwen3:8b"));
+        assertThat(definitions.getValue()).isEmpty();
+        assertThat((String) messages.getValue().get(0).get("content")).contains("OPS-35: rien.").contains("Monday 9 November 2026");
+        assertThat(messages.getValue().get(1).get("content")).isEqualTo("Résume OPS-35.");
+        verify(llm).endUsageCapture();
+        verify(records, never()).open(any(), any(), any());
+    }
+
+    @Test
     @DisplayName("au rejeu, la banque note la réponse que la personne verrait, corrigée par TaskForce (R116)")
     void a_replay_is_checked_like_an_answer() throws Exception {
         stubReplayTool("list_issues");

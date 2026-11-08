@@ -284,7 +284,7 @@ public class ModelCapabilityService {
     private Measures measures(AiStatusService.Snapshot snapshot) {
         List<String> order = ModelChoice.chatModels(snapshot.settings().provider(), snapshot.models());
         Map<Long, String> modelOfRun = new HashMap<>();
-        runs.findTop500BySuiteVersionOrderByStartedAtDesc(CapabilitySuite.VERSION).stream()
+        runs.findTop500BySuiteAndSuiteVersionOrderByStartedAtDesc(ModelCapabilityRun.CAPABILITY, CapabilitySuite.VERSION).stream()
             .filter(run -> order.contains(run.getModel()))
             .forEach(run -> modelOfRun.put(run.getId(), run.getModel()));
         Map<String, Map<String, Latest>> latest = new HashMap<>();

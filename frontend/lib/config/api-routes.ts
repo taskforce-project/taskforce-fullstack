@@ -404,6 +404,23 @@ export const AI_ROUTES = {
  * Ce que sait faire chaque modèle (R113) : la table de l'instance, une mesure cas par cas, le modèle de Cortex choisi.
  * Backend: @RequestMapping("/api/workspaces/{slug}/ai/models").
  */
+/**
+ * Le banc des modèles (R131)
+ * Backend: /api/workspaces/{slug}/ai/benchmark
+ */
+export const AI_BENCHMARK_ROUTES = {
+  MATRIX: (slug: string) => `/api/workspaces/${slug}/ai/benchmark`,
+  DETAIL: (slug: string) => `/api/workspaces/${slug}/ai/benchmark/detail`,
+  RUNS: (slug: string) => `/api/workspaces/${slug}/ai/benchmark/runs`,
+  RUN_CASE: (slug: string, runId: number, caseKey: string) =>
+    `/api/workspaces/${slug}/ai/benchmark/runs/${runId}/cases/${encodeURIComponent(caseKey)}`,
+  VERDICT: (slug: string, resultId: number) => `/api/workspaces/${slug}/ai/benchmark/results/${resultId}/verdict`,
+  TRIALS: (slug: string) => `/api/workspaces/${slug}/ai/benchmark/trials`,
+  TRIAL_LETTER: (slug: string, trialId: number, letter: string) =>
+    `/api/workspaces/${slug}/ai/benchmark/trials/${trialId}/letters/${encodeURIComponent(letter)}`,
+  TRIAL_CHOICE: (slug: string, trialId: number) => `/api/workspaces/${slug}/ai/benchmark/trials/${trialId}/choice`,
+} as const;
+
 export const AI_MODEL_ROUTES = {
   TABLE: (slug: string) => `/api/workspaces/${slug}/ai/models`,
   RUNS: (slug: string) => `/api/workspaces/${slug}/ai/models/runs`,

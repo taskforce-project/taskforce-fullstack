@@ -745,6 +745,24 @@ public class AgentService {
         }
     }
 
+    /**
+     * Une réponse sans outil, sur ce que TaskForce a lu pour le modèle (R131) : le banc des modèles et l'essai à l'aveugle. Rien
+     * ne s'écrit et rien ne s'exécute. Le quota et le frein de débit sont à l'appelant, comme pour un rejeu.
+     */
+    public ReplayOutcome answerFrom(String material, String question, LocalDate today, String model) {
+        String system = "You are Cortex, the AI copilot of a TaskForce workspace. Answer in the user's language, concisely. Use only "
+            + "what you are given here: never add a person, a date, a number or a fact it does not state. Today is "
+            + today.format(TODAY) + " (UTC).";
+        if (material != null && !material.isBlank()) system += "\n\n" + material.strip();
+        llm.beginUsageCapture();
+        try {
+            JsonNode reply = llm.rawChatWithModel(withHistory(system, List.of(), question), List.of(), model);
+            return new ReplayOutcome(reply.path("content").asText(""), List.of(), llm.currentModel(), llm.currentUsage());
+        } finally {
+            llm.endUsageCapture();
+        }
+    }
+
     /** Ce qui appelle le modèle : le tier d'une réponse, ou un modèle nommé au rejeu. */
     @FunctionalInterface
     private interface ModelCall {
@@ -960,6 +978,9 @@ public class AgentService {
                     ? new ToolOutcome("error", "Not available in this test case: this read was not made when it was "
                         + "written. Answer from what you have.")
                     : new ToolOutcome("success", served);
+            } else if (replayCase.simulates(name)) {
+                // Le banc (R131) : l'écriture est dite réussie pour que la demande continue ; rien n'est exécuté.
+                outcome = new ToolOutcome("success", replayCase.served(name, argsJson));
             } else {
                 outcome = new ToolOutcome("pending", PROPOSED);
             }
