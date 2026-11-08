@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, session, shell } from "electron";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -10,11 +10,13 @@ import { createRepo, DEVICE_PAGE, findRepo, GitHubSignIn, isNewRepoName, isRepoF
 import { initLog, log } from "./log";
 import { APP_ID, readNotice } from "./notify";
 import { appLogDir, fromStore, storeDataDir } from "./paths";
+import { applyPermissions } from "./permissions";
 import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
 import { toolsStatus } from "./tools";
 import { readMove, readWorkspaceMove, Transfer, type LocalApi } from "./transfer";
 import { check, installNow, restartApp, startUpdater, updateState } from "./updater";
+import { registerVoice, voiceAvailable } from "./voice";
 import {
   integratedTitleBar,
   MAIN_TITLE_BAR_HEIGHT,
@@ -63,6 +65,9 @@ async function main(): Promise<void> {
   if (process.platform === "win32" && !fromStore()) app.setAppUserModelId(APP_ID);
   Menu.setApplicationMenu(buildMenu());
   registerIpc();
+  registerVoice(() => mainWindow);
+  // Micro pour la seule origine de la fenêtre ; ce que l'interface n'utilise pas est refusé (cf. permissions.ts).
+  applyPermissions(session.defaultSession, () => stack?.origin ?? null, voiceAvailable());
 
   // Un compte connecté par un autre service de comptes (développement, changement d'adresse) demande une reconnexion.
   let account = settings.account();
@@ -321,6 +326,8 @@ function registerIpc(): void {
       onboardedOnline: stack?.account.profile?.onboardingCompleted === true,
       // Qui installe les mises à jour : l'app elle-même, ou le Microsoft Store pour sa version Store.
       updates: fromStore() ? "store" : "app",
+      // La voix transcrite sur la machine, là où le moteur est embarqué (cf. voice.ts).
+      voice: voiceAvailable(),
     };
   });
   ipcMain.handle("desktop:account-page", () => shell.openExternal(accountPageUrl()));

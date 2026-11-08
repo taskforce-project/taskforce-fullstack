@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
+import { WaitingRows } from "@/components/inbox/waiting-rows"
 import {
   Radio, AtSign, ShieldAlert, ClipboardList,
   CheckCheck, Flame, AlertTriangle, Clock, CheckCircle2,
@@ -17,10 +18,14 @@ import { PageContainer } from "@/components/layout/page-shell"
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table"
 import { RefreshControl } from "@/components/ui/refresh-control"
 import { cn } from "@/lib/utils"
+import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { useNotificationStore } from "@/lib/store/notification-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { useUserStore } from "@/lib/store/user-store"
 import type { Signal, Urgency } from "@/lib/store/notification-store"
 import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { issueRefOfUrl } from "@/lib/window/address"
+import { mentionItems, waitingItems } from "@/lib/window/arrival"
 import { issuePath } from "@/lib/window/pane"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -66,8 +71,14 @@ function hasDestination(s: Signal): boolean {
   return Boolean(s.issueUrl || s.operationUrl)
 }
 
+/**
+ * Une mention non lue est déjà dans les lignes du haut (R128) ; une fois lue, elle rejoint le fil. Le fil ne garde jamais
+ * une demande d'accord : ce qui est ouvert est en haut, lu des demandes elles-mêmes, et le reste se lit dans la mission.
+ */
+const unreadMention = (s: Signal) => s.type === "mention" && !s.read
+
 const TABS: { key: NotifTab; icon: React.ElementType; label: string; filter: (s: Signal) => boolean }[] = [
-  { key: "all",         icon: Radio,         label: "All", filter: () => true },
+  { key: "all",         icon: Radio,         label: "All", filter: (s) => !unreadMention(s) },
   { key: "alerts",      icon: ShieldAlert,   label: "Alerts",      filter: (s) => s.type === "dueSoon" || s.type === "overdue" },
   { key: "mentions",    icon: AtSign,        label: "Mentions",    filter: (s) => s.type === "mention" },
 ]
@@ -144,8 +155,12 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
   const params = useParams()
   const slug = params?.workspace as string | undefined
 
-  const { signals, isLoading, error, lastSyncAt, fetchNotifications, markAsRead, markAllAsRead, acknowledgeAll, acknowledge: acknowledgeNotif } =
+  const { signals: allSignals, isLoading, error, lastSyncAt, fetchNotifications, markAsRead, markAllAsRead, acknowledgeAll, acknowledge: acknowledgeNotif } =
     useNotificationStore()
+  const conversation = usePreferencesStore((s) => s.t.conversation)
+  const approvals = useDeliveryStore((s) => s.openApprovals)
+  const runs = useDeliveryStore((s) => s.workspaceRuns)
+  const me = useUserStore((s) => s.user?.id)
 
   const [activeTab, setActiveTab] = useState<NotifTab>(defaultTab)
   const { openIssue } = usePaneNavigation()
@@ -154,6 +169,12 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
     if (slug) fetchNotifications(slug)
   }, [slug, fetchNotifications])
 
+  // Ce qui attend vraiment la personne (R128), la même vérité que l'arrivée et le nombre de la barre de gauche.
+  const waiting = useMemo(
+    () => [...waitingItems(approvals, runs, me, conversation), ...mentionItems(allSignals, conversation)],
+    [approvals, runs, me, conversation, allSignals],
+  )
+  const signals = useMemo(() => allSignals.filter((s) => s.type !== "agentApproval"), [allSignals])
   const tabCfg = TABS.find((t) => t.key === activeTab)!
   const filtered = signals.filter(tabCfg.filter)
   const unreadCount = signals.filter((s) => !s.read).length
@@ -268,6 +289,9 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
 
   return (
     <PageContainer>
+      {/* Ce qui attend la personne, d'abord ; dessous, le fil de ses alertes et de ses mentions. */}
+      {waiting.length > 0 && slug && <div className="-mx-2"><WaitingRows slug={slug} items={waiting} /></div>}
+
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
@@ -323,7 +347,8 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
       ) : error && signals.length === 0 ? (
         <ErrorState onRetry={() => { if (slug) void fetchNotifications(slug) }} />
       ) : filtered.length === 0 ? (
-        <EmptyState tab={activeTab} />
+        // Des lignes attendent au-dessus : le fil vide ne dit pas « All clear ».
+        waiting.length > 0 ? null : <EmptyState tab={activeTab} />
       ) : (
         <div className="space-y-3">
           <DataTable

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.ApprovalDecisionRequest;
 import com.taskforce.tf_api.core.dto.request.DelegateRequest;
+import com.taskforce.tf_api.core.dto.response.DeliveryOpenApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryProviderResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunActivityResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
@@ -127,6 +128,20 @@ public class DeliveryController {
             runs = deliveryService.listRuns(slug, userId);
         }
         return ResponseEntity.ok(ApiResponse.success("Runs retrieved", runs));
+    }
+
+    /**
+     * GET /api/workspaces/{slug}/delivery/approvals/open : ce qui attend vraiment la personne connectée (R128, séance
+     * n°19), une ligne par mission : ses demandes encore ouvertes, sur une mission qui peut encore les recevoir, dans les
+     * projets qu'elle voit. « Waiting for you » lit ceci, pas les notifications.
+     */
+    @GetMapping("/approvals/open")
+    public ResponseEntity<ApiResponse<List<DeliveryOpenApprovalResponse>>> openApprovals(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("Open requests retrieved",
+            activityService.openApprovals(slug, resolveUserId(jwt))));
     }
 
     /**

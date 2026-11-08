@@ -193,4 +193,23 @@ describe("useModelCapabilityStore", () => {
     expect(await useModelCapabilityStore.getState().choose("acme", "gone:1b")).toBe(false);
     expect(useModelCapabilityStore.getState().error).toBe("The AI of this instance doesn't serve gone:1b.");
   });
+
+  it("the instance's model changed: the last gesture wins over a model pinned with Use for Cortex", async () => {
+    const pinned = { ...TABLE, choice: "qwen3:14b", current: "qwen3:14b" };
+    useModelCapabilityStore.setState({ table: pinned });
+    vi.mocked(service.chooseModel).mockResolvedValueOnce({ ...TABLE, choice: null });
+
+    expect(await useModelCapabilityStore.getState().instanceChanged("acme")).toBe(true);
+    expect(service.chooseModel).toHaveBeenCalledWith("acme", null);
+    expect(useModelCapabilityStore.getState().table?.choice).toBeNull();
+  });
+
+  it("the instance's model changed with nothing pinned: the table is read again, and says when it can't be", async () => {
+    useModelCapabilityStore.setState({ table: { ...TABLE, choice: null } });
+    vi.mocked(service.getModelCapabilities).mockResolvedValueOnce(TABLE).mockRejectedValueOnce(new Error("down"));
+
+    expect(await useModelCapabilityStore.getState().instanceChanged("acme")).toBe(true);
+    expect(service.chooseModel).not.toHaveBeenCalled();
+    expect(await useModelCapabilityStore.getState().instanceChanged("acme")).toBe(false);
+  });
 });

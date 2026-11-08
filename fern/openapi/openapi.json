@@ -8756,6 +8756,36 @@
         }
       }
     },
+    "/api/workspaces/{slug}/delivery/approvals/open": {
+      "get": {
+        "tags": [
+          "Coding agents"
+        ],
+        "operationId": "openApprovals",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListDeliveryOpenApprovalResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/bundle": {
       "get": {
         "tags": [
@@ -11194,6 +11224,12 @@
           },
           "card": {
             "$ref": "#/components/schemas/Card"
+          },
+          "failedCases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -19193,6 +19229,54 @@
           },
           "trial": {
             "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseListDeliveryOpenApprovalResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryOpenApprovalResponse"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DeliveryOpenApprovalResponse": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "issueId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "issueKey": {
+            "type": "string"
+          },
+          "issueTitle": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "requests": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

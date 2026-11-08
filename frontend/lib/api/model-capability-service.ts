@@ -55,6 +55,8 @@ export interface ModelCapabilityRow {
   scores: ModelCapabilityScore[]
   /** La fiche du modèle ; null quand le fournisseur ne la donne pas, absente d'un serveur plus ancien. */
   card?: ModelCard | null
+  /** Les clés des cas ratés à leur dernière note, dans l'ordre de la suite ; absente d'un serveur plus ancien. */
+  failedCases?: string[]
 }
 
 export interface ModelCapabilityProposal {
