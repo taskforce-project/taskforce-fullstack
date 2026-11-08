@@ -96,12 +96,14 @@ export function mentionItems(signals: readonly Signal[], t: ConversationTexts): 
 }
 
 /**
- * L'arrivée peut-elle mettre le curseur dans le compositeur, comme Raycast et Spotlight (E18) ? Seulement si la
- * conversation est seule à l'écran et que personne n'est ailleurs : ni dans un volet, ni dans une fenêtre de dialogue, ni
- * dans un champ ; et pas sur un écran tactile, où le clavier couvrirait l'arrivée. Lu au moment où l'arrivée s'ouvre.
+ * L'arrivée peut-elle mettre le curseur dans le compositeur, comme Raycast et Spotlight (E18) ? Seulement sur une
+ * conversation neuve (l'arrivée s'affiche aussi le temps qu'une conversation de l'adresse se charge), seule à l'écran,
+ * et si personne n'est ailleurs : ni dans un volet, ni dans une fenêtre de dialogue, ni dans un champ ; et pas sur un
+ * écran tactile, où le clavier couvrirait l'arrivée. Lu au moment où l'arrivée s'ouvre.
  */
 export function arrivalMayTakeFocus(): boolean {
   if (paneOf(globalThis.location?.pathname) !== null) return false
+  if (new URLSearchParams(globalThis.location?.search).has("c")) return false
   if (!globalThis.matchMedia?.("(pointer: fine)").matches) return false
   const active = document.activeElement
   if (active && active !== document.body) return false

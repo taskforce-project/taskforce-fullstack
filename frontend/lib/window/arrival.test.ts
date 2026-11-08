@@ -104,6 +104,12 @@ describe("arrivalMayTakeFocus", () => {
     expect(arrivalMayTakeFocus()).toBe(false)
   })
 
+  it("non quand l'adresse rouvre une conversation : l'arrivée n'est là que le temps qu'elle se charge", () => {
+    window.history.replaceState(null, "", "/acme?c=12")
+    pointer(true)
+    expect(arrivalMayTakeFocus()).toBe(false)
+  })
+
   it("non sur un écran tactile : le clavier couvrirait l'arrivée", () => {
     window.history.replaceState(null, "", "/acme")
     pointer(false)
