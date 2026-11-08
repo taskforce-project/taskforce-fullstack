@@ -132,6 +132,19 @@ export function toDesktopRelease(rel: GithubRelease): DesktopRelease {
 /** Variables d'environnement du build (Node) ; le site n'embarque pas les types de Node. */
 const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
 
+/** Compare deux numéros de version, nombre par nombre : 1.10.0 vient après 1.9.0. */
+export function compareVersions(a: string, b: string): number {
+  const numbers = (version: string) => version.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const [left, right] = [numbers(a), numbers(b)];
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    const difference = (left[i] ?? 0) - (right[i] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+const versionOf = (rel: GithubRelease) => rel.tag_name.slice(DESKTOP_TAG_PREFIX.length);
+
 async function load(): Promise<DesktopRelease | null> {
   // Build hors ligne ou volontairement sans release (ex. aperçu) : DESKTOP_RELEASE=none.
   if (env.DESKTOP_RELEASE === "none") return null;
@@ -141,16 +154,17 @@ async function load(): Promise<DesktopRelease | null> {
       "User-Agent": "taskforce-site-build",
     };
     if (env.GITHUB_TOKEN) headers.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
-    const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=40`, {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=100`, {
       headers,
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return null;
     const list = (await res.json()) as GithubRelease[];
-    const rel = list.find(
-      (r) => !r.draft && r.tag_name.startsWith(DESKTOP_TAG_PREFIX) && r.assets.some((a) => platformOf(a.name).length > 0),
-    );
-    return rel ? toDesktopRelease(rel) : null;
+    // L'ordre de cette liste n'est pas celui des versions (1.9.0 y passait devant 1.10.0) : le plus grand numéro gagne.
+    const [newest] = list
+      .filter((r) => !r.draft && r.tag_name.startsWith(DESKTOP_TAG_PREFIX) && r.assets.some((a) => platformOf(a.name).length > 0))
+      .sort((a, b) => compareVersions(versionOf(b), versionOf(a)));
+    return newest ? toDesktopRelease(newest) : null;
   } catch {
     return null; // réseau indisponible au build : état « pas encore publiée », jamais de lien inventé
   }
