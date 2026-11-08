@@ -1,0 +1,125 @@
+name: Desktop - Launch checklist
+
+# The launch checklist of each milestone (roadmap R105) on a Windows machine that has never seen TaskForce: a clean
+# install of the previous published version, the update to the next one, the uninstall, and everything that can be
+# proved without an account. It uses only what is published (the installers of the GitHub Releases) and no credential:
+# the app stops at its sign-in window and nothing here signs in.
+#
+# Each step ends with one line in the job summary, in plain English. The checks are in
+# .github/scripts/desktop-launch-checklist.ps1; the evidence (screenshots, the app's logs, listings of its folders) is
+# kept as an artifact of the run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: 'Version installed first (empty: the second latest published desktop version)'
+        type: string
+        default: ''
+      to:
+        description: 'Version it updates to (empty: the latest published desktop version)'
+        type: string
+        default: ''
+  # So that it can run from its own branch, before the workflow exists on the default branch.
+  push:
+    branches: [chore/desktop-launch-checklist]
+    paths:
+      - '.github/workflows/desktop-launch-checklist.yml'
+      - '.github/scripts/desktop-launch-checklist.ps1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-launch-checklist
+  cancel-in-progress: true
+
+jobs:
+  checklist:
+    name: Install, update, uninstall
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - name: Which versions
+        id: versions
+        timeout-minutes: 2
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM_INPUT: ${{ inputs.from }}
+          TO_INPUT: ${{ inputs.to }}
+        run: ./.github/scripts/desktop-launch-checklist.ps1 versions
+
+      - name: Download the published installers
+        id: download
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./.github/scripts/desktop-launch-checklist.ps1 download
+
+      - name: Clean install of the previous version
+        id: clean-install
+        timeout-minutes: 6
+        run: ./.github/scripts/desktop-launch-checklist.ps1 clean-install
+
+      - name: First start, up to the sign-in window
+        id: first-start
+        timeout-minutes: 4
+        run: ./.github/scripts/desktop-launch-checklist.ps1 first-start
+
+      - name: Embedded database of the previous version
+        id: first-database
+        timeout-minutes: 4
+        run: ./.github/scripts/desktop-launch-checklist.ps1 first-database
+
+      - name: Update to the next version
+        id: update
+        timeout-minutes: 8
+        run: ./.github/scripts/desktop-launch-checklist.ps1 update
+
+      - name: Embedded database after the update
+        id: updated-database
+        timeout-minutes: 4
+        run: ./.github/scripts/desktop-launch-checklist.ps1 updated-database
+
+      - name: As far as no account goes
+        id: without-account
+        timeout-minutes: 4
+        run: ./.github/scripts/desktop-launch-checklist.ps1 without-account
+
+      # The runner has this runtime and Windows does not guarantee it, so this step hides it. Its result is about another
+      # machine than the runner: it says what it finds without stopping the checklist, and the last step repeats it. Once
+      # the app brings its own runtime, remove continue-on-error so that it stays that way.
+      - name: On a computer without the Visual C++ runtime
+        id: no-visual-cpp
+        timeout-minutes: 3
+        continue-on-error: true
+        run: ./.github/scripts/desktop-launch-checklist.ps1 no-visual-cpp
+
+      - name: Uninstall
+        id: uninstall
+        timeout-minutes: 4
+        run: ./.github/scripts/desktop-launch-checklist.ps1 uninstall
+
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-checklist-evidence
+          path: ${{ runner.temp }}/launch-checklist/evidence
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Say how it ended
+        if: always()
+        env:
+          CHECKLIST_STATUS: ${{ job.status }}
+          CHECKLIST_STEPS: ${{ toJSON(steps) }}
+        run: ./.github/scripts/desktop-launch-checklist.ps1 verdict
