@@ -1901,7 +1901,8 @@ class AgentServiceTest {
 
         assertThat(answer.mode()).isEqualTo("fallback");
         assertThat(answer.model()).isNull();
-        assertThat(answer.answer()).startsWith(ActionClaimCheck.SIGNATURE).contains("This request is about ").contains(" tokens, and tiny:1b's context window is 4,096, so it wasn't sent.");
+        assertThat(answer.answer()).startsWith(ActionClaimCheck.SIGNATURE).contains("This request needs about ")
+            .contains(" tokens with its answer, and tiny:1b's context window is 4,096, so it wasn't sent.");
         assertThat(answer.offer().from()).isEqualTo("tiny:1b");
         assertThat(answer.offer().to()).isEqualTo("qwen3:8b");
         assertThat(answer.offer().text()).contains("qwen3:8b's context window is 16,384").contains("send this request to qwen3:8b");

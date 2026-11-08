@@ -593,8 +593,11 @@ public class AgentService {
                                          AssistantUsage usage) {
         ContextBudget budget = tooBig.budget;
         ModelWindow window = budget.window();
-        String text = "This request is about " + number(budget.fixed()) + " tokens, and " + window.model()
-            + "'s context window is " + (window.estimated() ? "about " : "") + number(window.tokens()) + ", so it wasn't sent.";
+        // La taille qui compte pour la personne, sa réponse comprise : sans elle, « 3 995 jetons pour une fenêtre de 4 096 »
+        // se lirait comme tenant.
+        String text = "This request needs about " + number(budget.fixed() + window.answerRoom()) + " tokens with its answer, and "
+            + window.model() + "'s context window is " + (window.estimated() ? "about " : "") + number(window.tokens())
+            + ", so it wasn't sent.";
         ChatTurnResponse.Escalation offer = llm.largerWindow(tooBig.tier, budget.fixed())
             .map(larger -> new ChatTurnResponse.Escalation(Capability.CONTEXT.key(), window.model(), larger.model(),
                 larger.model() + "'s context window is " + number(larger.tokens()) + ". You can send this request to "
