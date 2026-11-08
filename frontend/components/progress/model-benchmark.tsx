@@ -1,24 +1,92 @@
 "use client"
 
-import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from "react"
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react"
 import { AlignLeft, Play, Square } from "lucide-react"
 
 import { BenchmarkDetail } from "@/components/progress/benchmark-detail"
 import { TASK_ICONS, VerdictMark } from "@/components/progress/benchmark-signs"
+import { Named } from "@/components/progress/named"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cellTitle, estimateOf, roughDuration } from "@/lib/ai/benchmark"
-import type { BenchmarkMatrix } from "@/lib/api/model-benchmark-service"
+import type { BenchmarkMatrix, BenchmarkModelRow, BenchmarkTaskInfo } from "@/lib/api/model-benchmark-service"
 import { fillText } from "@/lib/delivery/result-card"
+import { dayOf } from "@/lib/progress/day"
 import { useEvalStore } from "@/lib/store/eval-store"
 import { useModelBenchmarkStore } from "@/lib/store/model-benchmark-store"
 import { useModelCapabilityStore } from "@/lib/store/model-capability-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
-import { parseServerDate } from "@/lib/utils/server-date"
+import { cn } from "@/lib/utils"
 
-const dayOf = (at: string | null): string | null =>
-  at ? parseServerDate(at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : null
+/** Une colonne de la matrice, 28 px (« Le dessin », séance n°19). */
+const COLUMN = "flex w-7 shrink-0 items-center justify-center"
+
+/** La tête d'une colonne : l'icône de la tâche, son nom au survol (R129). */
+function TaskHead({ task }: Readonly<{ task: BenchmarkTaskInfo }>) {
+  const Icon = TASK_ICONS[task.key] ?? AlignLeft
+  const name = `${task.label}: ${task.description}`
+  return (
+    <span className={COLUMN}>
+      <Named name={name} wide>
+        <span role="img" aria-label={name} className="flex size-4 items-center justify-center text-muted-foreground">
+          <Icon className="size-3.5" aria-hidden />
+        </span>
+      </Named>
+    </span>
+  )
+}
+
+/** Une ligne, 36 px : le point du modèle en service, son nom, un verdict par tâche ; un clic ouvre son détail dans la ligne. */
+function ModelLine({ slug, matrix, row, open, onToggle }: Readonly<{
+  slug: string
+  matrix: BenchmarkMatrix
+  row: BenchmarkModelRow
+  open: boolean
+  onToggle: () => void
+}>) {
+  const t = usePreferencesStore((s) => s.t.benchmark)
+  const detailId = useId()
+  const labelOf = (key: string) => matrix.tasks.find((task) => task.key === key)?.label ?? key
+  return (
+    <li>
+      <button
+        type="button"
+        data-benchmark-line
+        aria-expanded={open}
+        aria-controls={open ? detailId : undefined}
+        onClick={onToggle}
+        className={cn(
+          "flex h-9 w-full min-w-0 items-center gap-2 rounded-md px-1 text-left transition-colors duration-150 hover:bg-muted motion-reduce:transition-none",
+          open && "bg-muted",
+        )}
+      >
+        <span className="flex w-3 shrink-0 justify-center">
+          {row.current && (
+            <Named name={t.inUse}>
+              <span role="img" aria-label={t.inUse} className="block size-1.5 rounded-full bg-primary" />
+            </Named>
+          )}
+        </span>
+        <Named name={row.model}>
+          <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">{row.model}</span>
+        </Named>
+        <span className="flex shrink-0">
+          {row.cells.map((cell) => (
+            <span key={cell.task} className={COLUMN}>
+              <VerdictMark verdict={cell.verdict} judge={cell.judge} name={cellTitle(labelOf(cell.task), cell, t)} />
+            </span>
+          ))}
+        </span>
+      </button>
+      {open && (
+        <div id={detailId}>
+          <BenchmarkDetail slug={slug} model={row.model} tasks={matrix.tasks} models={matrix.models} />
+        </div>
+      )}
+    </li>
+  )
+}
 
 /**
  * Le banc des modèles (R131, séance n°19) : « que puis-je confier à ce modèle ? ». Une ligne par modèle, une colonne de
@@ -38,7 +106,7 @@ export function ModelBenchmark({ slug }: Readonly<{ slug: string }>) {
   const measuring = useModelCapabilityStore((s) => s.progress !== null)
   const open = useModelBenchmarkStore((s) => s.openModel)
   const setOpen = useModelBenchmarkStore((s) => s.setOpenModel)
-  const tableRef = useRef<HTMLTableElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
 
   useEffect(() => {
     if (slug) void fetchMatrix(slug)
@@ -49,29 +117,30 @@ export function ModelBenchmark({ slug }: Readonly<{ slug: string }>) {
 
   const neverRun = matrix.models.every((row) => row.lastRunAt === null)
 
-  // Les flèches passent d'une ligne à l'autre, Entrée ouvre la ligne (Saarinen).
-  const onRowKey = (e: KeyboardEvent<HTMLButtonElement>) => {
-    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return
-    const rows = Array.from(tableRef.current?.querySelectorAll<HTMLButtonElement>("[data-benchmark-row]") ?? [])
-    const at = rows.indexOf(e.currentTarget)
-    const next = rows[(at + (e.key === "ArrowDown" ? 1 : rows.length - 1)) % rows.length]
-    if (next) {
-      e.preventDefault()
-      next.focus()
-    }
+  /** Les flèches passent d'une ligne à l'autre, Entrée ouvre son détail : le geste du bouton de la ligne. */
+  const arrows = (event: KeyboardEvent<HTMLUListElement>) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return
+    const lines = [...(listRef.current?.querySelectorAll<HTMLButtonElement>("[data-benchmark-line]") ?? [])]
+    const here = lines.indexOf(document.activeElement as HTMLButtonElement)
+    if (here < 0) return
+    event.preventDefault()
+    lines[Math.min(Math.max(here + (event.key === "ArrowDown" ? 1 : -1), 0), lines.length - 1)]?.focus()
   }
 
   return (
-    <div className="flex w-full flex-col gap-2">
+    <div className="flex w-full flex-col gap-1">
       <div className="flex min-h-7 items-center justify-between gap-2">
         {neverRun && !progress
           ? <p className="text-xs text-muted-foreground">{t.empty}</p>
           : <span />}
         {progress ? (
-          <Button size="sm" variant="ghost" className="gap-1.5" onClick={stop} disabled={progress.stopping} title={t.stop}>
-            <Square className="size-3" aria-hidden="true" />
-            {t.stop}
-          </Button>
+          <Named name={t.stop}>
+            <span className="inline-flex shrink-0">
+              <Button size="icon-sm" variant="ghost" onClick={stop} disabled={progress.stopping} aria-label={t.stop}>
+                <Square className="size-3.5" />
+              </Button>
+            </span>
+          </Named>
         ) : (
           <RunPicker slug={slug} matrix={matrix} disabled={replaying || measuring} />
         )}
@@ -79,77 +148,26 @@ export function ModelBenchmark({ slug }: Readonly<{ slug: string }>) {
 
       {progress && <RunLine done={progress.done} total={progress.total} model={progress.model} waitSeconds={progress.waitSeconds} />}
 
-      {!neverRun || progress ? (
-        <table ref={tableRef} className="w-full table-fixed border-collapse text-xs">
-          <colgroup>
-            <col />
-            {matrix.tasks.map((task) => <col key={task.key} className="w-7" />)}
-          </colgroup>
-          <thead>
-            <tr className="h-7 text-muted-foreground">
-              <th scope="col"><span className="sr-only">{t.model}</span></th>
-              {matrix.tasks.map((task) => {
-                const Icon = TASK_ICONS[task.key] ?? AlignLeft
-                return (
-                  <th key={task.key} scope="col" title={task.label} aria-label={task.label} className="font-normal">
-                    <Icon className="mx-auto size-3.5" aria-hidden="true" />
-                  </th>
-                )
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {matrix.models.map((row) => {
-              const expanded = open === row.model
-              return (
-                <Fragment key={row.model}>
-                  <tr
-                    className="h-9 cursor-pointer border-t border-border/60 transition-colors duration-150 hover:bg-muted/40 motion-reduce:transition-none"
-                    onClick={() => setOpen(expanded ? null : row.model)}
-                  >
-                    <td className="min-w-0 pr-1">
-                      <button
-                        type="button"
-                        data-benchmark-row
-                        aria-expanded={expanded}
-                        title={row.model}
-                        onKeyDown={onRowKey}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setOpen(expanded ? null : row.model)
-                        }}
-                        className="flex w-full min-w-0 items-center gap-1.5 text-left font-mono text-[11px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                      >
-                        {row.current && (
-                          <span title={t.inUse} aria-label={t.inUse} className="size-1.5 shrink-0 rounded-full bg-foreground" />
-                        )}
-                        <span className="truncate">{row.model}</span>
-                      </button>
-                    </td>
-                    {row.cells.map((cell) => {
-                      const task = matrix.tasks.find((candidate) => candidate.key === cell.task)
-                      const title = cellTitle(task?.label ?? cell.task, cell, t)
-                      return (
-                        <td key={cell.task} className="text-center" title={title}>
-                          <VerdictMark verdict={cell.verdict} judge={cell.judge} />
-                          <span className="sr-only">{title}</span>
-                        </td>
-                      )
-                    })}
-                  </tr>
-                  {expanded && (
-                    <tr>
-                      <td colSpan={matrix.tasks.length + 1} className="pb-3">
-                        <BenchmarkDetail slug={slug} model={row.model} tasks={matrix.tasks} models={matrix.models} />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              )
-            })}
-          </tbody>
-        </table>
-      ) : null}
+      {(!neverRun || progress) && (
+        <>
+          {/* Les têtes s'alignent sur les signes : le retrait du bouton de la ligne (4 px). */}
+          <div className="flex h-5 justify-end pr-1">
+            {matrix.tasks.map((task) => <TaskHead key={task.key} task={task} />)}
+          </div>
+          <ul ref={listRef} onKeyDown={arrows} className="flex flex-col">
+            {matrix.models.map((row) => (
+              <ModelLine
+                key={row.model}
+                slug={slug}
+                matrix={matrix}
+                row={row}
+                open={open === row.model}
+                onToggle={() => setOpen(open === row.model ? null : row.model)}
+              />
+            ))}
+          </ul>
+        </>
+      )}
 
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
@@ -169,18 +187,20 @@ function RunLine({ done, total, model, waitSeconds }: Readonly<{
     ? fillText(t.waiting, { seconds: waitSeconds })
     : fillText(t.progress, { model, done, total })
   return (
-    <div className="flex items-center gap-2" role="status" title={label} aria-label={label}>
-      <div
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={total}
-        aria-valuenow={done}
-        className="h-0.5 min-w-0 flex-1 overflow-hidden rounded-full bg-border"
-      >
-        <div className="h-full bg-foreground transition-[width] duration-150 motion-reduce:transition-none" style={{ width: `${percent}%` }} />
+    <Named name={label} wide>
+      <div className="flex items-center gap-2" role="status" aria-label={label}>
+        <div
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={total}
+          aria-valuenow={done}
+          className="h-0.5 min-w-0 flex-1 overflow-hidden rounded-full bg-border"
+        >
+          <div className="h-full bg-foreground transition-[width] duration-150 motion-reduce:transition-none" style={{ width: `${percent}%` }} />
+        </div>
+        <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{done}/{total}</span>
       </div>
-      <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{done}/{total}</span>
-    </div>
+    </Named>
   )
 }
 
@@ -211,22 +231,21 @@ function RunPicker({ slug, matrix, disabled }: Readonly<{ slug: string; matrix: 
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 p-2">
         <ul className="flex max-h-64 flex-col overflow-y-auto" aria-label={t.modelsToRun}>
-          {matrix.models.map((row) => {
-            const last = dayOf(row.lastRunAt)
-            return (
-              <li key={row.model}>
-                <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md px-1.5 hover:bg-muted">
-                  <Checkbox
-                    checked={chosen.includes(row.model)}
-                    onCheckedChange={(checked) => toggle(row.model, checked === true)}
-                    aria-label={row.model}
-                  />
-                  <span className="min-w-0 flex-1 truncate font-mono text-[11px]" title={row.model}>{row.model}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">{last ?? t.never}</span>
-                </label>
-              </li>
-            )
-          })}
+          {matrix.models.map((row) => (
+            <li key={row.model}>
+              <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md px-1.5 hover:bg-muted">
+                <Checkbox
+                  checked={chosen.includes(row.model)}
+                  onCheckedChange={(checked) => toggle(row.model, checked === true)}
+                  aria-label={row.model}
+                />
+                <Named name={row.model}>
+                  <span className="min-w-0 flex-1 truncate font-mono text-[11px]">{row.model}</span>
+                </Named>
+                <span className="shrink-0 text-xs text-muted-foreground">{row.lastRunAt ? dayOf(row.lastRunAt) : t.never}</span>
+              </label>
+            </li>
+          ))}
         </ul>
         <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-2">
           <span className="text-xs text-muted-foreground">

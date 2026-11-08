@@ -82,14 +82,15 @@ describe("BenchmarkDetail", () => {
     expect(screen.getByText(/update_issue/)).toBeInTheDocument()
     const checks = screen.getByRole("list", { name: "What was checked" })
     expect(within(checks).getByText("says it ships in 4.3")).toBeInTheDocument()
-    expect(within(checks).getByText("invented: Sophie")).toBeInTheDocument()
+    expect(within(checks).getByText("invents no person, date, number or name: invented: Sophie")).toBeInTheDocument()
     // Le critère réussi garde son détail au survol seulement.
-    expect(within(checks).queryByText("seen")).not.toBeInTheDocument()
+    expect(within(checks).queryByText(/seen/)).not.toBeInTheDocument()
   })
 
   it("a case not played cannot be opened", () => {
     show()
     expect(screen.getByRole("button", { name: /Not played yet/ })).toBeDisabled()
+    expect(screen.getByRole("img", { name: "Not run" })).toBeInTheDocument()
   })
 
   it("overturns a case with its two buttons, and a second click gives the note back to the code", () => {

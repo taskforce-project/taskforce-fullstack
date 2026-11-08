@@ -5,6 +5,7 @@ import { X } from "lucide-react"
 
 import { optionDomId, PickList } from "@/components/agent/pick-list"
 import { TASK_ICONS } from "@/components/progress/benchmark-signs"
+import { Named } from "@/components/progress/named"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { timeText } from "@/lib/ai/benchmark"
@@ -45,15 +46,16 @@ export function BenchmarkTrial({ slug, model, tasks, models, onClose }: Readonly
     <section aria-label={t.trialOpen} className="flex flex-col gap-2 border-t border-border pt-2">
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-medium text-foreground">{t.trialOpen}</h4>
-        <button
-          type="button"
-          onClick={close}
-          aria-label={t.trialClose}
-          title={t.trialClose}
-          className="rounded-sm p-0.5 text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-        >
-          <X className="size-3.5" aria-hidden="true" />
-        </button>
+        <Named name={t.trialClose}>
+          <button
+            type="button"
+            onClick={close}
+            aria-label={t.trialClose}
+            className="rounded-sm p-0.5 text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <X className="size-3.5" aria-hidden="true" />
+          </button>
+        </Named>
       </div>
       {blind ? <TrialAnswers slug={slug} onDone={close} /> : <TrialSetup slug={slug} model={model} tasks={tasks} models={models} />}
     </section>
@@ -95,16 +97,19 @@ function TrialSetup({ slug, model, tasks, models }: Readonly<{
       {picked ? (
         <div className="flex h-7 items-center gap-1.5 text-xs">
           <span className="shrink-0 font-medium text-foreground">{picked.label}</span>
-          <span className="min-w-0 flex-1 truncate text-muted-foreground" title={picked.detail ?? undefined}>{picked.detail}</span>
-          <button
-            type="button"
-            onClick={() => setPicked(null)}
-            aria-label={t.trialChange}
-            title={t.trialChange}
-            className="rounded-sm p-0.5 text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-          >
-            <X className="size-3" aria-hidden="true" />
-          </button>
+          <Named name={picked.detail ?? picked.label} wide>
+            <span className="min-w-0 flex-1 truncate text-muted-foreground">{picked.detail}</span>
+          </Named>
+          <Named name={t.trialChange}>
+            <button
+              type="button"
+              onClick={() => setPicked(null)}
+              aria-label={t.trialChange}
+              className="rounded-sm p-0.5 text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              <X className="size-3" aria-hidden="true" />
+            </button>
+          </Named>
         </div>
       ) : (
         <IssuePicker slug={slug} onPick={setPicked} />
@@ -114,21 +119,21 @@ function TrialSetup({ slug, model, tasks, models }: Readonly<{
         {offered.map((item) => {
           const Icon = TASK_ICONS[item.key]
           return (
-            <button
-              key={item.key}
-              type="button"
-              role="radio"
-              aria-checked={task === item.key}
-              title={item.description}
-              onClick={() => setTask(item.key)}
-              className={cn(
-                "flex h-7 items-center gap-1 rounded-md px-2 text-xs outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring/50 motion-reduce:transition-none",
-                task === item.key ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted",
-              )}
-            >
-              {Icon && <Icon className="size-3" aria-hidden="true" />}
-              {item.label}
-            </button>
+            <Named key={item.key} name={item.description} wide>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={task === item.key}
+                onClick={() => setTask(item.key)}
+                className={cn(
+                  "flex h-7 items-center gap-1 rounded-md px-2 text-xs outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring/50 motion-reduce:transition-none",
+                  task === item.key ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted",
+                )}
+              >
+                {Icon && <Icon className="size-3" aria-hidden="true" />}
+                {item.label}
+              </button>
+            </Named>
           )
         })}
       </div>
@@ -145,7 +150,9 @@ function TrialSetup({ slug, model, tasks, models }: Readonly<{
                   onCheckedChange={(checked) => toggle(row.model, checked === true)}
                   aria-label={row.model}
                 />
-                <span className="min-w-0 truncate font-mono text-[11px]" title={row.model}>{row.model}</span>
+                <Named name={row.model}>
+                  <span className="min-w-0 truncate font-mono text-[11px]">{row.model}</span>
+                </Named>
               </label>
             </li>
           )
@@ -154,7 +161,11 @@ function TrialSetup({ slug, model, tasks, models }: Readonly<{
 
       <div className="flex items-center gap-2">
         <Button size="sm" onClick={go} disabled={!ready}>{t.trialGo}</Button>
-        {error && <span className="min-w-0 truncate text-xs text-destructive" title={error}>{error}</span>}
+        {error && (
+          <Named name={error} wide>
+            <span className="min-w-0 truncate text-xs text-destructive">{error}</span>
+          </Named>
+        )}
       </div>
     </div>
   )
@@ -232,7 +243,11 @@ function TrialAnswers({ slug, onDone }: Readonly<{ slug: string; onDone: () => v
             >
               <div className="flex items-center gap-1.5">
                 <span className="font-mono text-xs font-medium text-foreground">{letter}</span>
-                {revealed && <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground" title={revealed.model}>{revealed.model}</span>}
+                {revealed && (
+                  <Named name={revealed.model}>
+                    <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">{revealed.model}</span>
+                  </Named>
+                )}
                 {revealed && <span className="ml-auto shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">{timeText(revealed.durationMs, t)}</span>}
                 {chosen && <span className="shrink-0 text-xs text-foreground">{t.trialChosen}</span>}
               </div>

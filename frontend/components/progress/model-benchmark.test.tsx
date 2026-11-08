@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 
 import { ModelBenchmark } from "./model-benchmark"
 import type { BenchmarkCell, BenchmarkMatrix, BenchmarkModelDetail } from "@/lib/api/model-benchmark-service"
@@ -48,14 +49,21 @@ describe("ModelBenchmark", () => {
     render(<ModelBenchmark slug="acme" />)
 
     expect(fetchMatrix).toHaveBeenCalledWith("acme")
-    expect(screen.getByRole("columnheader", { name: "Summarize" })).toHaveAttribute("title", "Summarize")
-    const rows = screen.getAllByRole("row")
-    expect(within(rows[1]).getByRole("button", { name: /qwen3:8b/ })).toHaveAttribute("aria-expanded", "false")
-    expect(within(rows[1]).getByLabelText("Cortex uses it")).toBeInTheDocument()
-    expect(within(rows[1]).getByTitle("Summarize: Give it, 3 of 3 cases")).toBeInTheDocument()
-    expect(within(rows[1]).getByTitle("Triage: With review, 2 of 3 cases · Your verdict")).toBeInTheDocument()
-    expect(within(rows[1]).getByTitle("Answer: Not run")).toBeInTheDocument()
-    expect(within(rows[2]).getByText("qwen3:14b")).toBeInTheDocument()
+    expect(screen.getByRole("img", { name: "Summarize: What summarize measures" })).toBeInTheDocument()
+    const rows = screen.getAllByRole("listitem")
+    expect(within(rows[0]).getByRole("button", { name: /qwen3:8b/ })).toHaveAttribute("aria-expanded", "false")
+    expect(within(rows[0]).getByRole("img", { name: "Cortex uses it" })).toBeInTheDocument()
+    expect(within(rows[0]).getByRole("img", { name: "Summarize: Give it, 3 of 3 cases" })).toBeInTheDocument()
+    expect(within(rows[0]).getByRole("img", { name: "Triage: With review, 2 of 3 cases · Your verdict" })).toBeInTheDocument()
+    expect(within(rows[0]).getByRole("img", { name: "Answer: Not run" })).toBeInTheDocument()
+    expect(within(rows[1]).getByText("qwen3:14b")).toBeInTheDocument()
+  })
+
+  it("names a verdict on hover, with what it rests on", async () => {
+    render(<ModelBenchmark slug="acme" />)
+
+    await userEvent.setup().hover(screen.getByRole("img", { name: "Summarize: Give it, 3 of 3 cases" }))
+    await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("Summarize: Give it, 3 of 3 cases"))
   })
 
   it("reads, says when there is no matrix yet or no model, and starts from one line and Run", () => {
@@ -130,12 +138,20 @@ describe("ModelBenchmark", () => {
   it("opens and closes a row's detail with a click, on the row or its name", async () => {
     render(<ModelBenchmark slug="acme" />)
 
-    fireEvent.click(screen.getAllByRole("row")[1])
+    fireEvent.click(screen.getByRole("button", { name: /qwen3:8b/ }))
     await waitFor(() => expect(fetchDetail).toHaveBeenCalledWith("acme", "qwen3:8b"))
     expect(screen.getByText("Indicative, on 21 cases.")).toBeInTheDocument()
+    expect(useModelBenchmarkStore.getState().openModel).toBe("qwen3:8b")
 
     fireEvent.click(screen.getByRole("button", { name: /qwen3:8b/ }))
     expect(screen.queryByText("Indicative, on 21 cases.")).not.toBeInTheDocument()
+    expect(useModelBenchmarkStore.getState().openModel).toBeNull()
+  })
+
+  it("keeps a row open when the person comes back to the tab", () => {
+    useModelBenchmarkStore.setState({ openModel: "qwen3:8b" })
+    render(<ModelBenchmark slug="acme" />)
+    expect(screen.getByText("Indicative, on 21 cases.")).toBeInTheDocument()
   })
 
   it("moves between rows with the arrows", () => {
@@ -146,12 +162,13 @@ describe("ModelBenchmark", () => {
     first.focus()
     fireEvent.keyDown(first, { key: "ArrowDown" })
     expect(document.activeElement).toBe(second)
+    // Au bout de la liste, on y reste.
     fireEvent.keyDown(second, { key: "ArrowDown" })
+    expect(document.activeElement).toBe(second)
+    fireEvent.keyDown(second, { key: "ArrowUp" })
     expect(document.activeElement).toBe(first)
-    fireEvent.keyDown(first, { key: "ArrowUp" })
-    expect(document.activeElement).toBe(second)
-    fireEvent.keyDown(second, { key: "a" })
-    expect(document.activeElement).toBe(second)
+    fireEvent.keyDown(first, { key: "a" })
+    expect(document.activeElement).toBe(first)
   })
 
   it("says an error", () => {

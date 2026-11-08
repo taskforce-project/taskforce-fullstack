@@ -4,6 +4,7 @@ import type {
   BenchmarkMatrix,
   BenchmarkVerdict,
 } from "@/lib/api/model-benchmark-service";
+import type { CapabilitySign } from "@/lib/ai/model-table";
 import type { CONSTANTS_EN } from "@/lib/constants_en";
 import { fillText } from "@/lib/delivery/result-card";
 
@@ -14,12 +15,10 @@ import { fillText } from "@/lib/delivery/result-card";
 
 type BenchmarkTexts = (typeof CONSTANTS_EN)["benchmark"];
 
-/** Le signe d'un verdict dans la matrice : plein, à moitié, vide, ou un tiret quand la tâche n'a pas été passée. */
-export type VerdictSign = "full" | "half" | "empty" | "none";
+const SIGNS: Record<BenchmarkVerdict, CapabilitySign> = { give_it: "passed", with_review: "partly", not_yet: "failed" };
 
-const SIGNS: Record<BenchmarkVerdict, VerdictSign> = { give_it: "full", with_review: "half", not_yet: "empty" };
-
-export const verdictSign = (verdict: BenchmarkVerdict | null): VerdictSign => (verdict ? SIGNS[verdict] : "none");
+/** Le signe d'un verdict dans la matrice, le même que ceux des capacités (R130) ; un tiret quand la tâche n'a pas été passée. */
+export const verdictSign = (verdict: BenchmarkVerdict | null): CapabilitySign => (verdict ? SIGNS[verdict] : "none");
 
 /** Le verdict en mots : « Give it », « With review », « Not yet », « Not run ». */
 export const verdictWord = (verdict: BenchmarkVerdict | null, t: BenchmarkTexts): string =>

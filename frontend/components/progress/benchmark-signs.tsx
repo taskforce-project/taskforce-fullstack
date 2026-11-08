@@ -11,7 +11,8 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
-import { verdictSign, type VerdictSign } from "@/lib/ai/benchmark"
+import { CapabilitySign } from "@/components/progress/capability-sign"
+import { verdictSign } from "@/lib/ai/benchmark"
 import type { BenchmarkJudge, BenchmarkVerdict } from "@/lib/api/model-benchmark-service"
 import { cn } from "@/lib/utils"
 
@@ -26,35 +27,18 @@ export const TASK_ICONS: Record<string, LucideIcon> = {
   code: CodeXml,
 }
 
-const TONES: Record<VerdictSign, string> = {
-  full: "text-ink-green",
-  half: "text-ink-yellow",
-  empty: "text-muted-foreground",
-  none: "text-muted-foreground/50",
-}
-
-/** Le signe d'un verdict : un point plein, un demi-point, un cercle, un tiret ; cerclé quand il est celui d'une personne. */
-export function VerdictMark({ verdict, judge, className }: Readonly<{
+/**
+ * Le signe d'un verdict : le même dessin que les capacités (point plein, demi-point, cercle, tiret), son mot au survol et
+ * pour les lecteurs d'écran ; cerclé quand il est le verdict d'une personne (R131).
+ */
+export function VerdictMark({ verdict, judge, name }: Readonly<{
   verdict: BenchmarkVerdict | null
   judge?: BenchmarkJudge | null
-  className?: string
+  name: string
 }>) {
-  const sign = verdictSign(verdict)
   return (
-    <span aria-hidden="true" className={cn("inline-flex size-4 items-center justify-center", TONES[sign], className)}>
-      {sign === "none"
-        ? <span className="h-px w-2.5 bg-current" />
-        : (
-          <span
-            data-sign={sign}
-            className={cn(
-              "size-2.5 rounded-full border border-current",
-              sign === "full" && "bg-current",
-              sign === "half" && "bg-[linear-gradient(90deg,currentColor_50%,transparent_50%)]",
-              judge && "outline outline-1 outline-offset-1 outline-foreground/60",
-            )}
-          />
-        )}
+    <span className={cn("block size-4 rounded-full", judge && "outline outline-1 outline-offset-0 outline-foreground/60")}>
+      <CapabilitySign sign={verdictSign(verdict)} name={name} />
     </span>
   )
 }

@@ -844,6 +844,7 @@ export const CONSTANTS_EN = {
     // one line in TABS (components/progress/progress-pane.tsx).
     tabs: {
       models: { label: "Models", hint: "What each model can do, measured here. Nothing here comes from a vendor's benchmark." },
+      benchmark: { label: "Benchmark", hint: "What you can give each model, task by task, on real work. Indicative." },
       history: { label: "History", hint: "How Cortex does over time, and what improved it." },
       sources: { label: "Sources", hint: "What Cortex can read for you here, counted, with the date of the latest change." },
     },

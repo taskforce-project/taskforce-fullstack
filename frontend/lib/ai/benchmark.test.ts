@@ -13,9 +13,9 @@ const cell = (verdict: BenchmarkVerdict | null, judge: BenchmarkCell["judge"] = 
 /** Le verdict du banc (R131), dans les mots de l'interface : le signe, le mot, le survol, un temps, une durée approchée. */
 describe("benchmark", () => {
   it.each([
-    ["give_it", "full", "Give it"],
-    ["with_review", "half", "With review"],
-    ["not_yet", "empty", "Not yet"],
+    ["give_it", "passed", "Give it"],
+    ["with_review", "partly", "With review"],
+    ["not_yet", "failed", "Not yet"],
     [null, "none", "Not run"],
   ] as const)("reads the verdict %s as the sign %s and the word %s", (verdict, sign, word) => {
     expect(verdictSign(verdict)).toBe(sign)

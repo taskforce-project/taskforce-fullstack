@@ -7,6 +7,9 @@ vi.mock("next/navigation", () => ({ useParams: () => params.value }))
 vi.mock("@/components/progress/model-capability-table", () => ({
   ModelCapabilityTable: ({ slug }: { slug: string }) => <section aria-label={`models of ${slug}`} />,
 }))
+vi.mock("@/components/progress/model-benchmark", () => ({
+  ModelBenchmark: ({ slug }: { slug: string }) => <section aria-label={`benchmark of ${slug}`} />,
+}))
 vi.mock("@/components/progress/bank-history", () => ({
   BankHistory: ({ slug }: { slug: string }) => <section aria-label={`bank of ${slug}`} />,
 }))
@@ -34,7 +37,7 @@ describe("ProgressPane", () => {
   it("is a segmented control of one word each, on Models by default, for the workspace of the address", () => {
     render(<ProgressPane />)
 
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Models", "History", "Sources"])
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Models", "Benchmark", "History", "Sources"])
     expect(screen.getByRole("tab", { name: "Models" })).toHaveAttribute("aria-selected", "true")
     expect(regions()).toEqual(["models of acme"])
   })
@@ -42,6 +45,8 @@ describe("ProgressPane", () => {
   it("History holds the bank's curve and what improved it; Sources what Cortex can read", () => {
     render(<ProgressPane />)
 
+    pick("Benchmark")
+    expect(regions()).toEqual(["benchmark of acme"])
     pick("History")
     expect(regions()).toEqual(["bank of acme", "improvements"])
     pick("Sources")

@@ -6,6 +6,7 @@ import { useParams } from "next/navigation"
 import { BankHistory } from "@/components/progress/bank-history"
 import { CortexSources } from "@/components/progress/cortex-sources"
 import { Improvements } from "@/components/progress/improvements"
+import { ModelBenchmark } from "@/components/progress/model-benchmark"
 import { ModelCapabilityTable } from "@/components/progress/model-capability-table"
 import { Named } from "@/components/progress/named"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -29,6 +30,7 @@ function History({ slug }: Readonly<{ slug: string }>) {
 /** Les onglets, dans leur ordre : un de plus, c'est une ligne ici et son mot dans `progress.tabs` (`constants_en.ts`). */
 const TABS: readonly { readonly key: ProgressTab; readonly Panel: ComponentType<Readonly<{ slug: string }>> }[] = [
   { key: "models", Panel: ModelCapabilityTable },
+  { key: "benchmark", Panel: ModelBenchmark },
   { key: "history", Panel: History },
   { key: "sources", Panel: CortexSources },
 ]
