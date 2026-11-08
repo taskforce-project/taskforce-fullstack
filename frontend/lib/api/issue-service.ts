@@ -99,6 +99,8 @@ export interface IssueComment {
   content: string;
   /** L'agent qui l'a écrit pour son auteur (« qwen3:8b », « Claude Code », « Cortex ») ; absent quand l'auteur l'a écrit. */
   via?: string | null;
+  /** Le modèle qui faisait parler cet agent (« qwen3:8b » pour Cortex, R123) ; absent sinon. */
+  model?: string | null;
   isEdited: boolean;
   createdAt: string;
   updatedAt: string;
@@ -115,6 +117,8 @@ export interface IssueActivity {
    * de `actor` (« Claude Code ») ; null quand la personne a agi seule.
    */
   via?: string | null;
+  /** Le modèle qui faisait parler cet agent (« qwen3:8b » pour Cortex, R123) ; absent sinon. */
+  model?: string | null;
   createdAt: string;
 }
 
