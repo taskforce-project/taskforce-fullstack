@@ -12,7 +12,7 @@ vi.mock("@/lib/api/issue-service", () => ({ searchIssues: vi.fn().mockResolvedVa
 
 import { Composer } from "./composer"
 import type { AiStatus } from "@/lib/api/ai-status-service"
-import type { IssueHit } from "@/lib/api/issue-service"
+import { searchIssues, type IssueHit } from "@/lib/api/issue-service"
 import type { Project } from "@/lib/api/project-service"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { useCortexStore } from "@/lib/store/cortex-store"
@@ -29,6 +29,8 @@ describe("Composer", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // La recherche de l'espace rend la même issue que celle déjà gardée : la pause de la frappe ne la retire pas.
+    vi.mocked(searchIssues).mockResolvedValue([hit])
     useCortexStore.setState({ ...initial, draft: "", attachments: [], turns: [], open: true, unread: false, sentAt: null, tokens: 1200, send })
     useAiStatusStore.setState({ status: { configured: true, fastModel: "qwen3:8b", chatModel: "qwen3:14b" } as AiStatus })
     useSearchStore.setState({ hits: { [searchKey("acme", "")]: [hit], [searchKey("acme", "ops")]: [hit] }, latest: {}, pending: {} })

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { act, render, screen } from "@testing-library/react"
+import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 const { push, setTheme } = vi.hoisted(() => ({ push: vi.fn(), setTheme: vi.fn() }))
@@ -12,6 +12,7 @@ vi.mock("next-themes", () => ({ useTheme: () => ({ setTheme }) }))
 vi.mock("@/lib/api/issue-service", () => ({ searchIssues: vi.fn().mockResolvedValue([]) }))
 
 import { CommandPalette } from "./command-palette"
+import { searchIssues } from "@/lib/api/issue-service"
 import type { Project } from "@/lib/api/project-service"
 import { useCortexStore } from "@/lib/store/cortex-store"
 import { useProjectStore } from "@/lib/store/project-store"
@@ -32,6 +33,7 @@ describe("CommandPalette", () => {
 
   beforeEach(() => {
     push.mockClear()
+    vi.mocked(searchIssues).mockResolvedValue([])
     window.history.replaceState(null, "", "/acme?c=12")
     useSettingsStore.setState({ open: false, section: "agents" })
     useProjectStore.setState({
@@ -79,15 +81,18 @@ describe("CommandPalette", () => {
   })
 
   it("finds an issue by its key, and opens it in the pane over the board of its project", async () => {
+    // La recherche de l'espace trouve l'issue (« ops 35 » pour OPS-35), après la pause de la frappe.
+    vi.mocked(searchIssues).mockResolvedValue([
+      { id: 350, projectId: 3, key: "OPS-35", title: "Iteration #35", status: "Done", statusCategory: "COMPLETED" },
+    ])
     render(<CommandPalette open onOpenChange={vi.fn()} />)
     await userEvent.type(screen.getByPlaceholderText(/Search issues/), "ops 35")
-    act(() => useSearchStore.setState({
-      hits: { [searchKey("acme", "ops 35")]: [{ id: 350, projectId: 3, key: "OPS-35", title: "Iteration #35", status: "Done", statusCategory: "COMPLETED" }] },
-    }))
 
     await userEvent.click(await screen.findByText("OPS-35"))
 
+    expect(searchIssues).toHaveBeenCalledWith("acme", "ops 35")
     expect(push).toHaveBeenCalledWith("/acme/projects/3?c=12&issue=350", { scroll: false })
+    expect(useSearchStore.getState().hits[searchKey("acme", "ops 35")]).toHaveLength(1)
   })
 
   it("opens a project's board, never an archived one, and a conversation at the center", async () => {
