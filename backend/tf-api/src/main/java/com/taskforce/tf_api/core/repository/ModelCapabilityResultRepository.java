@@ -24,9 +24,30 @@ public interface ModelCapabilityResultRepository extends JpaRepository<ModelCapa
         LocalDateTime getCreatedAt();
     }
 
+    /** Une note telle que le banc la lit (R131) : sans sa réponse, avec son temps et ce qu'une personne en a dit. */
+    interface BenchmarkRow {
+        Long getId();
+
+        Long getRunId();
+
+        String getCaseKey();
+
+        Boolean getPassed();
+
+        Long getDurationMs();
+
+        Boolean getPersonPassed();
+
+        Long getPersonId();
+
+        LocalDateTime getCreatedAt();
+    }
+
     Optional<ModelCapabilityResult> findByRunIdAndCaseKey(Long runId, String caseKey);
 
     List<Row> findRowsByRunIdIn(Collection<Long> runIds);
+
+    List<BenchmarkRow> findBenchmarkRowsByRunIdIn(Collection<Long> runIds);
 
     long countByRunId(Long runId);
 

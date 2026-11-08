@@ -129,6 +129,10 @@
       "description": "What each model the instance's AI reaches can do, measured by fixed test cases: the table, a measure case by case, and the model the person chooses for Cortex."
     },
     {
+      "name": "Model benchmark",
+      "description": "What can be given to each model: seven tasks from real work, graded by code, a verdict per model and task that a person can overturn, and a blind trial on one of their issues."
+    },
+    {
       "name": "AI analysis (workflows)",
       "description": "AI analysis jobs: launch, follow and resume."
     },
@@ -759,6 +763,55 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseModelCapabilityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/ai/benchmark/results/{resultId}/verdict": {
+      "put": {
+        "tags": [
+          "Model benchmark"
+        ],
+        "operationId": "overturnBenchmarkCase",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resultId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerdictRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseModelDetail"
                 }
               }
             }
@@ -4978,6 +5031,229 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseCaseResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/ai/benchmark/trials": {
+      "post": {
+        "tags": [
+          "Model benchmark"
+        ],
+        "operationId": "startBlindTrial",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTrialStarted"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/ai/benchmark/trials/{trialId}/letters/{letter}": {
+      "post": {
+        "tags": [
+          "Model benchmark"
+        ],
+        "operationId": "playBlindTrialLetter",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "trialId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "letter",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTrialLetterAnswer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/ai/benchmark/trials/{trialId}/choice": {
+      "post": {
+        "tags": [
+          "Model benchmark"
+        ],
+        "operationId": "chooseBlindTrial",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "trialId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChoiceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTrialResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/ai/benchmark/runs": {
+      "post": {
+        "tags": [
+          "Model benchmark"
+        ],
+        "operationId": "startBenchmarkRun",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRunStarted"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/ai/benchmark/runs/{runId}/cases/{caseKey}": {
+      "post": {
+        "tags": [
+          "Model benchmark"
+        ],
+        "operationId": "playBenchmarkCase",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "caseKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCaseDetail"
                 }
               }
             }
@@ -9298,6 +9574,76 @@
         }
       }
     },
+    "/api/workspaces/{slug}/ai/benchmark": {
+      "get": {
+        "tags": [
+          "Model benchmark"
+        ],
+        "operationId": "benchmarkMatrix",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseModelBenchmarkResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/ai/benchmark/detail": {
+      "get": {
+        "tags": [
+          "Model benchmark"
+        ],
+        "operationId": "benchmarkModelDetail",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseModelDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/users/search": {
       "get": {
         "tags": [
@@ -11272,6 +11618,225 @@
           "measuredAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "VerdictRequest": {
+        "type": "object",
+        "properties": {
+          "passed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseModelDetail": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ModelDetail"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CaseDetail": {
+        "type": "object",
+        "properties": {
+          "resultId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "caseKey": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "gradedPassed": {
+            "type": "boolean"
+          },
+          "personPassed": {
+            "type": "boolean"
+          },
+          "judge": {
+            "type": "string"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Check"
+            }
+          },
+          "calls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayCall"
+            }
+          },
+          "answer": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Check": {
+        "type": "object",
+        "properties": {
+          "criterion": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "ModelDetail": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "lastRunAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cases": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskDetail"
+            }
+          },
+          "trials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrialResult"
+            }
+          }
+        }
+      },
+      "ReplayCall": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string"
+          },
+          "arguments": {
+            "type": "string"
+          },
+          "effect": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "TaskDetail": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "measured": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "judge": {
+            "type": "string"
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseDetail"
+            }
+          }
+        }
+      },
+      "TrialAnswer": {
+        "type": "object",
+        "properties": {
+          "letter": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "TrialResult": {
+        "type": "object",
+        "properties": {
+          "trialId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "task": {
+            "type": "string"
+          },
+          "issueKey": {
+            "type": "string"
+          },
+          "chosenLetter": {
+            "type": "string"
+          },
+          "chosenModel": {
+            "type": "string"
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "answers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrialAnswer"
+            }
           }
         }
       },
@@ -14290,37 +14855,6 @@
           }
         }
       },
-      "Check": {
-        "type": "object",
-        "properties": {
-          "criterion": {
-            "type": "string"
-          },
-          "passed": {
-            "type": "boolean"
-          },
-          "detail": {
-            "type": "string"
-          }
-        }
-      },
-      "ReplayCall": {
-        "type": "object",
-        "properties": {
-          "tool": {
-            "type": "string"
-          },
-          "arguments": {
-            "type": "string"
-          },
-          "effect": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          }
-        }
-      },
       "Result": {
         "type": "object",
         "properties": {
@@ -15786,6 +16320,158 @@
           "promptTokens": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "TrialRequest": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "issueId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "task": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 0
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 0
+            },
+            "maxItems": 3,
+            "minItems": 2
+          }
+        },
+        "required": [
+          "issueId",
+          "models",
+          "projectId",
+          "task"
+        ]
+      },
+      "ApiResponseTrialStarted": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TrialStarted"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TrialStarted": {
+        "type": "object",
+        "properties": {
+          "trialId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "task": {
+            "type": "string"
+          },
+          "issueKey": {
+            "type": "string"
+          },
+          "letters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ApiResponseTrialLetterAnswer": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TrialLetterAnswer"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TrialLetterAnswer": {
+        "type": "object",
+        "properties": {
+          "letter": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ChoiceRequest": {
+        "type": "object",
+        "properties": {
+          "letter": {
+            "type": "string",
+            "maxLength": 1,
+            "minLength": 0
+          }
+        }
+      },
+      "ApiResponseTrialResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TrialResult"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseCaseDetail": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CaseDetail"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -19955,6 +20641,76 @@
           },
           "read": {
             "$ref": "#/components/schemas/AssistantRead"
+          }
+        }
+      },
+      "ApiResponseModelBenchmarkResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ModelBenchmarkResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ModelBenchmarkResponse": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "current": {
+            "type": "string"
+          },
+          "suiteVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cases": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskInfo"
+            }
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelRow"
+            }
+          }
+        }
+      },
+      "TaskInfo": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "cases": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "trial": {
+            "type": "boolean"
           }
         }
       },
