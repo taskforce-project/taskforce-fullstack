@@ -8117,6 +8117,55 @@
         }
       }
     },
+    "/api/workspaces/{slug}/issues/search": {
+      "get": {
+        "tags": [
+          "Issues"
+        ],
+        "operationId": "search_1",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 8
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListIssueHitResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/integrations/slack/status": {
       "get": {
         "tags": [
@@ -8472,6 +8521,36 @@
         }
       }
     },
+    "/api/workspaces/{slug}/evals/history": {
+      "get": {
+        "tags": [
+          "Test bank"
+        ],
+        "operationId": "history",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseEvalHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/delivery/runs": {
       "get": {
         "tags": [
@@ -8753,6 +8832,36 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseListAuditLogResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/assistant/sources": {
+      "get": {
+        "tags": [
+          "AI assistant"
+        ],
+        "operationId": "sources",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCortexSourcesResponse"
                 }
               }
             }
@@ -10987,6 +11096,21 @@
           }
         }
       },
+      "Card": {
+        "type": "object",
+        "properties": {
+          "parameters": {
+            "type": "string"
+          },
+          "contextWindow": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tools": {
+            "type": "boolean"
+          }
+        }
+      },
       "CaseInfo": {
         "type": "object",
         "properties": {
@@ -11067,6 +11191,9 @@
             "items": {
               "$ref": "#/components/schemas/Score"
             }
+          },
+          "card": {
+            "$ref": "#/components/schemas/Card"
           }
         }
       },
@@ -12498,6 +12625,9 @@
             "type": "string"
           },
           "via": {
+            "type": "string"
+          },
+          "model": {
             "type": "string"
           },
           "createdAt": {
@@ -14766,6 +14896,14 @@
             "type": "string",
             "maxLength": 128,
             "minLength": 0
+          },
+          "attach": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScreenRequest"
+            },
+            "maxItems": 3,
+            "minItems": 0
           }
         },
         "required": [
@@ -14841,6 +14979,9 @@
           },
           "model": {
             "type": "string"
+          },
+          "read": {
+            "$ref": "#/components/schemas/AssistantRead"
           }
         }
       },
@@ -14881,6 +15022,33 @@
             "items": {
               "$ref": "#/components/schemas/AssistantChoice"
             }
+          }
+        }
+      },
+      "AssistantRead": {
+        "type": "object",
+        "properties": {
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueRead"
+            }
+          },
+          "boards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoardRead"
+            }
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolRead"
+            }
+          },
+          "notes": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -14971,6 +15139,21 @@
           }
         }
       },
+      "BoardRead": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "issues": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "open": {
+            "type": "string"
+          }
+        }
+      },
       "ChatTurnResponse": {
         "type": "object",
         "properties": {
@@ -15006,6 +15189,30 @@
           },
           "text": {
             "type": "string"
+          }
+        }
+      },
+      "IssueRead": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "comments": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ToolRead": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "calls": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -17650,6 +17857,9 @@
           "via": {
             "type": "string"
           },
+          "model": {
+            "type": "string"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -18201,6 +18411,52 @@
           }
         }
       },
+      "ApiResponseListIssueHitResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueHitResponse"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "IssueHitResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "key": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "statusCategory": {
+            "type": "string"
+          }
+        }
+      },
       "ApiResponseListInvitationResponse": {
         "type": "object",
         "properties": {
@@ -18646,6 +18902,140 @@
           }
         }
       },
+      "ApiResponseEvalHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EvalHistoryResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Case": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "askedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "addedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "mine": {
+            "type": "boolean"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/Origin"
+          },
+          "grades": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Grade"
+            }
+          }
+        }
+      },
+      "EvalHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Run"
+            }
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Case"
+            }
+          }
+        }
+      },
+      "Grade": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Origin": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "said": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "shown": {
+            "type": "string"
+          }
+        }
+      },
+      "Run": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "model": {
+            "type": "string"
+          },
+          "answeredBy": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "graded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "passed": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "ApiResponseListDeliveryRunResponse": {
         "type": "object",
         "properties": {
@@ -18935,6 +19325,51 @@
             "type": "string"
           },
           "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseCortexSourcesResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CortexSourcesResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CortexSourcesResponse": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            }
+          }
+        }
+      },
+      "Source": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "changedAt": {
             "type": "string",
             "format": "date-time"
           }
@@ -19433,6 +19868,9 @@
           },
           "model": {
             "type": "string"
+          },
+          "read": {
+            "$ref": "#/components/schemas/AssistantRead"
           }
         }
       },

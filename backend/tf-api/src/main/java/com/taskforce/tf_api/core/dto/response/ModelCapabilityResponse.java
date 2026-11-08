@@ -41,8 +41,19 @@ public record ModelCapabilityResponse(
     public record CaseInfo(String key, String capability, String title) {
     }
 
-    /** Une ligne : un modèle servi, s'il répond à Cortex pour la personne, sa dernière mesure. */
-    public record ModelRow(String model, boolean current, LocalDateTime measuredAt, List<Score> scores) {
+    /**
+     * Une ligne : un modèle servi, s'il répond à Cortex pour la personne, sa dernière mesure, et ce que dit sa fiche chez
+     * le fournisseur ({@code card}, sur Ollama ; {@code null} ailleurs). Le volet « Progress » montre la fiche comme
+     * telle tant que le modèle n'est pas mesuré, jamais comme une note (R113, R125).
+     */
+    public record ModelRow(String model, boolean current, LocalDateTime measuredAt, List<Score> scores, Card card) {
+    }
+
+    /**
+     * La fiche d'un modèle chez son fournisseur : sa taille ({@code parameters}, « 8.2B »), sa fenêtre de contexte en
+     * jetons, s'il prend des outils. Chaque valeur est {@code null} quand la fiche ne la dit pas.
+     */
+    public record Card(String parameters, Integer contextWindow, Boolean tools) {
     }
 
     /**

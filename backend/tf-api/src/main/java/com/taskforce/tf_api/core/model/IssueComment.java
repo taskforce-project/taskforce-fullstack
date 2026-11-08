@@ -54,6 +54,10 @@ public class IssueComment {
     @Column(length = 60)
     private String via;
 
+    /** Le modèle qui faisait parler l'agent de {@code via} quand il l'a écrit (« qwen3:8b » pour Cortex, V119) ; null sinon. */
+    @Column(length = 128)
+    private String model;
+
     @Column(name = "is_edited", nullable = false)
     @Builder.Default
     private boolean isEdited = false;

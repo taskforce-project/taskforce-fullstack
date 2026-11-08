@@ -29,6 +29,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.dto.response.AssistantActionResult;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantToolCall;
 import com.taskforce.tf_api.core.enums.NodeDomain;
 import com.taskforce.tf_api.core.enums.NodeType;
@@ -217,6 +218,9 @@ class AgentServiceTest {
         assertThat(answer.answer()).isEqualTo("Final answer");
         assertThat(answer.toolCalls()).hasSize(1);
         assertThat(answer.sources()).hasSize(1);
+        // La ligne grise (R123) : l'outil qui lit et a abouti, et la note servie au modèle.
+        assertThat(answer.read().tools()).containsExactly(new AssistantRead.ToolRead("search_brain", 1));
+        assertThat(answer.read().notes()).isEqualTo(1);
     }
 
     @Test
@@ -743,6 +747,23 @@ class AgentServiceTest {
     }
 
     @Test
+    @DisplayName("R123 : une action accordée garde le modèle qui l'a proposée, celui du dossier, le temps de l'action")
+    void an_approved_action_keeps_the_model_of_its_record() {
+        AgentTool tool = approvedInternal("create_note");
+        when(records.model(RECORD)).thenReturn(Optional.of("qwen3:8b"));
+        java.util.concurrent.atomic.AtomicReference<String> during = new java.util.concurrent.atomic.AtomicReference<>();
+        when(tool.execute(any(), any())).thenAnswer(call -> {
+            during.set(com.taskforce.tf_api.core.security.DelegatedAgent.model().orElse(null));
+            return "Note created";
+        });
+
+        service.runApproved("acme", 7L, "create_note", "{\"title\":\"T\"}", RECORD.toString());
+
+        assertThat(during.get()).isEqualTo("qwen3:8b");
+        assertThat(com.taskforce.tf_api.core.security.DelegatedAgent.model()).isEmpty();
+    }
+
+    @Test
     @DisplayName("un accord sans proposition qui l'attend (jamais proposée, ou déjà accordée) : rien ne tourne")
     void approval_without_a_waiting_proposal_is_refused() {
         stubWorkspace();
@@ -1091,6 +1112,27 @@ class AgentServiceTest {
     }
 
     @Test
+    @DisplayName("R123 : ce que Cortex écrit garde le modèle qui a répondu, le temps du geste seulement")
+    void a_gesture_keeps_the_model_that_answered() throws Exception {
+        modelCalls("update_issue", "{\"issue\":\"TF-12\",\"status\":\"In Progress\"}", "TF-12 is in progress.");
+        CortexGesture tool = gesture("update_issue", "issue.update");
+        when(llm.currentModel()).thenReturn("qwen3:8b");
+        java.util.concurrent.atomic.AtomicReference<String> during = new java.util.concurrent.atomic.AtomicReference<>();
+        when(tool.perform(any(), any())).thenAnswer(call -> {
+            during.set(com.taskforce.tf_api.core.security.DelegatedAgent.model().orElse(null));
+            return new CortexGesture.Done("Updated TF-12.", Map.of("issueId", 5), null);
+        });
+
+        AssistantAnswer answer = service.run("acme", 7L, "Move TF-12 to In Progress");
+
+        assertThat(during.get()).isEqualTo("qwen3:8b");
+        assertThat(com.taskforce.tf_api.core.security.DelegatedAgent.model()).isEmpty();
+        assertThat(answer.model()).isEqualTo("qwen3:8b");
+        // Un geste n'est pas une lecture : la ligne grise ne le compte pas.
+        assertThat(answer.read().tools()).isEmpty();
+    }
+
+    @Test
     @DisplayName("un geste qui n'a rien changé n'a pas d'Undo : la carte n'en montre pas un qui échouerait")
     void a_gesture_that_changed_nothing_has_no_undo() throws Exception {
         modelCalls("update_issue", "{\"issue\":\"TF-12\",\"assignee\":\"moi\"}", "TF-12 is already yours.");
@@ -1217,9 +1259,11 @@ class AgentServiceTest {
         when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of(note));
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"OK\"}"));
-        when(screens.describe(any())).thenReturn("On screen, what the person sees now.\nProject TESTTA \"test taskforce\".\n");
+        when(screens.read(any())).thenReturn(new ScreenContext.Seen(
+            "On screen, what the person sees now.\nProject TESTTA \"test taskforce\".\n", "TESTTA", 3, null));
 
-        service.run("acme", 7L, "supprime l issue qu il y a dans in review by AI", List.of(), new Screen(12L, null));
+        AssistantAnswer answer = service.run("acme", 7L, "supprime l issue qu il y a dans in review by AI", List.of(),
+            new Screen(12L, null));
 
         String system = systemPrompt();
         int plan = system.indexOf("Plan to delete or archive an issue:");
@@ -1229,8 +1273,12 @@ class AgentServiceTest {
         assertThat(screen).isGreaterThan(plan);
         assertThat(notes).isGreaterThan(screen);
         ArgumentCaptor<AgentContext> seen = ArgumentCaptor.forClass(AgentContext.class);
-        verify(screens).describe(seen.capture());
+        verify(screens).read(seen.capture());
         assertThat(seen.getValue().screen()).isEqualTo(new Screen(12L, null));
+        // La ligne grise (R123) : le tableau de l'écran et la note servie, comptés.
+        assertThat(answer.read().boards()).containsExactly(new AssistantRead.BoardRead("TESTTA", 3, null));
+        assertThat(answer.read().notes()).isEqualTo(1);
+        assertThat(answer.read().issues()).isEmpty();
     }
 
     @Test
@@ -1419,19 +1467,66 @@ class AgentServiceTest {
         when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         when(llm.isConfigured()).thenReturn(true);
         when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"OK\"}"));
-        lenient().when(material.describe(any(), eq(message))).thenReturn(IssueMaterial.HEADER
-            + "OPS-35 \"Iteration #35\": in Done, unassigned.\nDescription: none.\n");
+        lenient().when(material.read(any(), eq(message), anyList(), eq(true))).thenReturn(new IssueMaterial.Read(
+            IssueMaterial.HEADER + "OPS-35 \"Iteration #35\": in Done, unassigned.\nDescription: none.\n",
+            List.of(new AssistantRead.IssueRead("OPS-35", 3))));
 
-        service.run("acme", 7L, message);
+        AssistantAnswer answer = service.run("acme", 7L, message);
 
         String system = systemPrompt();
         if (!read) {
             assertThat(system).doesNotContain("The issue to summarize");
-            verify(material, never()).describe(any(), any());
+            verify(material, never()).read(any(), any(), any(), Mockito.anyBoolean());
+            assertThat(answer.read().issues()).isEmpty();
             return;
         }
         assertThat(system.indexOf("The issue to summarize")).isGreaterThan(system.indexOf("Plan to summarize:"));
         assertThat(system).contains("OPS-35 \"Iteration #35\": in Done, unassigned.");
+        // La ligne grise : « read OPS-35 and 3 comments » (R123).
+        assertThat(answer.read().issues()).containsExactly(new AssistantRead.IssueRead("OPS-35", 3));
+    }
+
+    @Test
+    @DisplayName("R123 : ce que la personne joint se lit, le tableau d'un projet comme l'issue, sans demande de résumé")
+    void what_the_person_attaches_is_read() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"OK\"}"));
+        List<Screen> attached = List.of(new Screen(30L, 350L), new Screen(31L, null), new Screen(31L, null));
+        when(material.read(any(), eq("qui devrait la prendre ?"), eq(attached), eq(false))).thenReturn(new IssueMaterial.Read(
+            IssueMaterial.ATTACHED + "OPS-35 \"Iteration #35\": in Done, unassigned.\n", List.of(new AssistantRead.IssueRead("OPS-35", 0))));
+        when(screens.attached(any(), eq(31L))).thenReturn(new ScreenContext.Seen(
+            ScreenContext.ATTACHED + "Project WEB \"Website\".\n", "WEB", 4, null));
+
+        AssistantAnswer answer = service.run("acme", 7L, "qui devrait la prendre ?", List.of(), Screen.NONE, attached);
+
+        String system = systemPrompt();
+        assertThat(system).contains("Project WEB \"Website\".").contains("OPS-35 \"Iteration #35\"");
+        assertThat(system.indexOf("Project WEB")).isLessThan(system.indexOf("OPS-35 \"Iteration"));
+        // Le même projet joint deux fois ne se lit qu'une fois.
+        verify(screens).attached(any(), eq(31L));
+        assertThat(answer.read().boards()).containsExactly(new AssistantRead.BoardRead("WEB", 4, null));
+        assertThat(answer.read().issues()).containsExactly(new AssistantRead.IssueRead("OPS-35", 0));
+    }
+
+    @Test
+    @DisplayName("R123 : un projet joint qui est déjà celui de l'écran ne se relit pas")
+    void an_attached_project_already_on_screen_is_not_read_again() throws Exception {
+        stubWorkspace();
+        stubToolLoop();
+        when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"OK\"}"));
+        when(screens.read(any())).thenReturn(new ScreenContext.Seen("On screen.\nProject OPS \"Ops\".\n", "OPS", 2, "OPS-35"));
+
+        AssistantAnswer answer = service.run("acme", 7L, "quoi de neuf ?", List.of(), new Screen(30L, 350L),
+            List.of(new Screen(30L, null)));
+
+        verify(screens, never()).attached(any(), any());
+        verifyNoInteractions(material);
+        assertThat(answer.read().boards()).containsExactly(new AssistantRead.BoardRead("OPS", 2, "OPS-35"));
     }
 
     /**

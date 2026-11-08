@@ -15,7 +15,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
  * Pierre). Hors d'une session déléguée (la personne elle-même, un jeton personnel, une tâche de fond), rien.
  *
  * <p>Cortex aussi agit pour la personne : un geste qu'il fait dans la conversation (ADR-024) passe par
- * {@link #actingAs}, et l'activité dit « Cortex », au nom de la personne, comme pour l'agent d'une mission.</p>
+ * {@link #actingAs}, et l'activité dit « Cortex », au nom de la personne, comme pour l'agent d'une mission. Le modèle qui
+ * le fait parler s'y ajoute ({@link #withModel}) : son commentaire dit « Cortex · qwen3:8b » (R123, séance n°18).</p>
  */
 public final class DelegatedAgent {
 
@@ -24,6 +25,8 @@ public final class DelegatedAgent {
 
     /** L'agent qui fait, dans ce fil, un geste au nom de la personne connectée (Cortex, dans la conversation). */
     private static final ThreadLocal<String> ACTING = new ThreadLocal<>();
+    /** Le modèle qui fait parler cet agent, dans ce fil : celui qui a répondu à la personne. */
+    private static final ThreadLocal<String> MODEL = new ThreadLocal<>();
 
     private DelegatedAgent() {}
 
@@ -46,6 +49,28 @@ public final class DelegatedAgent {
         } finally {
             if (before == null) ACTING.remove();
             else ACTING.set(before);
+        }
+    }
+
+    /** Le modèle qui fait parler l'agent de ce fil (Cortex : celui qui a répondu à la personne), ou vide. */
+    public static Optional<String> model() {
+        String model = MODEL.get();
+        return model == null || model.isBlank() ? Optional.empty() : Optional.of(model.strip());
+    }
+
+    /**
+     * Fait {@code action} avec le modèle {@code model} : ce qu'un agent y écrit pour la personne garde le nom du modèle
+     * qui le faisait parler (R123). Le nom ne vaut que pendant l'action, dans ce fil ; un modèle nul n'en pose aucun.
+     */
+    public static <T> T withModel(String model, Supplier<T> action) {
+        String before = MODEL.get();
+        if (model == null) MODEL.remove();
+        else MODEL.set(model);
+        try {
+            return action.get();
+        } finally {
+            if (before == null) MODEL.remove();
+            else MODEL.set(before);
         }
     }
 

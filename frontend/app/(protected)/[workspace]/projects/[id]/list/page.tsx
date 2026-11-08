@@ -16,7 +16,7 @@ import { UserAvatar } from "@/components/ui/user-avatar"
 import { cn } from "@/lib/utils"
 import { PRIORITY_DOT } from "@/lib/palette"
 import { useIssueStore } from "@/lib/store/issue-store"
-import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { InlineIssueFilters } from "@/components/issues/issue-filters"
 import { Skeleton } from "@/components/ui/skeleton"
 import { type IssueFilterState, EMPTY_ISSUE_FILTERS, applyIssueFilters } from "@/lib/issue-filters"
@@ -42,33 +42,6 @@ function extractParam(p: string | string[] | undefined): string {
   if (typeof p === "string") return p
   if (Array.isArray(p)) return p[0] ?? ""
   return ""
-}
-
-// ---------------------------------------------------------------------------
-// toSheetIssue
-// ---------------------------------------------------------------------------
-
-function toSheetIssue(issue: Issue): SheetIssue {
-  return {
-    id:             String(issue.id),
-    identifier:     issue.identifier,
-    title:          issue.title,
-    description:    issue.description ?? undefined,
-    priority:       issue.priority as SheetIssue["priority"],
-    statusId:       issue.status.id,
-    statusName:     issue.status.name,
-    statusCategory: issue.status.category,
-    assignee:       issue.assignee
-      ? { name: issue.assignee.displayName ?? issue.assignee.email, email: issue.assignee.email, userId: issue.assignee.id }
-      : null,
-    assigneeId:     issue.assignee?.id ?? null,
-    labels:         issue.labels,
-    pinned:         issue.pinned,
-    archived:       issue.archived,
-    dueDate:        issue.dueDate,
-    storyPoints:    null,
-    createdAt:      issue.createdAt,
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +150,7 @@ export default function ProjectListPage() {
   const projectId = Number(extractParam(params.id))
 
   const { issues, statuses, isLoading, fetchIssues, fetchStatuses, updateIssue } = useIssueStore()
-  const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
+  const { openIssue } = usePaneNavigation()
   const [filters, setFilters] = useState<IssueFilterState>(EMPTY_ISSUE_FILTERS)
 
   // QA3-9 : clic sur l'icône → bascule terminé / rouvert
@@ -260,19 +233,11 @@ export default function ProjectListPage() {
             key={status.id}
             status={status}
             issues={groupIssues}
-            onOpenIssue={(issue) => setSelectedIssue(toSheetIssue(issue))}
+            onOpenIssue={(issue) => openIssue({ projectId, issueId: issue.id })}
             onToggleDone={handleToggleDone}
           />
         )
       })}
-
-      <IssueSheet
-        issue={selectedIssue}
-        open={selectedIssue !== null}
-        onOpenChange={(open) => { if (!open) setSelectedIssue(null) }}
-        workspaceSlug={workspace}
-        projectId={projectId}
-      />
       </div>
     </div>
   )

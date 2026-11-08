@@ -1,17 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 
-import { messagesToTurns, undoKey, useCortexStore } from "./cortex-store";
+import { deletionKey, messagesToTurns, undoKey, useCortexStore } from "./cortex-store";
+import { useIssueStore } from "./issue-store";
 import { useScreenStore } from "./screen-store";
 import {
-  answerQuestion, sendAgentMessage, undoAction, type AssistantAnswer, type AssistantToolCall,
+  answerQuestion, approveAction, sendAgentMessage, undoAction, type AssistantAnswer, type AssistantToolCall,
 } from "@/lib/api/assistant-service";
 import {
   deleteConversation, getConversation, listConversations, type ConversationSummary,
 } from "@/lib/api/ai-conversation-service";
 
 // Aucun réseau : la réponse de Cortex et les conversations sont simulées ; les erreurs passent par le vrai client.
-vi.mock("@/lib/api/assistant-service", () => ({ sendAgentMessage: vi.fn(), answerQuestion: vi.fn(), undoAction: vi.fn() }));
+vi.mock("@/lib/api/assistant-service", () => ({
+  sendAgentMessage: vi.fn(), answerQuestion: vi.fn(), undoAction: vi.fn(), approveAction: vi.fn(),
+}));
 vi.mock("@/lib/api/ai-conversation-service", () => ({
   listConversations: vi.fn(), getConversation: vi.fn(), deleteConversation: vi.fn(),
 }));
@@ -174,6 +177,18 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
     expect(useCortexStore.getState().conversationId).toBe(4);
   });
 
+  // « Changes » est celui de la conversation : en rouvrir une autre repart de ses gestes à elle.
+  it("leaves the gestures of the cards with the conversation that made them", async () => {
+    vi.mocked(getConversation).mockResolvedValue({ id: 6, title: "Other", totalTokens: 0, messages: [] });
+    useCortexStore.setState({
+      done: [{ name: "create_issue", status: "success", input: null, output: null, record: "r" }],
+      deletions: { "r:1": { status: "archived" } },
+    });
+
+    await useCortexStore.getState().openConversation("acme", 6);
+    expect(useCortexStore.getState()).toMatchObject({ done: [], deletions: {} });
+  });
+
   // Test du CEO de la 1.10.0 : quel modèle a répondu ? Une réponse rouverte le dit encore, quand il a été gardé.
   it("reopens an answer with the model that wrote it, when it was kept", () => {
     const turns = messagesToTurns([
@@ -183,6 +198,62 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
 
     expect(turns[0].answer?.model).toBe("qwen3:8b");
     expect(turns[1].answer?.model).toBeNull();
+  });
+
+  it("keeps what the model read with each answer of a reopened conversation: the grey line reads the same (R123)", () => {
+    const read = { issues: [{ key: "OPS-35", comments: 3 }], boards: [], tools: [], notes: 0 };
+    const turns = messagesToTurns([
+      { id: 9, role: "assistant", content: "ok", mode: "deep", totalTokens: 3, createdAt: null, model: "qwen3:8b", read },
+      { id: 10, role: "assistant", content: "ok", mode: "deep", totalTokens: 3, createdAt: null },
+    ]);
+
+    expect(turns[0].answer?.read).toEqual(read);
+    expect(turns[1].answer?.read).toBeNull();
+  });
+
+  // R123 : « + » et « @ » joignent une issue ou un projet ; la demande les emporte, et le fil les montre sous elle.
+  it("attaches issues and projects to the next request, three at most, each once", () => {
+    const issue = (id: number) => ({ kind: "issue" as const, projectId: 3, issueId: id, label: `OPS-${id}`, title: "T" });
+    const { attach, detach } = useCortexStore.getState();
+
+    expect(attach(issue(35))).toBe(true);
+    expect(attach(issue(35))).toBe(false);
+    expect(attach({ kind: "project", projectId: 4, issueId: null, label: "Website", title: null })).toBe(true);
+    expect(attach(issue(36))).toBe(true);
+    expect(attach(issue(37))).toBe(false);
+    expect(useCortexStore.getState().attachments.map((a) => a.label)).toEqual(["OPS-35", "Website", "OPS-36"]);
+
+    detach("project:4");
+    expect(useCortexStore.getState().attachments.map((a) => a.label)).toEqual(["OPS-35", "OPS-36"]);
+  });
+
+  it("sends what is attached with the request, shows it under the request, and empties the composer", async () => {
+    vi.mocked(sendAgentMessage).mockResolvedValue({ conversationId: 7, title: "t", answer: answer("ok") });
+    useCortexStore.setState({
+      workspace: "acme",
+      attachments: [
+        { kind: "issue", projectId: 3, issueId: 35, label: "OPS-35", title: "Iteration #35" },
+        { kind: "project", projectId: 4, issueId: null, label: "Website", title: null },
+      ],
+    });
+    useCortexStore.getState().setDraft("Summarize OPS-35");
+
+    await expect(useCortexStore.getState().send("acme")).resolves.toBe(true);
+
+    expect(sendAgentMessage).toHaveBeenCalledWith("acme", "Summarize OPS-35", null, null, null,
+      [{ projectId: 3, issueId: 35 }, { projectId: 4 }]);
+    expect(useCortexStore.getState().attachments).toEqual([]);
+    expect(useCortexStore.getState().turns[0].attached?.map((a) => a.label)).toEqual(["OPS-35", "Website"]);
+  });
+
+  it("leaves the attachments of another workspace behind", () => {
+    useCortexStore.setState({
+      workspace: "acme", attachments: [{ kind: "project", projectId: 4, issueId: null, label: "Website", title: null }],
+    });
+
+    useCortexStore.getState().enterWorkspace("partner");
+
+    expect(useCortexStore.getState().attachments).toEqual([]);
   });
 
   it("deletes a conversation, and starts afresh when it was the open one", async () => {
@@ -401,5 +472,90 @@ describe("useCortexStore : les gestes faits sur leurs cartes, et leur « Undo »
     [{ record: null, name: "add_comment" }, ":add_comment"],
   ])("names a gesture by its record and its print: %o", (call, key) => {
     expect(undoKey(call)).toBe(key);
+  });
+});
+
+describe("useCortexStore : la carte de suppression, son archivage et sa suppression dans « Changes » (R122)", () => {
+  const target = { issueId: 55, projectId: 3, key: "TESTTA-2", title: "Fix the footer" };
+  const card: AssistantToolCall = {
+    name: "delete_issue", status: "pending", input: "{\"issue\":\"TESTTA-2\"}", output: null, record: "rec-9", target,
+  };
+  const archiveIssue = vi.fn();
+  const key = deletionKey(card);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useCortexStore.setState({ ...initial, turns: [], done: [], deletions: {} });
+    useIssueStore.setState({ archiveIssue });
+  });
+
+  it("names a card by the record of its answer and the issue it touches", () => {
+    expect(key).toBe("rec-9:55");
+    expect(deletionKey({ record: null, name: "delete_issue" })).toBe(":delete_issue");
+  });
+
+  it("archives the issue, shows it in Changes, and puts it back", async () => {
+    archiveIssue.mockResolvedValue({ id: 55 });
+
+    const archiving = useCortexStore.getState().archiveFromCard("acme", card, true);
+    expect(useCortexStore.getState().deletions[key]).toEqual({ status: "archiving" });
+    await expect(useCortexStore.getState().archiveFromCard("acme", card, true)).resolves.toBe(false);
+    await expect(archiving).resolves.toBe(true);
+    expect(archiveIssue).toHaveBeenCalledWith("acme", 3, 55, true);
+    expect(useCortexStore.getState().deletions[key]).toEqual({ status: "archived" });
+    expect(useCortexStore.getState().done).toEqual([expect.objectContaining({ name: "archive_issue", status: "success", target, record: "rec-9" })]);
+
+    await expect(useCortexStore.getState().archiveFromCard("acme", card, false)).resolves.toBe(true);
+    expect(archiveIssue).toHaveBeenLastCalledWith("acme", 3, 55, false);
+    expect(useCortexStore.getState().deletions[key]).toEqual({ status: "idle" });
+    expect(useCortexStore.getState().done).toEqual([]);
+  });
+
+  it("says a failed archive, and a failed putting back, keeping where the card was", async () => {
+    archiveIssue.mockResolvedValueOnce(null);
+    await expect(useCortexStore.getState().archiveFromCard("acme", card, true)).resolves.toBe(false);
+    expect(useCortexStore.getState().deletions[key]).toEqual({ status: "idle", failed: { gesture: "archive" } });
+    expect(useCortexStore.getState().done).toEqual([]);
+
+    archiveIssue.mockResolvedValueOnce({ id: 55 }).mockResolvedValueOnce(null);
+    await useCortexStore.getState().archiveFromCard("acme", card, true);
+    await expect(useCortexStore.getState().archiveFromCard("acme", card, false)).resolves.toBe(false);
+    expect(useCortexStore.getState().deletions[key]).toEqual({ status: "archived", failed: { gesture: "archive" } });
+    expect(useCortexStore.getState().done).toHaveLength(1);
+  });
+
+  it("archives nothing without a workspace or an issue", async () => {
+    await expect(useCortexStore.getState().archiveFromCard("", card, true)).resolves.toBe(false);
+    await expect(useCortexStore.getState().archiveFromCard("acme", { ...card, target: null }, true)).resolves.toBe(false);
+    expect(archiveIssue).not.toHaveBeenCalled();
+  });
+
+  it("deletes with the person's approval, the deletion taking the archive's place in Changes", async () => {
+    archiveIssue.mockResolvedValue({ id: 55 });
+    vi.mocked(approveAction).mockResolvedValue({ tool: "delete_issue", status: "success", output: "Deleted TESTTA-2.", ref: "print" });
+    await useCortexStore.getState().archiveFromCard("acme", card, true);
+
+    await expect(useCortexStore.getState().deleteFromCard("acme", card)).resolves.toBe(true);
+    expect(approveAction).toHaveBeenCalledWith("acme", card);
+    expect(useCortexStore.getState().deletions[key]).toEqual({ status: "deleted", output: "Deleted TESTTA-2." });
+    expect(useCortexStore.getState().done).toEqual([
+      expect.objectContaining({ name: "delete_issue", status: "success", output: "Deleted TESTTA-2.", ref: "print", target }),
+    ]);
+    // Supprimée : plus aucun geste de cette carte ne part.
+    await expect(useCortexStore.getState().deleteFromCard("acme", card)).resolves.toBe(false);
+    await expect(useCortexStore.getState().archiveFromCard("acme", card, false)).resolves.toBe(false);
+    expect(approveAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the issue when the rules or the server refuse, and says why", async () => {
+    vi.mocked(approveAction).mockResolvedValueOnce({ tool: "delete_issue", status: "refused", output: "Not run: the rules refuse it." });
+    await expect(useCortexStore.getState().deleteFromCard("acme", card)).resolves.toBe(false);
+    expect(useCortexStore.getState().deletions[key]).toEqual({ status: "idle", failed: { gesture: "delete", why: "Not run: the rules refuse it." } });
+
+    vi.mocked(approveAction).mockRejectedValueOnce(httpError(409, { message: "TESTTA-2 has a mission at work" }));
+    await expect(useCortexStore.getState().deleteFromCard("acme", card)).resolves.toBe(false);
+    expect(useCortexStore.getState().deletions[key]).toEqual({ status: "idle", failed: { gesture: "delete", why: "TESTTA-2 has a mission at work" } });
+    expect(useCortexStore.getState().done).toEqual([]);
+    await expect(useCortexStore.getState().deleteFromCard("", card)).resolves.toBe(false);
   });
 });

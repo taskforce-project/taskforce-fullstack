@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,4 +18,8 @@ public interface CortexRecordEventRepository extends JpaRepository<CortexRecordE
 
     /** Le dossier entier, dans l'ordre de la chaîne. */
     List<CortexRecordEvent> findByRecordIdOrderBySeqAsc(UUID recordId);
+
+    /** Les événements d'un genre, posés par un même acteur, dans ces dossiers : les notes du serveur, par exemple. */
+    List<CortexRecordEvent> findByRecordIdInAndTypeAndActorKindOrderBySeqAsc(Collection<UUID> recordIds, String type,
+                                                                            String actorKind);
 }

@@ -1,4 +1,5 @@
 import { act } from '@testing-library/react';
+import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDeliveryStore } from './delivery-store';
 import type { DeliveryProvider, DeliveryRun } from '../api/delivery-service';
@@ -14,6 +15,7 @@ vi.mock('../api/delivery-service', () => ({
   getRunActivity: vi.fn(),
   decideApproval: vi.fn(),
   downloadEvidence: vi.fn(),
+  getEvidence: vi.fn(),
   applyRun: vi.fn(),
   discardRun: vi.fn(),
   markRunDone: vi.fn(),
@@ -187,6 +189,25 @@ describe('delivery-store', () => {
     await act(async () => { ok = await useDeliveryStore.getState().downloadEvidence('acme', 100, 'md'); });
     expect(ok).toBe(expected);
     expect(svc.downloadEvidence).toHaveBeenCalledWith('acme', 100, 'md');
+  });
+
+  // La vue du travail lit le dossier de preuve pendant qu'il se construit (R95, point 3).
+  it('fetchEvidence keeps the record of a run, null while it has none, the last read on another error', async () => {
+    const evidence = { format: 'taskforce-evidence/1', events: [], root: 'h1' };
+    const missing = new AxiosError('Not found', 'ERR_BAD_REQUEST', {} as InternalAxiosRequestConfig, undefined,
+      { status: 404, data: {}, headers: {}, statusText: '', config: {} } as AxiosResponse);
+    vi.mocked(svc.getEvidence).mockResolvedValueOnce(evidence).mockRejectedValueOnce(new Error('offline')).mockRejectedValueOnce(missing);
+    let read: unknown = undefined;
+
+    await act(async () => { read = await useDeliveryStore.getState().fetchEvidence('acme', 100); });
+    expect(read).toEqual(evidence);
+    expect(useDeliveryStore.getState().evidence[100]).toEqual(evidence);
+    await act(async () => { read = await useDeliveryStore.getState().fetchEvidence('acme', 100); });
+    expect(read).toBeNull();
+    expect(useDeliveryStore.getState().evidence[100]).toEqual(evidence);
+    await act(async () => { read = await useDeliveryStore.getState().fetchEvidence('acme', 100); });
+    expect(useDeliveryStore.getState().evidence[100]).toBeNull();
+    expect(svc.getEvidence).toHaveBeenCalledWith('acme', 100);
   });
 
   it('decideApproval returns false when the server refuses', async () => {

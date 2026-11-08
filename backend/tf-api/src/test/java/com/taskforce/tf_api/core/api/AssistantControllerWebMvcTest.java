@@ -78,7 +78,7 @@ class AssistantControllerWebMvcTest {
         when(conversationService.recentHistory(anyLong())).thenReturn(java.util.List.of());
         when(conversationService.autoTitle(anyLong(), anyString())).thenReturn("Move");
         AtomicReference<String> model = new AtomicReference<>();
-        when(agentService.run(anyString(), anyLong(), anyString(), any(), any())).thenAnswer(call -> {
+        when(agentService.run(anyString(), anyLong(), anyString(), any(), any(), any())).thenAnswer(call -> {
             model.set(ChosenModel.current().orElse(null));
             // Le modèle qui répond, comme la passerelle le dit : celui que la personne a choisi ou cliqué, ici.
             return new com.taskforce.tf_api.core.dto.response.AssistantAnswer(text, null, "deep", java.util.List.of(),
@@ -107,7 +107,7 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.answer.answer").value("Done."));
         // Rien n'a changé de modèle : la personne décide d'un clic.
         org.assertj.core.api.Assertions.assertThat(used.get()).isNull();
-        verify(conversationService).appendMessage(1L, "assistant", "Done." + ModelCapabilityService.block(text), "deep", 0, null);
+        verify(conversationService).appendMessage(1L, "assistant", "Done." + ModelCapabilityService.block(text), "deep", 0, null, null);
     }
 
     @Test
@@ -125,7 +125,7 @@ class AssistantControllerWebMvcTest {
         org.assertj.core.api.Assertions.assertThat(used.get()).isEqualTo("qwen3:8b");
         verify(capabilities, never()).offer(anyString(), any(), anyString());
         verify(conversationService).appendMessage(1L, "assistant",
-            "Moved." + ModelCapabilityService.block(ModelCapabilityService.sentNotice("qwen3:8b")), "deep", 0, "qwen3:8b");
+            "Moved." + ModelCapabilityService.block(ModelCapabilityService.sentNotice("qwen3:8b")), "deep", 0, "qwen3:8b", null);
     }
 
     @Test
@@ -143,7 +143,7 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.answer.model").value("qwen3:14b"));
         org.assertj.core.api.Assertions.assertThat(used.get()).isEqualTo("qwen3:14b");
         // Le modèle qui a répondu reste avec la réponse : une conversation rouverte le montre encore.
-        verify(conversationService).appendMessage(1L, "assistant", "Hi.", "deep", 0, "qwen3:14b");
+        verify(conversationService).appendMessage(1L, "assistant", "Hi.", "deep", 0, "qwen3:14b", null);
     }
 
     @Test
@@ -157,7 +157,7 @@ class AssistantControllerWebMvcTest {
         when(conversationService.getOrCreate(anyLong(), anyLong(), any(), any())).thenReturn(conv);
         when(conversationService.recentHistory(anyLong())).thenReturn(java.util.List.of());
         when(conversationService.autoTitle(anyLong(), anyString())).thenReturn("Bonjour");
-        when(agentService.run(anyString(), anyLong(), anyString(), any(), any())).thenReturn(
+        when(agentService.run(anyString(), anyLong(), anyString(), any(), any(), any())).thenReturn(
             new com.taskforce.tf_api.core.dto.response.AssistantAnswer(
                 "Réponse", null, "fast", java.util.List.of(), java.util.List.of(), java.util.List.of(),
                 com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE));
@@ -166,7 +166,7 @@ class AssistantControllerWebMvcTest {
                 .accept(MediaType.APPLICATION_JSON)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Bonjour\"}"))
             .andExpect(status().isOk());
-        verify(agentService).run(eq("acme"), eq(7L), eq("Bonjour"), any(), eq(Screen.NONE));
+        verify(agentService).run(eq("acme"), eq(7L), eq("Bonjour"), any(), eq(Screen.NONE), eq(java.util.List.of()));
     }
 
     @ParameterizedTest(name = "écran {0} → {1}")
@@ -183,7 +183,7 @@ class AssistantControllerWebMvcTest {
         when(conv.getId()).thenReturn(1L);
         when(conversationService.getOrCreate(anyLong(), anyLong(), any(), any())).thenReturn(conv);
         when(conversationService.recentHistory(anyLong())).thenReturn(java.util.List.of());
-        when(agentService.run(anyString(), anyLong(), anyString(), any(), any())).thenReturn(
+        when(agentService.run(anyString(), anyLong(), anyString(), any(), any(), any())).thenReturn(
             new com.taskforce.tf_api.core.dto.response.AssistantAnswer(
                 "Réponse", null, "fast", java.util.List.of(), java.util.List.of(), java.util.List.of(),
                 com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE));
@@ -192,9 +192,50 @@ class AssistantControllerWebMvcTest {
                 .accept(MediaType.APPLICATION_JSON)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"supprime ça\",\"screen\":" + screen + "}"))
             .andExpect(status().isOk());
-        verify(agentService).run(eq("acme"), eq(7L), eq("supprime ça"), any(), eq(new Screen(projectId, issueId)));
+        verify(agentService).run(eq("acme"), eq(7L), eq("supprime ça"), any(), eq(new Screen(projectId, issueId)), any());
         // Une conversation qui commence sur un projet se range sous lui (R121) ; sans projet à l'écran, sous aucun.
         verify(conversationService).getOrCreate(eq(1L), eq(7L), any(), eq(projectId));
+    }
+
+    @Test
+    @DisplayName("POST assistant avec des pièces jointes (R123) : chacune part à Cortex dans son projet ; ce que le modèle a lu est gardé")
+    void chat_passes_the_attachments_and_keeps_what_was_read() throws Exception {
+        var ws = com.taskforce.tf_api.core.model.Workspace.builder().id(1L).slug("acme").name("Acme").build();
+        when(access.resolveAndAuthorize(anyString(), anyLong())).thenReturn(ws);
+        var conv = org.mockito.Mockito.mock(com.taskforce.tf_api.core.model.AiConversation.class);
+        when(conv.getId()).thenReturn(1L);
+        when(conversationService.getOrCreate(anyLong(), anyLong(), any(), any())).thenReturn(conv);
+        when(conversationService.recentHistory(anyLong())).thenReturn(java.util.List.of());
+        var read = new com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead(
+            java.util.List.of(new com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead.IssueRead("OPS-35", 3)),
+            java.util.List.of(), java.util.List.of(), 0);
+        when(agentService.run(anyString(), anyLong(), anyString(), any(), any(), any())).thenReturn(
+            new com.taskforce.tf_api.core.dto.response.AssistantAnswer(
+                "Réponse", null, "fast", java.util.List.of(), java.util.List.of(), java.util.List.of(),
+                com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE, null, "qwen3:8b", read));
+
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"résume\",\"attach\":["
+                    + "{\"projectId\":30,\"issueId\":350},{\"projectId\":31},{\"issueId\":9}]}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.answer.read.issues[0].key").value("OPS-35"))
+            .andExpect(jsonPath("$.data.answer.read.issues[0].comments").value(3));
+        // Une issue sans son projet ne se lit pas.
+        verify(agentService).run(eq("acme"), eq(7L), eq("résume"), any(), eq(Screen.NONE),
+            eq(java.util.List.of(new Screen(30L, 350L), new Screen(31L, null))));
+        verify(conversationService).appendMessage(1L, "assistant", "Réponse", "fast", 0, "qwen3:8b", read);
+    }
+
+    @Test
+    @DisplayName("POST assistant avec plus de trois pièces jointes → 400")
+    void chat_too_many_attachments_400() throws Exception {
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"hi\",\"attach\":["
+                    + "{\"projectId\":1},{\"projectId\":2},{\"projectId\":3},{\"projectId\":4}]}"))
+            .andExpect(status().isBadRequest());
+        verify(agentService, never()).run(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -204,7 +245,7 @@ class AssistantControllerWebMvcTest {
                 .accept(MediaType.APPLICATION_JSON)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"hi\",\"screen\":{\"projectId\":-1}}"))
             .andExpect(status().isBadRequest());
-        verify(agentService, never()).run(any(), any(), any(), any(), any());
+        verify(agentService, never()).run(any(), any(), any(), any(), any(), any());
     }
 
     @Test

@@ -242,6 +242,8 @@ export const ISSUE_ROUTES = {
   MY_ISSUES: (slug: string) => `/api/workspaces/${slug}/my-issues`,
   /** Vue My Work - cycles de tous les projets visibles, en un appel (évite un appel par projet) */
   MY_CYCLES: (slug: string) => `/api/workspaces/${slug}/my-cycles`,
+  /** La recherche de la fenêtre (Ctrl+K, le « @ » et le « + » du compositeur) : par clé ou par titre, tous projets vus. */
+  SEARCH: (slug: string) => `/api/workspaces/${slug}/issues/search`,
   LIST:    (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues`,
   /** Liste paginée pour l'infinite-scroll du backlog (QA2-33) */
   PAGED:   (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/paged`,
@@ -373,6 +375,16 @@ export const EVAL_ROUTES = {
   RUN_CASE: (slug: string, runId: number, caseId: number) =>
     `/api/workspaces/${slug}/evals/runs/${runId}/cases/${caseId}`,
   SETTINGS: (slug: string) => `/api/workspaces/${slug}/evals/settings`,
+  /** L'histoire de la banque (R125) : ses rejeux par modèle et par date, l'origine de chaque cas et ses notes. */
+  HISTORY: (slug: string) => `/api/workspaces/${slug}/evals/history`,
+} as const;
+
+/**
+ * Ce que Cortex peut lire dans un espace (R125), compté et daté, pour le volet « Progress ».
+ * Backend: @RequestMapping("/api/workspaces/{slug}/assistant/sources").
+ */
+export const CORTEX_SOURCE_ROUTES = {
+  SOURCES: (slug: string) => `/api/workspaces/${slug}/assistant/sources`,
 } as const;
 
 /**

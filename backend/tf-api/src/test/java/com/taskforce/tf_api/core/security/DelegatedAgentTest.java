@@ -92,4 +92,31 @@ class DelegatedAgentTest {
 
         assertThat(DelegatedAgent.current()).isEmpty();
     }
+
+    @Test
+    @DisplayName("le modèle qui fait parler Cortex (R123) : pendant l'action seulement, même imbriqué, et blanc ne compte pas")
+    void the_model_holds_during_the_action_only() {
+        String inside = DelegatedAgent.withModel("qwen3:8b", () -> DelegatedAgent.actingAs("Cortex", () -> {
+            String nested = DelegatedAgent.withModel(" qwen3:14b ", () -> DelegatedAgent.model().orElseThrow());
+            return nested + "/" + DelegatedAgent.model().orElseThrow();
+        }));
+
+        assertThat(inside).isEqualTo("qwen3:14b/qwen3:8b");
+        assertThat(DelegatedAgent.model()).isEmpty();
+        assertThat(DelegatedAgent.withModel("  ", DelegatedAgent::model)).isEmpty();
+        // Un modèle nul n'en pose aucun, même sous un autre : le geste n'a pas de modèle connu.
+        assertThat(DelegatedAgent.withModel("qwen3:8b", () -> DelegatedAgent.withModel(null, DelegatedAgent::model))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("une action qui échoue ne laisse pas son modèle sur le fil")
+    void a_failed_action_leaves_no_model_behind() {
+        try {
+            DelegatedAgent.withModel("qwen3:8b", () -> { throw new IllegalStateException("boom"); });
+        } catch (IllegalStateException expected) {
+            // l'échec remonte tel quel
+        }
+
+        assertThat(DelegatedAgent.model()).isEmpty();
+    }
 }

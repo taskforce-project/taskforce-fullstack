@@ -3,29 +3,29 @@
 import { useEffect } from "react"
 import { Loader2 } from "lucide-react"
 
+import { ProgressSection } from "@/components/progress/progress-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { fillModelText, proposalLines, scoreText, scoreTone } from "@/lib/ai/model-table"
-import { useAiStatusStore } from "@/lib/store/ai-status-store"
+import { cardLine } from "@/lib/progress/model-card"
+import { useEvalStore } from "@/lib/store/eval-store"
 import { useModelCapabilityStore } from "@/lib/store/model-capability-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { useSettingsStore } from "@/lib/store/settings-store"
 import { cn } from "@/lib/utils"
 import { parseServerDate } from "@/lib/utils/server-date"
 
 const TONE = { good: "text-ink-green", bad: "text-ink-yellow", none: "text-muted-foreground" } as const
 
 /**
- * Ce que sait faire chaque modèle (R113, séance n°16) : la table de l'instance, mesurée par les cas fixes de la banque,
- * ce que TaskForce propose, et le geste « Use for Cortex ». La personne choisit : dans la webapp, le modèle de Cortex
- * pour elle ({@code onUse} absent : le store le garde) ; dans l'app desktop, {@code onUse} remplit ses réglages d'IA, et
- * elle enregistre. Rien ne change de modèle sans elle.
+ * Ce que sait faire chaque modèle, mesuré ici (R113, séance n°16 ; R125, séance n°18) : la table de l'instance, notée par
+ * les cas fixes de la suite, et ce que TaskForce propose. Un modèle pas encore mesuré montre ce que dit sa fiche (sa
+ * taille, sa fenêtre, ses outils), écrit comme tel, jamais une note d'éditeur. La table vit dans le volet « Progress » ;
+ * le choix du modèle de Cortex reste dans Settings > AI, où mène la proposition. Rien ne change de modèle sans la personne.
  */
-export function ModelCapabilityTable({ slug, onUse }: Readonly<{
-  slug: string
-  /** App desktop : le modèle choisi va dans les réglages d'IA de l'ordinateur, que la personne enregistre. */
-  onUse?: (model: string) => void
-}>) {
+export function ModelCapabilityTable({ slug }: Readonly<{ slug: string }>) {
   const t = usePreferencesStore((s) => s.t.models)
+  const tp = usePreferencesStore((s) => s.t.progress)
   const table = useModelCapabilityStore((s) => s.table)
   const progress = useModelCapabilityStore((s) => s.progress)
   const results = useModelCapabilityStore((s) => s.results)
@@ -34,50 +34,51 @@ export function ModelCapabilityTable({ slug, onUse }: Readonly<{
   const measure = useModelCapabilityStore((s) => s.measure)
   const measureCortexModel = useModelCapabilityStore((s) => s.measureCortexModel)
   const stop = useModelCapabilityStore((s) => s.stop)
-  const choose = useModelCapabilityStore((s) => s.choose)
-  // La fenêtre de contexte du modèle de Cortex (le rapide), dite par l'état de l'IA quand le fournisseur est Ollama.
-  const contextWindow = useAiStatusStore((s) => s.status?.fastContextWindow ?? null)
-  const fetchAiStatus = useAiStatusStore((s) => s.fetchStatus)
+  // Un rejeu de la banque tient déjà le modèle : une mesure attend qu'il finisse.
+  const replaying = useEvalStore((s) => s.progress !== null)
+  const openSettings = useSettingsStore((s) => s.openSettings)
 
   useEffect(() => {
     if (slug) void fetchTable(slug)
   }, [slug, fetchTable])
-  useEffect(() => {
-    void fetchAiStatus()
-  }, [fetchAiStatus])
-  // Le modèle de Cortex sans mesure complète se mesure une fois, sans clic : à l'ouverture de la table, et quand le
-  // modèle de Cortex change (« Use for Cortex », ou les réglages d'IA enregistrés dans l'app desktop). Les autres
-  // restent à la demande ; le store garde ce qu'il a déjà mesuré seul.
+  // Le modèle de Cortex sans mesure complète se mesure une fois, sans clic, quand la table s'ouvre ou que le modèle de
+  // Cortex change (Settings > AI). Les autres restent à la demande ; le store garde ce qu'il a déjà mesuré seul.
   useEffect(() => {
     if (slug && table) void measureCortexModel(slug)
   }, [slug, table, measureCortexModel])
 
   if (!table) {
-    return <p className="text-xs text-muted-foreground">{t.title}…</p>
+    return (
+      <ProgressSection title={t.title}>
+        <p className="text-xs text-muted-foreground">{tp.reading}</p>
+      </ProgressSection>
+    )
   }
   const proposal = proposalLines(table, t)
   const caseTitle = (key: string) => table.cases.find((c) => c.key === key)?.title ?? key
   const failed = results.filter((r) => !r.passed)
 
   return (
-    <section className="flex flex-col gap-4" aria-label={t.title}>
-      <div>
-        <h3 className="text-sm font-semibold text-foreground">{t.title}</h3>
-        <p className="mt-0.5 text-xs text-muted-foreground">{fillModelText(t.hint, { cases: table.cases.length })}</p>
-      </div>
-
+    <ProgressSection title={t.title} hint={fillModelText(t.hint, { cases: table.cases.length })}>
       {table.models.length === 0 ? (
         <p className="text-xs text-muted-foreground">{t.noModels}</p>
       ) : (
         <>
-          <div className="flex flex-col gap-1 border border-border/60 bg-muted/20 px-3 py-2 text-xs">
+          <div className="flex flex-col gap-1 border-l border-border pl-3 text-xs">
             <span className="font-medium text-foreground">{t.proposalTitle}</span>
             <span className="text-foreground">{proposal.overall}</span>
             <span className="text-muted-foreground">{proposal.each.join(" · ")}</span>
+            <button
+              type="button"
+              onClick={() => openSettings("ai")}
+              className="mt-0.5 w-fit text-left text-foreground underline-offset-4 hover:underline"
+            >
+              {tp.chooseModel}
+            </button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse text-xs">
+            <table className="w-full min-w-[560px] border-collapse text-xs">
               <thead>
                 <tr className="border-b border-border text-left text-muted-foreground">
                   <th className="py-1.5 pr-3 font-medium">{t.model}</th>
@@ -90,35 +91,38 @@ export function ModelCapabilityTable({ slug, onUse }: Readonly<{
               </thead>
               <tbody>
                 {table.models.map((row) => {
-                  const inUse = row.model === table.current
+                  const unmeasured = row.measuredAt === null
+                  const card = unmeasured ? cardLine(row.card, tp) : null
                   return (
                     <tr key={row.model} className="border-b border-border/50 align-top">
                       <td className="py-2 pr-3">
                         <span className="font-mono text-[11px] text-foreground">{row.model}</span>
-                        {inUse && <Badge variant="secondary" className="ml-1.5 text-[10px]">{t.inUse}</Badge>}
+                        {row.current && <Badge variant="secondary" className="ml-1.5 text-[10px]">{t.inUse}</Badge>}
                       </td>
-                      {row.scores.map((score) => (
-                        <td key={score.capability} className={cn("py-2 pr-3 tabular-nums", TONE[scoreTone(score)])}>
-                          {scoreText(score, t)}
+                      {unmeasured ? (
+                        // Pas encore mesuré : ce que dit sa fiche, comme telle, à la place des notes.
+                        <td colSpan={table.capabilities.length} className="py-2 pr-3 text-muted-foreground">
+                          {tp.notMeasuredYet}
+                          {card && <span className="ml-1">{card}</span>}
                         </td>
-                      ))}
+                      ) : (
+                        row.scores.map((score) => (
+                          <td key={score.capability} className={cn("py-2 pr-3 tabular-nums", TONE[scoreTone(score)])}>
+                            {scoreText(score, t)}
+                          </td>
+                        ))
+                      )}
                       <td className="py-2 pr-3 text-muted-foreground">
                         {row.measuredAt
                           ? parseServerDate(row.measuredAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
                           : t.never}
                       </td>
                       <td className="py-1.5">
-                        <div className="flex justify-end gap-1">
-                          <Button size="sm" variant="ghost" disabled={progress !== null}
+                        <div className="flex justify-end">
+                          <Button size="sm" variant="ghost" disabled={progress !== null || replaying}
                             onClick={() => void measure(slug, row.model)}>
                             {row.measuredAt ? t.measureAgain : t.measure}
                           </Button>
-                          {!inUse && (
-                            <Button size="sm" variant="outline" title={t.useHint}
-                              onClick={() => (onUse ? onUse(row.model) : void choose(slug, row.model))}>
-                              {t.use}
-                            </Button>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -131,8 +135,8 @@ export function ModelCapabilityTable({ slug, onUse }: Readonly<{
       )}
 
       {progress && (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin" />
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" role="status">
+          <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" />
           {progress.waitSeconds !== null
             ? fillModelText(t.waiting, { seconds: progress.waitSeconds })
             : fillModelText(progress.auto ? t.autoMeasuring : t.measuring,
@@ -149,20 +153,7 @@ export function ModelCapabilityTable({ slug, onUse }: Readonly<{
           {failed.map((r) => <span key={r.caseKey}>{fillModelText(t.caseFailed, { title: caseTitle(r.caseKey) })}</span>)}
         </div>
       )}
-
-      {!onUse && table.models.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          {table.choice ? fillModelText(t.yourChoice, { model: table.choice })
-            : table.instanceModel ? fillModelText(contextWindow ? t.instanceModelWindow : t.instanceModel, {
-              model: table.instanceModel, tokens: contextWindow ? contextWindow.toLocaleString("en-US") : "",
-            }) : null}
-          {table.choice && (
-            <Button size="sm" variant="ghost" onClick={() => void choose(slug, null)}>{t.useInstance}</Button>
-          )}
-        </div>
-      )}
-      {onUse && <p className="text-xs text-muted-foreground">{t.desktopUse}</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}
-    </section>
+    </ProgressSection>
   )
 }

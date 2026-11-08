@@ -1,15 +1,16 @@
 "use client"
 
-import { useState } from "react"
 import { Archive, Loader2, Trash2, Undo2 } from "lucide-react"
 
+import { PaneLink } from "@/components/layout/pane-link"
 import { Button } from "@/components/ui/button"
-import { approveAction, type AssistantTarget, type AssistantToolCall } from "@/lib/api/assistant-service"
-import { getErrorMessage } from "@/lib/api/client"
+import type { AssistantTarget, AssistantToolCall } from "@/lib/api/assistant-service"
 import type { TranslationKeys } from "@/lib/constants_en"
 import { fillText } from "@/lib/delivery/result-card"
-import { useIssueStore } from "@/lib/store/issue-store"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
+import { deletionKey, useCortexStore } from "@/lib/store/cortex-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { issuePath } from "@/lib/window/pane"
 
 type Texts = TranslationKeys["cortex"]
 
@@ -24,8 +25,6 @@ function goesWith(target: AssistantTarget, t: Texts): string[] {
   return what
 }
 
-type State = "idle" | "archiving" | "archived" | "restoring" | "deleting" | "deleted"
-
 /** Le titre de la carte : l'issue, sa colonne à côté de sa clé quand le serveur la donne, et son titre. */
 export function deletionTitle(target: AssistantTarget, t: Texts): string {
   const key = target.key ?? ""
@@ -37,68 +36,51 @@ export function deletionTitle(target: AssistantTarget, t: Texts): string {
 /**
  * « Supprime TF-12 » dans la conversation (TF-J1-5) : la règle delete-issue demande, et cette carte dit l'issue, sa
  * colonne (test du CEO du 05/11/2026 : la carte d'une autre issue au même titre doit se voir d'emblée) et ce qui
- * partirait avec elle. « Archive » d'abord : l'issue quitte le tableau, et « Undo » la remet. « Delete » ensuite :
- * l'accord part avec le dossier de la réponse, où le serveur rejuge la suppression. Seul ce clic supprime, jamais un
- * « oui » écrit (R1).
+ * partirait avec elle ; son titre ouvre l'issue dans le volet (R123). « Archive » d'abord : l'issue quitte le tableau, et
+ * « Undo » la remet. « Delete » ensuite : l'accord part avec le dossier de la réponse, où le serveur rejuge la
+ * suppression. Seul ce clic supprime, jamais un « oui » écrit (R1). Son état vit dans `useCortexStore` : « Changes »
+ * (R122) montre l'archivage et la suppression, et la carte les garde quand la conversation se replie puis se déplie.
  */
 export function DeleteIssueCard({ slug, call, target }: Readonly<{ slug: string; call: AssistantToolCall; target: AssistantTarget }>) {
   const t = usePreferencesStore((s) => s.t.cortex)
-  const archiveIssue = useIssueStore((s) => s.archiveIssue)
-  const [state, setState] = useState<State>("idle")
-  const [problem, setProblem] = useState<string | null>(null)
-  const [deleted, setDeleted] = useState<string | null>(null)
+  const openText = usePreferencesStore((s) => s.t.window.openIssue)
+  const state = useCortexStore((s) => s.deletions[deletionKey(call)])
+  const archiveFromCard = useCortexStore((s) => s.archiveFromCard)
+  const deleteFromCard = useCortexStore((s) => s.deleteFromCard)
+  const { openIssue } = usePaneNavigation()
+  const status = state?.status ?? "idle"
   const key = target.key ?? ""
   const title = deletionTitle(target, t)
   const what = goesWith(target, t)
-  const busy = state === "archiving" || state === "restoring" || state === "deleting"
+  const busy = status === "archiving" || status === "restoring" || status === "deleting"
+  const failed = state?.failed
+  const problem = !failed ? null : failed.gesture === "archive" ? t.archiveFailed : fillText(t.deleteFailed, { why: failed.why })
+  const asCall = { ...call, target }
 
-  async function archive(archived: boolean) {
-    setState(archived ? "archiving" : "restoring")
-    setProblem(null)
-    const done = await archiveIssue(slug, target.projectId, target.issueId, archived)
-    if (done) {
-      setState(archived ? "archived" : "idle")
-    } else {
-      setState(archived ? "idle" : "archived")
-      setProblem(t.archiveFailed)
-    }
-  }
-
-  async function remove() {
-    setState("deleting")
-    setProblem(null)
-    try {
-      const result = await approveAction(slug, call)
-      if (result.status === "success") {
-        setDeleted(result.output)
-        setState("deleted")
-      } else {
-        setState("idle")
-        setProblem(fillText(t.deleteFailed, { why: result.output }))
-      }
-    } catch (e) {
-      setState("idle")
-      setProblem(fillText(t.deleteFailed, { why: getErrorMessage(e) }))
-    }
-  }
-
-  if (state === "deleted") {
+  if (status === "deleted") {
     // Ce que le serveur a supprimé, dans ses mots (« Deleted TF-12 "Fix login", with its 3 comments. »).
-    return <p className="my-2 whitespace-pre-wrap break-words text-xs text-muted-foreground">{deleted || t.deleteDeleted}</p>
+    return <p className="my-2 whitespace-pre-wrap break-words text-xs text-muted-foreground">{state?.output || t.deleteDeleted}</p>
   }
 
   return (
     <div className="my-2 flex flex-col gap-2 border border-border p-2.5 text-xs" role="group" aria-label={title}>
-      <p className="font-medium text-foreground">{title}</p>
+      <PaneLink
+        href={issuePath(slug, target.projectId, target.issueId)}
+        open={() => openIssue({ projectId: target.projectId, issueId: target.issueId })}
+        title={fillText(openText, { key })}
+        className="w-fit font-medium text-foreground underline-offset-2 hover:underline"
+      >
+        {title}
+      </PaneLink>
       <p className="text-muted-foreground">
         {what.length > 0 ? fillText(t.deleteGoesWith, { what: what.join(", ") }) : t.deleteNothingElse}
       </p>
       <p className="text-muted-foreground">{t.deleteHint}</p>
-      {state === "archived" ? (
+      {status === "archived" || status === "restoring" ? (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-foreground">{fillText(t.deleteArchived, { key })}</span>
-          <Button variant="outline" size="sm" className="h-7 px-2.5 text-[11px]" disabled={busy} onClick={() => void archive(false)}>
-            <Undo2 className="size-3" /> {t.deleteUndo}
+          <Button variant="outline" size="sm" className="h-7 px-2.5 text-[11px]" disabled={busy} onClick={() => void archiveFromCard(slug, asCall, false)}>
+            {status === "restoring" ? <Loader2 className="size-3 animate-spin" /> : <Undo2 className="size-3" />} {t.deleteUndo}
           </Button>
         </div>
       ) : (
@@ -106,12 +88,12 @@ export function DeleteIssueCard({ slug, call, target }: Readonly<{ slug: string;
           {target.archived ? (
             <span className="text-muted-foreground">{fillText(t.deleteAlreadyArchived, { key })}</span>
           ) : (
-            <Button size="sm" className="h-7 px-2.5 text-[11px]" disabled={busy} onClick={() => void archive(true)}>
-              {state === "archiving" ? <Loader2 className="size-3 animate-spin" /> : <Archive className="size-3" />} {t.deleteArchive}
+            <Button size="sm" className="h-7 px-2.5 text-[11px]" disabled={busy} onClick={() => void archiveFromCard(slug, asCall, true)}>
+              {status === "archiving" ? <Loader2 className="size-3 animate-spin" /> : <Archive className="size-3" />} {t.deleteArchive}
             </Button>
           )}
-          <Button variant="destructive" size="sm" className="h-7 px-2.5 text-[11px]" disabled={busy} onClick={() => void remove()}>
-            {state === "deleting" ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />} {t.deleteDelete}
+          <Button variant="destructive" size="sm" className="h-7 px-2.5 text-[11px]" disabled={busy} onClick={() => void deleteFromCard(slug, asCall)}>
+            {status === "deleting" ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />} {t.deleteDelete}
           </Button>
         </div>
       )}

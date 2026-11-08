@@ -355,17 +355,8 @@ export function RoadmapGantt({ slug, projectId }: { readonly slug: string; reado
 
   return (
     <div className="flex flex-col gap-6 w-full">
-      {/* Header - masqué en mode onglet projet (le layout du projet fournit déjà le titre) */}
-      {!scoped && (
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Roadmap</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Timeline across all projects
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Ce que la page montre ; son titre est celui du volet (R124), et dans un projet, son onglet. */}
+      {!scoped && <p className="text-sm text-muted-foreground">Timeline across all projects</p>}
 
       {/* Controls */}
       <div className="flex items-center gap-2 flex-wrap">

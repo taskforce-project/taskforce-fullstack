@@ -2,6 +2,8 @@ package com.taskforce.tf_api.core.service.agent;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -60,6 +62,8 @@ public class CortexRecordService {
     static final int MAX_EVENTS = 200;
     /** Ce qu'un événement garde d'un texte (question, arguments, résultat) : de quoi relire, pas tout recopier. */
     static final int MAX_TEXT = 2000;
+    /** La note d'un incident de confiance ({@code ActionClaimCheck.Checked#incident}) : {@code "incident": "trust"}. */
+    static final String INCIDENT = "trust";
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -230,10 +234,40 @@ public class CortexRecordService {
         return id;
     }
 
+    /**
+     * L'incident de confiance que garde chacun de ces dossiers (R116, E17), quand il en garde un : la note du serveur,
+     * telle qu'elle est au dossier (ce que le modèle a dit, ce que TaskForce a montré). Le premier de chaque dossier ;
+     * un dossier sans incident n'y est pas.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, JsonNode> incidents(Collection<UUID> recordIds) {
+        if (recordIds.isEmpty()) return Map.of();
+        Map<UUID, JsonNode> found = new HashMap<>();
+        for (CortexRecordEvent event
+            : eventRepository.findByRecordIdInAndTypeAndActorKindOrderBySeqAsc(recordIds, "note", Actor.SERVER.kind())) {
+            ObjectNode data = parse(event.getData());
+            if (INCIDENT.equals(data.path("incident").asText())) found.putIfAbsent(event.getRecordId(), data);
+        }
+        return found;
+    }
+
     /** Vrai si le dossier est celui de cette personne, dans cet espace : un autre ne se prolonge pas. */
     @Transactional(readOnly = true)
     public boolean owns(UUID recordId, AgentContext ctx) {
         return records.findByIdAndWorkspaceIdAndUserId(recordId, ctx.workspaceId(), ctx.userId()).isPresent();
+    }
+
+    /**
+     * Le modèle qui a répondu à la demande du dossier, tel que son ouverture l'a gardé : ce que Cortex écrit plus tard,
+     * sur l'accord ou les réponses de la personne, le garde aussi (R123). Vide quand l'ouverture ne le dit pas.
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> model(UUID recordId) {
+        if (recordId == null) return Optional.empty();
+        return eventRepository.findByRecordIdOrderBySeqAsc(recordId).stream().findFirst()
+            .map(first -> parse(first.getData()).path("model").asText(""))
+            .map(String::strip)
+            .filter(model -> !model.isEmpty());
     }
 
     /** Les événements du dossier, chaînés, tels qu'un export les relit et les vérifie. */

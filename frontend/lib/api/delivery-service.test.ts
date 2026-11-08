@@ -9,6 +9,7 @@ import {
   getRunActivity,
   decideApproval,
   downloadEvidence,
+  getEvidence,
   applyRun,
   discardRun,
   markRunDone,
@@ -146,6 +147,15 @@ describe('delivery-service', () => {
 
     expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.EVIDENCE(SLUG, 100), { params: { format }, responseType: 'blob', silentError: true });
     expect(saveBlob).toHaveBeenCalledWith(blob, `evidence-run-100.${format}`);
+  });
+
+  it('GET le dossier de preuve en JSON, pour la vue du travail', async () => {
+    const evidence = { format: 'taskforce-evidence/1', events: [], root: 'h1' };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: evidence });
+
+    await expect(getEvidence(SLUG, 100)).resolves.toEqual(evidence);
+
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.EVIDENCE(SLUG, 100), { params: { format: 'json' }, silentError: true });
   });
 
   it('GET les agents pour un projet donné', async () => {

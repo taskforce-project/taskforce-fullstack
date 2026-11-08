@@ -14,10 +14,10 @@ import { PageContainer, PageHeader } from "@/components/layout/page-shell"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table"
 import { RefreshControl } from "@/components/ui/refresh-control"
-import { IssueSheetLoader, type IssueSheetTarget } from "@/components/sheets/issue-sheet-loader"
 import { cn } from "@/lib/utils"
 import { PRIORITY_DOT as DOT } from "@/lib/palette"
 import { useUserStore } from "@/lib/store/user-store"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { listMyIssues } from "@/lib/api/issue-service"
 import { acceptAssignment, declineAssignment } from "@/lib/api/assignment-service"
 import { listWorkspaceCycles, type WorkspaceCycle } from "@/lib/api/cycle-service"
@@ -276,7 +276,7 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
 
   const [myIssues, setMyIssues] = useState<Issue[]>([])
   const [myCycles, setMyCycles] = useState<Cycle[]>([])
-  const [sheetTarget, setSheetTarget] = useState<IssueSheetTarget | null>(null)
+  const { openIssue } = usePaneNavigation()
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
 
@@ -366,7 +366,6 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
   return (
     <PageContainer>
       <PageHeader
-        title="My Queue"
         description="Issues and sprints assigned to you"
         actions={
           <RefreshControl
@@ -396,8 +395,8 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
               columns={issueColumns}
               data={myIssues}
               rowKey={(i) => i.id}
-              // Une issue est une entité qu'on consulte/édite : sheet en place, la file reste derrière.
-              onRowClick={(i) => setSheetTarget({ projectId: Number(i.projectId), issueId: Number(i.id) })}
+              // Une issue est une entité qu'on consulte/édite : dans le volet, par-dessus la file, qui reste dessous.
+              onRowClick={(i) => openIssue({ projectId: Number(i.projectId), issueId: Number(i.id) })}
               emptyMessage="No open issues assigned to you."
             />
           </QueueSection>
@@ -414,16 +413,6 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
           </QueueSection>
         )}
       </div>
-
-      {/* Sheet ouvert en place depuis la file (les sprints restent une redirection : c'est un contexte avec sa
-          propre navigation). */}
-      {slug && (
-        <IssueSheetLoader
-          slug={slug}
-          target={sheetTarget}
-          onClose={() => setSheetTarget(null)}
-        />
-      )}
     </PageContainer>
   )
 }

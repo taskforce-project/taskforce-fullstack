@@ -99,6 +99,8 @@ export interface IssueComment {
   content: string;
   /** L'agent qui l'a écrit pour son auteur (« qwen3:8b », « Claude Code », « Cortex ») ; absent quand l'auteur l'a écrit. */
   via?: string | null;
+  /** Le modèle qui faisait parler cet agent (« qwen3:8b » pour Cortex, R123) ; absent sinon. */
+  model?: string | null;
   isEdited: boolean;
   createdAt: string;
   updatedAt: string;
@@ -115,7 +117,24 @@ export interface IssueActivity {
    * de `actor` (« Claude Code ») ; null quand la personne a agi seule.
    */
   via?: string | null;
+  /** Le modèle qui faisait parler cet agent (« qwen3:8b » pour Cortex, R123) ; absent sinon. */
+  model?: string | null;
   createdAt: string;
+}
+
+/**
+ * Une issue trouvée par la recherche de la fenêtre (R123, R124) : de quoi la reconnaître, l'ouvrir dans le volet ou la
+ * joindre à une demande à Cortex.
+ */
+export interface IssueHit {
+  id: number;
+  projectId: number;
+  /** La clé de l'issue (« OPS-35 »). */
+  key: string;
+  title: string;
+  /** Le nom de sa colonne ; null sans colonne. */
+  status: string | null;
+  statusCategory: string | null;
 }
 
 export interface SmartAssignCandidate {
@@ -237,6 +256,15 @@ export async function listMyIssues(slug: string): Promise<Issue[]> {
 /**
  * Retourne les issues planifiées (startDate ou dueDate renseigné) du workspace - roadmap.
  */
+/**
+ * Cherche les issues de l'espace par leur clé (« OPS-35 », « ops 35 ») ou leur titre, dans les projets que la personne
+ * voit, la clé exacte d'abord ; sans texte, les dernières changées.
+ */
+export async function searchIssues(slug: string, query: string, limit = 8): Promise<IssueHit[]> {
+  const res = await apiClient.get<{ data: IssueHit[] }>(ISSUE_ROUTES.SEARCH(slug), { params: { q: query, limit } });
+  return res.data.data ?? [];
+}
+
 export async function getScheduledIssues(slug: string): Promise<Issue[]> {
   const res = await apiClient.get<{ data: Issue[] }>(ROADMAP_ROUTES.SCHEDULED(slug));
   return res.data.data;

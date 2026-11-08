@@ -15,7 +15,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead;
+import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationDetail;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationSummary;
+import com.taskforce.tf_api.core.dto.response.ConversationDtos.MessageDto;
 import com.taskforce.tf_api.core.model.AiConversation;
 import com.taskforce.tf_api.core.model.AiMessage;
 import com.taskforce.tf_api.core.model.Project;
@@ -200,5 +203,32 @@ class AiConversationServiceTest {
             assertThat(summary.messageCount()).isEqualTo(2);
             assertThat(summary.totalTokens()).isEqualTo(120L);
         });
+    }
+
+    @Test
+    @DisplayName("la ligne grise (R123) : ce que le modèle a lu est gardé avec la réponse, et relu tel quel à la réouverture")
+    void what_the_model_read_survives_reopening() {
+        AssistantRead read = new AssistantRead(List.of(new AssistantRead.IssueRead("OPS-35", 3)),
+            List.of(new AssistantRead.BoardRead("OPS", 12, "OPS-35")), List.of(new AssistantRead.ToolRead("list_issues", 2)), 4);
+        org.mockito.ArgumentCaptor<AiMessage> saved = org.mockito.ArgumentCaptor.forClass(AiMessage.class);
+        when(messageRepository.save(saved.capture())).thenAnswer(call -> call.getArgument(0));
+
+        service.appendMessage(5L, "assistant", "OPS-35 is done.", "deep", 900, "qwen3:8b", read);
+
+        AiMessage kept = saved.getValue();
+        assertThat(kept.getModel()).isEqualTo("qwen3:8b");
+        assertThat(kept.getReading()).containsEntry("notes", 4);
+        AiConversation conv = new AiConversation();
+        conv.setId(5L);
+        conv.setTitle("OPS-35");
+        when(conversationRepository.findByIdAndUserId(5L, 7L)).thenReturn(Optional.of(conv));
+        kept.setId(11L);
+        AiMessage before = msg(10L, "assistant", "Older answer");
+        before.setReading(Map.of("issues", "not a list"));
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(5L)).thenReturn(List.of(msg(9L, "user", "Hi"), before, kept));
+
+        ConversationDetail detail = service.detail(5L, 7L);
+
+        assertThat(detail.messages()).extracting(MessageDto::read).containsExactly(null, null, read);
     }
 }

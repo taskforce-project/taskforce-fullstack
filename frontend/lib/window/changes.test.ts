@@ -27,6 +27,7 @@ describe("changeKind", () => {
     [call("create_project"), "created"],
     [call("create_note"), "created"],
     [call("add_comment"), "commented"],
+    [call("archive_issue"), "archived"],
     [call("delete_issue"), "deleted"],
     [call("delegate_issue"), "delegated"],
     [call("update_issue", { input: '{"issue":"TF-12","status":"Done"}' }), "moved"],

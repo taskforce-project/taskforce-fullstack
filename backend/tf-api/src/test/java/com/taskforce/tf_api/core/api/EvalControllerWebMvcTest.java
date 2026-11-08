@@ -1,5 +1,7 @@
 package com.taskforce.tf_api.core.api;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,6 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.taskforce.tf_api.core.dto.response.EvalBankResponse;
+import com.taskforce.tf_api.core.dto.response.EvalHistoryResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
@@ -66,6 +69,25 @@ class EvalControllerWebMvcTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.enabled").value(true))
             .andExpect(jsonPath("$.data.canManage").value(false));
+    }
+
+    @Test
+    @DisplayName("GET evals/history : les rejeux par modèle et par date, et chaque cas avec son origine")
+    void history_200() throws Exception {
+        when(evalService.history("acme", 7L)).thenReturn(new EvalHistoryResponse(
+            List.of(new EvalHistoryResponse.Run(9L, "default", "qwen3:8b", LocalDateTime.of(2026, 11, 7, 10, 0),
+                LocalDateTime.of(2026, 11, 7, 10, 4), 6, 6, 4)),
+            List.of(new EvalHistoryResponse.Case(40L, "R118 4/6: delete TESTTA-2", "suprime testta 2",
+                LocalDate.of(2026, 11, 2), LocalDateTime.of(2026, 11, 2, 15, 8), true,
+                new EvalHistoryResponse.Origin("incident", List.of("I deleted TESTTA-2."), "Nothing was deleted."),
+                List.of(new EvalHistoryResponse.Grade(9L, true))))));
+
+        mockMvc.perform(get(URL + "/history").with(auth()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.runs[0].answeredBy").value("qwen3:8b"))
+            .andExpect(jsonPath("$.data.runs[0].graded").value(6))
+            .andExpect(jsonPath("$.data.cases[0].origin.kind").value("incident"))
+            .andExpect(jsonPath("$.data.cases[0].grades[0].passed").value(true));
     }
 
     @Test

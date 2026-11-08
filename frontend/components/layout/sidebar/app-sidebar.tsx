@@ -6,9 +6,10 @@ import Link from "next/link"
 import { useParams, usePathname } from "next/navigation"
 import {
   Activity, CalendarRange, ChevronRight, Inbox, LayoutDashboard, ListChecks, Plus, Repeat, Search, SquarePen, Trash2,
-  Users, type LucideIcon,
+  TrendingUp, Users, type LucideIcon,
 } from "lucide-react"
 
+import { PaneLink } from "@/components/layout/pane-link"
 import { NavUser } from "@/components/layout/sidebar/nav-user"
 import { WorkDot } from "@/components/layout/work-dot"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -38,6 +39,7 @@ import type { DeliveryRun } from "@/lib/api/delivery-service"
 import { fillText } from "@/lib/delivery/result-card"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { useModKeyLabel } from "@/lib/hooks/use-mod-key"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { useCortexStore } from "@/lib/store/cortex-store"
 import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
@@ -48,8 +50,9 @@ import { useUserStore } from "@/lib/store/user-store"
 import { useWindowStore } from "@/lib/store/window-store"
 import { cn } from "@/lib/utils"
 import { groupConversations, leftBarProjects } from "@/lib/window/left-bar"
+import { missionPath } from "@/lib/window/address"
 import { liveRuns, runLabel, runState, type WorkState } from "@/lib/window/missions"
-import { boardPath, issuePath } from "@/lib/window/pane"
+import { PROGRESS, boardPath } from "@/lib/window/pane"
 import { waitingCount } from "@/lib/window/waiting"
 
 const LOGO_SRC = "/assets/logo/logo_taskforce_tp.png"
@@ -57,9 +60,12 @@ const LOGO_SRC = "/assets/logo/logo_taskforce_tp.png"
 const UNDER_PROJECT = 5
 const LOOSE = 10
 
-type MoreKey = "myWork" | "dashboard" | "roadmap" | "cycles" | "members" | "analytics"
+type MoreKey = "myWork" | "dashboard" | "roadmap" | "cycles" | "members" | "analytics" | "progress"
 
-/** Sous « More » (R121) : retirés du premier regard, pas du produit ; chacun s'ouvre dans le volet. */
+/**
+ * Sous « More » (R121) : retirés du premier regard, pas du produit ; chacun s'ouvre dans le volet. « Progress » (R125)
+ * s'y range aussi : on l'ouvre surtout depuis le nom du modèle sous le compositeur.
+ */
 const MORE: readonly { key: MoreKey; path: string; icon: LucideIcon }[] = [
   { key: "myWork", path: "/my-work", icon: ListChecks },
   { key: "dashboard", path: "/dashboard", icon: LayoutDashboard },
@@ -68,6 +74,7 @@ const MORE: readonly { key: MoreKey; path: string; icon: LucideIcon }[] = [
   // App desktop : pas de membres, on y travaille seul avec ses agents.
   ...(IS_DESKTOP ? [] : [{ key: "members" as const, path: "/members", icon: Users }]),
   { key: "analytics", path: "/analytics", icon: Activity },
+  { key: "progress", path: `/${PROGRESS}`, icon: TrendingUp },
 ]
 
 /** Le titre d'une conversation, son état en un point, et la corbeille au survol. */
@@ -114,16 +121,17 @@ function ConversationItem({ conversation, state, active, onPick, onDelete, sub }
   )
 }
 
-/** Une mission en cours sous son projet : son état en un point ; un clic ouvre son issue dans le volet. */
+/** Une mission en cours sous son projet : son état en un point ; un clic ouvre sa vue du travail dans le volet. */
 function MissionItem({ slug, run, onPick }: Readonly<{ slug: string; run: DeliveryRun; onPick: () => void }>) {
+  const { openMission } = usePaneNavigation()
   if (run.projectId === null) return null
   return (
     <SidebarMenuSubItem>
       <SidebarMenuSubButton asChild size="sm">
-        <Link href={issuePath(slug, run.projectId, run.issueId)} onClick={onPick}>
+        <PaneLink href={missionPath(slug, run.id)} open={() => { onPick(); openMission(run.id) }}>
           <WorkDot state={runState(run)} />
           <span>{runLabel(run)}</span>
-        </Link>
+        </PaneLink>
       </SidebarMenuSubButton>
     </SidebarMenuSubItem>
   )
@@ -145,8 +153,9 @@ function MoreItems({ count, onShow, sub }: Readonly<{ count: number; onShow: () 
  * La barre de gauche de la fenêtre (R121, séance n°18) : le travail et ses conversations. En haut, « New
  * conversation », « Search » (Ctrl+K) et « Waiting for you » avec son nombre, qui remplace l'Inbox et la cloche. Puis
  * chaque projet : son nom ouvre son tableau dans le volet ; dessous, ses conversations et ses missions en cours, chacune
- * avec son état en un point. Puis les conversations sans projet, puis « More », replié. En bas, la personne. 16rem ;
- * Ctrl+B la replie. Sur un téléphone, c'est un tiroir, qui se ferme au choix d'une ligne.
+ * avec son état en un point ; une mission ouvre sa vue du travail. Puis les conversations sans projet, puis « More »,
+ * replié. En bas, la personne. 16rem ; Ctrl+B la replie. Sous `lg` dans la webapp, c'est un tiroir, qui se ferme au
+ * choix d'une ligne.
  */
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
@@ -230,7 +239,6 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
       collapsible="offcanvas"
       variant={IS_DESKTOP ? "inset" : "sidebar"}
       className="overflow-x-hidden"
-      data-tour="sidebar"
       {...props}
     >
       {/* La marque, sur la hauteur de la ligne du haut ; dans l'app desktop, elle déplace la fenêtre. */}
