@@ -236,6 +236,19 @@ public class CortexRecordService {
         return records.findByIdAndWorkspaceIdAndUserId(recordId, ctx.workspaceId(), ctx.userId()).isPresent();
     }
 
+    /**
+     * Le modèle qui a répondu à la demande du dossier, tel que son ouverture l'a gardé : ce que Cortex écrit plus tard,
+     * sur l'accord ou les réponses de la personne, le garde aussi (R123). Vide quand l'ouverture ne le dit pas.
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> model(UUID recordId) {
+        if (recordId == null) return Optional.empty();
+        return eventRepository.findByRecordIdOrderBySeqAsc(recordId).stream().findFirst()
+            .map(first -> parse(first.getData()).path("model").asText(""))
+            .map(String::strip)
+            .filter(model -> !model.isEmpty());
+    }
+
     /** Les événements du dossier, chaînés, tels qu'un export les relit et les vérifie. */
     @Transactional(readOnly = true)
     public List<ObjectNode> events(UUID recordId) {

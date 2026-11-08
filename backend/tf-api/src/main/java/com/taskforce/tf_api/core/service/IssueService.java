@@ -1000,8 +1000,10 @@ public class IssueService {
             .issue(issue)
             .author(author)
             .content(request.getContent())
-            // Écrit par un agent pour la personne (une mission, l'agent à l'essai, Cortex) : le commentaire le dit.
+            // Écrit par un agent pour la personne (une mission, l'agent à l'essai, Cortex) : le commentaire le dit, avec le
+            // modèle qui le faisait parler (R123 : « Cortex · qwen3:8b »).
             .via(clip(DelegatedAgent.current().orElse(null), ACTIVITY_VIA_MAX))
+            .model(agentModel(DelegatedAgent.current().orElse(null)))
             .build();
         comment = commentRepository.save(comment);
         logActivity(issue, author, IssueActivityType.COMMENT_ADDED, null, null);
@@ -1263,6 +1265,7 @@ public class IssueService {
             .oldValue(clip(oldValue, ACTIVITY_VALUE_MAX))
             .newValue(clip(newValue, ACTIVITY_VALUE_MAX))
             .via(clip(via, ACTIVITY_VIA_MAX))
+            .model(agentModel(via))
             .build();
         activityRepository.save(activity);
         announceActivity(issue);
@@ -1296,6 +1299,16 @@ public class IssueService {
     /** Tailles des colonnes {@code old_value}/{@code new_value} et {@code via} d'{@code issue_activity}. */
     private static final int ACTIVITY_VALUE_MAX = 500;
     private static final int ACTIVITY_VIA_MAX = 60;
+    /** La taille de {@code issue_comments.model} et de {@code issue_activity.model} (V119). */
+    private static final int MODEL_MAX = 128;
+
+    /**
+     * Le modèle d'un agent qui agit pour la personne (Cortex dans la conversation : celui qui a répondu, R123), gardé avec
+     * ce qu'il écrit ; null quand la personne agit seule ({@code via} nul), ou quand l'agent ne dit pas son modèle.
+     */
+    private static String agentModel(String via) {
+        return via == null ? null : clip(DelegatedAgent.model().orElse(null), MODEL_MAX);
+    }
 
     private static String clip(String value, int max) {
         return value == null || value.length() <= max ? value : value.substring(0, max);
@@ -1379,6 +1392,7 @@ public class IssueService {
             .author(toUserSummary(c.getAuthor()))
             .content(c.getContent())
             .via(c.getVia())
+            .model(c.getModel())
             .isEdited(c.isEdited())
             .createdAt(c.getCreatedAt())
             .updatedAt(c.getUpdatedAt())
@@ -1393,6 +1407,7 @@ public class IssueService {
             .oldValue(a.getOldValue())
             .newValue(a.getNewValue())
             .via(a.getVia())
+            .model(a.getModel())
             .createdAt(a.getCreatedAt())
             .build();
     }
