@@ -51,4 +51,12 @@ describe("CommandPalette - réglages", () => {
     expect(push).toHaveBeenCalledWith("/acme/projects")
     expect(useSettingsStore.getState().open).toBe(false)
   })
+
+  it("trouve le volet « Progress » (R125) : ce qui quitte le premier regard reste par la recherche", async () => {
+    render(<CommandPalette open onOpenChange={vi.fn()} />)
+
+    await userEvent.click(screen.getByText("Go to Progress"))
+
+    expect(push).toHaveBeenCalledWith("/acme/progress")
+  })
 })

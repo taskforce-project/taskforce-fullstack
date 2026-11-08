@@ -6,7 +6,7 @@ import Link from "next/link"
 import { useParams, usePathname } from "next/navigation"
 import {
   Activity, CalendarRange, ChevronRight, Inbox, LayoutDashboard, ListChecks, Plus, Repeat, Search, SquarePen, Trash2,
-  Users, type LucideIcon,
+  TrendingUp, Users, type LucideIcon,
 } from "lucide-react"
 
 import { PaneLink } from "@/components/layout/pane-link"
@@ -52,7 +52,7 @@ import { cn } from "@/lib/utils"
 import { groupConversations, leftBarProjects } from "@/lib/window/left-bar"
 import { missionPath } from "@/lib/window/address"
 import { liveRuns, runLabel, runState, type WorkState } from "@/lib/window/missions"
-import { boardPath } from "@/lib/window/pane"
+import { PROGRESS, boardPath } from "@/lib/window/pane"
 import { waitingCount } from "@/lib/window/waiting"
 
 const LOGO_SRC = "/assets/logo/logo_taskforce_tp.png"
@@ -60,9 +60,12 @@ const LOGO_SRC = "/assets/logo/logo_taskforce_tp.png"
 const UNDER_PROJECT = 5
 const LOOSE = 10
 
-type MoreKey = "myWork" | "dashboard" | "roadmap" | "cycles" | "members" | "analytics"
+type MoreKey = "myWork" | "dashboard" | "roadmap" | "cycles" | "members" | "analytics" | "progress"
 
-/** Sous « More » (R121) : retirés du premier regard, pas du produit ; chacun s'ouvre dans le volet. */
+/**
+ * Sous « More » (R121) : retirés du premier regard, pas du produit ; chacun s'ouvre dans le volet. « Progress » (R125)
+ * s'y range aussi : on l'ouvre surtout depuis le nom du modèle sous le compositeur.
+ */
 const MORE: readonly { key: MoreKey; path: string; icon: LucideIcon }[] = [
   { key: "myWork", path: "/my-work", icon: ListChecks },
   { key: "dashboard", path: "/dashboard", icon: LayoutDashboard },
@@ -71,6 +74,7 @@ const MORE: readonly { key: MoreKey; path: string; icon: LucideIcon }[] = [
   // App desktop : pas de membres, on y travaille seul avec ses agents.
   ...(IS_DESKTOP ? [] : [{ key: "members" as const, path: "/members", icon: Users }]),
   { key: "analytics", path: "/analytics", icon: Activity },
+  { key: "progress", path: `/${PROGRESS}`, icon: TrendingUp },
 ]
 
 /** Le titre d'une conversation, son état en un point, et la corbeille au survol. */
