@@ -10,11 +10,12 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
-> **▶ MAJ 08/11/2026 - Release 1.12.0 EN PROD : la fenêtre, lots 2 et 3 (les volets, la conversation, le volet « Progress ») ; desktop 1.9.0 en construction.** `[release]`
+> **▶ MAJ 08/11/2026 - Release 1.12.0 EN PROD : la fenêtre, lots 2 et 3 (les volets, la conversation, le volet « Progress ») ; desktop 1.9.0 publiée.** `[release]`
 > - **Décision du CEO** : « go release ».
 > - **En prod** : `chore(desktop)` 1.9.0 (`19732dc9`) ; release #499 vers `main` (`00c33b39`, commit-tree : l'arbre exact de `dev`, puis la version produit 1.12.0 en plomberie ; étiquettes `minor`). Dedans : la fenêtre, lot 2 (#496, R120) ; lot 3a, la conversation (#498, R123 et R124) ; lot 3b, le volet « Progress » (#497, R125). Migrations V119 et V120.
 > - **Vérifié** : fusion à 16:14:34 UTC ; l'API a eu trois coupures entre 16:18:50 et 16:21:18 (des délais dépassés, pas des 502 comme à la 1.11.0), puis `readyz` 200, stable (le démarrage valide le schéma : V119 et V120 passées) ; la webapp affiche 1.12.0 à 16:21:58 ; la doc de l'API est publiée depuis `main` (Fern : `test-bank/history`, `issues/search-1`, `ai-assistant/sources`). Pas vérifié : les lots 2 et 3 connectés, avec des données (la Présidence les teste sur l'app desktop) ; sur VM1, l'heure de démarrage du backend et `flyway_schema_history` (Tailscale demande la validation de la Présidence).
-> - **Suite** : la desktop 1.9.0 (run 42498937003), puis le site ; le test du CEO et la revue de J1 au Conseil ; le micro (R76), qui demande sa décision ; la recherche d'issues s'appelle `search-1` dans la doc de l'API (un `operationId` à lui donner).
+> - **Desktop 1.9.0 publiée** : run 42498937003 depuis `main`, vert, VirusTotal compris ; `desktop-v1.9.0` (préversion, comme les précédentes) et `desktop-latest`, dont `latest.yml` annonce 1.9.0 aux apps installées ; le site est reconstruit pour la proposer.
+> - **Suite** : le test du CEO et la revue de J1 au Conseil ; le micro (R76), qui demande sa décision ; la recherche d'issues s'appelle `search-1` dans la doc de l'API (un `operationId` à lui donner).
 
 > **▶ MAJ 08/11/2026 - J1 : la fenêtre, lot 3b (R125) : le volet « Progress », ce que l'agent sait et comment il progresse, mesuré ici.** `[frontend]` `[backend]`
 > - **Origine** : TF-J1-9, lot 3 de la séance n°18, en deux moitiés parallèles ; celle-ci est R125 (le lot 3a, la conversation, R123 et R124, est sur `feat/window-lot3-conversation`). Contrat : 3b crée `/{slug}/progress` (`progressPath`), 3a lie le nom du modèle sous le compositeur à ce volet.
