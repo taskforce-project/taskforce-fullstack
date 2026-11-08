@@ -15,6 +15,12 @@ public record ReplayCase(String question, LocalDate askedOn, List<FrozenNote> no
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    /**
+     * Une entrée de cassette qui répond à tout appel de son outil, quels que soient ses arguments : le banc des modèles (R131),
+     * où un tableau inventé répond à toute lecture. Jamais dans une cassette de la banque, qui garde les lectures d'une réponse.
+     */
+    public static final String ANY = "*";
+
     public ReplayCase {
         notes = notes == null ? List.of() : List.copyOf(notes);
         cassette = cassette == null ? List.of() : List.copyOf(cassette);
@@ -42,7 +48,7 @@ public record ReplayCase(String question, LocalDate askedOn, List<FrozenNote> no
     public String served(String tool, String argsJson) {
         String wanted = canonical(argsJson);
         return cassette.stream()
-            .filter(entry -> entry.tool().equals(tool) && entry.arguments().equals(wanted))
+            .filter(entry -> entry.tool().equals(tool) && (entry.arguments().equals(wanted) || ANY.equals(entry.arguments())))
             .map(CassetteEntry::output)
             .findFirst()
             .orElse(null);
