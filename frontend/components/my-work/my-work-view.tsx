@@ -366,7 +366,6 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
   return (
     <PageContainer>
       <PageHeader
-        title="My Queue"
         description="Issues and sprints assigned to you"
         actions={
           <RefreshControl

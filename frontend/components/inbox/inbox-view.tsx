@@ -19,7 +19,6 @@ import { RefreshControl } from "@/components/ui/refresh-control"
 import { cn } from "@/lib/utils"
 import { useNotificationStore } from "@/lib/store/notification-store"
 import type { Signal, Urgency } from "@/lib/store/notification-store"
-import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { issueRefOfUrl } from "@/lib/window/address"
 import { issuePath } from "@/lib/window/pane"
@@ -147,8 +146,6 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
 
   const { signals, isLoading, error, lastSyncAt, fetchNotifications, markAsRead, markAllAsRead, acknowledgeAll, acknowledge: acknowledgeNotif } =
     useNotificationStore()
-  const title = usePreferencesStore((s) => s.t.window.waitingForYou)
-
 
   const [activeTab, setActiveTab] = useState<NotifTab>(defaultTab)
   const { openIssue } = usePaneNavigation()
@@ -272,10 +269,9 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
   return (
     <PageContainer>
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          {/* « Waiting for you » remplace l'Inbox et la cloche (R121) : la page garde son nom. */}
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          {/* « Waiting for you » remplace l'Inbox et la cloche (R121) : son nom est le titre du volet (R124). */}
           <p className="text-sm text-muted-foreground">
             Operational alerts and mentions, sorted by urgency. What is assigned to you lives in My Work.
           </p>
