@@ -23,6 +23,10 @@ import java.util.function.Function;
  *   <li>{@code AI_TIMEOUT} (secondes) ; {@code AI_MAX_TOKENS}, le plafond d'une réponse d'Anthropic, qui l'exige.</li>
  *   <li>{@code AI_OLLAMA_MAX_CONTEXT} : la plus grande fenêtre de contexte (en jetons) que la passerelle demande à
  *       Ollama ; elle la taille à chaque requête ({@code OllamaProtocol.window}). 16 384 par défaut.</li>
+ *   <li>{@code AI_DEFAULT_CONTEXT} : la fenêtre supposée d'un modèle hébergé dont le fournisseur ne dit rien (OpenAI, par
+ *       exemple), montrée comme une estimation. 16 384 par défaut.</li>
+ *   <li>{@code AI_HOSTED_MAX_CONTEXT} : la plus grande fenêtre sur laquelle TaskForce compte chez un fournisseur hébergé,
+ *       même s'il en annonce plus. Vide : ce qu'il annonce, sauf chez Groq, 12 000 par défaut.</li>
  *   <li>Alias d'avant le lot 4, toujours lus : {@code GROQ_API_KEY}, {@code GROQ_BASE_URL}, {@code GROQ_MODEL},
  *       {@code GROQ_MODEL_FAST} ; {@code OLLAMA_BASE_URL} (sans {@code /v1}), {@code OLLAMA_MODEL},
  *       {@code OLLAMA_MODEL_FAST}, {@code OLLAMA_EMBED_MODEL}, {@code OLLAMA_TIMEOUT}.</li>
@@ -44,6 +48,8 @@ import java.util.function.Function;
  * @param embedBaseUrl URL de base des vecteurs (API compatible OpenAI), avec {@code /v1}
  * @param embedModel   modèle des vecteurs ; vide, choisi parmi les modèles installés
  * @param ollamaMaxContext la plus grande fenêtre de contexte demandée à Ollama, en jetons
+ * @param hostedMaxContext la plus grande fenêtre sur laquelle compter chez un fournisseur hébergé, en jetons ; 0 : ce qu'il annonce
+ * @param defaultContext   la fenêtre supposée d'un modèle hébergé dont le fournisseur ne dit rien, en jetons
  */
 public record AiProviderSettings(
     boolean enabled,
@@ -57,7 +63,9 @@ public record AiProviderSettings(
     String embedModel,
     Duration timeout,
     int maxTokens,
-    int ollamaMaxContext) {
+    int ollamaMaxContext,
+    int hostedMaxContext,
+    int defaultContext) {
 
     /** Ollama de la machine hôte, vu depuis un conteneur. */
     public static final String DEFAULT_OLLAMA_URL = "http://host.docker.internal:11434";
@@ -82,12 +90,20 @@ public record AiProviderSettings(
      * prompt de Cortex, un document de 3 000 mots et l'historique. Une carte plus grande relève le plafond.
      */
     static final int DEFAULT_OLLAMA_MAX_CONTEXT = 16_384;
+    /** La fenêtre supposée quand le fournisseur ne dit rien : prudente, celle que les réglages d'Ollama donnent par défaut. */
+    static final int DEFAULT_CONTEXT = 16_384;
+    /**
+     * Le plafond chez Groq : sa liste annonce 131 072 jetons (gpt-oss-20b), mais son offre à la demande refuse toute requête
+     * au-delà de ses jetons par minute, 8 000 sur ces modèles (console.groq.com/docs/rate-limits, 08/11/2026). À trois
+     * caractères par jeton, 12 000 estimés en font 8 000 lus.
+     */
+    static final int DEFAULT_GROQ_MAX_CONTEXT = 12_000;
 
     /** Les variables lues : l'app desktop ne peut poser que celles-là. */
     public static final List<String> VARIABLES = List.of(
         "AI_PROVIDER", "AI_BASE_URL", "AI_API_KEY", "AI_MODEL", "AI_MODEL_FAST",
         "AI_EMBED_BASE_URL", "AI_EMBED_API_KEY", "AI_EMBED_MODEL", "AI_TIMEOUT", "AI_MAX_TOKENS",
-        "AI_OLLAMA_MAX_CONTEXT",
+        "AI_OLLAMA_MAX_CONTEXT", "AI_HOSTED_MAX_CONTEXT", "AI_DEFAULT_CONTEXT",
         "GROQ_API_KEY", "GROQ_BASE_URL", "GROQ_MODEL", "GROQ_MODEL_FAST",
         "OLLAMA_BASE_URL", "OLLAMA_MODEL", "OLLAMA_MODEL_FAST", "OLLAMA_EMBED_MODEL", "OLLAMA_TIMEOUT");
 
@@ -172,7 +188,9 @@ public record AiProviderSettings(
             first(env, legacy ? LEGACY_EMBED_MODEL : "", "AI_EMBED_MODEL", "OLLAMA_EMBED_MODEL"),
             seconds(first(env, "", "AI_TIMEOUT", "OLLAMA_TIMEOUT")),
             positive(first(env, "", "AI_MAX_TOKENS"), DEFAULT_MAX_TOKENS),
-            positive(first(env, "", "AI_OLLAMA_MAX_CONTEXT"), DEFAULT_OLLAMA_MAX_CONTEXT));
+            positive(first(env, "", "AI_OLLAMA_MAX_CONTEXT"), DEFAULT_OLLAMA_MAX_CONTEXT),
+            positive(first(env, "", "AI_HOSTED_MAX_CONTEXT"), "groq".equals(kind) ? DEFAULT_GROQ_MAX_CONTEXT : 0),
+            positive(first(env, "", "AI_DEFAULT_CONTEXT"), DEFAULT_CONTEXT));
     }
 
     /** Les vecteurs passent par le même point d'accès, avec la même clé, que la conversation. */

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -169,7 +170,9 @@ class ModelGatewayTest {
             assertThat(reply.model()).isEqualTo(model);
             assertThat(reply.message().path("content").asText()).isEqualTo("ok");
             assertThat(reply.usage().totalTokens()).isEqualTo(4);
-            assertThat(reply.contextWindow()).isNull(); // le fournisseur tient sa fenêtre
+            // Le fournisseur n'a rien dit de ce modèle : la valeur prudente des réglages, donnée comme une estimation.
+            assertThat(reply.contextWindow()).isEqualTo(16_384);
+            assertThat(reply.windowEstimated()).isTrue();
         }
 
         @Test
@@ -520,6 +523,81 @@ class ModelGatewayTest {
             assertThat(gateway.describe(settings(OLLAMA), "qwen3:8b")).isEmpty();
 
             assertThat(http.reads).hasSize(2);
+        }
+
+        static Stream<Arguments> reportedWindows() {
+            return Stream.of(
+                // Groq : context_window (console.groq.com/docs/api-reference), sous son plafond par défaut.
+                Arguments.of("Groq", Map.of("AI_PROVIDER", "groq", "AI_API_KEY", "k"),
+                    "{\"id\":\"openai/gpt-oss-20b\",\"context_window\":131072}", "openai/gpt-oss-20b", 12_000, false, 2_048),
+                Arguments.of("Groq, plafond levé", Map.of("AI_PROVIDER", "groq", "AI_API_KEY", "k", "AI_HOSTED_MAX_CONTEXT", "131072"),
+                    "{\"id\":\"openai/gpt-oss-20b\",\"context_window\":131072}", "openai/gpt-oss-20b", 131_072, false, 2_048),
+                // Anthropic : max_input_tokens (platform.claude.com/docs/en/api/models/list) ; la réponse a la place d'AI_MAX_TOKENS.
+                Arguments.of("Anthropic", Map.of("AI_PROVIDER", "anthropic"),
+                    "{\"id\":\"claude-opus-5-5\",\"max_input_tokens\":1000000,\"max_tokens\":128000}", "claude-opus-5-5", 1_000_000, false, 16_000),
+                // Mistral : max_context_length (docs.mistral.ai/api/endpoint/models).
+                Arguments.of("Mistral", Map.of("AI_PROVIDER", "openai", "AI_BASE_URL", "https://api.mistral.ai/v1"),
+                    "{\"id\":\"mistral-small\",\"max_context_length\":32768}", "mistral-small", 32_768, false, 2_048),
+                // OpenRouter : context_length (une vraie réponse de openrouter.ai/api/v1/models, 08/11/2026).
+                Arguments.of("OpenRouter", Map.of("AI_PROVIDER", "openai", "AI_BASE_URL", "https://openrouter.ai/api/v1"),
+                    "{\"id\":\"liquid/lfm-3-1.7b\",\"context_length\":262144}", "liquid/lfm-3-1.7b", 262_144, false, 2_048),
+                // OpenAI ne dit rien : la valeur prudente des réglages, une estimation.
+                Arguments.of("OpenAI", Map.of("AI_PROVIDER", "openai"),
+                    "{\"id\":\"gpt-5\",\"object\":\"model\",\"owned_by\":\"openai\"}", "gpt-5", 16_384, true, 2_048),
+                Arguments.of("OpenAI, défaut posé", Map.of("AI_PROVIDER", "openai", "AI_DEFAULT_CONTEXT", "64000"),
+                    "{\"id\":\"gpt-5\"}", "gpt-5", 64_000, true, 2_048),
+                Arguments.of("le plafond vaut aussi pour la valeur supposée", Map.of("AI_PROVIDER", "openai", "AI_HOSTED_MAX_CONTEXT", "8000"),
+                    "{\"id\":\"gpt-5\"}", "gpt-5", 8_000, true, 2_000));
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @MethodSource("reportedWindows")
+        @DisplayName("chez un fournisseur hébergé : ce qu'il dit dans sa liste, sinon une estimation donnée pour telle")
+        void theProviderSaysItsWindow(String provider, Map<String, String> env, String row, String model, int window, boolean estimated, int room) {
+            AiProviderSettings hosted = settings(env);
+            http.reply(200, "{\"data\":[" + row + "]}");
+            gateway.chatModels(hosted);
+
+            assertThat(gateway.window(hosted, model, false)).isEqualTo(new ModelWindow(model, window, estimated, room));
+        }
+
+        @Test
+        @DisplayName("une réponse hébergée dit sa fenêtre, et si c'est une estimation")
+        void aReplySaysItsWindow() {
+            AiProviderSettings groq = settings(Map.of("AI_PROVIDER", "groq", "AI_API_KEY", "k"));
+            http.reply(200, "{\"data\":[{\"id\":\"qwen3:8b\",\"context_window\":8192}]}").reply(200, CHOICE);
+            gateway.chatModels(groq);
+
+            ModelGateway.ChatReply reply = gateway.chat(groq, new ModelGateway.ChatCall(List.of(), List.of(), false, "qwen3:8b", false));
+
+            assertThat(reply.contextWindow()).isEqualTo(8_192);
+            assertThat(reply.windowEstimated()).isFalse();
+        }
+
+        @Test
+        @DisplayName("sa fiche : la fenêtre que le fournisseur annonce, telle quelle, sans le plafond de TaskForce")
+        void theCardOfAHostedModel() {
+            AiProviderSettings groq = settings(Map.of("AI_PROVIDER", "groq", "AI_API_KEY", "k"));
+            http.reply(200, "{\"data\":[{\"id\":\"openai/gpt-oss-20b\",\"context_window\":131072}]}");
+            gateway.chatModels(groq);
+
+            assertThat(gateway.describe(groq, "openai/gpt-oss-20b")).contains(new ModelGateway.ModelCard(null, 131_072, null));
+        }
+
+        @ParameterizedTest(name = "raisonnement {0} : {1} jetons pour la réponse")
+        @CsvSource({"false, 2048", "true, 8192"})
+        @DisplayName("sur Ollama : ce que la passerelle lui donne au plus, jamais une estimation")
+        void ollamaWindow(boolean think, int room) {
+            http.read("/api/show", QWEN3_SHOW);
+
+            assertThat(gateway.window(settings(OLLAMA), "qwen3:8b", think)).isEqualTo(new ModelWindow("qwen3:8b", 16_384, false, room));
+        }
+
+        @Test
+        @DisplayName("sans modèle nommé, Ollama vaut son réglage ; chez un autre, l'estimation")
+        void noModelNamed() {
+            assertThat(gateway.window(settings(OLLAMA), null, false).tokens()).isEqualTo(16_384);
+            assertThat(gateway.window(settings(COMPATIBLE), null, false).estimated()).isTrue();
         }
 
         @Test

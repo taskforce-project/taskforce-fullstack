@@ -24,15 +24,6 @@ final class OllamaProtocol {
 
     /** La plus petite fenêtre demandée : le prompt de Cortex (3 300 à 3 700 jetons avec l'écran) et sa réponse y tiennent. */
     static final int MINIMUM_WINDOW = 8_192;
-    /** La place gardée pour la réponse. */
-    static final int ANSWER_BUDGET = 2_048;
-    /** La place gardée pour une réponse qui raisonne d'abord (palier « deep ») : Qwen3 raisonne sur des milliers de jetons. */
-    static final int THINKING_BUDGET = 8_192;
-    /**
-     * Les caractères d'un jeton, au plus juste. Un texte anglais en fait 4,3 avec qwen3:8b, le JSON des outils moins :
-     * on compte large, car une fenêtre trop courte perd le début du prompt.
-     */
-    static final int CHARS_PER_TOKEN = 3;
 
     private OllamaProtocol() {
     }
@@ -42,14 +33,12 @@ final class OllamaProtocol {
         return baseUrl.replaceAll("/v1$", "");
     }
 
-    /** Les jetons estimés d'une requête dont les messages et les outils font {@code chars} caractères de JSON. */
-    static int tokens(long chars) {
-        return (int) Math.min(Integer.MAX_VALUE, (chars + CHARS_PER_TOKEN - 1) / CHARS_PER_TOKEN);
-    }
-
-    /** Les jetons que la requête demande à la fenêtre : son prompt estimé et la place de la réponse. */
-    static int needed(int tokens, boolean think) {
-        return (int) Math.min(Integer.MAX_VALUE, (long) tokens + (think ? THINKING_BUDGET : ANSWER_BUDGET));
+    /**
+     * Les jetons que la requête demande à la fenêtre : son prompt estimé et la place de la réponse, celle que le budget de
+     * la requête garde ({@link ContextBudget#answerRoom}) dans la plus grande fenêtre que ce modèle reçoit.
+     */
+    static int needed(int tokens, boolean think, int ceiling) {
+        return (int) Math.min(Integer.MAX_VALUE, (long) tokens + ContextBudget.answerRoom(ceiling, think));
     }
 
     /**
