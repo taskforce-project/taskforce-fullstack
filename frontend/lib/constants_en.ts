@@ -842,13 +842,11 @@ export const CONSTANTS_EN = {
     pullRequest: "Pull request {repo}#{number}",
     steps: "Steps",
     files: "Files and documents",
-    noFiles: "No file or document yet.",
     written: "Written",
     edited: "Edited",
     times: "{count} times",
     diff: "Diff",
     diffHint: "Open this file's diff in the pull request",
-    diffLater: "Each file's diff opens here once the agent's pull request is open.",
     documents: {
       comment: "Commented",
       issue: "Created an issue",
