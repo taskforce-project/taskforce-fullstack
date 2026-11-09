@@ -1,7 +1,7 @@
 "use client"
 
 import { useId, useState, type ReactNode } from "react"
-import { CornerDownLeft, Loader2, ShieldCheck } from "lucide-react"
+import { CornerDownLeft, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -16,7 +16,7 @@ import { useCortexStore } from "@/lib/store/cortex-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 
 /**
- * La carte des questions de TaskForce avant un geste (R115, séance n°17), dans la forme des questions de Claude (décision
+ * La carte des questions de Cortex avant un geste (R115, R136 : une seule voix), dans la forme des questions de Claude (décision
  * du CEO, 05/11/2026) : deux questions au plus, chacune avec son titre court, ses choix et ce qu'ils veulent dire en une
  * ligne, le recommandé en premier, marqué et coché d'avance, des cases à cocher quand les réponses ne s'excluent pas,
  * « Other » pour taper sa réponse, et un seul envoi pour la carte. Les réponses partent au serveur, qui reprend le geste
@@ -73,12 +73,6 @@ export function QuestionCard({ slug, call, then }: Readonly<{
         void send()
       }}
     >
-      {/* TaskForce pose ces questions, pas le modèle (R115) : la carte le dit, comme ses autres paroles. */}
-      <p className="flex items-center gap-1.5">
-        <ShieldCheck className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
-        <span className="font-semibold text-primary">{t.taskforceSays}</span>
-        <span className="text-muted-foreground">· {t.questionWhat}</span>
-      </p>
       {call.questions.map((question) => (
         <QuestionField
           key={question.field}

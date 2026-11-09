@@ -111,8 +111,8 @@ export interface AssistantUsage {
 export interface AssistantAnswer {
   answer: string
   reasoning: string | null
-  /** « stopped » : la personne a arrêté ce tour (R134). */
-  mode: "fast" | "deep" | "fallback" | "stopped"
+  /** « stopped » : la personne a arrêté ce tour (R134). « not_sent » : trop grande pour la fenêtre du modèle, elle ne lui a pas été envoyée. */
+  mode: "fast" | "deep" | "fallback" | "stopped" | "not_sent"
   sources: AssistantSource[]
   steps: AssistantStep[]
   toolCalls: AssistantToolCall[]
@@ -140,6 +140,14 @@ export interface AssistantRead {
   notes: number
   /** Ce que TaskForce a dû faire pour tenir la fenêtre du modèle (TF-J1-13) ; absent quand rien n'a été touché. */
   context?: ContextRead | null
+  /** Les notes servies au modèle, par leur nom : un clic sur « 5 notes » les nomme (R137). */
+  notesRead?: { id: number; title: string }[]
+  /** Ce que Cortex a fait, geste par geste, gardé pour se relire dans une conversation rouverte. */
+  acts?: { name: string; status: string; key: string | null }[]
+  /** Le temps que la réponse a pris, en millisecondes. */
+  workedMs?: number | null
+  /** Le dossier de la réponse, gardé avec elle : il en fait un cas de la banque, même rouverte. */
+  record?: string | null
   /** Les fichiers joints à la demande (R134) ; absent des réponses d'avant. */
   files?: { name: string }[]
 }
@@ -221,8 +229,9 @@ export async function sendAgentMessage(
     ...(project !== undefined ? { project: { id: project } } : {}),
     ...(files && files.length > 0 ? { files } : {}),
   }
+  // Sans toast : ce qui n'a pas marché se dit dans la conversation, là où la réponse devait venir (TF-J1-15).
   const res = await apiClient.post<{ data: ChatTurnResponse }>(ASSISTANT_ROUTES.CHAT(slug), body, {
-    timeout: AI_TIMEOUT_MS, ...(signal ? { signal } : {}),
+    timeout: AI_TIMEOUT_MS, silentError: true, ...(signal ? { signal } : {}),
   })
   return res.data.data
 }

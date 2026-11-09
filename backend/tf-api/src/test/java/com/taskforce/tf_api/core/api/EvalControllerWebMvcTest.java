@@ -60,6 +60,52 @@ class EvalControllerWebMvcTest {
         return jwt().jwt(b -> b.claim("email", EMAIL));
     }
 
+    private static EvalBankResponse.CaseSummary kept(boolean waiting) {
+        LocalDateTime at = LocalDateTime.of(2026, 11, 9, 10, 0);
+        return new EvalBankResponse.CaseSummary(40L, "Case", "Question", "", at, at, true, waiting ? "Ask first." : "", waiting);
+    }
+
+    @Test
+    @DisplayName("POST cases/good : ce qui a été observé devient ce qu'on attend, d'un clic")
+    void good_200() throws Exception {
+        when(evalService.keepGood("acme", 7L, "r-1")).thenReturn(kept(false));
+
+        mockMvc.perform(post(URL + "/cases/good").with(auth()).contentType(MediaType.APPLICATION_JSON).content("{\"record\":\"r-1\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.waiting").value(false));
+    }
+
+    @Test
+    @DisplayName("POST cases/bad : une phrase, et le cas attend ses critères")
+    void bad_200() throws Exception {
+        when(evalService.keepBad("acme", 7L, "r-1", "Ask first.")).thenReturn(kept(true));
+
+        mockMvc.perform(post(URL + "/cases/bad").with(auth()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"record\":\"r-1\",\"expected\":\"Ask first.\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.waiting").value(true))
+            .andExpect(jsonPath("$.data.expected").value("Ask first."));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest(name = "{0}")
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"{\"record\":\"r-1\"}", "{\"record\":\"r-1\",\"expected\":\"  \"}"})
+    void bad_needs_its_sentence_400(String body) throws Exception {
+        mockMvc.perform(post(URL + "/cases/bad").with(auth()).contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT cases/{id}/criteria : les critères d'un cas qui les attend")
+    void criteria_200() throws Exception {
+        when(evalService.giveCriteria(org.mockito.ArgumentMatchers.eq("acme"), org.mockito.ArgumentMatchers.eq(7L), org.mockito.ArgumentMatchers.eq(40L),
+                org.mockito.ArgumentMatchers.eq("Case"), org.mockito.ArgumentMatchers.any())).thenReturn(kept(false));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(URL + "/cases/40/criteria").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"Case\",\"criteria\":{\"tool\":\"none\"}}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(40));
+    }
+
     @Test
     @DisplayName("GET evals : la banque, son interrupteur et ses cas")
     void bank_200() throws Exception {

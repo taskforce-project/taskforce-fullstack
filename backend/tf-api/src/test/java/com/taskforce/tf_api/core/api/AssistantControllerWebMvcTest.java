@@ -61,6 +61,7 @@ class AssistantControllerWebMvcTest {
     @MockitoBean private WorkspaceRepository workspaceRepository;
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository;
     @MockitoBean private ModelCapabilityService capabilities;
+    @MockitoBean private com.taskforce.tf_api.core.service.agent.TurnProgressPublisher turnProgress;
 
     private static final String EMAIL = "dev@it.dev";
     private static final String URL = "/api/workspaces/acme/assistant";
@@ -119,7 +120,7 @@ class AssistantControllerWebMvcTest {
         ChatTurnResponse.Escalation offer = new ChatTurnResponse.Escalation("context", "qwen3:8b", "qwen3:14b", text);
         answering("Too big.");
         when(agentService.run(anyString(), anyLong(), any(TurnInput.class))).thenReturn(
-            new com.taskforce.tf_api.core.dto.response.AssistantAnswer("Too big.", null, "fallback", java.util.List.of(), java.util.List.of(),
+            new com.taskforce.tf_api.core.dto.response.AssistantAnswer("Too big.", null, "not_sent", java.util.List.of(), java.util.List.of(),
                 java.util.List.of(), com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE, null, null, null, offer));
 
         mockMvc.perform(post(URL).with(auth())
@@ -130,7 +131,8 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.escalation.capability").value("context"))
             .andExpect(jsonPath("$.data.answer.offer").doesNotExist());
         verify(capabilities, never()).offer(anyString(), any(), anyString());
-        verify(conversationService).appendAnswer(1L, "Too big." + ModelCapabilityService.block(text), "fallback", 0, null, null, null);
+        verify(conversationService).appendNotSent(1L, "Summarize", java.util.List.of());
+        verify(conversationService).appendAnswer(1L, "Too big." + ModelCapabilityService.block(text), "not_sent", 0, null, null, null);
     }
 
     @Test
@@ -425,6 +427,33 @@ class AssistantControllerWebMvcTest {
         verify(agentService, never()).run(any(), any(), any(TurnInput.class));
     }
 
+    /**
+     * La recette de la 1.13 (étapes 35 et 38) : un texte de 11 000 caractères était refusé avant que le budget de la
+     * requête le voie. La borne ne protège plus que le serveur : un long message passe, la réponse dit le reste.
+     */
+    @org.junit.jupiter.params.ParameterizedTest(name = "{0} caractères : {1}")
+    @org.junit.jupiter.params.provider.CsvSource({"11482, 200", "400000, 200", "400001, 400"})
+    void a_long_message_is_only_bounded_to_protect_the_server(int length, int expected) throws Exception {
+        answering("Answered.");
+
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"" + "a".repeat(length) + "\"}"))
+            .andExpect(status().is(expected));
+    }
+
+    @Test
+    @DisplayName("POST assistant trop long : le refus dit la limite et quoi faire, dans le champ du message")
+    void a_refused_message_says_the_limit() throws Exception {
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"" + "a".repeat(400_001) + "\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.validationErrors.message[0]").value(
+                "This message is too long: TaskForce takes 400,000 characters at most. Shorten it, or split it in two."));
+        verify(agentService, never()).run(any(), any(), any(), any(), any(), any());
+    }
+
     @Test
     @DisplayName("POST assistant avec un écran invalide (@Positive) → 400")
     void chat_invalid_screen_400() throws Exception {
@@ -494,17 +523,6 @@ class AssistantControllerWebMvcTest {
                 .accept(MediaType.APPLICATION_JSON)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"hi\"}"))
             .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    @DisplayName("POST assistant message > 4000 caractères (@Size) → 400")
-    void chat_message_too_long_400() throws Exception {
-        String tooLong = "x".repeat(4001);
-        mockMvc.perform(post(URL).with(auth())
-                .accept(MediaType.APPLICATION_JSON)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"message\":\"" + tooLong + "\"}"))
-            .andExpect(status().isBadRequest());
     }
 
     @Test

@@ -61,7 +61,9 @@ import lombok.extern.slf4j.Slf4j;
  * <ul>
  *   <li>Un cas naît d'un geste de la personne sur une de ses réponses : le serveur fige, depuis le dossier de cette
  *       réponse, la question, sa date, les notes servies et ce que les outils de lecture ont rendu.</li>
- *   <li>Les critères viennent de l'acte qu'elle a validé, et sont datés avant tout rejeu.</li>
+ *   <li>Les critères viennent de l'acte qu'elle a validé, et sont datés avant tout rejeu. Sous une réponse, un clic sur
+ *       « bien » garde ce qui a été observé ; « pas bien » garde une phrase, ce qu'il aurait fallu faire, et le cas attend
+ *       ses critères : aucun rejeu ne le note tant qu'ils ne sont pas écrits (R137).</li>
  *   <li>Un rejeu fait répondre un modèle nommé à chaque cas, sans toucher l'espace, et le note par du code.</li>
  *   <li>Coupée, la banque ne prend plus de cas ; les siens restent, rejouables.</li>
  * </ul>
@@ -78,6 +80,8 @@ public class EvalService {
     static final int MAX_ITEMS = 10;
     static final int MAX_VALUE = 200;
     static final int MAX_TITLE = 200;
+    /** La phrase de la personne : ce qu'il aurait fallu faire. */
+    public static final int MAX_EXPECTED = 500;
     /** Le modèle par défaut de l'instance (le tier rapide), quand le rejeu n'en nomme pas. */
     static final String DEFAULT_MODEL = "default";
     /** D'où vient un cas, pour l'histoire de la banque (R125). */
@@ -145,7 +149,9 @@ public class EvalService {
         List<EvalHistoryResponse.Case> history = active.stream()
             .map(evalCase -> new EvalHistoryResponse.Case(evalCase.getId(), evalCase.getTitle(), evalCase.getQuestion(),
                 evalCase.getAskedOn(), evalCase.getCreatedAt(), userId.equals(evalCase.getCreatedBy()),
-                origin(evalCase, incidents), grades(recent, byCase.getOrDefault(evalCase.getId(), Map.of()))))
+                origin(evalCase, incidents), grades(recent, byCase.getOrDefault(evalCase.getId(), Map.of())),
+                read(evalCase.getCriteria(), EvalCriteria.class).expected(), evalCase.waiting(),
+                evalCase.waiting() && evalCase.getSourceRecord() != null ? evalCase.getSourceRecord().toString() : null))
             .toList();
         return new EvalHistoryResponse(points, history);
     }
@@ -170,19 +176,91 @@ public class EvalService {
     public CaseSummary create(String slug, Long userId, String recordRef, String title, EvalCriteria criteria) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         requireEnabled(ws.getId());
-        if (cases.countByWorkspaceIdAndArchivedFalse(ws.getId()) >= MAX_CASES) {
-            throw new BusinessException("The test bank holds " + MAX_CASES + " cases: archive one before adding another.");
-        }
+        requireRoom(ws.getId());
         validate(criteria);
         UUID record = recordId(recordRef);
         Frozen frozen = freeze(new AgentContext(slug, ws.getId(), userId), record);
         LocalDateTime now = LocalDateTime.now();
-        EvalCase saved = cases.save(EvalCase.builder()
-            .workspaceId(ws.getId()).createdBy(userId).createdAt(now).criteriaAt(now).sourceRecord(record)
+        return summary(cases.save(frozenCase(ws.getId(), userId, record, title, frozen, now, now, criteria)), userId);
+    }
+
+    /**
+     * « Bien », d'un clic (R137) : ce qui a été observé devient ce qu'on attend (les critères que le brouillon proposait),
+     * datés maintenant. La même réponse ne se garde qu'une fois.
+     */
+    @Transactional
+    public CaseSummary keepGood(String slug, Long userId, String recordRef) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        requireEnabled(ws.getId());
+        UUID record = recordId(recordRef);
+        Optional<EvalCase> kept = cases.findFirstByWorkspaceIdAndSourceRecordAndArchivedFalseOrderByIdDesc(ws.getId(), record);
+        if (kept.isPresent()) return summary(kept.get(), userId);
+        requireRoom(ws.getId());
+        Frozen frozen = freeze(new AgentContext(slug, ws.getId(), userId), record);
+        LocalDateTime now = LocalDateTime.now();
+        return summary(cases.save(frozenCase(ws.getId(), userId, record, null, frozen, now, now, propose(frozen.calls()))), userId);
+    }
+
+    /**
+     * « Pas bien » (R137) : une phrase, ce qu'il aurait fallu faire. Une phrase ne se vérifie pas par du code : le cas se
+     * garde, il se lit dans l'histoire avec elle, et il attend ses critères. Aucun rejeu ne le note avant ({@link
+     * EvalCase#WAITING_FOR_CRITERIA}, R61).
+     */
+    @Transactional
+    public CaseSummary keepBad(String slug, Long userId, String recordRef, String expected) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        requireEnabled(ws.getId());
+        String sentence = expected == null ? "" : expected.strip();
+        if (sentence.isEmpty() || sentence.length() > MAX_EXPECTED) {
+            throw new BusinessException("Say in one sentence what Cortex should have done (" + MAX_EXPECTED + " characters at most).");
+        }
+        UUID record = recordId(recordRef);
+        Optional<EvalCase> kept = cases.findFirstByWorkspaceIdAndSourceRecordAndArchivedFalseOrderByIdDesc(ws.getId(), record);
+        if (kept.isPresent()) return summary(kept.get(), userId);
+        requireRoom(ws.getId());
+        Frozen frozen = freeze(new AgentContext(slug, ws.getId(), userId), record);
+        EvalCase waiting = frozenCase(ws.getId(), userId, record, null, frozen, LocalDateTime.now(), EvalCase.WAITING_FOR_CRITERIA,
+            EvalCriteria.sentence(sentence));
+        return summary(cases.save(waiting), userId);
+    }
+
+    /**
+     * Écrit les critères d'un cas qui les attend, une seule fois, datés maintenant : avant tout rejeu qui le notera (R61).
+     * Un cas qui a déjà les siens ne les change pas.
+     */
+    @Transactional
+    public CaseSummary giveCriteria(String slug, Long userId, Long caseId, String title, EvalCriteria criteria) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        EvalCase evalCase = cases.findByIdAndWorkspaceId(caseId, ws.getId())
+            .orElseThrow(() -> new ResourceNotFoundException("This case was not found."));
+        if (!userId.equals(evalCase.getCreatedBy()) && !authorization.isManager(ws.getId(), userId)) {
+            throw new ForbiddenException("Only the person who added this case, or an owner or admin, can write its criteria.");
+        }
+        if (!evalCase.waiting()) {
+            throw new BusinessException("This case already has its criteria: they can't change once a model may be graded on them.");
+        }
+        validate(criteria);
+        String sentence = read(evalCase.getCriteria(), EvalCriteria.class).expected();
+        evalCase.setCriteria(json(criteria.keeping(sentence)));
+        evalCase.setCriteriaAt(LocalDateTime.now());
+        if (title != null && !title.isBlank()) evalCase.setTitle(title(title, evalCase.getQuestion(), MAX_TITLE));
+        return summary(cases.save(evalCase), userId);
+    }
+
+    private void requireRoom(Long workspaceId) {
+        if (cases.countByWorkspaceIdAndArchivedFalse(workspaceId) >= MAX_CASES) {
+            throw new BusinessException("The test bank holds " + MAX_CASES + " cases: archive one before adding another.");
+        }
+    }
+
+    /** Un cas tel que le serveur le fige : sa question, sa date, ses notes et sa cassette viennent du dossier. */
+    private static EvalCase frozenCase(Long workspaceId, Long userId, UUID record, String title, Frozen frozen,
+                                       LocalDateTime createdAt, LocalDateTime criteriaAt, EvalCriteria criteria) {
+        return EvalCase.builder()
+            .workspaceId(workspaceId).createdBy(userId).createdAt(createdAt).criteriaAt(criteriaAt).sourceRecord(record)
             .title(title(title, frozen.question(), MAX_TITLE)).question(frozen.question()).askedOn(frozen.askedOn())
             .notes(json(frozen.notes())).cassette(json(frozen.cassette())).criteria(json(criteria)).archived(false)
-            .build());
-        return summary(saved, userId);
+            .build();
     }
 
     /** Archive un cas : la personne qui l'a ajouté, ou un gestionnaire de l'espace. Ses notes passées restent. */
@@ -225,6 +303,7 @@ public class EvalService {
         Optional<EvalResult> done = results.findByRunIdAndCaseId(runId, caseId);
         if (done.isPresent()) return result(done.get(), evalCase);
         if (evalCase.isArchived()) throw new BusinessException("This case is archived.");
+        if (evalCase.waiting()) throw new BusinessException("This case is still waiting for its criteria.");
         if (evalCase.getCriteriaAt().isAfter(run.getStartedAt())) {
             throw new BusinessException("This case was written after the run started: its criteria must come first.");
         }
@@ -399,6 +478,9 @@ public class EvalService {
         if (!criteria.effect().isEmpty() && !EFFECTS.contains(criteria.effect())) {
             throw new BusinessException("A rule effect is allow, ask or deny.");
         }
+        if (criteria.expected().length() > MAX_EXPECTED) {
+            throw new BusinessException("What it should have done takes " + MAX_EXPECTED + " characters at most.");
+        }
         if (criteria.args().size() > MAX_ITEMS) throw new BusinessException("A case checks " + MAX_ITEMS + " arguments at most.");
         criteria.args().forEach((key, values) -> {
             if (key.isBlank() || key.length() > 64) throw new BusinessException("An argument needs a short name.");
@@ -471,7 +553,8 @@ public class EvalService {
     private static CaseSummary summary(EvalCase evalCase, Long userId) {
         EvalCriteria criteria = read(evalCase.getCriteria(), EvalCriteria.class);
         return new CaseSummary(evalCase.getId(), evalCase.getTitle(), evalCase.getQuestion(), criteria.tool(),
-            evalCase.getCreatedAt(), evalCase.getCriteriaAt(), userId.equals(evalCase.getCreatedBy()));
+            evalCase.getCreatedAt(), evalCase.getCriteriaAt(), userId.equals(evalCase.getCreatedBy()), criteria.expected(),
+            evalCase.waiting());
     }
 
     private static RunSummary summary(EvalRun run) {

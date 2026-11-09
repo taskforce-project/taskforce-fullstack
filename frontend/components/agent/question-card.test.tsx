@@ -37,13 +37,21 @@ function show(questions: AssistantQuestion[]) {
   return call
 }
 
-/** « Crée un projet Next.js » (R115) : TaskForce demande le nom et où vit son code, sur une carte, comme Claude. */
-describe("QuestionCard: TaskForce's questions, like Claude's", () => {
+/** « Crée un projet Next.js » (R115, R136) : Cortex demande le nom et où vit son code, sur une carte, comme Claude. */
+describe("QuestionCard: Cortex's questions, like Claude's", () => {
   const answerQuestion = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
     useCortexStore.setState({ answerQuestion, questionProblem: null })
+  })
+
+  it("speaks with one voice: no signature of TaskForce on the card", () => {
+    show([NAME, REPOSITORY])
+
+    expect(screen.getByRole("form", { name: "Questions from Cortex" })).toBeInTheDocument()
+    expect(screen.queryByText(/asks before it acts/)).not.toBeInTheDocument()
+    expect(screen.queryByText("TaskForce")).not.toBeInTheDocument()
   })
 
   it("shows each question with its header, its choices and what they mean, the recommended one first, marked and checked", () => {

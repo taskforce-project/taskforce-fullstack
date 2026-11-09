@@ -46,9 +46,10 @@ export function BankHistory({ slug }: Readonly<{ slug: string }>) {
     return <p className="text-xs text-muted-foreground">{failed ? tp.readFailed : tp.reading}</p>
   }
 
-  const count = history.cases.length
   // Une banque vide : une ligne, et le prochain geste (R129).
-  if (count === 0) return <p className="text-xs text-muted-foreground">{tp.noCases}</p>
+  if (history.cases.length === 0) return <p className="text-xs text-muted-foreground">{tp.noCases}</p>
+  // Un cas qui attend ses critères n'est pas rejoué (R61).
+  const count = history.cases.filter((item) => !item.waiting).length
 
   const target = model ?? tp.cortexModel
   const passedText = (point: CurvePoint) => fillText(tp.passed, { passed: point.passed, total: point.total })
@@ -76,7 +77,7 @@ export function BankHistory({ slug }: Readonly<{ slug: string }>) {
   ) : (
     <Named name={`${replayName}. ${tp.replayHint}`} wide>
       <span className="inline-flex">
-        <Button variant="outline" size="sm" onClick={() => void runBank(slug, model ?? "")} disabled={measuring} aria-label={replayName} className="gap-1.5">
+        <Button variant="outline" size="sm" onClick={() => void runBank(slug, model ?? "")} disabled={measuring || count === 0} aria-label={replayName} className="gap-1.5">
           <Play className="size-3" /> {tp.replayShort}
         </Button>
       </span>

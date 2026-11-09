@@ -14,7 +14,10 @@ import {
   attachmentKey, COMPACT_COMMAND, toRequest, withAttachment, type ComposerAttachment,
 } from "@/lib/cortex/composer-picker";
 import { contextFrom, type CortexContext } from "@/lib/cortex/context-gauge";
+import { failureText } from "@/lib/cortex/failed-turn";
 import { screenFrom } from "@/lib/cortex/screen";
+import type { CortexWorkStep } from "@/lib/cortex/work-lines";
+import { CONSTANTS_EN } from "@/lib/constants_en";
 import { useIssueStore } from "@/lib/store/issue-store";
 import { useScreenStore } from "@/lib/store/screen-store";
 
@@ -34,6 +37,12 @@ export interface CortexTurn {
   kind?: "quota" | "compact" | "stopped";
   /** Les messages que « /compact » a condensés ; 0 quand il n'y avait rien à condenser. */
   compacted?: number;
+  /** « /compact » travaille : sa ligne attend là où viendra le résultat, sans rien déplacer (TF-J1-15). */
+  compacting?: boolean;
+  /** Le résumé que « /compact » a écrit : sa ligne l'ouvre, d'un clic. */
+  summary?: string | null;
+  /** Pourquoi « /compact » n'a rien changé, dit à la place de sa ligne. */
+  problem?: string;
   /** Ce que TaskForce propose sous la réponse (R118) ; `escalated` une fois la demande envoyée au modèle proposé. */
   escalation?: ModelEscalation | null;
   escalated?: boolean;
@@ -119,6 +128,8 @@ interface CortexState {
   context: CortexContext | null;
   /** Une réponse est attendue depuis cet instant (ms), sinon null. */
   sentAt: number | null;
+  /** Ce que Cortex fait en ce moment, annoncé par le serveur (R137) ; null entre deux réponses, et avant la première étape. */
+  workStep: CortexWorkStep | null;
   /** Le tour en cours peut s'arrêter : le bouton d'envoi est un carré (R134). */
   stoppable: boolean;
   /** Durée de la dernière réponse, en ms. */
@@ -138,6 +149,8 @@ interface CortexState {
   deletions: Record<string, CardDeletion>;
 
   setDraft: (text: string) => void;
+  /** Une étape de la réponse attendue : ignorée hors d'une attente, et celle d'une autre conversation de la personne. */
+  noteWorkStep: (step: CortexWorkStep) => void;
   /** Joint une issue ou un projet à la prochaine demande : false quand il y est déjà, ou qu'il y en a trois. */
   attach: (item: ComposerAttachment) => boolean;
   /** Retire une pièce jointe, par `attachmentKey`. */
@@ -257,6 +270,8 @@ function fallbackAnswer(text: string): AssistantAnswer {
   };
 }
 
+/** Ce que « /compact » gardait avant de garder son résumé : rien à ouvrir. */
+const LEGACY_COMPACT_LINE = "Conversation compacted";
 /** Ce que le serveur garde d'un tour arrêté sans rien avoir fait (R134) : la fenêtre le relit comme une ligne calme. */
 const STOPPED_TEXT = "Stopped by you.";
 
@@ -269,7 +284,10 @@ export function messagesToTurns(messages: ConversationMessage[]): CortexTurn[] {
     m.role === "user"
       ? { id: `m${m.id}`, role: "user", text: m.content, ...(m.files?.length ? { attached: m.files.map((file) => ({ label: file.name })) } : {}) }
       : m.mode === "compact"
-      ? { id: `m${m.id}`, role: "assistant", kind: "compact", compacted: m.read?.context?.summarized ?? 0 }
+      ? {
+          id: `m${m.id}`, role: "assistant", kind: "compact", compacted: m.read?.context?.summarized ?? 0,
+          ...(m.content === LEGACY_COMPACT_LINE ? {} : { summary: m.content }),
+        }
       : m.mode === "stopped" && m.content === STOPPED_TEXT
       ? { id: `m${m.id}`, role: "assistant", kind: "stopped" }
       : {
@@ -280,6 +298,7 @@ export function messagesToTurns(messages: ConversationMessage[]): CortexTurn[] {
             usage: { promptTokens: 0, completionTokens: 0, totalTokens: m.totalTokens },
             model: m.model ?? null,
             read: m.read ?? null,
+            record: m.read?.record ?? null,
           },
         },
   );
@@ -300,16 +319,13 @@ const withoutArchive = (done: AssistantToolCall[], key: string): AssistantToolCa
 
 /**
  * Le tour d'une demande qui n'a pas abouti. 409 : le plafond de tokens de l'instance, une carte d'information plutôt
- * qu'un « réessayez » trompeur. 429 : le frein de débit, avec sa limite et la vraie attente (R52). Le reste : un repli.
+ * qu'un « réessayez » trompeur. Le reste dit ce qui s'est passé et quoi faire, depuis la vraie cause (TF-J1-15) : la
+ * taille refusée, le délai, le serveur, le frein de débit avec sa limite et la vraie attente (R52).
  */
 function failedTurn(e: unknown): CortexTurn {
-  const status = getErrorStatus(e);
-  return status === 409
+  return getErrorStatus(e) === 409
     ? { id: nextId("a"), role: "assistant", kind: "quota" }
-    : {
-        id: nextId("a"), role: "assistant",
-        answer: fallbackAnswer(status === 429 ? getErrorMessage(e) : "Sorry, I couldn't answer. Please try again."),
-      };
+    : { id: nextId("a"), role: "assistant", answer: fallbackAnswer(failureText(e, CONSTANTS_EN.thread)) };
 }
 
 /** Le tour se finit : la file repart s'il a abouti ; après un échec, elle attend un clic (R134). */
@@ -345,7 +361,7 @@ async function speak(slug: string, out: Outgoing): Promise<boolean> {
   // Ce qui est joint part avec la demande, et se montre sous elle (R123).
   const shown = [...attached.map((a) => ({ label: a.label })), ...files.map((f) => ({ label: f.name }))];
   useCortexStore.setState((s) => ({
-    sentAt, stoppable: true, open: true, unread: false, projectPinned: true,
+    sentAt, stoppable: true, workStep: null, open: true, unread: false, projectPinned: true,
     turns: [...s.turns, { id: nextId("u"), role: "user", text, ...(shown.length > 0 ? { attached: shown } : {}) }],
   }));
   let ok = false;
@@ -376,7 +392,7 @@ async function speak(slug: string, out: Outgoing): Promise<boolean> {
     if (current === run) {
       current = null;
       // Repliée pendant l'attente : la barre signale qu'une réponse attend d'être lue.
-      useCortexStore.setState((s) => ({ sentAt: null, stoppable: false, lastMs: Date.now() - sentAt, unread: !s.open }));
+      useCortexStore.setState((s) => ({ sentAt: null, stoppable: false, workStep: null, lastMs: Date.now() - sentAt, unread: !s.open }));
       afterTurn(slug, ok);
     }
   }
@@ -421,12 +437,18 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
   ...EMPTY_CONVERSATION,
   conversations: [],
   sentAt: null,
+  workStep: null,
   stoppable: false,
   open: false,
   undos: {},
   deletions: {},
 
   setDraft: (text) => set({ draft: text }),
+
+  noteWorkStep: (step) => set((s) => {
+    if (s.sentAt === null || (s.conversationId !== null && step.conversationId !== s.conversationId)) return {};
+    return { workStep: step };
+  }),
 
   attach: (item) => {
     const before = get().attachments;
@@ -510,7 +532,7 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
     run.controller.abort();
     const line = nextId("a");
     set((s) => ({
-      sentAt: null, stoppable: false, lastMs: s.sentAt === null ? s.lastMs : Date.now() - s.sentAt, unread: !s.open,
+      sentAt: null, stoppable: false, workStep: null, lastMs: s.sentAt === null ? s.lastMs : Date.now() - s.sentAt, unread: !s.open,
       queueHalted: s.queue.length > 0,
       turns: [...s.turns, { id: line, role: "assistant" as const, kind: "stopped" as const }],
     }));
@@ -522,30 +544,44 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
     if (!slug || get().sentAt !== null) return false;
     get().enterWorkspace(slug);
     const sentAt = Date.now();
-    set({ draft: "", sentAt, open: true, unread: false });
-    const say = (compacted: number) => (s: CortexState) => ({
-      turns: [...s.turns, { id: nextId("a"), role: "assistant" as const, kind: "compact" as const, compacted }],
-      // Le prochain prompt sera plus court : la jauge ne garde pas la mesure d'avant.
-      context: compacted > 0 ? null : s.context,
+    // La ligne attend là où viendra le résultat, et le fil reste à sa place (TF-J1-15 : « ca scroll dans le chat pour
+    // aucune raison », « la ca supp tout le context ??? ») : rien des tours d'avant ne bouge, rien n'en disparaît.
+    const line = nextId("a");
+    set((s) => ({
+      draft: "", sentAt, open: true, unread: false,
+      turns: [...s.turns, { id: line, role: "assistant", kind: "compact", compacted: 0, compacting: true }],
+    }));
+    const settle = (patch: Partial<CortexTurn>) => (s: CortexState) => ({
+      turns: s.turns.map((turn) => (turn.id === line ? { ...turn, ...patch, compacting: false } : turn)),
     });
     let ok = false;
     try {
       const id = get().conversationId;
       if (id === null) {
-        set(say(0));
+        set(settle({ compacted: 0 }));
         ok = true;
         return true;
       }
-      const { summarized } = await compactConversation(slug, id);
-      set(say(summarized));
+      const done = await compactConversation(slug, id);
+      set((s) => ({
+        ...settle({ compacted: done.summarized, summary: done.summary ?? null })(s),
+        // La jauge prend sa nouvelle valeur tout de suite : le serveur a compté ce qui partirait maintenant. Un serveur
+        // plus ancien ne le dit pas : elle oublie sa mesure, le prochain prompt sera plus court.
+        context: done.summarized === 0 ? s.context : (done.contextTokens ?? 0) > 0
+          ? {
+              tokens: done.contextTokens ?? 0,
+              window: done.contextWindow ?? null,
+              ...(done.contextEstimated ? { estimated: true } : {}),
+            }
+          : null,
+      }));
       ok = true;
       return true;
     } catch (e) {
-      // 400 : ce que le serveur dit de son échec (rien n'a changé) ; le quota et le frein gardent leur tour.
-      const status = getErrorStatus(e);
-      set((s) => ({ turns: [...s.turns, status === 400
-        ? { id: nextId("a"), role: "assistant", answer: fallbackAnswer(getErrorMessage(e)) }
-        : failedTurn(e)] }));
+      // Le plafond de tokens garde sa carte ; le reste se dit à la place de la ligne : rien n'a changé.
+      set((s) => (getErrorStatus(e) === 409
+        ? { turns: s.turns.map((turn) => (turn.id === line ? { id: turn.id, role: "assistant", kind: "quota" } : turn)) }
+        : settle({ problem: failureText(e, CONSTANTS_EN.thread) })(s)));
       return false;
     } finally {
       set((s) => ({ sentAt: null, lastMs: Date.now() - sentAt, unread: !s.open }));
@@ -563,7 +599,7 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
     const sentAt = Date.now();
     // La demande repart telle quelle, vers le modèle proposé : la conversation montre où elle va.
     set((s) => ({
-      sentAt, stoppable: true, open: true, unread: false,
+      sentAt, stoppable: true, workStep: null, open: true, unread: false,
       turns: [
         ...s.turns.map((turn) => (turn.id === turnId ? { ...turn, escalated: true } : turn)),
         { id: nextId("u"), role: "user", text: asked, sentTo: offer.to },
@@ -591,7 +627,7 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
     } finally {
       if (current === run) {
         current = null;
-        set((s) => ({ sentAt: null, stoppable: false, lastMs: Date.now() - sentAt, unread: !s.open }));
+        set((s) => ({ sentAt: null, stoppable: false, workStep: null, lastMs: Date.now() - sentAt, unread: !s.open }));
         afterTurn(slug, ok);
       }
     }

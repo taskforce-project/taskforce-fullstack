@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch"
 import { NO_TOOL, type EvalResult } from "@/lib/api/eval-service"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { useEvalStore } from "@/lib/store/eval-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { cn } from "@/lib/utils"
 import { parseServerDate } from "@/lib/utils/server-date"
@@ -80,11 +81,15 @@ export function EvalBankPanel() {
   const runBank = useEvalStore((s) => s.runBank)
   const stopRun = useEvalStore((s) => s.stopRun)
   const openRun = useEvalStore((s) => s.openRun)
+  const waitingCriteria = usePreferencesStore((s) => s.t.thread.waitingCriteria)
   const [model, setModel] = useState("")
 
   useEffect(() => { if (slug) void fetchBank(slug) }, [slug, fetchBank])
 
   if (!bank) return <p className="text-xs text-muted-foreground">Loading the test bank…</p>
+
+  // Un cas qui attend ses critères n'est pas rejoué (R61).
+  const replayable = bank.cases.filter((c) => !c.waiting).length
 
   return (
     <div className="flex flex-col gap-4">
@@ -142,8 +147,8 @@ export function EvalBankPanel() {
               <Square className="size-3" /> {progress.stopping ? "Stopping…" : "Stop"}
             </Button>
           ) : (
-            <Button size="sm" onClick={() => void runBank(slug, model)} disabled={bank.cases.length === 0} className="gap-1.5">
-              <Play className="size-3" /> Run {bank.cases.length} case{bank.cases.length === 1 ? "" : "s"}
+            <Button size="sm" onClick={() => void runBank(slug, model)} disabled={replayable === 0} className="gap-1.5">
+              <Play className="size-3" /> Run {replayable} case{replayable === 1 ? "" : "s"}
             </Button>
           )}
         </div>
@@ -200,7 +205,7 @@ export function EvalBankPanel() {
         <div className="mb-3">
           <h3 className="text-sm font-semibold text-foreground">Cases ({bank.cases.length})</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Under an answer of Cortex that used a tool, choose Add to test bank.
+            Under an answer of Cortex, choose good or bad.
           </p>
         </div>
         {bank.cases.length === 0 ? (
@@ -212,8 +217,14 @@ export function EvalBankPanel() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-foreground">{c.title}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {c.tool === NO_TOOL ? "No tool" : c.tool ? <span className="font-mono">{c.tool}</span> : "Tool not checked"}
-                    {" · criteria set "}{formatDate(c.criteriaAt)}
+                    {c.waiting ? (
+                      <>{waitingCriteria}{c.expected ? ` · ${c.expected}` : ""}</>
+                    ) : (
+                      <>
+                        {c.tool === NO_TOOL ? "No tool" : c.tool ? <span className="font-mono">{c.tool}</span> : "Tool not checked"}
+                        {" · criteria set "}{formatDate(c.criteriaAt)}
+                      </>
+                    )}
                   </p>
                 </div>
                 {(c.mine || bank.canManage) && (

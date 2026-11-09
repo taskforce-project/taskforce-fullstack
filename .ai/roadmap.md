@@ -10,6 +10,17 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 09/11/2026 - TF-J1-15, la conversation dit ce qu'elle fait, d'une seule voix (R136, R137, la part messages de R143, séance n°20) :** `[feat]`
+> - **Longs messages** : `@Size(max = 4000)` refusait le texte de la recette avant le budget de contexte de la 1.13 ; la borne ne protège plus que le serveur (400 000 caractères), un texte plus grand que la fenêtre reçoit la réponse prévue, reste dans le fil et ne repart plus au modèle aux tours suivants (`mode = not_sent`), et un long texte collé se replie dans sa bulle.
+> - **Échecs** : `ModelProviderException.Why` et `ModelFailure` disent la vraie cause (délai avec sa durée, fournisseur injoignable, crédit, débit, clé, modèle absent, mémoire) ; côté front, `lib/cortex/failed-turn.ts`. Plus de « Sorry, I couldn't answer ».
+> - **Une voix (R136)** : les questions sont dites par Cortex ; TaskForce ne signe que la correction d'une phrase fausse et ce qui parle du modèle.
+> - **Le travail se replie (R137)** : le serveur annonce ses étapes (`TurnProgress`, `/topic/cortex.{userId}`), la ligne de travail les dit, puis « Worked for 8 s » et des phrases, jamais un nom d'outil. Le mot « Sources » disparaît : « read 5 notes and the SOLO board », un clic les nomme, chacune s'ouvre (`GET /brain/nodes/{id}`).
+> - **Sous une réponse** : copier, bien, pas bien. Toute réponse d'un modèle a son dossier ; « bien » garde ce qui a été observé, « pas bien » une phrase, et le cas attend ses critères dans Progress > History (`EvalCase.WAITING_FOR_CRITERIA`, sans migration : R61 tient, aucun rejeu ne le note). Le formulaire passe sous « Advanced ».
+> - **`/compact`** : une ligne attend là où viendra le résultat, rien ne défile, le fil reste entier, la ligne ouvre le résumé (gardé dans le message), la jauge prend la taille comptée par le serveur.
+> - **Dépôt (s14)** : « Create a new repository » dans la question, privé, au nom du projet, puis lié ; la webapp l'a par sa connexion GitHub (scope `repo`), le desktop par le `gh` de la personne quand son jeton en a le droit (R15), le clic sur la carte est l'accord.
+
+
+
 > **▶ MAJ 09/11/2026 - La barre de saisie, comme celle qu'on connaît (TF-J1-14, R134, R135 de la séance n°20).** `[frontend + backend + fern + docs]`
 > - **Constat** (recette 1.13, étapes 4, 12, 15, 35, 37) : un champ d'une ligne, un « + » qui ne joint qu'issue et projet, aucun moyen d'arrêter une demande, un modèle qu'on ne change pas facilement et dont on ne sait pas lequel répond, une carte préparée dans le projet de l'écran, puis, après « tu t'es trompé de projet », la même carte avec une description inventée.
 > - **Le champ** : un `textarea` de 14 px sur 20 px, de 1 à 17 lignes puis il défile ; le « + » à gauche, le micro et l'envoi à droite ne bougent pas ; Entrée envoie, Maj+Entrée va à la ligne, rien ne part pendant une saisie IME ; le micro écrit au curseur.

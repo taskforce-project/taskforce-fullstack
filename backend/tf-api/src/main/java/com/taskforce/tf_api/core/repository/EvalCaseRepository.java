@@ -18,6 +18,9 @@ public interface EvalCaseRepository extends JpaRepository<EvalCase, Long> {
 
     long countByWorkspaceIdAndArchivedFalse(Long workspaceId);
 
+    /** Le cas déjà tiré de cette réponse, s'il y en a un : « bien » ou « pas bien » ne le gardent qu'une fois. */
+    Optional<EvalCase> findFirstByWorkspaceIdAndSourceRecordAndArchivedFalseOrderByIdDesc(Long workspaceId, java.util.UUID sourceRecord);
+
     /** Les cas d'un rejeu : actifs, et dont les critères précèdent son départ. */
     long countByWorkspaceIdAndArchivedFalseAndCriteriaAtLessThanEqual(Long workspaceId, LocalDateTime startedAt);
 }
