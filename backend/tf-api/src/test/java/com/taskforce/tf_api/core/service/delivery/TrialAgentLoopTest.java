@@ -149,6 +149,20 @@ class TrialAgentLoopTest {
     }
 
     @Test
+    @DisplayName("arrêtée pendant l'appel au modèle : rien n'est posté (R138)")
+    void postsNothingOnceStopped() throws Exception {
+        when(llm.rawChatWithModel(any(), eq(List.of()), eq("qwen3:8b"))).thenAnswer(call -> {
+            run.setStatus(DeliveryRunStatus.FAILED);
+            return new ObjectMapper().createObjectNode().put("role", "assistant").put("content", "Too late.");
+        });
+
+        loop.run(90L);
+
+        verify(issueService, never()).addComment(any(), any(), any(), any(), any());
+        verify(runner, never()).complete(any(), any());
+    }
+
+    @Test
     @DisplayName("la règle permet : le commentaire part sur l'issue confiée, sous le nom du modèle, et la mission se clôt")
     void postsTheAnswerAsAComment() throws Exception {
         answers("Three themes: export, speed, onboarding. The export comes first.");
