@@ -121,9 +121,53 @@ class ProjectGesturesTest {
         Question repository = card.get(1);
         assertThat(repository.choices()).hasSize(Question.MAX_CHOICES).allMatch(choice -> choice.description() != null);
         assertThat(repository.choices()).extracting(Question.Choice::label)
-            .containsExactly("A new private repository", "A new public repository", "acme/web", "No repository for now");
+            .containsExactly("Create a new repository", "acme/web", "acme/api", "No repository for now");
         assertThat(repository.choices()).filteredOn(Question.Choice::recommended).extracting(Question.Choice::value)
             .containsExactly("new-private");
+        assertThat(repository.choices().get(0).description()).isEqualTo("Private, named after the project, and linked to this project");
+    }
+
+    /**
+     * Test du CEO du 09/11/2026 : « Crée un projet "Recette 113" », et qwen3:8b passe de lui-même un nouveau dépôt. La
+     * personne n'en a rien dit : la carte le propose, et son clic est l'accord ; rien ne se crée avant.
+     */
+    @Test
+    @DisplayName("un nouveau dépôt que seul le modèle demande se propose sur la carte, au nom du projet")
+    void a_new_repository_only_the_model_said_is_offered() throws Exception {
+        List<Question> card = gestures.questions("acme", args("{\"name\": \"Recette 113\", \"repository\": \"new\"}"),
+            "Crée un projet \"Recette 113\"");
+
+        assertThat(card).singleElement().satisfies(question -> {
+            assertThat(question.text()).isEqualTo("Where does the code of Recette 113 live?");
+            assertThat(question.choices().get(0).label()).isEqualTo("Create a new repository");
+            assertThat(question.choices().get(0).value()).isEqualTo("new-private");
+            assertThat(question.choices().get(0).description()).isEqualTo("Private, named recette-113, and linked to this project");
+            assertThat(question.choices().get(0).recommended()).isTrue();
+        });
+        verify(projectService, never()).createProject(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("quand la personne le dit, un nouveau dépôt ne repose pas la question du dépôt")
+    void a_new_repository_the_person_said_keeps_its_visibility_question() throws Exception {
+        List<Question> card = gestures.questions("acme", args("{\"name\": \"Atlas\", \"repository\": \"new\"}"),
+            "Crée un projet Atlas avec un nouveau repo");
+
+        assertThat(card).singleElement().satisfies(question -> assertThat(question.header()).isEqualTo("Visibility"));
+    }
+
+    /** Sur la carte, ce qui ne peut pas se faire ici n'est pas proposé (R15). */
+    @Test
+    @DisplayName("là où aucun dépôt ne se crée, la carte ne propose que ce qui existe, sans s'en excuser")
+    void the_option_is_absent_where_it_cannot_be_done() throws Exception {
+        when(repoHost.createsRepos("acme")).thenReturn(false);
+
+        List<Question> card = gestures.questions("acme", args("{\"name\": \"Recette 113\", \"repository\": \"new\"}"), "Crée un projet");
+
+        assertThat(card).singleElement().satisfies(question -> {
+            assertThat(question.text()).isEqualTo("Where does the code of Recette 113 live?");
+            assertThat(question.choices()).extracting(Question.Choice::value).doesNotContain("new-private", "new-public");
+        });
     }
 
     /** Le nom manque, ou ne dit que la pile : TaskForce le demande, avant de rien créer. */
@@ -154,7 +198,7 @@ class ProjectGesturesTest {
         assertThat(question.field()).isEqualTo("repository");
         assertThat(question.text()).isEqualTo("Where does the code of Atlas live?");
         assertThat(question.choices()).extracting(Question.Choice::value)
-            .containsExactly("new-private", "new-public", "acme/web", "none");
+            .containsExactly("new-private", "acme/web", "acme/api", "none");
         assertThat(question.choices().get(0).recommended()).isTrue();
         assertThat(question.choices()).filteredOn(Question.Choice::recommended).hasSize(1);
         verify(projectService, never()).createProject(any(), any(), any());
@@ -163,7 +207,7 @@ class ProjectGesturesTest {
     /** Ce que TaskForce peut faire ici décide des choix : sans GitHub dans l'app desktop, pas de nouveau dépôt. */
     @ParameterizedTest(name = "crée {0}, lie {1} : {2}")
     @CsvSource(delimiter = '|', value = {
-        "true  | false | new-private,new-public,none",
+        "true  | false | new-private,none",
         "false | true  | acme/web,acme/api,acme/site,none",
     })
     void the_choices_are_what_taskforce_can_do_here(boolean creates, boolean links, String choices) {
@@ -287,7 +331,7 @@ class ProjectGesturesTest {
 
         when(repoHost.createsRepos("acme")).thenReturn(false);
         assertThat(asked("{\"name\": \"Atlas\", \"stack\": \"Next.js\", \"repository\": \"new\"}").text())
-            .isEqualTo("TaskForce can't create a repository here. Where does the code of Atlas live?");
+            .isEqualTo("A new repository can't be created from here. Where does the code of Atlas live?");
     }
 
     /**
@@ -302,13 +346,13 @@ class ProjectGesturesTest {
             + "normalement nan ?\", \"answered\": [\"name\", \"repository\"";
 
         Question card = asked(body + "]}");
-        assertThat(card.text()).isEqualTo("TaskForce can't see your repositories here: write it as owner/name, or go on "
+        assertThat(card.text()).isEqualTo("I can't see your repositories here: write it as owner/name, or go on "
             + "without one.");
         assertThat(card.choices()).extracting(Question.Choice::value).containsExactly("none");
 
         IssueGestures.Gesture done = gestures.create("acme", 7L, args(body + ", \"repository\"]}"));
         assertThat(done.summary()).isEqualTo("Project created in TaskForce: NEXTJSAPP \"Next.js app\" (id 31). No "
-            + "repository is linked: TaskForce can't see your repositories here. Link it from the page of Next.js app.");
+            + "repository is linked: your repositories can't be read from here. Link it from the page of Next.js app.");
         verify(repoService, never()).linkRepo(any(), any(), any(), any());
     }
 
