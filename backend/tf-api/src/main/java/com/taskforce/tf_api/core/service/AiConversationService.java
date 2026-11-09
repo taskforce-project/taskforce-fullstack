@@ -2,10 +2,14 @@ package com.taskforce.tf_api.core.service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -17,11 +21,14 @@ import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead.Cont
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationDetail;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationSummary;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.MessageDto;
+import com.taskforce.tf_api.core.dto.response.ConversationDtos.MessageFile;
 import com.taskforce.tf_api.core.model.AiConversation;
 import com.taskforce.tf_api.core.model.AiMessage;
 import com.taskforce.tf_api.core.repository.AiConversationRepository;
 import com.taskforce.tf_api.core.repository.AiMessageRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
+import com.taskforce.tf_api.core.service.agent.TurnInput.LastCard;
+import com.taskforce.tf_api.core.service.ai.AttachedFile;
 import com.taskforce.tf_api.core.service.ai.ContextBudget;
 import com.taskforce.tf_api.core.service.ai.ModelWindow;
 import com.taskforce.tf_api.core.service.ai.TurnHistory;
@@ -56,6 +63,13 @@ public class AiConversationService {
     /** Ce que le modèle a lu, gardé en JSON avec la réponse (V120), et relu tel quel. */
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final TypeReference<Map<String, Object>> READING = new TypeReference<>() {};
+    private static final TypeReference<List<AttachedFile>> FILES = new TypeReference<>() {};
+
+    /** Ce qu'un message garde en plus de ce que le modèle a lu : les fichiers joints à une demande, la carte d'une réponse. */
+    private static final String ATTACHED_FILES = "attachedFiles";
+    private static final String CARD = "card";
+    /** Les messages relus pour retrouver la dernière carte préparée. */
+    private static final int CARD_LOOKBACK = 12;
 
     private static final String SUMMARY_SYSTEM =
         "You condense the history of a conversation between a user and the Cortex assistant. "
@@ -75,12 +89,16 @@ public class AiConversationService {
     @Transactional(readOnly = true)
     public List<ConversationSummary> list(Long workspaceId, Long userId) {
         return conversationRepository.findByWorkspaceIdAndUserIdOrderByUpdatedAtDesc(workspaceId, userId).stream()
-            .map(c -> new ConversationSummary(
-                c.getId(), c.getTitle(),
-                c.getUpdatedAt() != null ? c.getUpdatedAt().toString() : null,
-                messageRepository.countByConversationId(c.getId()),
-                messageRepository.sumTokens(c.getId()), c.getProjectId()))
+            .map(this::summaryOf)
             .toList();
+    }
+
+    private ConversationSummary summaryOf(AiConversation c) {
+        return new ConversationSummary(
+            c.getId(), c.getTitle(),
+            c.getUpdatedAt() != null ? c.getUpdatedAt().toString() : null,
+            messageRepository.countByConversationId(c.getId()),
+            messageRepository.sumTokens(c.getId()), c.getProjectId());
     }
 
     @Transactional(readOnly = true)
@@ -88,20 +106,65 @@ public class AiConversationService {
         AiConversation conv = requireOwned(id, userId);
         List<MessageDto> messages = messageRepository.findByConversationIdOrderByCreatedAtAsc(id).stream()
             .map(m -> new MessageDto(m.getId(), m.getRole(), m.getContent(), m.getMode(), m.getTotalTokens(),
-                m.getCreatedAt() != null ? m.getCreatedAt().toString() : null, m.getModel(), readOf(m)))
+                m.getCreatedAt() != null ? m.getCreatedAt().toString() : null, m.getModel(), readOf(m),
+                filesOf(m).stream().map(file -> new MessageFile(file.name())).toList()))
             .toList();
         return new ConversationDetail(conv.getId(), conv.getTitle(),
-            messageRepository.sumTokens(id), messages);
+            messageRepository.sumTokens(id), messages, conv.getProjectId());
     }
 
     /** Ce que TaskForce a donné à lire au modèle pour ce message ; null sans lecture gardée, ou illisible. */
     private static AssistantRead readOf(AiMessage message) {
         if (message.getReading() == null) return null;
+        Map<String, Object> reading = new HashMap<>(message.getReading());
+        reading.remove(ATTACHED_FILES);
+        reading.remove(CARD);
+        if (reading.isEmpty()) return null;
         try {
-            return JSON.convertValue(message.getReading(), AssistantRead.class);
+            return JSON.convertValue(reading, AssistantRead.class);
         } catch (IllegalArgumentException unreadable) {
             return null;
         }
+    }
+
+    /** Les fichiers que la personne a joints à ce message (R134) ; aucun pour les autres, ou illisibles. */
+    private static List<AttachedFile> filesOf(AiMessage message) {
+        Object kept = message.getReading() == null ? null : message.getReading().get(ATTACHED_FILES);
+        if (kept == null) return List.of();
+        try {
+            return JSON.convertValue(kept, FILES);
+        } catch (IllegalArgumentException unreadable) {
+            return List.of();
+        }
+    }
+
+    /** La carte préparée que ce message montrait (R135) ; null sans carte, ou illisible. */
+    private static LastCard cardOf(AiMessage message) {
+        Object kept = message.getReading() == null ? null : message.getReading().get(CARD);
+        if (kept == null) return null;
+        try {
+            return JSON.convertValue(kept, LastCard.class);
+        } catch (IllegalArgumentException unreadable) {
+            return null;
+        }
+    }
+
+    /**
+     * La dernière carte préparée de cette conversation, parmi ses derniers messages, pour « tu t'es trompé de projet » (R135) :
+     * l'étape 15 de la recette le disait deux messages après la carte.
+     */
+    @Transactional(readOnly = true)
+    public Optional<LastCard> lastCard(Long conversationId) {
+        return messageRepository.findByConversationIdOrderByCreatedAtDesc(conversationId, PageRequest.of(0, CARD_LOOKBACK)).stream()
+            .map(AiConversationService::cardOf)
+            .filter(Objects::nonNull)
+            .findFirst();
+    }
+
+    /** Le projet où la conversation travaille maintenant ; null sans projet. */
+    @Transactional(readOnly = true)
+    public Long currentProject(Long conversationId) {
+        return conversationRepository.findById(conversationId).map(AiConversation::getProjectId).orElse(null);
     }
 
     /**
@@ -213,8 +276,10 @@ public class AiConversationService {
         return Map.of("role", "system", "content", "Summary of the earlier exchanges of this conversation: " + summary);
     }
 
+    /** Un message tel qu'il part au modèle : les fichiers joints à une demande restent avec elle (R134). */
     private static Map<String, Object> llmMessage(AiMessage message) {
-        return Map.of("role", message.getRole(), "content", message.getContent());
+        String files = AttachedFile.block(filesOf(message));
+        return Map.of("role", message.getRole(), "content", files.isEmpty() ? message.getContent() : message.getContent() + "\n\n" + files);
     }
 
     private static int tokensOf(Map<String, Object> message) {
@@ -364,7 +429,7 @@ public class AiConversationService {
 
     // ── Écriture ────────────────────────────────────────────────────────────────
 
-    /** {@code projectId} : le projet à l'écran (R114), gardé seulement s'il est de cet espace ; null sinon. */
+    /** {@code projectId} : le projet de la conversation (R135), gardé seulement s'il est de cet espace ; null sinon. */
     @Transactional
     public AiConversation create(Long workspaceId, Long userId, String title, Long projectId) {
         AiConversation conv = new AiConversation();
@@ -378,8 +443,8 @@ public class AiConversationService {
     }
 
     /**
-     * Résout une conversation existante (bornée à l'utilisateur) ou en crée une nouvelle, rangée sous le projet à l'écran
-     * quand elle commence (R121) ; une conversation existante garde le sien.
+     * Résout une conversation existante (bornée à l'utilisateur) ou en crée une nouvelle, au projet que la rangée sous le
+     * compositeur montre quand elle commence (R121, R135) ; une conversation existante garde le sien.
      */
     @Transactional
     public AiConversation getOrCreate(Long workspaceId, Long userId, Long conversationId, Long projectId) {
@@ -389,10 +454,43 @@ public class AiConversationService {
         return create(workspaceId, userId, DEFAULT_TITLE, projectId);
     }
 
+    /**
+     * Le projet où travaille la conversation (R135) : celui que la personne choisit dans la rangée sous le compositeur, ou
+     * sur une carte ; null pour aucun. Un projet d'un autre espace ne se pose pas.
+     */
+    @Transactional
+    public ConversationSummary setProject(Long id, Long userId, Long workspaceId, Long projectId) {
+        AiConversation conv = requireOwned(id, userId);
+        if (projectId != null && projectRepository.findByIdAndWorkspaceId(projectId, workspaceId).isEmpty()) {
+            throw new ResourceNotFoundException("Project not found");
+        }
+        conv.setProjectId(projectId);
+        return summaryOf(conversationRepository.save(conv));
+    }
+
     @Transactional
     public void delete(Long id, Long userId) {
         AiConversation conv = requireOwned(id, userId);
         conversationRepository.delete(conv); // cascade DB → messages
+    }
+
+    /** La demande de la personne, avec les fichiers qu'elle a joints (R134) : ils restent avec le message. */
+    @Transactional
+    public void appendAsked(Long conversationId, String content, List<AttachedFile> files) {
+        append(conversationId, "user", content, null, 0, null,
+            files == null || files.isEmpty() ? null : new HashMap<>(Map.of(ATTACHED_FILES, files)));
+    }
+
+    /**
+     * La réponse, avec ce que TaskForce a donné à lire au modèle, et la carte qu'elle prépare (R135) : « tu t'es trompé de
+     * projet » la reprend telle quelle.
+     */
+    @Transactional
+    public void appendAnswer(Long conversationId, String content, String mode, long tokens, String model, AssistantRead read,
+                             LastCard card) {
+        Map<String, Object> reading = read == null ? new HashMap<>() : JSON.convertValue(read, READING);
+        if (card != null) reading.put(CARD, Map.of("tool", card.tool(), "input", card.input() == null ? "{}" : card.input()));
+        append(conversationId, "assistant", content, mode, tokens, model, reading.isEmpty() ? null : reading);
     }
 
     @Transactional
@@ -413,8 +511,13 @@ public class AiConversationService {
     @Transactional
     public void appendMessage(Long conversationId, String role, String content, String mode, long tokens, String model,
                               AssistantRead read) {
+        append(conversationId, role, content, mode, tokens, model, read == null ? null : JSON.convertValue(read, READING));
+    }
+
+    private void append(Long conversationId, String role, String content, String mode, long tokens, String model,
+                        Map<String, Object> reading) {
         AiMessage m = new AiMessage();
-        m.setReading(read == null ? null : JSON.convertValue(read, READING));
+        m.setReading(reading);
         m.setConversationId(conversationId);
         m.setRole(role);
         m.setContent(content);

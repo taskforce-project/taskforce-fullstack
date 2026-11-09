@@ -6,18 +6,20 @@ package com.taskforce.tf_api.core.dto.response;
  *
  * <p>{@code escalation} : ce que TaskForce propose quand la banque dit que le modèle de Cortex échoue à ce genre de
  * demande et qu'un autre modèle servi le réussit (R118) ; la personne envoie la demande d'un clic, jamais TaskForce
- * seul. {@code sentTo} : le modèle vers lequel la personne a envoyé cette demande, quand elle l'a fait.</p>
+ * seul. {@code sentTo} : le modèle vers lequel la personne a envoyé cette demande, quand elle l'a fait. {@code projectId} :
+ * le projet de la conversation après ce tour (R135), que la rangée sous le compositeur montre ; null sans projet.</p>
  */
 public record ChatTurnResponse(
     Long conversationId,
     String title,
     AssistantAnswer answer,
     Escalation escalation,
-    String sentTo
+    String sentTo,
+    Long projectId
 ) {
 
     public ChatTurnResponse(Long conversationId, String title, AssistantAnswer answer) {
-        this(conversationId, title, answer, null, null);
+        this(conversationId, title, answer, null, null, null);
     }
 
     /**

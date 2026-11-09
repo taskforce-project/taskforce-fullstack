@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useParams } from "next/navigation"
-import { Sparkles, ExternalLink, ChevronDown, ChevronRight, RefreshCw } from "lucide-react"
+import { Sparkles, ExternalLink, ChevronRight, RefreshCw } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { contextGauge } from "@/lib/cortex/context-gauge"
@@ -131,15 +131,16 @@ export function CortexUsage({ className }: { className?: string }) {
 
   return (
     <div ref={ref} className={cn("relative", className)}>
+      {/* Un petit anneau, à droite de la rangée sous la boîte (R134) : son nom et sa valeur au survol. */}
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground motion-reduce:transition-none"
-        title="Context window & usage"
+        aria-expanded={open}
+        aria-label={gauge.value ? `${t.gaugeLabel}: ${gauge.value}` : t.gaugeLabel}
+        title={gauge.value ? `${t.gaugeLabel}: ${gauge.value}` : t.gaugeLabel}
+        className="flex size-6 items-center justify-center rounded text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground motion-reduce:transition-none"
       >
         <Ring pct={gauge.pct} />
-        <span className="font-medium">Cortex</span>
-        <ChevronDown className={cn("size-4 transition-transform duration-150 motion-reduce:transition-none", open && "rotate-180")} />
       </button>
 
       {open && coords && typeof document !== "undefined" && createPortal(
@@ -213,7 +214,8 @@ export function CortexUsage({ className }: { className?: string }) {
                 type="button"
                 onClick={() => void load(true)}
                 className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                title="Actualiser"
+                title={t.gaugeRefresh}
+                aria-label={t.gaugeRefresh}
               >
                 <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
               </button>

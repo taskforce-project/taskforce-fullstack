@@ -18,6 +18,10 @@ describe("readLine", () => {
       .toBe("qwen3:8b · read OPS-35 and 3 comments · saw the OPS board, 12 issues · 2 notes")
   })
 
+  it("dit les fichiers joints qu'il a lus (R134) : la ligne ne dit jamais « read nothing » quand il en a reçu", () => {
+    expect(readLine("qwen3:8b", read({ files: [{ name: "notes.md" }], notes: 1 }), t)).toBe("qwen3:8b · read notes.md · 1 note")
+  })
+
   it("dit aussi qu'un modèle n'a rien lu : un résumé écrit sans lire se voit", () => {
     expect(readLine("qwen3:8b", read({}), t)).toBe("qwen3:8b · read nothing in TaskForce")
   })
