@@ -320,6 +320,8 @@ export const CONSTANTS_EN = {
   // Desktop app update, in one toast that stays (desktop-update-toast.tsx). Since 05/11/2026 the installer runs without
   // a window: this toast is where an update that didn't install is told.
   desktopUpdate: {
+    installed: "TaskForce {version} is installed",
+    installedHint: "Updated from version {from}.",
     downloading: "Downloading TaskForce {version}",
     progress: "{percent}% · Keep TaskForce open: the download starts over if you quit.",
     progressLabel: "Update download",

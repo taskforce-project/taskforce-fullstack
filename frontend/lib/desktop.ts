@@ -126,6 +126,7 @@ export type DesktopUpdateCheck =
  */
 export type DesktopUpdateState =
   | { status: "idle" }
+  | { status: "installed"; version: string; from: string }
   | { status: "downloading"; version: string; percent: number }
   | { status: "ready"; version: string; retry?: boolean }
   | { status: "failed"; version: string; message: string };
