@@ -88,7 +88,7 @@ export function AttachMenu({ slug, onDone, onFiles }: Readonly<{
         <DropdownMenuContent
           side="top"
           align="start"
-          className="w-[260px] max-w-[calc(100vw-2rem)]"
+          className="w-[260px] max-w-[calc(100vw-2rem)] motion-reduce:!animate-none"
           // La recherche prend le curseur quand elle s'ouvre ; sinon, le champ le reprend.
           onCloseAutoFocus={(event) => {
             event.preventDefault()
@@ -114,7 +114,7 @@ export function AttachMenu({ slug, onDone, onFiles }: Readonly<{
               <span>{texts.connectors}</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
-              <DropdownMenuSubContent className="max-h-80 w-[260px] max-w-[calc(100vw-2rem)] overflow-y-auto">
+              <DropdownMenuSubContent className="max-h-80 w-[260px] max-w-[calc(100vw-2rem)] overflow-y-auto motion-reduce:!animate-none">
                 {lines.length === 0 && (
                   <DropdownMenuItem className={cn(ROW, "text-muted-foreground")} onSelect={() => openSettings("integrations")}>
                     <span className="min-w-0 flex-1 truncate">{texts.noConnectors}</span>

@@ -30,7 +30,7 @@ export function RowMenu({ label, menuLabel, trigger, children }: Readonly<{
         side="top"
         align="start"
         aria-label={menuLabel}
-        className="max-h-80 w-[260px] max-w-[calc(100vw-2rem)]"
+        className="max-h-80 w-[260px] max-w-[calc(100vw-2rem)] motion-reduce:!animate-none"
         onCloseAutoFocus={(event) => {
           // Le champ reprend le curseur : c'est là que la personne continue d'écrire.
           event.preventDefault()
