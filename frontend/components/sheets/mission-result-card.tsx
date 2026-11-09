@@ -6,27 +6,29 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Markdown } from "@/components/ui/lightweight-markdown"
-import { fillText, missionAgentName, resultCard, resultLine } from "@/lib/delivery/result-card"
+import { agentWords, fillText, missionAgentName, resultCard } from "@/lib/delivery/result-card"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { cn } from "@/lib/utils"
 
 /**
- * « Relire » (R78, séance n°13 ; J3, R50) : la carte de résultat d'une mission finie, sous le titre de l'issue. Le
- * résultat, les contrôles tirés du dossier (jamais du résumé de l'agent), ce qui changera si l'on applique, les mots de
- * l'agent pour ce qu'ils sont, puis trois gestes : « Discard », « Try again », « Apply ». Seule la personne qui a délégué
- * tranche : les gestes ne s'affichent que pour elle, le serveur le vérifie, et la carte dit pourquoi il refuse. Des tests
- * en échec éteignent « Apply » (R87, séance n°14) : on ne passe outre que par « Apply anyway », en écrivant pourquoi.
- * Une mission qui n'a rien changé n'a rien à appliquer : le geste principal devient « Mark as done », qui termine
- * l'issue (rejeu de la 1.8.0, TESTTA-2 : « Apply » restait éteint sans dire pourquoi).
+ * « Relire » (R78, séance n°13 ; J3, R50 ; R138, séance n°20) : la carte de résultat d'une mission finie. Elle se lit de
+ * haut en bas : ce qui est rendu, ce que l'agent dit avoir fait, les contrôles tirés du dossier (jamais du résumé de
+ * l'agent), ce qui changera si l'on applique, puis trois gestes : « Discard », « Try again », « Apply ». Seule la personne
+ * qui a délégué tranche : les gestes ne s'affichent que pour elle, le serveur le vérifie, et la carte dit pourquoi il refuse.
+ * Des tests en échec éteignent « Apply » (R87, séance n°14) : on ne passe outre que par « Apply anyway », en écrivant
+ * pourquoi. Une mission qui n'a rien changé n'a rien à appliquer : le geste principal devient « Mark as done », qui termine
+ * l'issue (rejeu de la 1.8.0, TESTTA-2 : « Apply » restait éteint sans dire pourquoi). `embedded` : dans la vue du travail,
+ * dont l'en-tête dit déjà le titre et l'état.
  */
-export function MissionResultCard({ slug, issueId, issueKey, issueTitle, responsible }: Readonly<{
+export function MissionResultCard({ slug, issueId, issueKey, issueTitle, responsible, embedded = false }: Readonly<{
   slug: string
   issueId: number
   issueKey: string | null
   issueTitle: string
   responsible: string | null
+  embedded?: boolean
 }>) {
   const t = usePreferencesStore((s) => s.t.missions)
   const run = useDeliveryStore((s) => s.runs[issueId])
@@ -74,23 +76,32 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
 
   return (
     <section className="flex flex-col border border-border text-xs" aria-label={`${r.theResult}: ${issueTitle}`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-3 py-2.5">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <span className="text-sm font-semibold text-foreground">{issueTitle}</span>
-          <span className="text-muted-foreground">{who}</span>
+      {!embedded && (
+        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-3 py-2.5">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-sm font-semibold text-foreground">{issueTitle}</span>
+            <span className="text-muted-foreground">{who}</span>
+          </div>
+          <span className="border border-shape-green/40 px-1.5 py-0.5 text-[11px] text-ink-green">{r.ready}</span>
         </div>
-        <span className="border border-shape-green/40 px-1.5 py-0.5 text-[11px] text-ink-green">{r.ready}</span>
-      </div>
+      )}
 
-      <Zone label={r.theResult}>
-        <p className="text-foreground">{resultLine(run, r)}</p>
+      {/* Ce qui est rendu, puis ce que l'agent en dit : le rapport se lit en premier (R138), rendu comme une description. */}
+      <div className="flex flex-col gap-1.5 border-b border-border px-3 py-2.5">
+        <p className="text-sm font-medium text-foreground">{card.delivered}</p>
         {card.pr && (
           <a href={card.pr.url} target="_blank" rel="noopener noreferrer"
             className="inline-flex w-fit items-center gap-1 border border-border px-2 py-1 text-foreground hover:bg-muted">
-            <ExternalLink className="size-3" /> {r.openPullRequest}
+            <ExternalLink className="size-3" aria-hidden="true" /> {r.openPullRequest}
           </a>
         )}
-      </Zone>
+      </div>
+
+      {run.summary && (
+        <Zone label={r.inItsWords}>
+          <Markdown content={agentWords(run.summary)} compact className="space-y-1.5 break-words leading-relaxed text-foreground" />
+        </Zone>
+      )}
 
       <Zone label={r.isItGood}>
         <ul className="flex flex-col gap-1">
@@ -115,15 +126,6 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
               </li>
             ))}
           </ul>
-        </Zone>
-      )}
-
-      {run.summary && (
-        <Zone label={r.inItsWords}>
-          {/* L'agent écrit en Markdown (titres, gras, listes) : rendu comme une description, sans balise brute ni HTML. */}
-          <div className="max-h-64 overflow-y-auto pr-1">
-            <Markdown content={run.summary} compact className="space-y-1.5 break-words leading-relaxed text-muted-foreground" />
-          </div>
         </Zone>
       )}
 
@@ -158,7 +160,7 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <Button variant="outline" size="sm" className="h-8 text-xs" disabled={busy !== null} onClick={() => void act("discard")}>
                 {busy === "discard" ? <Loader2 className="size-3 animate-spin" /> : r.discard}
               </Button>
@@ -211,7 +213,7 @@ type Gesture = "apply" | "discard" | "done" | "retry"
 function Zone({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
     <div className="flex flex-col gap-1.5 border-b border-border px-3 py-2.5">
-      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
       {children}
     </div>
   )

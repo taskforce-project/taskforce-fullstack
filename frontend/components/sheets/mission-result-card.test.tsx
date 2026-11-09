@@ -54,6 +54,24 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
     expect(screen.getByText("Fixed 3 links in the footer.")).toBeInTheDocument();
   });
 
+  it("reads top-down: what is delivered, what the agent says, is it good, what will change, the buttons", () => {
+    show();
+
+    const order = ["Pull request #212 on acme/website.", "Fixed 3 links in the footer.", "12 of 12 passed", "Merge pull request #212 on GitHub", "Apply"];
+    const at = order.map((text) => document.body.textContent?.indexOf(text) ?? -1);
+    expect(at.every((position) => position >= 0)).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+    expect(screen.getByText("What it says it did")).toBeInTheDocument();
+  });
+
+  it("embedded in the work view, it doesn't repeat the title of the mission", () => {
+    render(<MissionResultCard slug="acme" issueId={28} issueKey="TF-28" issueTitle="Fix the footer links" responsible="Pierre" embedded />);
+
+    expect(screen.queryByText("Fix the footer links")).toBeNull();
+    expect(screen.queryByText("Ready to review")).toBeNull();
+    expect(screen.getByText("Pull request #212 on acme/website.")).toBeInTheDocument();
+  });
+
   it("Apply goes through the store", async () => {
     applyRun.mockResolvedValue(true);
     show();
@@ -181,6 +199,19 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
       expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
     });
 
+    it("doesn't headline a mission that delivered comments with No code change was needed (s08)", () => {
+      const COMMENT = { seq: 1, kind: "tool" as const, tool: "taskforce: add_comment", text: "{}", at: null };
+      useDeliveryStore.setState({
+        runs: { 28: { ...NO_CHANGE, summary: "No code change was needed.\n\nDeliverable posted." } },
+        activity: { 100: { events: [COMMENT, { ...COMMENT, seq: 2 }, { ...COMMENT, seq: 3 }, { ...COMMENT, seq: 4 }], approvals: [] } },
+      });
+      show();
+
+      expect(screen.getByText("Delivered 4 comments on TF-28.")).toBeInTheDocument();
+      expect(screen.getByText("Deliverable posted.")).toBeInTheDocument();
+      expect(document.body.textContent).not.toContain("No code change was needed");
+    });
+
     it("Mark as done goes through the store, and says it is done", async () => {
       const markRunDone = vi.fn().mockResolvedValue(true);
       useDeliveryStore.setState({ runs: { 28: NO_CHANGE }, markRunDone });
@@ -190,7 +221,7 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
 
       await waitFor(() => expect(markRunDone).toHaveBeenCalledWith("acme", 28, 100));
       const { toast } = await import("sonner");
-      expect(toast.success).toHaveBeenCalledWith("Done: no change was needed");
+      expect(toast.success).toHaveBeenCalledWith("Marked as done");
     });
 
     it("an older runner that says nothing about the branch counts as no change", () => {
@@ -208,7 +239,7 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
     fireEvent.click(screen.getByRole("button", { name: "Markdown" }));
 
     await waitFor(() => expect(downloadEvidence).toHaveBeenCalledWith("acme", 100, "md"));
-    expect(screen.getByText("Rules v12 · 0 steps · 0 requests, 0 answered")).toBeInTheDocument();
+    expect(screen.getByText("Rules v12 · 0 actions · 0 requests, 0 answered")).toBeInTheDocument();
   });
 
   it.each([

@@ -1,6 +1,7 @@
 import type { DeliveryRun, DeliveryRunActivity } from "@/lib/api/delivery-service";
 import type { CONSTANTS_EN } from "@/lib/constants_en";
 import { parseServerDate } from "@/lib/utils/server-date";
+import { documentChanges, fileChanges } from "@/lib/window/work-view";
 
 // ---------------------------------------------------------------------------
 // La carte de résultat d'une mission (R78, séance n°13 ; J3, R50) : ce qui est rendu, les contrôles tirés du dossier
@@ -34,6 +35,8 @@ export interface ResultCardModel {
    * de la 1.8.0, TESTTA-2 : « Apply » restait éteint sans dire pourquoi).
    */
   noChange: boolean;
+  /** Ce que la mission a rendu, en une phrase : le titre de la carte. */
+  delivered: string;
   /** Minutes de travail, du moment où le runner a pris la mission à sa fin ; null sans fin connue. */
   minutes: number | null;
   checks: Check[];
@@ -91,6 +94,7 @@ export function resultCard(
   return {
     pr,
     noChange,
+    delivered: deliveredLine(run, activity, issueKey, t),
     minutes: workMinutes(run),
     checks,
     changes,
@@ -117,6 +121,43 @@ export function resultLine(run: DeliveryRun, t: ResultTexts): string {
   if (pr) return fill(t.pullRequest, { number: pr.number, repo: pr.repo });
   if (run.branch && run.commits) return fill(t.branchOnly, { commits: run.commits, branch: run.branch });
   return run.providerKey === TRIAL_AGENT ? t.answeredInComment : t.noChange;
+}
+
+const amount = (count: number, one: string, many: string): string | null =>
+  count === 0 ? null : count === 1 ? one : fill(many, { count });
+
+/**
+ * Ce que la mission a rendu : la pull request ou la branche quand il y en a, sinon ce qu'elle a écrit. « No code change
+ * was needed » ne titre pas une mission qui a livré quatre commentaires (recette 1.13, étape 8) : il reste pour celle
+ * qui n'a vraiment rien produit.
+ */
+export function deliveredLine(
+  run: DeliveryRun,
+  activity: DeliveryRunActivity | undefined,
+  issueKey: string | null,
+  t: ResultTexts,
+): string {
+  if (!changedNothing(run) || run.providerKey === TRIAL_AGENT) return resultLine(run, t);
+  const events = activity?.events ?? [];
+  const documents = documentChanges(events);
+  const made = (gesture: (typeof documents)[number]["gesture"]): number => documents.filter((d) => d.gesture === gesture).length;
+  const what = [
+    amount(made("comment"), t.oneComment, t.comments),
+    amount(made("issue"), t.oneIssue, t.issues),
+    amount(made("update"), t.oneUpdate, t.updates),
+    amount(made("checklist"), t.oneChecked, t.checked),
+  ].filter((part): part is string => part !== null);
+  if (what.length > 0) {
+    const list = what.length > 1 ? `${what.slice(0, -1).join(", ")}${t.and}${what[what.length - 1]}` : what[0];
+    return issueKey ? fill(t.deliveredOn, { what: list, key: issueKey }) : fill(t.delivered, { what: list });
+  }
+  const files = amount(fileChanges(events).length, t.oneFile, t.files);
+  return files ? fill(t.delivered, { what: files }) : t.noChange;
+}
+
+/** Le compte rendu de l'agent, sans la phrase que le runner met devant celui d'une mission sans commit : elle ne le titre pas. */
+export function agentWords(summary: string): string {
+  return summary.replace(/^No code change was needed\.\s*/, "");
 }
 
 /** Le nom de l'agent d'une mission : son modèle pour l'agent à l'essai, qui répond sous ce nom ; sinon {@code fallback}. */

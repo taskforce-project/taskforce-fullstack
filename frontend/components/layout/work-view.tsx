@@ -1,76 +1,164 @@
 "use client"
 
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import { ExternalLink, FileCheck2, FilePen, FilePlus2, Loader2, MessageSquareText, ShieldQuestion, Wrench } from "lucide-react"
+import { ChevronRight, ExternalLink, FileCheck2, Loader2, ShieldCheck, Square } from "lucide-react"
+import { toast } from "sonner"
 
+import { MissionFiles } from "@/components/delivery/mission-files"
+import { MissionDetailLine, MissionSteps } from "@/components/delivery/mission-steps"
 import { PaneLink } from "@/components/layout/pane-link"
 import { WorkDot } from "@/components/layout/work-dot"
 import { MissionResultCard } from "@/components/sheets/mission-result-card"
-import { EVENT_ICON, PendingApproval } from "@/components/sheets/run-activity"
+import { PendingApproval } from "@/components/sheets/pending-approval"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
+import { Markdown } from "@/components/ui/lightweight-markdown"
+import { Switch } from "@/components/ui/switch"
 import { useNow } from "@/hooks/use-now"
-import type { DeliveryRun, DeliveryRunEvent } from "@/lib/api/delivery-service"
-import { approvalOutcome } from "@/lib/delivery/approval-words"
-import { fillText, missionAgentName, pullRequestOf, workMinutes } from "@/lib/delivery/result-card"
+import type { DeliveryRun, DeliveryRunApproval, DeliveryRunEvent } from "@/lib/api/delivery-service"
+import { approvalLine, approvalsSentence, missionModel, missionSequence } from "@/lib/delivery/mission-sequence"
+import { agentWords, fillText, missionAgentName, pullRequestOf, workMinutes } from "@/lib/delivery/result-card"
 import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { useUserStore } from "@/lib/store/user-store"
 import { cn } from "@/lib/utils"
-import { parseServerDate } from "@/lib/utils/server-date"
-import { elapsedMinutes, isActiveRun, runState } from "@/lib/window/missions"
+import { elapsedMinutes, isActiveRun, isMine, runState } from "@/lib/window/missions"
 import { issuePath } from "@/lib/window/pane"
-import { diffAnchor, documentChanges, evidenceKind, fileChanges, proofOf } from "@/lib/window/work-view"
+import { proofOf } from "@/lib/window/work-view"
 
 /** Le rythme des relectures pendant que la mission tourne : son état et sa chronologie, puis son dossier. */
 const RUN_MS = 2_000
 const PROOF_MS = 5_000
 
 const NO_EVENTS: readonly DeliveryRunEvent[] = []
+const NO_APPROVALS: readonly DeliveryRunApproval[] = []
 
-function Section({ title, count, children }: Readonly<{ title: string; count?: number; children: ReactNode }>) {
+/** Copilot travaille sur GitHub : TaskForce ne sait pas l'y arrêter, le bouton n'existe pas pour lui (R15). */
+const CANNOT_STOP = "github-copilot"
+
+/** « Stop » : une question, parce qu'une mission arrêtée ne reprend pas ; la dialogue a une colonne et une action (R133). */
+function StopMission({ slug, run, agent }: Readonly<{ slug: string; run: DeliveryRun; agent: string }>) {
+  const t = usePreferencesStore((s) => s.t.missionSequence.stop)
+  const stopRun = useDeliveryStore((s) => s.stopRun)
+  const [asking, setAsking] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  async function stop() {
+    setBusy(true)
+    const ok = await stopRun(slug, run.issueId, run.id)
+    setBusy(false)
+    setAsking(false)
+    if (ok) toast.success(t.done)
+    else toast.error(t.failed)
+  }
+
   return (
-    <section aria-label={title} className="flex flex-col gap-2">
-      <h3 className="flex items-baseline gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {title}
-        {count !== undefined && count > 0 && <span className="tabular-nums normal-case">{count}</span>}
-      </h3>
-      {children}
-    </section>
+    <>
+      <Button variant="outline" size="sm" className="h-7 shrink-0 gap-1.5 px-2.5 text-xs" title={t.hint} onClick={() => setAsking(true)}>
+        <Square className="size-3" aria-hidden="true" /> {t.action}
+      </Button>
+      <AlertDialog open={asking} onOpenChange={setAsking}>
+        <AlertDialogContent className="max-w-[420px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t.title}</AlertDialogTitle>
+            <AlertDialogDescription>{fillText(t.body, { agent })}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{t.keep}</AlertDialogCancel>
+            <AlertDialogAction disabled={busy} onClick={(event) => { event.preventDefault(); void stop() }}>
+              {busy ? <Loader2 className="size-3.5 animate-spin" /> : t.confirm}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 
-/** Les ancres des fichiers dans la pull request, calculées une fois par chemin. */
-function useDiffAnchors(paths: readonly string[]): Readonly<Record<string, string>> {
-  const [anchors, setAnchors] = useState<Readonly<Record<string, string>>>({})
-  const wanted = paths.join("\n")
-  useEffect(() => {
-    let live = true
-    const list = wanted ? wanted.split("\n") : []
-    void Promise.all(list.map(async (path) => [path, await diffAnchor(path)] as const)).then((pairs) => {
-      if (!live) return
-      setAnchors(Object.fromEntries(pairs.filter((pair): pair is readonly [string, string] => pair[1] !== null)))
-    })
-    return () => { live = false }
-  }, [wanted])
-  return anchors
+/** Les accords : une phrase, le détail d'un clic, la commande derrière l'interrupteur (R133). */
+function ApprovalsRow({ run, approvals, you, showCommands }: Readonly<{
+  run: DeliveryRun
+  approvals: readonly DeliveryRunApproval[]
+  you: boolean
+  showCommands: boolean
+}>) {
+  const name = usePreferencesStore((s) => s.t.workView.approvals)
+  const sequence = usePreferencesStore((s) => s.t.missionSequence)
+  const [open, setOpen] = useState(false)
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={`${name}: ${approvalsSentence(approvals, sequence, you)}`}
+        onClick={() => setOpen((was) => !was)}
+        className="flex h-9 w-full items-center gap-2.5 px-2 text-left text-xs transition-colors duration-150 hover:bg-muted/60 motion-reduce:transition-none"
+      >
+        <span role="img" aria-label={name} title={name} className="inline-flex shrink-0">
+          <ShieldCheck className="size-4 text-muted-foreground" aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-foreground">{approvalsSentence(approvals, sequence, you)}</span>
+        <ChevronRight
+          aria-hidden="true"
+          className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none", open && "rotate-90")}
+        />
+      </button>
+      {open && (
+        <ol className="flex flex-col pb-2.5 pl-[34px] pr-2">
+          {approvals.map((approval) => (
+            <MissionDetailLine key={approval.id} line={approvalLine(approval, run, sequence, you)} showCommands={showCommands} />
+          ))}
+        </ol>
+      )}
+    </div>
+  )
 }
 
-const timeOf = (at: string | null): string =>
-  at ? parseServerDate(at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : ""
+/** La preuve, repliée en une ligne (R138) : le nombre d'événements, scellés, et le téléchargement du dossier. */
+function ProofRow({ slug, runId, count, sealed }: Readonly<{ slug: string; runId: number; count: number; sealed: boolean }>) {
+  const t = usePreferencesStore((s) => s.t.missionSequence.proof)
+  const downloadEvidence = useDeliveryStore((s) => s.downloadEvidence)
+  const said = count === 0 ? t.none
+    : sealed ? (count === 1 ? t.sealedOne : fillText(t.sealed, { count }))
+    : (count === 1 ? t.buildingOne : fillText(t.building, { count }))
+
+  async function download(format: "json" | "md") {
+    if (!(await downloadEvidence(slug, runId, format))) toast.error(t.failed)
+  }
+
+  return (
+    <p className="flex min-h-9 flex-wrap items-center gap-x-2.5 gap-y-1 px-2 py-1 text-xs text-muted-foreground" title={t.hint}>
+      <FileCheck2 className="size-4 shrink-0" aria-hidden="true" />
+      <span className="tabular-nums text-foreground">{said}</span>
+      {count > 0 && (
+        <span className="ml-auto flex items-center gap-1.5">
+          {t.download}
+          <button type="button" className="text-foreground underline-offset-2 hover:underline" onClick={() => void download("json")}>JSON</button>
+          <span aria-hidden="true">·</span>
+          <button type="button" className="text-foreground underline-offset-2 hover:underline" onClick={() => void download("md")}>Markdown</button>
+        </span>
+      )}
+    </p>
+  )
+}
 
 /**
- * La vue du travail d'une mission (R95, point 3 ; R120, séance n°18) : un volet pour une mission, en direct. Ce que
- * l'agent fait, étape par étape, et chaque outil qu'il appelle ; les fichiers et les documents qu'il produit, avec leur
- * diff dans sa pull request ; les accords qu'il demande, à décider ici ; la preuve qui se construit, le dossier de la
- * mission, chaîné. Puis la carte de résultat, quand il attend la personne. Rien n'y juge ni ne classe l'agent (R57) :
- * on y lit ce qu'il a fait. Elle se lit dans ce que TaskForce a déjà : la mission, sa chronologie, son dossier.
+ * La vue du travail d'une mission (R95, point 3 ; R138, séance n°20) : un volet pour une mission, en direct. Un en-tête dit
+ * où elle en est en une phrase ; cinq étapes, toujours les mêmes, racontent ce que l'agent fait ; les accords et la preuve
+ * se replient en une ligne chacun, et les commandes reviennent d'un interrupteur. Puis le résultat, quand l'agent le rend.
+ * Rien n'y juge ni ne classe l'agent (R57). Elle se lit dans ce que TaskForce a déjà : la mission, sa chronologie, son dossier.
  */
 export function WorkView({ runId }: Readonly<{ runId: number }>) {
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const t = usePreferencesStore((s) => s.t.workView)
   const missions = usePreferencesStore((s) => s.t.missions)
-  const states = usePreferencesStore((s) => s.t.window.states)
+  const sequenceTexts = usePreferencesStore((s) => s.t.missionSequence)
   const listed = useDeliveryStore((s) => s.workspaceRuns.find((r) => r.id === runId))
   const latest = useDeliveryStore((s) => (listed ? s.runs[listed.issueId] : undefined))
   const activity = useDeliveryStore((s) => s.activity[runId])
@@ -79,10 +167,11 @@ export function WorkView({ runId }: Readonly<{ runId: number }>) {
   const fetchRun = useDeliveryStore((s) => s.fetchRun)
   const fetchActivity = useDeliveryStore((s) => s.fetchActivity)
   const fetchEvidence = useDeliveryStore((s) => s.fetchEvidence)
-  const downloadEvidence = useDeliveryStore((s) => s.downloadEvidence)
+  const viewerId = useUserStore((s) => s.user?.id)
   const { openIssue } = usePaneNavigation()
   const now = useNow(30_000)
   const [checked, setChecked] = useState(false)
+  const [showCommands, setShowCommands] = useState(false)
 
   // La mission la plus fraîche : celle de son issue quand c'est elle, sinon celle de la liste de l'espace.
   const run: DeliveryRun | undefined = latest?.id === runId ? latest : listed
@@ -126,12 +215,6 @@ export function WorkView({ runId }: Readonly<{ runId: number }>) {
     return () => clearInterval(id)
   }, [slug, runId, active, known, fetchEvidence])
 
-  const events = activity?.events ?? NO_EVENTS
-  const files = useMemo(() => fileChanges(events), [events])
-  const documents = useMemo(() => documentChanges(events), [events])
-  const anchors = useDiffAnchors(files.map((file) => file.path))
-  const proof = proofOf(evidence)
-
   if (!run) {
     return (
       <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -140,192 +223,101 @@ export function WorkView({ runId }: Readonly<{ runId: number }>) {
     )
   }
 
-  const state = runState(run)
+  const events = activity?.events ?? NO_EVENTS
+  const approvals = activity?.approvals ?? NO_APPROVALS
+  const proof = proofOf(evidence)
+  const you = isMine(run, viewerId)
+  const sequence = missionSequence(run, activity, sequenceTexts, you)
   const pull = pullRequestOf(run.resultUrl)
   const minutes = workMinutes(run) ?? elapsedMinutes(run.claimedAt ?? run.createdAt, now)
   const agent = missionAgentName(run, missions.agent)
-  const pending = running ? (activity?.approvals ?? []).filter((a) => a.status === "PENDING") : []
-  const answered = (activity?.approvals ?? []).filter((a) => a.status !== "PENDING")
+  const model = run.providerKey === "taskforce-agent" ? null : missionModel(run, events)
+  const pending = running ? approvals.filter((a) => a.status === "PENDING") : []
+  const answered = approvals.filter((a) => a.status !== "PENDING")
   const key = run.issueKey ?? `#${run.issueId}`
   const goal = run.issueTitle ? `${run.issueTitle} (${key})` : key
+  const worker = model ? `${agent} · ${model}` : agent
   const facts = [
-    run.startedByName ? fillText(t.agentFor, { agent, who: run.startedByName }) : agent,
+    run.startedByName ? fillText(t.agentFor, { agent: worker, who: run.startedByName }) : worker,
     minutes === null ? null : minutes < 1 ? t.underAMinute : fillText(t.elapsed, { minutes }),
-    run.branch ? fillText(t.branch, { branch: run.branch }) : null,
-    run.commits ? (run.commits === 1 ? t.oneCommit : fillText(t.commits, { count: run.commits })) : null,
+    // Des mots du métier : ils restent à l'interrupteur, comme les commandes.
+    showCommands && run.branch ? fillText(t.branch, { branch: run.branch }) : null,
+    showCommands && run.commits ? (run.commits === 1 ? t.oneCommit : fillText(t.commits, { count: run.commits })) : null,
   ].filter(Boolean).join(" · ")
   const projectId = run.projectId
   // La carte de résultat lit la dernière mission de l'issue : elle ne se montre que sur celle-ci.
-  const judged = latest?.id === runId
+  const judged = latest?.id === runId && run.status === "DONE" && !run.outcome
+  const words = run.status === "DONE" && run.summary ? agentWords(run.summary) : ""
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <header className="flex flex-col gap-1">
-        <p className="flex items-center gap-2 text-sm">
-          <WorkDot state={state} />
-          <span className="text-muted-foreground">{states[state]}</span>
-        </p>
-        <h3 className="text-lg font-semibold leading-snug text-foreground">
-          {projectId === null ? key : (
-            <PaneLink
-              href={issuePath(slug, projectId, run.issueId)}
-              open={() => openIssue({ projectId, issueId: run.issueId })}
-              title={fillText(t.openIssue, { key })}
-              className="underline-offset-4 hover:underline"
-            >
-              {key}
-            </PaneLink>
-          )}
-          {run.issueTitle && <span> {run.issueTitle}</span>}
-        </h3>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="min-w-0 text-base font-semibold leading-snug text-foreground">
+            {projectId === null ? key : (
+              <PaneLink
+                href={issuePath(slug, projectId, run.issueId)}
+                open={() => openIssue({ projectId, issueId: run.issueId })}
+                title={fillText(t.openIssue, { key })}
+                className="underline-offset-4 hover:underline"
+              >
+                {key}
+              </PaneLink>
+            )}
+            {run.issueTitle && <span> {run.issueTitle}</span>}
+          </h3>
+          {active && you && run.providerKey !== CANNOT_STOP && <StopMission slug={slug} run={run} agent={agent} />}
+        </div>
         <p className="text-xs text-muted-foreground">{facts}</p>
+        <p className="mt-1 flex items-center gap-2 text-sm text-foreground">
+          <WorkDot state={runState(run)} />
+          <span className="min-w-0 break-words">{sequence.status}</span>
+        </p>
         {pull && (
           <a href={pull.url} target="_blank" rel="noopener noreferrer"
             className="mt-1 inline-flex w-fit items-center gap-1 border border-border px-2 py-1 text-xs text-foreground hover:bg-muted">
-            <ExternalLink className="size-3" /> {fillText(t.pullRequest, { repo: pull.repo, number: pull.number })}
+            <ExternalLink className="size-3" aria-hidden="true" /> {fillText(t.pullRequest, { repo: pull.repo, number: pull.number })}
           </a>
         )}
       </header>
 
-      {pending.length > 0 && (
-        <Section title={t.waiting} count={pending.length}>
-          {pending.map((approval) => <PendingApproval key={approval.id} slug={slug} runId={runId} approval={approval} goal={goal} />)}
-        </Section>
+      <section aria-label={t.steps} className="flex flex-col gap-1.5">
+        <label className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+          {sequenceTexts.showCommands}
+          <Switch checked={showCommands} onCheckedChange={setShowCommands} aria-label={sequenceTexts.showCommands} />
+        </label>
+        <MissionSteps
+          steps={sequence.steps}
+          showCommands={showCommands}
+          waitingLabel={you ? undefined : sequenceTexts.states.waitingOther}
+          waiting={pending.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {pending.map((approval) => (
+                <PendingApproval key={approval.id} slug={slug} runId={runId} approval={approval} goal={goal} run={run} showCommand={showCommands} />
+              ))}
+            </div>
+          ) : undefined}
+        />
+      </section>
+
+      {/* La place de <MissionChanges run={run} /> (TF-J1-17) : les fichiers de la mission, leurs lignes et leur diff. */}
+      <MissionFiles run={run} events={events} />
+
+      {judged ? (
+        <section aria-label={t.result}>
+          <MissionResultCard slug={slug} issueId={run.issueId} issueKey={run.issueKey} issueTitle={run.issueTitle ?? key} responsible={null} embedded />
+        </section>
+      ) : words && (
+        <section aria-label={t.result} className="flex flex-col gap-1.5">
+          <h3 className="text-xs font-medium text-muted-foreground">{missions.result.inItsWords}</h3>
+          <Markdown content={words} compact className="space-y-1.5 break-words text-xs leading-relaxed text-foreground" />
+        </section>
       )}
 
-      <Section title={t.steps} count={events.length}>
-        {events.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t.noSteps}</p>
-        ) : (
-          <ol className="flex flex-col gap-1.5 border-l border-border pl-3" aria-label={t.steps}>
-            {events.map((event) => {
-              const Icon = EVENT_ICON[event.kind] ?? Wrench
-              const failed = event.kind === "error" || event.kind === "denied" || event.kind === "limit"
-              return (
-                <li key={event.seq} className="flex items-start gap-2 text-xs leading-relaxed">
-                  <Icon className={cn("mt-0.5 size-3.5 shrink-0", failed ? "text-destructive" : "text-muted-foreground")} />
-                  <span className="min-w-0 flex-1 break-words">
-                    {event.tool && <span className="font-medium text-foreground">{event.tool} </span>}
-                    <span className={cn(event.kind === "tool" ? "font-mono text-[11px] text-muted-foreground" : "text-foreground")}>
-                      {event.text}
-                    </span>
-                  </span>
-                  {event.at && <span className="shrink-0 tabular-nums text-[10px] text-muted-foreground">{timeOf(event.at)}</span>}
-                </li>
-              )
-            })}
-            {running && (
-              <li className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" />
-              </li>
-            )}
-          </ol>
-        )}
-      </Section>
-
-      <Section title={t.files} count={files.length + documents.length}>
-        {files.length === 0 && documents.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t.noFiles}</p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-border border-y border-border">
-            {files.map((file) => {
-              const anchor = anchors[file.path]
-              const diff = pull ? `${pull.url}/files${anchor ? `#${anchor}` : ""}` : null
-              return (
-                <li key={file.path} className="flex items-center gap-2 py-1.5 text-xs">
-                  {file.kind === "written"
-                    ? <FilePlus2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                    : <FilePen className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />}
-                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground" title={file.path}>{file.path}</span>
-                  <span className="shrink-0 text-muted-foreground">
-                    {file.kind === "written" ? t.written : t.edited}
-                    {file.times > 1 && ` · ${fillText(t.times, { count: file.times })}`}
-                  </span>
-                  {diff && (
-                    <a href={diff} target="_blank" rel="noopener noreferrer" title={t.diffHint}
-                      className="flex shrink-0 items-center gap-1 text-foreground underline-offset-2 hover:underline">
-                      {t.diff} <ExternalLink className="size-3" />
-                    </a>
-                  )}
-                </li>
-              )
-            })}
-            {documents.map((document) => (
-              <li key={`doc-${document.seq}`} className="flex items-start gap-2 py-1.5 text-xs">
-                <MessageSquareText className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <span className="min-w-0 flex-1 break-words">
-                  <span className="text-muted-foreground">{t.documents[document.gesture]}</span>
-                  {document.issue && <span className="font-medium text-foreground"> {document.issue}</span>}
-                  {document.text && <span className="text-foreground">: {document.text}</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {files.length > 0 && !pull && <p className="text-[11px] text-muted-foreground">{t.diffLater}</p>}
-      </Section>
-
-      <Section title={t.approvals} count={answered.length}>
-        {answered.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t.noApprovals}</p>
-        ) : (
-          <ul className="flex flex-col gap-1.5">
-            {answered.map((approval) => (
-              <li key={approval.id} className="flex items-start gap-2 text-xs">
-                <ShieldQuestion className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <span className="min-w-0 break-words">
-                  <span className="font-medium text-foreground">{approval.tool} </span>
-                  <span className="font-mono text-[11px] text-muted-foreground">{approval.summary}</span>
-                  <span className="text-muted-foreground">: {approvalOutcome(approval, missions)}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-
-      <Section title={t.proof} count={proof.count}>
-        {proof.count === 0 ? (
-          <p className="text-xs text-muted-foreground">{t.proofNone}</p>
-        ) : (
-          <>
-            <p className="text-xs text-foreground">
-              {proof.count === 1 ? t.proofOne : fillText(t.proofCount, { count: proof.count })}{" "}
-              <span className="text-muted-foreground">
-                {proof.sealed && proof.root ? fillText(t.proofSealed, { root: proof.root.slice(0, 12) }) : t.proofBuilding}
-              </span>
-            </p>
-            <ol className="flex flex-col gap-1" aria-label={t.proof}>
-              {proof.latest.map((event) => {
-                const kind = evidenceKind(event.type)
-                const actor = (t.actors as Readonly<Record<string, string>>)[event.actor.kind] ?? event.actor.kind
-                return (
-                  <li key={event.seq} className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-baseline gap-2 text-xs">
-                    <span className="tabular-nums text-muted-foreground">#{event.seq}</span>
-                    <span className="min-w-0 truncate text-foreground">
-                      {kind ? t.kinds[kind] : event.type} <span className="text-muted-foreground">· {actor}</span>
-                    </span>
-                    <span className="font-mono text-[10px] text-muted-foreground" title={event.hash}>{event.hash.slice(0, 8)}</span>
-                  </li>
-                )
-              })}
-            </ol>
-            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <FileCheck2 className="size-3 shrink-0" />
-              {t.download}
-              <button type="button" className="hover:text-foreground hover:underline" onClick={() => void downloadEvidence(slug, runId, "json")}>JSON</button>
-              <span aria-hidden="true">·</span>
-              <button type="button" className="hover:text-foreground hover:underline" onClick={() => void downloadEvidence(slug, runId, "md")}>Markdown</button>
-            </p>
-          </>
-        )}
-      </Section>
-
-      {judged && run.status === "DONE" && !run.outcome && (
-        <Section title={t.result}>
-          <MissionResultCard slug={slug} issueId={run.issueId} issueKey={run.issueKey} issueTitle={run.issueTitle ?? key} responsible={null} />
-        </Section>
-      )}
+      <div className="flex flex-col divide-y divide-border border-y border-border">
+        {answered.length > 0 && <ApprovalsRow run={run} approvals={answered} you={you} showCommands={showCommands} />}
+        <ProofRow slug={slug} runId={runId} count={proof.count} sealed={proof.sealed} />
+      </div>
     </div>
   )
 }

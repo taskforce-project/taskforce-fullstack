@@ -1,4 +1,4 @@
-import type { DeliveryRunEvent, MissionEvidence, MissionEvidenceEvent } from "@/lib/api/delivery-service"
+import type { DeliveryRunEvent, MissionEvidence } from "@/lib/api/delivery-service"
 
 /**
  * La vue du travail d'une mission (R95, point 3 ; séance n°18), lue dans ce que le runner a déjà envoyé : la chronologie
@@ -85,32 +85,14 @@ export async function diffAnchor(path: string): Promise<string | null> {
   return `diff-${[...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`
 }
 
-/** La preuve telle qu'elle se construit : combien d'événements le dossier garde, les derniers, et s'il est scellé. */
+/** La preuve telle qu'elle se construit : combien d'événements le dossier garde, et s'il est scellé. */
 export interface Proof {
   readonly count: number
-  readonly latest: readonly MissionEvidenceEvent[]
   /** La mission est finie : l'empreinte du dernier événement scelle le dossier. */
   readonly sealed: boolean
-  readonly root: string | null
 }
 
-export function proofOf(evidence: MissionEvidence | null | undefined, shown = 8): Proof {
+export function proofOf(evidence: MissionEvidence | null | undefined): Proof {
   const events = evidence?.events ?? []
-  return {
-    count: events.length,
-    latest: events.slice(-shown).reverse(),
-    sealed: events.some((event) => event.type === "mission.ended"),
-    root: events.length > 0 ? (evidence?.root ?? null) : null,
-  }
-}
-
-/** Les sortes d'événements du dossier, telles que la vue les nomme ; une sorte inconnue se dit par son nom. */
-export const EVIDENCE_KINDS = [
-  "mission.started", "note", "action.requested", "action.decided", "action.result", "human.decision", "exit.result",
-  "test.result", "limit.reached", "mission.ended",
-] as const
-export type EvidenceKind = (typeof EVIDENCE_KINDS)[number]
-
-export function evidenceKind(type: string): EvidenceKind | null {
-  return (EVIDENCE_KINDS as readonly string[]).includes(type) ? (type as EvidenceKind) : null
+  return { count: events.length, sealed: events.some((event) => event.type === "mission.ended") }
 }
