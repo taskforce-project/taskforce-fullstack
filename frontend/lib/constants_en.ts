@@ -1069,6 +1069,7 @@ export const CONSTANTS_EN = {
       discarded: "Discarded",
       markedDone: "Marked as done",
       retried: "Replaced by a new try",
+      followedUp: "Changes asked: the agent went back to it",
       stoppedByYou: "Stopped by you",
       stoppedBy: "Stopped by {who}",
       notStarted: "Not started: {reason}",
