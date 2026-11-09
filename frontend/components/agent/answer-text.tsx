@@ -10,10 +10,11 @@ import { usePreferencesStore } from "@/lib/store/preferences-store"
 
 /**
  * Le texte d'une réponse de Cortex : son markdown, et ce que TaskForce y dit à la place d'une phrase où Cortex disait
- * avoir fait ce qu'aucune action du tour n'a fait (R116), à propos du modèle qui répond (R118), ou les questions qu'il
- * pose avant un geste (R115), sous son nom et dans son style, jamais mêlé aux mots du modèle. Quand la carte de ces
- * questions est là (`withCard`), c'est elle qui les montre : le bloc ne les répète pas. Les issues et les projets que
- * Cortex nomme sont des liens vers leur volet (R120) ; les gestes de la réponse (`toolCalls`) disent quelles issues.
+ * avoir fait ce qu'aucune action du tour n'a fait (R116), ou à propos du modèle qui répond (R118), sous son nom et dans
+ * son style, jamais mêlé aux mots du modèle. Tout le reste est dit par Cortex (R136), les questions d'un geste comprises :
+ * quand leur carte est là (`withCard`), c'est elle qui les montre ; sans elle (une conversation rouverte), elles se lisent
+ * comme ses mots. Les issues et les projets que Cortex nomme sont des liens vers leur volet (R120) ; les gestes de la
+ * réponse (`toolCalls`) disent quelles issues.
  */
 export function AnswerText({ text, withCard = false, toolCalls }: Readonly<{
   text: string
@@ -25,7 +26,7 @@ export function AnswerText({ text, withCard = false, toolCalls }: Readonly<{
     <>
       {splitAnswer(text).map((part, i) => {
         if (part.by === "cortex") return <Markdown key={i} content={part.text} renderText={links} />
-        if (part.kind === "asks" && withCard) return null
+        if (part.kind === "asks") return withCard ? null : <Markdown key={i} content={part.lines.join("\n\n")} renderText={links} />
         return <TaskForceSays key={i} lines={part.lines} kind={part.kind} />
       })}
     </>
@@ -45,9 +46,7 @@ export function TaskForceSays({ lines, kind, children }: Readonly<{
   const m = usePreferencesStore((s) => s.t.models)
   const says = kind === "models"
     ? { label: m.saysLabel, hint: m.saysHint, what: m.saysWhat }
-    : kind === "asks"
-      ? { label: t.taskforceAsksLabel, hint: t.taskforceAsksHint, what: t.taskforceAsksWhat }
-      : { label: t.taskforceSaysLabel, hint: t.taskforceSaysHint, what: t.taskforceSaysWhat }
+    : { label: t.taskforceSaysLabel, hint: t.taskforceSaysHint, what: t.taskforceSaysWhat }
   return (
     <div
       role="note"

@@ -84,11 +84,10 @@ describe("CommandBar : repliée dans le compositeur, la conversation s'ouvre au-
     await waitFor(() => expect(conversation).toHaveTextContent("Two issues are blocked."));
     expect(sendAgentMessage).toHaveBeenCalledWith("acme", "Which issues are blocked?", null);
     expect(input).toHaveAttribute("placeholder", "Reply to Cortex…");
-    // Dépliée, la conversation est le contexte : plus de suggestions sous la barre, et les sources restent repliées.
+    // Dépliée, la conversation est le contexte : plus de suggestions sous la barre, et plus de mot « Sources » (R137).
     expect(screen.queryByRole("button", { name: "Create an issue" })).toBeNull();
+    expect(screen.queryByText(/Sources/)).toBeNull();
     expect(screen.queryByText("Runbook")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Sources \(1\)/ }));
-    expect(screen.getByText("Runbook")).toBeTruthy();
   });
 
   it("minimizes with Escape and opens the same conversation again", async () => {
