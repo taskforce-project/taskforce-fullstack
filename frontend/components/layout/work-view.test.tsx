@@ -234,7 +234,7 @@ describe("WorkView", () => {
     useDeliveryStore.setState({ workspaceRuns: [trial], runs: { 28: trial }, activity: { 100: { events: [], approvals: [] } } })
     render(<WorkView runId={100} />)
 
-    expect(screen.getByText("qwen3:8b, for Pierre · 4 min")).toBeInTheDocument()
+    expect(screen.getByText("Cortex · qwen3:8b, for Pierre · 4 min")).toBeInTheDocument()
   })
 
   it("the time reads under a minute, and without a name who it's for", () => {

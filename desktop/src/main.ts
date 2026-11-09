@@ -15,8 +15,8 @@ import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
 import { toolsStatus } from "./tools";
 import { readMove, readWorkspaceMove, Transfer, type LocalApi } from "./transfer";
-import { check, installNow, restartApp, startUpdater, updateState } from "./updater";
-import { registerVoice, voiceAvailable } from "./voice";
+import { announceInstalled, check, installNow, releaseUpdateScreenOnFirstWindow, restartApp, startUpdater, updateState } from "./updater";
+import { prepareVoiceInBackground, registerVoice, voiceAvailable } from "./voice";
 import {
   integratedTitleBar,
   MAIN_TITLE_BAR_HEIGHT,
@@ -66,6 +66,7 @@ async function main(): Promise<void> {
   Menu.setApplicationMenu(buildMenu());
   registerIpc();
   registerVoice(() => mainWindow);
+  releaseUpdateScreenOnFirstWindow();
   // Micro pour la seule origine de la fenêtre ; ce que l'interface n'utilise pas est refusé (cf. permissions.ts).
   applyPermissions(session.defaultSession, () => stack?.origin ?? null, voiceAvailable());
 
@@ -97,6 +98,7 @@ async function main(): Promise<void> {
     return;
   }
   startUpdater();
+  prepareVoiceInBackground();
 }
 
 /**
@@ -207,13 +209,14 @@ function splashWindow(hash?: string): BrowserWindow {
 
 /**
  * Avant d'installer une mise à jour (« Restart now », cf. `installNow` dans updater.ts) : l'écran d'attente de l'app, à
- * ses couleurs, remplace la fenêtre pendant que la pile s'arrête proprement. L'installeur, lui, ne montre plus rien.
+ * ses couleurs, remplace la fenêtre pendant que la pile s'arrête proprement. Il reste jusqu'à ce que la fenêtre de
+ * l'installeur, dessinée à l'identique (installer.nsh, mêmes phrases), prenne le relais.
  */
 async function prepareUpdate(version: string): Promise<void> {
   quitting = true;
   const splash = splashWindow(new URLSearchParams({
     step: `Installing TaskForce ${version}`,
-    note: "TaskForce closes, installs it, then opens again.",
+    note: "It takes a minute or two. TaskForce opens again by itself.",
   }).toString());
   // La fenêtre se ferme une fois l'écran affiché : l'app n'a jamais zéro fenêtre, ce qui la ferait quitter.
   await new Promise<void>((resolve) => {
@@ -281,15 +284,10 @@ async function openApp(account: Account, previous: BrowserWindow | null): Promis
       mainWindow.show();
     }
     if (!splash.isDestroyed()) splash.close();
-    // Premier lancement d'une nouvelle version : la personne voit que la mise à jour est faite.
-    if (stack?.updateNotice && Notification.isSupported()) {
-      const updated = new Notification(stack.updateNotice);
-      notices.add(updated);
-      updated.on("close", () => notices.delete(updated));
-      updated.show();
-    }
   });
   mainWindow.on("closed", () => (mainWindow = null));
+  // Premier lancement d'une nouvelle version : la fenêtre le dit à son ouverture, plus de notification du système.
+  if (stack.updateNotice) announceInstalled(stack.updateNotice);
   await mainWindow.loadURL(stack.origin);
 }
 
