@@ -15,6 +15,7 @@ import {
   discardRun,
   markRunDone,
   retryRun,
+  stopRun,
 } from './delivery-service';
 import { apiClient } from './client';
 import { DELIVERY_ROUTES } from '../config/api-routes';
@@ -33,6 +34,12 @@ const SLUG = 'acme';
 const envelope = <T>(payload: T) => ({ data: { success: true, message: 'ok', data: payload } });
 
 describe('delivery-service', () => {
+  it('stopRun : poste sur la route de la mission, sans toast global (R138)', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({});
+    await stopRun('acme', 100);
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.STOP('acme', 100), {}, { silentError: true });
+  });
+
   beforeEach(() => vi.clearAllMocks());
 
   it('GET la liste des providers et retourne le payload', async () => {

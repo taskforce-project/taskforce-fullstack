@@ -64,6 +64,8 @@ class MissionResultServiceTest {
     @Mock private MergedPullRequests mergedPullRequests;
     @Mock private IssueService issueService;
     @Mock private DeliveryService deliveryService;
+    @Mock private DeliveryRunner deliveryRunner;
+    @Mock private MissionEvidenceService evidenceService;
 
     private MissionResultService service;
     private User delegator;
@@ -73,7 +75,7 @@ class MissionResultServiceTest {
     @BeforeEach
     void setUp() {
         service = new MissionResultService(runRepository, userRepository, linkRepository, visibilityGuard, pullRequests,
-            mergedPullRequests, issueService, deliveryService);
+            mergedPullRequests, issueService, deliveryService, deliveryRunner, evidenceService);
         delegator = User.builder().id(7L).email("ada@taskforce.dev").build();
         Workspace workspace = Workspace.builder().id(1L).slug("acme").build();
         Project project = Project.builder().id(12L).workspace(workspace).build();
@@ -111,6 +113,79 @@ class MissionResultServiceTest {
         verify(pullRequests, never()).merge(anyLong(), any(), anyInt());
         assertThat(run.getOutcome()).isNull();
         verify(issueService, never()).logActivity(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Stop : la mission en cours se clôt au nom de la personne, et le dossier le garde (R138)")
+    void stop_closes_a_running_mission() {
+        run.setStatus(DeliveryRunStatus.RUNNING);
+        run.setResultUrl(null);
+        delegator.setDisplayName("Ada");
+
+        service.stop("acme", 100L, 7L);
+
+        assertThat(run.getOutcome()).isEqualTo(DeliveryRunOutcome.STOPPED);
+        assertThat(run.getOutcomeBy()).isEqualTo(delegator);
+        assertThat(run.getOutcomeAt()).isNotNull();
+        assertThat(run.getEndedAt()).isNotNull();
+        verify(evidenceService).append(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), any());
+        verify(deliveryRunner).complete(100L, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "Stopped by Ada."));
+    }
+
+    @Test
+    @DisplayName("Stop : une mission encore en file se clôt sans dossier, et sans nom elle dit l'e-mail")
+    void stop_closes_a_queued_mission() {
+        run.setStatus(DeliveryRunStatus.QUEUED);
+        delegator.setDisplayName(" ");
+
+        service.stop("acme", 100L, 7L);
+
+        verify(evidenceService, never()).append(any(), any(), any(), any());
+        verify(deliveryRunner).complete(100L, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "Stopped by ada@taskforce.dev."));
+    }
+
+    @Test
+    @DisplayName("Stop : seule la personne qui a délégué arrête la mission")
+    void stop_is_for_the_delegator() {
+        run.setStatus(DeliveryRunStatus.RUNNING);
+
+        assertThatThrownBy(() -> service.stop("acme", 100L, 8L)).isInstanceOf(ForbiddenException.class)
+            .hasMessageContaining("stop it");
+
+        assertThat(run.getOutcome()).isNull();
+        verify(deliveryRunner, never()).complete(any(), any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"DONE", "FAILED"})
+    @DisplayName("Stop : une mission finie ne s'arrête plus")
+    void stop_refuses_a_mission_that_ended(DeliveryRunStatus status) {
+        run.setStatus(status);
+
+        assertThatThrownBy(() -> service.stop("acme", 100L, 7L)).isInstanceOf(BusinessException.class)
+            .hasMessage("This mission has already ended.");
+
+        verify(deliveryRunner, never()).complete(any(), any());
+    }
+
+    @Test
+    @DisplayName("Stop : Copilot travaille sur GitHub, TaskForce ne prétend pas l'arrêter (R15)")
+    void stop_refuses_copilot() {
+        run.setStatus(DeliveryRunStatus.RUNNING);
+        run.setProviderKey(GitHubCopilotProvider.KEY);
+
+        assertThatThrownBy(() -> service.stop("acme", 100L, 7L)).isInstanceOf(BusinessException.class)
+            .hasMessageContaining("GitHub");
+
+        assertThat(run.getOutcome()).isNull();
+    }
+
+    @Test
+    @DisplayName("Stop : la mission d'un autre workspace n'existe pas")
+    void stop_stays_in_its_workspace() {
+        run.setStatus(DeliveryRunStatus.RUNNING);
+
+        assertThatThrownBy(() -> service.stop("other", 100L, 7L)).isInstanceOf(ResourceNotFoundException.class);
     }
 
     @ParameterizedTest(name = "{0} : {1} à l'activité de l'issue, au nom de la personne")
