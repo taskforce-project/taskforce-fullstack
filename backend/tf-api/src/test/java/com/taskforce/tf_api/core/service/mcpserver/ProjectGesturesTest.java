@@ -452,8 +452,8 @@ class ProjectGesturesTest {
     @CsvSource(delimiter = '|', value = {
         "Orion          | false | acme/orion-docs,acme/orion-web,acme/api,none",
         "Orion Web      | false | acme/orion-web*,acme/orion-docs,acme/api,none",
-        "Orion Web      | true  | acme/orion-web*,new-private,new-public,none",
-        "Atlas          | true  | new-private*,new-public,acme/api,none",
+        "Orion Web      | true  | acme/orion-web*,new-private,acme/orion-docs,none",
+        "Atlas          | true  | new-private*,acme/api,acme/site,none",
     })
     void the_closest_repositories_come_first(String name, boolean creates, String choices) {
         when(repoHost.createsRepos("acme")).thenReturn(creates);
@@ -475,8 +475,8 @@ class ProjectGesturesTest {
         IssueGestures.Gesture done = gestures.create("acme", 7L,
             args("{\"name\": \"Atlas\", \"stack\": \"Next.js\", \"repository\": \"acme/web\"}"));
 
-        assertThat(done.summary()).isEqualTo("Project created in TaskForce: ATLAS \"Atlas\" (id 31). TaskForce can't link a "
-            + "repository here: connect GitHub in Settings > Integrations, then link one from the project's page.");
+        assertThat(done.summary()).isEqualTo("Project created in TaskForce: ATLAS \"Atlas\" (id 31). No repository can be linked from here: "
+            + "connect GitHub in Settings > Integrations, then link one from the project's page.");
         verify(repoService, never()).linkRepo(any(), any(), any(), any());
     }
 

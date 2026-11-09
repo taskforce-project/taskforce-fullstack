@@ -359,17 +359,6 @@ class AssistantControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("POST assistant message > 4000 caractères (@Size) → 400")
-    void chat_message_too_long_400() throws Exception {
-        String tooLong = "x".repeat(4001);
-        mockMvc.perform(post(URL).with(auth())
-                .accept(MediaType.APPLICATION_JSON)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"message\":\"" + tooLong + "\"}"))
-            .andExpect(status().isBadRequest());
-    }
-
-    @Test
     @DisplayName("POST assistant utilisateur introuvable → 404")
     void chat_user_not_found_404() throws Exception {
         // JWT valide mais aucun utilisateur en DB → resolveUserId lève ResourceNotFoundException

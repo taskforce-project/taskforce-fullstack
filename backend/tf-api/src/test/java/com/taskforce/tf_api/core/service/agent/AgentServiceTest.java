@@ -696,7 +696,8 @@ class AgentServiceTest {
     @Test
     @DisplayName("la réponse annonce ses étapes dans l'ordre : les notes, la demande, l'outil, la réponse")
     void the_answer_announces_its_steps() throws Exception {
-        stubInternalCall("create_note");
+        AgentTool tool = stubInternalCall("create_note");
+        lenient().when(tool.execute(any(), any())).thenReturn("Note written.");
         when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
         List<TurnProgress.Step> steps = new java.util.ArrayList<>();
 

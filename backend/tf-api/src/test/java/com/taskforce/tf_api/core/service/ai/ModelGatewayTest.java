@@ -119,6 +119,7 @@ class ModelGatewayTest {
     @DisplayName("un appel qui échoue dit le modèle visé et pourquoi : trop lent, ou refusé")
     void a_failed_call_says_its_model_and_why() {
         http.fail(new java.net.http.HttpTimeoutException("timed out"));
+        http.reply(404, "{\"error\":\"model 'qwen9' not found\"}");
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> gateway.chat(settings(OLLAMA),
                 new ModelGateway.ChatCall(question(), List.of(), false, "qwen3:8b", false)))
             .isInstanceOfSatisfying(ModelProviderException.class, failure -> {
@@ -127,7 +128,6 @@ class ModelGatewayTest {
                 org.assertj.core.api.Assertions.assertThat(failure.waited()).isPositive();
             });
 
-        http.reply(404, "{\"error\":\"model 'qwen9' not found\"}");
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> gateway.chat(settings(OLLAMA),
                 new ModelGateway.ChatCall(question(), List.of(), false, "qwen9", false)))
             .isInstanceOfSatisfying(ModelProviderException.class, failure -> {
