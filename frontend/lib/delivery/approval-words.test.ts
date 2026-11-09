@@ -6,6 +6,13 @@ import { approvalOutcome, approvalWords, deadlineText } from "./approval-words";
 const t = CONSTANTS_EN.missions;
 
 describe("approvalWords", () => {
+  it("names an action the rules don't know in words, when it has them", () => {
+    expect(approvalWords({ tool: "taskforce: delete_issue", askedBy: "agent", action: null, reason: null }, t, "delete an issue").title)
+      .toBe("Claude Code wants to delete an issue");
+    expect(approvalWords({ tool: "WebFetch", askedBy: "agent", action: "web.fetch", reason: null }, t, "open nodejs.org").title)
+      .toBe("Claude Code wants to open a web page");
+  });
+
   it("says what the agent wants, from the action the rules judged, with the rule's reason", () => {
     const words = approvalWords({
       tool: "WebSearch", askedBy: "agent", action: "web.search",

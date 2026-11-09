@@ -72,6 +72,8 @@ export const DELIVERY_ROUTES = {
   APPLY: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/apply`,
   DISCARD: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/discard`,
   RETRY: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/retry`,
+  /** « Stop » pendant le travail (POST, R138). */
+  STOP: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/stop`,
   /** Une mission qui n'a rien changé : l'issue se termine (POST, rejeu de la 1.8.0). */
   DONE: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/done`,
   /** Serveur MCP de l'instance pour ce workspace (adresse à donner à Claude Code, pas appelée par le front). */
@@ -246,6 +248,8 @@ export const ISSUE_ROUTES = {
   MY_CYCLES: (slug: string) => `/api/workspaces/${slug}/my-cycles`,
   /** La recherche de la fenêtre (Ctrl+K, le « @ » et le « + » du compositeur) : par clé ou par titre, tous projets vus. */
   SEARCH: (slug: string) => `/api/workspaces/${slug}/issues/search`,
+  /** Ctrl+K (R141) : les issues trouvées par ce qu'on a écrit dessous, sur les projets que la personne voit. */
+  SEARCH_COMMENTS: (slug: string) => `/api/workspaces/${slug}/issues/search/comments`,
   LIST:    (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues`,
   /** Liste paginée pour l'infinite-scroll du backlog (QA2-33) */
   PAGED:   (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/paged`,
@@ -389,6 +393,12 @@ export const EVAL_ROUTES = {
  */
 export const CORTEX_SOURCE_ROUTES = {
   SOURCES: (slug: string) => `/api/workspaces/${slug}/assistant/sources`,
+} as const;
+
+/** Les notes de l'espace (Brain OS) : Ctrl+K les cherche, le volet les lit (R141). */
+export const NOTE_ROUTES = {
+  SEARCH: (slug: string) => `/api/workspaces/${slug}/brain/search`,
+  BY_ID: (slug: string, id: number) => `/api/workspaces/${slug}/brain/nodes/${id}`,
 } as const;
 
 /**

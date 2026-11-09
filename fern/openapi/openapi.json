@@ -4098,6 +4098,45 @@
         }
       }
     },
+    "/api/workspaces/{slug}/delivery/runs/{runId}/stop": {
+      "post": {
+        "tags": [
+          "Coding agents"
+        ],
+        "operationId": "stop",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/delivery/runs/{runId}/retry": {
       "post": {
         "tags": [
@@ -7611,6 +7650,43 @@
       }
     },
     "/api/workspaces/{slug}/brain/nodes/{nodeId}": {
+      "get": {
+        "tags": [
+          "Brain OS"
+        ],
+        "operationId": "getNode",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseKnowledgeNodeResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "Brain OS"
@@ -8563,6 +8639,55 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseListIssueHitResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/issues/search/comments": {
+      "get": {
+        "tags": [
+          "Issues"
+        ],
+        "operationId": "searchComments",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 5
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListIssueCommentHitResponse"
                 }
               }
             }
@@ -15506,6 +15631,9 @@
           },
           "domain": {
             "type": "string"
+          },
+          "textOnly": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -15542,6 +15670,9 @@
           "score": {
             "type": "number",
             "format": "double"
+          },
+          "excerpt": {
+            "type": "string"
           }
         }
       },
@@ -19461,6 +19592,27 @@
           }
         }
       },
+      "ApiResponseListIssueCommentHitResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueCommentHitResponse"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "IssueHitResponse": {
         "type": "object",
         "properties": {
@@ -19482,6 +19634,28 @@
             "type": "string"
           },
           "statusCategory": {
+            "type": "string"
+          }
+        }
+      },
+      "IssueCommentHitResponse": {
+        "type": "object",
+        "properties": {
+          "issueId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "key": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "excerpt": {
             "type": "string"
           }
         }

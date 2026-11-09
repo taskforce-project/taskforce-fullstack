@@ -255,6 +255,18 @@ public class DeliveryController {
     /** La remarque de la personne pour la nouvelle mission ; elle va sur l'issue, où l'agent la lit. */
     public record MissionRetryRequest(@Size(max = 2000) String note) {}
 
+    /**
+     * POST .../runs/{runId}/stop : « Stop » pendant le travail (R138) : la mission se clôt au nom de la personne qui l'a
+     * déléguée, et le runner arrête l'agent à son prochain signe de vie. Ce n'est pas une panne : l'issue reste où elle est.
+     */
+    @PostMapping("/runs/{runId}/stop")
+    public ResponseEntity<ApiResponse<Void>> stop(
+        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId
+    ) {
+        missionResults.stop(slug, runId, resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Stopped", null));
+    }
+
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         return userRepository.findByEmail(email)

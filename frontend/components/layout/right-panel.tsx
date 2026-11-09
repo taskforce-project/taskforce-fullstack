@@ -1,14 +1,14 @@
 "use client"
 
-import { useEffect } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useParams, usePathname } from "next/navigation"
 
 import { catalogForThisApp } from "@/components/integrations/integrations-catalog"
 import { PANEL_ITEM, PanelRow } from "@/components/layout/panel-row"
-import { ChangesRow, MissionsRow, ResultsRow } from "@/components/layout/work-rows"
+import { ChangesRow, MissionsRow } from "@/components/layout/work-rows"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { useMinWidth } from "@/hooks/use-min-width"
-import { formatTokens } from "@/lib/cortex/context-gauge"
+import { toneOf } from "@/lib/cortex/context-gauge"
 import { screenFrom } from "@/lib/cortex/screen"
 import { fillText } from "@/lib/delivery/result-card"
 import { IS_DESKTOP } from "@/lib/desktop"
@@ -23,8 +23,9 @@ import { useScreenStore } from "@/lib/store/screen-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { useWindowStore } from "@/lib/store/window-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
-import { connectorLines } from "@/lib/window/connectors"
-import { contextSentence, windowShare } from "@/lib/window/context"
+import { cn } from "@/lib/utils"
+import { connectorLines, connectorsSummary } from "@/lib/window/connectors"
+import { contextRaw, contextRead, contextRoom, contextSees, windowShare } from "@/lib/window/context"
 import { cortexModel, modelPlace, projectInView } from "@/lib/window/environment"
 
 /** La conversation en cours, telle que la liste de l'espace la résume (son projet compris). */
@@ -34,101 +35,108 @@ function useConversation() {
   return conversations.find((c) => c.id === conversationId)
 }
 
-/** Environment : l'espace, le projet en vue, son dépôt, et où tourne le modèle. */
+const capitalized = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
+
+/** Environment : d'un regard, où Cortex travaille et où tourne son modèle ; le détail ne répète ni l'un ni l'autre. */
 function EnvironmentRow() {
   const pathname = usePathname()
-  const t = usePreferencesStore((s) => s.t.window)
+  const w = usePreferencesStore((s) => s.t.window)
+  const t = usePreferencesStore((s) => s.t.rail)
   const workspace = useWorkspaceStore((s) => s.activeWorkspace)
   const projects = useProjectStore((s) => s.projects)
   const status = useAiStatusStore((s) => s.status)
   const conversation = useConversation()
   const project = projectInView(pathname, conversation, projects)
-  const place = modelPlace(status, IS_DESKTOP)
-  const model = cortexModel(status) ?? ""
-  const where = { here: t.thisComputer, taskforce: t.taskforce, provider: t.provider, none: t.noModel }[place]
-  const modelLine = {
-    here: fillText(t.modelHere, { model }),
-    taskforce: fillText(t.modelTaskforce, { model }),
-    provider: fillText(t.modelProvider, { model }),
-    none: t.noModel,
-  }[place]
+  const how = t.places[modelPlace(status, IS_DESKTOP)]
+  const where = project?.name ?? workspace?.name
+  const model = cortexModel(status)
+  const details = [
+    project && workspace ? { label: w.workspace, value: workspace.name } : null,
+    project?.repoFullName ? { label: w.repository, value: project.repoFullName } : null,
+    model ? { label: w.model, value: model } : null,
+  ].filter((line) => line !== null)
 
   return (
-    <PanelRow row="environment" value={where}>
-      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 px-2 text-xs">
-        <dt className="text-muted-foreground">{t.workspace}</dt>
-        <dd className="truncate text-foreground">{workspace?.name}</dd>
-        {project && (
-          <>
-            <dt className="text-muted-foreground">{t.project}</dt>
-            <dd className="truncate text-foreground">
-              {project.name} <span className="text-muted-foreground">{project.identifier}</span>
-            </dd>
-          </>
-        )}
-        {project?.repoFullName && (
-          <>
-            <dt className="text-muted-foreground">{t.repository}</dt>
-            <dd className="truncate text-foreground">{project.repoFullName}</dd>
-          </>
-        )}
-        <dt className="text-muted-foreground">{t.model}</dt>
-        <dd className="truncate text-foreground" title={modelLine}>{modelLine}</dd>
-      </dl>
+    <PanelRow row="environment" summary={where ? fillText(t.where, { where, how }) : capitalized(how)}>
+      {details.length > 0 && (
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 px-2 py-0.5 text-xs">
+          {details.map((line) => (
+            <div key={line.label} className="contents">
+              <dt className="text-muted-foreground">{line.label}</dt>
+              <dd className="truncate text-foreground" title={line.value}>{line.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
     </PanelRow>
   )
 }
 
-/** Context : ce que Cortex voit (le volet, l'issue ouverte, R114) et la place de sa dernière réponse, en une phrase. */
+const FILL = { blue: "bg-primary", amber: "bg-shape-yellow", rose: "bg-shape-red" } as const
+
+/**
+ * Context : d'un regard, ce que Cortex voit (le volet, l'issue ouverte, R114) et, à droite, la place prise ; un clic plus
+ * loin, ce que ce chiffre veut dire et ce que la dernière réponse a lu.
+ */
 function ContextRow() {
   const pathname = usePathname()
-  const t = usePreferencesStore((s) => s.t.window)
+  const w = usePreferencesStore((s) => s.t.window)
+  const t = usePreferencesStore((s) => s.t.rail.context)
   const openIssue = useScreenStore((s) => s.openIssue)
   const projects = useProjectStore((s) => s.projects)
   const issues = useIssueStore((s) => s.issues)
   const activeIssue = useIssueStore((s) => s.activeIssue)
   // La jauge de contexte (R122, sous le compositeur) : le prompt de la dernière demande contre sa fenêtre.
   const context = useCortexStore((s) => s.context)
+  const lastRead = useCortexStore((s) => s.turns.findLast((turn) => turn.answer)?.answer?.read)
   const status = useAiStatusStore((s) => s.status)
 
   const screen = screenFrom(pathname, openIssue)
   const project = screen ? projects.find((p) => p.id === screen.projectId) : undefined
   const issueId = screen?.issueId ?? null
   const issue = issueId === null ? undefined : [activeIssue, ...issues].find((i) => i?.id === issueId)
-  const share = windowShare(context)
-  const sentence = contextSentence(
-    {
-      project: screen ? (project?.name ?? t.project) : null,
-      issue: issueId === null ? null : (issue?.identifier ?? `#${issueId}`),
-      context,
-      model: cortexModel(status),
-    },
-    t.context,
+  const sees = contextSees(
+    { project: screen ? (project?.name ?? w.project) : null, issue: issueId === null ? null : (issue?.identifier ?? `#${issueId}`) },
+    t,
   )
-  const value = share !== null ? `${share}%` : context ? formatTokens(context.tokens) : undefined
+  const share = windowShare(context)
+  const room = contextRoom(context, cortexModel(status), t)
+  const read = contextRead(lastRead, t)
 
   return (
-    <PanelRow row="context" value={value}>
-      <p className="px-2 text-xs leading-relaxed text-foreground">{sentence}</p>
+    <PanelRow row="context" summary={sees} value={share !== null ? `${share}%` : undefined}>
+      <div className="flex flex-col gap-1.5 px-2 py-0.5 text-xs">
+        {share !== null && (
+          <div className="h-1 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
+            <div className={cn("h-full rounded-full", FILL[toneOf(share)])} style={{ width: `${share}%` }} />
+          </div>
+        )}
+        <p className="leading-relaxed text-foreground" title={contextRaw(context)}>{room}</p>
+        {read && <p className="leading-relaxed text-muted-foreground">{read}</p>}
+      </div>
     </PanelRow>
   )
 }
 
-/** Connectors : les intégrations connectées, celles à reconnecter d'abord ; un clic mène aux réglages. */
+/** Connectors : d'un regard, ceux à reconnecter d'abord, sinon ce qui est branché ; un clic mène aux réglages. */
 function ConnectorsRow() {
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
-  const t = usePreferencesStore((s) => s.t.window)
+  const t = usePreferencesStore((s) => s.t.rail.connectors)
   const integrationTexts = usePreferencesStore((s) => s.t.integrations)
   const connectors = useIntegrationStore((s) => s.connectors)
   const fetchConnectors = useIntegrationStore((s) => s.fetchConnectors)
   const desktopGitHub = useDesktopToolsStore((s) => s.status?.github ?? null)
   const refreshDesktopTools = useDesktopToolsStore((s) => s.refresh)
   const openSettings = useSettingsStore((s) => s.openSettings)
+  const [failed, setFailed] = useState(false)
 
-  useEffect(() => {
-    if (slug) void fetchConnectors(slug)
+  const load = useCallback(() => {
+    if (!slug) return
+    void fetchConnectors(slug).then((ok) => setFailed(!ok))
   }, [slug, fetchConnectors])
+
+  useEffect(() => { load() }, [load])
   // App desktop : GitHub est connecté quand le GitHub CLI de la personne l'est, comme dans le catalogue.
   useEffect(() => {
     if (IS_DESKTOP && useDesktopToolsStore.getState().status === null) void refreshDesktopTools()
@@ -136,29 +144,33 @@ function ConnectorsRow() {
 
   const catalog = connectors ? catalogForThisApp(connectors.catalog, integrationTexts, IS_DESKTOP, desktopGitHub) : null
   const lines = catalog && connectors ? connectorLines(catalog, connectors.servers) : []
-  const reconnect = lines.filter((line) => line.reconnect).length
-  const value = reconnect > 0 ? fillText(t.reconnectCount, { count: reconnect }) : catalog ? lines.length : undefined
   const settings = () => openSettings("integrations")
 
+  // Le temps du chargement, la hauteur de la phrase reste réservée : les cartes du dessous ne sautent pas.
   return (
-    <PanelRow row="connectors" value={value}>
-      {lines.length === 0 ? (
-        <button type="button" onClick={settings} className={`${PANEL_ITEM} text-muted-foreground`}>
-          {t.noConnectors}
+    <PanelRow row="connectors" summary={catalog ? connectorsSummary(lines, t) : failed ? t.failed : " "}>
+      {!catalog && failed && (
+        <button type="button" onClick={load} className={cn(PANEL_ITEM, "text-muted-foreground")}>
+          {t.retry}
         </button>
-      ) : (
-        <ul className="flex flex-col">
-          {lines.map((line) => (
-            <li key={line.key}>
-              <button type="button" onClick={settings} className={PANEL_ITEM}>
-                <span className="min-w-0 flex-1 truncate text-foreground">{line.name}</span>
-                <span className={line.reconnect ? "text-ink-yellow" : "text-muted-foreground"}>
-                  {line.reconnect ? t.toReconnect : t.connected}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+      )}
+      {catalog && (
+        lines.length === 0 ? (
+          <button type="button" onClick={settings} className={cn(PANEL_ITEM, "text-muted-foreground")}>
+            {t.connect}
+          </button>
+        ) : (
+          <ul className="flex flex-col">
+            {lines.map((line) => (
+              <li key={line.key}>
+                <button type="button" onClick={settings} className={PANEL_ITEM}>
+                  <span className="min-w-0 flex-1 truncate text-foreground">{line.name}</span>
+                  {line.reconnect && <span className="text-ink-yellow">{t.reconnect}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )
       )}
     </PanelRow>
   )
@@ -166,22 +178,23 @@ function ConnectorsRow() {
 
 function Rows() {
   return (
-    <>
+    <div className="flex flex-col gap-2 p-2">
       <EnvironmentRow />
       <ContextRow />
       <ConnectorsRow />
-      <ResultsRow />
-      <ChangesRow />
       <MissionsRow />
-    </>
+      <ChangesRow />
+    </div>
   )
 }
 
 /**
- * La zone de droite de la fenêtre (R122, séance n°18) : ce qui entoure la conversation, en six lignes repliées par
- * défaut, chacune avec son nombre. 320 px ; elle s'ouvre et se replie depuis la ligne du haut, et se replie seule quand
- * un volet s'ouvre sous 1 600 px de large. Elle ne montre que le travail de la personne, chaque ligne menant à son
- * objet (R57). Sous `lg`, c'est un tiroir, qui s'ouvre depuis le même bouton et se ferme au choix d'une ligne.
+ * La zone de droite de la fenêtre (R122, R141) : ce qui entoure la conversation, en cartes, à la manière du rail d'une
+ * session de Claude. Où Cortex travaille, ce qu'il voit, ce qui est branché, puis le travail de fond et ce que la
+ * conversation a changé, qui n'apparaissent que quand ils existent : ils s'ajoutent en bas, rien ne saute. 320 px ; elle
+ * s'ouvre et se replie depuis la ligne du haut, et se replie seule quand un volet s'ouvre sous 1 600 px de large. Elle ne
+ * montre que le travail de la personne, chaque ligne menant à son objet (R57). Sous `lg`, c'est un tiroir, qui s'ouvre
+ * depuis le même bouton et se ferme au choix d'une ligne.
  */
 export function RightPanel() {
   const wide = useMinWidth(1024)

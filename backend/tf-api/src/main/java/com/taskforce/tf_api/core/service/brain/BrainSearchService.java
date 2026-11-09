@@ -14,6 +14,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.taskforce.tf_api.core.dto.response.KnowledgeNodeResponse;
 import com.taskforce.tf_api.core.dto.response.KnowledgeSearchHit;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Workspace;
@@ -75,6 +76,36 @@ public class BrainSearchService {
                 KnowledgeNode n = byId.get(hit.id());
                 if (n != null) out.add(KnowledgeSearchHit.builder()
                     .node(BrainMapper.toNodeResponse(n)).score(hit.score()).build());
+            }
+            return out;
+        });
+    }
+
+    /**
+     * Plein texte seulement, pour la recherche de la fenêtre (Ctrl+K, R141) : elle répond à la frappe, sans passer par le
+     * modèle de vecteurs (jusqu'à 60 s sur un modèle local, et Ollama n'en sert qu'un à la fois), et une note ne sort que
+     * si elle contient ce qu'on tape. Chaque résultat porte son passage plutôt que son contenu ; les notes du noyau
+     * restent cachées, comme dans la vue d'ensemble.
+     */
+    public List<KnowledgeSearchHit> searchText(String slug, Long userId, String query, Integer topK) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        BrainViewer viewer = access.viewer(ws.getId(), userId);
+        int limit = Math.max(1, Math.min(topK != null ? topK : 8, 50));
+        List<Hit> hits = textHits(viewer, query, limit, null);
+        if (hits.isEmpty()) return List.of();
+
+        List<String> words = terms(query);
+        return transactionTemplate.execute(status -> {
+            Map<Long, KnowledgeNode> byId = loadNodes(hits);
+            List<KnowledgeSearchHit> out = new ArrayList<>();
+            for (Hit hit : hits) {
+                KnowledgeNode n = byId.get(hit.id());
+                if (n == null) continue;
+                KnowledgeNodeResponse node = BrainMapper.toNodeResponse(n);
+                if (node.isSystem()) continue;
+                node.setContent(null);
+                out.add(KnowledgeSearchHit.builder().node(node).score(hit.score())
+                    .excerpt(SearchExcerpt.around(n.getContent(), words)).build());
             }
             return out;
         });
@@ -182,7 +213,7 @@ public class BrainSearchService {
     }
 
     /** Mots de la requête (lettres et chiffres, deux caractères au moins), en minuscules, sans doublon. */
-    static List<String> terms(String query) {
+    public static List<String> terms(String query) {
         Set<String> out = new LinkedHashSet<>();
         if (query != null) {
             Matcher m = WORD.matcher(query.toLowerCase(Locale.ROOT));

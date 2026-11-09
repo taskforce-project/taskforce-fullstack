@@ -104,10 +104,13 @@ function renderInline(text: string, keyPrefix: string, opts: MarkdownProps): Rea
     } else if (token.startsWith("[[")) {
       const title = token.slice(2, -2).trim()
       out.push(
-        <button key={key} type="button" onClick={opts.onWikiLink ? () => opts.onWikiLink!(title) : undefined}
-          className="text-primary underline decoration-dotted underline-offset-2 hover:bg-primary/10 rounded px-0.5">
-          {title}
-        </button>,
+        // Sans geste à faire, le lien ne se présente pas comme cliquable.
+        opts.onWikiLink ? (
+          <button key={key} type="button" onClick={() => opts.onWikiLink!(title)}
+            className="text-primary underline decoration-dotted underline-offset-2 hover:bg-primary/10 rounded px-0.5">
+            {title}
+          </button>
+        ) : <span key={key} className="text-primary">{title}</span>,
       )
     } else if (token.startsWith("==")) {
       out.push(<mark key={key} className="rounded bg-shape-yellow/30 px-0.5">{token.slice(2, -2)}</mark>)
@@ -118,10 +121,12 @@ function renderInline(text: string, keyPrefix: string, opts: MarkdownProps): Rea
     } else if (token.startsWith("#")) {
       const tag = token.slice(1)
       out.push(
-        <button key={key} type="button" onClick={opts.onTag ? () => opts.onTag!(tag) : undefined}
-          className="inline-flex items-center rounded-full bg-primary/10 px-1.5 text-[0.8em] font-medium text-primary hover:bg-primary/20">
-          #{tag}
-        </button>,
+        opts.onTag ? (
+          <button key={key} type="button" onClick={() => opts.onTag!(tag)}
+            className="inline-flex items-center rounded-full bg-primary/10 px-1.5 text-[0.8em] font-medium text-primary hover:bg-primary/20">
+            #{tag}
+          </button>
+        ) : <span key={key} className="inline-flex items-center rounded-full bg-primary/10 px-1.5 text-[0.8em] font-medium text-primary">#{tag}</span>,
       )
     } else {
       const mm = /\[([^\]]+)\]\(([^)]+)\)/.exec(token)

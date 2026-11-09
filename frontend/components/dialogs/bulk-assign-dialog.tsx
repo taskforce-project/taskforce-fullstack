@@ -156,7 +156,7 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="size-4 text-primary" /> Auto-assign

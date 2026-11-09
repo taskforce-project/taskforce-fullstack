@@ -13,4 +13,6 @@ import lombok.NoArgsConstructor;
 public class KnowledgeSearchHit {
     private KnowledgeNodeResponse node;
     private double score;
+    /** Le passage qui répond, en texte brut : seulement la recherche plein texte de la fenêtre (Ctrl+K), sinon null. */
+    private String excerpt;
 }

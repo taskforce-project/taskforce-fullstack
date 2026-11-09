@@ -148,7 +148,7 @@ export function CreateCycleDialog({ children, onCreated, projectId }: CreateCycl
         )}
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <RefreshCw className="h-4 w-4 text-muted-foreground" />
@@ -167,7 +167,7 @@ export function CreateCycleDialog({ children, onCreated, projectId }: CreateCycl
             </label>
             <Input
               id="cycle-name"
-              placeholder="Sprint 12 – Auth & Onboarding"
+              placeholder="Sprint 12: Auth & Onboarding"
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
@@ -222,8 +222,8 @@ export function CreateCycleDialog({ children, onCreated, projectId }: CreateCycl
             </div>
           )}
 
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Dates, l'une sous l'autre : une colonne (R133). */}
+          <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Start date</span>
               <Popover open={startOpen} onOpenChange={setStartOpen}>

@@ -223,6 +223,9 @@ public class TrialAgentLoop {
             return;
         }
 
+        // La personne a pu l'arrêter pendant l'appel au modèle (R138) : rien n'est posté.
+        if (!stillRunning(m.runId())) return;
+
         // La porte : la demande, puis la règle de l'espace sur un commentaire, comme pour un agent délégué.
         event(m, "tool", "add_comment", "Posts its answer as a comment on " + m.issueKey(), null, null);
         RulesEngine.Decision decision = RulesEngine.decide(m.rules(), Map.of("action", "comment.create", "tool", "add_comment"));
@@ -257,6 +260,11 @@ public class TrialAgentLoop {
         event(m, "text", null, "Answered in a comment on " + m.issueKey() + " (" + words + " words)", null, null);
         finish(m.runId(), new DeliveryPoll(DeliveryRunStatus.DONE, name + " answered in a comment on "
             + m.issueKey() + ".", null, null));
+    }
+
+    private boolean stillRunning(Long runId) {
+        return Boolean.TRUE.equals(tx.execute(status -> runRepository.findById(runId)
+            .filter(run -> run.getStatus() == DeliveryRunStatus.RUNNING).isPresent()));
     }
 
     /** Les notes que la personne peut lire, les plus proches de l'issue ; aucune si la recherche ne répond pas. */

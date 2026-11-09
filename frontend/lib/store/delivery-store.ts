@@ -12,6 +12,7 @@ import {
   discardRun as discardRunApi,
   markRunDone as markRunDoneApi,
   retryRun as retryRunApi,
+  stopRun as stopRunApi,
   downloadEvidence as downloadEvidenceApi,
   getEvidence,
   provisionRunner as provisionRunnerApi,
@@ -81,6 +82,8 @@ interface DeliveryState {
   /** Une mission qui n'a rien changé : l'issue se termine (rejeu de la 1.8.0). */
   markRunDone: (slug: string, issueId: number, runId: number) => Promise<boolean>;
   retryRun: (slug: string, issueId: number, runId: number, note: string) => Promise<DeliveryRun | null>;
+  /** « Stop » pendant le travail (R138) : `false` en cas d'échec, l'écran le dit. */
+  stopRun: (slug: string, issueId: number, runId: number) => Promise<boolean>;
 }
 
 /** Une réponse donnée : la mission a une demande ouverte de moins, et quitte la liste à la dernière. */
@@ -288,6 +291,18 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
     } catch (e) {
       set((state) => ({ resultErrors: { ...state.resultErrors, [runId]: getErrorMessage(e) } }));
       return null;
+    }
+  },
+
+  stopRun: async (slug, issueId, runId) => {
+    try {
+      await stopRunApi(slug, runId);
+      await Promise.all([get().fetchRun(slug, issueId), get().fetchActivity(slug, runId), get().fetchOpenApprovals(slug)]);
+      return true;
+    } catch {
+      // Elle a pu finir entre-temps : la relecture dit où elle en est.
+      await get().fetchRun(slug, issueId);
+      return false;
     }
   },
 }));

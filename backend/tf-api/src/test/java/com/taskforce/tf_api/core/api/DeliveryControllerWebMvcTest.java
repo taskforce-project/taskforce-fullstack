@@ -317,6 +317,16 @@ class DeliveryControllerWebMvcTest {
     }
 
     @Test
+    @DisplayName("POST /runs/{id}/stop : la personne arrête la mission (R138)")
+    void stop_200() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/stop").with(auth()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("Stopped"));
+
+        verify(missionResults).stop("acme", 100L, 7L);
+    }
+
+    @Test
     @DisplayName("POST /runs/{id}/retry : une nouvelle mission part avec la remarque")
     void retry_200() throws Exception {
         var a = auth();

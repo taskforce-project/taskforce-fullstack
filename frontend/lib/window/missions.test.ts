@@ -35,6 +35,7 @@ describe("les missions de la fenêtre", () => {
     [run({ status: "DONE", outcome: "APPLIED" }), "done"],
     [run({ status: "FAILED" }), "failed"],
     [run({ status: "FAILED", refused: true }), "done"],
+    [run({ status: "FAILED", outcome: "STOPPED" }), "done"],
   ])("une mission %#, en un point : %s", (mission, state) => {
     expect(runState(mission)).toBe(state)
   })
