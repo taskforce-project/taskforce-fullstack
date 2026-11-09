@@ -31,6 +31,7 @@ import com.taskforce.tf_api.core.service.brain.BrainMapper;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.core.service.brain.BrainSeedingService;
 import com.taskforce.tf_api.core.service.brain.BrainViewer;
+import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -129,6 +130,15 @@ public class KnowledgeService {
         return kept;
     }
 
+    /** Une note que la personne lit, pour le volet (Ctrl+K, R141) : une note archivée répond comme une note absente. */
+    @Transactional(readOnly = true)
+    public KnowledgeNodeResponse getNode(String slug, Long nodeId, Long userId) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        KnowledgeNode node = access.requireNode(nodeId, access.viewer(ws.getId(), userId));
+        if (node.getStatus() != NodeStatus.ACTIVE) throw new ResourceNotFoundException("Page not found: " + nodeId);
+        return BrainMapper.toNodeResponse(node);
+    }
+
     // =========================================================================
     // Écriture — nodes
     // =========================================================================
@@ -165,13 +175,6 @@ public class KnowledgeService {
         links.syncFromContent(saved, req.getTags()); // #tags + [[wikilinks]] → arêtes auto
         // Vecteur calculé en tâche de fond (BrainEmbeddingIndexer), jamais pendant la requête.
         return BrainMapper.toNodeResponse(saved);
-    }
-
-    /** Une note, telle que la personne a le droit de la lire : la conversation l'ouvre depuis ce que Cortex a lu (R137). */
-    @Transactional(readOnly = true)
-    public KnowledgeNodeResponse getNode(String slug, Long nodeId, Long userId) {
-        Workspace ws = access.resolveAndAuthorize(slug, userId);
-        return BrainMapper.toNodeResponse(access.requireNode(nodeId, access.viewer(ws.getId(), userId)));
     }
 
     @Transactional

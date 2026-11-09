@@ -265,6 +265,24 @@ export async function searchIssues(slug: string, query: string, limit = 8): Prom
   return res.data.data ?? [];
 }
 
+/** Une issue trouvée par ce qu'on a écrit dessous (Ctrl+K, R141) : le passage du commentaire qui répond. */
+export interface IssueCommentHit {
+  issueId: number;
+  projectId: number;
+  key: string;
+  title: string;
+  excerpt: string;
+}
+
+/** Les issues dont un commentaire répond, une ligne par issue. Appel de fond (à la frappe) : jamais de toast. */
+export async function searchIssueComments(slug: string, query: string, limit = 5): Promise<IssueCommentHit[]> {
+  const res = await apiClient.get<{ data: IssueCommentHit[] }>(ISSUE_ROUTES.SEARCH_COMMENTS(slug), {
+    params: { q: query, limit },
+    silentError: true,
+  });
+  return res.data.data ?? [];
+}
+
 export async function getScheduledIssues(slug: string): Promise<Issue[]> {
   const res = await apiClient.get<{ data: Issue[] }>(ROADMAP_ROUTES.SCHEDULED(slug));
   return res.data.data;

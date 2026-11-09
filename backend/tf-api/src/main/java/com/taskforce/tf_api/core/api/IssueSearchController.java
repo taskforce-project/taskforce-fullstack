@@ -11,9 +11,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.taskforce.tf_api.core.dto.response.IssueCommentHitResponse;
 import com.taskforce.tf_api.core.dto.response.IssueHitResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.service.IssueCommentSearchService;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -34,6 +36,7 @@ public class IssueSearchController {
     static final int MAX_QUERY = 100;
 
     private final IssueService issueService;
+    private final IssueCommentSearchService commentSearchService;
     private final UserRepository userRepository;
 
     /**
@@ -50,6 +53,23 @@ public class IssueSearchController {
         Long userId = resolveUserId(jwt);
         String query = q.length() > MAX_QUERY ? q.substring(0, MAX_QUERY) : q;
         return ResponseEntity.ok(ApiResponse.success("Issues found", issueService.searchIssues(slug, userId, query, limit)));
+    }
+
+    /**
+     * GET /api/workspaces/{slug}/issues/search/comments?q=deploy&limit=5 : les issues dont un commentaire répond (Ctrl+K,
+     * R141), sur les projets que la personne voit, une ligne par issue, avec le passage qui répond. {@code limit} : 5 par
+     * défaut, 20 au plus.
+     */
+    @GetMapping("/search/comments")
+    public ResponseEntity<ApiResponse<List<IssueCommentHitResponse>>> searchComments(
+        @PathVariable String slug,
+        @RequestParam(name = "q", defaultValue = "") String q,
+        @RequestParam(name = "limit", defaultValue = "5") int limit,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        String query = q.length() > MAX_QUERY ? q.substring(0, MAX_QUERY) : q;
+        return ResponseEntity.ok(ApiResponse.success("Comments found", commentSearchService.search(slug, userId, query, limit)));
     }
 
     private Long resolveUserId(Jwt jwt) {

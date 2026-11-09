@@ -1,17 +1,18 @@
 "use client"
 
 import { Fragment, useId, useState } from "react"
+import { useRouter } from "next/navigation"
 
 import type { AssistantAnswer } from "@/lib/api/assistant-service"
 import { fillModelText } from "@/lib/ai/model-table"
 import { greyLine, inASentence, readLine } from "@/lib/cortex/read-line"
-import { useNoteStore } from "@/lib/store/note-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { withConversation } from "@/lib/window/address"
 
 /**
  * La ligne grise sous une réponse (R123, R137) : le modèle qui a répondu et ce qu'il a lu, dans une phrase, toujours visible.
  * Le mot « Sources » n'existe plus (« Je sais tjr pas c'est quoi les sources ») : un clic sur « 5 notes » les nomme, et
- * chacune s'ouvre. Le mode et les tokens restent au survol, pour qui les cherche.
+ * chacune s'ouvre dans le volet, la conversation gardée. Le mode et les tokens restent au survol, pour qui les cherche.
  */
 export function ReadLine({ slug, answer }: Readonly<{
   slug: string
@@ -20,7 +21,7 @@ export function ReadLine({ slug, answer }: Readonly<{
   const c = usePreferencesStore((s) => s.t.conversation)
   const t = usePreferencesStore((s) => s.t.thread)
   const answeredWith = usePreferencesStore((s) => s.t.cortex.answeredWith)
-  const openNote = useNoteStore((s) => s.openNote)
+  const router = useRouter()
   const [named, setNamed] = useState(false)
   const id = useId()
   const line = greyLine(answer.model, answer.read, c, t)
@@ -73,7 +74,7 @@ export function ReadLine({ slug, answer }: Readonly<{
             <li key={note.id}>
               <button
                 type="button"
-                onClick={() => void openNote(slug, note.id, note.title)}
+                onClick={() => router.push(withConversation(`/${slug}/notes/${note.id}`, globalThis.location?.search ?? ""), { scroll: false })}
                 className="max-w-full truncate py-0.5 text-left transition-colors duration-150 hover:text-foreground hover:underline motion-reduce:transition-none"
               >
                 {note.title}

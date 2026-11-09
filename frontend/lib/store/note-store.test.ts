@@ -1,62 +1,57 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { getNote } from "../api/note-service"
-import { useNoteStore } from "./note-store"
+import { getNote, searchNotes, type Note } from "@/lib/api/note-service"
+import { noteKey, useNoteStore } from "./note-store"
 
-vi.mock("../api/note-service", () => ({ getNote: vi.fn() }))
+vi.mock("@/lib/api/note-service", () => ({ getNote: vi.fn(), searchNotes: vi.fn() }))
 
-const NOTE = { id: 12, title: "Release process", content: "Steps.", domain: "RUNBOOKS", updatedAt: null }
+const note: Note = { id: 5, title: "Runbook", content: "# Hi", contentUrl: null, updatedAt: null }
+const key = noteKey("acme", 5)
 
-/** Une note que Cortex a lue s'ouvre d'un clic (R137) ; un échec se dit par l'état, jamais par une exception. */
+/** Une note ouverte dans le volet (R141). */
 describe("useNoteStore", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    useNoteStore.getState().closeNote()
+    useNoteStore.setState({ notes: {}, status: {} })
   })
 
-  it("montre son nom dès le clic, puis son texte", async () => {
-    let answer: (note: typeof NOTE) => void = () => {}
-    vi.mocked(getNote).mockReturnValue(new Promise((resolve) => { answer = resolve }))
+  it("reads a note and keeps it", async () => {
+    vi.mocked(getNote).mockResolvedValue(note)
 
-    const opening = useNoteStore.getState().openNote("acme", 12, "Release process")
-    expect(useNoteStore.getState()).toMatchObject({ title: "Release process", loading: true, note: null, failed: false })
+    const reading = useNoteStore.getState().fetchNote("acme", 5)
+    expect(useNoteStore.getState().status[key]).toBe("loading")
+    await expect(reading).resolves.toEqual(note)
 
-    answer(NOTE)
-    await expect(opening).resolves.toBe(true)
-    expect(getNote).toHaveBeenCalledWith("acme", 12)
-    expect(useNoteStore.getState()).toMatchObject({ note: NOTE, loading: false })
+    expect(useNoteStore.getState().notes[key]).toEqual(note)
+    expect(useNoteStore.getState().status[key]).toBe("ready")
   })
 
-  it("dit qu'elle n'a pas pu être lue, sans lever", async () => {
-    vi.mocked(getNote).mockRejectedValue(new Error("404"))
+  it.each([
+    [{ response: { status: 404 } }, "missing"],
+    [{ response: { status: 500 } }, "failed"],
+    [new Error("down"), "failed"],
+  ])("on failure gives null and says why: %j", async (error, status) => {
+    vi.mocked(getNote).mockRejectedValue(error)
 
-    await expect(useNoteStore.getState().openNote("acme", 12, "Gone")).resolves.toBe(false)
-
-    expect(useNoteStore.getState()).toMatchObject({ title: "Gone", loading: false, failed: true, note: null })
+    await expect(useNoteStore.getState().fetchNote("acme", 5)).resolves.toBeNull()
+    expect(useNoteStore.getState().status[key]).toBe(status)
   })
 
-  it("se referme, et une réponse tardive ne la rouvre pas", async () => {
-    let answer: (note: typeof NOTE) => void = () => {}
-    vi.mocked(getNote).mockReturnValue(new Promise((resolve) => { answer = resolve }))
+  it("finds the note of an exact title, for a [[link]]", async () => {
+    vi.mocked(searchNotes).mockResolvedValue([
+      { id: 8, title: "Runbook of staging", excerpt: "" },
+      { id: 5, title: "Runbook", excerpt: "" },
+    ])
 
-    const opening = useNoteStore.getState().openNote("acme", 12, "Release process")
-    useNoteStore.getState().closeNote()
-    answer(NOTE)
-    await opening
-
-    expect(useNoteStore.getState()).toMatchObject({ title: null, note: null, loading: false })
+    await expect(useNoteStore.getState().findByTitle("acme", " runbook ")).resolves.toBe(5)
+    expect(searchNotes).toHaveBeenCalledWith("acme", " runbook ")
   })
 
-  it("une réponse tardive en échec ne touche pas la note ouverte depuis", async () => {
-    let refuse: (e: Error) => void = () => {}
-    vi.mocked(getNote).mockReturnValueOnce(new Promise((_, reject) => { refuse = reject }))
-    const first = useNoteStore.getState().openNote("acme", 1, "First")
-    vi.mocked(getNote).mockResolvedValueOnce(NOTE)
-    await useNoteStore.getState().openNote("acme", 12, "Release process")
-
-    refuse(new Error("late"))
-    await first
-
-    expect(useNoteStore.getState()).toMatchObject({ note: NOTE, failed: false, title: "Release process" })
+  it.each([
+    ["no note of that title", () => vi.mocked(searchNotes).mockResolvedValue([{ id: 8, title: "Other", excerpt: "" }])],
+    ["a failure", () => vi.mocked(searchNotes).mockRejectedValue(new Error("down"))],
+  ])("a link leads nowhere on %s", async (_, arrange) => {
+    arrange()
+    await expect(useNoteStore.getState().findByTitle("acme", "Runbook")).resolves.toBeNull()
   })
 })

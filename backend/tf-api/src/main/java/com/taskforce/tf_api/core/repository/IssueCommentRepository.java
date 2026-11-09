@@ -17,6 +17,23 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
     long countByIssueId(Long issueId);
 
     /**
+     * Ctrl+K (R141) : les commentaires des issues non archivées des projets donnés qui répondent à {@code tsquery}
+     * ({@code to_tsquery}, configuration {@code simple}), les plus récents d'abord. Le texte de la requête est déjà réduit
+     * à des mots : rien ne peut casser sa syntaxe.
+     */
+    @Query(value = """
+        SELECT c.* FROM issue_comments c
+        JOIN issues i ON i.id = c.issue_id
+        WHERE i.project_id IN (:projectIds)
+          AND i.archived_at IS NULL
+          AND to_tsvector('simple', c.content) @@ to_tsquery('simple', :tsquery)
+        ORDER BY c.created_at DESC, c.id DESC
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<IssueComment> searchInProjects(@Param("projectIds") List<Long> projectIds, @Param("tsquery") String tsquery,
+                                        @Param("limit") int limit);
+
+    /**
      * Les commentaires des issues non archivées de chaque projet de l'espace, et leur dernier changement : Cortex les lit
      * avant de résumer une issue (R125).
      */

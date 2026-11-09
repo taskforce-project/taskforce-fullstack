@@ -2,19 +2,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen } from "@testing-library/react"
 
 import type { AssistantRead } from "@/lib/api/assistant-service"
-import { useNoteStore } from "@/lib/store/note-store"
 import { ReadLine } from "./read-line"
+
+const { push } = vi.hoisted(() => ({ push: vi.fn() }))
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }))
 
 const read = (patch: Partial<AssistantRead> = {}): AssistantRead => ({ issues: [], boards: [], tools: [], notes: 0, ...patch })
 const USAGE = { promptTokens: 100, completionTokens: 20, totalTokens: 120 }
-
-const openNote = vi.fn()
 
 /** R137 : « Je sais tjr pas c'est quoi les sources ». Le mot disparaît : la ligne grise dit ce qui a été lu, un clic nomme les notes. */
 describe("ReadLine", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    useNoteStore.setState({ openNote })
+    window.history.replaceState(null, "", "/acme?c=7")
   })
 
   const answer = (what: AssistantRead | null, model: string | null = "qwen3:8b") => ({ model, read: what, mode: "fast" as const, usage: USAGE })
@@ -26,7 +26,7 @@ describe("ReadLine", () => {
     expect(screen.queryByText(/Sources/)).not.toBeInTheDocument()
   })
 
-  it("un clic sur « 5 notes » les nomme, et chacune s'ouvre", () => {
+  it("un clic sur « 5 notes » les nomme, et chacune s'ouvre dans le volet, la conversation gardée", () => {
     render(<ReadLine slug="acme" answer={answer(read({ notes: 2, notesRead: [{ id: 12, title: "Release process" }, { id: 13, title: "Roadmap" }] }))} />)
 
     const notes = screen.getByRole("button", { name: "2 notes" })
@@ -37,7 +37,7 @@ describe("ReadLine", () => {
     fireEvent.click(screen.getByRole("button", { name: "Release process" }))
 
     expect(notes).toHaveAttribute("aria-expanded", "true")
-    expect(openNote).toHaveBeenCalledWith("acme", 12, "Release process")
+    expect(push).toHaveBeenCalledWith("/acme/notes/12?c=7", { scroll: false })
     expect(screen.getByRole("button", { name: "Roadmap" })).toBeInTheDocument()
   })
 

@@ -15,7 +15,7 @@ vi.mock("@/lib/api/assistant-service", async (importOriginal) => ({
   undoAction: vi.fn(),
 }))
 
-import { ChangesRow, MissionsRow, ResultsRow } from "./work-rows"
+import { ChangesRow, MissionsRow } from "./work-rows"
 import type { AnalysisJob } from "@/lib/api/analysis-service"
 import { undoAction, type AssistantToolCall } from "@/lib/api/assistant-service"
 import type { DeliveryRun } from "@/lib/api/delivery-service"
@@ -49,7 +49,7 @@ const success = (name: string, patch: Partial<AssistantToolCall> = {}): Assistan
 
 const unfold = (name: string) => fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${name}`) }))
 
-/** Results, Changes et Missions (R122) : le travail de la personne, chaque ligne vers son objet (R57). */
+/** Missions et Changes (R122, R141) : le travail de la personne, chaque ligne vers son objet (R57). */
 describe("les lignes du travail de la zone de droite", () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["Date"] })
@@ -63,24 +63,24 @@ describe("les lignes du travail de la zone de droite", () => {
   })
   afterEach(() => vi.useRealTimers())
 
-  it("lists the results that wait for the person's judgment, each opening its issue", () => {
+  it("lists the results that wait for the person's judgment, each opening its issue, and does not repeat them in Done", () => {
     useDeliveryStore.setState({
       workspaceRuns: [run(1, { status: "DONE" }), run(2, { status: "DONE", outcome: "APPLIED" }), run(3, { status: "DONE", startedById: 8 })],
     })
-    render(<ResultsRow />)
+    render(<MissionsRow />)
 
-    expect(screen.getByRole("button", { name: /^Results/ })).toHaveTextContent("1")
-    unfold("Results")
+    expect(screen.getByRole("button", { name: /^Missions/ })).toHaveTextContent("1 to review")
+    unfold("Missions")
     const result = screen.getByRole("link", { name: /WEB-1 Issue 1/ })
     expect(result).toHaveAttribute("href", "/acme/projects/3?issue=10")
     fireEvent.click(result)
     expect(nav.push).toHaveBeenCalledWith("/acme/projects/3?issue=10", { scroll: false })
+    expect(screen.getByRole("button", { name: "Done: 1" })).toBeInTheDocument()
   })
 
-  it("says when no result waits", () => {
-    render(<ResultsRow />)
-    unfold("Results")
-    expect(screen.getByText("No result waits for your review.")).toBeInTheDocument()
+  it("is not there when nothing has ever run", () => {
+    const { container } = render(<MissionsRow />)
+    expect(container).toBeEmptyDOMElement()
   })
 
   it("lists what the conversation changed, with Undo where it can, and the pull requests of its missions", async () => {
@@ -102,6 +102,8 @@ describe("les lignes du travail de la zone de droite", () => {
     useDeliveryStore.setState({ workspaceRuns: [run(5, { status: "DONE", resultUrl: "https://github.com/acme/website/pull/212" })] })
     render(<ChangesRow />)
 
+    // D'un regard : la dernière chose changée, et leur nombre.
+    expect(screen.getByRole("button", { name: /^Changes/ })).toHaveTextContent("Created Pricing page")
     expect(screen.getByRole("button", { name: /^Changes/ })).toHaveTextContent("3")
     unfold("Changes")
     // Le plus récent d'abord : la carte, puis les gestes du tour, du dernier au premier.
@@ -153,10 +155,9 @@ describe("les lignes du travail de la zone de droite", () => {
     expect(screen.getAllByRole("listitem").map((li) => li.querySelector("p")?.textContent)).toEqual(["Archived WEB-12 Fix the login"])
   })
 
-  it("says when the conversation changed nothing yet", () => {
-    render(<ChangesRow />)
-    unfold("Changes")
-    expect(screen.getByText("This conversation hasn't changed anything in TaskForce yet.")).toBeInTheDocument()
+  it("is not there while the conversation has changed nothing", () => {
+    const { container } = render(<ChangesRow />)
+    expect(container).toBeEmptyDOMElement()
   })
 
   it("shows the running missions with their time, then unfolds the history from Done", () => {
@@ -166,7 +167,7 @@ describe("les lignes du travail de la zone de droite", () => {
     useWorkflowStore.setState({ jobs: [job(4), job(6, { status: "DONE" })] })
     render(<MissionsRow />)
 
-    expect(screen.getByRole("button", { name: /^Missions/ })).toHaveTextContent("2")
+    expect(screen.getByRole("button", { name: /^Missions/ })).toHaveTextContent("2 running")
     unfold("Missions")
     // Une mission ouvre sa vue du travail (R95, point 3).
     const working = screen.getByRole("link", { name: /WEB-1 Issue 1/ })
@@ -201,11 +202,13 @@ describe("les lignes du travail de la zone de droite", () => {
     await waitFor(() => expect(reply).toHaveValue(""))
   })
 
-  it("says when no mission runs, and keeps the workflow canvas two clicks away", () => {
+  it("says when no mission runs, and keeps the history and the workflow canvas two clicks away", () => {
+    useDeliveryStore.setState({ workspaceRuns: [run(2, { status: "DONE", outcome: "APPLIED" })] })
     render(<MissionsRow />)
+    expect(screen.getByRole("button", { name: /^Missions/ })).toHaveTextContent("Nothing running")
     unfold("Missions")
 
-    expect(screen.getByText("No mission running.")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Done: 1" })).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Open the workflow canvas" }))
     expect(screen.getByRole("dialog", { name: "workflow canvas" })).toBeInTheDocument()
   })

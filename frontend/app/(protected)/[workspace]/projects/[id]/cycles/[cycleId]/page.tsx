@@ -219,7 +219,7 @@ function AddIssuesDialog({
           <Plus className="h-3.5 w-3.5" /> Add issues
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Add issues to cycle</DialogTitle>
         </DialogHeader>

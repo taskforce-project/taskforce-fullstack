@@ -246,6 +246,8 @@ export const ISSUE_ROUTES = {
   MY_CYCLES: (slug: string) => `/api/workspaces/${slug}/my-cycles`,
   /** La recherche de la fenêtre (Ctrl+K, le « @ » et le « + » du compositeur) : par clé ou par titre, tous projets vus. */
   SEARCH: (slug: string) => `/api/workspaces/${slug}/issues/search`,
+  /** Ctrl+K (R141) : les issues trouvées par ce qu'on a écrit dessous, sur les projets que la personne voit. */
+  SEARCH_COMMENTS: (slug: string) => `/api/workspaces/${slug}/issues/search/comments`,
   LIST:    (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues`,
   /** Liste paginée pour l'infinite-scroll du backlog (QA2-33) */
   PAGED:   (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/paged`,
@@ -385,17 +387,18 @@ export const EVAL_ROUTES = {
   CASE_CRITERIA: (slug: string, caseId: number) => `/api/workspaces/${slug}/evals/cases/${caseId}/criteria`,
 } as const;
 
-/** Une note du Brain OS, lue avec les droits de la personne : ce que Cortex a lu s'ouvre d'un clic (R137). */
-export const NOTE_ROUTES = {
-  NOTE: (slug: string, nodeId: number) => `/api/workspaces/${slug}/brain/nodes/${nodeId}`,
-} as const;
-
 /**
  * Ce que Cortex peut lire dans un espace (R125), compté et daté, pour le volet « Progress ».
  * Backend: @RequestMapping("/api/workspaces/{slug}/assistant/sources").
  */
 export const CORTEX_SOURCE_ROUTES = {
   SOURCES: (slug: string) => `/api/workspaces/${slug}/assistant/sources`,
+} as const;
+
+/** Les notes de l'espace (Brain OS) : Ctrl+K les cherche, le volet les lit (R141). */
+export const NOTE_ROUTES = {
+  SEARCH: (slug: string) => `/api/workspaces/${slug}/brain/search`,
+  BY_ID: (slug: string, id: number) => `/api/workspaces/${slug}/brain/nodes/${id}`,
 } as const;
 
 /**

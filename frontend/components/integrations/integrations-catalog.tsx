@@ -471,7 +471,7 @@ function ConnectorDialog({
   const [wide, setWide] = useState(false)
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className={cn("sm:max-w-md", wide && "sm:max-w-2xl")}>
+      <DialogContent size={wide ? "lg" : "sm"}>
         <DialogHeader>
           <DialogTitle>{isNew ? "Connect an MCP server" : tool.name}</DialogTitle>
         </DialogHeader>
@@ -708,6 +708,7 @@ function McpServerForm({
   const [name, setName] = useState(isNew ? "" : tool.name)
   const [mcpUrl, setMcpUrl] = useState(tool.mcpSuggestedUrl ?? "")
   const [authMode, setAuthMode] = useState<"bearer" | "header">("bearer")
+  const [withToken, setWithToken] = useState(false)
   const [headerName, setHeaderName] = useState("")
   const [mcpToken, setMcpToken] = useState("")
   const [status, setStatus] = useState<McpServerStatus | null>(null)
@@ -864,41 +865,53 @@ function McpServerForm({
         </span>
       </label>
 
-      {/* 1-clic : OAuth (découverte + DCR + PKCE), aucun jeton à coller. */}
-      <Button onClick={handleOAuth} disabled={!canSubmit} className="gap-1.5">
-        {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Server className="size-3.5" />}
-        Connect with OAuth
-      </Button>
-      <div className="flex items-center gap-2 text-[11px] text-muted-foreground/50">
-        <span className="h-px flex-1 bg-border" /> or with a token <span className="h-px flex-1 bg-border" />
-      </div>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-muted-foreground">Send the token as</span>
-        <Select value={authMode} onValueChange={(v) => setAuthMode(v as "bearer" | "header")}>
-          <SelectTrigger className="h-control"><SelectValue /></SelectTrigger>
-          <SelectContent position="popper">
-            <SelectItem value="bearer">Authorization: Bearer</SelectItem>
-            <SelectItem value="header">A custom header</SelectItem>
-          </SelectContent>
-        </Select>
-      </label>
-      {authMode === "header" && (
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">Header name *</span>
-          <Input value={headerName} onChange={(e) => setHeaderName(e.target.value)} placeholder="X-API-Key" autoComplete="off" />
-        </label>
+      {/* Le jeton, un clic plus loin : OAuth (découverte + DCR + PKCE) reste le geste par défaut, aucun jeton à coller. */}
+      {withToken && (
+        <>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Send the token as</span>
+            <Select value={authMode} onValueChange={(v) => setAuthMode(v as "bearer" | "header")}>
+              <SelectTrigger className="h-control"><SelectValue /></SelectTrigger>
+              <SelectContent position="popper">
+                <SelectItem value="bearer">Authorization: Bearer</SelectItem>
+                <SelectItem value="header">A custom header</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          {authMode === "header" && (
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">Header name *</span>
+              <Input value={headerName} onChange={(e) => setHeaderName(e.target.value)} placeholder="X-API-Key" autoComplete="off" />
+            </label>
+          )}
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              {authMode === "header" ? "Header value *" : "Access token (optional)"}
+            </span>
+            <Input type="password" value={mcpToken} onChange={(e) => setMcpToken(e.target.value)} autoComplete="off" />
+          </label>
+        </>
       )}
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-muted-foreground">
-          {authMode === "header" ? "Header value *" : "Access token (optional)"}
-        </span>
-        <Input type="password" value={mcpToken} onChange={(e) => setMcpToken(e.target.value)} autoComplete="off" />
-      </label>
+      <button
+        type="button"
+        onClick={() => setWithToken((value) => !value)}
+        className="w-fit text-xs text-muted-foreground transition-colors duration-150 hover:text-foreground motion-reduce:transition-none"
+      >
+        {withToken ? "Sign in with OAuth instead" : "Use a token instead"}
+      </button>
+      {/* Une action principale, en bas à droite (R133) : celle de la façon de se connecter choisie. */}
       <DialogFooter>
-        <Button variant="outline" onClick={handleConnect} disabled={!canSubmit || headerMissing} className="gap-1.5">
-          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
-          Connect
-        </Button>
+        {withToken ? (
+          <Button onClick={handleConnect} disabled={!canSubmit || headerMissing} className="gap-1.5">
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
+            Connect
+          </Button>
+        ) : (
+          <Button onClick={handleOAuth} disabled={!canSubmit} className="gap-1.5">
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Server className="size-3.5" />}
+            Connect with OAuth
+          </Button>
+        )}
       </DialogFooter>
     </div>
   )

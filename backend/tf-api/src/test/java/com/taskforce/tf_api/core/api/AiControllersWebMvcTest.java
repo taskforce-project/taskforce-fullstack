@@ -104,6 +104,35 @@ class AiControllersWebMvcTest {
     }
 
     @Test
+    @DisplayName("GET une note → 200, pour la lire dans le volet")
+    void knowledge_node_200() throws Exception {
+        when(knowledgeService.getNode(eq("acme"), eq(5L), anyLong()))
+            .thenReturn(com.taskforce.tf_api.core.dto.response.KnowledgeNodeResponse.builder().id(5L).title("Runbook").build());
+
+        mockMvc.perform(get("/api/workspaces/acme/brain/nodes/5").with(auth()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.title").value("Runbook"));
+    }
+
+    @Test
+    @DisplayName("POST brain/search : textOnly passe par le plein texte, sans lui la recherche habituelle")
+    void knowledge_search_text_only() throws Exception {
+        when(brainSearchService.searchText(eq("acme"), anyLong(), eq("deploy"), eq(6))).thenReturn(List.of());
+
+        mockMvc.perform(post("/api/workspaces/acme/brain/search").with(auth())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"query\":\"deploy\",\"topK\":6,\"textOnly\":true}"))
+            .andExpect(status().isOk());
+        org.mockito.Mockito.verify(brainSearchService).searchText(eq("acme"), anyLong(), eq("deploy"), eq(6));
+
+        mockMvc.perform(post("/api/workspaces/acme/brain/search").with(auth())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"query\":\"deploy\"}"))
+            .andExpect(status().isOk());
+        org.mockito.Mockito.verify(brainSearchService).search(eq("acme"), anyLong(), eq("deploy"), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull());
+    }
+
+    @Test
     @DisplayName("GET analysis workflows → 200")
     void analysis_list_200() throws Exception {
         when(analysisJobService.list(anyString(), anyLong())).thenReturn(List.of());

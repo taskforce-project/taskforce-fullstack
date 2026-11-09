@@ -32,7 +32,6 @@ import { DeleteIssueCard } from "./delete-issue-card"
 import { IssueDraftCard } from "./issue-draft-card"
 import { MissionInChat } from "./mission-in-chat"
 import { ModelOffer } from "./model-offer"
-import { NoteDialog } from "./note-dialog"
 import { QuestionCard } from "./question-card"
 import { ReadLine } from "./read-line"
 import { UndoAction } from "./undo-action"
@@ -409,7 +408,6 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
           </button>
         </div>
       )}
-      <NoteDialog />
     </div>
   )
 }

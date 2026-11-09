@@ -1,47 +1,54 @@
-import { create } from "zustand";
+import { create } from "zustand"
 
-import { getNote, type BrainNote } from "../api/note-service";
+import { getNote, searchNotes, type Note } from "@/lib/api/note-service"
 
 // ---------------------------------------------------------------------------
-// La note ouverte depuis ce que Cortex a lu (R137 : « 5 notes » les nomme, chacune s'ouvre). Un domaine = un store ; un
-// échec se dit par son état, jamais par une exception.
+// Les notes ouvertes dans le volet (R141, séance n°20) : Ctrl+K en trouve une, le volet la lit. Un domaine = un store ;
+// un échec rend null.
 // ---------------------------------------------------------------------------
+
+export type NoteStatus = "loading" | "ready" | "missing" | "failed"
 
 interface NoteState {
-  /** Son nom, connu dès le clic : le dialogue le montre pendant qu'elle se lit. */
-  title: string | null;
-  note: BrainNote | null;
-  loading: boolean;
-  failed: boolean;
-
-  /** Ouvre une note ; false si elle n'a pas pu être lue. */
-  openNote: (slug: string, id: number, title: string) => Promise<boolean>;
-  closeNote: () => void;
+  /** Les notes lues, par espace et par id (`noteKey`). */
+  notes: Record<string, Note>
+  /** Où en est chaque note. */
+  status: Record<string, NoteStatus>
+  /** Lit une note : la note, ou null quand elle n'existe plus, n'est pas lisible, ou que l'appel a échoué. */
+  fetchNote: (slug: string, id: number) => Promise<Note | null>
+  /** La note d'un titre exact (un lien `[[titre]]`), par la recherche de l'espace : son id, ou null. */
+  findByTitle: (slug: string, title: string) => Promise<number | null>
 }
 
-const CLOSED = { title: null, note: null, loading: false, failed: false };
+export const noteKey = (slug: string, id: number): string => `${slug}:${id}`
 
-/** La dernière note demandée : une réponse qui arrive après une autre ouverture ne la remplace pas. */
-let asked = 0;
+/** Une note absente et une note d'un projet privé répondent pareil : on ne révèle pas ce que la personne ne voit pas. */
+const isMissing = (error: unknown): boolean => (error as { response?: { status?: number } })?.response?.status === 404
 
-export const useNoteStore = create<NoteState>((set) => ({
-  ...CLOSED,
+export const useNoteStore = create<NoteState>()((set) => ({
+  notes: {},
+  status: {},
 
-  openNote: async (slug, id, title) => {
-    const mine = ++asked;
-    set({ title, note: null, loading: true, failed: false });
+  fetchNote: async (slug, id) => {
+    const key = noteKey(slug, id)
+    set((s) => ({ status: { ...s.status, [key]: "loading" } }))
     try {
-      const note = await getNote(slug, id);
-      if (mine === asked) set({ note, loading: false });
-      return true;
-    } catch {
-      if (mine === asked) set({ loading: false, failed: true });
-      return false;
+      const note = await getNote(slug, id)
+      set((s) => ({ notes: { ...s.notes, [key]: note }, status: { ...s.status, [key]: "ready" } }))
+      return note
+    } catch (error) {
+      set((s) => ({ status: { ...s.status, [key]: isMissing(error) ? "missing" : "failed" } }))
+      return null
     }
   },
 
-  closeNote: () => {
-    asked++;
-    set(CLOSED);
+  findByTitle: async (slug, title) => {
+    try {
+      const wanted = title.trim().toLowerCase()
+      const hits = await searchNotes(slug, title)
+      return hits.find((hit) => hit.title.trim().toLowerCase() === wanted)?.id ?? null
+    } catch {
+      return null
+    }
   },
-}));
+}))

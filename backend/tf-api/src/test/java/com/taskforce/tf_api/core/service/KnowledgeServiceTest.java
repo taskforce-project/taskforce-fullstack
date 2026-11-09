@@ -85,18 +85,6 @@ class KnowledgeServiceTest {
     }
 
     @Test
-    @DisplayName("getNode : une note se lit avec les droits de la personne (ce que Cortex a lu s'ouvre d'un clic)")
-    void get_node_reads_with_the_person_s_rights() {
-        workspace();
-        when(access.requireNode(50L, VIEWER)).thenReturn(node(50L, null));
-
-        KnowledgeNodeResponse res = service.getNode(SLUG, 50L, USER);
-
-        assertThat(res.getTitle()).isEqualTo("N50");
-        verify(access).requireNode(50L, VIEWER);
-    }
-
-    @Test
     @DisplayName("createNode avec parentNodeId : la page est nichee sous le parent (valide meme-workspace)")
     void create_with_parent_nests_under_it() {
         workspace();
@@ -219,5 +207,26 @@ class KnowledgeServiceTest {
         assertThat(kept).hasSize(5);
         assertThat(kept).contains(container);                       // l'ossature n'est jamais larguee
         assertThat(kept.stream().filter(n -> n.getParentNodeId() != null)).hasSize(4); // + feuilles jusqu'au plafond
+    }
+
+    @Test
+    @DisplayName("getNode : la note que la personne lit, pour le volet")
+    void get_node_reads_a_note() {
+        workspace();
+        when(access.requireNode(5L, VIEWER)).thenReturn(node(5L, null));
+
+        assertThat(service.getNode(SLUG, 5L, USER).getTitle()).isEqualTo("N5");
+    }
+
+    @Test
+    @DisplayName("getNode : une note archivée répond comme une note absente")
+    void get_node_hides_an_archived_note() {
+        workspace();
+        KnowledgeNode archived = node(5L, null);
+        archived.setStatus(NodeStatus.ARCHIVED);
+        when(access.requireNode(5L, VIEWER)).thenReturn(archived);
+
+        assertThatThrownBy(() -> service.getNode(SLUG, 5L, USER))
+            .isInstanceOf(com.taskforce.tf_api.shared.exception.ResourceNotFoundException.class);
     }
 }
