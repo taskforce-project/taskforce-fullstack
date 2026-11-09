@@ -74,7 +74,7 @@ function LoadingRows() {
 function Group({ title, count, showMore, children }: Readonly<{
   title: string
   count: number
-  showMore?: { hidden: number; run: () => void; label: string } | null
+  showMore?: { run: () => void; label: string } | null
   children: ReactNode
 }>) {
   return (
@@ -145,7 +145,6 @@ export function InboxView({ show = "all" }: Readonly<{ show?: InboxShow }>) {
     if (slug) void markAsRead(slug, s.id)
     const target = issueRefOfUrl(s.issueUrl)
     if (target?.issueId != null && slug) router.push(issuePath(slug, target.projectId, target.issueId))
-    else if (s.operationUrl) router.push(s.operationUrl)
   }
 
   function openWaiting(item: WaitingItem) {
@@ -159,7 +158,8 @@ export function InboxView({ show = "all" }: Readonly<{ show?: InboxShow }>) {
     const actions: ListRowAction[] = []
     if (!s.read) actions.push({ label: t.markRead, run: () => void markAsRead(slug, s.id) })
     if (!s.acknowledged) actions.push({ label: t.dismiss, run: () => void acknowledge(slug, s.id) })
-    if (issueRefOfUrl(s.issueUrl)?.issueId != null || s.operationUrl) actions.push({ label: t.openBoard, run: () => openOnBoard(s) })
+    // Seulement une issue a un tableau : une surcharge mène à la fiche d'un membre, le clic sur la ligne suffit.
+    if (issueRefOfUrl(s.issueUrl)?.issueId != null) actions.push({ label: t.openBoard, run: () => openOnBoard(s) })
     return actions
   }
 
@@ -220,7 +220,6 @@ export function InboxView({ show = "all" }: Readonly<{ show?: InboxShow }>) {
         title={title}
         count={items.length}
         showMore={hidden > 0 ? {
-          hidden,
           label: fillText(t.showMore, { count: hidden }),
           run: () => setLimits((current) => ({ ...current, [name]: limit + GROUP_PAGE })),
         } : null}

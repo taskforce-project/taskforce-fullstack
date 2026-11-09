@@ -107,13 +107,14 @@ describe("InboxView", () => {
     expect(screen.getByRole("group", { name: "Notification: Declined" })).toBeInTheDocument()
   })
 
-  it("an overload leads to the member, without a key", () => {
+  it("an overload leads to the member, without a key and without a board", () => {
     useNotificationStore.setState({
       signals: [signal({ id: "5", type: "overload", title: "Ada is overloaded (9 open issues)", issueId: "overload-7", issueUrl: "/acme/members/7" })],
     })
     render(<InboxView />)
 
     expect(screen.queryByText("overload-7")).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Open on its board" })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: /^Too much work/ }))
     expect(push).toHaveBeenCalledWith("/acme/members/7")
   })
