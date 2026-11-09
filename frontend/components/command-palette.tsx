@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type ReactNode } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
-  Activity, Bug, CalendarRange, CircleDot, FileText, FolderKanban, Inbox, LayoutDashboard, ListChecks, MessageSquare,
-  MessagesSquare, Monitor, Moon, Plus, Repeat, Settings, Sparkles, Sun, TrendingUp, User, Users, type LucideIcon,
+  Activity, AtSign, Bug, CalendarRange, CircleDot, FileText, FolderKanban, Inbox, LayoutDashboard, ListChecks, MessageSquare,
+  MessagesSquare, Monitor, Moon, Plus, Repeat, Settings, ShieldAlert, Sparkles, Sun, TrendingUp, User, Users, type LucideIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -30,7 +30,8 @@ import { homePath, PROGRESS } from "@/lib/window/pane"
 const REPORT_ISSUE_URL = "https://github.com/taskforce-project/taskforce-fullstack/issues/new/choose"
 
 type ScreenKey =
-  | "waitingForYou" | "myWork" | "dashboard" | "projects" | "roadmap" | "cycles" | "members" | "analytics" | "progress"
+  | "waitingForYou" | "alerts" | "mentions" | "myWork" | "dashboard" | "projects" | "roadmap" | "cycles" | "members"
+  | "analytics" | "progress"
 
 /**
  * Les écrans qui ont quitté le premier regard (R124, la règle de Norman), et ceux de la barre de gauche : chacun s'ouvre
@@ -38,6 +39,9 @@ type ScreenKey =
  */
 const SCREENS: readonly { key: ScreenKey; path: string; icon: LucideIcon }[] = [
   { key: "waitingForYou", path: "/inbox", icon: Inbox },
+  // Les anciens onglets du volet (R141) : leur liste seule, à leur adresse.
+  { key: "alerts", path: "/inbox/alerts", icon: ShieldAlert },
+  { key: "mentions", path: "/inbox/mentions", icon: AtSign },
   { key: "myWork", path: "/my-work", icon: ListChecks },
   { key: "dashboard", path: "/dashboard", icon: LayoutDashboard },
   { key: "projects", path: "/projects", icon: FolderKanban },
@@ -124,14 +128,15 @@ export function CommandPalette({ open, onOpenChange }: Readonly<{ open: boolean;
   const root = useRef<HTMLDivElement>(null)
   // Entrée pressée avant la réponse : la ligne attendue est la première des résultats à venir, pas celle d'avant.
   const enterWaits = useRef(false)
-  const askedMembers = useRef(false)
+  const membersAskedFor = useRef<string | null>(null)
 
-  // Les personnes ne se chargent qu'une fois, à la première ouverture. App desktop : on y travaille seul avec ses agents.
+  // Les personnes ne se chargent qu'une fois par espace, à la première ouverture. App desktop : on y travaille seul avec
+  // ses agents.
   useEffect(() => {
-    if (!open || IS_DESKTOP || members.length > 0 || askedMembers.current) return
-    askedMembers.current = true
+    if (!open || IS_DESKTOP || members.length > 0 || membersAskedFor.current === slug) return
+    membersAskedFor.current = slug
     void fetchMembers()
-  }, [open, members.length, fetchMembers])
+  }, [open, slug, members.length, fetchMembers])
 
   const close = useCallback(() => {
     onOpenChange(false)

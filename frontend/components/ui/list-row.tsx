@@ -52,7 +52,8 @@ export function ListRow({ icon: Icon, tone, name, hint, sentence, unread, unread
       {(code || time) && (
         <span className={cn("flex shrink-0 items-center gap-3 text-xs text-muted-foreground", actions.length > 0 && "[@media(hover:none)]:hidden")}>
           {code && <span className="font-mono">{code}</span>}
-          {time && <span className="tabular-nums">{time}</span>}
+          {/* Une largeur fixe : les clés s'alignent d'une ligne à l'autre, avec ou sans moment. */}
+          <span className="w-[4.5rem] text-right tabular-nums">{time}</span>
         </span>
       )}
     </>

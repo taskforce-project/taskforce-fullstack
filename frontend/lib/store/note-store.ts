@@ -1,6 +1,6 @@
 import { create } from "zustand"
 
-import { getNote, type Note } from "@/lib/api/note-service"
+import { getNote, searchNotes, type Note } from "@/lib/api/note-service"
 
 // ---------------------------------------------------------------------------
 // Les notes ouvertes dans le volet (R141, séance n°20) : Ctrl+K en trouve une, le volet la lit. Un domaine = un store ;
@@ -16,6 +16,8 @@ interface NoteState {
   status: Record<string, NoteStatus>
   /** Lit une note : la note, ou null quand elle n'existe plus, n'est pas lisible, ou que l'appel a échoué. */
   fetchNote: (slug: string, id: number) => Promise<Note | null>
+  /** La note d'un titre exact (un lien `[[titre]]`), par la recherche de l'espace : son id, ou null. */
+  findByTitle: (slug: string, title: string) => Promise<number | null>
 }
 
 export const noteKey = (slug: string, id: number): string => `${slug}:${id}`
@@ -36,6 +38,16 @@ export const useNoteStore = create<NoteState>()((set) => ({
       return note
     } catch (error) {
       set((s) => ({ status: { ...s.status, [key]: isMissing(error) ? "missing" : "failed" } }))
+      return null
+    }
+  },
+
+  findByTitle: async (slug, title) => {
+    try {
+      const wanted = title.trim().toLowerCase()
+      const hits = await searchNotes(slug, title)
+      return hits.find((hit) => hit.title.trim().toLowerCase() === wanted)?.id ?? null
+    } catch {
       return null
     }
   },

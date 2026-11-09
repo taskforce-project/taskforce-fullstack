@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { AlertTriangle, ExternalLink, FileText } from "lucide-react"
+import { toast } from "sonner"
 
 import { PageContainer } from "@/components/layout/page-shell"
 import { Button } from "@/components/ui/button"
@@ -12,6 +13,7 @@ import { fillText } from "@/lib/delivery/result-card"
 import { noteKey, useNoteStore } from "@/lib/store/note-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { relativeTime } from "@/lib/utils/server-date"
+import { withConversation } from "@/lib/window/address"
 
 /**
  * Une note de l'espace, dans le volet (R141, séance n°20) : Ctrl+K la trouve, on la lit ici, la conversation gardée. Rien
@@ -25,10 +27,19 @@ export function NoteView({ id }: Readonly<{ id: number }>) {
   const note = useNoteStore((s) => s.notes[key])
   const status = useNoteStore((s) => s.status[key])
   const fetchNote = useNoteStore((s) => s.fetchNote)
+  const findByTitle = useNoteStore((s) => s.findByTitle)
+  const router = useRouter()
 
   useEffect(() => {
     if (slug && Number.isFinite(id)) void fetchNote(slug, id)
   }, [slug, id, fetchNote])
+
+  // Un lien `[[titre]]` ouvre sa note dans le volet, la conversation gardée.
+  async function openLinked(title: string) {
+    const linked = await findByTitle(slug, title)
+    if (linked === null) toast.error(t.linkMissing)
+    else router.push(withConversation(`/${slug}/notes/${linked}`, globalThis.location?.search ?? ""), { scroll: false })
+  }
 
   if (!Number.isFinite(id) || status === "missing") {
     return <p className="text-sm text-muted-foreground">{t.missing}</p>
@@ -61,7 +72,7 @@ export function NoteView({ id }: Readonly<{ id: number }>) {
         </h1>
         {note.updatedAt && <p className="text-xs text-muted-foreground">{fillText(t.updated, { when: relativeTime(note.updatedAt) })}</p>}
       </header>
-      {note.content ? <Markdown content={note.content} /> : <p className="text-sm text-muted-foreground">{t.empty}</p>}
+      {note.content ? <Markdown content={note.content} onWikiLink={(title) => void openLinked(title)} /> : <p className="text-sm text-muted-foreground">{t.empty}</p>}
       {note.contentUrl && (
         <a
           href={note.contentUrl}

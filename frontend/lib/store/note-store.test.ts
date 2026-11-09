@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { getNote, type Note } from "@/lib/api/note-service"
+import { getNote, searchNotes, type Note } from "@/lib/api/note-service"
 import { noteKey, useNoteStore } from "./note-store"
 
-vi.mock("@/lib/api/note-service", () => ({ getNote: vi.fn() }))
+vi.mock("@/lib/api/note-service", () => ({ getNote: vi.fn(), searchNotes: vi.fn() }))
 
 const note: Note = { id: 5, title: "Runbook", content: "# Hi", contentUrl: null, updatedAt: null }
 const key = noteKey("acme", 5)
@@ -35,5 +35,23 @@ describe("useNoteStore", () => {
 
     await expect(useNoteStore.getState().fetchNote("acme", 5)).resolves.toBeNull()
     expect(useNoteStore.getState().status[key]).toBe(status)
+  })
+
+  it("finds the note of an exact title, for a [[link]]", async () => {
+    vi.mocked(searchNotes).mockResolvedValue([
+      { id: 8, title: "Runbook of staging", excerpt: "" },
+      { id: 5, title: "Runbook", excerpt: "" },
+    ])
+
+    await expect(useNoteStore.getState().findByTitle("acme", " runbook ")).resolves.toBe(5)
+    expect(searchNotes).toHaveBeenCalledWith("acme", " runbook ")
+  })
+
+  it.each([
+    ["no note of that title", () => vi.mocked(searchNotes).mockResolvedValue([{ id: 8, title: "Other", excerpt: "" }])],
+    ["a failure", () => vi.mocked(searchNotes).mockRejectedValue(new Error("down"))],
+  ])("a link leads nowhere on %s", async (_, arrange) => {
+    arrange()
+    await expect(useNoteStore.getState().findByTitle("acme", "Runbook")).resolves.toBeNull()
   })
 })

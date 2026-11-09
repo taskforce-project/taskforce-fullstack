@@ -1,22 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 
-vi.mock("next/navigation", () => ({ useParams: () => ({ workspace: "acme" }) }))
+const { push, toastError } = vi.hoisted(() => ({ push: vi.fn(), toastError: vi.fn() }))
+vi.mock("next/navigation", () => ({ useParams: () => ({ workspace: "acme" }), useRouter: () => ({ push }) }))
+vi.mock("sonner", () => ({ toast: { error: toastError } }))
 
 import { NoteView } from "./note-view"
 import type { Note } from "@/lib/api/note-service"
 import { noteKey, useNoteStore } from "@/lib/store/note-store"
 
-const note: Note = { id: 5, title: "Runbook", content: "Roll the **deploy**", contentUrl: "https://example.org/doc", updatedAt: "2026-11-08T10:00:00" }
+const note: Note = { id: 5, title: "Runbook", content: "Roll the **deploy**, see [[Staging]]", contentUrl: "https://example.org/doc", updatedAt: "2026-11-08T10:00:00" }
 const key = noteKey("acme", 5)
 
-/** Une note dans le volet (R141) : on la lit, et un échec dit quoi faire. */
+/** Une note dans le volet (R141) : on la lit, ses liens s'ouvrent, et un échec dit quoi faire. */
 describe("NoteView", () => {
   const fetchNote = vi.fn().mockResolvedValue(null)
+  const findByTitle = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
-    useNoteStore.setState({ notes: {}, status: {}, fetchNote })
+    window.history.replaceState(null, "", "/acme/notes/5?c=12")
+    useNoteStore.setState({ notes: {}, status: {}, fetchNote, findByTitle })
   })
 
   it("reads the note: title, when it changed, text, source", () => {
@@ -28,6 +32,28 @@ describe("NoteView", () => {
     expect(screen.getByText(/^Updated /)).toBeInTheDocument()
     expect(screen.getByText("deploy")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Open the original" })).toHaveAttribute("href", "https://example.org/doc")
+  })
+
+  it("a [[link]] opens its note in the pane, the conversation kept", async () => {
+    findByTitle.mockResolvedValue(8)
+    useNoteStore.setState({ notes: { [key]: note }, status: { [key]: "ready" } })
+    render(<NoteView id={5} />)
+
+    fireEvent.click(screen.getByRole("button", { name: "Staging" }))
+
+    expect(findByTitle).toHaveBeenCalledWith("acme", "Staging")
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/acme/notes/8?c=12", { scroll: false }))
+  })
+
+  it("a [[link]] that leads nowhere says so", async () => {
+    findByTitle.mockResolvedValue(null)
+    useNoteStore.setState({ notes: { [key]: note }, status: { [key]: "ready" } })
+    render(<NoteView id={5} />)
+
+    fireEvent.click(screen.getByRole("button", { name: "Staging" }))
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("This note links to a page that isn't there any more."))
+    expect(push).not.toHaveBeenCalled()
   })
 
   it("says when a note has no text", () => {

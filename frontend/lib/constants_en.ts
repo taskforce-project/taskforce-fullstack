@@ -742,6 +742,7 @@ export const CONSTANTS_EN = {
     source: "Open the original",
     missing: "This note isn't there any more, or it's in a project you can't see.",
     failed: "Couldn't open this note. Check your connection, then try again.",
+    linkMissing: "This note links to a page that isn't there any more.",
     retry: "Try again",
   },
 
@@ -796,6 +797,8 @@ export const CONSTANTS_EN = {
     newConversation: "New conversation",
     search: "Search",
     waitingForYou: "Waiting for you",
+    alerts: "Alerts",
+    mentions: "Mentions",
     // R128: unread mentions are counted apart from what blocks an agent: a quiet dot beside the number.
     unreadMentions: "Unread mentions: {count}",
     projects: "Projects",
