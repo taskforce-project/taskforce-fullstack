@@ -434,6 +434,8 @@ function ToolCallView({ slug, call, followUp = false }: { slug: string; call: As
   if (isDeletion(call)) return <DeleteIssueCard slug={slug} call={call} target={call.target} />
   // Repris sur une carte, le geste n'a pas de réponse du modèle : ce qu'il a fait se dit ici, en une phrase.
   const said = followUp ? outcomeLine(call, t) : null
+  // Un appel sans carte se raconte dans le pli du travail : ici, il ne prend aucune place.
+  if (!said && !isApprovable(call) && !isUndoable(call) && !isMission(call)) return null
   return (
     <div>
       {said && <p className="whitespace-pre-wrap break-words text-sm text-foreground">{said}</p>}

@@ -74,6 +74,14 @@ describe("AgentChat : le fil", () => {
     expect(screen.queryByText(/delete_issue|list_issues|Tools:/)).not.toBeInTheDocument()
   })
 
+  it("un appel sans carte ne prend aucune place dans le fil", () => {
+    const { container } = show([said("u1", "Résume"), replied("a1", { toolCalls: [call("list_issues", "success")] })])
+
+    const answerRoot = container.querySelector(".group\\/answer")
+    expect(answerRoot?.querySelectorAll(":scope > div:empty")).toHaveLength(0)
+    expect(screen.getByRole("button", { name: "Worked for 8 s" })).toBeInTheDocument()
+  })
+
   it("la carte d'une action demandée dit ce qu'elle fera, sans le nom de l'outil", async () => {
     vi.mocked(approveAction).mockResolvedValue({ tool: "delegate_issue", status: "success", output: "Delegated SOLO-151." })
     show([said("u1", "Confie"), replied("a1", { toolCalls: [call("delegate_issue", "pending")] })])
