@@ -19,6 +19,7 @@ import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationDetail;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationSummary;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.MessageDto;
+import com.taskforce.tf_api.core.dto.response.ConversationDtos;
 import com.taskforce.tf_api.core.model.AiConversation;
 import com.taskforce.tf_api.core.model.AiMessage;
 import com.taskforce.tf_api.core.model.Project;
@@ -275,8 +276,13 @@ class AiConversationServiceTest {
         when(conversationRepository.findByIdAndUserId(1L, 7L)).thenReturn(Optional.of(conv));
         when(llm.chatCompletion(anyString(), anyString(), anyBoolean(), anyString())).thenReturn("Résumé.");
 
-        assertThat(service.compact(1L, 7L)).isEqualTo(2);
+        ConversationDtos.Compaction done = service.compact(1L, 7L);
 
+        assertThat(done.summarized()).isEqualTo(2);
+        assertThat(done.summary()).isEqualTo("Résumé.");
+        assertThat(done.contextWindow()).isEqualTo(16_384);
+        assertThat(done.contextEstimated()).isFalse();
+        assertThat(done.historyTokens()).isPositive();
         assertThat(conv.getSummary()).isEqualTo("Résumé.");
         assertThat(conv.getSummaryUptoId()).isEqualTo(2L);
         org.mockito.ArgumentCaptor<AiMessage> line = org.mockito.ArgumentCaptor.forClass(AiMessage.class);
@@ -284,6 +290,26 @@ class AiConversationServiceTest {
         assertThat(line.getValue().getMode()).isEqualTo(AiConversationService.COMPACT_MODE);
         assertThat(line.getValue().getRole()).isEqualTo("assistant");
         assertThat(line.getValue().getReading()).containsKey("context");
+        // La ligne garde le résumé : elle l'ouvre, et une conversation rouverte aussi.
+        assertThat(line.getValue().getContent()).isEqualTo("Résumé.");
+    }
+
+    @Test
+    @DisplayName("compact : la jauge compte ce qui reste, le résumé et ce qui n'a pas été condensé")
+    void compact_says_what_is_left() throws Exception {
+        when(aiMeter.metered(any(), any())).thenAnswer(inv -> ((AiMeter.AiCall<?>) inv.getArgument(1)).call());
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.contextWindow("fast")).thenReturn(new ModelWindow("qwen3:8b", 16_384, true, 2_048));
+        AiConversation conv = holding(List.of(msg(1L, "user", "a".repeat(3_000)), msg(2L, "assistant", "b".repeat(3_000)),
+            msg(3L, "user", "Dernière demande"), msg(4L, "assistant", "Dernière réponse")));
+        when(conversationRepository.findByIdAndUserId(1L, 7L)).thenReturn(Optional.of(conv));
+        when(llm.chatCompletion(anyString(), anyString(), anyBoolean(), anyString())).thenReturn("Résumé court.");
+
+        ConversationDtos.Compaction done = service.compact(1L, 7L);
+
+        assertThat(done.historyTokens()).isBetween(1, 200); // deux mille jetons condensés, il n'en reste que quelques dizaines
+        assertThat(done.contextEstimated()).isTrue();
+        assertThat(done.withBaseline(1_000).contextTokens()).isEqualTo(1_000 + done.historyTokens());
     }
 
     @ParameterizedTest(name = "{0} messages")
@@ -295,8 +321,10 @@ class AiConversationServiceTest {
         AiConversation conv = holding(thread(count));
         when(conversationRepository.findByIdAndUserId(1L, 7L)).thenReturn(Optional.of(conv));
 
-        assertThat(service.compact(1L, 7L)).isZero();
+        ConversationDtos.Compaction done = service.compact(1L, 7L);
 
+        assertThat(done.summarized()).isZero();
+        assertThat(done.withBaseline(3_000).contextTokens()).isZero(); // la jauge garde sa mesure
         verify(llm, never()).chatCompletion(anyString(), anyString(), anyBoolean(), anyString());
         verify(messageRepository, never()).save(any());
     }
@@ -326,6 +354,21 @@ class AiConversationServiceTest {
         assertThatThrownBy(() -> service.compact(1L, 7L)).isInstanceOf(BusinessException.class);
         assertThat(conv.getSummary()).isNull();
         verify(messageRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("compact : un modèle trop lent se dit, et rien n'a changé")
+    void compact_says_why_it_failed() throws Exception {
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.contextWindow("fast")).thenReturn(new ModelWindow("qwen3:8b", 16_384, false, 2_048));
+        AiConversation conv = holding(thread(4));
+        when(conversationRepository.findByIdAndUserId(1L, 7L)).thenReturn(Optional.of(conv));
+        when(aiMeter.metered(any(), any())).thenThrow(new RuntimeException("down", com.taskforce.tf_api.core.service.ai.ModelProviderException
+            .transport("timed out", new java.net.http.HttpTimeoutException("timed out"), java.time.Duration.ofSeconds(180))));
+
+        assertThatThrownBy(() -> service.compact(1L, 7L)).isInstanceOf(BusinessException.class)
+            .hasMessageStartingWith("Nothing changed in this conversation.")
+            .hasMessageContaining("180 seconds");
     }
 
     @Test

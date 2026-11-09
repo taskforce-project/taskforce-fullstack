@@ -14,6 +14,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead.ContextRead;
+import com.taskforce.tf_api.core.dto.response.ConversationDtos.Compaction;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationDetail;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationSummary;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.MessageDto;
@@ -23,8 +24,10 @@ import com.taskforce.tf_api.core.repository.AiConversationRepository;
 import com.taskforce.tf_api.core.repository.AiMessageRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.service.ai.ContextBudget;
+import com.taskforce.tf_api.core.service.ai.ModelFailure;
 import com.taskforce.tf_api.core.service.ai.ModelWindow;
 import com.taskforce.tf_api.core.service.ai.TurnHistory;
+import com.taskforce.tf_api.core.service.agent.TurnProgress;
 import com.taskforce.tf_api.shared.exception.AiRateLimitedException;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -44,12 +47,12 @@ import lombok.extern.slf4j.Slf4j;
 public class AiConversationService {
 
     private static final String DEFAULT_TITLE = "New conversation";
-    /** Ce que « /compact » laisse dans la conversation : une ligne de TaskForce, qui ne part jamais au modèle. */
+    /** Ce que « /compact » laisse dans la conversation : une ligne, avec son résumé, qui ne part jamais au modèle. */
     static final String COMPACT_MODE = "compact";
-    private static final String COMPACTED = "Conversation compacted";
     /** Le dernier échange reste toujours verbatim : une compaction ne condense pas ce qui vient d'être dit. */
     private static final int LAST_EXCHANGE = 2;
     /** Ce qu'un message apporte au prompt d'un résumé : au moins ce début, plus quand peu de messages partagent la place. */
+    private static final String NOT_COMPACTED = "The model returned no summary, so nothing changed in this conversation. Try again.";
     private static final int MESSAGE_CHARS_MIN = 600;
     private static final int MESSAGE_CHARS_MAX = 4_000;
 
@@ -141,6 +144,7 @@ public class AiConversationService {
             return TurnHistory.Fitted.NONE;
         }
         Condensation pending = llm.isConfigured() ? due(kept, budget) : null;
+        if (pending != null) TurnProgress.say(TurnProgress.CONDENSING);
         String summary = pending == null ? null : summarized(pending, tier);
         if (summary == null) {
             return chosen(kept, budget, 0);
@@ -152,12 +156,13 @@ public class AiConversationService {
 
     /**
      * « /compact », à la demande (TF-J1-13) : condense tout sauf le dernier échange, même sous le seuil, et le dit dans la
-     * conversation par une ligne qui ne part jamais au modèle. Métré comme tout appel hors chat : au-dessus du quota, le
-     * refus remonte ; un résumé raté dit que rien n'a changé.
+     * conversation par une ligne qui ne part jamais au modèle, et qui garde le résumé (TF-J1-15 : « la ca supp tout le
+     * context ??? » : le fil reste entier, et la ligne montre ce que le modèle garde). Métré comme tout appel hors chat :
+     * au-dessus du quota, le refus remonte ; un résumé raté dit pourquoi, et que rien n'a changé.
      *
-     * @return les messages condensés ; 0 quand il n'y a rien à condenser
+     * @return ce qui a été condensé, le résumé et ce qu'il reste à envoyer au modèle
      */
-    public int compact(Long conversationId, Long userId) {
+    public Compaction compact(Long conversationId, Long userId) {
         if (!llm.isConfigured()) {
             throw new BusinessException("AI is not available on this instance.");
         }
@@ -170,7 +175,7 @@ public class AiConversationService {
         Condensation pending = kept == null ? null
             : condensation(kept, budget, Math.max(0, kept.messages().size() - LAST_EXCHANGE));
         if (pending == null || pending.count() == 0) {
-            return 0;
+            return Compaction.NOTHING;
         }
         String summary;
         try {
@@ -180,15 +185,23 @@ public class AiConversationService {
             throw refused; // le quota ou le frein de débit : leur réponse HTTP dit l'attente
         } catch (Exception failed) {
             log.warn("Compaction de la conversation {} impossible : {}", conversationId, LogSafe.of(failed.getMessage()));
-            throw new BusinessException("The conversation could not be compacted: nothing changed. Try again.");
+            throw new BusinessException("Nothing changed in this conversation. " + ModelFailure.of(failed).said());
         }
         if (summary == null || summary.isBlank()) {
-            throw new BusinessException("The conversation could not be compacted: nothing changed. Try again.");
+            throw new BusinessException(NOT_COMPACTED);
         }
-        save(conversationId, summary.strip(), pending.uptoId());
-        appendMessage(conversationId, "assistant", COMPACTED, COMPACT_MODE, 0, null,
+        String written = summary.strip();
+        save(conversationId, written, pending.uptoId());
+        appendMessage(conversationId, "assistant", written, COMPACT_MODE, 0, null,
             new AssistantRead(List.of(), List.of(), List.of(), 0, new ContextRead(pending.count(), 0, 0)));
-        return pending.count();
+        // Ce qui partira maintenant : le résumé, et les messages que la compaction n'a pas pris.
+        int[] sizes = sizes(kept.messages());
+        int left = 0;
+        for (int i = pending.count(); i < sizes.length; i++) {
+            left += sizes[i];
+        }
+        return new Compaction(pending.count(), written, tokensOf(summaryMessage(written)) + left, 0,
+            window == null ? null : Integer.valueOf(window.tokens()), window != null && window.estimated());
     }
 
     /** Ce qu'il y a à envoyer : le résumé courant, et les messages au-delà de son filigrane. */
