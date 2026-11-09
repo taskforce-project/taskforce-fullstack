@@ -158,10 +158,10 @@ class TrialAgentLoopTest {
         ArgumentCaptor<CreateIssueCommentRequest> comment = ArgumentCaptor.forClass(CreateIssueCommentRequest.class);
         verify(issueService).addComment(eq("acme"), eq(3L), eq(55L), comment.capture(), eq(7L));
         assertThat(comment.getValue().getContent()).isEqualTo("Three themes: export, speed, onboarding. The export comes first.");
-        assertThat(commentedVia.get()).isEqualTo("qwen3:8b");
+        assertThat(commentedVia.get()).isEqualTo("Cortex · qwen3:8b");
         DeliveryPoll poll = finished();
         assertThat(poll.status()).isEqualTo(DeliveryRunStatus.DONE);
-        assertThat(poll.summary()).isEqualTo("qwen3:8b answered in a comment on TESTTA-4.");
+        assertThat(poll.summary()).isEqualTo("Cortex · qwen3:8b answered in a comment on TESTTA-4.");
         assertThat(kinds()).containsExactly("start", "tool", "decision", "text");
         verify(runRepository).recordRules(90L, 3, "sha256:" + "a".repeat(64));
         verify(evidence).append(eq(run), eq("mission.started"), eq(MissionEvidenceService.Actor.SERVER), any());
@@ -216,7 +216,7 @@ class TrialAgentLoopTest {
         loop.run(90L);
 
         verify(issueService, never()).addComment(anyString(), anyLong(), anyLong(), any(), anyLong());
-        assertThat(finished().error()).isEqualTo("qwen3:8b wrote no answer, so nothing was posted on TESTTA-4.");
+        assertThat(finished().error()).isEqualTo("Cortex · qwen3:8b wrote no answer, so nothing was posted on TESTTA-4.");
     }
 
     @Test
@@ -227,7 +227,7 @@ class TrialAgentLoopTest {
         loop.run(90L);
 
         verify(issueService, never()).addComment(anyString(), anyLong(), anyLong(), any(), anyLong());
-        assertThat(finished().error()).isEqualTo("qwen3:8b stopped: AI provider unreachable. Nothing was posted.");
+        assertThat(finished().error()).isEqualTo("Cortex · qwen3:8b stopped: AI provider unreachable. Nothing was posted.");
         assertThat(kinds()).contains("error");
     }
 

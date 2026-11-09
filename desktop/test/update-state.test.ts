@@ -25,6 +25,10 @@ describe("update state, as the interface shows it", () => {
     ["a failed download says so", downloading(60), { kind: "error", message: "net::ERR_CONNECTION_RESET" },
       { status: "failed", version: "1.3.3", message: "net::ERR_CONNECTION_RESET" }],
     ["a failed check while offline shows nothing", IDLE, { kind: "error", message: "net::ERR_INTERNET_DISCONNECTED" }, null],
+    ["the first launch of a new version does not stop a later download", { status: "installed", version: "1.3.3", from: "1.3.2" },
+      { kind: "available", version: "1.3.4" }, { status: "downloading", version: "1.3.4", percent: 0 }],
+    ["a failed check does not change what the new version says", { status: "installed", version: "1.3.3", from: "1.3.2" },
+      { kind: "error", message: "net::ERR_INTERNET_DISCONNECTED" }, null],
   ];
   for (const [label, state, event, expected] of cases) {
     it(label, () => assert.deepEqual(reduceUpdate(state, event), expected));

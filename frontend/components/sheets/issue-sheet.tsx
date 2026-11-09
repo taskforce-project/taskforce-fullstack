@@ -1686,7 +1686,7 @@ export function IssueDetail({ issue, onClose, workspaceSlug, projectId }: Readon
                   projectId={projectId}
                   issueId={issueId}
                   assignee={assignee}
-                  working={agentWorking ? { label: agentWorking, hint: missionsText.workingHint } : null}
+                  working={agentWorking ? { label: agentWorking, hint: missionsText.workingHint, logoKey: deliveryProviders?.find((p) => p.key === deliveryRun?.providerKey)?.logoKey } : null}
                   members={projectMembers}
                   agents={availableAgents}
                   onAssign={async (userId) => {
