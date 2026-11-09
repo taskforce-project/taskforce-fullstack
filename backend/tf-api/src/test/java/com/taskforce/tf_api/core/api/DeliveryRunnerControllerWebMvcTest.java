@@ -330,11 +330,17 @@ class DeliveryRunnerControllerWebMvcTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @CsvSource({ "/api/delivery/runner/commands", "/api/delivery/runner/commands/9/result", "/api/delivery/runner/runs/100/changes" })
+    @CsvSource(delimiter = '|', value = {
+        "/api/delivery/runner/commands | {}",
+        "/api/delivery/runner/commands/9/result | {\"ok\":true,\"message\":\"done\"}",
+        "/api/delivery/runner/runs/100/changes | {\"mode\":\"repo\",\"files\":[],\"more\":0,\"added\":0,\"removed\":0,\"final\":false}",
+    })
     @DisplayName("un utilisateur ne peut pas jouer le runner (403)")
-    void new_routes_refuse_a_user_token(String path) throws Exception {
-        mockMvc.perform(post(path).with(user()).contentType(MediaType.APPLICATION_JSON).content("{}"))
+    void new_routes_refuse_a_user_token(String path, String body) throws Exception {
+        mockMvc.perform(post(path).with(user()).contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isForbidden());
         verify(missionChanges, never()).takeCommands(any());
+        verify(missionChanges, never()).saveChanges(any(), any(), any());
+        verify(missionChanges, never()).finishCommand(any(), any(), any());
     }
 }
