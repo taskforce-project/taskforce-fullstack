@@ -571,10 +571,7 @@ export const CONSTANTS_EN = {
     missionText: "Where does the mission on {key} stand?",
     changed: "What changed in {project} this week?",
     // The composer.
-    attach: "Attach an issue or a project",
-    attachSearch: "Find an issue or a project",
     attachNone: "Nothing matches.",
-    attachFull: "Three attachments at most",
     detach: "Remove {name}",
     attached: "Attached to your request",
     listLabel: "Suggestions for what you type",
@@ -583,7 +580,6 @@ export const CONSTANTS_EN = {
     projects: "Projects",
     gestures: "What Cortex can do",
     searching: "Searching…",
-    modelProgress: "{model}: what it knows and how it improves, in Progress",
     // "/": what Cortex can do, in plain words; a gesture fills the composer, it never sends.
     gesture: {
       summarize: { label: "Summarize an issue", text: "Summarize " },

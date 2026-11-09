@@ -1,8 +1,8 @@
 "use client"
 
 import {
-  useEffect, useId, useLayoutEffect, useRef, useState,
-  type ClipboardEvent, type DragEvent, type RefObject,
+  useCallback, useEffect, useId, useLayoutEffect, useRef, useState,
+  type ClipboardEvent, type DragEvent, type ReactNode, type RefObject,
 } from "react"
 import { useParams } from "next/navigation"
 import { ArrowUp, ChevronDown, CircleDot, FileText, FolderKanban, Loader2, MessageSquare, Square, X } from "lucide-react"
@@ -88,18 +88,22 @@ export function Composer({ variant, inputRef, onToggle }: Readonly<{
   const current = listOpen ? options[Math.min(active, options.length - 1)] : undefined
   useThreadEnd()
 
-  // Le champ suit son texte, de 1 à 17 lignes, avant que le navigateur ne peigne : la boîte ne saute pas. Une colonne qui
-  // change de largeur change aussi les retours à la ligne.
-  useLayoutEffect(() => {
+  // Le champ suit son texte, de 1 à 17 lignes, avant que le navigateur ne peigne : la boîte ne saute pas.
+  const fit = useCallback(() => {
     const field = ref.current
     if (!field) return
-    const fit = () => {
-      field.style.height = "auto"
-      const wanted = field.scrollHeight
-      if (wanted > 0) field.style.height = `${Math.min(wanted, LINE_PX * MAX_LINES)}px`
-      field.style.overflowY = wanted > LINE_PX * MAX_LINES ? "auto" : "hidden"
-    }
-    fit()
+    field.style.height = "auto"
+    const wanted = field.scrollHeight
+    if (wanted > 0) field.style.height = `${Math.min(wanted, LINE_PX * MAX_LINES)}px`
+    field.style.overflowY = wanted > LINE_PX * MAX_LINES ? "auto" : "hidden"
+  }, [ref])
+
+  useLayoutEffect(fit, [draft, fit])
+
+  // Une colonne qui change de largeur change aussi les retours à la ligne.
+  useEffect(() => {
+    const field = ref.current
+    if (!field) return
     let width = field.clientWidth
     const watcher = new ResizeObserver(() => {
       if (field.clientWidth === width) return
@@ -108,7 +112,7 @@ export function Composer({ variant, inputRef, onToggle }: Readonly<{
     })
     watcher.observe(field)
     return () => watcher.disconnect()
-  }, [draft, ref])
+  }, [fit, ref])
 
   // Échap arrête où que soit le curseur, sauf quand une fenêtre de dialogue ou un menu la prend d'abord. Dans le champ,
   // sa touche passe avant le repli de la conversation.
@@ -126,11 +130,8 @@ export function Composer({ variant, inputRef, onToggle }: Readonly<{
 
   const submit = () => {
     if (!draft.trim()) return
-    if (!busy) {
-      void send(slug)
-    } else if (!enqueue()) {
-      setNotice(texts.queueFull)
-    }
+    if (busy) setNotice(enqueue() ? null : texts.queueFull)
+    else void send(slug)
   }
 
   const write = (text: string, at: number) => {
@@ -355,7 +356,7 @@ export function Composer({ variant, inputRef, onToggle }: Readonly<{
 
 /** Une pastille au-dessus du texte : ce qui part avec la demande, et sa croix. */
 function AttachedChip({ icon, label, title, removeLabel, onRemove }: Readonly<{
-  icon: React.ReactNode
+  icon: ReactNode
   label: string
   title: string
   removeLabel: string

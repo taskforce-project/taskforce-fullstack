@@ -223,6 +223,21 @@ describe("AppShell : la fenêtre", () => {
     expect(nav.push).toHaveBeenCalledWith("/acme/projects/3?c=9", { scroll: false })
   })
 
+  it("leaves Escape to the composer while Cortex works: it stops first, nothing folds", () => {
+    widthOf(1920)
+    nav.pathname = "/acme/projects/3"
+    nav.search = "c=9&issue=34"
+    useWindowStore.setState({ paneFull: true })
+    render(<AppShell><p /></AppShell>)
+    act(() => { useCortexStore.setState({ open: true, stoppable: true }) })
+
+    act(() => { fireEvent.keyDown(window, { key: "Escape" }) })
+
+    expect(useCortexStore.getState().open).toBe(true)
+    expect(nav.push).not.toHaveBeenCalled()
+    act(() => { useCortexStore.setState({ stoppable: false, open: false }) })
+  })
+
   it("never closes the issue under a typing cursor, nor after a dialog took the key", () => {
     widthOf(1920)
     nav.pathname = "/acme/projects/3"
