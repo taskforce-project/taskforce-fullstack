@@ -180,7 +180,7 @@ describe("ModelBenchmark", () => {
     })
     render(<ModelBenchmark slug="acme" />)
 
-    expect(within(screen.getAllByRole("listitem")[1]).getByText("In the queue")).toBeInTheDocument()
+    expect(within(screen.getAllByRole("listitem")[1]).getByText("Queued")).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Run" }))
     const picker = await screen.findByRole("list", { name: "Models to run" })
     expect(within(picker).getByRole("checkbox", { name: "qwen3:14b" })).toBeDisabled()

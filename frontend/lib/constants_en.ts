@@ -479,7 +479,7 @@ export const CONSTANTS_EN = {
     measuringAuto: "{model}, the model Cortex uses, is measured once: {done} of {total}.",
     loadingModel: "Loading {model} into memory. This does not count against it.",
     loadingShort: "Loading",
-    queued: "In the queue",
+    queued: "Queued",
     waiting: "Next case in {seconds} s",
     waitingShort: "{seconds} s",
     replayBusy: "A replay of your test bank is running: wait for it to finish.",
