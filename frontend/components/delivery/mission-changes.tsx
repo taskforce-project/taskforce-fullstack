@@ -338,10 +338,10 @@ export function MissionChanges({ run }: Readonly<{ run: DeliveryRun }>) {
 
   return (
     <section aria-label={t.title} className="flex flex-col gap-1.5">
-      <h3 className="flex items-baseline gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <h3 className="flex items-baseline gap-2 text-xs font-medium text-muted-foreground">
         {t.title}
-        {!empty && <span className="normal-case tabular-nums">{count === 1 ? t.oneFile : fillText(t.files, { count })}</span>}
-        {!empty && changes.mode === "repo" && <span className="normal-case"><Counts added={changes.added} removed={changes.removed} t={t} /></span>}
+        {!empty && <span className="tabular-nums">{count === 1 ? t.oneFile : fillText(t.files, { count })}</span>}
+        {!empty && changes.mode === "repo" && <Counts added={changes.added} removed={changes.removed} t={t} />}
       </h3>
       {empty ? (
         <p className="text-xs text-muted-foreground">{working ? t.noneYet : t.none}</p>
