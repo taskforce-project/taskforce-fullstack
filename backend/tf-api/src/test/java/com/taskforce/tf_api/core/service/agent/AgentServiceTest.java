@@ -2007,7 +2007,7 @@ class AgentServiceTest {
 
         AssistantAnswer answer = service.run("acme", 7L, "Give me the status of the project");
 
-        assertThat(answer.mode()).isEqualTo("fallback");
+        assertThat(answer.mode()).isEqualTo(AssistantAnswer.NOT_SENT);
         assertThat(answer.model()).isNull();
         assertThat(answer.answer()).startsWith(ActionClaimCheck.SIGNATURE).contains("This request needs about ")
             .contains(" tokens with its answer, and tiny:1b's context window is 4,096, so it wasn't sent.");

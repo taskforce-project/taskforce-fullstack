@@ -114,8 +114,10 @@ public class AssistantController {
             : escalation != null ? escalation.text() : null;
 
         // Persiste le tour dans la conversation (multi-conversation + historique), avec ce que TaskForce y a dit et ce qu'il
-        // a donné à lire au modèle (la ligne grise, R123) : une conversation rouverte se relit pareil.
-        conversationService.appendMessage(conv.getId(), "user", body.message(), null, 0);
+        // a donné à lire au modèle (la ligne grise, R123) : une conversation rouverte se relit pareil. Une demande qui n'a pas
+        // tenu la fenêtre garde son mode : elle reste dans le fil, et le modèle ne la relit pas aux tours suivants.
+        conversationService.appendMessage(conv.getId(), "user", body.message(),
+            AssistantAnswer.NOT_SENT.equals(answer.mode()) ? AssistantAnswer.NOT_SENT : null, 0);
         conversationService.appendMessage(conv.getId(), "assistant",
             notice == null ? answer.answer() : answer.answer() + ModelCapabilityService.block(notice), answer.mode(),
             answer.usage() != null ? answer.usage().totalTokens() : 0, answer.model(), answer.read());

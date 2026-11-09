@@ -118,7 +118,7 @@ class AssistantControllerWebMvcTest {
         ChatTurnResponse.Escalation offer = new ChatTurnResponse.Escalation("context", "qwen3:8b", "qwen3:14b", text);
         answering("Too big.");
         when(agentService.run(anyString(), anyLong(), anyString(), any(), any(), any())).thenReturn(
-            new com.taskforce.tf_api.core.dto.response.AssistantAnswer("Too big.", null, "fallback", java.util.List.of(), java.util.List.of(),
+            new com.taskforce.tf_api.core.dto.response.AssistantAnswer("Too big.", null, "not_sent", java.util.List.of(), java.util.List.of(),
                 java.util.List.of(), com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE, null, null, null, offer));
 
         mockMvc.perform(post(URL).with(auth())
@@ -129,7 +129,8 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.escalation.capability").value("context"))
             .andExpect(jsonPath("$.data.answer.offer").doesNotExist());
         verify(capabilities, never()).offer(anyString(), any(), anyString());
-        verify(conversationService).appendMessage(1L, "assistant", "Too big." + ModelCapabilityService.block(text), "fallback", 0, null, null);
+        verify(conversationService).appendMessage(1L, "user", "Summarize", "not_sent", 0);
+        verify(conversationService).appendMessage(1L, "assistant", "Too big." + ModelCapabilityService.block(text), "not_sent", 0, null, null);
     }
 
     @Test

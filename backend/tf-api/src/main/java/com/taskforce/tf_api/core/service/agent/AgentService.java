@@ -651,8 +651,8 @@ public class AgentService {
                 larger.model() + "'s context window is " + number(larger.tokens()) + ". You can send this request to "
                     + larger.model() + "."))
             .orElse(null);
-        return new AssistantAnswer(signed(ABOUT_MODELS, List.of(text)), null, "fallback", sources, steps, List.of(), usage, null, null,
-            null, offer);
+        return new AssistantAnswer(signed(ABOUT_MODELS, List.of(text)), null, AssistantAnswer.NOT_SENT, sources, steps, List.of(), usage,
+            null, null, null, offer);
     }
 
     private static String number(int tokens) {

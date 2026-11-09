@@ -12,6 +12,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead.ContextRead;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.Compaction;
@@ -217,9 +218,14 @@ public class AiConversationService {
         }
         long upto = conv.getSummaryUptoId() != null ? conv.getSummaryUptoId() : 0L;
         List<AiMessage> messages = messageRepository.findByConversationIdAndIdGreaterThanOrderByIdAsc(conversationId, upto)
-            .stream().filter(message -> !COMPACT_MODE.equals(message.getMode())).toList();
+            .stream().filter(AiConversationService::reachedTheModel).toList();
         String summary = conv.getSummary();
         return new Kept(conv.getWorkspaceId(), summary == null || summary.isBlank() ? null : summary, messages);
+    }
+
+    /** La ligne de « /compact » et une demande qui n'a pas tenu la fenêtre restent dans le fil : le modèle ne les lit jamais. */
+    private static boolean reachedTheModel(AiMessage message) {
+        return !COMPACT_MODE.equals(message.getMode()) && !AssistantAnswer.NOT_SENT.equals(message.getMode());
     }
 
     private static Map<String, Object> summaryMessage(String summary) {

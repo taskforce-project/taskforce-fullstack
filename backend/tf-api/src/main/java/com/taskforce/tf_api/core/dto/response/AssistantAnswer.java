@@ -23,6 +23,9 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
  *
  * <p>{@code offer} : ce que TaskForce propose quand une demande est trop grande pour ce modèle (TF-J1-13) : un modèle
  * servi dont la fenêtre la tient ; le contrôleur le rend avec le tour, jamais dans la réponse elle-même.
+ *
+ * <p>{@link #NOT_SENT} : le {@code mode} d'une demande trop grande pour la fenêtre du modèle. Elle ne lui a jamais été
+ * envoyée, et les tours suivants ne la lui donnent pas non plus.
  */
 public record AssistantAnswer(
     String answer,
@@ -37,6 +40,8 @@ public record AssistantAnswer(
     AssistantRead read,
     @JsonIgnore ChatTurnResponse.Escalation offer
 ) {
+    public static final String NOT_SENT = "not_sent";
+
     /** Une réponse sans proposition d'un autre modèle. */
     public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
                            List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage,

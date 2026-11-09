@@ -111,7 +111,7 @@ export interface AssistantUsage {
 export interface AssistantAnswer {
   answer: string
   reasoning: string | null
-  mode: "fast" | "deep" | "fallback"
+  mode: "fast" | "deep" | "fallback" | "not_sent"
   sources: AssistantSource[]
   steps: AssistantStep[]
   toolCalls: AssistantToolCall[]

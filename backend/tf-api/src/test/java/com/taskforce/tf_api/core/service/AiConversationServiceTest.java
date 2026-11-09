@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationDetail;
 import com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationSummary;
@@ -264,6 +265,21 @@ class AiConversationServiceTest {
 
         assertThat(service.fit(1L, budget(8_192), "fast").messages())
             .extracting(message -> message.get("content")).containsExactly("Bonjour", "Salut");
+    }
+
+    @Test
+    @DisplayName("fit : une demande qui n'a pas tenu la fenêtre reste dans le fil, sans repartir ni se condenser aux tours suivants")
+    void fit_leaves_out_a_turn_that_was_not_sent() {
+        when(llm.isConfigured()).thenReturn(true);
+        AiMessage asked = msg(3L, "user", "x".repeat(200_000));
+        asked.setMode(AssistantAnswer.NOT_SENT);
+        AiMessage said = msg(4L, "assistant", "This request needs about 66,000 tokens, so it wasn't sent.");
+        said.setMode(AssistantAnswer.NOT_SENT);
+        holding(List.of(msg(1L, "user", "Bonjour"), msg(2L, "assistant", "Salut"), asked, said));
+
+        assertThat(service.fit(1L, budget(8_192), "fast").messages())
+            .extracting(message -> message.get("content")).containsExactly("Bonjour", "Salut");
+        verify(llm, never()).chatCompletion(anyString(), anyString(), anyBoolean(), anyString());
     }
 
     @Test
