@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 
+import { toast } from "sonner"
+
 import { useEvalStore } from "@/lib/store/eval-store"
+import { useUserStore } from "@/lib/store/user-store"
+import { useWindowStore } from "@/lib/store/window-store"
 import { AnswerActions } from "./answer-actions"
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }))
+const push = vi.hoisted(() => vi.fn())
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }))
 vi.mock("sonner", () => ({ toast: { success: vi.fn() } }))
 vi.mock("./eval-case-dialog", () => ({
   EvalCaseDialog: ({ expected, onSaved }: { expected?: string; onSaved?: () => void }) => (
@@ -57,6 +62,20 @@ describe("AnswerActions", () => {
 
     await waitFor(() => expect(screen.getAllByRole("button", { name: "Kept in your test bank" })[0]).toHaveAttribute("aria-pressed", "true"))
     expect(keepGood).toHaveBeenCalledWith("acme", "r-1")
+  })
+
+  it("le toast ouvre l'histoire de la banque, là où le cas se lit", async () => {
+    keepGood.mockResolvedValue(CASE)
+    useUserStore.setState({ user: { id: 7 } as never })
+    show()
+
+    fireEvent.click(good())
+    await waitFor(() => expect(toast.success).toHaveBeenCalled())
+    const options = vi.mocked(toast.success).mock.calls[0][1] as { action: { onClick: () => void } }
+    options.action.onClick()
+
+    expect(useWindowStore.getState().progressTabs["7"]).toBe("history")
+    expect(push).toHaveBeenCalledWith("/acme/progress", { scroll: false })
   })
 
   it("bien qui échoue le dit", async () => {

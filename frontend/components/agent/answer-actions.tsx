@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useEvalStore } from "@/lib/store/eval-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { useUserStore } from "@/lib/store/user-store"
+import { useWindowStore } from "@/lib/store/window-store"
 import { cn } from "@/lib/utils"
 import { withConversation } from "@/lib/window/address"
 import { progressPath } from "@/lib/window/pane"
@@ -43,6 +45,8 @@ export function AnswerActions({ slug, text, record }: Readonly<{ slug: string; t
   const keepGood = useEvalStore((s) => s.keepGood)
   const keepBad = useEvalStore((s) => s.keepBad)
   const bankOff = useEvalStore((s) => s.bank !== null && !s.bank.enabled)
+  const me = useUserStore((s) => s.user?.id)
+  const setProgressTab = useWindowStore((s) => s.setProgressTab)
   const router = useRouter()
 
   const [copied, setCopied] = useState(false)
@@ -72,7 +76,11 @@ export function AnswerActions({ slug, text, record }: Readonly<{ slug: string; t
     toast.success(t.keptToast, {
       action: {
         label: t.keptOpen,
-        onClick: () => router.push(withConversation(progressPath(slug), globalThis.location?.search ?? ""), { scroll: false }),
+        onClick: () => {
+          // Le volet s'ouvre là où le cas se lit : son histoire.
+          if (me !== undefined && me !== null) setProgressTab(String(me), "history")
+          router.push(withConversation(progressPath(slug), globalThis.location?.search ?? ""), { scroll: false })
+        },
       },
     })
   }
