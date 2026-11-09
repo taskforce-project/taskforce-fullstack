@@ -129,6 +129,34 @@ class AiControllersWebMvcTest {
         org.assertj.core.api.Assertions.assertThat(model.get()).isEqualTo("qwen3:14b");
     }
 
+    @org.junit.jupiter.params.ParameterizedTest(name = "{0}")
+    @org.junit.jupiter.params.provider.CsvSource(delimiter = '|', value = {
+        "{\"projectId\":12}   | 12",
+        "{\"projectId\":null} | ",
+    })
+    @DisplayName("PUT project : la conversation travaille dans ce projet, ou dans aucun (R135)")
+    void conversations_set_project_200(String body, Long projectId) throws Exception {
+        com.taskforce.tf_api.core.model.User user = com.taskforce.tf_api.core.model.User.builder().id(7L).build();
+        com.taskforce.tf_api.core.model.Workspace workspace = com.taskforce.tf_api.core.model.Workspace.builder().id(1L).slug("acme").build();
+        when(userRepository.findByEmail(any())).thenReturn(java.util.Optional.of(user));
+        when(brainAccessGuard.resolveAndAuthorize(eq("acme"), anyLong())).thenReturn(workspace);
+        when(aiConversationService.setProject(5L, 7L, 1L, projectId)).thenReturn(
+            new com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationSummary(5L, "t", null, 2, 0, projectId));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/workspaces/acme/ai/conversations/5/project")
+                .with(auth()).contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(5));
+    }
+
+    @Test
+    @DisplayName("PUT project invalide (@Positive) → 400")
+    void conversations_set_invalid_project_400() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/workspaces/acme/ai/conversations/5/project")
+                .with(auth()).contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"projectId\":-1}"))
+            .andExpect(status().isBadRequest());
+    }
+
     @Test
     @DisplayName("GET Cortex conversations → 200")
     void conversations_list_200() throws Exception {
