@@ -688,6 +688,50 @@ export const CONSTANTS_EN = {
     close: "to close",
   },
 
+  // "Waiting for you" (R141, session 20): three groups of one-sentence rows. A row says what happened in words; its
+  // actions come on hover, in words too.
+  inbox: {
+    groups: {
+      waiting: "Needs you",
+      happened: "What happened",
+      alerts: "Alerts",
+      mentions: "Mentions",
+    },
+    approve: "Approve or refuse a request on {title}",
+    approveMany: "Approve or refuse {count} requests on {title}",
+    review: "Review the result on {title}",
+    mentioned: "{who} mentioned you on {title}",
+    commented: "{who} commented on {title}",
+    assigned: "{who} assigned you {title}",
+    someone: "Someone",
+    markRead: "Mark as read",
+    markAllRead: "Mark all as read",
+    dismiss: "Dismiss",
+    openBoard: "Open on its board",
+    refresh: "Refresh",
+    showMore: "Show {count} more",
+    unread: "Unread",
+    empty: "Nothing is waiting for you.",
+    emptyAlerts: "No alert right now.",
+    emptyMentions: "Nobody has mentioned you yet.",
+    loadFailed: "Couldn't load this list. Check your connection, then try again.",
+    retry: "Try again",
+    types: {
+      overdue: "Deadline breached",
+      dueSoon: "Deadline coming",
+      mention: "Mentioned you",
+      assigned: "Assigned to you",
+      commented: "Commented",
+      statusChanged: "Status changed",
+      completed: "Completed",
+      overload: "Too much work",
+      agentDone: "Agent finished",
+      agentFailed: "Agent failed",
+      agentNotStarted: "Agent didn't start",
+      other: "Notification",
+    },
+  },
+
   // The window (R119 to R122, session 18 of the Council): the left bar, the title line, the conversation, the pane and
   // the right panel. Its names enter the interface glossary (R22).
   window: {
