@@ -158,7 +158,7 @@ public class TrialAgentLoop {
             mission = tx.execute(status -> open(runId));
         } catch (RuntimeException e) {
             log.warn("Agent à l'essai : mission {} non ouverte : {}", runId, LogSafe.of(e.getMessage()));
-            finish(runId, failed("The trial agent couldn't open this task: " + e.getMessage()));
+            finish(runId, failed("Cortex couldn't open this task: " + e.getMessage()));
             return;
         }
         if (mission == null) return; // le run n'existe plus, ou ne court plus
@@ -167,7 +167,7 @@ public class TrialAgentLoop {
         } catch (Exception e) {
             log.warn("Agent à l'essai : mission {} en échec : {}", runId, LogSafe.of(e.getMessage()));
             event(mission, "error", null, "Stopped: " + e.getMessage(), null, null);
-            finish(runId, failed(mission.model() + " stopped: " + e.getMessage() + " Nothing was posted."));
+            finish(runId, failed(TrialAgentProvider.named(mission.model()) + " stopped: " + e.getMessage() + " Nothing was posted."));
         }
     }
 
@@ -198,7 +198,8 @@ public class TrialAgentLoop {
     }
 
     private void work(Mission m) throws Exception {
-        event(m, "start", null, m.model() + " reads " + m.issueKey() + ", its project and the notes " + m.person()
+        String name = TrialAgentProvider.named(m.model());
+        event(m, "start", null, name + " reads " + m.issueKey() + ", its project and the notes " + m.person()
             + " can read", null, null);
         // Ce que la personne voit, avec ses droits : l'issue, sa liste, ses commentaires, les autres issues, ses notes.
         IssueResponse issue = issueService.getIssue(m.slug(), m.projectId(), m.issueId(), m.userId());
@@ -217,8 +218,8 @@ public class TrialAgentLoop {
         String answer = meter.metered(m.workspaceId(),
             () -> llm.rawChatWithModel(messages, List.of(), m.model()).path("content").asText("")).strip();
         if (answer.isEmpty()) {
-            event(m, "error", null, m.model() + " wrote nothing", null, null);
-            finish(m.runId(), failed(m.model() + " wrote no answer, so nothing was posted on " + m.issueKey() + "."));
+            event(m, "error", null, name + " wrote nothing", null, null);
+            finish(m.runId(), failed(name + " wrote no answer, so nothing was posted on " + m.issueKey() + "."));
             return;
         }
 
@@ -239,7 +240,7 @@ public class TrialAgentLoop {
         }
         if (!RulesEngine.ALLOW.equals(decision.effect())) {
             event(m, "error", "add_comment", "The rules ask before a comment", null, null);
-            finish(m.runId(), failed("The rules of this workspace ask before a comment, and the trial agent can't wait "
+            finish(m.runId(), failed("The rules of this workspace ask before a comment, and Cortex can't wait "
                 + "for an answer yet: nothing was posted."));
             return;
         }
@@ -250,11 +251,11 @@ public class TrialAgentLoop {
         }
         CreateIssueCommentRequest comment = new CreateIssueCommentRequest();
         comment.setContent(clip(answer, MAX_COMMENT));
-        DelegatedAgent.actingAs(m.model(),
+        DelegatedAgent.actingAs(name,
             () -> issueService.addComment(m.slug(), m.projectId(), m.issueId(), comment, m.userId()));
         int words = answer.split("\\s+").length;
         event(m, "text", null, "Answered in a comment on " + m.issueKey() + " (" + words + " words)", null, null);
-        finish(m.runId(), new DeliveryPoll(DeliveryRunStatus.DONE, m.model() + " answered in a comment on "
+        finish(m.runId(), new DeliveryPoll(DeliveryRunStatus.DONE, name + " answered in a comment on "
             + m.issueKey() + ".", null, null));
     }
 

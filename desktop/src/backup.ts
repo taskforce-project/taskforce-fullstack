@@ -29,12 +29,12 @@ export function lastVersion(dataDir: string): string | null {
 }
 
 /**
- * Notification du premier lancement d'une nouvelle version, sur une base qu'une version précédente avait ouverte : la
- * personne voit que la mise à jour est faite, et depuis quelle version. Rien pour une première installation.
+ * Premier lancement d'une nouvelle version, sur une base qu'une version précédente avait ouverte : la fenêtre le dit
+ * (cf. update-state.ts), avec la version d'avant. Rien pour une première installation.
  */
-export function updateNotice(previous: string | null, version: string, fresh: boolean): { title: string; body: string } | null {
+export function updateNotice(previous: string | null, version: string, fresh: boolean): { version: string; from: string } | null {
   if (fresh || !previous || previous === version) return null;
-  return { title: `TaskForce ${version} is installed`, body: `Updated from version ${previous}.` };
+  return { version, from: previous };
 }
 
 /** Garde les `keep` copies les plus récentes : leur nom commence par leur date, l'ordre alphabétique est le bon. */

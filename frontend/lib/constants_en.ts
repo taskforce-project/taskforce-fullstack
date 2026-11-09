@@ -320,6 +320,8 @@ export const CONSTANTS_EN = {
   // Desktop app update, in one toast that stays (desktop-update-toast.tsx). Since 05/11/2026 the installer runs without
   // a window: this toast is where an update that didn't install is told.
   desktopUpdate: {
+    installed: "TaskForce {version} is installed",
+    installedHint: "Updated from version {from}.",
     downloading: "Downloading TaskForce {version}",
     progress: "{percent}% · Keep TaskForce open: the download starts over if you quit.",
     progressLabel: "Update download",
@@ -443,10 +445,9 @@ export const CONSTANTS_EN = {
     offerAsk: "Ask {model}",
     sentTo: "to {model}",
     answeredBy: "Answered by {model}, as you asked.",
-    // R51: TaskForce's own loop on a local model, on trial, for the tasks answered in a comment.
-    trial: "Trial",
-    trialHint: "Answers in a comment. No code, no repository.",
-    trialAgent: "TaskForce's own loop on {model}, on trial: it reads the issue, its project and the notes you can read, and answers in a comment, under its name and for you. Only for tasks without a repository: code stays with Claude Code.",
+    // R144: Cortex on the model of this instance, for the tasks answered in a comment.
+    cortexHint: "Answers in a comment. No code, no repository.",
+    cortexAgent: "Cortex, on the model of this instance: it reads the issue, its project and the notes you can read, and answers in a comment, under its name and for you. Only for tasks without a repository: code stays with Claude Code.",
   },
 
   // R131: the model benchmark. A sign, a name on hover; the words live in the detail.
@@ -746,22 +747,17 @@ export const CONSTANTS_EN = {
     consent: "Your browser sends your voice to its speech service. Turn on voice, or keep typing.",
     turnOn: "Turn on voice",
     keepTyping: "Keep typing",
-    offer: "Voice needs a one-time download: {size} MB.",
-    download: "Download",
-    retry: "Try again",
-    notNow: "Not now",
-    downloading: "Downloading voice: {percent}%",
-    cancel: "Cancel",
+    preparing: "Getting voice ready: {percent}%",
     dismiss: "Dismiss",
     notices: {
       denied: "Microphone blocked in your settings.",
       noDevice: "No microphone found.",
       busy: "The microphone is in use.",
-      model: "The voice model is missing.",
+      model: "The voice model is missing. Click to retry.",
       engine: "Voice stopped working. Try again, or keep typing.",
       service: "The speech service is out of reach.",
-      network: "The download stopped. Check your connection.",
-      checksum: "The download was damaged.",
+      network: "The voice download stopped. Click to retry.",
+      checksum: "The voice download was damaged. Click to retry.",
       disk: "Not enough disk space for voice.",
       nothing: "Nothing heard.",
       limit: "Stopped after two minutes.",
@@ -1116,7 +1112,7 @@ export const CONSTANTS_EN = {
       openPullRequest: "Open the pull request",
       branchOnly: "{commits} commits on the branch {branch}, without a pull request.",
       noChange: "No code change was needed.",
-      // R51: the trial agent answers in a comment, without a repository.
+      // R51: Cortex answers in a comment, without a repository.
       answeredInComment: "Answered in a comment on this issue.",
       isItGood: "Is it good?",
       testsRan: "Tests ran",

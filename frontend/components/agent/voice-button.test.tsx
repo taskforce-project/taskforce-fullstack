@@ -83,6 +83,35 @@ describe("VoiceButton", () => {
     expect(bar.style.transform).toBe("scaleX(0)")
   })
 
+  it("shows on the icon how far the model is, while it gets ready", () => {
+    useVoiceStore.setState({ phase: "downloading", model: { bytes: 1000, received: 425 } })
+    const { container } = render(<VoiceButton onText={vi.fn()} />)
+
+    const button = screen.getByRole("button", { name: "Getting voice ready: 42%" })
+    expect(button).toHaveAttribute("title", "Getting voice ready: 42%")
+    const circles = container.querySelectorAll("circle")
+    expect(circles).toHaveLength(2)
+    const circumference = 2 * Math.PI * 14
+    expect(Number(circles[1].getAttribute("stroke-dashoffset"))).toBeCloseTo(circumference * 0.58)
+
+    fireEvent.click(button)
+    expect(press).toHaveBeenCalledTimes(1)
+  })
+
+  it("starts its ring at zero before the model size is known", () => {
+    useVoiceStore.setState({ phase: "downloading", model: null })
+    render(<VoiceButton onText={vi.fn()} />)
+
+    expect(screen.getByRole("button", { name: "Getting voice ready: 0%" })).toBeInTheDocument()
+  })
+
+  it("has no ring once the model is ready", () => {
+    useVoiceStore.setState({ phase: "idle", model: null })
+    const { container } = render(<VoiceButton onText={vi.fn()} />)
+
+    expect(container.querySelector("circle")).toBeNull()
+  })
+
   it.each(["starting", "transcribing"] as const)("shows that it is working while %s", (phase) => {
     useVoiceStore.setState({ phase })
     render(<VoiceButton onText={vi.fn()} />)

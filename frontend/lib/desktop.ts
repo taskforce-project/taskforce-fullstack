@@ -126,6 +126,7 @@ export type DesktopUpdateCheck =
  */
 export type DesktopUpdateState =
   | { status: "idle" }
+  | { status: "installed"; version: string; from: string }
   | { status: "downloading"; version: string; percent: number }
   | { status: "ready"; version: string; retry?: boolean }
   | { status: "failed"; version: string; message: string };
@@ -219,9 +220,8 @@ export interface DesktopBridge {
   /** La voix transcrite sur l'ordinateur (R80, R132). Absente là où le moteur n'est pas embarqué (version du Store). */
   readonly voice?: {
     status(): Promise<DesktopVoiceStatus>;
-    /** Télécharge le modèle, une fois, ou reprend là où il s'était arrêté. */
+    /** Rejoint la préparation du modèle, ou la lance : il se télécharge seul, une fois, peu après l'ouverture de l'app. */
     download(): Promise<DesktopVoiceResult<void>>;
-    cancelDownload(): Promise<void>;
     /** Avancement du téléchargement ; rend de quoi arrêter l'écoute. */
     onStatus(callback: (status: DesktopVoiceStatus) => void): () => void;
     /** Charge le modèle pendant que la personne parle. */

@@ -26,8 +26,8 @@ export interface Stack {
   ai: BackendAi;
   /** Jeton GitHub de la personne (son `gh`), rendu au backend seul (Copilot, pull requests liées). */
   github: GitHubRelay;
-  /** Notification à montrer une fois la fenêtre ouverte, au premier lancement d'une nouvelle version (cf. backup.ts). */
-  updateNotice: { title: string; body: string } | null;
+  /** Premier lancement d'une nouvelle version : la fenêtre le dit à son ouverture (cf. backup.ts). */
+  updateNotice: { version: string; from: string } | null;
   stop: () => Promise<void>;
 }
 
