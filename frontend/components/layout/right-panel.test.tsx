@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { fireEvent, render, screen, within } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 
 const nav = vi.hoisted(() => ({ pathname: "/acme/projects/3" }))
 vi.mock("next/navigation", () => ({
@@ -184,6 +184,16 @@ describe("RightPanel", () => {
     expect(lines.map((b) => b.textContent)).toEqual(["NotionReconnect", "Linear"])
     fireEvent.click(lines[1])
     expect(openSettings).toHaveBeenCalledWith("integrations")
+  })
+
+  it("says when the connectors can't be read, and tries again", async () => {
+    fetchConnectors.mockResolvedValueOnce(false)
+    render(<RightPanel />)
+
+    await waitFor(() => expect(row("Connectors")).toHaveTextContent("Couldn't read your connectors."))
+    fireEvent.click(row("Connectors"))
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }))
+    expect(fetchConnectors).toHaveBeenCalledTimes(2)
   })
 
   it("says how to connect a tool when none is connected", () => {

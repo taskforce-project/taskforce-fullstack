@@ -781,6 +781,8 @@ export const CONSTANTS_EN = {
       two: "{first} and {second}",
       more: "{first}, {second} and {count} more",
       reconnect: "Reconnect",
+      failed: "Couldn't read your connectors.",
+      retry: "Try again",
     },
     missions: {
       running: "{count} running",

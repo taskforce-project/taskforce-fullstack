@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useParams, usePathname } from "next/navigation"
 
 import { catalogForThisApp } from "@/components/integrations/integrations-catalog"
@@ -129,10 +129,14 @@ function ConnectorsRow() {
   const desktopGitHub = useDesktopToolsStore((s) => s.status?.github ?? null)
   const refreshDesktopTools = useDesktopToolsStore((s) => s.refresh)
   const openSettings = useSettingsStore((s) => s.openSettings)
+  const [failed, setFailed] = useState(false)
 
-  useEffect(() => {
-    if (slug) void fetchConnectors(slug)
+  const load = useCallback(() => {
+    if (!slug) return
+    void fetchConnectors(slug).then((ok) => setFailed(!ok))
   }, [slug, fetchConnectors])
+
+  useEffect(() => { load() }, [load])
   // App desktop : GitHub est connecté quand le GitHub CLI de la personne l'est, comme dans le catalogue.
   useEffect(() => {
     if (IS_DESKTOP && useDesktopToolsStore.getState().status === null) void refreshDesktopTools()
@@ -144,7 +148,12 @@ function ConnectorsRow() {
 
   // Le temps du chargement, la hauteur de la phrase reste réservée : les cartes du dessous ne sautent pas.
   return (
-    <PanelRow row="connectors" summary={catalog ? connectorsSummary(lines, t) : " "}>
+    <PanelRow row="connectors" summary={catalog ? connectorsSummary(lines, t) : failed ? t.failed : " "}>
+      {!catalog && failed && (
+        <button type="button" onClick={load} className={cn(PANEL_ITEM, "text-muted-foreground")}>
+          {t.retry}
+        </button>
+      )}
       {catalog && (
         lines.length === 0 ? (
           <button type="button" onClick={settings} className={cn(PANEL_ITEM, "text-muted-foreground")}>
