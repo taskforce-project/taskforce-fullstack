@@ -12,7 +12,7 @@ export interface ConversationSummary {
   updatedAt: string | null
   messageCount: number
   totalTokens: number
-  /** Le projet à l'écran quand la conversation a commencé (R121) ; null sans projet, absent d'un serveur plus ancien. */
+  /** Le projet où la conversation travaille (R121, R135) ; null sans projet, absent d'un serveur plus ancien. */
   projectId?: number | null
 }
 
@@ -27,6 +27,8 @@ export interface ConversationMessage {
   model?: string | null
   /** Ce que TaskForce lui a donné à lire (la ligne grise, R123) ; absent des messages d'avant lot 3 de la fenêtre. */
   read?: AssistantRead | null
+  /** Les fichiers joints à cette demande (R134) ; leur contenu reste au serveur. */
+  files?: { name: string }[]
 }
 
 export interface ConversationDetail {
@@ -34,6 +36,8 @@ export interface ConversationDetail {
   title: string
   totalTokens: number
   messages: ConversationMessage[]
+  /** Le projet où elle travaille (R135) ; null sans projet, absent d'un serveur plus ancien. */
+  projectId?: number | null
 }
 
 export async function listConversations(slug: string): Promise<ConversationSummary[]> {
@@ -48,6 +52,12 @@ export async function getConversation(slug: string, id: number): Promise<Convers
 
 export async function createConversation(slug: string): Promise<ConversationSummary> {
   const res = await apiClient.post<{ data: ConversationSummary }>(AI_ROUTES.CONVERSATIONS(slug))
+  return res.data.data
+}
+
+/** Le projet où la conversation travaille (R135), choisi dans la rangée sous le compositeur ; null pour aucun. */
+export async function setConversationProject(slug: string, id: number, projectId: number | null): Promise<ConversationSummary> {
+  const res = await apiClient.put<{ data: ConversationSummary }>(AI_ROUTES.CONVERSATION_PROJECT(slug, id), { projectId }, { silentError: true })
   return res.data.data
 }
 

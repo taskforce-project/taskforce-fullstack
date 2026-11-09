@@ -38,6 +38,7 @@ export function readParts(read: AssistantRead, t: ConversationTexts): string[] {
       ? fillText(t.usedToolTimes, { tool: tool.name, count: String(tool.calls) })
       : fillText(t.usedTool, { tool: tool.name }))
   }
+  for (const file of read.files ?? []) parts.push(fillText(t.readFile, { name: file.name }))
   if (read.notes === 1) parts.push(t.note)
   else if (read.notes > 1) parts.push(fillText(t.notes, { count: String(read.notes) }))
   return parts

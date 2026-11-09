@@ -361,6 +361,8 @@ export const ASSISTANT_ROUTES = {
   ACTION_UNDO: (slug: string) => `/api/workspaces/${slug}/assistant/actions/undo`,
   /** La réponse de la personne à une question de TaskForce (R115) : le geste reprend sur son clic. */
   ACTION_ANSWER: (slug: string) => `/api/workspaces/${slug}/assistant/actions/answer`,
+  /** Arrête un tour de Cortex (R134) : le serveur coupe l'appel au modèle. */
+  STOP: (slug: string) => `/api/workspaces/${slug}/assistant/stop`,
 } as const;
 
 /**
@@ -399,6 +401,8 @@ export const AI_ROUTES = {
   CONVERSATIONS: (slug: string) => `/api/workspaces/${slug}/ai/conversations`,
   CONVERSATION: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}`,
   CONVERSATION_COMPACT: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}/compact`,
+  /** Le projet où travaille une conversation (R135), « No project » compris. */
+  CONVERSATION_PROJECT: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}/project`,
 } as const;
 
 /**

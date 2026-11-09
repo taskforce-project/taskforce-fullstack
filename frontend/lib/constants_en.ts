@@ -608,9 +608,49 @@ export const CONSTANTS_EN = {
     sawOpen: "{key} open",
     usedTool: "used {tool}",
     usedToolTimes: "used {tool} {count} times",
+    readFile: "read {name}",
     note: "1 note",
     notes: "{count} notes",
     readNothing: "read nothing in TaskForce",
+  },
+
+  // The box where the person writes (R134, R135, session 20 of the Council): the "+" menu, the row under the box, Stop and
+  // the queue. No text here ever mentions "@" or "/".
+  composer: {
+    add: "Add files, an issue or a project",
+    addFiles: "Add files",
+    issue: "Issue",
+    project: "Project",
+    connectors: "Connectors",
+    findIssue: "Find an issue",
+    findProject: "Find a project",
+    attachedFull: "Three issues or projects at most",
+    noConnectors: "No connector yet",
+    manageConnectors: "Manage connectors",
+    reconnect: "Reconnect",
+    // A file that TaskForce can't read says in one line what it can read.
+    filesRefusedOne: "{name} can't be read here. TaskForce reads text files and source code, up to 256 KB each.",
+    filesRefusedMany: "{count} files can't be read here. TaskForce reads text files and source code, up to 256 KB each.",
+    filesFull: "Five files at most on one request: remove one to add another.",
+    dismiss: "Dismiss",
+    stop: "Stop",
+    stopHint: "Stop (Esc)",
+    stopped: "Stopped by you",
+    // The messages waiting above the box.
+    queue: "Waiting to be sent",
+    queueRemove: "Remove from the queue: {text}",
+    queueFull: "Five messages can wait at most: remove one to add this one.",
+    sendNext: "Send next",
+    // The row under the box.
+    noProject: "No project",
+    projectLabel: "Project of this conversation: {project}",
+    projectMenu: "Where this conversation works",
+    projectNotSaved: "The project of this conversation did not change: check your connection, then try again.",
+    modelLabel: "Model that answers: {model}",
+    modelMenu: "Model that answers",
+    modelNotChanged: "The model did not change: {why}",
+    modelNotChangedNoReason: "The model did not change: check your connection, then try again.",
+    modelProgress: "What each model can do",
   },
 
   // What TaskForce did so a request fits its model's context window (TF-J1-13): one quiet line in the conversation.
@@ -1224,6 +1264,8 @@ export const CONSTANTS_EN = {
     contextEstimated: "An estimate: the provider doesn't say this model's window.",
     contextProvider: "What Cortex sent the model for its last answer. The AI provider sets the window.",
     contextNone: "Shows after Cortex's next answer: what it sends the model, against the window the model gets.",
+    gaugeLabel: "Context window and usage",
+    gaugeRefresh: "Refresh",
     contextTokens: "{tokens} tokens",
     // Under each answer: the model that wrote it, as the AI gateway called it (CEO's test of 1.10.0).
     answeredWith: "Answered by {model}",
