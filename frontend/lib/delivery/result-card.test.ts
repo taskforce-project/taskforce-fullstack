@@ -132,8 +132,8 @@ describe("resultLine", () => {
 
 describe("missionAgentName", () => {
   it("names the trial agent after the model that answers, and keeps the others' names", () => {
-    expect(missionAgentName({ providerKey: "taskforce-agent", model: "qwen3:8b" }, "Claude Code")).toBe("qwen3:8b");
-    expect(missionAgentName({ providerKey: "taskforce-agent", model: null }, "Claude Code")).toBe("Claude Code");
+    expect(missionAgentName({ providerKey: "taskforce-agent", model: "qwen3:8b" }, "Claude Code")).toBe("Cortex · qwen3:8b");
+    expect(missionAgentName({ providerKey: "taskforce-agent", model: null }, "Claude Code")).toBe("Cortex");
     expect(missionAgentName({ providerKey: "claude-code", model: "claude-opus-5" }, "Claude Code")).toBe("Claude Code");
   });
 });

@@ -46,10 +46,10 @@ class TrialAgentProviderTest {
     }
 
     @Test
-    @DisplayName("le nom du modèle, à l'essai, et jamais proposé pour une tâche qui a un dépôt")
+    @DisplayName("Cortex suivi de son modèle, et jamais proposé pour une tâche qui a un dépôt")
     void namedAfterItsModelAndOnlyWithoutARepository() {
         assertThat(provider.key()).isEqualTo("taskforce-agent");
-        assertThat(provider.displayName()).isEqualTo("qwen3:8b");
+        assertThat(provider.displayName()).isEqualTo("Cortex · qwen3:8b");
         assertThat(provider.models()).containsExactly("qwen3:8b");
         assertThat(provider.logoKey()).isEqualTo("ollama");
         assertThat(provider.trial()).isTrue();
@@ -63,11 +63,11 @@ class TrialAgentProviderTest {
     }
 
     @Test
-    @DisplayName("sans IA qui répond : ni nom de modèle ni délégation possible")
+    @DisplayName("sans IA qui répond : Cortex seul, sans modèle, et pas de délégation")
     void unavailableWithoutAi() {
         ready(new AiStatusService.AiStatus(true, false, null, null, false, null));
 
-        assertThat(provider.displayName()).isEqualTo("TaskForce agent");
+        assertThat(provider.displayName()).isEqualTo("Cortex");
         assertThat(provider.models()).isEmpty();
         assertThat(provider.available()).isFalse();
         assertThat(provider.unavailableReason(context(null))).contains("isn't answering");

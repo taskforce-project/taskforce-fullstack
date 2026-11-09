@@ -306,15 +306,10 @@ export function AssigneeMenu({
                         <span className="min-w-0">
                           <span className="flex items-center gap-1.5">
                             <span className="truncate">{a.displayName}</span>
-                            {/* L'agent à l'essai de R51 se dit à l'essai, et dit ce qu'il rend. */}
-                            {a.trial && (
-                              <span className="shrink-0 border border-border px-1 text-[10px] uppercase text-muted-foreground">
-                                {models.trial}
-                              </span>
-                            )}
                           </span>
+                          {/* Cortex (R144) dit ce qu'il rend. */}
                           {a.ready && a.trial && (
-                            <span className="block whitespace-normal text-xs text-muted-foreground">{models.trialHint}</span>
+                            <span className="block whitespace-normal text-xs text-muted-foreground">{models.cortexHint}</span>
                           )}
                           {!a.ready && a.reason && (
                             <span className="block whitespace-normal text-xs text-muted-foreground">{a.reason}</span>

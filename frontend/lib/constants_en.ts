@@ -445,10 +445,9 @@ export const CONSTANTS_EN = {
     offerAsk: "Ask {model}",
     sentTo: "to {model}",
     answeredBy: "Answered by {model}, as you asked.",
-    // R51: TaskForce's own loop on a local model, on trial, for the tasks answered in a comment.
-    trial: "Trial",
-    trialHint: "Answers in a comment. No code, no repository.",
-    trialAgent: "TaskForce's own loop on {model}, on trial: it reads the issue, its project and the notes you can read, and answers in a comment, under its name and for you. Only for tasks without a repository: code stays with Claude Code.",
+    // R144: Cortex on the model of this instance, for the tasks answered in a comment.
+    cortexHint: "Answers in a comment. No code, no repository.",
+    cortexAgent: "Cortex, on the model of this instance: it reads the issue, its project and the notes you can read, and answers in a comment, under its name and for you. Only for tasks without a repository: code stays with Claude Code.",
   },
 
   // R131: the model benchmark. A sign, a name on hover; the words live in the detail.
@@ -1005,7 +1004,7 @@ export const CONSTANTS_EN = {
       openPullRequest: "Open the pull request",
       branchOnly: "{commits} commits on the branch {branch}, without a pull request.",
       noChange: "No code change was needed.",
-      // R51: the trial agent answers in a comment, without a repository.
+      // R51: Cortex answers in a comment, without a repository.
       answeredInComment: "Answered in a comment on this issue.",
       isItGood: "Is it good?",
       testsRan: "Tests ran",
