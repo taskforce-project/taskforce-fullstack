@@ -80,32 +80,41 @@ public record AssistantAnswer(
      * nombre de commentaires donnés ; {@code boards} : les tableaux montrés (celui de l'écran, ceux joints), avec le nombre
      * d'issues montrées et l'issue ouverte ; {@code tools} : les outils qui lisent et ont abouti, avec leur nombre
      * d'appels ; {@code notes} : les notes du Brain OS servies au modèle ; {@code context} : ce que TaskForce a fait pour
-     * que la requête tienne la fenêtre de ce modèle (TF-J1-13), null quand rien n'a été touché. Gardé avec la réponse, de
-     * quoi la relire pareil dans une conversation rouverte (R137) : {@code notesRead}, ces notes par leur nom ;
-     * {@code acts}, ce que Cortex a fait, geste par geste ; {@code workedMs}, le temps que la réponse a pris ;
-     * {@code record}, son dossier, qui fait d'elle un cas de la banque.
+     * que la requête tienne la fenêtre de ce modèle (TF-J1-13), null quand rien n'a été touché ; {@code files} : les
+     * fichiers joints à la demande (R134). Gardé avec la réponse, de quoi la relire pareil dans une conversation rouverte
+     * (R137) : {@code notesRead}, ces notes par leur nom ; {@code acts}, ce que Cortex a fait, geste par geste ;
+     * {@code workedMs}, le temps que la réponse a pris ; {@code record}, son dossier, qui fait d'elle un cas de la banque.
      */
     public record AssistantRead(List<IssueRead> issues, List<BoardRead> boards, List<ToolRead> tools, int notes,
-                                ContextRead context, List<NoteRead> notesRead, List<ActRead> acts, Long workedMs,
-                                String record) {
+                                ContextRead context, List<FileRead> files, List<NoteRead> notesRead, List<ActRead> acts,
+                                Long workedMs, String record) {
         public AssistantRead {
             issues = issues == null ? List.of() : List.copyOf(issues);
             boards = boards == null ? List.of() : List.copyOf(boards);
             tools = tools == null ? List.of() : List.copyOf(tools);
+            files = files == null ? List.of() : List.copyOf(files);
             notesRead = notesRead == null ? List.of() : List.copyOf(notesRead);
             acts = acts == null ? List.of() : List.copyOf(acts);
         }
 
-        /** Ce qui a été lu, et ce qu'il a fallu faire pour tenir la fenêtre du modèle. */
-        public AssistantRead(List<IssueRead> issues, List<BoardRead> boards, List<ToolRead> tools, int notes,
-                             ContextRead context) {
-            this(issues, boards, tools, notes, context, null, null, null, null);
+        /** Ce qui a été lu, sans fichier joint. */
+        public AssistantRead(List<IssueRead> issues, List<BoardRead> boards, List<ToolRead> tools, int notes, ContextRead context) {
+            this(issues, boards, tools, notes, context, null, null, null, null, null);
+        }
+
+        /** Ce qui a été lu, avec les fichiers joints. */
+        public AssistantRead(List<IssueRead> issues, List<BoardRead> boards, List<ToolRead> tools, int notes, ContextRead context,
+                             List<FileRead> files) {
+            this(issues, boards, tools, notes, context, files, null, null, null, null);
         }
 
         /** Ce qui a été lu, rien n'a dû être condensé ni coupé. */
         public AssistantRead(List<IssueRead> issues, List<BoardRead> boards, List<ToolRead> tools, int notes) {
-            this(issues, boards, tools, notes, null);
+            this(issues, boards, tools, notes, null, List.of());
         }
+
+        /** Un fichier joint à la demande : son nom. */
+        public record FileRead(String name) {}
 
         /**
          * Ce qui a dû changer pour tenir la fenêtre du modèle : les messages condensés dans le résumé pour ce tour, ceux qui

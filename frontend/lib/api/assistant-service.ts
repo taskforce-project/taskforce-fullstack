@@ -111,7 +111,8 @@ export interface AssistantUsage {
 export interface AssistantAnswer {
   answer: string
   reasoning: string | null
-  mode: "fast" | "deep" | "fallback" | "not_sent"
+  /** « stopped » : la personne a arrêté ce tour (R134). « not_sent » : trop grande pour la fenêtre du modèle, elle ne lui a pas été envoyée. */
+  mode: "fast" | "deep" | "fallback" | "stopped" | "not_sent"
   sources: AssistantSource[]
   steps: AssistantStep[]
   toolCalls: AssistantToolCall[]
@@ -147,6 +148,8 @@ export interface AssistantRead {
   workedMs?: number | null
   /** Le dossier de la réponse, gardé avec elle : il en fait un cas de la banque, même rouverte. */
   record?: string | null
+  /** Les fichiers joints à la demande (R134) ; absent des réponses d'avant. */
+  files?: { name: string }[]
 }
 
 /**
@@ -185,6 +188,20 @@ export interface ChatTurnResponse {
   escalation?: ModelEscalation | null
   /** Le modèle vers lequel la personne a envoyé cette demande, d'un clic. */
   sentTo?: string | null
+  /** Le projet de la conversation après ce tour (R135) ; null sans projet, absent d'un serveur plus ancien. */
+  projectId?: number | null
+}
+
+/** Ce qu'un tour envoie en plus de son texte (R134, R135). */
+export interface AgentMessageOptions {
+  /** Le nom de ce tour, pour pouvoir l'arrêter. */
+  turn?: string
+  /** Le projet de la conversation, tel que la rangée le montre : null pour « No project ». */
+  project?: number | null
+  /** Les fichiers texte joints. */
+  files?: readonly { name: string; text: string }[]
+  /** Coupe l'attente côté client, à l'arrêt. */
+  signal?: AbortSignal
 }
 
 /**
@@ -198,17 +215,34 @@ export async function sendAgentMessage(
   screen?: AssistantScreen | null,
   model?: string | null,
   attach?: readonly AssistantAttachment[] | null,
+  options: AgentMessageOptions = {},
 ): Promise<ChatTurnResponse> {
   // L'écran part avec le message quand la personne regarde un projet (R114) : Cortex le lit avant les notes. Le
   // modèle, quand la personne envoie la demande à celui que TaskForce propose (R118) ; sans lui, rien ne change. Ce
-  // qu'elle a joint depuis le compositeur (R123), quand elle a joint quelque chose.
+  // qu'elle a joint depuis le compositeur (R123), quand elle a joint quelque chose. Le projet de la conversation (R135),
+  // dès qu'elle en dit un : c'est lui qui décide, l'écran renseigne.
+  const { turn, project, files, signal } = options
   const body = {
     message, conversationId: conversationId ?? null, ...(screen ? { screen } : {}), ...(model ? { model } : {}),
     ...(attach && attach.length > 0 ? { attach } : {}),
+    ...(turn ? { turn } : {}),
+    ...(project !== undefined ? { project: { id: project } } : {}),
+    ...(files && files.length > 0 ? { files } : {}),
   }
   // Sans toast : ce qui n'a pas marché se dit dans la conversation, là où la réponse devait venir (TF-J1-15).
-  const res = await apiClient.post<{ data: ChatTurnResponse }>(ASSISTANT_ROUTES.CHAT(slug), body, { timeout: AI_TIMEOUT_MS, silentError: true })
+  const res = await apiClient.post<{ data: ChatTurnResponse }>(ASSISTANT_ROUTES.CHAT(slug), body, {
+    timeout: AI_TIMEOUT_MS, silentError: true, ...(signal ? { signal } : {}),
+  })
   return res.data.data
+}
+
+/**
+ * Arrête un tour (R134) : le serveur coupe l'appel au modèle, et rend le tour tel qu'il s'est arrêté, ce qu'il a déjà fait
+ * compris ; null quand il n'a pas encore commencé, qu'il est déjà fini, ou qu'il finit encore.
+ */
+export async function stopTurn(slug: string, turn: string): Promise<ChatTurnResponse | null> {
+  const res = await apiClient.post<{ data: ChatTurnResponse | null }>(ASSISTANT_ROUTES.STOP(slug), { turn }, { silentError: true })
+  return res.data.data ?? null
 }
 
 /**

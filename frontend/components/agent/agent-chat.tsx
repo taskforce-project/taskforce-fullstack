@@ -34,6 +34,7 @@ import { MissionInChat } from "./mission-in-chat"
 import { ModelOffer } from "./model-offer"
 import { QuestionCard } from "./question-card"
 import { ReadLine } from "./read-line"
+import { StoppedNotice } from "./stopped-notice"
 import { UndoAction } from "./undo-action"
 import { UserMessage } from "./user-message"
 import { WorkedLine, WorkingLine } from "./work-line"
@@ -306,6 +307,8 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
                   </Message>
                 ) : turn.kind === "compact" ? (
                   <CompactedNotice compacted={turn.compacted ?? 0} compacting={turn.compacting} summary={turn.summary} problem={turn.problem} />
+                ) : turn.kind === "stopped" ? (
+                  <StoppedNotice />
                 ) : (
                   <Message role="assistant">
                     {turn.answer && <AgentAnswerView answer={turn.answer} slug={slug} />}

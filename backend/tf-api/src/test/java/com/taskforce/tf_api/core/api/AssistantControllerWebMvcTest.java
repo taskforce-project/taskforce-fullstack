@@ -23,8 +23,10 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.agent.CortexTurns;
 import com.taskforce.tf_api.core.service.agent.ModelCapabilityService;
 import com.taskforce.tf_api.core.service.agent.Screen;
+import com.taskforce.tf_api.core.service.agent.TurnInput;
 import com.taskforce.tf_api.core.service.ai.ChosenModel;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
@@ -45,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * {@code AgentService} mocké.
  */
 @WebMvcTest(AssistantController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, CortexTurns.class})
 @ActiveProfiles("test")
 @DisplayName("AssistantController (@WebMvcTest)")
 class AssistantControllerWebMvcTest {
@@ -79,7 +81,7 @@ class AssistantControllerWebMvcTest {
         when(conversationService.recentHistory(anyLong())).thenReturn(java.util.List.of());
         when(conversationService.autoTitle(anyLong(), anyString())).thenReturn("Move");
         AtomicReference<String> model = new AtomicReference<>();
-        when(agentService.run(anyString(), anyLong(), anyString(), any(), any(), any())).thenAnswer(call -> {
+        when(agentService.run(anyString(), anyLong(), any(TurnInput.class))).thenAnswer(call -> {
             model.set(ChosenModel.current().orElse(null));
             // Le modèle qui répond, comme la passerelle le dit : celui que la personne a choisi ou cliqué, ici.
             return new com.taskforce.tf_api.core.dto.response.AssistantAnswer(text, null, "deep", java.util.List.of(),
@@ -108,7 +110,7 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.answer.answer").value("Done."));
         // Rien n'a changé de modèle : la personne décide d'un clic.
         org.assertj.core.api.Assertions.assertThat(used.get()).isNull();
-        verify(conversationService).appendMessage(1L, "assistant", "Done." + ModelCapabilityService.block(text), "deep", 0, null, null);
+        verify(conversationService).appendAnswer(1L, "Done." + ModelCapabilityService.block(text), "deep", 0, null, null, null);
     }
 
     @Test
@@ -117,7 +119,7 @@ class AssistantControllerWebMvcTest {
         String text = "qwen3:14b's context window is 40,960. You can send this request to qwen3:14b.";
         ChatTurnResponse.Escalation offer = new ChatTurnResponse.Escalation("context", "qwen3:8b", "qwen3:14b", text);
         answering("Too big.");
-        when(agentService.run(anyString(), anyLong(), anyString(), any(), any(), any())).thenReturn(
+        when(agentService.run(anyString(), anyLong(), any(TurnInput.class))).thenReturn(
             new com.taskforce.tf_api.core.dto.response.AssistantAnswer("Too big.", null, "not_sent", java.util.List.of(), java.util.List.of(),
                 java.util.List.of(), com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE, null, null, null, offer));
 
@@ -129,8 +131,8 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.escalation.capability").value("context"))
             .andExpect(jsonPath("$.data.answer.offer").doesNotExist());
         verify(capabilities, never()).offer(anyString(), any(), anyString());
-        verify(conversationService).appendMessage(1L, "user", "Summarize", "not_sent", 0);
-        verify(conversationService).appendMessage(1L, "assistant", "Too big." + ModelCapabilityService.block(text), "not_sent", 0, null, null);
+        verify(conversationService).appendNotSent(1L, "Summarize", java.util.List.of());
+        verify(conversationService).appendAnswer(1L, "Too big." + ModelCapabilityService.block(text), "not_sent", 0, null, null, null);
     }
 
     @Test
@@ -147,8 +149,8 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.escalation").doesNotExist());
         org.assertj.core.api.Assertions.assertThat(used.get()).isEqualTo("qwen3:8b");
         verify(capabilities, never()).offer(anyString(), any(), anyString());
-        verify(conversationService).appendMessage(1L, "assistant",
-            "Moved." + ModelCapabilityService.block(ModelCapabilityService.sentNotice("qwen3:8b")), "deep", 0, "qwen3:8b", null);
+        verify(conversationService).appendAnswer(1L,
+            "Moved." + ModelCapabilityService.block(ModelCapabilityService.sentNotice("qwen3:8b")), "deep", 0, "qwen3:8b", null, null);
     }
 
     @Test
@@ -166,7 +168,7 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.answer.model").value("qwen3:14b"));
         org.assertj.core.api.Assertions.assertThat(used.get()).isEqualTo("qwen3:14b");
         // Le modèle qui a répondu reste avec la réponse : une conversation rouverte le montre encore.
-        verify(conversationService).appendMessage(1L, "assistant", "Hi.", "deep", 0, "qwen3:14b", null);
+        verify(conversationService).appendAnswer(1L, "Hi.", "deep", 0, "qwen3:14b", null, null);
     }
 
     @Test
@@ -180,7 +182,7 @@ class AssistantControllerWebMvcTest {
         when(conversationService.getOrCreate(anyLong(), anyLong(), any(), any())).thenReturn(conv);
         when(conversationService.recentHistory(anyLong())).thenReturn(java.util.List.of());
         when(conversationService.autoTitle(anyLong(), anyString())).thenReturn("Bonjour");
-        when(agentService.run(anyString(), anyLong(), anyString(), any(), any(), any())).thenReturn(
+        when(agentService.run(anyString(), anyLong(), any(TurnInput.class))).thenReturn(
             new com.taskforce.tf_api.core.dto.response.AssistantAnswer(
                 "Réponse", null, "fast", java.util.List.of(), java.util.List.of(), java.util.List.of(),
                 com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE));
@@ -189,7 +191,17 @@ class AssistantControllerWebMvcTest {
                 .accept(MediaType.APPLICATION_JSON)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Bonjour\"}"))
             .andExpect(status().isOk());
-        verify(agentService).run(eq("acme"), eq(7L), eq("Bonjour"), any(), eq(Screen.NONE), eq(java.util.List.of()));
+        TurnInput sent = sentInput();
+        org.assertj.core.api.Assertions.assertThat(sent.message()).isEqualTo("Bonjour");
+        org.assertj.core.api.Assertions.assertThat(sent.screen()).isEqualTo(Screen.NONE);
+        org.assertj.core.api.Assertions.assertThat(sent.attached()).isEmpty();
+    }
+
+    /** Ce que le contrôleur a passé au tour. */
+    private TurnInput sentInput() {
+        org.mockito.ArgumentCaptor<TurnInput> input = org.mockito.ArgumentCaptor.forClass(TurnInput.class);
+        verify(agentService).run(eq("acme"), eq(7L), input.capture());
+        return input.getValue();
     }
 
     @ParameterizedTest(name = "écran {0} → {1}")
@@ -198,7 +210,7 @@ class AssistantControllerWebMvcTest {
         "{\"projectId\":12,\"issueId\":34}  | 12   | 34",
         "{\"issueId\":34}                   |      | ",   // une issue sans son projet ne se lit pas
     })
-    @DisplayName("POST assistant avec l'écran (R114) : le projet et l'issue ouverts partent à Cortex, le projet range la conversation")
+    @DisplayName("POST assistant avec l'écran (R114) : le projet et l'issue ouverts partent à Cortex ; il ne décide plus du projet (R135)")
     void chat_passes_the_screen(String screen, Long projectId, Long issueId) throws Exception {
         var ws = com.taskforce.tf_api.core.model.Workspace.builder().id(1L).slug("acme").name("Acme").build();
         when(access.resolveAndAuthorize(anyString(), anyLong())).thenReturn(ws);
@@ -206,7 +218,7 @@ class AssistantControllerWebMvcTest {
         when(conv.getId()).thenReturn(1L);
         when(conversationService.getOrCreate(anyLong(), anyLong(), any(), any())).thenReturn(conv);
         when(conversationService.recentHistory(anyLong())).thenReturn(java.util.List.of());
-        when(agentService.run(anyString(), anyLong(), anyString(), any(), any(), any())).thenReturn(
+        when(agentService.run(anyString(), anyLong(), any(TurnInput.class))).thenReturn(
             new com.taskforce.tf_api.core.dto.response.AssistantAnswer(
                 "Réponse", null, "fast", java.util.List.of(), java.util.List.of(), java.util.List.of(),
                 com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE));
@@ -215,9 +227,163 @@ class AssistantControllerWebMvcTest {
                 .accept(MediaType.APPLICATION_JSON)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"supprime ça\",\"screen\":" + screen + "}"))
             .andExpect(status().isOk());
-        verify(agentService).run(eq("acme"), eq(7L), eq("supprime ça"), any(), eq(new Screen(projectId, issueId)), any());
-        // Une conversation qui commence sur un projet se range sous lui (R121) ; sans projet à l'écran, sous aucun.
-        verify(conversationService).getOrCreate(eq(1L), eq(7L), any(), eq(projectId));
+        org.assertj.core.api.Assertions.assertThat(sentInput().screen()).isEqualTo(new Screen(projectId, issueId));
+        verify(conversationService).getOrCreate(eq(1L), eq(7L), any(), eq(null));
+    }
+
+    @Test
+    @DisplayName("POST assistant : la conversation neuve prend le projet que la rangée montre (R135), et le dit avec la réponse")
+    void chat_starts_in_the_project_of_the_row() throws Exception {
+        answering("Ok.");
+        when(conversationService.currentProject(1L)).thenReturn(12L);
+
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Ok\",\"project\":{\"id\":12},\"screen\":{\"projectId\":99}}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.projectId").value(12));
+        verify(conversationService).getOrCreate(eq(1L), eq(7L), any(), eq(12L));
+        org.assertj.core.api.Assertions.assertThat(sentInput().project()).isEqualTo(12L);
+        org.assertj.core.api.Assertions.assertThat(sentInput().conversation()).isEqualTo(1L);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+        "un autre projet     | {\"id\":5}   | 5",
+        "« No project »      | {\"id\":null} | ",
+    })
+    @DisplayName("POST assistant dans une conversation existante : ce que la rangée montre est gardé (R135)")
+    void chat_keeps_the_project_of_the_row(String label, String project, Long id) throws Exception {
+        answering("Ok.");
+
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Ok\",\"conversationId\":1,\"project\":" + project + "}"))
+            .andExpect(status().isOk());
+        if (id != null) {
+            verify(conversationService).setProject(1L, 7L, 1L, id);
+        } else {
+            verify(conversationService, never()).setProject(anyLong(), anyLong(), anyLong(), anyLong());
+        }
+        org.assertj.core.api.Assertions.assertThat(sentInput().project()).isEqualTo(id);
+    }
+
+    @Test
+    @DisplayName("POST assistant avec des fichiers (R134) : ils partent à Cortex et restent avec le message")
+    void chat_passes_the_files_and_keeps_them() throws Exception {
+        answering("x");
+        var read = new com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead(java.util.List.of(), java.util.List.of(), java.util.List.of(), 0, null,
+            java.util.List.of(new com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead.FileRead("notes.md")));
+        when(agentService.run(anyString(), anyLong(), any(TurnInput.class))).thenReturn(
+            new com.taskforce.tf_api.core.dto.response.AssistantAnswer("Lu.", null, "fast", java.util.List.of(), java.util.List.of(), java.util.List.of(),
+                com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE, null, "qwen3:8b", read));
+
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Lis\",\"files\":[{\"name\":\"notes.md\",\"text\":\"corps\"}]}"))
+            .andExpect(status().isOk());
+        java.util.List<com.taskforce.tf_api.core.service.ai.AttachedFile> files =
+            java.util.List.of(new com.taskforce.tf_api.core.service.ai.AttachedFile("notes.md", "corps"));
+        org.assertj.core.api.Assertions.assertThat(sentInput().files()).isEqualTo(files);
+        verify(conversationService).appendAsked(1L, "Lis", files);
+    }
+
+    @Test
+    @DisplayName("POST assistant : un fichier que le modèle n'a pas reçu ne garde que son nom")
+    void chat_keeps_only_the_name_of_an_unread_file() throws Exception {
+        answering("Too big.");
+
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Lis\",\"files\":[{\"name\":\"big.log\",\"text\":\"corps\"}]}"))
+            .andExpect(status().isOk());
+        verify(conversationService).appendAsked(1L, "Lis",
+            java.util.List.of(new com.taskforce.tf_api.core.service.ai.AttachedFile("big.log", "")));
+    }
+
+    @ParameterizedTest(name = "{0} → 400")
+    @ValueSource(strings = {
+        "[{\"name\":\"a\",\"text\":\"t\"},{\"name\":\"b\",\"text\":\"t\"},{\"name\":\"c\",\"text\":\"t\"},{\"name\":\"d\",\"text\":\"t\"},"
+            + "{\"name\":\"e\",\"text\":\"t\"},{\"name\":\"f\",\"text\":\"t\"}]",   // six fichiers
+        "[{\"name\":\"\",\"text\":\"t\"}]",                                         // sans nom
+        "[{\"name\":\"a\"}]",                                                       // sans contenu
+    })
+    @DisplayName("POST assistant avec des fichiers invalides → 400")
+    void chat_invalid_files_400(String files) throws Exception {
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"hi\",\"files\":" + files + "}"))
+            .andExpect(status().isBadRequest());
+        verify(agentService, never()).run(any(), any(), any(TurnInput.class));
+    }
+
+    @Test
+    @DisplayName("POST assistant arrêté par la personne (R134) : pas de proposition sous le tour, et il est gardé comme tel")
+    void chat_stopped_makes_no_offer() throws Exception {
+        answering("x");
+        when(agentService.run(anyString(), anyLong(), any(TurnInput.class))).thenReturn(
+            new com.taskforce.tf_api.core.dto.response.AssistantAnswer("Stopped by you.", null, "stopped", java.util.List.of(), java.util.List.of(),
+                java.util.List.of(), new com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage(30, 0, 30)));
+
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Long\",\"turn\":\"t-1\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.answer.mode").value("stopped"));
+        verify(capabilities, never()).offer(anyString(), any(), anyString());
+        verify(conversationService).appendAnswer(1L, "Stopped by you.", "stopped", 30, null, null, null);
+    }
+
+    @Test
+    @DisplayName("POST assistant : la carte qu'une réponse prépare reste avec elle (R135)")
+    void chat_keeps_the_prepared_card() throws Exception {
+        answering("x");
+        AssistantToolCall card = new AssistantToolCall("create_issue", "pending", "{\"title\":\"Test\"}", "ready", "r");
+        when(agentService.run(anyString(), anyLong(), any(TurnInput.class))).thenReturn(
+            new com.taskforce.tf_api.core.dto.response.AssistantAnswer("Prête.", null, "deep", java.util.List.of(), java.util.List.of(),
+                java.util.List.of(card), com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE));
+
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Crée une issue Test\"}"))
+            .andExpect(status().isOk());
+        verify(conversationService).appendAnswer(1L, "Prête.", "deep", 0, null, null,
+            new TurnInput.LastCard("create_issue", "{\"title\":\"Test\"}"));
+        org.assertj.core.api.Assertions.assertThat(sentInput().lastCard()).isNull();
+    }
+
+    @Test
+    @DisplayName("POST assistant « tu t'es trompé de projet » : la dernière carte de la conversation part avec le tour (R135)")
+    void chat_hands_the_last_card_to_a_correction() throws Exception {
+        answering("x");
+        TurnInput.LastCard last = new TurnInput.LastCard("create_issue", "{\"title\":\"Test\"}");
+        when(conversationService.lastCard(1L)).thenReturn(Optional.of(last));
+
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"oui mais tu t'es trompe de projet\"}"))
+            .andExpect(status().isOk());
+        org.assertj.core.api.Assertions.assertThat(sentInput().lastCard()).isEqualTo(last);
+    }
+
+    @Test
+    @DisplayName("POST stop : le tour de cette personne s'arrête, et rien n'est rendu quand il n'a pas commencé (R134)")
+    void stop_200() throws Exception {
+        var ws = com.taskforce.tf_api.core.model.Workspace.builder().id(1L).slug("acme").name("Acme").build();
+        when(access.resolveAndAuthorize(anyString(), anyLong())).thenReturn(ws);
+
+        mockMvc.perform(post(URL + "/stop").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"turn\":\"t-1\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    @ParameterizedTest(name = "stop {0} → 400")
+    @ValueSource(strings = {"{}", "{\"turn\":\"\"}"})
+    void stop_without_turn_400(String body) throws Exception {
+        mockMvc.perform(post(URL + "/stop").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -232,7 +398,7 @@ class AssistantControllerWebMvcTest {
         var read = new com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead(
             java.util.List.of(new com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead.IssueRead("OPS-35", 3)),
             java.util.List.of(), java.util.List.of(), 0);
-        when(agentService.run(anyString(), anyLong(), anyString(), any(), any(), any())).thenReturn(
+        when(agentService.run(anyString(), anyLong(), any(TurnInput.class))).thenReturn(
             new com.taskforce.tf_api.core.dto.response.AssistantAnswer(
                 "Réponse", null, "fast", java.util.List.of(), java.util.List.of(), java.util.List.of(),
                 com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE, null, "qwen3:8b", read));
@@ -245,9 +411,9 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.answer.read.issues[0].key").value("OPS-35"))
             .andExpect(jsonPath("$.data.answer.read.issues[0].comments").value(3));
         // Une issue sans son projet ne se lit pas.
-        verify(agentService).run(eq("acme"), eq(7L), eq("résume"), any(), eq(Screen.NONE),
-            eq(java.util.List.of(new Screen(30L, 350L), new Screen(31L, null))));
-        verify(conversationService).appendMessage(1L, "assistant", "Réponse", "fast", 0, "qwen3:8b", read);
+        org.assertj.core.api.Assertions.assertThat(sentInput().attached())
+            .containsExactly(new Screen(30L, 350L), new Screen(31L, null));
+        verify(conversationService).appendAnswer(1L, "Réponse", "fast", 0, "qwen3:8b", read, null);
     }
 
     @Test
@@ -258,7 +424,7 @@ class AssistantControllerWebMvcTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"hi\",\"attach\":["
                     + "{\"projectId\":1},{\"projectId\":2},{\"projectId\":3},{\"projectId\":4}]}"))
             .andExpect(status().isBadRequest());
-        verify(agentService, never()).run(any(), any(), any(), any(), any(), any());
+        verify(agentService, never()).run(any(), any(), any(TurnInput.class));
     }
 
     /**
@@ -295,7 +461,7 @@ class AssistantControllerWebMvcTest {
                 .accept(MediaType.APPLICATION_JSON)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"hi\",\"screen\":{\"projectId\":-1}}"))
             .andExpect(status().isBadRequest());
-        verify(agentService, never()).run(any(), any(), any(), any(), any(), any());
+        verify(agentService, never()).run(any(), any(), any(TurnInput.class));
     }
 
     @Test

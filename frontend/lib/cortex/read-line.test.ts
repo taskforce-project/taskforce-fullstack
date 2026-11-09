@@ -21,6 +21,7 @@ describe("readLine", () => {
     ["deux lectures du même tableau se disent une fois", { boards: [{ project: "OPS", issues: 2, open: null }, { project: "OPS", issues: 3, open: null }] }, "qwen3:8b · read the OPS board"],
     ["chercher dans les notes ne s'ajoute pas aux notes lues", { notes: 3, tools: [{ name: "search_brain", calls: 2 }] }, "qwen3:8b · read 3 notes"],
     ["dit aussi qu'un modèle n'a rien lu : un résumé écrit sans lire se voit", {}, "qwen3:8b · read nothing in TaskForce"],
+    ["les fichiers joints d'abord (R134) : jamais « read nothing » quand il en a reçu", { files: [{ name: "notes.md" }], notes: 1 }, "qwen3:8b · read notes.md and 1 note"],
   ] as const)("%s", (_, what, expected) => {
     expect(line("qwen3:8b", read(what as Partial<AssistantRead>))).toBe(expected)
   })

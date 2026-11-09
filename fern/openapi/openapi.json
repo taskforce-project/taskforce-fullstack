@@ -690,55 +690,6 @@
         }
       }
     },
-    "/api/workspaces/{slug}/evals/cases/{caseId}/criteria": {
-      "put": {
-        "tags": [
-          "Test bank"
-        ],
-        "operationId": "criteria",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "caseId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CriteriaRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseCaseSummary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/workspaces/{slug}/dashboard-cards/reorder": {
       "put": {
         "tags": [
@@ -812,6 +763,55 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseModelCapabilityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/ai/conversations/{id}/project": {
+      "put": {
+        "tags": [
+          "AI assistant"
+        ],
+        "operationId": "setProject",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseConversationSummary"
                 }
               }
             }
@@ -4058,46 +4058,6 @@
         }
       }
     },
-    "/api/workspaces/{slug}/evals/cases/good": {
-      "post": {
-        "tags": [
-          "Test bank"
-        ],
-        "operationId": "good",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DraftRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseCaseSummary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/workspaces/{slug}/evals/cases/draft": {
       "post": {
         "tags": [
@@ -4131,46 +4091,6 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseDraft"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/workspaces/{slug}/evals/cases/bad": {
-      "post": {
-        "tags": [
-          "Test bank"
-        ],
-        "operationId": "bad",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BadCaseRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseCaseSummary"
                 }
               }
             }
@@ -4715,6 +4635,46 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/AssistantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseChatTurnResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/assistant/stop": {
+      "post": {
+        "tags": [
+          "AI assistant"
+        ],
+        "operationId": "stop",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantStopRequest"
               }
             }
           },
@@ -11657,119 +11617,6 @@
           }
         }
       },
-      "CriteriaRequest": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 0
-          },
-          "criteria": {
-            "$ref": "#/components/schemas/EvalCriteria"
-          }
-        },
-        "required": [
-          "criteria"
-        ]
-      },
-      "EvalCriteria": {
-        "type": "object",
-        "properties": {
-          "tool": {
-            "type": "string"
-          },
-          "args": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          "effect": {
-            "type": "string"
-          },
-          "forbid": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "contains": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "notContains": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "honest": {
-            "type": "boolean"
-          },
-          "expected": {
-            "type": "string"
-          }
-        }
-      },
-      "ApiResponseCaseSummary": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/CaseSummary"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "CaseSummary": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "title": {
-            "type": "string"
-          },
-          "question": {
-            "type": "string"
-          },
-          "tool": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "criteriaAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "mine": {
-            "type": "boolean"
-          },
-          "expected": {
-            "type": "string"
-          },
-          "waiting": {
-            "type": "boolean"
-          }
-        }
-      },
       "ReorderDashboardCardsRequest": {
         "type": "object",
         "properties": {
@@ -12024,6 +11871,60 @@
           "measuredAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ConversationProjectRequest": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ApiResponseConversationSummary": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConversationSummary"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ConversationSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "messageCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -15316,6 +15217,94 @@
           "record"
         ]
       },
+      "EvalCriteria": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string"
+          },
+          "args": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "effect": {
+            "type": "string"
+          },
+          "forbid": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notContains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "honest": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseCaseSummary": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CaseSummary"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CaseSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "criteriaAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "mine": {
+            "type": "boolean"
+          }
+        }
+      },
       "DraftRequest": {
         "type": "object",
         "properties": {
@@ -15399,25 +15388,6 @@
             "type": "boolean"
           }
         }
-      },
-      "BadCaseRequest": {
-        "type": "object",
-        "properties": {
-          "record": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 0
-          },
-          "expected": {
-            "type": "string",
-            "maxLength": 500,
-            "minLength": 0
-          }
-        },
-        "required": [
-          "expected",
-          "record"
-        ]
       },
       "MissionRetryRequest": {
         "type": "object",
@@ -15795,7 +15765,7 @@
         "properties": {
           "message": {
             "type": "string",
-            "maxLength": 400000,
+            "maxLength": 4000,
             "minLength": 0
           },
           "conversationId": {
@@ -15817,11 +15787,55 @@
             },
             "maxItems": 3,
             "minItems": 0
+          },
+          "turn": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectRequest"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileRequest"
+            },
+            "maxItems": 5,
+            "minItems": 0
           }
         },
         "required": [
           "message"
         ]
+      },
+      "FileRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 0
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 262144,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "name",
+          "text"
+        ]
+      },
+      "ProjectRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "ScreenRequest": {
         "type": "object",
@@ -15833,20 +15847,6 @@
           "issueId": {
             "type": "integer",
             "format": "int64"
-          }
-        }
-      },
-      "ActRead": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "key": {
-            "type": "string"
           }
         }
       },
@@ -15980,24 +15980,11 @@
           "context": {
             "$ref": "#/components/schemas/ContextRead"
           },
-          "notesRead": {
+          "files": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NoteRead"
+              "$ref": "#/components/schemas/FileRead"
             }
-          },
-          "acts": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ActRead"
-            }
-          },
-          "workedMs": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "record": {
-            "type": "string"
           }
         }
       },
@@ -16124,6 +16111,10 @@
           },
           "sentTo": {
             "type": "string"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -16161,6 +16152,14 @@
           }
         }
       },
+      "FileRead": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "IssueRead": {
         "type": "object",
         "properties": {
@@ -16170,18 +16169,6 @@
           "comments": {
             "type": "integer",
             "format": "int32"
-          }
-        }
-      },
-      "NoteRead": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "title": {
-            "type": "string"
           }
         }
       },
@@ -16196,6 +16183,19 @@
             "format": "int32"
           }
         }
+      },
+      "AssistantStopRequest": {
+        "type": "object",
+        "properties": {
+          "turn": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "turn"
+        ]
       },
       "AssistantUndoRequest": {
         "type": "object",
@@ -16758,24 +16758,6 @@
           "summarized": {
             "type": "integer",
             "format": "int32"
-          },
-          "summary": {
-            "type": "string"
-          },
-          "historyTokens": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "contextTokens": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "contextWindow": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "contextEstimated": {
-            "type": "boolean"
           }
         }
       },
@@ -19610,6 +19592,27 @@
           }
         }
       },
+      "ApiResponseListIssueCommentHitResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueCommentHitResponse"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "IssueHitResponse": {
         "type": "object",
         "properties": {
@@ -19632,27 +19635,6 @@
           },
           "statusCategory": {
             "type": "string"
-          }
-        }
-      },
-      "ApiResponseListIssueCommentHitResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/IssueCommentHitResponse"
-            }
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },
@@ -20173,15 +20155,6 @@
             "items": {
               "$ref": "#/components/schemas/Grade"
             }
-          },
-          "expected": {
-            "type": "string"
-          },
-          "waiting": {
-            "type": "boolean"
-          },
-          "record": {
-            "type": "string"
           }
         }
       },
@@ -21054,33 +21027,6 @@
           }
         }
       },
-      "ConversationSummary": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "title": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "type": "string"
-          },
-          "messageCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "totalTokens": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "projectId": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
       "ApiResponseConversationDetail": {
         "type": "object",
         "properties": {
@@ -21118,6 +21064,10 @@
             "items": {
               "$ref": "#/components/schemas/MessageDto"
             }
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -21149,6 +21099,20 @@
           },
           "read": {
             "$ref": "#/components/schemas/AssistantRead"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageFile"
+            }
+          }
+        }
+      },
+      "MessageFile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
           }
         }
       },

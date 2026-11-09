@@ -41,9 +41,9 @@ export function readLine(line: GreyLine | null, c: ConversationTexts): string | 
   return `${line.model} · ${c.read} ${inASentence(line.pieces.map((piece) => piece.text), c).join("")}`
 }
 
-/** Ce que le modèle a lu, dans l'ordre de la ligne : les notes, les tableaux montrés, les issues lues, ce que ses outils ont lu. */
+/** Ce que le modèle a lu, dans l'ordre de la ligne : les fichiers joints, les notes, les tableaux montrés, les issues lues, ce que ses outils ont lu. */
 export function readPieces(read: AssistantRead, c: ConversationTexts, t: ThreadTexts): ReadPiece[] {
-  const pieces: ReadPiece[] = []
+  const pieces: ReadPiece[] = (read.files ?? []).map((file) => ({ kind: "text", text: fillText(c.readFile, { name: file.name }) }))
   if (read.notes > 0) pieces.push({ kind: "notes", text: read.notes === 1 ? c.note : fillText(c.notes, { count: String(read.notes) }) })
   const boards = new Set((read.boards ?? []).map((board) => fillText(c.sawBoard, { project: board.project })))
   boards.forEach((text) => pieces.push({ kind: "text", text }))

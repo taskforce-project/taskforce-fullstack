@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.api;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -23,12 +24,17 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.AiConversationService;
 import com.taskforce.tf_api.core.service.agent.AgentService;
+import com.taskforce.tf_api.core.service.agent.CortexTurns;
 import com.taskforce.tf_api.core.service.agent.ModelCapabilityService;
+import com.taskforce.tf_api.core.service.agent.ProjectCorrection;
 import com.taskforce.tf_api.core.service.agent.Question;
 import com.taskforce.tf_api.core.service.agent.QuestionNeeded;
 import com.taskforce.tf_api.core.service.agent.Screen;
+import com.taskforce.tf_api.core.service.agent.TurnInput;
+import com.taskforce.tf_api.core.service.agent.TurnInput.LastCard;
 import com.taskforce.tf_api.core.service.agent.TurnProgress;
 import com.taskforce.tf_api.core.service.agent.TurnProgressPublisher;
+import com.taskforce.tf_api.core.service.ai.AttachedFile;
 import com.taskforce.tf_api.core.service.ai.ChosenModel;
 import com.taskforce.tf_api.core.service.ai.TurnHistory;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
@@ -63,6 +69,7 @@ public class AssistantController {
     private final BrainAccessGuard      access;
     private final AiConversationService conversationService;
     private final ModelCapabilityService capabilities;
+    private final CortexTurns           turns;
     private final TurnProgressPublisher turnProgress;
 
     /**
@@ -91,8 +98,33 @@ public class AssistantController {
     ) {
         Long userId = resolveUserId(jwt);
         Workspace ws = access.resolveAndAuthorize(slug, userId);
+        return ResponseEntity.ok(ApiResponse.success(turns.run(userId, body.turn(), () -> turn(slug, ws, userId, body))));
+    }
+
+    /**
+     * Arrête un tour de la personne (R134) : l'appel au modèle en cours est coupé, le suivant ne part pas. Rend le tour tel
+     * qu'il s'est arrêté et gardé ; null quand il n'a pas encore commencé, qu'il est déjà fini ou qu'il finit encore.
+     */
+    @PostMapping(value = "/stop", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<ChatTurnResponse>> stop(
+        @PathVariable String slug,
+        @Valid @RequestBody AssistantStopRequest body,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        access.resolveAndAuthorize(slug, userId);
+        return ResponseEntity.ok(ApiResponse.success(turns.stop(userId, body.turn())));
+    }
+
+    private ChatTurnResponse turn(String slug, Workspace ws, Long userId, AssistantRequest body) {
+        // La conversation travaille dans le projet que la rangée sous le compositeur montre (R135) ; l'écran n'en décide plus.
         AiConversation conv = conversationService.getOrCreate(ws.getId(), userId, body.conversationId(),
-            body.screenOf().projectId());
+            body.project() == null ? null : body.project().id());
+        if (body.conversationId() != null && body.project() != null
+            && !Objects.equals(conv.getProjectId(), body.project().id())) {
+            conversationService.setProject(conv.getId(), userId, ws.getId(), body.project().id());
+        }
+        Long project = body.project() != null ? body.project().id() : conv.getProjectId();
 
         // La taille de la conversation AVANT d'ajouter le tour courant, que la proposition d'un modèle compare (R118).
         List<Map<String, Object>> history = conversationService.recentHistory(conv.getId());
@@ -104,26 +136,53 @@ public class AssistantController {
         // (R113), sinon celui de l'instance. TaskForce ne change jamais de modèle sans elle.
         String sentTo = capabilities.requestedModel(body.model());
         String chosen = sentTo != null ? sentTo : capabilities.chosenModel(userId);
+        // « Tu t'es trompé de projet » reprend la dernière carte préparée de cette conversation (R135).
+        LastCard lastCard = ProjectCorrection.asks(body.message()) ? conversationService.lastCard(conv.getId()).orElse(null) : null;
+        TurnInput input = new TurnInput(body.message(), memory, body.screenOf(), body.attachedOf(), body.filesOf(), conv.getId(),
+            project, lastCard);
         AssistantAnswer answer = ChosenModel.using(chosen, () -> TurnProgress.during(turnProgress.sinkFor(userId, conv.getId()),
-            () -> agentService.run(slug, userId, body.message(), memory, body.screenOf(), body.attachedOf())));
+            () -> agentService.run(slug, userId, input)));
+        boolean stopped = AgentService.STOPPED_MODE.equals(answer.mode());
         // Ce que TaskForce dit sous la réponse : un modèle qui tient une demande trop grande (TF-J1-13), la proposition d'un
-        // modèle plus fort, ou la demande envoyée à un autre.
-        ChatTurnResponse.Escalation escalation = sentTo != null ? null : answer.offer() != null ? answer.offer()
+        // modèle plus fort, ou la demande envoyée à un autre. Rien sous un tour que la personne a arrêté.
+        ChatTurnResponse.Escalation escalation = sentTo != null || stopped ? null : answer.offer() != null ? answer.offer()
             : capabilities.offer(body.message(), history, capabilities.cortexModel(chosen)).orElse(null);
-        String notice = sentTo != null ? ModelCapabilityService.sentNotice(sentTo)
+        String notice = stopped ? null : sentTo != null ? ModelCapabilityService.sentNotice(sentTo)
             : escalation != null ? escalation.text() : null;
 
         // Persiste le tour dans la conversation (multi-conversation + historique), avec ce que TaskForce y a dit et ce qu'il
-        // a donné à lire au modèle (la ligne grise, R123) : une conversation rouverte se relit pareil. Une demande qui n'a pas
-        // tenu la fenêtre garde son mode : elle reste dans le fil, et le modèle ne la relit pas aux tours suivants.
-        conversationService.appendMessage(conv.getId(), "user", body.message(),
-            AssistantAnswer.NOT_SENT.equals(answer.mode()) ? AssistantAnswer.NOT_SENT : null, 0);
-        conversationService.appendMessage(conv.getId(), "assistant",
+        // a donné à lire au modèle (la ligne grise, R123) : une conversation rouverte se relit pareil, les fichiers joints et
+        // « Stopped by you » compris. Une demande qui n'a pas tenu la fenêtre reste dans le fil, et le modèle ne la relit pas.
+        if (AssistantAnswer.NOT_SENT.equals(answer.mode())) {
+            conversationService.appendNotSent(conv.getId(), body.message(), keptFiles(body.filesOf(), answer));
+        } else {
+            conversationService.appendAsked(conv.getId(), body.message(), keptFiles(body.filesOf(), answer));
+        }
+        conversationService.appendAnswer(conv.getId(),
             notice == null ? answer.answer() : answer.answer() + ModelCapabilityService.block(notice), answer.mode(),
-            answer.usage() != null ? answer.usage().totalTokens() : 0, answer.model(), answer.read());
+            answer.usage() != null ? answer.usage().totalTokens() : 0, answer.model(), answer.read(), preparedCard(answer));
         String title = conversationService.autoTitle(conv.getId(), body.message());
 
-        return ResponseEntity.ok(ApiResponse.success(new ChatTurnResponse(conv.getId(), title, answer, escalation, sentTo)));
+        return new ChatTurnResponse(conv.getId(), title, answer, escalation, sentTo, conversationService.currentProject(conv.getId()));
+    }
+
+    /**
+     * Ce qui reste des fichiers avec la demande (R134) : leur contenu quand le modèle l'a reçu ; sinon leurs noms, pour qu'une
+     * demande trop grande pour ce modèle ne fasse pas tomber l'historique des tours suivants.
+     */
+    private static List<AttachedFile> keptFiles(List<AttachedFile> files, AssistantAnswer answer) {
+        boolean read = answer.read() != null && !answer.read().files().isEmpty();
+        return read ? files : files.stream().map(AttachedFile::nameOnly).toList();
+    }
+
+    /** La carte que cette réponse prépare (R135), ou la question qui la précède : ce que « tu t'es trompé de projet » reprend. */
+    private static LastCard preparedCard(AssistantAnswer answer) {
+        return answer.toolCalls() == null ? null : answer.toolCalls().stream()
+            .filter(call -> AgentService.PREPARED.contains(call.name())
+                && ("pending".equals(call.status()) || AgentService.QUESTION.equals(call.status())))
+            .reduce((first, second) -> second)
+            .map(call -> new LastCard(call.name(), call.input()))
+            .orElse(null);
     }
 
     /**
@@ -184,6 +243,9 @@ public class AssistantController {
      * {@code model} : le modèle vers lequel la personne envoie cette demande, d'un clic sur la proposition de TaskForce
      * (R118). {@code attach} : ce qu'elle a joint depuis le compositeur (R123), trois au plus : une issue (son projet et
      * son id), que TaskForce lit comme avant un résumé, ou un projet (sans issue), dont il montre le tableau.
+     * {@code turn} : le nom que le client donne à ce tour, pour pouvoir l'arrêter (R134) ; {@code project} : le projet de
+     * la conversation tel que la rangée le montre (R135) : son {@code id}, null pour « No project », absent pour le laisser
+     * tel qu'il est ; {@code files} : les fichiers texte joints (R134), cinq au plus, 256 Ko chacun.
      */
     public record AssistantRequest(
         @NotBlank
@@ -192,7 +254,10 @@ public class AssistantController {
         Long conversationId,
         @Valid ScreenRequest screen,
         @Size(max = 128) String model,
-        @Size(max = 3) List<@NotNull @Valid ScreenRequest> attach
+        @Size(max = 3) List<@NotNull @Valid ScreenRequest> attach,
+        @Size(max = 64) String turn,
+        @Valid ProjectRequest project,
+        @Size(max = AttachedFile.MAX_FILES) List<@NotNull @Valid FileRequest> files
     ) {
         Screen screenOf() {
             return screen == null ? Screen.NONE : new Screen(screen.projectId(), screen.issueId());
@@ -204,7 +269,23 @@ public class AssistantController {
             return attach.stream().filter(item -> item.projectId() != null)
                 .map(item -> new Screen(item.projectId(), item.issueId())).toList();
         }
+
+        List<AttachedFile> filesOf() {
+            return files == null ? List.of() : files.stream().map(file -> new AttachedFile(file.name(), file.text())).toList();
+        }
     }
+
+    /** Le projet de la conversation : son id, null pour aucun. */
+    public record ProjectRequest(@Positive Long id) {}
+
+    /** Un fichier texte joint à la demande : son nom et son contenu, lus dans le navigateur. */
+    public record FileRequest(
+        @NotBlank @Size(max = 255) String name,
+        @NotNull @Size(max = AttachedFile.MAX_CHARS) String text
+    ) {}
+
+    /** Le tour à arrêter, par le nom que le client lui a donné. */
+    public record AssistantStopRequest(@NotBlank @Size(max = 64) String turn) {}
 
     /**
      * Le projet ouvert et l'issue ouverte, par leurs ids, ou ce que la personne a joint ; ce qu'ils montrent se relit avec
