@@ -236,6 +236,8 @@ describe("Sentences, never commands", () => {
     ["bash ./run.sh", "Ran a script"],
     ['C:\\Python\\python.exe -I -c "print(1 > 0)"', "Ran a script"],
     ['cd "a b" && python -c "x=1; y=2"', "Ran a script"],
+    ['"C:\\Program Files\\Python\\python.exe" tools/a.py', "Ran a script"],
+    ["sed -i 's/a b/c d/' x.txt", "Edited a file"],
     ['python -c "import x; open(', "Ran a script"],
     ["npm run seed", "Ran a script"],
     // Les tests du projet.
@@ -368,6 +370,10 @@ describe("Understand, Do: where a gesture falls", () => {
     expect(stateOf(RUN, [read, ev("text", null, "Je vais rédiger le plan de tests.")]).plan).toBe("in-progress")
     expect(stateOf(RUN, [read, ev("text", null, "Je vais vérifier le dépôt.")]).plan).toBe("not-started")
     expect(stateOf(RUN, [read, ev("text", null, "I will first look at the tests.")]).plan).toBe("not-started")
+  })
+
+  it("a script counts as having looked at something", () => {
+    expect(stateOf(RUN, [ev("tool", "Bash", "python x.py"), ev("text", null, "I'll write the report.")]).plan).toBe("in-progress")
   })
 
   it("an announcement before any read isn't a plan yet", () => {
@@ -539,6 +545,14 @@ describe("When it doesn't go to the end", () => {
       ["skipped", "Nothing handed over"],
     ])
     expect(seq.steps[2].current).toBe(true)
+  })
+
+  it.each([
+    ["Claude Code exited with code 1", "It stopped before the end: Claude Code exited with code 1. Delegate the issue again to retry."],
+    ["The agent was stopped after 60 min (timeout).", "It stopped before the end: The agent was stopped after 60 min (timeout). Delegate the issue again to retry."],
+    ["Set up your runner, then delegate the task again.", "It stopped before the end: Set up your runner, then delegate the task again."],
+  ])("a failure says what happened and what to do: %s", (error, status) => {
+    expect(sequence({ ...failed, error }, []).status).toBe(status)
   })
 
   it("failed without a reason still says what to do", () => {

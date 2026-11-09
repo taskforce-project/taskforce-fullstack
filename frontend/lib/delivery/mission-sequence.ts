@@ -295,7 +295,8 @@ function pythonGesture(args: readonly string[]): Gesture {
 
 /** Ce que fait une commande simple ; null pour ce qui ne fait rien de notable (`cd`, `echo`). */
 function partGesture(part: string): Gesture | null {
-  const words = part.split(/\s+/)
+  // Un mot entre guillemets reste un mot : un programme dans « Program Files », le texte d'un `python -c`.
+  const words = part.match(/"[^"]*"|'[^']*'|\S+/g) ?? []
   let start = 0
   while (start < words.length && (/^\w+=/.test(words[start]) || WRAPPERS.has(words[start]))) start++
   const program = (words[start] ?? "").replace(/^["']|["']$/g, "").split(/[\\/]/).pop()?.toLowerCase().replace(/\.(exe|cmd|bat|ps1)$/, "") ?? ""
@@ -478,7 +479,7 @@ function readEvents(run: SequencedRun, events: readonly DeliveryRunEvent[], t: S
         const g = toolGesture(event.tool ?? "", event.text, run)
         place(event, byNature(g.nature, wrote), didOf(g, t), g)
         if (g.nature === "change") wrote = true
-        if (g.nature === "read") hasRead = true
+        if (g.nature === "read" || g.nature === "neutral") hasRead = true
         if (g.nature === "plan" && !wrote) planned = true
         break
       }
@@ -633,6 +634,14 @@ function sentenceOf(facts: StepFacts, run: SequencedRun, t: SequenceTexts): stri
   }
 }
 
+/** Un échec dit ce qui s'est passé et quoi faire : la raison telle qu'elle arrive, et la suite quand elle ne la dit pas (R133). */
+function failureWords(error: string | null, t: SequenceTexts): string {
+  if (!error) return t.status.failedNoReason
+  const reason = /[.!?]$/.test(error.trim()) ? error.trim() : `${error.trim()}.`
+  const said = fillText(t.status.failed, { reason })
+  return /\bagain\b/i.test(reason) ? said : `${said}${t.status.failedNext}`
+}
+
 function statusOf(run: SequencedRun, pending: readonly DeliveryRunApproval[], current: MissionStepKey, t: SequenceTexts, you: boolean): string {
   const s = t.status
   switch (run.status) {
@@ -649,7 +658,7 @@ function statusOf(run: SequencedRun, pending: readonly DeliveryRunApproval[], cu
     default:
       if (run.refused) return run.error ? fillText(s.notStarted, { reason: run.error }) : t.states["not-started"]
       if (stoppedByPerson(run)) return you ? s.stoppedByYou : fillText(s.stoppedBy, { who: delegatorOf(run, t) })
-      return run.error ? fillText(s.failed, { reason: run.error }) : s.failedNoReason
+      return failureWords(run.error, t)
   }
 }
 

@@ -897,6 +897,7 @@ export const CONSTANTS_EN = {
       stoppedBy: "Stopped by {who}",
       notStarted: "Not started: {reason}",
       failed: "It stopped before the end: {reason}",
+      failedNext: " Delegate the issue again to retry.",
       failedNoReason: "It stopped before the end. Delegate the issue again to retry.",
     },
     // A step that did not happen says so in a word.
