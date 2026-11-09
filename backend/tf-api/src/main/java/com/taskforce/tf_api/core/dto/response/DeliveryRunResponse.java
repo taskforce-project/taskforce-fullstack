@@ -51,6 +51,17 @@ public record DeliveryRunResponse(
     Long followUpOf
 ) {
 
+    /** Une mission neuve : elle ne reprend rien. */
+    public DeliveryRunResponse(Long id, Long issueId, String issueKey, String issueTitle, Long projectId, String projectName,
+                               String providerKey, String model, String status, String summary, String resultUrl, String error,
+                               boolean refused, Long startedById, String startedByName, LocalDateTime createdAt, LocalDateTime updatedAt,
+                               LocalDateTime claimedAt, LocalDateTime endedAt, Integer rulesVersion, String branch, Integer commits,
+                               Tests tests, String outcome, LocalDateTime outcomeAt) {
+        this(id, issueId, issueKey, issueTitle, projectId, projectName, providerKey, model, status, summary, resultUrl, error,
+            refused, startedById, startedByName, createdAt, updatedAt, claimedAt, endedAt, rulesVersion, branch, commits, tests,
+            outcome, outcomeAt, null);
+    }
+
     /** Un run sans les faits de la carte de résultat. */
     public DeliveryRunResponse(Long id, Long issueId, String issueKey, String issueTitle, Long projectId, String projectName,
                                String providerKey, String model, String status, String summary, String resultUrl, String error,
