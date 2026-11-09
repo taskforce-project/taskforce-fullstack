@@ -132,7 +132,7 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Invite a member</DialogTitle>
           <DialogDescription>

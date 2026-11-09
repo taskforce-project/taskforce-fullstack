@@ -11,11 +11,13 @@ import com.taskforce.tf_api.core.service.AiStatusService.AiStatus;
 import com.taskforce.tf_api.core.service.ai.AiProviderSettings;
 import com.taskforce.tf_api.core.service.ai.ModelGateway;
 import com.taskforce.tf_api.core.service.ai.ModelProviderException;
+import com.taskforce.tf_api.core.service.ai.TurnStoppedException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -71,6 +73,15 @@ class EmbeddingClientTest {
 
         assertThat(client.embed("x")).isNull();
         verify(status).invalidate();
+    }
+
+    @Test
+    @DisplayName("un tour arrêté par la personne : null, et l'état de l'IA reste valable")
+    void stoppedTurnIsNotAnOutage() {
+        when(gateway.embed(any(), any(), any())).thenThrow(new TurnStoppedException());
+
+        assertThat(client.embed("x")).isNull();
+        verify(status, never()).invalidate();
     }
 
     @Test

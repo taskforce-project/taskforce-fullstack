@@ -23,11 +23,13 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.taskforce.tf_api.core.dto.response.IssueCommentHitResponse;
 import com.taskforce.tf_api.core.dto.response.IssueHitResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.IssueCommentSearchService;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
@@ -45,6 +47,7 @@ class IssueSearchControllerWebMvcTest {
     @Autowired private MockMvc mockMvc;
 
     @MockitoBean private IssueService issueService;
+    @MockitoBean private IssueCommentSearchService commentSearchService;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;             // WorkspaceAccessInterceptor
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository; // WorkspaceAccessInterceptor
@@ -101,5 +104,40 @@ class IssueSearchControllerWebMvcTest {
         mockMvc.perform(get(URL).param("q", "OPS"))
             .andExpect(status().isUnauthorized());
         verify(issueService, never()).searchIssues(anyString(), org.mockito.ArgumentMatchers.anyLong(), anyString(), anyInt());
+    }
+
+    @Test
+    @DisplayName("GET /search/comments?q=deploy → 200, l'issue et le passage, 5 par défaut")
+    void finds_issues_by_their_comments() throws Exception {
+        stubUser();
+        when(commentSearchService.search("acme", 7L, "deploy", 5)).thenReturn(List.of(
+            new IssueCommentHitResponse(35L, 3L, "OPS-35", "Iteration #35", "The deploy failed")));
+
+        mockMvc.perform(get(URL + "/comments").param("q", "deploy").with(jwt().jwt(b -> b.claim("email", EMAIL))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].issueId").value(35))
+            .andExpect(jsonPath("$.data[0].projectId").value(3))
+            .andExpect(jsonPath("$.data[0].key").value("OPS-35"))
+            .andExpect(jsonPath("$.data[0].excerpt").value("The deploy failed"));
+    }
+
+    @Test
+    @DisplayName("GET /search/comments : le texte est coupé, et la limite passée au service")
+    void comments_query_is_bounded() throws Exception {
+        stubUser();
+        when(commentSearchService.search(eq("acme"), eq(7L), anyString(), anyInt())).thenReturn(List.of());
+
+        mockMvc.perform(get(URL + "/comments").param("q", "a".repeat(IssueSearchController.MAX_QUERY + 50)).param("limit", "9")
+                .with(jwt().jwt(b -> b.claim("email", EMAIL))))
+            .andExpect(status().isOk());
+        verify(commentSearchService).search("acme", 7L, "a".repeat(IssueSearchController.MAX_QUERY), 9);
+    }
+
+    @Test
+    @DisplayName("GET /search/comments sans JWT → 401, rien n'est cherché")
+    void comments_need_a_token() throws Exception {
+        mockMvc.perform(get(URL + "/comments").param("q", "deploy"))
+            .andExpect(status().isUnauthorized());
+        verify(commentSearchService, never()).search(anyString(), org.mockito.ArgumentMatchers.anyLong(), anyString(), anyInt());
     }
 }

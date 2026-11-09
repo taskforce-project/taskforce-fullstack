@@ -25,6 +25,7 @@ import { loadConfig, type RepoConfig, type RunnerConfig } from "./config.js";
 import { exitFacts, judgeExit, type ExitVerdict } from "./exits.js";
 import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWorktree, reopenWorktree, repoVisibility, resolveRepo, runSetup, type Worktree } from "./git.js";
 import { verifiedBundle } from "./harness/verify.js";
+import { startHeartbeat } from "./heartbeat.js";
 import { log } from "./log.js";
 import { resolveCommand, run } from "./proc.js";
 import { agentProblem, PROBLEM_TEXT, Readiness, signedIn, type AgentProblem } from "./readiness.js";
@@ -35,7 +36,8 @@ import { MIN_CLAUDE_CODE, supportsApprovals } from "./version.js";
 // en hériter.
 delete process.env.ELECTRON_RUN_AS_NODE;
 
-const HEARTBEAT_MS = 30_000;
+/** Assez court pour qu'un « Stop » dans TaskForce arrête l'agent en quelques secondes (R138). */
+const HEARTBEAT_MS = 5_000;
 
 /**
  * Une règle refuse la mission au départ (par exemple sur un dépôt public) : ce n'est pas une panne. Le résultat le dit
@@ -96,11 +98,11 @@ function logOutcome(outcome: AgentOutcome): void {
 }
 
 /** Traite un run réclamé, jusqu'au résultat posté. Ne lève jamais : tout échec devient un résultat FAILED. */
-async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim, live: LiveMissions, signal?: AbortSignal): Promise<void> {
+async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim, live: LiveMissions, shutdown?: AbortSignal): Promise<void> {
   log.info(`Run #${claim.runId} claimed: ${claim.issueKey} - ${claim.title}`);
-  const heartbeat = setInterval(() => {
-    api.heartbeat(claim.runId).catch((e: unknown) => log.warn(`Heartbeat refused: ${(e as Error).message}`));
-  }, HEARTBEAT_MS);
+  const heartbeat = startHeartbeat(api, claim.runId, HEARTBEAT_MS);
+  // L'agent s'arrête si le runner s'arrête, ou si la personne a arrêté la mission dans TaskForce (R138).
+  const signal = shutdown ? AbortSignal.any([shutdown, heartbeat.closed]) : heartbeat.closed;
 
   let result: RunResult;
   let worktree: Worktree | null = null;
@@ -174,6 +176,8 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
           ...(tests.counts ? { passedCount: tests.counts.passed, total: tests.counts.total } : {}),
         };
       }
+      // Arrêtée pendant ses tests : rien ne sort du poste.
+      signal.throwIfAborted();
       if (commits === 0) {
         result = { status: "DONE", summary: `No code change was needed.\n\n${outcome.text}`.slice(0, 7900) };
       } else if (!config.push) {
@@ -250,9 +254,15 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       result = { status: "FAILED", error: message.slice(0, 3900) };
     }
   } finally {
-    clearInterval(heartbeat);
+    heartbeat.stop();
     live.detach(claim.runId);
     removeLiveIndex(liveIndex);
+  }
+
+  // Close dans TaskForce : le serveur a déjà sa fin, et son dossier est scellé.
+  if (heartbeat.closed.aborted) {
+    log.info(`Run #${claim.runId}: stopped in TaskForce, nothing more is sent.`);
+    return;
   }
 
   try {

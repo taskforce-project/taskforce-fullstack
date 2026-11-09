@@ -26,6 +26,7 @@ vi.mock('../api/delivery-service', () => ({
   revertMissionFile: vi.fn(),
   askForChanges: vi.fn(),
   sendCorrection: vi.fn(),
+  stopRun: vi.fn(),
 }));
 
 function makeRun(overrides: Partial<DeliveryRun> = {}): DeliveryRun {
@@ -472,6 +473,32 @@ describe('delivery-store : les gestes de la carte de résultat (R78)', () => {
     await act(async () => { await useDeliveryStore.getState().discardRun('acme', 28, 100); });
 
     expect(useDeliveryStore.getState().resultErrors[100]).toBeUndefined();
+  });
+
+  it('stopRun : la mission se relit, sa chronologie et ce qui attend aussi', async () => {
+    vi.mocked(svc.stopRun).mockResolvedValue(undefined);
+    vi.mocked(svc.getIssueRun).mockResolvedValue({ id: 100, issueId: 28, status: 'FAILED', outcome: 'STOPPED' } as DeliveryRun);
+    vi.mocked(svc.getRunActivity).mockResolvedValue({ events: [], approvals: [] });
+    vi.mocked(svc.listOpenApprovals).mockResolvedValue([]);
+
+    let ok = false;
+    await act(async () => { ok = await useDeliveryStore.getState().stopRun('acme', 28, 100); });
+
+    expect(ok).toBe(true);
+    expect(svc.stopRun).toHaveBeenCalledWith('acme', 100);
+    expect(useDeliveryStore.getState().runs[28]?.outcome).toBe('STOPPED');
+    expect(svc.listOpenApprovals).toHaveBeenCalledWith('acme');
+  });
+
+  it('stopRun refusé : false, et la mission se relit pour dire où elle en est', async () => {
+    vi.mocked(svc.stopRun).mockRejectedValue(new Error('This mission has already ended.'));
+    vi.mocked(svc.getIssueRun).mockResolvedValue({ id: 100, issueId: 28, status: 'DONE' } as DeliveryRun);
+
+    let ok = true;
+    await act(async () => { ok = await useDeliveryStore.getState().stopRun('acme', 28, 100); });
+
+    expect(ok).toBe(false);
+    expect(useDeliveryStore.getState().runs[28]?.status).toBe('DONE');
   });
 
   it('retryRun : la nouvelle mission remplace l\'ancienne sur l\'issue', async () => {

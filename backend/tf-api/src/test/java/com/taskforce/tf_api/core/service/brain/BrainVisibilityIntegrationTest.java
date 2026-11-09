@@ -223,7 +223,9 @@ class BrainVisibilityIntegrationTest extends AbstractIntegrationTest {
             mock(WorkspaceMcpService.class), mock(AuthorizationService.class), mock(CortexGate.class),
             mock(CortexRecordService.class), mock(CortexUndo.class),
             mock(com.taskforce.tf_api.core.service.agent.ScreenContext.class),
-            mock(com.taskforce.tf_api.core.service.agent.IssueMaterial.class));
+            mock(com.taskforce.tf_api.core.service.agent.IssueMaterial.class),
+            mock(com.taskforce.tf_api.core.service.agent.tools.ProjectResolver.class),
+            mock(com.taskforce.tf_api.core.service.AiConversationService.class));
         searchBrainTool = new SearchBrainTool(search, access);
         // Les gestes sur une issue ne servent pas ici : les arguments de brain_search passent tels quels.
         IssueGestures gestures = mock(IssueGestures.class);

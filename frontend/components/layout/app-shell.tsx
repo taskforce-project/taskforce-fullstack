@@ -92,6 +92,8 @@ function useEscape(folded: boolean, issueOpen: boolean, closeIssue: () => void) 
     function onKey(e: KeyboardEvent) {
       if (e.key !== "Escape" || e.defaultPrevented || typing(e.target)) return
       const cortex = useCortexStore.getState()
+      // Pendant que Cortex travaille, Échap l'arrête d'abord (R134) : le compositeur s'en charge.
+      if (cortex.stoppable) return
       if (folded && cortex.open) {
         e.preventDefault()
         cortex.setOpen(false)

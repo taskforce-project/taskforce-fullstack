@@ -89,7 +89,6 @@ contextBridge.exposeInMainWorld("taskforceDesktop", {
     ? {
         status: (): Promise<unknown> => ipcRenderer.invoke("desktop:voice-get-status"),
         download: (): Promise<unknown> => ipcRenderer.invoke("desktop:voice-download"),
-        cancelDownload: (): Promise<void> => ipcRenderer.invoke("desktop:voice-cancel-download"),
         onStatus: (callback: (status: unknown) => void): (() => void) => {
           const listener = (_event: unknown, status: unknown) => callback(status);
           ipcRenderer.on("desktop:voice-status", listener);

@@ -103,6 +103,35 @@ class AiControllersWebMvcTest {
     }
 
     @Test
+    @DisplayName("GET une note → 200, pour la lire dans le volet")
+    void knowledge_node_200() throws Exception {
+        when(knowledgeService.getNode(eq("acme"), eq(5L), anyLong()))
+            .thenReturn(com.taskforce.tf_api.core.dto.response.KnowledgeNodeResponse.builder().id(5L).title("Runbook").build());
+
+        mockMvc.perform(get("/api/workspaces/acme/brain/nodes/5").with(auth()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.title").value("Runbook"));
+    }
+
+    @Test
+    @DisplayName("POST brain/search : textOnly passe par le plein texte, sans lui la recherche habituelle")
+    void knowledge_search_text_only() throws Exception {
+        when(brainSearchService.searchText(eq("acme"), anyLong(), eq("deploy"), eq(6))).thenReturn(List.of());
+
+        mockMvc.perform(post("/api/workspaces/acme/brain/search").with(auth())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"query\":\"deploy\",\"topK\":6,\"textOnly\":true}"))
+            .andExpect(status().isOk());
+        org.mockito.Mockito.verify(brainSearchService).searchText(eq("acme"), anyLong(), eq("deploy"), eq(6));
+
+        mockMvc.perform(post("/api/workspaces/acme/brain/search").with(auth())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"query\":\"deploy\"}"))
+            .andExpect(status().isOk());
+        org.mockito.Mockito.verify(brainSearchService).search(eq("acme"), anyLong(), eq("deploy"), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull());
+    }
+
+    @Test
     @DisplayName("GET analysis workflows → 200")
     void analysis_list_200() throws Exception {
         when(analysisJobService.list(anyString(), anyLong())).thenReturn(List.of());
@@ -127,6 +156,34 @@ class AiControllersWebMvcTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.summarized").value(12));
         org.assertj.core.api.Assertions.assertThat(model.get()).isEqualTo("qwen3:14b");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest(name = "{0}")
+    @org.junit.jupiter.params.provider.CsvSource(delimiter = '|', value = {
+        "{\"projectId\":12}   | 12",
+        "{\"projectId\":null} | ",
+    })
+    @DisplayName("PUT project : la conversation travaille dans ce projet, ou dans aucun (R135)")
+    void conversations_set_project_200(String body, Long projectId) throws Exception {
+        com.taskforce.tf_api.core.model.User user = com.taskforce.tf_api.core.model.User.builder().id(7L).build();
+        com.taskforce.tf_api.core.model.Workspace workspace = com.taskforce.tf_api.core.model.Workspace.builder().id(1L).slug("acme").build();
+        when(userRepository.findByEmail(any())).thenReturn(java.util.Optional.of(user));
+        when(brainAccessGuard.resolveAndAuthorize(eq("acme"), anyLong())).thenReturn(workspace);
+        when(aiConversationService.setProject(5L, 7L, 1L, projectId)).thenReturn(
+            new com.taskforce.tf_api.core.dto.response.ConversationDtos.ConversationSummary(5L, "t", null, 2, 0, projectId));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/workspaces/acme/ai/conversations/5/project")
+                .with(auth()).contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(5));
+    }
+
+    @Test
+    @DisplayName("PUT project invalide (@Positive) → 400")
+    void conversations_set_invalid_project_400() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/workspaces/acme/ai/conversations/5/project")
+                .with(auth()).contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"projectId\":-1}"))
+            .andExpect(status().isBadRequest());
     }
 
     @Test

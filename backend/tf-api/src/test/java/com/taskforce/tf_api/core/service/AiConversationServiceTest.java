@@ -25,6 +25,8 @@ import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.repository.AiConversationRepository;
 import com.taskforce.tf_api.core.repository.AiMessageRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
+import com.taskforce.tf_api.core.service.agent.TurnInput.LastCard;
+import com.taskforce.tf_api.core.service.ai.AttachedFile;
 import com.taskforce.tf_api.core.service.ai.ContextBudget;
 import com.taskforce.tf_api.core.service.ai.ModelWindow;
 import com.taskforce.tf_api.core.service.ai.TurnHistory;
@@ -462,5 +464,135 @@ class AiConversationServiceTest {
         ConversationDetail detail = service.detail(5L, 7L);
 
         assertThat(detail.messages()).extracting(MessageDto::read).containsExactly(null, null, read);
+    }
+
+    private AiMessage withReading(long id, String role, String content, Map<String, Object> reading) {
+        AiMessage message = msg(id, role, content);
+        message.setReading(reading);
+        return message;
+    }
+
+    @Test
+    @DisplayName("les fichiers joints restent avec la demande (R134) : ils repartent au modèle, et se relisent par leurs noms")
+    void attached_files_stay_with_their_message() {
+        org.mockito.ArgumentCaptor<AiMessage> saved = org.mockito.ArgumentCaptor.forClass(AiMessage.class);
+        when(messageRepository.save(saved.capture())).thenAnswer(call -> call.getArgument(0));
+        List<AttachedFile> files = List.of(new AttachedFile("notes.md", "Le nom de code est HERON."));
+
+        service.appendAsked(5L, "Lis ce fichier", files);
+
+        AiMessage asked = saved.getValue();
+        assertThat(asked.getRole()).isEqualTo("user");
+        assertThat(asked.getReading()).containsKey("attachedFiles");
+        asked.setId(1L);
+        // Comme quand il revient de la base : du JSON relu, plus l'objet qui l'a écrit.
+        asked.setReading(new com.fasterxml.jackson.databind.ObjectMapper().convertValue(asked.getReading(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
+        when(llm.isConfigured()).thenReturn(true);
+        holding(List.of(asked));
+
+        assertThat(service.fit(1L, budget(8_192), "fast").messages()).singleElement()
+            .satisfies(sent -> assertThat((String) sent.get("content"))
+                .startsWith("Lis ce fichier\n\n").contains("File \"notes.md\":").contains("Le nom de code est HERON."));
+
+        AiConversation conv = new AiConversation();
+        conv.setId(5L);
+        conv.setProjectId(12L);
+        when(conversationRepository.findByIdAndUserId(5L, 7L)).thenReturn(Optional.of(conv));
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(5L)).thenReturn(List.of(asked, msg(2L, "assistant", "HERON.")));
+        ConversationDetail detail = service.detail(5L, 7L);
+
+        assertThat(detail.projectId()).isEqualTo(12L);
+        assertThat(detail.messages().get(0).files()).extracting("name").containsExactly("notes.md");
+        assertThat(detail.messages().get(0).read()).isNull();
+        assertThat(detail.messages().get(1).files()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("une demande sans fichier ne garde rien de plus")
+    void a_request_without_files_keeps_nothing_more() {
+        org.mockito.ArgumentCaptor<AiMessage> saved = org.mockito.ArgumentCaptor.forClass(AiMessage.class);
+        when(messageRepository.save(saved.capture())).thenAnswer(call -> call.getArgument(0));
+
+        service.appendAsked(5L, "Bonjour", List.of());
+
+        assertThat(saved.getValue().getReading()).isNull();
+    }
+
+    @Test
+    @DisplayName("la carte préparée reste avec sa réponse, et la lecture se relit sans elle (R135)")
+    void the_prepared_card_stays_with_its_answer() {
+        org.mockito.ArgumentCaptor<AiMessage> saved = org.mockito.ArgumentCaptor.forClass(AiMessage.class);
+        when(messageRepository.save(saved.capture())).thenAnswer(call -> call.getArgument(0));
+        AssistantRead read = new AssistantRead(List.of(), List.of(), List.of(), 2);
+        LastCard card = new LastCard("create_issue", "{\"title\":\"Test\"}");
+
+        service.appendAnswer(5L, "Prête.", "deep", 30, "qwen3:8b", read, card);
+
+        AiMessage kept = saved.getValue();
+        assertThat(kept.getReading()).containsKey("card").containsEntry("notes", 2);
+        kept.setId(2L);
+        when(messageRepository.findByConversationIdOrderByCreatedAtDesc(eq(5L), any()))
+            .thenReturn(List.of(msg(4L, "assistant", "Autre chose"), msg(3L, "user", "ok"), kept));
+        assertThat(service.lastCard(5L)).contains(card);
+
+        AiConversation conv = new AiConversation();
+        conv.setId(5L);
+        when(conversationRepository.findByIdAndUserId(5L, 7L)).thenReturn(Optional.of(conv));
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(5L)).thenReturn(List.of(kept));
+        assertThat(service.detail(5L, 7L).messages().get(0).read()).isEqualTo(read);
+    }
+
+    @Test
+    @DisplayName("une réponse sans lecture ni carte ne garde rien ; sans carte, rien à reprendre")
+    void an_answer_without_card_or_reading() {
+        org.mockito.ArgumentCaptor<AiMessage> saved = org.mockito.ArgumentCaptor.forClass(AiMessage.class);
+        when(messageRepository.save(saved.capture())).thenAnswer(call -> call.getArgument(0));
+
+        service.appendAnswer(5L, "Stopped by you.", "stopped", 12, null, null, null);
+
+        assertThat(saved.getValue().getReading()).isNull();
+        assertThat(saved.getValue().getMode()).isEqualTo("stopped");
+        when(messageRepository.findByConversationIdOrderByCreatedAtDesc(eq(5L), any())).thenReturn(List.of(saved.getValue()));
+        assertThat(service.lastCard(5L)).isEmpty();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+        "attachedFiles | not a list",
+        "card          | not a card",
+    })
+    @DisplayName("une matière illisible ne casse pas la conversation")
+    void unreadable_extras_are_ignored(String key, String value) {
+        AiMessage message = withReading(1L, "user", "Salut", Map.of(key, value));
+        when(messageRepository.findByConversationIdOrderByCreatedAtDesc(eq(5L), any())).thenReturn(List.of(message));
+        when(llm.isConfigured()).thenReturn(true);
+        holding(List.of(message));
+
+        assertThat(service.lastCard(5L)).isEmpty();
+        assertThat(service.fit(1L, budget(8_192), "fast").messages()).singleElement()
+            .satisfies(sent -> assertThat(sent.get("content")).isEqualTo("Salut"));
+    }
+
+    @Test
+    @DisplayName("le projet d'une conversation se pose, se retire, et reste dans son espace (R135)")
+    void the_project_of_a_conversation() {
+        AiConversation conv = new AiConversation();
+        conv.setId(5L);
+        conv.setTitle("t");
+        when(conversationRepository.findByIdAndUserId(5L, 7L)).thenReturn(Optional.of(conv));
+        when(conversationRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(projectRepository.findByIdAndWorkspaceId(12L, 1L)).thenReturn(Optional.of(new Project()));
+
+        assertThat(service.setProject(5L, 7L, 1L, 12L).projectId()).isEqualTo(12L);
+        assertThat(service.setProject(5L, 7L, 1L, null).projectId()).isNull();
+
+        when(projectRepository.findByIdAndWorkspaceId(13L, 1L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.setProject(5L, 7L, 1L, 13L)).isInstanceOf(ResourceNotFoundException.class);
+
+        when(conversationRepository.findById(5L)).thenReturn(Optional.of(conv));
+        conv.setProjectId(9L);
+        assertThat(service.currentProject(5L)).isEqualTo(9L);
+        when(conversationRepository.findById(6L)).thenReturn(Optional.empty());
+        assertThat(service.currentProject(6L)).isNull();
     }
 }

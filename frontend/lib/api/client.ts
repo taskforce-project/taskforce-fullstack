@@ -120,6 +120,9 @@ async function refreshAccessToken(): Promise<string | null> {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
+    // Une requête que la personne a coupée (l'arrêt d'un tour, R134) n'est pas une panne : rien à dire, rien à rejouer.
+    if (axios.isCancel(error)) return Promise.reject(error);
+
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     const requestUrl = error.config?.url ?? ""

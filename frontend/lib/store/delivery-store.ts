@@ -12,6 +12,7 @@ import {
   discardRun as discardRunApi,
   markRunDone as markRunDoneApi,
   retryRun as retryRunApi,
+  stopRun as stopRunApi,
   downloadEvidence as downloadEvidenceApi,
   getEvidence,
   provisionRunner as provisionRunnerApi,
@@ -112,6 +113,8 @@ interface DeliveryState {
   askForChanges: (slug: string, issueId: number, runId: number) => Promise<DeliveryRun | null>;
   /** Passe une correction à l'agent ; `false` en cas de refus, la raison dans `changeErrors`. */
   sendCorrection: (slug: string, runId: number, text: string) => Promise<boolean>;
+  /** « Stop » pendant le travail (R138) : `false` en cas d'échec, l'écran le dit. */
+  stopRun: (slug: string, issueId: number, runId: number) => Promise<boolean>;
 }
 
 /** Un commentaire de relecture pas encore envoyé. */
@@ -430,6 +433,18 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
     } catch (e) {
       set((state) => ({ resultErrors: { ...state.resultErrors, [runId]: getErrorMessage(e) } }));
       return null;
+    }
+  },
+
+  stopRun: async (slug, issueId, runId) => {
+    try {
+      await stopRunApi(slug, runId);
+      await Promise.all([get().fetchRun(slug, issueId), get().fetchActivity(slug, runId), get().fetchOpenApprovals(slug)]);
+      return true;
+    } catch {
+      // Elle a pu finir entre-temps : la relecture dit où elle en est.
+      await get().fetchRun(slug, issueId);
+      return false;
     }
   },
 }));

@@ -72,6 +72,8 @@ export const DELIVERY_ROUTES = {
   APPLY: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/apply`,
   DISCARD: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/discard`,
   RETRY: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/retry`,
+  /** « Stop » pendant le travail (POST, R138). */
+  STOP: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/stop`,
   /** Une mission qui n'a rien changé : l'issue se termine (POST, rejeu de la 1.8.0). */
   DONE: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/done`,
   /** Les fichiers qu'une mission a changés, avec leurs lignes (GET, R139). */
@@ -256,6 +258,8 @@ export const ISSUE_ROUTES = {
   MY_CYCLES: (slug: string) => `/api/workspaces/${slug}/my-cycles`,
   /** La recherche de la fenêtre (Ctrl+K, le « @ » et le « + » du compositeur) : par clé ou par titre, tous projets vus. */
   SEARCH: (slug: string) => `/api/workspaces/${slug}/issues/search`,
+  /** Ctrl+K (R141) : les issues trouvées par ce qu'on a écrit dessous, sur les projets que la personne voit. */
+  SEARCH_COMMENTS: (slug: string) => `/api/workspaces/${slug}/issues/search/comments`,
   LIST:    (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues`,
   /** Liste paginée pour l'infinite-scroll du backlog (QA2-33) */
   PAGED:   (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/paged`,
@@ -371,6 +375,8 @@ export const ASSISTANT_ROUTES = {
   ACTION_UNDO: (slug: string) => `/api/workspaces/${slug}/assistant/actions/undo`,
   /** La réponse de la personne à une question de TaskForce (R115) : le geste reprend sur son clic. */
   ACTION_ANSWER: (slug: string) => `/api/workspaces/${slug}/assistant/actions/answer`,
+  /** Arrête un tour de Cortex (R134) : le serveur coupe l'appel au modèle. */
+  STOP: (slug: string) => `/api/workspaces/${slug}/assistant/stop`,
 } as const;
 
 /**
@@ -399,6 +405,12 @@ export const CORTEX_SOURCE_ROUTES = {
   SOURCES: (slug: string) => `/api/workspaces/${slug}/assistant/sources`,
 } as const;
 
+/** Les notes de l'espace (Brain OS) : Ctrl+K les cherche, le volet les lit (R141). */
+export const NOTE_ROUTES = {
+  SEARCH: (slug: string) => `/api/workspaces/${slug}/brain/search`,
+  BY_ID: (slug: string, id: number) => `/api/workspaces/${slug}/brain/nodes/${id}`,
+} as const;
+
 /**
  * Consommation IA (tokens) du workspace - mois courant + plafond de l'instance (illimité par défaut).
  * Backend: @RequestMapping("/api/workspaces/{slug}/ai"). État de l'IA de l'instance : GET /api/ai/status.
@@ -409,6 +421,8 @@ export const AI_ROUTES = {
   CONVERSATIONS: (slug: string) => `/api/workspaces/${slug}/ai/conversations`,
   CONVERSATION: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}`,
   CONVERSATION_COMPACT: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}/compact`,
+  /** Le projet où travaille une conversation (R135), « No project » compris. */
+  CONVERSATION_PROJECT: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}/project`,
 } as const;
 
 /**

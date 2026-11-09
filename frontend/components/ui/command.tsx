@@ -36,6 +36,7 @@ function CommandDialog({
   className,
   showCloseButton = true,
   onEscapeKeyDown,
+  commandProps,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
   title?: string
@@ -44,6 +45,8 @@ function CommandDialog({
   showCloseButton?: boolean
   /** Échap intercepté avant la fermeture (ex. sortir d'un sous-mode) : `preventDefault()` garde la palette ouverte. */
   onEscapeKeyDown?: (event: KeyboardEvent) => void
+  /** Ce que la liste reçoit : le filtre, la boucle du clavier, ses touches. */
+  commandProps?: Omit<React.ComponentProps<typeof CommandPrimitive>, "children">
 }) {
   return (
     <Dialog {...props}>
@@ -56,7 +59,11 @@ function CommandDialog({
         showCloseButton={showCloseButton}
         onEscapeKeyDown={onEscapeKeyDown}
       >
-        <Command className="**:[[cmdk-group-heading]]:text-muted-foreground **:data-[slot=command-input-wrapper]:h-12 **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 **:[[cmdk-input]]:h-12 **:[[cmdk-item]]:px-2 **:[[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
+        {/* La palette (R141, « Le dessin », séance n°20) : un champ de 48 px, des lignes de 36 px. */}
+        <Command
+          {...commandProps}
+          className="**:data-[slot=command-input-wrapper]:h-12 **:[[cmdk-input]]:h-12 **:[[cmdk-group-heading]]:h-7 **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-0 **:[[cmdk-group-heading]]:leading-7 **:[[cmdk-group]]:px-2 **:[[cmdk-item]]:h-9 **:[[cmdk-item]]:px-2 **:[[cmdk-item]]:py-0 **:[[cmdk-item]]:rounded-md"
+        >
           {children}
         </Command>
       </DialogContent>

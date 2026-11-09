@@ -59,6 +59,7 @@ public class MissionResultService {
     private final MergedPullRequests mergedPullRequests;
     private final IssueService issueService;
     private final DeliveryService deliveryService;
+    private final DeliveryRunner deliveryRunner;
     private final MissionChangesService missionChanges;
     private final MissionEvidenceService evidenceService;
 
@@ -189,10 +190,40 @@ public class MissionResultService {
         if (closed) throw new BusinessException("This pull request is already merged or closed: use Try again to start over.");
     }
 
+    /**
+     * « Stop » pendant le travail (R138, séance n°20) : la mission se clôt tout de suite, au nom de la personne qui l'a
+     * déléguée. Ce n'est pas une panne : l'issue reste où elle est. La session de l'agent tombe avec le run, il ne touche
+     * plus à TaskForce ; le prochain signe de vie du runner est refusé et il arrête l'agent ; l'agent à l'essai se relit
+     * avant de poster. Copilot travaille sur GitHub : TaskForce ne sait pas l'y arrêter, le geste ne lui est pas proposé.
+     */
+    @Transactional
+    public void stop(String slug, Long runId, Long userId) {
+        DeliveryRun run = delegated(slug, runId, userId, "Only the person who delegated this task can stop it.");
+        boolean working = run.getStatus() == DeliveryRunStatus.RUNNING;
+        if (!working && run.getStatus() != DeliveryRunStatus.QUEUED) throw new BusinessException("This mission has already ended.");
+        if (GitHubCopilotProvider.KEY.equals(run.getProviderKey())) {
+            throw new BusinessException("Copilot works on GitHub: TaskForce can't stop it from here.");
+        }
+        User person = run.getStartedBy();
+        // Une mission encore en file n'a pas de dossier : il s'ouvre quand un runner la prend.
+        if (working) {
+            evidenceService.append(run, "human.decision", new MissionEvidenceService.Actor("person", person.getEmail()),
+                Map.of("decision", "STOP"));
+        }
+        LocalDateTime now = LocalDateTime.now();
+        run.setOutcome(DeliveryRunOutcome.STOPPED);
+        run.setOutcomeBy(person);
+        run.setOutcomeAt(now);
+        run.setEndedAt(now);
+        String who = person.getDisplayName() == null || person.getDisplayName().isBlank() ? person.getEmail() : person.getDisplayName();
+        deliveryRunner.complete(runId, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "Stopped by " + who + "."));
+        log.info("Run {} : arrêté par {}", runId, userId);
+    }
+
     // ---------------------------------------------------------------------
 
-    /** La mission du workspace, finie avec un résultat que personne n'a encore tranché, et la personne qui l'a déléguée. */
-    private DeliveryRun decidable(String slug, Long runId, Long userId) {
+    /** La mission du workspace, déléguée par cette personne, qui peut encore écrire sur le projet. */
+    private DeliveryRun delegated(String slug, Long runId, Long userId, String refused) {
         DeliveryRun run = runRepository.findByIdForUpdate(runId)
             .orElseThrow(() -> new ResourceNotFoundException("Run not found"));
         var project = run.getIssue().getProject();
@@ -201,8 +232,14 @@ public class MissionResultService {
         }
         visibilityGuard.assertCanWrite(project, userId);
         if (run.getStartedBy() == null || !Objects.equals(run.getStartedBy().getId(), userId)) {
-            throw new ForbiddenException("Only the person who delegated this task can apply, discard or retry its result.");
+            throw new ForbiddenException(refused);
         }
+        return run;
+    }
+
+    /** La mission du workspace, finie avec un résultat que personne n'a encore tranché, et la personne qui l'a déléguée. */
+    private DeliveryRun decidable(String slug, Long runId, Long userId) {
+        DeliveryRun run = delegated(slug, runId, userId, "Only the person who delegated this task can apply, discard or retry its result.");
         if (run.getStatus() != DeliveryRunStatus.DONE) throw new BusinessException("This mission has no result to review.");
         if (run.getOutcome() != null) {
             throw new BusinessException("This result was already " + run.getOutcome().name().toLowerCase() + ".");

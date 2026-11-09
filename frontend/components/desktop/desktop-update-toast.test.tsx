@@ -52,6 +52,19 @@ describe("DesktopUpdateToast: the app update, inside the app", () => {
     expect(options).toMatchObject({ id: "desktop-update", duration: Infinity })
   })
 
+  it("says once, in the window, that a new version is installed and from which one", async () => {
+    installBridge({ status: "installed", version: "1.11.0", from: "1.10.0" })
+    const { DesktopUpdateToast, toast } = await load()
+
+    render(<DesktopUpdateToast />)
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalled())
+    const [title, options] = vi.mocked(toast.success).mock.calls[0]
+    expect(title).toBe("TaskForce 1.11.0 is installed")
+    expect(options).toMatchObject({ id: "desktop-update", description: "Updated from version 1.10.0." })
+    expect(options).not.toHaveProperty("duration")
+  })
+
   it("turns into Restart now when the shell says it is ready", async () => {
     const { bridge, emit } = installBridge({ status: "idle" })
     const { DesktopUpdateToast, toast } = await load()

@@ -7,9 +7,12 @@
  *
  * `retry` : cette version devait déjà s'installer au dernier arrêt, et l'app tourne encore sur la précédente (cf.
  * update-pending.ts). L'installeur tourne sans fenêtre depuis le 05/11/2026 : c'est le toast qui dit l'échec.
+ *
+ * `installed` : premier lancement d'une nouvelle version (cf. backup.ts) ; l'interface le dit une fois, dans la fenêtre.
  */
 export type UpdateState =
   | { status: "idle" }
+  | { status: "installed"; version: string; from: string }
   | { status: "downloading"; version: string; percent: number }
   | { status: "ready"; version: string; retry?: true }
   | { status: "failed"; version: string; message: string };

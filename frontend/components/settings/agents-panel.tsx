@@ -52,11 +52,10 @@ export function AgentsPanel() {
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 text-sm font-medium text-foreground">
                     {p.displayName}
-                    {p.trial && <Badge variant="outline" className="text-[10px] uppercase">{models.trial}</Badge>}
                     {!p.available && <Badge variant="secondary" className="text-[10px] uppercase">Off</Badge>}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {p.key === TRIAL_AGENT ? models.trialAgent.replace("{model}", p.displayName) : descriptionFor(p.key, p.available)}
+                    {p.key === TRIAL_AGENT ? models.cortexAgent : descriptionFor(p.key, p.available)}
                   </p>
                   {p.available && !p.ready && p.reason && (
                     <p className="mt-0.5 text-xs text-ink-yellow">{p.reason}</p>

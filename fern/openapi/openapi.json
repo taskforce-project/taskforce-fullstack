@@ -770,6 +770,55 @@
         }
       }
     },
+    "/api/workspaces/{slug}/ai/conversations/{id}/project": {
+      "put": {
+        "tags": [
+          "AI assistant"
+        ],
+        "operationId": "setProject",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseConversationSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/ai/benchmark/results/{resultId}/verdict": {
       "put": {
         "tags": [
@@ -4049,6 +4098,45 @@
         }
       }
     },
+    "/api/workspaces/{slug}/delivery/runs/{runId}/stop": {
+      "post": {
+        "tags": [
+          "Coding agents"
+        ],
+        "operationId": "stop",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/delivery/runs/{runId}/retry": {
       "post": {
         "tags": [
@@ -4694,6 +4782,46 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/AssistantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseChatTurnResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/assistant/stop": {
+      "post": {
+        "tags": [
+          "AI assistant"
+        ],
+        "operationId": "stop",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantStopRequest"
               }
             }
           },
@@ -7669,6 +7797,43 @@
       }
     },
     "/api/workspaces/{slug}/brain/nodes/{nodeId}": {
+      "get": {
+        "tags": [
+          "Brain OS"
+        ],
+        "operationId": "getNode",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseKnowledgeNodeResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "Brain OS"
@@ -8621,6 +8786,55 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseListIssueHitResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/issues/search/comments": {
+      "get": {
+        "tags": [
+          "Issues"
+        ],
+        "operationId": "searchComments",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 5
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListIssueCommentHitResponse"
                 }
               }
             }
@@ -11890,6 +12104,60 @@
           "measuredAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ConversationProjectRequest": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ApiResponseConversationSummary": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConversationSummary"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ConversationSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "messageCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -15675,6 +15943,9 @@
           },
           "domain": {
             "type": "string"
+          },
+          "textOnly": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -15711,6 +15982,9 @@
           "score": {
             "type": "number",
             "format": "double"
+          },
+          "excerpt": {
+            "type": "string"
           }
         }
       },
@@ -15825,11 +16099,55 @@
             },
             "maxItems": 3,
             "minItems": 0
+          },
+          "turn": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectRequest"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileRequest"
+            },
+            "maxItems": 5,
+            "minItems": 0
           }
         },
         "required": [
           "message"
         ]
+      },
+      "FileRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 0
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 262144,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "name",
+          "text"
+        ]
+      },
+      "ProjectRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "ScreenRequest": {
         "type": "object",
@@ -15973,6 +16291,12 @@
           },
           "context": {
             "$ref": "#/components/schemas/ContextRead"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileRead"
+            }
           }
         }
       },
@@ -16099,6 +16423,10 @@
           },
           "sentTo": {
             "type": "string"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -16136,6 +16464,14 @@
           }
         }
       },
+      "FileRead": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "IssueRead": {
         "type": "object",
         "properties": {
@@ -16159,6 +16495,19 @@
             "format": "int32"
           }
         }
+      },
+      "AssistantStopRequest": {
+        "type": "object",
+        "properties": {
+          "turn": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "turn"
+        ]
       },
       "AssistantUndoRequest": {
         "type": "object",
@@ -19817,6 +20166,27 @@
           }
         }
       },
+      "ApiResponseListIssueCommentHitResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueCommentHitResponse"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "IssueHitResponse": {
         "type": "object",
         "properties": {
@@ -19838,6 +20208,28 @@
             "type": "string"
           },
           "statusCategory": {
+            "type": "string"
+          }
+        }
+      },
+      "IssueCommentHitResponse": {
+        "type": "object",
+        "properties": {
+          "issueId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "key": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "excerpt": {
             "type": "string"
           }
         }
@@ -21333,33 +21725,6 @@
           }
         }
       },
-      "ConversationSummary": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "title": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "type": "string"
-          },
-          "messageCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "totalTokens": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "projectId": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
       "ApiResponseConversationDetail": {
         "type": "object",
         "properties": {
@@ -21397,6 +21762,10 @@
             "items": {
               "$ref": "#/components/schemas/MessageDto"
             }
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -21428,6 +21797,20 @@
           },
           "read": {
             "$ref": "#/components/schemas/AssistantRead"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageFile"
+            }
+          }
+        }
+      },
+      "MessageFile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
           }
         }
       },

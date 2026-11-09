@@ -73,9 +73,10 @@ export interface DeliveryRun {
 
 /**
  * `MARKED_DONE` : la mission n'a rien changé, la personne a terminé l'issue (rejeu de la 1.8.0). `FOLLOWED_UP` : la
- * personne a commenté des lignes, une reprise continue la même branche (R139).
+ * personne a commenté des lignes, une reprise continue la même branche (R139). `STOPPED` : la personne l'a arrêtée
+ * pendant le travail (R138) ; son état reste FAILED pour la file, mais ce n'est pas une panne.
  */
-export type DeliveryRunOutcome = "APPLIED" | "DISCARDED" | "RETRIED" | "MARKED_DONE" | "FOLLOWED_UP";
+export type DeliveryRunOutcome = "APPLIED" | "DISCARDED" | "RETRIED" | "MARKED_DONE" | "FOLLOWED_UP" | "STOPPED";
 
 export interface DeliveryRunTests {
   command: string;
@@ -204,6 +205,11 @@ export async function markRunDone(slug: string, runId: number): Promise<void> {
 export async function retryRun(slug: string, runId: number, note: string): Promise<DeliveryRun> {
   const res = await apiClient.post<{ data: DeliveryRun }>(DELIVERY_ROUTES.RETRY(slug, runId), note.trim() ? { note: note.trim() } : {});
   return res.data.data;
+}
+
+/** « Stop » : la mission se clôt, au nom de la personne ; le runner arrête l'agent à son prochain signe de vie (R138). */
+export async function stopRun(slug: string, runId: number): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.STOP(slug, runId), {}, { silentError: true });
 }
 
 /** Délègue une issue à un agent (crée un run, exécuté en arrière-plan côté serveur). */

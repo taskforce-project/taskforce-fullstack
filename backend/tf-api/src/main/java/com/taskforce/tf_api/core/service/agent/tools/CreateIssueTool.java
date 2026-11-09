@@ -27,6 +27,7 @@ import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
+import com.taskforce.tf_api.core.service.agent.Question;
 import com.taskforce.tf_api.core.service.agent.tools.IssueFields.Found;
 
 /**
@@ -90,13 +91,13 @@ public class CreateIssueTool implements AgentTool {
 
     @Override public String description() {
         return "Prepares an issue card the person checks and creates, with a checklist if the work has steps. "
-            + "Ask first only when the project or the person is unclear.";
+            + "Ask first only when the person named is unclear.";
     }
 
     @Override public Map<String, Object> parametersSchema() {
         Map<String, Object> properties = new LinkedHashMap<>();
-        properties.put("project", Map.of("type", "string", "description",
-            "The project's key or name, as list_projects shows it. Never a guess: ask when the request does not say."));
+        properties.put(ProjectResolver.FIELD, Map.of("type", "string", "description",
+            "The project's key or name, only when the request names one. Leave it out otherwise: TaskForce handles it."));
         properties.put("title", Map.of("type", "string", "description", "Issue title"));
         properties.put("description", Map.of("type", "string", "description", "Markdown description (optional)"));
         properties.put("priority", Map.of("type", "string", "description",
@@ -116,7 +117,7 @@ public class CreateIssueTool implements AgentTool {
             "Estimate in points, 1 to " + IssueFields.MAX_POINTS + " (optional), only when the request gives one."));
         properties.put("cycle", Map.of("type", "string", "description",
             "A cycle of the project, by name (optional): the one the request names, or the active one when the work starts now."));
-        return Map.of("type", "object", "properties", properties, "required", List.of("project", "title"));
+        return Map.of("type", "object", "properties", properties, "required", List.of("title"));
     }
 
     @Override public String execute(Map<String, Object> args, AgentContext ctx) {
@@ -190,22 +191,23 @@ public class CreateIssueTool implements AgentTool {
     }
 
     /**
-     * Avant la carte, ce qui compte et que seule la personne peut dire (R102 : « pas chiant à remplir ») : le projet,
-     * quand la demande ne le dit pas, et la personne nommée, quand elle désigne plusieurs membres ou aucun. Cortex pose
-     * alors une seule question courte au lieu de deviner. Le reste (priorité, labels, points, cycle) ne se demande
-     * jamais : il reste à remplir sur la carte.
+     * Avant la carte, ce qui compte et que seule la personne peut dire (R102 : « pas chiant à remplir ») : le projet
+     * ({@link ProjectResolver#forGesture} : celui que la demande nomme, sinon celui de la conversation, sinon TaskForce
+     * demande lequel sur une carte, R135) et la personne nommée, quand elle désigne plusieurs membres ou aucun. Le reste
+     * (priorité, labels, points, cycle) ne se demande jamais : il reste à remplir sur la carte.
      *
      * <p>La carte montre le projet et l'assigné tels que le serveur les a résolus : la clé du projet, l'e-mail du
      * membre. Elle relit ces valeurs parmi les projets et les membres ; « moi » ou une partie d'un nom n'y désignaient
      * personne, et l'issue partait sans assigné (rejeu de la 1.8.0, 02/11/2026).</p>
      */
     @Override public Prepared prepare(Map<String, Object> args, AgentContext ctx) {
-        ProjectResolver.Resolution where = projects.resolve(args.get("project"), ctx);
+        ProjectResolver.Resolution where = projects.forGesture(args.get(ProjectResolver.FIELD), text(args.get("title")), ctx);
         if (!where.found()) return Prepared.ask(where.problem());
         Found<ProjectMemberResponse> assignee = fields.assignee(where.project(), text(args.get("assignee")), ctx.slug(), ctx.userId());
         if (!assignee.ok()) return Prepared.ask(assignee.problem());
         Map<String, Object> shown = new LinkedHashMap<>(args);
-        if (where.project().getIdentifier() != null) shown.put("project", where.project().getIdentifier());
+        shown.remove(Question.ANSWERED);
+        if (where.project().getIdentifier() != null) shown.put(ProjectResolver.FIELD, where.project().getIdentifier());
         if (assignee.value() != null && assignee.value().getEmail() != null) shown.put("assignee", assignee.value().getEmail());
         return Prepared.card(shown);
     }

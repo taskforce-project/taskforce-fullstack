@@ -20,7 +20,7 @@ export function CommandBar() {
   const reduceMotion = useReducedMotion()
   const open = useCortexStore((s) => s.open)
   const setOpen = useCortexStore((s) => s.setOpen)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const show = () => {
     setOpen(true)
