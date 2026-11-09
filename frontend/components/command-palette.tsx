@@ -330,8 +330,8 @@ export function CommandPalette({ open, onOpenChange }: Readonly<{ open: boolean;
       </CommandList>
 
       {/* Les rappels du clavier. */}
-      <div className="flex h-9 shrink-0 items-center gap-4 border-t border-border px-3 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5"><Key>↑</Key><Key>↓</Key>{t.navigate}</span>
+      <div className="flex h-9 shrink-0 items-center gap-4 whitespace-nowrap border-t border-border px-3 text-xs text-muted-foreground">
+        <span className="hidden items-center gap-1.5 sm:flex"><Key>↑</Key><Key>↓</Key>{t.navigate}</span>
         <span className="flex items-center gap-1.5"><Key>↵</Key>{t.open}</span>
         <span className="flex items-center gap-1.5"><Key>{mod} ↵</Key>{t.ask}</span>
         {/* Pas d'indicateur sous la demi-seconde : il n'apparaît que si la réponse se fait attendre. */}
