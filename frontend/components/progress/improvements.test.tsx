@@ -56,7 +56,7 @@ describe("Improvements", () => {
 
     open("Create an issue Test")
 
-    expect(screen.getByText("It should have: It should have asked which project.")).toBeInTheDocument()
+    expect(screen.getByText("What it should have done: It should have asked which project.")).toBeInTheDocument()
   })
 
   it("only its author can write the criteria from here", () => {

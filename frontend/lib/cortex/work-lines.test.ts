@@ -162,7 +162,7 @@ describe("proposalLine : la carte d'une action demandée, sans nom d'outil", () 
   it.each([
     ["delegate_issue", "Cortex proposes to hand this issue to an agent. Nothing changes until you approve it."],
     ["create_note", "Cortex proposes to write this note. Nothing changes until you approve it."],
-    ["list_issues", "Cortex proposes to this action. Nothing changes until you approve it."],
+    ["list_issues", "Cortex proposes to do this. Nothing changes until you approve it."],
     ["linear__save_issue", "Cortex proposes an action in Linear. Nothing is sent until you approve it."],
   ])("%s", (tool, expected) => {
     expect(proposalLine(tool, t)).toBe(expected)

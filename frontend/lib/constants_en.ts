@@ -697,7 +697,7 @@ export const CONSTANTS_EN = {
     failedWhy: "One step failed: {why}",
     // The card of an action that waits for the person's approval.
     proposes: "Cortex proposes to {what}. Nothing changes until you approve it.",
-    proposesThis: "this action",
+    proposesThis: "do this",
     proposesExternal: "Cortex proposes an action in {service}. Nothing is sent until you approve it.",
     approve: "Approve",
     approving: "Working…",
@@ -727,7 +727,7 @@ export const CONSTANTS_EN = {
     cancel: "Cancel",
     // A case that is only a sentence, in Progress > History (R137, R61).
     waitingCriteria: "Waiting for its criteria",
-    expectedLine: "It should have: {sentence}",
+    expectedLine: "What it should have done: {sentence}",
     writeCriteria: "Write its criteria",
     criteriaSaved: "Criteria saved",
     // The note a click on "5 notes" opens.
