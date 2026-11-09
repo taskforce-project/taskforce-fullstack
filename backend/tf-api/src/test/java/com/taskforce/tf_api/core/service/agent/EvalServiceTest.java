@@ -217,7 +217,6 @@ class EvalServiceTest {
     @DisplayName("bien : un clic garde le cas, avec ce qui a été observé, daté maintenant")
     void good_keeps_what_was_observed() throws Exception {
         stubRecord(answerThatCreatedAnIssue());
-        when(cases.save(any())).thenAnswer(call -> call.getArgument(0));
 
         EvalBankResponse.CaseSummary kept = service.keepGood("acme", 7L, RECORD.toString());
 
@@ -234,7 +233,6 @@ class EvalServiceTest {
     @DisplayName("pas bien : la phrase seule fait un cas qui attend ses critères, à l'écart de tout rejeu")
     void bad_keeps_a_sentence_waiting_for_its_criteria() throws Exception {
         stubRecord(answerThatCreatedAnIssue());
-        when(cases.save(any())).thenAnswer(call -> call.getArgument(0));
 
         EvalBankResponse.CaseSummary kept = service.keepBad("acme", 7L, RECORD.toString(), "  It should have asked which project.  ");
 
@@ -273,8 +271,6 @@ class EvalServiceTest {
         EvalCase waiting = storedCase(EvalCase.WAITING_FOR_CRITERIA);
         waiting.setCriteria("{\"expected\":\"It should have asked.\"}");
         when(cases.findByIdAndWorkspaceId(40L, 1L)).thenReturn(Optional.of(waiting));
-        when(cases.save(any())).thenAnswer(call -> call.getArgument(0));
-        lenient().when(tools.all()).thenReturn(List.of());
 
         EvalBankResponse.CaseSummary done = service.giveCriteria("acme", 7L, 40L, "Asks first",
             new EvalCriteria(EvalCriteria.NO_TOOL, null, null, null, null, null, false));

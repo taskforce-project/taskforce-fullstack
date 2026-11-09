@@ -181,7 +181,7 @@ public class EvalService {
         UUID record = recordId(recordRef);
         Frozen frozen = freeze(new AgentContext(slug, ws.getId(), userId), record);
         LocalDateTime now = LocalDateTime.now();
-        return summary(cases.save(frozenCase(ws.getId(), userId, record, title, frozen, now, criteria)), userId);
+        return summary(cases.save(frozenCase(ws.getId(), userId, record, title, frozen, now, now, criteria)), userId);
     }
 
     /**
@@ -197,7 +197,8 @@ public class EvalService {
         if (kept.isPresent()) return summary(kept.get(), userId);
         requireRoom(ws.getId());
         Frozen frozen = freeze(new AgentContext(slug, ws.getId(), userId), record);
-        return summary(cases.save(frozenCase(ws.getId(), userId, record, null, frozen, LocalDateTime.now(), propose(frozen.calls()))), userId);
+        LocalDateTime now = LocalDateTime.now();
+        return summary(cases.save(frozenCase(ws.getId(), userId, record, null, frozen, now, now, propose(frozen.calls()))), userId);
     }
 
     /**
@@ -218,7 +219,8 @@ public class EvalService {
         if (kept.isPresent()) return summary(kept.get(), userId);
         requireRoom(ws.getId());
         Frozen frozen = freeze(new AgentContext(slug, ws.getId(), userId), record);
-        EvalCase waiting = frozenCase(ws.getId(), userId, record, null, frozen, EvalCase.WAITING_FOR_CRITERIA, EvalCriteria.sentence(sentence));
+        EvalCase waiting = frozenCase(ws.getId(), userId, record, null, frozen, LocalDateTime.now(), EvalCase.WAITING_FOR_CRITERIA,
+            EvalCriteria.sentence(sentence));
         return summary(cases.save(waiting), userId);
     }
 
@@ -253,9 +255,9 @@ public class EvalService {
 
     /** Un cas tel que le serveur le fige : sa question, sa date, ses notes et sa cassette viennent du dossier. */
     private static EvalCase frozenCase(Long workspaceId, Long userId, UUID record, String title, Frozen frozen,
-                                       LocalDateTime criteriaAt, EvalCriteria criteria) {
+                                       LocalDateTime createdAt, LocalDateTime criteriaAt, EvalCriteria criteria) {
         return EvalCase.builder()
-            .workspaceId(workspaceId).createdBy(userId).createdAt(LocalDateTime.now()).criteriaAt(criteriaAt).sourceRecord(record)
+            .workspaceId(workspaceId).createdBy(userId).createdAt(createdAt).criteriaAt(criteriaAt).sourceRecord(record)
             .title(title(title, frozen.question(), MAX_TITLE)).question(frozen.question()).askedOn(frozen.askedOn())
             .notes(json(frozen.notes())).cassette(json(frozen.cassette())).criteria(json(criteria)).archived(false)
             .build();

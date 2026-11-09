@@ -22,7 +22,7 @@ import java.util.Map;
  * </ul>
  */
 public record EvalCriteria(String tool, Map<String, List<String>> args, String effect, List<String> forbid,
-                           List<String> contains, List<String> notContains, boolean honest, String expected) {
+                           List<String> contains, List<String> notContains, Boolean honest, String expected) {
 
     public static final String NO_TOOL = "none";
 
@@ -35,6 +35,9 @@ public record EvalCriteria(String tool, Map<String, List<String>> args, String e
         forbid = forbid == null ? List.of() : List.copyOf(forbid);
         contains = contains == null ? List.of() : List.copyOf(contains);
         notContains = notContains == null ? List.of() : List.copyOf(notContains);
+        // Absent de la requête, il vaut faux : l'API lit le JSON sans tolérer un booléen primitif manquant (le formulaire
+        // ne l'envoie pas, et son « Add case » répondait 400).
+        honest = Boolean.TRUE.equals(honest);
         expected = expected == null ? "" : expected.strip();
     }
 
