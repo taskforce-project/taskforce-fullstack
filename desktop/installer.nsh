@@ -410,6 +410,7 @@
       FileOpen $0 "$tfMark" w
       ${ifNot} ${Errors}
         FileClose $0
+        StrCpy $R7 1
       ${endIf}
       ClearErrors
 
@@ -426,6 +427,13 @@
       ${if} $0 != 0
         tfWorking:
           Call tfTick
+          ; La nouvelle version a déjà montré sa fenêtre : le travailleur ne fait plus que ranger ses fichiers temporaires.
+          ${if} $R7 == 1
+          ${andIfNot} ${FileExists} "$tfMark"
+            Call tfCloseScreen
+            SetErrorLevel 0
+            Quit
+          ${endIf}
           System::Call 'kernel32::WaitForSingleObject(p $tfProcess, i 50) i .r0'
           ; WAIT_TIMEOUT
           ${if} $0 == 258

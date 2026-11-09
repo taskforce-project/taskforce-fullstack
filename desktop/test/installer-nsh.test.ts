@@ -51,6 +51,10 @@ describe("the installer's update screen and the app", () => {
     assert.doesNotMatch(code, /\.(ps1|vbs|hta|bat|cmd)\b/i);
   });
 
+  it("leaves as soon as the new version has shown its window, without waiting for the worker to tidy up", () => {
+    assert.match(code, /\$\{andIfNot\} \$\{FileExists\} "\$tfMark"\s+Call tfCloseScreen/);
+  });
+
   it("keeps the template's system dialog out of a failed update: it would block the install behind the window", () => {
     assert.match(code, /!macro customUnInstallCheck[\s\S]*?\$\{ifNot\} \$\{isUpdated\}\s+MessageBox/);
   });
