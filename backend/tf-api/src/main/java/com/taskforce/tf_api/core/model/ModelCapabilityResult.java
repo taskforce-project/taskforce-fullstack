@@ -61,4 +61,9 @@ public class ModelCapabilityResult {
 
     @Column(name = "person_at")
     private LocalDateTime personAt;
+
+    /** Le cas n'a pas répondu dans son budget (R142) : « Too slow here », pas un raté. */
+    @Builder.Default
+    @Column(name = "too_slow", nullable = false, updatable = false)
+    private boolean tooSlow = false;
 }

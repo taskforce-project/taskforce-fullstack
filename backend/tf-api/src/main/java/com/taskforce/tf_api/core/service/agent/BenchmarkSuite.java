@@ -22,6 +22,7 @@ import static com.taskforce.tf_api.core.service.agent.BenchmarkGrader.numberedSt
 import static com.taskforce.tf_api.core.service.agent.BenchmarkGrader.onlyBullets;
 import static com.taskforce.tf_api.core.service.agent.BenchmarkGrader.says;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -65,6 +66,18 @@ public final class BenchmarkSuite {
 
     /** La date que le modèle lit : fixe, pour que deux passages posent la même question. */
     public static final LocalDate ASKED_ON = LocalDate.of(2026, 11, 9);
+
+    /**
+     * Le temps qu'a un cas pour répondre (R142) : cinq minutes, tous ses appels au modèle compris (un cas d'Act en fait
+     * plusieurs). Pas {@code AI_TIMEOUT}, réglé à 120 s pour une personne qui attend une réponse : un modèle de 14 milliards de
+     * paramètres qui déborde d'une carte de 8 Go répond, mais lentement, et le cas le plus long de la suite (un cas d'Act, un
+     * document de 3 000 mots) lui demande plusieurs minutes. Au-delà de cinq minutes pour une seule demande, ce modèle ne sert
+     * à rien ici, même s'il a la bonne réponse : c'est un verdict, « Too slow here », jamais une erreur.
+     */
+    public static final Duration CASE_BUDGET = Duration.ofMinutes(5);
+
+    /** Le temps du premier appel d'un passage, qui charge le modèle : large, un disque lent peut y passer plusieurs minutes. */
+    public static final Duration LOAD_BUDGET = Duration.ofMinutes(5);
 
     private BenchmarkSuite() {
     }
