@@ -100,13 +100,13 @@ class CreateIssueToolTest {
     }
 
     @Test
-    @DisplayName("métadonnées : project et title requis ; chaque description tient dans les 160 caractères envoyés")
+    @DisplayName("métadonnées : seul le titre est requis, le projet vient de la demande ou de la conversation (R135) ; chaque description tient dans les 160 caractères envoyés")
     void metadata() {
         CreateIssueTool t = bare();
         assertThat(t.name()).isEqualTo("create_issue");
         @SuppressWarnings("unchecked")
         List<String> required = (List<String>) t.parametersSchema().get("required");
-        assertThat(required).containsExactly("project", "title");
+        assertThat(required).containsExactly("title");
         assertThat(t.description()).hasSizeLessThanOrEqualTo(160);
         @SuppressWarnings("unchecked")
         Map<String, Map<String, Object>> properties = (Map<String, Map<String, Object>>) t.parametersSchema().get("properties");
