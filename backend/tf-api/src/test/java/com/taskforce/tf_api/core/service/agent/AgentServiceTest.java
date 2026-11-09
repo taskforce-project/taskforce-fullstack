@@ -620,7 +620,9 @@ class AgentServiceTest {
         assertThat(system)
             .contains("Fill only what the request or the project says")
             .contains("an assignee (a member of the project)")
-            .contains("Ask one short question, with the choices, before preparing the card only when what matters is unclear")
+            .contains("Give the project only when the request names one")
+            .contains("never take it from the screen")
+            .contains("Ask one short question, with the choices, before preparing the card only when the request names a person")
             .contains("matches several members")
             .contains("Never ask about the other fields")
             .doesNotContainIgnoringCase("subtask");

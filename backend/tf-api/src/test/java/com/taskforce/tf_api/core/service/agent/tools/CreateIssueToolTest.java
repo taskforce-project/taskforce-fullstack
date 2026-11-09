@@ -35,8 +35,11 @@ import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
+import com.taskforce.tf_api.core.service.agent.Question;
+import com.taskforce.tf_api.core.service.agent.QuestionNeeded;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -517,14 +520,15 @@ class CreateIssueToolTest {
 
     @ParameterizedTest(name = "projet « {0} » : {1}")
     @CsvSource(delimiter = '|', value = {
-        "''     | The project is missing. The projects are: TF (TaskForce), API (API Platform).",
-        "Mobile | No project matches \"Mobile\".",
+        "''     | Which project should \"Rate limiting\" go in?",
+        "Mobile | No project matches \"Mobile\". Which project should \"Rate limiting\" go in?",
     })
     void prepare_asks_which_project(String project, String question) {
-        AgentTool.Prepared asked = tool().prepare(Map.of("project", project, "title", "Rate limiting"), CTX);
-
-        assertThat(asked.asks()).isTrue();
-        assertThat(asked.question()).startsWith(question).contains("ask the person");
+        assertThatThrownBy(() -> tool().prepare(Map.of("project", project, "title", "Rate limiting"), CTX))
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> {
+                assertThat(needed.question().text()).isEqualTo(question);
+                assertThat(needed.question().choices()).extracting(Question.Choice::value).containsExactly("TF", "API");
+            });
         nothingCreated();
     }
 

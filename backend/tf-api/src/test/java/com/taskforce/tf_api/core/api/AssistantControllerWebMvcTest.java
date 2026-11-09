@@ -109,7 +109,7 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.answer.answer").value("Done."));
         // Rien n'a changé de modèle : la personne décide d'un clic.
         org.assertj.core.api.Assertions.assertThat(used.get()).isNull();
-        verify(conversationService).appendMessage(1L, "assistant", "Done." + ModelCapabilityService.block(text), "deep", 0, null, null);
+        verify(conversationService).appendAnswer(1L, "Done." + ModelCapabilityService.block(text), "deep", 0, null, null, null);
     }
 
     @Test

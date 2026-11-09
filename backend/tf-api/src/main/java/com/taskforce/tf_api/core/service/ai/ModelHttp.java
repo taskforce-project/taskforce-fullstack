@@ -69,6 +69,8 @@ public interface ModelHttp {
             } catch (CancellationException stopped) {
                 throw new TurnStoppedException();
             } catch (ExecutionException failed) {
+                // Selon où il en était, un appel coupé finit ici : si la personne a arrêté, ce n'est pas une panne.
+                TurnStop.check();
                 throw failed.getCause() instanceof IOException io ? io : new IOException(failed.getCause());
             } catch (InterruptedException interrupted) {
                 call.cancel(true);
