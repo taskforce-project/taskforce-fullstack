@@ -39,11 +39,19 @@ describe("usePaletteSearch", () => {
     expect(result.current.shown).toBe("")
   })
 
-  it("searches nothing while closed", async () => {
-    renderHook(() => usePaletteSearch("acme", false))
+  it("reads the latest changed issues before the first opening, so nothing jumps, and searches nothing else while closed", async () => {
+    vi.mocked(searchIssues).mockResolvedValue([hit(1)])
+    const { result, rerender } = renderHook(({ open }) => usePaletteSearch("acme", open), { initialProps: { open: false } })
     await flush(1000)
 
-    expect(searchIssues).not.toHaveBeenCalled()
+    expect(searchIssues).toHaveBeenCalledTimes(1)
+    expect(searchIssues).toHaveBeenCalledWith("acme", "")
+    expect(searchNotes).not.toHaveBeenCalled()
+    expect(result.current.issues).toEqual([hit(1)])
+
+    rerender({ open: true })
+    await flush(0)
+    expect(searchIssues).toHaveBeenCalledTimes(2)
   })
 
   it("waits for the pause, then changes everything at once", async () => {

@@ -55,12 +55,13 @@ export function usePaletteSearch(slug: string, open: boolean): PaletteSearch {
   const comments = useSearchStore((s) => (shown ? s.comments[shownKey] : undefined)) ?? NO_COMMENTS
   const notes = useSearchStore((s) => (shown ? s.notes[shownKey] : undefined)) ?? NO_NOTES
 
+  // Les dernières changées sont lues avant la première ouverture, et relues à chacune : la section est déjà là, rien ne saute.
   useEffect(() => {
-    if (!open || !slug) return
-    if (!typed) {
-      void find(slug, "")
-      return
-    }
+    if (slug && !typed) void find(slug, "")
+  }, [slug, open, typed, find])
+
+  useEffect(() => {
+    if (!open || !slug || !typed) return
     let live = true
     const id = setTimeout(() => {
       const answered = Promise.all([find(slug, typed), findInside(slug, typed)]).then(([found, inside]) => {
