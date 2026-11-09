@@ -150,8 +150,10 @@ function spawnCollect(file: string, finalArgs: string[], verbatim: boolean, opti
     if (options.signal?.aborted) abort();
     else options.signal?.addEventListener("abort", abort, { once: true });
 
-    child.stdout.on("data", (chunk: Buffer) => {
-      const text = chunk.toString("utf8");
+    // Décodé par le flux : un caractère coupé entre deux morceaux (un patch accentué, une longue sortie) reste entier.
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (text: string) => {
       stdout += text;
       if (!options.onStdoutLine) return;
       pending += text;
@@ -159,7 +161,7 @@ function spawnCollect(file: string, finalArgs: string[], verbatim: boolean, opti
       pending = lines.pop() ?? "";
       for (const line of lines) if (line.trim()) options.onStdoutLine(line);
     });
-    child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString("utf8")));
+    child.stderr.on("data", (text: string) => (stderr += text));
     child.on("error", (err) => {
       if (timer) clearTimeout(timer);
       options.signal?.removeEventListener("abort", abort);

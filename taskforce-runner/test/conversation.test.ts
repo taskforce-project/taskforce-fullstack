@@ -114,6 +114,15 @@ describe("la conversation avec l'agent, par son vrai processus (R140)", () => {
   });
 });
 
+describe("la sortie d'un processus", () => {
+  it("un caractère coupé entre deux morceaux de la sortie reste entier", async () => {
+    // « é » (2 octets) écrit en deux morceaux séparés dans le temps.
+    const split = "process.stdout.write(Buffer.from([0xc3])); setTimeout(() => process.stdout.write(Buffer.from([0xa9, 0x0a])), 100);";
+    const result = await run(process.execPath, ["-e", split], { timeoutMs: 30_000 });
+    assert.equal(result.stdout, "é\n");
+  });
+});
+
 describe("l'entrée d'un processus qui travaille encore", () => {
   it("les écritures passent, et la fermeture termine le processus", async () => {
     const echo = "process.stdin.pipe(process.stdout);";
