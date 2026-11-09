@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { AI_TIMEOUT_MS, apiClient } from "./client"
 import {
-  archiveEvalCase, createEvalCase, draftEvalCase, getEvalBank, getEvalHistory, getEvalRun, runEvalCase,
-  setEvalBankEnabled, startEvalRun, NO_TOOL, type EvalCriteria,
+  archiveEvalCase, createEvalCase, draftEvalCase, getEvalBank, getEvalHistory, getEvalRun, giveEvalCriteria, keepBadCase,
+  keepGoodCase, runEvalCase, setEvalBankEnabled, startEvalRun, NO_TOOL, type EvalCriteria,
 } from "./eval-service"
 
 vi.mock("./client", () => ({
@@ -19,6 +19,27 @@ const CRITERIA: EvalCriteria = {
 
 describe("eval-service", () => {
   beforeEach(() => vi.clearAllMocks())
+
+  it("keeps an answer as good, with what was observed", async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope({ id: 40 }))
+
+    expect(await keepGoodCase("acme", "r-1")).toEqual({ id: 40 })
+    expect(apiClient.post).toHaveBeenCalledWith(`${BASE}/cases/good`, { record: "r-1" })
+  })
+
+  it("keeps an answer as bad, with one sentence", async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope({ id: 41, waiting: true }))
+
+    expect(await keepBadCase("acme", "r-1", "Ask first.")).toEqual({ id: 41, waiting: true })
+    expect(apiClient.post).toHaveBeenCalledWith(`${BASE}/cases/bad`, { record: "r-1", expected: "Ask first." })
+  })
+
+  it("writes the criteria of a case that waits for them", async () => {
+    vi.mocked(apiClient.put).mockResolvedValue(envelope({ id: 41, waiting: false }))
+
+    expect(await giveEvalCriteria("acme", 41, "Title", CRITERIA)).toEqual({ id: 41, waiting: false })
+    expect(apiClient.put).toHaveBeenCalledWith(`${BASE}/cases/41/criteria`, { title: "Title", criteria: CRITERIA })
+  })
 
   it("reads the bank without a toast (background call)", async () => {
     const bank = { enabled: true, canManage: false, cases: [], runs: [] }

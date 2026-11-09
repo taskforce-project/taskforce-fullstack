@@ -7,8 +7,8 @@
  *
  * Un bloc signé « TaskForce · models » parle du modèle qui répond (R113, R118) : la banque dit qu'il échoue à ce genre de
  * demande et qu'un autre le réussit, ou la personne a envoyé la demande à un autre modèle. Ce n'est pas une correction.
- * Un bloc signé « TaskForce · asks » dit les questions que TaskForce pose avant un geste (R115), une par ligne : la
- * conversation montre leur carte à sa place, et une conversation rouverte, sans la carte, les relit.
+ * Un bloc marqué « TaskForce · asks » dit les questions d'un geste (R115), une par ligne : la conversation montre leur
+ * carte à sa place, et une conversation rouverte, sans la carte, les relit comme les mots de Cortex (R136).
  */
 export type AnswerKind = "models" | "asks"
 

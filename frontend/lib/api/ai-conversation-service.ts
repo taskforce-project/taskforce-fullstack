@@ -65,13 +65,20 @@ export async function deleteConversation(slug: string, id: number): Promise<void
   await apiClient.delete(AI_ROUTES.CONVERSATION(slug, id))
 }
 
-/** Ce que « /compact » a fait : les messages condensés dans le résumé de la conversation ; 0 sans rien à condenser. */
+/**
+ * Ce que « /compact » a fait : les messages condensés dans le résumé de la conversation (0 sans rien à condenser), ce résumé,
+ * et ce qui partirait maintenant au modèle, compté par le serveur contre sa fenêtre (TF-J1-15).
+ */
 export interface ConversationCompaction {
   summarized: number
+  summary?: string | null
+  contextTokens?: number
+  contextWindow?: number | null
+  contextEstimated?: boolean
 }
 
 export async function compactConversation(slug: string, id: number): Promise<ConversationCompaction> {
   // Le serveur demande au modèle un résumé : le temps d'une réponse de Cortex, pas celui d'une lecture.
-  const res = await apiClient.post<{ data: ConversationCompaction }>(AI_ROUTES.CONVERSATION_COMPACT(slug, id), undefined, { timeout: AI_TIMEOUT_MS })
+  const res = await apiClient.post<{ data: ConversationCompaction }>(AI_ROUTES.CONVERSATION_COMPACT(slug, id), undefined, { timeout: AI_TIMEOUT_MS, silentError: true })
   return res.data.data
 }

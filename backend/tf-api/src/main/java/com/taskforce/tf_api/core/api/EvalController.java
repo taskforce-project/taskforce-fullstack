@@ -68,6 +68,28 @@ public class EvalController {
             evalService.create(slug, resolveUserId(jwt), body.record(), body.title(), body.criteria())));
     }
 
+    /** « Bien », sous une réponse (R137) : ce qui a été observé devient ce qu'on attend, d'un clic. */
+    @PostMapping("/cases/good")
+    public ResponseEntity<ApiResponse<EvalBankResponse.CaseSummary>> good(
+        @PathVariable String slug, @Valid @RequestBody DraftRequest body, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(evalService.keepGood(slug, resolveUserId(jwt), body.record())));
+    }
+
+    /** « Pas bien », sous une réponse (R137) : une phrase, ce qu'il aurait fallu faire ; le cas attend ses critères. */
+    @PostMapping("/cases/bad")
+    public ResponseEntity<ApiResponse<EvalBankResponse.CaseSummary>> bad(
+        @PathVariable String slug, @Valid @RequestBody BadCaseRequest body, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(evalService.keepBad(slug, resolveUserId(jwt), body.record(), body.expected())));
+    }
+
+    /** Les critères d'un cas qui les attend : une fois, datés maintenant, avant tout rejeu qui le notera (R61). */
+    @PutMapping("/cases/{caseId}/criteria")
+    public ResponseEntity<ApiResponse<EvalBankResponse.CaseSummary>> criteria(
+        @PathVariable String slug, @PathVariable Long caseId, @Valid @RequestBody CriteriaRequest body, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(
+            evalService.giveCriteria(slug, resolveUserId(jwt), caseId, body.title(), body.criteria())));
+    }
+
     @DeleteMapping("/cases/{caseId}")
     public ResponseEntity<ApiResponse<Void>> archive(
         @PathVariable String slug, @PathVariable Long caseId, @AuthenticationPrincipal Jwt jwt) {
@@ -116,6 +138,12 @@ public class EvalController {
 
     public record CaseRequest(@NotBlank @Size(max = 64) String record, @Size(max = 200) String title,
                               @NotNull EvalCriteria criteria) {
+    }
+
+    public record BadCaseRequest(@NotBlank @Size(max = 64) String record, @NotBlank @Size(max = EvalService.MAX_EXPECTED) String expected) {
+    }
+
+    public record CriteriaRequest(@Size(max = 200) String title, @NotNull EvalCriteria criteria) {
     }
 
     public record RunRequest(@Size(max = 128) String model) {

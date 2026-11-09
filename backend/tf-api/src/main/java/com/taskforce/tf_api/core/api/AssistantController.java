@@ -32,6 +32,8 @@ import com.taskforce.tf_api.core.service.agent.QuestionNeeded;
 import com.taskforce.tf_api.core.service.agent.Screen;
 import com.taskforce.tf_api.core.service.agent.TurnInput;
 import com.taskforce.tf_api.core.service.agent.TurnInput.LastCard;
+import com.taskforce.tf_api.core.service.agent.TurnProgress;
+import com.taskforce.tf_api.core.service.agent.TurnProgressPublisher;
 import com.taskforce.tf_api.core.service.ai.AttachedFile;
 import com.taskforce.tf_api.core.service.ai.ChosenModel;
 import com.taskforce.tf_api.core.service.ai.TurnHistory;
@@ -68,6 +70,14 @@ public class AssistantController {
     private final AiConversationService conversationService;
     private final ModelCapabilityService capabilities;
     private final CortexTurns           turns;
+    private final TurnProgressPublisher turnProgress;
+
+    /**
+     * La borne d'un message : elle ne protège que le serveur (R143). Ce qui compte pour la conversation, c'est la fenêtre
+     * du modèle, que la réponse dit quand un message ne la tient pas : 4 000 caractères refusaient le texte de la recette
+     * avant que le budget de la requête le voie, et le front répondait « Sorry, I couldn't answer ».
+     */
+    static final int MAX_MESSAGE = 400_000;
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
@@ -130,7 +140,8 @@ public class AssistantController {
         LastCard lastCard = ProjectCorrection.asks(body.message()) ? conversationService.lastCard(conv.getId()).orElse(null) : null;
         TurnInput input = new TurnInput(body.message(), memory, body.screenOf(), body.attachedOf(), body.filesOf(), conv.getId(),
             project, lastCard);
-        AssistantAnswer answer = ChosenModel.using(chosen, () -> agentService.run(slug, userId, input));
+        AssistantAnswer answer = ChosenModel.using(chosen, () -> TurnProgress.during(turnProgress.sinkFor(userId, conv.getId()),
+            () -> agentService.run(slug, userId, input)));
         boolean stopped = AgentService.STOPPED_MODE.equals(answer.mode());
         // Ce que TaskForce dit sous la réponse : un modèle qui tient une demande trop grande (TF-J1-13), la proposition d'un
         // modèle plus fort, ou la demande envoyée à un autre. Rien sous un tour que la personne a arrêté.
@@ -141,8 +152,12 @@ public class AssistantController {
 
         // Persiste le tour dans la conversation (multi-conversation + historique), avec ce que TaskForce y a dit et ce qu'il
         // a donné à lire au modèle (la ligne grise, R123) : une conversation rouverte se relit pareil, les fichiers joints et
-        // « Stopped by you » compris.
-        conversationService.appendAsked(conv.getId(), body.message(), keptFiles(body.filesOf(), answer));
+        // « Stopped by you » compris. Une demande qui n'a pas tenu la fenêtre reste dans le fil, et le modèle ne la relit pas.
+        if (AssistantAnswer.NOT_SENT.equals(answer.mode())) {
+            conversationService.appendNotSent(conv.getId(), body.message(), keptFiles(body.filesOf(), answer));
+        } else {
+            conversationService.appendAsked(conv.getId(), body.message(), keptFiles(body.filesOf(), answer));
+        }
         conversationService.appendAnswer(conv.getId(),
             notice == null ? answer.answer() : answer.answer() + ModelCapabilityService.block(notice), answer.mode(),
             answer.usage() != null ? answer.usage().totalTokens() : 0, answer.model(), answer.read(), preparedCard(answer));
@@ -233,7 +248,9 @@ public class AssistantController {
      * tel qu'il est ; {@code files} : les fichiers texte joints (R134), cinq au plus, 256 Ko chacun.
      */
     public record AssistantRequest(
-        @NotBlank @Size(max = 4000) String message,
+        @NotBlank
+        @Size(max = MAX_MESSAGE, message = "This message is too long: TaskForce takes 400,000 characters at most. Shorten it, or split it in two.")
+        String message,
         Long conversationId,
         @Valid ScreenRequest screen,
         @Size(max = 128) String model,

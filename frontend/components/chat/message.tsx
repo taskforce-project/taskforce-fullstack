@@ -6,7 +6,7 @@ import { Markdown } from "@/components/ui/lightweight-markdown"
 
 /**
  * Bulle de message générique (user / assistant / system). Le contenu string est rendu en
- * markdown ; sinon, children libres (pour composer Tool/Reasoning/Steps/Sources).
+ * markdown ; sinon, children libres (une réponse et ses cartes, un texte collé replié).
  */
 export type MessageRole = "user" | "assistant" | "system"
 

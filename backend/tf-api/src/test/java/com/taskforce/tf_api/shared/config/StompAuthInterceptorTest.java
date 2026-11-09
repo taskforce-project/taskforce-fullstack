@@ -237,6 +237,9 @@ class StompAuthInterceptorTest {
         @Test
         @DisplayName("🔒 les notifications d'AUTRUI → REFUSÉ (la fuite d'origine)")
         void other_user_notifications_rejected() {
+            assertThatThrownBy(() -> interceptor.preSend(subscribe("/topic/cortex.42", "7"), channel))
+                .isInstanceOf(MessageDeliveryException.class);
+            org.assertj.core.api.Assertions.assertThat(interceptor.preSend(subscribe("/topic/cortex.7", "7"), channel)).isNotNull();
             assertThatThrownBy(() -> interceptor.preSend(subscribe("/topic/notifications.42", "7"), channel))
                 .isInstanceOf(MessageDeliveryException.class);
         }

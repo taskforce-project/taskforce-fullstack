@@ -690,6 +690,55 @@
         }
       }
     },
+    "/api/workspaces/{slug}/evals/cases/{caseId}/criteria": {
+      "put": {
+        "tags": [
+          "Test bank"
+        ],
+        "operationId": "criteria",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CriteriaRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCaseSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/dashboard-cards/reorder": {
       "put": {
         "tags": [
@@ -4058,6 +4107,46 @@
         }
       }
     },
+    "/api/workspaces/{slug}/evals/cases/good": {
+      "post": {
+        "tags": [
+          "Test bank"
+        ],
+        "operationId": "good",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCaseSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/evals/cases/draft": {
       "post": {
         "tags": [
@@ -4091,6 +4180,46 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseDraft"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/evals/cases/bad": {
+      "post": {
+        "tags": [
+          "Test bank"
+        ],
+        "operationId": "bad",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BadCaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCaseSummary"
                 }
               }
             }
@@ -4806,7 +4935,7 @@
         "tags": [
           "AI assistant"
         ],
-        "operationId": "stop",
+        "operationId": "stop_1",
         "parameters": [
           {
             "name": "slug",
@@ -11850,6 +11979,119 @@
           }
         }
       },
+      "CriteriaRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
+          },
+          "criteria": {
+            "$ref": "#/components/schemas/EvalCriteria"
+          }
+        },
+        "required": [
+          "criteria"
+        ]
+      },
+      "EvalCriteria": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string"
+          },
+          "args": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "effect": {
+            "type": "string"
+          },
+          "forbid": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notContains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "honest": {
+            "type": "boolean"
+          },
+          "expected": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseCaseSummary": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CaseSummary"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CaseSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "criteriaAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "mine": {
+            "type": "boolean"
+          },
+          "expected": {
+            "type": "string"
+          },
+          "waiting": {
+            "type": "boolean"
+          }
+        }
+      },
       "ReorderDashboardCardsRequest": {
         "type": "object",
         "properties": {
@@ -15450,94 +15692,6 @@
           "record"
         ]
       },
-      "EvalCriteria": {
-        "type": "object",
-        "properties": {
-          "tool": {
-            "type": "string"
-          },
-          "args": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          "effect": {
-            "type": "string"
-          },
-          "forbid": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "contains": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "notContains": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "honest": {
-            "type": "boolean"
-          }
-        }
-      },
-      "ApiResponseCaseSummary": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/CaseSummary"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "CaseSummary": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "title": {
-            "type": "string"
-          },
-          "question": {
-            "type": "string"
-          },
-          "tool": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "criteriaAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "mine": {
-            "type": "boolean"
-          }
-        }
-      },
       "DraftRequest": {
         "type": "object",
         "properties": {
@@ -15621,6 +15775,25 @@
             "type": "boolean"
           }
         }
+      },
+      "BadCaseRequest": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "expected": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "expected",
+          "record"
+        ]
       },
       "MissionRetryRequest": {
         "type": "object",
@@ -16077,7 +16250,7 @@
         "properties": {
           "message": {
             "type": "string",
-            "maxLength": 4000,
+            "maxLength": 400000,
             "minLength": 0
           },
           "conversationId": {
@@ -16159,6 +16332,20 @@
           "issueId": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "ActRead": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
           }
         }
       },
@@ -16297,6 +16484,25 @@
             "items": {
               "$ref": "#/components/schemas/FileRead"
             }
+          },
+          "notesRead": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoteRead"
+            }
+          },
+          "acts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActRead"
+            }
+          },
+          "workedMs": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "record": {
+            "type": "string"
           }
         }
       },
@@ -16481,6 +16687,18 @@
           "comments": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "NoteRead": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
           }
         }
       },
@@ -17070,6 +17288,24 @@
           "summarized": {
             "type": "integer",
             "format": "int32"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "historyTokens": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contextTokens": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contextWindow": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contextEstimated": {
+            "type": "boolean"
           }
         }
       },
@@ -20166,27 +20402,6 @@
           }
         }
       },
-      "ApiResponseListIssueCommentHitResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/IssueCommentHitResponse"
-            }
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
       "IssueHitResponse": {
         "type": "object",
         "properties": {
@@ -20209,6 +20424,27 @@
           },
           "statusCategory": {
             "type": "string"
+          }
+        }
+      },
+      "ApiResponseListIssueCommentHitResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueCommentHitResponse"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -20729,6 +20965,15 @@
             "items": {
               "$ref": "#/components/schemas/Grade"
             }
+          },
+          "expected": {
+            "type": "string"
+          },
+          "waiting": {
+            "type": "boolean"
+          },
+          "record": {
+            "type": "string"
           }
         }
       },

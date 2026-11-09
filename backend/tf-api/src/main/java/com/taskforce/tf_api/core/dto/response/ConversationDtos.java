@@ -29,6 +29,23 @@ public final class ConversationDtos {
     /** Détail : conversation + messages + empreinte tokens (jauge de contexte) + le projet où elle travaille (R135). */
     public record ConversationDetail(Long id, String title, long totalTokens, List<MessageDto> messages, Long projectId) {}
 
-    /** Ce que « /compact » a fait : les messages condensés dans le résumé ; 0 quand il n'y avait rien à condenser. */
-    public record Compaction(int summarized) {}
+    /**
+     * Ce que « /compact » a fait : les messages condensés dans le résumé (0 quand il n'y avait rien à condenser), ce résumé
+     * tel qu'il se lit sous sa ligne, et ce qu'il reste à envoyer au modèle : l'historique ({@code historyTokens}), compté
+     * tout de suite, et la fenêtre où il tient, pour que la jauge prenne sa nouvelle valeur sans attendre la prochaine
+     * réponse. {@code contextTokens} : tout ce qui partirait maintenant, consignes et outils compris ; la fenêtre est null
+     * quand personne ne la dit.
+     */
+    public record Compaction(int summarized, String summary, int historyTokens, int contextTokens, Integer contextWindow,
+                             boolean contextEstimated) {
+
+        /** Rien à condenser : la jauge garde sa mesure. */
+        public static final Compaction NOTHING = new Compaction(0, null, 0, 0, null, false);
+
+        /** La même compaction, avec tout ce qui partirait maintenant : ce qui part à chaque demande, et ce qu'il reste. */
+        public Compaction withBaseline(int baseline) {
+            return new Compaction(summarized, summary, historyTokens, summarized == 0 ? 0 : baseline + historyTokens, contextWindow,
+                contextEstimated);
+        }
+    }
 }

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 
 import { deletionKey, messagesToTurns, undoKey, useCortexStore } from "./cortex-store";
+import { CONSTANTS_EN } from "@/lib/constants_en";
 import { useIssueStore } from "./issue-store";
 import { useScreenStore } from "./screen-store";
 import {
@@ -79,12 +80,13 @@ describe("useCortexStore : /compact (TF-J1-13)", () => {
     expect(useCortexStore.getState().context).toEqual({ tokens: 3400, window: 8192 });
   });
 
-  it("a refused summary says what the server says, nothing changed", async () => {
-    vi.mocked(compactConversation).mockRejectedValue(httpError(400, { message: "The conversation could not be compacted: nothing changed. Try again." }));
+  it("a refused summary says what the server says, on the line: nothing changed", async () => {
+    vi.mocked(compactConversation).mockRejectedValue(httpError(400, { message: "The model returned no summary, so nothing changed in this conversation. Try again." }));
 
     await expect(useCortexStore.getState().compact("acme")).resolves.toBe(false);
 
-    expect(useCortexStore.getState().turns.at(-1)?.answer?.answer).toContain("could not be compacted");
+    expect(useCortexStore.getState().turns.at(-1)).toMatchObject({ kind: "compact", compacting: false });
+    expect(useCortexStore.getState().turns.at(-1)?.problem).toContain("nothing changed");
     expect(useCortexStore.getState().sentAt).toBeNull();
   });
 
@@ -94,6 +96,47 @@ describe("useCortexStore : /compact (TF-J1-13)", () => {
     await expect(useCortexStore.getState().compact("acme")).resolves.toBe(false);
 
     expect(useCortexStore.getState().turns.at(-1)?.kind).toBe("quota");
+    expect(useCortexStore.getState().turns.at(-1)?.compacting).toBeUndefined();
+  });
+
+  it("a pending line waits where the result will come, and the thread stays whole", async () => {
+    const before = [{ id: "u1", role: "user" as const, text: "Hello" }, { id: "a1", role: "assistant" as const, answer: answer("Hi.") }];
+    useCortexStore.setState({ turns: before, conversationId: 7 });
+    let finish: (done: { summarized: number }) => void = () => {};
+    vi.mocked(compactConversation).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+
+    const compacting = useCortexStore.getState().compact("acme");
+
+    const waiting = useCortexStore.getState().turns;
+    expect(waiting.slice(0, 2)).toEqual(before);
+    expect(waiting[2]).toMatchObject({ kind: "compact", compacting: true });
+
+    finish({ summarized: 4 });
+    await compacting;
+
+    const after = useCortexStore.getState().turns;
+    expect(after).toHaveLength(3);
+    expect(after[2].id).toBe(waiting[2].id);
+    expect(after[2]).toMatchObject({ kind: "compact", compacted: 4, compacting: false });
+  });
+
+  it("the line opens the summary, and the gauge takes its new value at once", async () => {
+    useCortexStore.setState({ conversationId: 7, context: { tokens: 6000, window: 8192 } });
+    vi.mocked(compactConversation).mockResolvedValue({ summarized: 8, summary: "What was said.", contextTokens: 2400, contextWindow: 8192, contextEstimated: true });
+
+    await useCortexStore.getState().compact("acme");
+
+    expect(useCortexStore.getState().turns.at(-1)?.summary).toBe("What was said.");
+    expect(useCortexStore.getState().context).toEqual({ tokens: 2400, window: 8192, estimated: true });
+  });
+
+  it("nothing compacted keeps the gauge", async () => {
+    useCortexStore.setState({ conversationId: 7, context: { tokens: 6000, window: 8192 } });
+    vi.mocked(compactConversation).mockResolvedValue({ summarized: 0 });
+
+    await useCortexStore.getState().compact("acme");
+
+    expect(useCortexStore.getState().context).toEqual({ tokens: 6000, window: 8192 });
   });
 
   it("does nothing while an answer is awaited, or without a workspace", async () => {
@@ -116,11 +159,59 @@ describe("useCortexStore : /compact (TF-J1-13)", () => {
     expect(turns[2].compacted).toBe(0);
   });
 
+  it("a reopened conversation still opens the summary of its compact line, and keeps its record", () => {
+    const [line, said] = messagesToTurns([
+      { id: 2, role: "assistant", content: "What was said.", mode: "compact", totalTokens: 0, createdAt: null },
+      { id: 3, role: "assistant", content: "Zephyr-7.", mode: "fast", totalTokens: 40, createdAt: null, model: "qwen3:8b",
+        read: { issues: [], boards: [], tools: [], notes: 0, record: "r-1" } },
+    ]);
+
+    expect(line.summary).toBe("What was said.");
+    expect(said.answer?.record).toBe("r-1");
+  });
+
   it("the quiet line of a compacted turn is kept with the answer on reopening", () => {
     const read = { issues: [], boards: [], tools: [], notes: 0, context: { summarized: 8, leftOut: 1, toolResults: 0 } };
     const [turn] = messagesToTurns([{ id: 2, role: "assistant", content: "Zephyr-7.", mode: "fast", totalTokens: 40, createdAt: null, model: "qwen3:8b", read }]);
 
     expect(turn.answer?.read?.context).toEqual({ summarized: 8, leftOut: 1, toolResults: 0 });
+  });
+});
+
+describe("useCortexStore : la ligne de travail (R137)", () => {
+  beforeEach(() => {
+    useCortexStore.setState({ ...initial, turns: [], workStep: null, sentAt: null, conversationId: null });
+  });
+
+  const step = (conversationId: number | null, name = "notes") => ({ conversationId, step: name, tool: null });
+
+  it.each([
+    ["an answer awaited, a new conversation", 1, null, step(9), true],
+    ["an answer awaited, this conversation", 1, 9, step(9), true],
+    ["another conversation of the same person", 1, 9, step(10), false],
+    ["no answer awaited", null, 9, step(9), false],
+  ])("%s", (_, sentAt, conversationId, event, taken) => {
+    useCortexStore.setState({ sentAt, conversationId });
+
+    useCortexStore.getState().noteWorkStep(event);
+
+    expect(useCortexStore.getState().workStep).toEqual(taken ? event : null);
+  });
+
+  it("the line starts empty for each answer, and ends with it", async () => {
+    let finish: (value: never) => void = () => {};
+    vi.mocked(sendAgentMessage).mockReturnValue(new Promise((resolve) => { finish = resolve as never; }));
+    useCortexStore.setState({ workStep: step(1), draft: "Hello there" });
+
+    const sending = useCortexStore.getState().send("acme");
+    expect(useCortexStore.getState().workStep).toBeNull();
+
+    useCortexStore.getState().noteWorkStep(step(null, "thinking"));
+    expect(useCortexStore.getState().workStep?.step).toBe("thinking");
+
+    finish({ conversationId: 3, title: "t", answer: answer("Done.") } as never);
+    await sending;
+    expect(useCortexStore.getState().workStep).toBeNull();
   });
 });
 
@@ -205,7 +296,8 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
   it.each([
     [409, {}, { kind: "quota" }],
     [429, { error: "AI Rate Limited", message: "Too many AI requests: wait 40 s." }, { answer: { answer: "Too many AI requests: wait 40 s." } }],
-    [500, {}, { answer: { answer: "Sorry, I couldn't answer. Please try again." } }],
+    [500, {}, { answer: { answer: CONSTANTS_EN.thread.failServer } }],
+    [400, { message: "Invalid input data", validationErrors: { message: ["This message is too long."] } }, { answer: { answer: "This message is too long." } }],
   ])("answers a refusal of the server (%i) in the conversation", async (status, data, expected) => {
     vi.mocked(sendAgentMessage).mockRejectedValue(httpError(status, data));
     useCortexStore.getState().setDraft("Summarize the decisions");

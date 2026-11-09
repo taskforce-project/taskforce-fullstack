@@ -66,6 +66,7 @@ class AiControllersWebMvcTest {
     @MockitoBean private AnalysisJobService analysisJobService;
     @MockitoBean private AnalysisJobRunner analysisJobRunner;
     @MockitoBean private AiConversationService aiConversationService;
+    @MockitoBean private com.taskforce.tf_api.core.service.agent.AgentService agentService;
     @MockitoBean private com.taskforce.tf_api.core.service.agent.ModelCapabilityService modelCapabilityService;
     @MockitoBean private BrainAccessGuard brainAccessGuard;
     @MockitoBean private UserRepository userRepository;
@@ -149,12 +150,16 @@ class AiControllersWebMvcTest {
         java.util.concurrent.atomic.AtomicReference<String> model = new java.util.concurrent.atomic.AtomicReference<>();
         when(aiConversationService.compact(5L, 7L)).thenAnswer(call -> {
             model.set(com.taskforce.tf_api.core.service.ai.ChosenModel.current().orElse(null));
-            return 12;
+            return new com.taskforce.tf_api.core.dto.response.ConversationDtos.Compaction(12, "A summary.", 900, 0, 16_384, false);
         });
+        when(agentService.baselineTokens()).thenReturn(3_100);
 
         mockMvc.perform(post("/api/workspaces/acme/ai/conversations/5/compact").with(auth()))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.summarized").value(12));
+            .andExpect(jsonPath("$.data.summarized").value(12))
+            .andExpect(jsonPath("$.data.summary").value("A summary."))
+            .andExpect(jsonPath("$.data.contextTokens").value(4_000))
+            .andExpect(jsonPath("$.data.contextWindow").value(16_384));
         org.assertj.core.api.Assertions.assertThat(model.get()).isEqualTo("qwen3:14b");
     }
 

@@ -21,6 +21,18 @@ const TABLE = { current: "qwen3:8b" } as ModelCapabilityTable
 
 /** Comment Cortex fait dans le temps (R61, R118, R125) : la banque par modèle et par date, et sa courbe. */
 describe("BankHistory", () => {
+  it("does not replay a case that waits for its criteria (R61, R137)", () => {
+    useEvalStore.setState({
+      history: { runs: [], cases: [{ ...CASES[0], waiting: true, expected: "Ask first." }] },
+      progress: null, error: null, fetchHistory: vi.fn(), runBank: vi.fn(), stopRun: vi.fn(),
+    })
+    useModelCapabilityStore.setState({ table: TABLE, fetchTable: vi.fn(), progress: null })
+
+    render(<BankHistory slug="acme" />)
+
+    expect(screen.getByRole("button", { name: /Replay 0 cases/ })).toBeDisabled()
+  })
+
   const fetchHistory = vi.fn()
   const fetchTable = vi.fn()
   const runBank = vi.fn()
@@ -126,7 +138,7 @@ describe("BankHistory", () => {
 
     useEvalStore.setState({ history: { runs: [], cases: [] }, historyFailed: false })
     rerender(<BankHistory slug="acme" />)
-    expect(screen.getByText("No test case yet: under an answer of Cortex, choose Add to test bank.")).toBeInTheDocument()
+    expect(screen.getByText("No test case yet: under an answer of Cortex, choose good or bad.")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /Replay/ })).not.toBeInTheDocument()
   })
 })
