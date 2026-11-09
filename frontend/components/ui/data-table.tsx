@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
+import { useElementWidth } from "@/hooks/use-element-width"
 import { usePagination } from "@/hooks/use-pagination"
 import { cn } from "@/lib/utils"
 
@@ -32,6 +33,13 @@ export interface DataTableColumn<T> {
   readonly render: (row: T) => React.ReactNode
   /** Si fourni → colonne triable (valeur de comparaison). */
   readonly sortValue?: (row: T) => string | number
+  /**
+   * Dans un volet étroit, le tableau devient une liste (R141) : ce que la colonne met sur la ligne. Sans, elle n'y est
+   * pas ; elle revient en pleine largeur.
+   */
+  readonly listCell?: (row: T) => React.ReactNode
+  /** La colonne qui prend la place qui reste sur la ligne (la phrase). */
+  readonly listGrow?: boolean
 }
 
 interface DataTableProps<T> {
@@ -51,6 +59,11 @@ interface DataTableProps<T> {
   readonly emptyMessage?: React.ReactNode
   readonly className?: string
 }
+
+/** Sous cette largeur, un tableau devient une liste (R141 : aucun tableau dans un volet de moins de 720 px). */
+const LIST_UNDER = 720
+/** Une liste montre tout jusque-là : pas de pagination sous quelques dizaines de lignes. */
+const LIST_WHOLE = 50
 
 const alignClass = (a?: "left" | "right" | "center") =>
   a === "right" ? "text-right" : a === "center" ? "text-center" : ""
@@ -86,7 +99,13 @@ export function DataTable<T>({
     })
   }, [data, sort, columns])
 
-  const paginate = pageSize > 0
+  const box = React.useRef<HTMLDivElement>(null)
+  const width = useElementWidth(box)
+  // Un tableau ne tient pas dans un volet à côté de la conversation (R141) : une ligne par chose, sans en-tête, et pas de
+  // pagination sous quelques dizaines de lignes. En pleine largeur, le tableau revient, avec son tri.
+  const asList = width > 0 && width < LIST_UNDER && columns.some((c) => c.listCell)
+
+  const paginate = pageSize > 0 && !(asList && sorted.length <= LIST_WHOLE)
   const { page, setPage, pageSize: ps, setPageSize, pageCount, pageItems, total } = usePagination(sorted, pageSize || 25)
   const rows = paginate ? pageItems : sorted
 
@@ -95,8 +114,54 @@ export function DataTable<T>({
       s?.key !== key ? { key, dir: "asc" } : s.dir === "asc" ? { key, dir: "desc" } : null
     )
 
+  if (asList) {
+    return (
+      <div ref={box} className={className}>
+        {rows.length === 0 ? (
+          <p className="px-2.5 py-2 text-sm text-muted-foreground">{emptyMessage}</p>
+        ) : (
+          <ul className="flex flex-col">
+            {rows.map((row) => {
+              const clickable = Boolean(onRowClick) && (isRowClickable?.(row) ?? true)
+              return (
+                <li
+                  key={rowKey(row)}
+                  role={clickable ? "button" : undefined}
+                  tabIndex={clickable ? 0 : undefined}
+                  onClick={clickable ? () => onRowClick?.(row) : undefined}
+                  onKeyDown={clickable ? (e) => { if (e.key === "Enter") onRowClick?.(row) } : undefined}
+                  className={cn(
+                    "flex h-9 items-center gap-2 rounded-md px-2.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
+                    clickable && "cursor-pointer hover:bg-muted",
+                  )}
+                >
+                  {columns.filter((col) => col.listCell).map((col) => (
+                    <span key={col.key} className={cn("min-w-0", col.listGrow ? "flex-1 truncate" : "shrink-0")}>
+                      {col.listCell?.(row)}
+                    </span>
+                  ))}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {paginate && (
+          <DataTablePagination
+            page={page}
+            pageCount={pageCount}
+            pageSize={ps}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            pageSizes={pageSizes}
+          />
+        )}
+      </div>
+    )
+  }
+
   return (
-    <div className={cn("overflow-hidden rounded-xl border border-border bg-card shadow-sm", className)}>
+    <div ref={box} className={cn("overflow-hidden rounded-xl border border-border bg-card shadow-sm", className)}>
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>

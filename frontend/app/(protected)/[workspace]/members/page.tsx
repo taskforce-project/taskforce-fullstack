@@ -206,7 +206,7 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Invite member</DialogTitle>
           <DialogDescription>
@@ -532,6 +532,21 @@ export default function MembersPage() {
       icon: <User className="size-3.5" />,
       className: "min-w-[200px]",
       sortValue: (m) => (m.displayName ?? m.email).toLowerCase(),
+      listGrow: true,
+      listCell: (m) => {
+        const label = m.displayName ?? m.email
+        return (
+          <span className="flex min-w-0 items-center gap-2">
+            <UserAvatar email={m.email} name={label} avatarUrl={m.avatarUrl} className="size-5 shrink-0" fallbackClassName="text-[8px] font-semibold" />
+            {slug ? (
+              <Link href={`/${slug}/members/${m.id}`} className="truncate hover:underline">{label}</Link>
+            ) : (
+              <span className="truncate">{label}</span>
+            )}
+            {String(m.userId) === String(currentUser?.id) && <span className="shrink-0 text-xs text-muted-foreground">(you)</span>}
+          </span>
+        )
+      },
       render: (m) => {
         const profile = profilesByUser[m.userId]
         const isYou = String(m.userId) === String(currentUser?.id)
@@ -562,6 +577,7 @@ export default function MembersPage() {
       icon: <Shield className="size-3.5" />,
       className: "w-32",
       sortValue: (m) => ROLE_RANK[m.role],
+      listCell: (m) => <span className="text-xs text-muted-foreground">{ROLE_CONFIG[m.role].label}</span>,
       render: (m) => {
         const role = ROLE_CONFIG[m.role]
         return (
@@ -635,6 +651,14 @@ export default function MembersPage() {
       align: "right",
       className: "w-12",
       render: (m) => (
+        <MemberActions
+          member={m}
+          isYou={String(m.userId) === String(currentUser?.id)}
+          canManage={canManage}
+          isOwner={isOwner}
+        />
+      ),
+      listCell: (m) => (
         <MemberActions
           member={m}
           isYou={String(m.userId) === String(currentUser?.id)}

@@ -40,20 +40,21 @@ describe("waitingItems", () => {
       7, t,
     )
 
-    expect(items).toEqual([
+    expect(items).toHaveLength(3)
+    expect(items).toMatchObject([
       {
         id: "approval:9", kind: "approval", label: "OPS-12 Fix the footer",
         name: "Approve or refuse 3 requests: OPS-12 Fix the footer", count: 3,
-        issue: { projectId: 3, issueId: 12 }, href: null, signalId: null,
+        issue: { projectId: 3, issueId: 12 }, href: null, signalId: null, key: "OPS-12", title: "Fix the footer", at: null,
       },
       {
         id: "approval:10", kind: "approval", label: "OPS-13 Ship it",
         name: "Approve or refuse: OPS-13 Ship it", count: 1,
-        issue: { projectId: 3, issueId: 13 }, href: null, signalId: null,
+        issue: { projectId: 3, issueId: 13 }, href: null, signalId: null, key: "OPS-13", title: "Ship it",
       },
       {
         id: "run:1", kind: "result", label: "OPS-1 Fix login", name: "Review the result on OPS-1 Fix login", count: 1,
-        issue: { projectId: 3, issueId: 1 }, href: null, signalId: null,
+        issue: { projectId: 3, issueId: 1 }, href: null, signalId: null, key: "OPS-1", title: "Fix login",
       },
     ])
   })
@@ -70,7 +71,8 @@ describe("mentionItems", () => {
   it("une ligne par mention non lue, qui mène à son issue ; lue, elle n'y est plus", () => {
     expect(mentionItems([signal({}), signal({ id: "s2", read: true }), signal({ id: "s3", type: "assigned" })], t)).toEqual([{
       id: "signal:s1", kind: "mention", label: "OPS-12 Fix the footer", name: "Mentioned you: OPS-12 Fix the footer", count: 1,
-      issue: { projectId: 3, issueId: 12 }, href: null, signalId: "s1",
+      issue: { projectId: 3, issueId: 12 }, href: null, signalId: "s1", key: "OPS-12", title: "Fix the footer",
+      at: "2026-11-08T10:00:00", who: null,
     }])
   })
 

@@ -120,7 +120,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Readonly<{ open: b
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Building2 className="size-5" />

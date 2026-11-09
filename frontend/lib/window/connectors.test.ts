@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest"
 
 import type { ConnectorView, IntegrationCatalog, McpServerStatus } from "@/lib/api/integration-service"
-import { connectorLines } from "./connectors"
+import { CONSTANTS_EN } from "@/lib/constants_en"
+import { connectorLines, connectorsSummary } from "./connectors"
 
 function tool(key: string, name: string, connected: boolean): ConnectorView {
   return {
@@ -35,5 +36,22 @@ describe("connectorLines", () => {
   it("ne montre rien sans connecteur connecté", () => {
     expect(connectorLines({ total: 1, connected: 0, categories: [{ category: "DEV", label: "Dev", tools: [tool("github", "GitHub", false)] }] }, []))
       .toEqual([])
+  })
+})
+
+/** D'un regard (R141) : ce qui demande un geste d'abord, sinon ce qui est branché. */
+describe("connectorsSummary", () => {
+  const t = CONSTANTS_EN.rail.connectors
+  const line = (name: string, reconnect = false) => ({ key: name, name, reconnect })
+
+  it.each([
+    [[], "None yet"],
+    [[line("GitHub")], "GitHub"],
+    [[line("GitHub"), line("Slack")], "GitHub and Slack"],
+    [[line("GitHub"), line("Slack"), line("Notion"), line("Figma")], "GitHub, Slack and 2 more"],
+    [[line("Notion", true), line("GitHub")], "Notion needs reconnecting"],
+    [[line("Notion", true), line("Slack", true), line("GitHub")], "2 need reconnecting"],
+  ])("%j : %s", (lines, sentence) => {
+    expect(connectorsSummary(lines, t)).toBe(sentence)
   })
 })
