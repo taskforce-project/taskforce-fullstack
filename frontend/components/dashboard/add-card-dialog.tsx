@@ -111,7 +111,7 @@ export function AddCardDialog({ slug, open, onOpenChange }: AddCardDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add a card</DialogTitle>
           <DialogDescription>
@@ -119,48 +119,45 @@ export function AddCardDialog({ slug, open, onOpenChange }: AddCardDialogProps) 
           </DialogDescription>
         </DialogHeader>
 
-        {/* Types du registre */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {/* Types du registre : une ligne par carte, une colonne (R133). */}
+        <div className="flex flex-col">
           {pickable.map((def) => (
             <button
               key={def.type}
               type="button"
               onClick={() => void handleAddType(def)}
               disabled={pending !== null}
-              className={cn(
-                "flex flex-col gap-1.5 rounded-lg border border-border p-3 text-left transition-colors",
-                "hover:border-primary/40 hover:bg-muted/40 disabled:pointer-events-none disabled:opacity-60",
-              )}
+              title={def.description}
+              className="flex h-9 items-center gap-2 rounded-md px-2 text-left text-sm transition-colors duration-150 hover:bg-muted disabled:pointer-events-none disabled:opacity-60 motion-reduce:transition-none"
             >
-              <span className="flex items-center gap-2 text-sm font-medium">
-                {pending === def.type ? (
-                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                ) : (
-                  <def.icon className="size-4 text-muted-foreground" />
-                )}
-                {def.label}
-              </span>
-              <span className="line-clamp-2 text-[11px] leading-snug text-muted-foreground">{def.description}</span>
+              {pending === def.type ? (
+                <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+              ) : (
+                <def.icon className="size-4 shrink-0 text-muted-foreground" />
+              )}
+              <span className="shrink-0 font-medium">{def.label}</span>
+              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{def.description}</span>
             </button>
           ))}
         </div>
 
-        {/* Génération IA */}
+        {/* Génération IA : le libellé au-dessus du champ, l'action dessous, à droite. */}
         <div className="space-y-2 border-t border-border pt-4">
-          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            <Sparkles className="size-3 text-primary" /> Ask AI
-          </p>
-          <div className="flex gap-2">
-            <Textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="e.g. issue breakdown by priority"
-              rows={2}
-              className="min-h-0 flex-1 resize-none text-sm"
-            />
+          <label htmlFor="add-card-prompt" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Sparkles className="size-3 text-primary" aria-hidden="true" /> Ask AI
+          </label>
+          <Textarea
+            id="add-card-prompt"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="e.g. issue breakdown by priority"
+            rows={2}
+            className="min-h-0 w-full resize-none text-sm"
+          />
+          <div className="flex justify-end">
             <Button
               size="sm"
-              className="h-auto shrink-0 gap-1.5 self-stretch px-3"
+              className="gap-1.5"
               onClick={() => void handleGenerate()}
               disabled={!prompt.trim() || generating}
             >
@@ -198,8 +195,8 @@ export function AddCardDialog({ slug, open, onOpenChange }: AddCardDialogProps) 
         {/* Graphes déjà épinglés dans Intelligence */}
         {saved.length > 0 && (
           <div className="space-y-2 border-t border-border pt-4">
-            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              <Pin className="size-3" /> My pinned charts
+            <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Pin className="size-3" aria-hidden="true" /> My pinned charts
             </p>
             <div className="max-h-40 space-y-0.5 overflow-y-auto">
               {saved.map((chart) => (

@@ -21,7 +21,7 @@ export interface ListRowAction {
  * (un écran tactile), elles prennent leur place pour de bon. Le nom complet s'affiche au survol et pour les lecteurs
  * d'écran (R129).
  */
-export function ListRow({ icon: Icon, tone, name, hint, sentence, unread, unreadLabel, code, time, onOpen, actions = [] }: Readonly<{
+export function ListRow({ icon: Icon, tone, name, hint, sentence, unread, unreadLabel, quiet, code, time, onOpen, actions = [] }: Readonly<{
   icon: LucideIcon
   /** La couleur de l'icône. */
   tone?: string
@@ -30,9 +30,11 @@ export function ListRow({ icon: Icon, tone, name, hint, sentence, unread, unread
   /** Le détail au survol, quand il y en a plus que le nom. */
   hint?: ReactNode
   sentence: string
-  /** Non lue : un point, et la phrase en clair. */
+  /** Non lue : un point, et la phrase en gras. */
   unread?: boolean
   unreadLabel?: string
+  /** Déjà vue : la phrase s'efface, la ligne reste. */
+  quiet?: boolean
   /** La clé de l'issue (« OPS-35 »). */
   code?: string | null
   time?: string | null
@@ -46,7 +48,7 @@ export function ListRow({ icon: Icon, tone, name, hint, sentence, unread, unread
         <span className="absolute left-0.5 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-primary" role="img" aria-label={unreadLabel} />
       )}
       <Icon className={cn("size-4 shrink-0", tone ?? "text-muted-foreground")} aria-hidden="true" />
-      <span className={cn("min-w-0 flex-1 truncate", unread ? "font-medium text-foreground" : "text-muted-foreground")}>{sentence}</span>
+      <span className={cn("min-w-0 flex-1 truncate", quiet ? "text-muted-foreground" : "text-foreground", unread && "font-medium")}>{sentence}</span>
       {(code || time) && (
         <span className={cn("flex shrink-0 items-center gap-3 text-xs text-muted-foreground", actions.length > 0 && "[@media(hover:none)]:hidden")}>
           {code && <span className="font-mono">{code}</span>}
@@ -73,13 +75,14 @@ export function ListRow({ icon: Icon, tone, name, hint, sentence, unread, unread
         <TooltipContent className="max-w-80">{hint ?? name}</TooltipContent>
       </Tooltip>
       {actions.length > 0 && (
-        <div className="absolute inset-y-0 right-0 flex items-center gap-0.5 rounded-r-md bg-gradient-to-l from-muted from-90% to-transparent pl-8 pr-1 opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 group-focus-within/row:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100">
+        // Le fond laisse passer les clics : seul un bouton capte le sien, le reste de la ligne l'ouvre toujours.
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center gap-0.5 rounded-r-md bg-gradient-to-l from-muted from-90% to-transparent pl-8 pr-1 opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 group-focus-within/row:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100">
           {actions.map((action) => (
             <button
               key={action.label}
               type="button"
               onClick={action.run}
-              className="h-7 shrink-0 rounded-md px-2 text-xs text-muted-foreground transition-colors duration-150 hover:bg-background hover:text-foreground motion-reduce:transition-none"
+              className="pointer-events-auto h-7 shrink-0 rounded-md px-2 text-xs text-muted-foreground transition-colors duration-150 hover:bg-background hover:text-foreground motion-reduce:transition-none"
             >
               {action.label}
             </button>

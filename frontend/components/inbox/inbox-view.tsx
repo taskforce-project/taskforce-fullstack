@@ -179,6 +179,7 @@ export function InboxView({ show = "all" }: Readonly<{ show?: InboxShow }>) {
         sentence={sentence}
         unread={!s.read}
         unreadLabel={t.unread}
+        quiet={s.read}
         code={s.type === "overload" ? null : s.issueId}
         time={s.timestamp}
         onOpen={opens ? () => openSignal(s) : undefined}

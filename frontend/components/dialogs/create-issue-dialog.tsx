@@ -243,30 +243,38 @@ export function CreateIssueDialog({
         )}
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent size="lg" className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create issue</DialogTitle>
           <DialogDescription className="sr-only">Fill in the details to create a new issue.</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-5 py-2">
-          {/* Title */}
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Issue title…"
-            className="h-control-lg text-base font-medium"
-            autoFocus
-            onKeyDown={(e) => e.key === "Enter" && title.trim() && handleCreate()}
-          />
+          {/* Title : les libellés au-dessus des champs (R133). */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="issue-title" className="text-xs font-medium text-muted-foreground">Title</label>
+            <Input
+              id="issue-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Issue title…"
+              className="h-control-lg text-base font-medium"
+              autoFocus
+              onKeyDown={(e) => e.key === "Enter" && title.trim() && handleCreate()}
+            />
+          </div>
 
           {/* Description */}
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add description, acceptance criteria, or context…"
-            className="w-full rounded-lg border border-border bg-muted/20 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-[100px]"
-          />
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="issue-description" className="text-xs font-medium text-muted-foreground">Description</label>
+            <textarea
+              id="issue-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Add description, acceptance criteria, or context…"
+              className="w-full rounded-lg border border-border bg-muted/20 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-[100px]"
+            />
+          </div>
 
           {/* Metadata row */}
           <div className="flex flex-wrap gap-2">

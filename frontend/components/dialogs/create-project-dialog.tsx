@@ -352,7 +352,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create project</DialogTitle>
           <DialogDescription>
@@ -400,22 +400,23 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
 
         {mode === "blank" ? (
           <div className="flex flex-col gap-5 py-2">
-            {/* Icon + Name row */}
-            <div className="flex items-end gap-4">
+            {/* Icon, then Name: one column (R133). */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium text-foreground">Icon</span>
               <ProjectIconPicker value={iconUrl} onChange={setIconUrl} />
+            </div>
 
-              <div className="flex-1 flex flex-col gap-1.5 pb-0.5">
-                <label htmlFor="project-name" className="text-sm font-medium text-foreground">Project name</label>
-                <Input
-                  id="project-name"
-                  value={name}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="My New Project"
-                  className="h-control"
-                  autoFocus
-                  onKeyDown={(e) => e.key === "Enter" && name.trim() && identifier.trim() && handleCreate()}
-                />
-              </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="project-name" className="text-sm font-medium text-foreground">Project name</label>
+              <Input
+                id="project-name"
+                value={name}
+                onChange={(e) => handleNameChange(e.target.value)}
+                placeholder="My New Project"
+                className="h-control"
+                autoFocus
+                onKeyDown={(e) => e.key === "Enter" && name.trim() && identifier.trim() && handleCreate()}
+              />
             </div>
 
             {/* Identifier */}
@@ -500,14 +501,14 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                   </div>
 
                   {repoMode === "create" && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-1.5">
                       <Input
                         value={repoName}
                         onChange={(e) => setRepoName(e.target.value.replaceAll(/\s+/g, "-"))}
                         placeholder="my-repo"
                         className="h-control font-mono"
                       />
-                      <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
+                      <label className="flex w-fit items-center gap-1.5 text-xs text-muted-foreground">
                         <input type="checkbox" checked={repoPrivate} onChange={(e) => setRepoPrivate(e.target.checked)} />
                         Private
                       </label>
@@ -583,27 +584,29 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-3 gap-2">
+                {/* Une ligne par outil, une colonne (R133). */}
+                <div className="flex flex-col">
                   {tools.map((t) => {
                     const selected = importSource === t.key
                     return (
                       <button
                         key={t.key}
                         type="button"
+                        aria-pressed={selected}
                         disabled={connectingKey !== null && connectingKey !== t.key}
                         onClick={() => (t.connected ? setImportSource(selected ? "" : t.key) : handleConnect(t))}
                         className={cn(
-                          "flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-colors",
-                          selected ? "border-primary bg-primary/5" : "border-border hover:bg-accent",
+                          "flex h-9 items-center gap-2 rounded-md px-2 text-left transition-colors duration-150 motion-reduce:transition-none",
+                          selected ? "bg-primary/5 ring-1 ring-primary/40" : "hover:bg-muted",
                           connectingKey !== null && connectingKey !== t.key && "opacity-50",
                         )}
                       >
-                        <BrandLogo slug={t.key} name={t.name} className="size-7" />
-                        <span className="text-[12.5px] font-medium text-foreground">{t.name}</span>
+                        <BrandLogo slug={t.key} name={t.name} className="size-4 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate text-sm text-foreground">{t.name}</span>
                         {t.connected ? (
-                          <span className="text-[10px] font-medium text-ink-green">Connected</span>
+                          <span className="shrink-0 text-xs text-ink-green">Connected</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary">
+                          <span className="inline-flex shrink-0 items-center gap-1 text-xs text-primary">
                             {connectingKey === t.key ? (
                               <Loader2 className="size-3 animate-spin" />
                             ) : (
