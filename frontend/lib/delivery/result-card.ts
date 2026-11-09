@@ -108,7 +108,7 @@ export function changedNothing(run: Pick<DeliveryRun, "resultUrl" | "branch" | "
   return !pullRequestOf(run.resultUrl) && !(run.branch && run.commits);
 }
 
-/** L'agent à l'essai de R51 : la boucle de TaskForce sur un modèle, qui répond en commentaire. */
+/** L'agent à l'essai de R51 : la boucle de TaskForce sur un modèle, qui répond en commentaire. À l'écran, c'est Cortex (R144). */
 export const TRIAL_AGENT = "taskforce-agent";
 
 /** La phrase du résultat : la pull request, sinon la branche, sinon le commentaire de l'agent à l'essai, sinon rien. */
@@ -119,9 +119,10 @@ export function resultLine(run: DeliveryRun, t: ResultTexts): string {
   return run.providerKey === TRIAL_AGENT ? t.answeredInComment : t.noChange;
 }
 
-/** Le nom de l'agent d'une mission : son modèle pour l'agent à l'essai, qui répond sous ce nom ; sinon {@code fallback}. */
+/** Le nom de l'agent d'une mission : Cortex suivi de son modèle pour l'agent de TaskForce (R144) ; sinon {@code fallback}. */
 export function missionAgentName(run: Pick<DeliveryRun, "providerKey" | "model">, fallback: string): string {
-  return run.providerKey === TRIAL_AGENT && run.model ? run.model : fallback;
+  if (run.providerKey !== TRIAL_AGENT) return fallback;
+  return run.model ? `Cortex · ${run.model}` : "Cortex";
 }
 
 export { fill as fillText };

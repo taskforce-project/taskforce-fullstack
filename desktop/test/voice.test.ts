@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -91,6 +91,7 @@ describe("Voice", () => {
 
   /** Le modèle déjà téléchargé et vérifié. */
   function installed(id = "test-model") {
+    mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "tokens.txt"), TOKENS);
     writeFileSync(join(dir, "encoder.onnx"), ENCODER);
     writeFileSync(join(dir, "verified.json"), JSON.stringify({ id }));
@@ -125,7 +126,7 @@ describe("Voice", () => {
       assert.deepEqual(readFileSync(join(dir, "encoder.onnx")), ENCODER);
       assert.equal(existsSync(join(dir, "encoder.onnx.part")), false);
       assert.deepEqual(await voice.status(), { state: "ready", bytes: TOKENS.length + ENCODER.length });
-      await new Promise((resolve) => setImmediate(resolve));
+      for (let i = 0; i < 300 && seen.at(-1)?.state !== "ready"; i++) await new Promise((resolve) => setTimeout(resolve, 10));
       assert.equal(seen[0]?.state, "downloading");
       assert.equal(seen.at(-1)?.state, "ready");
     });
@@ -141,6 +142,79 @@ describe("Voice", () => {
       assert.equal((await voice.status()).state, "downloading");
       await first;
       assert.equal(calls.length, 2);
+    });
+
+    describe("prepared by itself, a little after the app opens", () => {
+      const until = async (condition: () => boolean) => {
+        for (let i = 0; i < 300 && !condition(); i++) await new Promise((resolve) => setTimeout(resolve, 10));
+        assert.equal(condition(), true);
+      };
+
+      it("downloads the missing model, with nothing to validate", async () => {
+        const { fetchImpl, calls } = server();
+        const voice = new Voice({ dir, spawn, fetchImpl, model: model(), backgroundRate: 1_000_000_000 });
+
+        voice.prepareInBackground(5);
+
+        await until(() => existsSync(join(dir, "verified.json")));
+        assert.equal(calls.length, 2);
+        assert.equal((await voice.status()).state, "ready");
+      });
+
+      it("leaves a model already here alone", async () => {
+        installed();
+        const { fetchImpl, calls } = server();
+        const voice = new Voice({ dir, spawn, fetchImpl, model: model() });
+
+        voice.prepareInBackground(1);
+        await new Promise((resolve) => setTimeout(resolve, 40));
+
+        assert.equal(calls.length, 0);
+      });
+
+      it("does not try again by itself after a failure: the next start will", async () => {
+        const { fetchImpl, calls } = server({ status: 503 });
+        const voice = new Voice({ dir, spawn, fetchImpl, model: model(), backgroundRate: 1_000_000_000 });
+
+        voice.prepareInBackground(1);
+        await until(() => calls.length === 1);
+        await new Promise((resolve) => setTimeout(resolve, 40));
+
+        assert.equal(calls.length, 1);
+        assert.equal((await voice.status()).state, "missing");
+      });
+
+      it("holds its pace in the background", async () => {
+        const { fetchImpl } = server();
+        const rate = Math.ceil((TOKENS.length + ENCODER.length) / 0.3);
+        const voice = new Voice({ dir, spawn, fetchImpl, model: model(), backgroundRate: rate });
+        const started = Date.now();
+
+        voice.prepareInBackground(0);
+        await until(() => existsSync(join(dir, "verified.json")));
+
+        assert.ok(Date.now() - started >= 250, `took ${Date.now() - started} ms`);
+      });
+
+      it("a click on the microphone joins it and lifts the pace: the person is waiting", async () => {
+        const { fetchImpl, calls } = server();
+        const voice = new Voice({ dir, spawn, fetchImpl, model: model(), backgroundRate: 10 });
+
+        const background = voice.download(true);
+        await until(() => calls.length === 1);
+        const clicked = voice.download();
+
+        assert.equal(clicked, background);
+        assert.deepEqual(await clicked, { ok: true, value: undefined });
+        assert.equal(calls.length, 2);
+      });
+
+      it("does not hold back a download the person asked for", async () => {
+        const { fetchImpl } = server();
+        const voice = new Voice({ dir, spawn, fetchImpl, model: model(), backgroundRate: 10 });
+
+        assert.deepEqual(await voice.download(), { ok: true, value: undefined });
+      });
     });
 
     it("throws away a file whose checksum is wrong and says so", async () => {

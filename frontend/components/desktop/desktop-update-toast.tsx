@@ -38,6 +38,12 @@ function DownloadProgress({ percent, t }: Readonly<{ percent: number; t: Texts }
 export function showUpdateState(state: DesktopUpdateState, install: () => void, retry: () => void): void {
   const t = usePreferencesStore.getState().t.desktopUpdate
   switch (state.status) {
+    case "installed":
+      toast.success(fillText(t.installed, { version: state.version }), {
+        id: TOAST_ID,
+        description: fillText(t.installedHint, { from: state.from }),
+      })
+      break
     case "downloading":
       toast.loading(fillText(t.downloading, { version: state.version }), {
         id: TOAST_ID,
