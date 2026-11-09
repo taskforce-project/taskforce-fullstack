@@ -21,6 +21,20 @@ export interface ProcOptions {
   onStdoutLine?: (line: string) => void;
   /** Arrête le processus et ses descendants quand le signal est levé. */
   signal?: AbortSignal;
+  /**
+   * L'entrée reste ouverte : l'appelant y écrit encore pendant que le processus travaille, et la ferme lui-même (une
+   * correction de la personne, à l'étape suivante de l'agent, R140). Sans cela, `input` part et l'entrée se ferme.
+   */
+  onStdin?: (stdin: StdinChannel) => void;
+  /** Rendre stdout tel quel : `runOrThrow` le rogne sinon, or une sortie `-z` ou un patch ont du sens jusqu'au bout. */
+  raw?: boolean;
+}
+
+/** L'entrée d'un processus qui travaille encore. */
+export interface StdinChannel {
+  /** `false` si l'entrée est déjà fermée. */
+  write(text: string): boolean;
+  end(): void;
 }
 
 /**
@@ -158,6 +172,23 @@ function spawnCollect(file: string, finalArgs: string[], verbatim: boolean, opti
       resolvePromise({ code, stdout, stderr, timedOut, aborted });
     });
 
+    if (options.onStdin) {
+      let open = true;
+      // Le processus peut partir pendant une écriture : l'erreur de tube ne doit pas faire tomber le runner.
+      child.stdin.on("error", () => { open = false; });
+      options.onStdin({
+        write: (text) => {
+          if (!open) return false;
+          child.stdin.write(text);
+          return true;
+        },
+        end: () => {
+          if (open) child.stdin.end();
+          open = false;
+        },
+      });
+      return;
+    }
     if (options.input !== undefined) child.stdin.write(options.input);
     child.stdin.end();
   });
@@ -170,5 +201,5 @@ export async function runOrThrow(command: string, args: string[], options: ProcO
     const detail = (result.stderr || result.stdout).trim().split(/\r?\n/).slice(-5).join(" | ");
     throw new Error(`${command} ${args.slice(0, 3).join(" ")} failed (code ${result.code}): ${detail}`);
   }
-  return result.stdout.trim();
+  return options.raw ? result.stdout : result.stdout.trim();
 }
