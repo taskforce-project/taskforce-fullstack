@@ -65,6 +65,8 @@ function testsCheck(run: DeliveryRun, t: ResultTexts): Check {
   const tests = run.tests;
   if (!tests) return { label: t.noTestCommand, value: "", ok: null };
   if (!tests.ran) return { label: t.testsNotRun, value: t.testsNotRunValue, ok: false };
+  // Un fichier remis comme avant après leur passage : leur résultat porte sur une version qui n'existe plus (R139).
+  if (tests.stale) return { label: t.testsStale, value: "", ok: null };
   const counted = tests.passedCount != null && tests.total != null;
   const value = counted
     ? fill(t.testsCount, { passed: tests.passedCount as number, total: tests.total as number })

@@ -117,7 +117,8 @@ describe("WorkView", () => {
       "src/footer.tsxEdited", "src/links.tsWritten", "Commented WEB-28: Links fixed.",
     ])
     expect(within(files).queryByRole("link")).toBeNull()
-    expect(within(files).getByText("Each file's diff opens here once the agent's pull request is open.")).toBeInTheDocument()
+    // Sans pull request ni relevé du runner : aucun lien, et plus de phrase pour le promettre (R129).
+    expect(within(files).queryByRole("link", { name: /Diff/ })).toBeNull()
   })
 
   it("links each file to its diff in the pull request", async () => {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { useParams } from "next/navigation"
 import { ExternalLink, FileCheck2, FilePen, FilePlus2, Loader2, MessageSquareText, ShieldQuestion, Wrench } from "lucide-react"
 
+import { MissionChanges } from "@/components/delivery/mission-changes"
 import { PaneLink } from "@/components/layout/pane-link"
 import { WorkDot } from "@/components/layout/work-dot"
 import { MissionResultCard } from "@/components/sheets/mission-result-card"
@@ -75,6 +76,8 @@ export function WorkView({ runId }: Readonly<{ runId: number }>) {
   const latest = useDeliveryStore((s) => (listed ? s.runs[listed.issueId] : undefined))
   const activity = useDeliveryStore((s) => s.activity[runId])
   const evidence = useDeliveryStore((s) => s.evidence[runId])
+  // Le runner relève les changements (R139) : la liste d'après la chronologie ne sert plus qu'aux missions d'avant.
+  const tracked = useDeliveryStore((s) => Boolean(s.missionChanges[runId]?.mode))
   const fetchWorkspaceRuns = useDeliveryStore((s) => s.fetchWorkspaceRuns)
   const fetchRun = useDeliveryStore((s) => s.fetchRun)
   const fetchActivity = useDeliveryStore((s) => s.fetchActivity)
@@ -127,7 +130,7 @@ export function WorkView({ runId }: Readonly<{ runId: number }>) {
   }, [slug, runId, active, known, fetchEvidence])
 
   const events = activity?.events ?? NO_EVENTS
-  const files = useMemo(() => fileChanges(events), [events])
+  const files = useMemo(() => (tracked ? [] : fileChanges(events)), [events, tracked])
   const documents = useMemo(() => documentChanges(events), [events])
   const anchors = useDiffAnchors(files.map((file) => file.path))
   const proof = proofOf(evidence)
@@ -223,6 +226,9 @@ export function WorkView({ runId }: Readonly<{ runId: number }>) {
         )}
       </Section>
 
+      <MissionChanges run={run} />
+
+      {!(tracked && documents.length === 0) && (
       <Section title={t.files} count={files.length + documents.length}>
         {files.length === 0 && documents.length === 0 ? (
           <p className="text-xs text-muted-foreground">{t.noFiles}</p>
@@ -262,8 +268,8 @@ export function WorkView({ runId }: Readonly<{ runId: number }>) {
             ))}
           </ul>
         )}
-        {files.length > 0 && !pull && <p className="text-[11px] text-muted-foreground">{t.diffLater}</p>}
       </Section>
+      )}
 
       <Section title={t.approvals} count={answered.length}>
         {answered.length === 0 ? (

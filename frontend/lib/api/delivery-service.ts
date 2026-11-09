@@ -67,10 +67,15 @@ export interface DeliveryRun {
   /** Le geste de la personne sur la carte de résultat, et quand ; absents tant qu'elle n'a pas tranché. */
   outcome?: DeliveryRunOutcome | null;
   outcomeAt?: string | null;
+  /** La mission que celle-ci reprend sur la même branche (R139) ; absente d'une mission neuve. */
+  followUpOf?: number | null;
 }
 
-/** `MARKED_DONE` : la mission n'a rien changé, la personne a terminé l'issue (rejeu de la 1.8.0). */
-export type DeliveryRunOutcome = "APPLIED" | "DISCARDED" | "RETRIED" | "MARKED_DONE";
+/**
+ * `MARKED_DONE` : la mission n'a rien changé, la personne a terminé l'issue (rejeu de la 1.8.0). `FOLLOWED_UP` : la
+ * personne a commenté des lignes, une reprise continue la même branche (R139).
+ */
+export type DeliveryRunOutcome = "APPLIED" | "DISCARDED" | "RETRIED" | "MARKED_DONE" | "FOLLOWED_UP";
 
 export interface DeliveryRunTests {
   command: string;
@@ -79,6 +84,102 @@ export interface DeliveryRunTests {
   /** Combien ont passé, sur combien, quand la sortie des tests le dit. */
   passedCount: number | null;
   total: number | null;
+  /** Un fichier a été remis comme avant après leur passage : le résultat porte sur une version d'avant (R139). */
+  stale?: boolean;
+}
+
+/** Un fichier qu'une mission a changé, relevé par le runner (R139). */
+export interface MissionFileChange {
+  path: string;
+  /** `written` : un fichier d'un dossier jetable, qui n'a pas d'« avant ». */
+  status: "added" | "modified" | "deleted" | "written";
+  /** Lignes ajoutées et retirées ; null pour un binaire. */
+  added: number | null;
+  removed: number | null;
+  binary: boolean;
+  truncated: boolean;
+  /** Un fichier qui peut porter un secret : son texte n'a jamais quitté le poste. */
+  withheld: boolean;
+  /** L'empreinte de ce qui a changé : le diff ouvert se relit quand elle bouge. */
+  revision: string;
+  /** Le runner est en train de le remettre comme avant. */
+  reverting: boolean;
+  /** Pourquoi la dernière tentative n'a pas abouti, en mots. */
+  error: string | null;
+  updatedAt: string | null;
+}
+
+/** Ce qu'est devenue la dernière correction de la personne. */
+export interface MissionCorrection {
+  id: number;
+  text: string;
+  status: "PENDING" | "RUNNING" | "DONE" | "FAILED" | "EXPIRED";
+  message: string | null;
+}
+
+/** Les changements d'une mission, et ce que la personne connectée peut en faire maintenant (R139, R15). */
+export interface MissionChanges {
+  /** `repo`, `scratch`, ou null : le runner n'a rien relevé (runner plus ancien, ou pas encore parti). */
+  mode: "repo" | "scratch" | null;
+  live: boolean;
+  added: number;
+  removed: number;
+  /** Les fichiers au-delà du plafond, comptés dans les totaux. */
+  more: number;
+  files: MissionFileChange[];
+  canRevert: boolean;
+  canComment: boolean;
+  canCorrect: boolean;
+  /** Pourquoi ces gestes manquent, quand une phrase utile existe. */
+  blockedReason: string | null;
+  correction: MissionCorrection | null;
+}
+
+/** Le texte d'un fichier de la mission : un patch (`diff`) ou un contenu (`text`, dossier jetable). */
+export interface MissionFileDiff {
+  path: string;
+  format: "diff" | "text";
+  body: string | null;
+  binary: boolean;
+  truncated: boolean;
+  withheld: boolean;
+  revision: string;
+}
+
+/** Un commentaire de relecture sur une ligne : `new` dans la version de l'agent, `old` une ligne qu'il a retirée. */
+export interface ChangeComment {
+  path: string;
+  line: number;
+  side: "new" | "old";
+  text: string;
+}
+
+/** Les changements d'une mission. Lu en boucle pendant le travail : jamais de toast. */
+export async function getMissionChanges(slug: string, runId: number): Promise<MissionChanges> {
+  const res = await apiClient.get<{ data: MissionChanges }>(DELIVERY_ROUTES.CHANGES(slug, runId), { silentError: true });
+  return res.data.data;
+}
+
+/** Le diff d'un fichier de la mission. Une erreur remonte à l'appelant. */
+export async function getMissionFileDiff(slug: string, runId: number, path: string): Promise<MissionFileDiff> {
+  const res = await apiClient.get<{ data: MissionFileDiff }>(DELIVERY_ROUTES.CHANGED_FILE(slug, runId), { params: { path }, silentError: true });
+  return res.data.data;
+}
+
+/** Remet un fichier comme avant la mission : le runner le fait, la liste dit quand c'est fait. */
+export async function revertMissionFile(slug: string, runId: number, path: string): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.REVERT_FILE(slug, runId), { path }, { silentError: true });
+}
+
+/** Les commentaires sur les lignes, envoyés ensemble : rend la mission qui repart sur la même branche. */
+export async function askForChanges(slug: string, runId: number, comments: ChangeComment[]): Promise<DeliveryRun> {
+  const res = await apiClient.post<{ data: DeliveryRun }>(DELIVERY_ROUTES.FOLLOW_UP(slug, runId), { comments }, { silentError: true });
+  return res.data.data;
+}
+
+/** Une correction tapée pendant le travail : l'agent la lit à sa prochaine étape. */
+export async function sendCorrection(slug: string, runId: number, text: string): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.CORRECTION(slug, runId), { text }, { silentError: true });
 }
 
 /**
