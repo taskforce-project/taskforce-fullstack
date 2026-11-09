@@ -1,7 +1,7 @@
 "use client"
 
 import {
-  useCallback, useEffect, useId, useLayoutEffect, useRef, useState,
+  useEffect, useId, useLayoutEffect, useRef, useState,
   type ClipboardEvent, type DragEvent, type ReactNode, type RefObject,
 } from "react"
 import { useParams } from "next/navigation"
@@ -28,6 +28,15 @@ import { cn } from "@/lib/utils"
 /** Une ligne de texte : 14 px sur 20 px d'interligne. Le champ grandit jusqu'à 17 lignes, puis il défile (R134). */
 const LINE_PX = 20
 const MAX_LINES = 17
+
+/** Le champ suit son texte, de 1 à 17 lignes, puis il défile. */
+function fitField(field: HTMLTextAreaElement | null) {
+  if (!field) return
+  field.style.height = "auto"
+  const wanted = field.scrollHeight
+  if (wanted > 0) field.style.height = `${Math.min(wanted, LINE_PX * MAX_LINES)}px`
+  field.style.overflowY = wanted > LINE_PX * MAX_LINES ? "auto" : "hidden"
+}
 
 /**
  * Le compositeur (R76, R123, R134, séance n°20) : l'objet le plus touché de l'app, avec la structure qu'on connaît déjà
@@ -88,17 +97,8 @@ export function Composer({ variant, inputRef, onToggle }: Readonly<{
   const current = listOpen ? options[Math.min(active, options.length - 1)] : undefined
   useThreadEnd()
 
-  // Le champ suit son texte, de 1 à 17 lignes, avant que le navigateur ne peigne : la boîte ne saute pas.
-  const fit = useCallback(() => {
-    const field = ref.current
-    if (!field) return
-    field.style.height = "auto"
-    const wanted = field.scrollHeight
-    if (wanted > 0) field.style.height = `${Math.min(wanted, LINE_PX * MAX_LINES)}px`
-    field.style.overflowY = wanted > LINE_PX * MAX_LINES ? "auto" : "hidden"
-  }, [ref])
-
-  useLayoutEffect(fit, [draft, fit])
+  // Avant que le navigateur ne peigne : la boîte ne saute pas.
+  useLayoutEffect(() => fitField(ref.current), [draft, ref])
 
   // Une colonne qui change de largeur change aussi les retours à la ligne.
   useEffect(() => {
@@ -108,11 +108,11 @@ export function Composer({ variant, inputRef, onToggle }: Readonly<{
     const watcher = new ResizeObserver(() => {
       if (field.clientWidth === width) return
       width = field.clientWidth
-      fit()
+      fitField(field)
     })
     watcher.observe(field)
     return () => watcher.disconnect()
-  }, [fit, ref])
+  }, [ref])
 
   // Échap arrête où que soit le curseur, sauf quand une fenêtre de dialogue ou un menu la prend d'abord. Dans le champ,
   // sa touche passe avant le repli de la conversation.
