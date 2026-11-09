@@ -73,6 +73,16 @@ public class KnowledgeController {
 
     // ── Nodes ────────────────────────────────────────────────────────────────
 
+    @GetMapping("/nodes/{nodeId}")
+    public ResponseEntity<ApiResponse<KnowledgeNodeResponse>> getNode(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long nodeId
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success("Page retrieved", knowledgeService.getNode(slug, nodeId, userId)));
+    }
+
     @PostMapping("/nodes")
     public ResponseEntity<ApiResponse<KnowledgeNodeResponse>> createNode(
         @AuthenticationPrincipal Jwt jwt,

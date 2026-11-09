@@ -85,6 +85,18 @@ class KnowledgeServiceTest {
     }
 
     @Test
+    @DisplayName("getNode : une note se lit avec les droits de la personne (ce que Cortex a lu s'ouvre d'un clic)")
+    void get_node_reads_with_the_person_s_rights() {
+        workspace();
+        when(access.requireNode(50L, VIEWER)).thenReturn(node(50L, null));
+
+        KnowledgeNodeResponse res = service.getNode(SLUG, 50L, USER);
+
+        assertThat(res.getTitle()).isEqualTo("N50");
+        verify(access).requireNode(50L, VIEWER);
+    }
+
+    @Test
     @DisplayName("createNode avec parentNodeId : la page est nichee sous le parent (valide meme-workspace)")
     void create_with_parent_nests_under_it() {
         workspace();

@@ -167,6 +167,13 @@ public class KnowledgeService {
         return BrainMapper.toNodeResponse(saved);
     }
 
+    /** Une note, telle que la personne a le droit de la lire : la conversation l'ouvre depuis ce que Cortex a lu (R137). */
+    @Transactional(readOnly = true)
+    public KnowledgeNodeResponse getNode(String slug, Long nodeId, Long userId) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        return BrainMapper.toNodeResponse(access.requireNode(nodeId, access.viewer(ws.getId(), userId)));
+    }
+
     @Transactional
     public KnowledgeNodeResponse updateNode(String slug, Long nodeId, Long userId, UpdateKnowledgeNodeRequest req) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
