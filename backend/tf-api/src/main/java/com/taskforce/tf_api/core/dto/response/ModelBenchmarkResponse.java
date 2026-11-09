@@ -6,6 +6,8 @@ import java.util.List;
 import com.taskforce.tf_api.core.service.agent.EvalGrader;
 import com.taskforce.tf_api.core.service.agent.ReplayOutcome;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 /**
  * Le banc des modèles (R131, séance n°19 ; R142, séance n°20) : « que puis-je confier à ce modèle ? », tâche par tâche, dans
  * cet espace.
@@ -59,7 +61,11 @@ public record ModelBenchmarkResponse(
                              Boolean tools, Boolean chat, Long memoryBytes, Long gpuBytes, String loadProblem) {
     }
 
-    /** Une ligne : un modèle, son dernier passage, sa durée approchée en secondes, un verdict par tâche, et ce qu'on sait de lui. */
+    /**
+     * Une ligne : un modèle, son dernier passage, sa durée approchée en secondes, un verdict par tâche, et ce qu'on sait de lui.
+     * Son propre nom dans la référence d'API : {@link ModelCapabilityResponse.ModelRow} s'appelle pareil, et l'une cachait l'autre.
+     */
+    @Schema(name = "BenchmarkModelRow")
     public record ModelRow(String model, boolean current, LocalDateTime lastRunAt, long estimateSeconds, List<Cell> cells,
                            ModelFacts facts) {
     }

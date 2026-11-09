@@ -20911,6 +20911,64 @@
           }
         }
       },
+      "BenchmarkModelRow": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "lastRunAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "estimateSeconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Cell"
+            }
+          },
+          "facts": {
+            "$ref": "#/components/schemas/ModelFacts"
+          }
+        }
+      },
+      "Cell": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "measured": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "judge": {
+            "type": "string"
+          },
+          "tooSlow": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "ModelBenchmarkResponse": {
         "type": "object",
         "properties": {
@@ -20937,8 +20995,44 @@
           "models": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ModelRow"
+              "$ref": "#/components/schemas/BenchmarkModelRow"
             }
+          }
+        }
+      },
+      "ModelFacts": {
+        "type": "object",
+        "properties": {
+          "family": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "string"
+          },
+          "diskBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "contextWindow": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tools": {
+            "type": "boolean"
+          },
+          "chat": {
+            "type": "boolean"
+          },
+          "memoryBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gpuBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "loadProblem": {
+            "type": "string"
           }
         }
       },
