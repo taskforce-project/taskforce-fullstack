@@ -109,6 +109,8 @@ export interface CommandResult {
   pushed?: boolean;
   trace?: CommandTrace[];
   changes?: RunnerChanges;
+  /** Le détail technique d'un échec : pour le dossier de preuve, jamais pour l'écran (R133). */
+  detail?: string;
 }
 
 export interface RunResult {

@@ -68,8 +68,8 @@ describe("WorkView", () => {
     vi.setSystemTime(new Date("2026-11-07T10:05:00Z"))
     fetchWorkspaceRuns.mockResolvedValue([])
     useDeliveryStore.setState({
-      workspaceRuns: [RUN], runs: { 28: RUN }, activity: { 100: ACTIVITY }, evidence: { 100: EVIDENCE },
-      fetchWorkspaceRuns, fetchRun, fetchActivity, fetchEvidence, downloadEvidence,
+      workspaceRuns: [RUN], runs: { 28: RUN }, activity: { 100: ACTIVITY }, evidence: { 100: EVIDENCE }, missionChanges: {},
+      fetchWorkspaceRuns, fetchRun, fetchActivity, fetchEvidence, downloadEvidence, fetchMissionChanges: vi.fn().mockResolvedValue(null),
     })
   })
   afterEach(() => vi.useRealTimers())
@@ -117,8 +117,22 @@ describe("WorkView", () => {
       "src/footer.tsxEdited", "src/links.tsWritten", "Commented WEB-28: Links fixed.",
     ])
     expect(within(files).queryByRole("link")).toBeNull()
-    // Sans pull request ni relevé du runner : aucun lien, et plus de phrase pour le promettre (R129).
-    expect(within(files).queryByRole("link", { name: /Diff/ })).toBeNull()
+  })
+
+  it("shows what the runner read instead of the timeline's list, once the runner reports the changes (R139)", () => {
+    useDeliveryStore.setState({
+      missionChanges: { 100: {
+        mode: "repo", live: true, added: 12, removed: 1, more: 0, canRevert: false, canComment: false, canCorrect: false, blockedReason: null, correction: null,
+        files: [{ path: "src/footer.tsx", status: "modified", added: 12, removed: 1, binary: false, truncated: false, withheld: false, revision: "r1", reverting: false, error: null, updatedAt: null }],
+      } },
+    })
+    render(<WorkView runId={100} />)
+
+    const changes = screen.getByRole("region", { name: "Changes" })
+    expect(within(changes).getAllByRole("img", { name: "12 added, 1 removed" })).toHaveLength(2)
+    // Le commentaire de l'agent reste ; les fichiers d'après la chronologie, non.
+    const documents = screen.getByRole("region", { name: "Files and documents" })
+    expect(within(documents).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Commented WEB-28: Links fixed."])
   })
 
   it("links each file to its diff in the pull request", async () => {

@@ -46,6 +46,7 @@ export class LiveMissions {
 
 /** Ce qu'une personne lit quand le geste n'a pas pu se faire : ce qui s'est passé, et quoi faire (R133). */
 const REFUSED = (why: string): string => `TaskForce didn't put this file back: ${why}.`;
+const FAILED = "TaskForce couldn't put this file back: something went wrong on your computer while changing the branch. Nothing moved. Try again.";
 
 /**
  * Les règles de la mission jugent le geste avant que rien ne bouge. Le geste de la personne ne lève aucune règle : ce
@@ -111,7 +112,8 @@ export async function executeRevert(config: Pick<RunnerConfig, "home" | "repos" 
     const message = e instanceof Error ? e.message : String(e);
     log.warn(`Revert of ${path} refused or failed: ${message}`);
     if (e instanceof BranchGoneError) return { ok: false, gone: true, message: REFUSED("its branch is no longer on this computer or on GitHub"), trace };
-    return { ok: false, message: REFUSED(message.slice(0, 300)), trace };
+    // Ce que git a dit va au dossier, pas à l'écran (R133) : la personne lit ce qui s'est passé et quoi faire.
+    return { ok: false, message: FAILED, trace, detail: message.slice(0, 1000) };
   } finally {
     // Le dossier rouvert pour ce geste ne reste pas : le travail est dans la branche.
     if (opened && repo && !config.keepWorktree) await removeWorktree(repo, worktree).catch(() => undefined);
@@ -132,7 +134,9 @@ export function executeCorrection(live: LiveMissions, command: RunnerCommand): C
 export async function drainCommands(api: CommandApi, handle: (command: RunnerCommand) => Promise<CommandResult>): Promise<number> {
   const commands = await api.commands();
   for (const command of commands) {
-    const result = await handle(command).catch((e: unknown): CommandResult => ({ ok: false, message: e instanceof Error ? e.message.slice(0, 300) : "The command failed." }));
+    const result = await handle(command).catch((e: unknown): CommandResult => ({
+      ok: false, message: "TaskForce couldn't do this on your computer. Try again.", detail: e instanceof Error ? e.message.slice(0, 1000) : undefined,
+    }));
     await api.commandResult(command.commandId, { ...result, message: result.message.slice(0, 1000) })
       .catch((e: unknown) => log.warn(`Command result not sent to TaskForce: ${(e as Error).message}`));
   }

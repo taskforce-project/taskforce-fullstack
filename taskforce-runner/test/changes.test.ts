@@ -552,6 +552,9 @@ describe("remettre un fichier comme avant (R139), sur un vrai dépôt", () => {
       const result = await executeRevert(cfg(home), { ...command(wt.branch, wt.baseSha), rules: { ...RULES, digest: `sha256:${"0".repeat(64)}` } }, { repoFor: async () => repo, visibilityOf: async () => "private" });
       assert.equal(result.ok, false);
       assert.equal(git(wt.path, "rev-parse", "HEAD"), head);
+      // Une phrase pour la personne, le mot technique pour le dossier (R133).
+      assert.doesNotMatch(result.message, /digest/);
+      assert.match(result.detail ?? "", /digest/);
     } finally {
       cleanup();
     }
@@ -670,6 +673,8 @@ describe("les ordres de TaskForce", () => {
     });
     assert.equal(count, 3);
     assert.deepEqual(results.map(([id, r]) => [id, r.ok]), [[1, false], [2, true], [3, true]]);
-    assert.equal(results[0]?.[1].message, "boom");
+    // Le mot technique va au dossier, la personne lit une phrase (R133).
+    assert.equal(results[0]?.[1].detail, "boom");
+    assert.doesNotMatch(results[0]?.[1].message ?? "", /boom/);
   });
 });
