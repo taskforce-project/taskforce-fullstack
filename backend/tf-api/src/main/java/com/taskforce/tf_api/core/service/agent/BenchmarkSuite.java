@@ -69,10 +69,11 @@ public final class BenchmarkSuite {
 
     /**
      * Le temps qu'a un cas pour répondre (R142) : cinq minutes, tous ses appels au modèle compris (un cas d'Act en fait
-     * plusieurs). Pas {@code AI_TIMEOUT}, réglé à 120 s pour une personne qui attend une réponse : un modèle de 14 milliards de
-     * paramètres qui déborde d'une carte de 8 Go répond, mais lentement, et le cas le plus long de la suite (un cas d'Act, un
-     * document de 3 000 mots) lui demande plusieurs minutes. Au-delà de cinq minutes pour une seule demande, ce modèle ne sert
-     * à rien ici, même s'il a la bonne réponse : c'est un verdict, « Too slow here », jamais une erreur.
+     * plusieurs). Pas {@code AI_TIMEOUT}, réglé à 120 s pour une personne qui attend une réponse : c'est lui qui coupait les cas
+     * quand les modèles se chargeaient pendant le passage. Mesuré sur une carte de 8 Go, le modèle déjà chargé : 78 s au plus pour
+     * un modèle de 14 milliards de paramètres qui déborde sur le processeur (09/11/2026). Cinq minutes laissent de la marge à une
+     * carte partagée ou à une machine plus modeste. Au-delà, pour une seule demande, le modèle ne sert à rien ici, même s'il a la
+     * bonne réponse : c'est un verdict, « Too slow here », jamais une erreur.
      */
     public static final Duration CASE_BUDGET = Duration.ofMinutes(5);
 
