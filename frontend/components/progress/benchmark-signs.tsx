@@ -3,6 +3,7 @@
 import {
   AlignLeft,
   BookOpenText,
+  ClipboardCheck,
   CodeXml,
   ListChecks,
   MousePointerClick,
@@ -25,6 +26,7 @@ export const TASK_ICONS: Record<string, LucideIcon> = {
   write: PenLine,
   plan: ListChecks,
   code: CodeXml,
+  bank: ClipboardCheck,
 }
 
 /**

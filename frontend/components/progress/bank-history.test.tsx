@@ -5,6 +5,7 @@ import { BankHistory } from "./bank-history"
 import type { EvalHistory, EvalHistoryRun } from "@/lib/api/eval-service"
 import type { ModelCapabilityTable } from "@/lib/api/model-capability-service"
 import { useEvalStore } from "@/lib/store/eval-store"
+import { useModelBenchmarkStore } from "@/lib/store/model-benchmark-store"
 import { useModelCapabilityStore } from "@/lib/store/model-capability-store"
 
 const run = (patch: Partial<EvalHistoryRun>): EvalHistoryRun => ({
@@ -30,7 +31,8 @@ describe("BankHistory", () => {
     vi.clearAllMocks()
     runBank.mockResolvedValue(null)
     useEvalStore.setState({ history: { runs: [], cases: CASES }, progress: null, error: null, fetchHistory, runBank, stopRun })
-    useModelCapabilityStore.setState({ table: TABLE, progress: null, fetchTable })
+    useModelCapabilityStore.setState({ table: TABLE, fetchTable })
+    useModelBenchmarkStore.setState({ progress: null })
   })
 
   it("reads the history and the model of Cortex, and replays the bank on it in a click", () => {
@@ -48,7 +50,7 @@ describe("BankHistory", () => {
     expect(runBank).toHaveBeenCalledWith("acme", "qwen3:8b")
   })
 
-  it("replays on the instance's default model when it doesn't know Cortex's yet, and waits for a measure", () => {
+  it("replays on the instance's default model when it doesn't know Cortex's yet, and waits for the queue of models", () => {
     useEvalStore.setState({ history: { runs: [], cases: CASES.slice(0, 1) } })
     useModelCapabilityStore.setState({ table: null })
     const { rerender } = render(<BankHistory slug="acme" />)
@@ -56,7 +58,8 @@ describe("BankHistory", () => {
     fireEvent.click(screen.getByRole("button", { name: "Replay 1 case on Cortex's model" }))
     expect(runBank).toHaveBeenCalledWith("acme", "")
 
-    useModelCapabilityStore.setState({ table: TABLE, progress: { model: "qwen3:8b", done: 0, total: 8, waitSeconds: null, stopping: false, auto: true } })
+    useModelCapabilityStore.setState({ table: TABLE })
+    useModelBenchmarkStore.setState({ progress: { model: "qwen3:8b", phase: "running", done: 0, total: 8, waitSeconds: null, stopping: false, auto: true } })
     rerender(<BankHistory slug="acme" />)
     expect(screen.getByRole("button", { name: "Replay 1 case on qwen3:8b" })).toBeDisabled()
   })

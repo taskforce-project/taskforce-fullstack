@@ -8,7 +8,7 @@ import { TASK_ICONS } from "@/components/progress/benchmark-signs"
 import { Named } from "@/components/progress/named"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { timeText } from "@/lib/ai/benchmark"
+import { BUDGET_MINUTES, timeText } from "@/lib/ai/benchmark"
 import type { BenchmarkModelRow, BenchmarkTaskInfo } from "@/lib/api/model-benchmark-service"
 import { nextIndex, type PickOption } from "@/lib/cortex/composer-picker"
 import { fillText } from "@/lib/delivery/result-card"
@@ -17,14 +17,15 @@ import { useModelBenchmarkStore } from "@/lib/store/model-benchmark-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { cn } from "@/lib/utils"
 
-/** Deux ou trois modèles à la fois : assez pour comparer, pas trop pour lire (R131). */
-const MIN_MODELS = 2
+/** Un modèle se regarde seul ; deux ou trois se comparent, pas plus pour rester lisible (R131, R142). */
+const MIN_MODELS = 1
 const MAX_MODELS = 3
 
 /**
- * « Try on my work », l'essai à l'aveugle (R131) : une issue de la personne, une tâche, deux ou trois modèles. Les réponses
- * arrivent sous A, B, C, dans un ordre tiré par le serveur ; la personne choisit, ou aucune ; puis les noms apparaissent.
- * L'issue est lue avec ses droits, sans outil, et rien ne s'écrit sur elle.
+ * « Try on my work » (R131, R142) : une issue de la personne, une tâche, un à trois modèles. Avec un seul, c'est simplement un
+ * essai : son nom est là, rien à choisir. Avec plusieurs, à l'aveugle : les réponses arrivent sous A, B, C, dans un ordre tiré
+ * par le serveur ; la personne choisit, ou aucune ; puis les noms apparaissent. L'issue est lue avec ses droits, sans outil, et
+ * rien ne s'écrit sur elle.
  */
 export function BenchmarkTrial({ slug, model, tasks, models, onClose }: Readonly<{
   slug: string
@@ -73,12 +74,11 @@ function TrialSetup({ slug, model, tasks, models }: Readonly<{
   const startTrial = useModelBenchmarkStore((s) => s.startTrial)
   const error = useModelBenchmarkStore((s) => s.error)
   const offered = tasks.filter((task) => task.trial)
+  // Un modèle qui ne sait pas converser ne s'essaie pas (R142).
+  const runnable = models.filter((row) => row.facts.chat !== false)
   const [picked, setPicked] = useState<PickOption | null>(null)
   const [task, setTask] = useState(offered[0]?.key ?? "")
-  const [chosen, setChosen] = useState<string[]>(() => {
-    const others = models.map((row) => row.model).filter((name) => name !== model)
-    return [model, ...others.slice(0, 1)]
-  })
+  const [chosen, setChosen] = useState<string[]>([model])
   const attach = picked?.attach ?? null
   const ready = attach !== null && attach.issueId !== null && task !== "" && chosen.length >= MIN_MODELS
 
@@ -139,7 +139,7 @@ function TrialSetup({ slug, model, tasks, models }: Readonly<{
       </div>
 
       <ul aria-label={t.trialModels} className="flex flex-col">
-        {models.map((row) => {
+        {runnable.map((row) => {
           const on = chosen.includes(row.model)
           return (
             <li key={row.model}>
@@ -158,6 +158,7 @@ function TrialSetup({ slug, model, tasks, models }: Readonly<{
           )
         })}
       </ul>
+      {chosen.length > 1 && <p className="text-[11px] text-muted-foreground">{t.trialBlind}</p>}
 
       <div className="flex items-center gap-2">
         <Button size="sm" onClick={go} disabled={!ready}>{t.trialGo}</Button>
@@ -209,16 +210,17 @@ function IssuePicker({ slug, onPick }: Readonly<{ slug: string; onPick: (option:
   )
 }
 
-/** Les réponses sous leur lettre, côte à côte si le volet le permet ; un seul geste : choisir. Puis les noms. */
+/** Les réponses sous leur lettre, côte à côte si le volet le permet ; un seul geste : choisir. Puis les noms. Un modèle seul montre son nom. */
 function TrialAnswers({ slug, onDone }: Readonly<{ slug: string; onDone: () => void }>) {
   const t = usePreferencesStore((s) => s.t.benchmark)
   const blind = useModelBenchmarkStore((s) => s.blind)
   const chooseTrial = useModelBenchmarkStore((s) => s.chooseTrial)
   const error = useModelBenchmarkStore((s) => s.error)
   if (!blind) return null
-  const { phase, trial, answers, result, waitSeconds } = blind
+  const { phase, trial, answers, result, waitSeconds, model } = blind
   const named = (letter: string) => result?.answers.find((answer) => answer.letter === letter)
   const done = Object.keys(answers).length
+  const tooSlow = fillText(t.trialTooSlow, { minutes: BUDGET_MINUTES })
 
   return (
     <div className="flex flex-col gap-2 @container">
@@ -242,19 +244,27 @@ function TrialAnswers({ slug, onDone }: Readonly<{ slug: string; onDone: () => v
               className={cn("flex min-w-0 flex-col gap-1.5 rounded-md border border-border bg-background p-2", chosen && "border-foreground")}
             >
               <div className="flex items-center gap-1.5">
-                <span className="font-mono text-xs font-medium text-foreground">{letter}</span>
+                {model ? (
+                  <Named name={model}>
+                    <span className="min-w-0 truncate font-mono text-[11px] text-foreground">{model}</span>
+                  </Named>
+                ) : (
+                  <span className="font-mono text-xs font-medium text-foreground">{letter}</span>
+                )}
                 {revealed && (
                   <Named name={revealed.model}>
                     <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">{revealed.model}</span>
                   </Named>
                 )}
-                {revealed && <span className="ml-auto shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">{timeText(revealed.durationMs, t)}</span>}
+                {(revealed || (model && answer)) && (
+                  <span className="ml-auto shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">{timeText((revealed ?? answer)?.durationMs, t)}</span>
+                )}
                 {chosen && <span className="shrink-0 text-xs text-foreground">{t.trialChosen}</span>}
               </div>
               <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words font-sans text-xs text-foreground">
-                {answer ? (answer.answer || t.noAnswer) : "…"}
+                {answer ? (answer.tooSlow ? tooSlow : answer.answer || t.noAnswer) : "…"}
               </pre>
-              {phase === "choosing" && (
+              {phase === "choosing" && !answer?.tooSlow && (
                 <Button size="sm" variant="secondary" className="w-fit" onClick={() => void chooseTrial(slug, letter)}>{t.trialChoose}</Button>
               )}
             </article>
@@ -264,7 +274,7 @@ function TrialAnswers({ slug, onDone }: Readonly<{ slug: string; onDone: () => v
       {phase === "choosing" && (
         <Button size="sm" variant="ghost" className="w-fit" onClick={() => void chooseTrial(slug, null)}>{t.trialChooseNone}</Button>
       )}
-      {phase === "revealed" && (
+      {(phase === "revealed" || phase === "tried") && (
         <Button size="sm" variant="ghost" className="w-fit" onClick={onDone}>{t.trialDone}</Button>
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}

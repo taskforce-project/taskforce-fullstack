@@ -15,7 +15,10 @@ import { fillText } from "@/lib/delivery/result-card";
 
 type BenchmarkTexts = (typeof CONSTANTS_EN)["benchmark"];
 
-const SIGNS: Record<BenchmarkVerdict, CapabilitySign> = { give_it: "passed", with_review: "partly", not_yet: "failed" };
+/** Le budget d'un cas et d'un chargement, en minutes, tel que le serveur l'applique (`BenchmarkSuite`, R142). */
+export const BUDGET_MINUTES = 5;
+
+const SIGNS: Record<BenchmarkVerdict, CapabilitySign> = { give_it: "passed", with_review: "partly", not_yet: "failed", too_slow: "slow" };
 
 /** Le signe d'un verdict dans la matrice, le même que ceux des capacités (R130) ; un tiret quand la tâche n'a pas été passée. */
 export const verdictSign = (verdict: BenchmarkVerdict | null): CapabilitySign => (verdict ? SIGNS[verdict] : "none");
@@ -32,6 +35,7 @@ export const judgeWord = (judge: BenchmarkJudge | null, t: BenchmarkTexts): stri
 export function cellTitle(taskLabel: string, cell: BenchmarkCell, t: BenchmarkTexts): string {
   const word = verdictWord(cell.verdict, t);
   if (!cell.verdict) return fillText(t.cellEmpty, { task: taskLabel, verdict: word });
+  if (cell.verdict === "too_slow") return fillText(t.cellTooSlow, { task: taskLabel, tooSlow: cell.tooSlow, total: cell.total });
   const judge = judgeWord(cell.judge, t);
   const line = fillText(t.cellVerdict, { task: taskLabel, verdict: word, passed: cell.passed, total: cell.total });
   return judge ? `${line} · ${judge}` : line;

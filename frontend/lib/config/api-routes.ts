@@ -413,6 +413,9 @@ export const AI_BENCHMARK_ROUTES = {
   MATRIX: (slug: string) => `/api/workspaces/${slug}/ai/benchmark`,
   DETAIL: (slug: string) => `/api/workspaces/${slug}/ai/benchmark/detail`,
   RUNS: (slug: string) => `/api/workspaces/${slug}/ai/benchmark/runs`,
+  RUN_LOAD: (slug: string, runId: number) => `/api/workspaces/${slug}/ai/benchmark/runs/${runId}/load`,
+  STOP: (slug: string) => `/api/workspaces/${slug}/ai/benchmark/stop`,
+  HISTORY: (slug: string) => `/api/workspaces/${slug}/ai/benchmark/history`,
   RUN_CASE: (slug: string, runId: number, caseKey: string) =>
     `/api/workspaces/${slug}/ai/benchmark/runs/${runId}/cases/${encodeURIComponent(caseKey)}`,
   VERDICT: (slug: string, resultId: number) => `/api/workspaces/${slug}/ai/benchmark/results/${resultId}/verdict`,

@@ -3,7 +3,8 @@
  * question, sa date, les notes servies et ce que les outils de lecture ont rendu, figés par le serveur. Un rejeu le
  * rejoue à blanc sur un modèle nommé, et du code le note, critère par critère.
  */
-import { apiClient, AI_TIMEOUT_MS } from "./client"
+import { apiClient } from "./client"
+import { BENCHMARK_CASE_TIMEOUT_MS } from "./model-benchmark-service"
 import { EVAL_ROUTES } from "../config/api-routes"
 
 /** Valeur de `EvalCriteria.tool` quand Cortex ne devait appeler aucun outil. */
@@ -195,12 +196,12 @@ export async function startEvalRun(slug: string, model: string): Promise<EvalRun
 }
 
 /**
- * Rejoue et note un cas : un appel au modèle, d'où le délai de l'IA. Sans toast : le store attend lui-même le frein de
- * débit de l'IA (429) et dit pourquoi un rejeu s'arrête.
+ * Rejoue et note un cas : un appel au modèle, dans le budget d'un cas (R142). Sans toast : le store attend lui-même le frein
+ * de débit de l'IA (429) et dit pourquoi un rejeu s'arrête.
  */
 export async function runEvalCase(slug: string, runId: number, caseId: number): Promise<EvalResult> {
   const res = await apiClient.post<{ data: EvalResult }>(
-    EVAL_ROUTES.RUN_CASE(slug, runId, caseId), {}, { timeout: AI_TIMEOUT_MS, silentError: true },
+    EVAL_ROUTES.RUN_CASE(slug, runId, caseId), {}, { timeout: BENCHMARK_CASE_TIMEOUT_MS, silentError: true },
   )
   return res.data.data
 }

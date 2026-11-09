@@ -280,6 +280,11 @@ export function getErrorStatus(error: unknown): number | undefined {
   return axios.isAxiosError(error) ? error.response?.status : undefined;
 }
 
+/** La réponse n'est pas arrivée à temps (le délai du navigateur, ou un 504 d'un relais devant l'API). */
+export function isRequestTimeout(error: unknown): boolean {
+  return axios.isAxiosError(error) && (error.code === "ECONNABORTED" || error.response?.status === 504);
+}
+
 /**
  * Attente annoncée par un 429 (`Retry-After`, en secondes), pour qu'un appelant qui enchaîne des appels attende plutôt
  * que d'échouer ; `null` pour toute autre erreur, ou un 429 qui n'annonce pas d'attente lisible.
