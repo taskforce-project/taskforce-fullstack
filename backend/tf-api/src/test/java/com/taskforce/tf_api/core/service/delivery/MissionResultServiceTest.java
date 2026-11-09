@@ -14,6 +14,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest;
+import com.taskforce.tf_api.core.dto.request.MissionFollowUpRequest;
+import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunOutcome;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkStatus;
@@ -64,6 +66,8 @@ class MissionResultServiceTest {
     @Mock private MergedPullRequests mergedPullRequests;
     @Mock private IssueService issueService;
     @Mock private DeliveryService deliveryService;
+    @Mock private MissionChangesService missionChanges;
+    @Mock private MissionEvidenceService evidence;
 
     private MissionResultService service;
     private User delegator;
@@ -73,7 +77,7 @@ class MissionResultServiceTest {
     @BeforeEach
     void setUp() {
         service = new MissionResultService(runRepository, userRepository, linkRepository, visibilityGuard, pullRequests,
-            mergedPullRequests, issueService, deliveryService);
+            mergedPullRequests, issueService, deliveryService, missionChanges, evidence);
         delegator = User.builder().id(7L).email("ada@taskforce.dev").build();
         Workspace workspace = Workspace.builder().id(1L).slug("acme").build();
         Project project = Project.builder().id(12L).workspace(workspace).build();
@@ -86,6 +90,80 @@ class MissionResultServiceTest {
         lenient().when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(run));
         lenient().when(userRepository.getReferenceById(7L)).thenReturn(delegator);
         lenient().when(linkRepository.findByIssueIdOrderByLinkedAtDesc(55L)).thenReturn(List.of(link));
+    }
+
+    private static final List<MissionFollowUpRequest.Comment> COMMENTS = List.of(
+        new MissionFollowUpRequest.Comment("src/a.ts", 12, "new", " Use the helper "),
+        new MissionFollowUpRequest.Comment("src/b.ts", 4, "old", "Why was this removed?"));
+
+    /** La mission neuve que la délégation rend, telle que la base la garde. */
+    private DeliveryRun delegated() {
+        DeliveryRun next = DeliveryRun.builder().id(200L).issue(run.getIssue()).providerKey("claude-code").build();
+        var response = new DeliveryRunResponse(200L, 55L, "WEB-1", "t", 12L, "p", "claude-code", "sonnet", "QUEUED",
+            null, null, null, false, 7L, null, null);
+        when(deliveryService.delegate("acme", 55L, "claude-code", "sonnet", 7L)).thenReturn(response);
+        when(runRepository.findById(200L)).thenReturn(Optional.of(next));
+        return next;
+    }
+
+    @Test
+    @DisplayName("Ask for changes : une reprise sur la même branche, la pull request reste ouverte, la demande se lit partout")
+    void ask_for_changes() {
+        run.setBaseSha("a".repeat(40));
+        DeliveryRun next = delegated();
+
+        DeliveryRunResponse response = service.askForChanges("acme", 100L, 7L, COMMENTS);
+
+        assertThat(response.id()).isEqualTo(200L);
+        assertThat(next.getParentRun()).isEqualTo(run);
+        assertThat(next.getBranch()).isEqualTo("tf/web-28");
+        assertThat(next.getBaseSha()).isEqualTo("a".repeat(40));
+        assertThat(next.getFollowUp()).hasSize(2);
+        assertThat(next.getFollowUp().get(0)).containsEntry("path", "src/a.ts").containsEntry("line", 12).containsEntry("text", "Use the helper");
+        // Rien n'est écarté : la pull request reçoit la suite.
+        verify(pullRequests, never()).close(anyLong(), any(), anyInt());
+        assertThat(link.getStatus()).isEqualTo(GitHubLinkStatus.OPEN);
+        assertThat(run.getOutcome()).isEqualTo(DeliveryRunOutcome.FOLLOWED_UP);
+        verify(issueService).logActivity(run.getIssue(), delegator, IssueActivityType.MISSION_CHANGES_ASKED, null, null, null);
+        ArgumentCaptor<CreateIssueCommentRequest> comment = ArgumentCaptor.forClass(CreateIssueCommentRequest.class);
+        verify(issueService).addComment(eq("acme"), eq(12L), eq(55L), comment.capture(), eq(7L));
+        assertThat(comment.getValue().getContent()).contains("`src/a.ts`, line 12: Use the helper", "`src/b.ts`, line 4");
+        verify(missionChanges).assertCanAskForChanges(run, 7L, java.util.Set.of("src/a.ts", "src/b.ts"));
+        verify(evidence).appendAfterEnd(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), any());
+    }
+
+    @Test
+    @DisplayName("Ask for changes : les commentaires refusés ne lancent rien")
+    void ask_for_changes_refused_first() {
+        org.mockito.Mockito.doThrow(new BusinessException("no")).when(missionChanges).assertCanAskForChanges(any(), anyLong(), any());
+
+        assertThatThrownBy(() -> service.askForChanges("acme", 100L, 7L, COMMENTS)).isInstanceOf(BusinessException.class);
+
+        verify(deliveryService, never()).delegate(any(), anyLong(), any(), any(), anyLong());
+        assertThat(run.getOutcome()).isNull();
+    }
+
+    @ParameterizedTest(name = "pull request {0}")
+    @CsvSource({ "MERGED", "CLOSED" })
+    @DisplayName("Ask for changes : une pull request déjà fusionnée ou fermée ne reçoit plus rien")
+    void ask_for_changes_on_a_closed_pull_request(GitHubLinkStatus status) {
+        link.setStatus(status);
+
+        assertThatThrownBy(() -> service.askForChanges("acme", 100L, 7L, COMMENTS))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("already merged or closed");
+
+        verify(deliveryService, never()).delegate(any(), anyLong(), any(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("un fichier en train d'être remis retient le geste : le résultat ne se tranche pas sous ses pieds")
+    void a_revert_in_progress_holds_the_decision() {
+        when(missionChanges.busy(100L)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.apply("acme", 100L, 7L, null))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("still being put back");
+
+        verify(pullRequests, never()).merge(anyLong(), any(), anyInt());
     }
 
     @Test

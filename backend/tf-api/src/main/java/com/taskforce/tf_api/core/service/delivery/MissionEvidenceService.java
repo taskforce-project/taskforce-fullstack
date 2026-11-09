@@ -103,6 +103,17 @@ public class MissionEvidenceService {
         run.setEvidenceRoot(root);
     }
 
+    /**
+     * Un geste qui vient après la fin de la mission (R139 : un fichier remis, des changements demandés) : il s'ajoute à la
+     * suite de la chaîne, et le sceau passe à ce dernier maillon. Une copie exportée avant reste un début exact du dossier :
+     * rien n'est réécrit, chaque empreinte tient toujours.
+     */
+    @Transactional
+    public void appendAfterEnd(DeliveryRun run, String type, Actor actor, Map<String, ?> data) {
+        Optional<String> hash = append(run, type, actor, data);
+        if (run.getEvidenceRoot() != null) hash.ifPresent(run::setEvidenceRoot);
+    }
+
     private static String clip(String text) {
         return text == null || text.length() <= 2000 ? text : text.substring(0, 1997) + "...";
     }

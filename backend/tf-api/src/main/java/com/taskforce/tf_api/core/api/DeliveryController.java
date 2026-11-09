@@ -17,14 +17,18 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.ApprovalDecisionRequest;
 import com.taskforce.tf_api.core.dto.request.DelegateRequest;
+import com.taskforce.tf_api.core.dto.request.MissionFollowUpRequest;
 import com.taskforce.tf_api.core.dto.response.DeliveryOpenApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryProviderResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunActivityResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
+import com.taskforce.tf_api.core.dto.response.MissionChangesResponse;
+import com.taskforce.tf_api.core.dto.response.MissionFileChangeResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.delivery.DeliveryActivityService;
+import com.taskforce.tf_api.core.service.delivery.MissionChangesService;
 import com.taskforce.tf_api.core.service.delivery.MissionResultService;
 import com.taskforce.tf_api.core.service.delivery.DeliveryRunner;
 import com.taskforce.tf_api.core.service.delivery.DeliveryService;
@@ -32,6 +36,7 @@ import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 
@@ -54,6 +59,7 @@ public class DeliveryController {
     private final DeliveryRunner deliveryRunner;
     private final DeliveryActivityService activityService;
     private final MissionResultService missionResults;
+    private final MissionChangesService missionChanges;
     private final UserRepository userRepository;
 
     /**
@@ -254,6 +260,68 @@ public class DeliveryController {
 
     /** La remarque de la personne pour la nouvelle mission ; elle va sur l'issue, où l'agent la lit. */
     public record MissionRetryRequest(@Size(max = 2000) String note) {}
+
+    /**
+     * POST .../runs/{runId}/follow-up : « Ask for changes » (R139) : les commentaires sur les lignes, envoyés ensemble,
+     * relancent l'agent sur la même branche ; la réponse est cette nouvelle mission.
+     */
+    @PostMapping("/runs/{runId}/follow-up")
+    public ResponseEntity<ApiResponse<DeliveryRunResponse>> followUp(
+        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId,
+        @Valid @RequestBody MissionFollowUpRequest request
+    ) {
+        DeliveryRunResponse run = missionResults.askForChanges(slug, runId, resolveUserId(jwt), request.comments());
+        deliveryRunner.execute(run.id()); // async, une fois le run committé, comme une délégation
+        return ResponseEntity.ok(ApiResponse.success("The agent is on it", run));
+    }
+
+    /**
+     * GET .../runs/{runId}/changes : les fichiers que la mission a changés, chacun avec ses lignes ajoutées et retirées,
+     * pendant le travail et après (R139), et ce que la personne connectée peut en faire maintenant.
+     */
+    @GetMapping("/runs/{runId}/changes")
+    public ResponseEntity<ApiResponse<MissionChangesResponse>> changes(
+        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("Mission changes", missionChanges.changes(slug, runId, resolveUserId(jwt))));
+    }
+
+    /** GET .../runs/{runId}/changes/file?path= : le diff d'un fichier de la mission, ou son contenu dans un dossier jetable. */
+    @GetMapping("/runs/{runId}/changes/file")
+    public ResponseEntity<ApiResponse<MissionFileChangeResponse>> changedFile(
+        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId, @RequestParam String path
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("File change", missionChanges.file(slug, runId, path, resolveUserId(jwt))));
+    }
+
+    /**
+     * POST .../runs/{runId}/changes/revert : remet un fichier comme avant la mission, sur sa branche (R139). Le runner le
+     * fait sous les règles de la mission ; la liste des fichiers dit quand c'est fait.
+     */
+    @PostMapping("/runs/{runId}/changes/revert")
+    public ResponseEntity<ApiResponse<Void>> revertFile(
+        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId,
+        @Valid @RequestBody MissionRevertRequest request
+    ) {
+        missionChanges.revert(slug, runId, request.path(), resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Putting the file back", null));
+    }
+
+    /** Le fichier à remettre comme avant. */
+    public record MissionRevertRequest(@NotBlank @Size(max = 1000) String path) {}
+
+    /** POST .../runs/{runId}/correction : une correction tapée pendant le travail, que l'agent lit à sa prochaine étape (R140). */
+    @PostMapping("/runs/{runId}/correction")
+    public ResponseEntity<ApiResponse<Void>> correct(
+        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId,
+        @Valid @RequestBody MissionCorrectionRequest request
+    ) {
+        missionChanges.correct(slug, runId, request.text(), resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Sent to the agent", null));
+    }
+
+    /** Ce que la personne veut dire à l'agent pendant qu'il travaille. */
+    public record MissionCorrectionRequest(@NotBlank @Size(max = 2000) String text) {}
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");

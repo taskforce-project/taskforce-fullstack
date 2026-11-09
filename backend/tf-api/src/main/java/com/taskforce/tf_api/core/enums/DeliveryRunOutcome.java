@@ -10,5 +10,7 @@ public enum DeliveryRunOutcome {
     DISCARDED,
     RETRIED,
     /** L'issue terminée sans changement : ni pull request ni commit, rien à appliquer. */
-    MARKED_DONE
+    MARKED_DONE,
+    /** La personne a commenté des lignes : une reprise continue la même branche (R139, séance n°20). */
+    FOLLOWED_UP
 }

@@ -46,7 +46,9 @@ public record DeliveryRunResponse(
     Tests tests,
     /** Le geste de la personne sur la carte : APPLIED, DISCARDED ou RETRIED, et quand ; vides tant qu'elle n'a pas tranché. */
     String outcome,
-    LocalDateTime outcomeAt
+    LocalDateTime outcomeAt,
+    /** La mission que celle-ci reprend sur la même branche (R139) ; absente d'une mission neuve. */
+    Long followUpOf
 ) {
 
     /** Un run sans les faits de la carte de résultat. */
@@ -54,9 +56,17 @@ public record DeliveryRunResponse(
                                String providerKey, String model, String status, String summary, String resultUrl, String error,
                                boolean refused, Long startedById, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this(id, issueId, issueKey, issueTitle, projectId, projectName, providerKey, model, status, summary, resultUrl, error,
-            refused, startedById, null, createdAt, updatedAt, null, null, null, null, null, null, null, null);
+            refused, startedById, null, createdAt, updatedAt, null, null, null, null, null, null, null, null, null);
     }
 
-    /** {@code passedCount} sur {@code total}, quand la sortie des tests le dit. */
-    public record Tests(String command, boolean ran, boolean passed, Integer passedCount, Integer total) {}
+    /**
+     * {@code passedCount} sur {@code total}, quand la sortie des tests le dit. {@code stale} : un fichier a été remis comme
+     * avant après leur passage, le résultat porte sur une version d'avant (R139).
+     */
+    public record Tests(String command, boolean ran, boolean passed, Integer passedCount, Integer total, boolean stale) {
+
+        public Tests(String command, boolean ran, boolean passed, Integer passedCount, Integer total) {
+            this(command, ran, passed, passedCount, total, false);
+        }
+    }
 }

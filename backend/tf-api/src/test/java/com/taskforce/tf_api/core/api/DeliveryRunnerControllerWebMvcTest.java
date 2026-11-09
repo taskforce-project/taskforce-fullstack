@@ -8,6 +8,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,17 +22,20 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.taskforce.tf_api.core.dto.request.RunnerApprovalRequest;
+import com.taskforce.tf_api.core.dto.request.RunnerChangesRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerReadinessRequest;
 import com.taskforce.tf_api.core.config.DeliverySessionFilterConfig;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerClaimResponse;
+import com.taskforce.tf_api.core.dto.response.RunnerCommandResponse;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.security.DeliverySessionFilter;
 import com.taskforce.tf_api.core.service.delivery.LocalRunnerService;
 import com.taskforce.tf_api.core.service.delivery.LocalRunnerSettings;
+import com.taskforce.tf_api.core.service.delivery.MissionChangesService;
 import com.taskforce.tf_api.core.service.delivery.RunnerIdentity;
 import com.taskforce.tf_api.core.service.delivery.RunnerIdentityResolver;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
@@ -63,6 +67,7 @@ class DeliveryRunnerControllerWebMvcTest {
     @Autowired private MockMvc mockMvc;
 
     @MockitoBean private LocalRunnerService localRunnerService;
+    @MockitoBean private MissionChangesService missionChanges;
     @MockitoBean private UserRepository userRepository;                       // WorkspaceAccessInterceptor
     @MockitoBean private WorkspaceRepository workspaceRepository;             // WorkspaceAccessInterceptor
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository; // WorkspaceAccessInterceptor
@@ -259,5 +264,77 @@ class DeliveryRunnerControllerWebMvcTest {
             .andExpect(status().isForbidden());
 
         verify(localRunnerService, never()).requestApproval(any(), any(), any());
+    }
+
+    private static final RunnerIdentity IDENTITY = new RunnerIdentity("tf-runner-pierre", "pierre@taskforce.dev");
+    private static final String FILE = "{\"path\":\"a.txt\",\"status\":\"modified\",\"added\":2,\"removed\":1,\"binary\":false,\"truncated\":false,\"withheld\":false,\"revision\":\"r1\",\"body\":\"@@\"}";
+
+    @Test
+    @DisplayName("POST /runs/{id}/changes : le relevé du runner, et son drapeau « final »")
+    void changes_are_saved() throws Exception {
+        mockMvc.perform(post("/api/delivery/runner/runs/100/changes").with(runner())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"mode\":\"repo\",\"base\":\"" + "a".repeat(40) + "\",\"files\":[" + FILE + "],\"more\":0,\"added\":2,\"removed\":1,\"final\":true}"))
+            .andExpect(status().isOk());
+
+        ArgumentCaptor<RunnerChangesRequest> request = ArgumentCaptor.forClass(RunnerChangesRequest.class);
+        verify(missionChanges).saveChanges(eq(100L), eq(IDENTITY), request.capture());
+        assertThat(request.getValue().final_()).isTrue();
+        assertThat(request.getValue().files()).hasSize(1);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+        "mode inconnu | {\"mode\":\"cloud\",\"files\":[],\"more\":0,\"added\":0,\"removed\":0,\"final\":false}",
+        "base qui n'est pas un commit | {\"mode\":\"repo\",\"base\":\"HEAD; rm\",\"files\":[],\"more\":0,\"added\":0,\"removed\":0,\"final\":false}",
+        "sans liste | {\"mode\":\"repo\",\"more\":0,\"added\":0,\"removed\":0,\"final\":false}",
+        "statut inconnu | {\"mode\":\"repo\",\"files\":[{\"path\":\"a\",\"status\":\"moved\",\"revision\":\"r\"}],\"more\":0,\"added\":0,\"removed\":0,\"final\":false}",
+        "sans empreinte | {\"mode\":\"repo\",\"files\":[{\"path\":\"a\",\"status\":\"added\"}],\"more\":0,\"added\":0,\"removed\":0,\"final\":false}",
+    })
+    @DisplayName("un relevé mal formé est refusé (400)")
+    void changes_are_validated(String label, String body) throws Exception {
+        mockMvc.perform(post("/api/delivery/runner/runs/100/changes").with(runner()).contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isBadRequest());
+        verify(missionChanges, never()).saveChanges(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("POST /commands : les ordres de ce runner")
+    void commands_are_handed_out() throws Exception {
+        when(missionChanges.takeCommands(IDENTITY)).thenReturn(List.of(new RunnerCommandResponse(9L, 100L, "REVERT_FILE", "a.txt",
+            "tf/web-1-r100", "a".repeat(40), 100L, "acme/website", null, null)));
+
+        mockMvc.perform(post("/api/delivery/runner/commands").with(runner()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].commandId").value(9))
+            .andExpect(jsonPath("$.data[0].path").value("a.txt"))
+            .andExpect(jsonPath("$.data[0].branch").value("tf/web-1-r100"));
+    }
+
+    @Test
+    @DisplayName("POST /commands/{id}/result : ce que le runner a fait")
+    void command_result_is_saved() throws Exception {
+        mockMvc.perform(post("/api/delivery/runner/commands/9/result").with(runner())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"ok\":true,\"message\":\"Put a.txt back.\",\"commit\":\"" + "b".repeat(40) + "\",\"commits\":2,\"pushed\":true,\"trace\":[{\"action\":\"git.push\",\"effect\":\"allow\",\"rule\":\"x\"}]}"))
+            .andExpect(status().isOk());
+
+        verify(missionChanges).finishCommand(eq(9L), eq(IDENTITY), any());
+    }
+
+    @Test
+    @DisplayName("POST /commands/{id}/result : sans message, refusé (la personne doit pouvoir lire ce qui s'est passé)")
+    void command_result_needs_a_message() throws Exception {
+        mockMvc.perform(post("/api/delivery/runner/commands/9/result").with(runner()).contentType(MediaType.APPLICATION_JSON).content("{\"ok\":false}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({ "/api/delivery/runner/commands", "/api/delivery/runner/commands/9/result", "/api/delivery/runner/runs/100/changes" })
+    @DisplayName("un utilisateur ne peut pas jouer le runner (403)")
+    void new_routes_refuse_a_user_token(String path) throws Exception {
+        mockMvc.perform(post(path).with(user()).contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isForbidden());
+        verify(missionChanges, never()).takeCommands(any());
     }
 }

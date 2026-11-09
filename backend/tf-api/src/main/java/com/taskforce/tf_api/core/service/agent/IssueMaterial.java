@@ -260,6 +260,7 @@ public class IssueMaterial {
             case "MISSION_DISCARDED" -> "discarded the mission's result";
             case "MISSION_RETRIED" -> "sent the mission back to its agent";
             case "MISSION_MARKED_DONE" -> "marked the mission done with no change needed";
+            case "MISSION_CHANGES_ASKED" -> "asked the agent for changes";
             default -> event.getAction() == null ? "changed it" : event.getAction().name().toLowerCase(Locale.ROOT).replace('_', ' ');
         };
         return (event.getCreatedAt() == null ? "" : day(event.getCreatedAt()) + ", ") + who + " " + what.strip();
