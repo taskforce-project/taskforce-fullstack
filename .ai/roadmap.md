@@ -10,6 +10,15 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 09/11/2026 - TF-J1-15, la conversation dit ce qu'elle fait, d'une seule voix (R136, R137, la part messages de R143, séance n°20) :** `[feat]`
+> - **Longs messages** : `@Size(max = 4000)` refusait le texte de la recette avant le budget de contexte de la 1.13 ; la borne ne protège plus que le serveur (400 000 caractères), un texte plus grand que la fenêtre reçoit la réponse prévue, et un long texte collé se replie dans sa bulle.
+> - **Échecs** : `ModelProviderException.Why` et `ModelFailure` disent la vraie cause (délai avec sa durée, fournisseur injoignable, crédit, débit, clé, modèle absent, mémoire) ; côté front, `lib/cortex/failed-turn.ts`. Plus de « Sorry, I couldn't answer ».
+> - **Une voix (R136)** : les questions sont dites par Cortex ; TaskForce ne signe que la correction d'une phrase fausse et ce qui parle du modèle.
+> - **Le travail se replie (R137)** : le serveur annonce ses étapes (`TurnProgress`, `/topic/cortex.{userId}`), la ligne de travail les dit, puis « Worked for 8 s » et des phrases, jamais un nom d'outil. Le mot « Sources » disparaît : « read 5 notes and the SOLO board », un clic les nomme, chacune s'ouvre (`GET /brain/nodes/{id}`).
+> - **Sous une réponse** : copier, bien, pas bien. Toute réponse d'un modèle a son dossier ; « bien » garde ce qui a été observé, « pas bien » une phrase, et le cas attend ses critères dans Progress > History (`EvalCase.WAITING_FOR_CRITERIA`, sans migration : R61 tient, aucun rejeu ne le note). Le formulaire passe sous « Advanced ».
+> - **`/compact`** : une ligne attend là où viendra le résultat, rien ne défile, le fil reste entier, la ligne ouvre le résumé (gardé dans le message), la jauge prend la taille comptée par le serveur.
+> - **Dépôt (s14)** : « Create a new repository » dans la question, privé, au nom du projet, puis lié ; la webapp l'a par sa connexion GitHub (scope `repo`), le desktop par le `gh` de la personne quand son jeton en a le droit (R15), le clic sur la carte est l'accord.
+
 > **▶ MAJ 09/11/2026 - Le site propose la desktop la plus récente : le plus grand numéro, plus le premier de la liste de GitHub.** `[fix]`
 > - **Constat** : la desktop 1.10.0 publiée, `/download` proposait encore 1.9.0. `getDesktopRelease` (`landing-page/src/lib/release.ts`) prenait la première desktop de `GET /releases`, dont l'ordre n'est pas celui des versions : 1.9.0 y passe devant 1.10.0, le premier numéro à deux chiffres. Les apps installées ne sont pas touchées : elles lisent `latest.yml`, qui annonce 1.10.0.
 > - **Correctif** : le plus grand numéro, comparé nombre par nombre, sur 100 releases au lieu de 40.
