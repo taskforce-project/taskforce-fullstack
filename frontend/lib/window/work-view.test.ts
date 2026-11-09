@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { DeliveryRunEvent, MissionEvidence, MissionEvidenceEvent } from "@/lib/api/delivery-service"
-import { diffAnchor, documentChanges, evidenceKind, fileChanges, proofOf } from "./work-view"
+import { diffAnchor, documentChanges, fileChanges, proofOf } from "./work-view"
 
 let seq = 0
 const event = (kind: DeliveryRunEvent["kind"], tool: string | null, text: string): DeliveryRunEvent =>
@@ -73,21 +73,16 @@ describe("diffAnchor : un fichier dans l'onglet Files changed de la pull request
 })
 
 describe("proofOf : la preuve telle qu'elle se construit", () => {
-  it("counts the record's events, shows the latest first, and says when the mission ended", () => {
+  it("counts the record's events, and says when the mission ended", () => {
     const building: MissionEvidence = { format: "taskforce-evidence/1", events: [1, 2, 3].map((n) => proofEvent(n, "action.requested")), root: "h3" }
-    expect(proofOf(building, 2)).toEqual({ count: 3, latest: [building.events[2], building.events[1]], sealed: false, root: "h3" })
+    expect(proofOf(building)).toEqual({ count: 3, sealed: false })
 
     const sealed: MissionEvidence = { ...building, events: [...building.events, proofEvent(4, "mission.ended")], root: "h4" }
-    expect(proofOf(sealed)).toMatchObject({ count: 4, sealed: true, root: "h4" })
+    expect(proofOf(sealed)).toEqual({ count: 4, sealed: true })
   })
 
   it("is empty before the first event, or for a run without a record", () => {
-    expect(proofOf(null)).toEqual({ count: 0, latest: [], sealed: false, root: null })
-    expect(proofOf(undefined)).toEqual({ count: 0, latest: [], sealed: false, root: null })
-  })
-
-  it("names the kinds of the record, and leaves an unknown one to its name", () => {
-    expect(evidenceKind("human.decision")).toBe("human.decision")
-    expect(evidenceKind("something.new")).toBeNull()
+    expect(proofOf(null)).toEqual({ count: 0, sealed: false })
+    expect(proofOf(undefined)).toEqual({ count: 0, sealed: false })
   })
 })

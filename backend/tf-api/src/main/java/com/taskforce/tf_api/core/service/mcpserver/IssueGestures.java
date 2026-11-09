@@ -1041,7 +1041,8 @@ public class IssueGestures {
                 ? " is done: its result waits for review on the result card below (Apply, Discard, Try again, or Mark as "
                     + "done when it changed nothing)." + decides
                 : " is done, and its result was " + OUTCOMES.getOrDefault(run.outcome(), run.outcome().toLowerCase(Locale.ROOT)) + ".";
-            default -> run.refused() ? " did not start: " + text(run.error())
+            default -> "STOPPED".equals(run.outcome()) ? " was stopped by the person who delegated it."
+                : run.refused() ? " did not start: " + text(run.error())
                 : " failed" + (run.error() == null || run.error().isBlank() ? "." : ": " + run.error());
         };
     }
