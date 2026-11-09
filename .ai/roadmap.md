@@ -10,6 +10,15 @@
 >
 > Sources : les notes de conception du Brain OS (`taskforce-docs`) ; les anciennes notes de `.ai/` (QA, problèmes connus, cartes du code, plan P0) ont été retirées au lot 8 du plan open source et restent dans l'historique git.
 
+> **▶ MAJ 09/11/2026 - J1, TF-J1-18 : les listes, le rail, les dialogues et la palette (R133, R141, séance n°20).** `[frontend + backend + fern + docs]`
+> - **Constat** : « un tableau à colonnes `Type`, `Signal`, `Op`, un mot `Ack` » pour ce qui attend, « interface de search naze, peut-être pas assez deep », « retravailler les infos affichées, comment, pourquoi » sur le rail, les layouts dans les modales.
+> - **« Waiting for you »** : trois groupes (Needs you, What happened, Alerts), une phrase par ligne de 36 px, les actions au survol en mots ; plus de tableau ni d'onglets. `/inbox/alerts` et `/inbox/mentions` restent, Ctrl+K y mène.
+> - **Le rail** : des cartes qui disent d'un regard ce qu'elles apportent, le détail à un clic, sans « window » ni « tokens » ; Results rejoint Missions.
+> - **Dialogues et volets** : `size` 420, 560, 720 sur le `DialogContent` partagé, une colonne, une action principale ; un tableau dans un volet de moins de 720 px devient une liste (`DataTable`).
+> - **Ctrl+K** : 640 px, sections, première ligne choisie, pied avec les touches, Entrée avant la réponse attend la réponse ; issues par clé, titre et commentaires, notes en plein texte, personnes. Une note se lit dans le volet (`/notes/{id}`).
+> - **Backend** : `GET issues/search/comments`, `textOnly` sur `POST brain/search`, `GET brain/nodes/{id}`. Aucune migration.
+> - **Reste** : la palette et le rail n'ont été vus que sur une page temporaire, avec des données posées dans les stores (connexion impossible sans mot de passe) ; les endpoints, eux, ont leurs tests contre un vrai Postgres.
+
 > **▶ MAJ 09/11/2026 - Le site propose la desktop la plus récente : le plus grand numéro, plus le premier de la liste de GitHub.** `[fix]`
 > - **Constat** : la desktop 1.10.0 publiée, `/download` proposait encore 1.9.0. `getDesktopRelease` (`landing-page/src/lib/release.ts`) prenait la première desktop de `GET /releases`, dont l'ordre n'est pas celui des versions : 1.9.0 y passe devant 1.10.0, le premier numéro à deux chiffres. Les apps installées ne sont pas touchées : elles lisent `latest.yml`, qui annonce 1.10.0.
 > - **Correctif** : le plus grand numéro, comparé nombre par nombre, sur 100 releases au lieu de 40.
