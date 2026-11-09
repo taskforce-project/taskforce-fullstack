@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
-import { PENDING_FILE, pendingOutcome, savePending, takePending, type PendingUpdate } from "../src/update-pending";
+import { PENDING_FILE, pendingOutcome, releaseUpdateScreen, savePending, SCREEN_FILE, takePending, updateScreenIsUp, type PendingUpdate } from "../src/update-pending";
 
 let dir = "";
 
@@ -38,6 +38,27 @@ describe("the update noted before quitting, read once at the next start", () => 
   }
 
   it("has nothing to say without a note", () => assert.equal(takePending(dir), null));
+});
+
+describe("the hand-over of the update screen between the installer and the app", () => {
+  it("is up while the installer's file exists, and goes when the app releases it", () => {
+    assert.equal(updateScreenIsUp(dir), false);
+
+    writeFileSync(join(dir, SCREEN_FILE), "");
+    assert.equal(updateScreenIsUp(dir), true);
+
+    releaseUpdateScreen(dir);
+    assert.equal(updateScreenIsUp(dir), false);
+  });
+
+  it("has nothing to release when no installer waits, and does not fail", () => {
+    releaseUpdateScreen(dir);
+    assert.equal(updateScreenIsUp(dir), false);
+  });
+
+  it("does not fail when the folder cannot be written to", () => {
+    assert.doesNotThrow(() => releaseUpdateScreen(join(dir, "missing", "folder")));
+  });
 });
 
 describe("what the next start makes of it", () => {

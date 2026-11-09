@@ -27,6 +27,7 @@ vi.mock("@/lib/api/ai-conversation-service", () => ({
 }));
 vi.mock("@/lib/api/ai-status-service", () => ({ getAiStatus: vi.fn().mockResolvedValue(null) }));
 vi.mock("@/lib/api/integration-service", () => ({ getMcpServers: vi.fn().mockResolvedValue([]) }));
+vi.mock("@/lib/hooks/use-connector-lines", () => ({ useConnectorLines: () => [] }));
 
 // Le dépli et le repli sont instantanés en test : happy-dom annule les animations du navigateur, ce qui laisserait des
 // rejets non gérés après le repli.
@@ -82,13 +83,12 @@ describe("CommandBar : repliée dans le compositeur, la conversation s'ouvre au-
     const conversation = await screen.findByRole("region", { name: "Conversation with Cortex" });
     expect(conversation).toHaveTextContent("Which issues are blocked?");
     await waitFor(() => expect(conversation).toHaveTextContent("Two issues are blocked."));
-    expect(sendAgentMessage).toHaveBeenCalledWith("acme", "Which issues are blocked?", null);
+    expect(sendAgentMessage).toHaveBeenCalledWith("acme", "Which issues are blocked?", null, null, null, [], expect.objectContaining({ files: [] }));
     expect(input).toHaveAttribute("placeholder", "Reply to Cortex…");
-    // Dépliée, la conversation est le contexte : plus de suggestions sous la barre, et les sources restent repliées.
+    // Dépliée, la conversation est le contexte : plus de suggestions sous la barre, et plus de mot « Sources » (R137).
     expect(screen.queryByRole("button", { name: "Create an issue" })).toBeNull();
+    expect(screen.queryByText(/Sources/)).toBeNull();
     expect(screen.queryByText("Runbook")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Sources \(1\)/ }));
-    expect(screen.getByText("Runbook")).toBeTruthy();
   });
 
   it("minimizes with Escape and opens the same conversation again", async () => {

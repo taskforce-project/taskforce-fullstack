@@ -693,6 +693,7 @@ class IssueGesturesTest {
         "DONE    | APPLIED | false |          | is done, and its result was applied.",
         "FAILED  |         | true  | No rule  | did not start: No rule",
         "FAILED  |         | false | Crashed  | failed: Crashed",
+        "FAILED  | STOPPED | false | Stopped  | was stopped by the person who delegated it.",
     })
     void a_mission_says_where_it_stands(String status, String outcome, boolean refused, String error, String said)
         throws Exception {

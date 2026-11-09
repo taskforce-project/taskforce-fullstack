@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -19,12 +21,15 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.AiConversationService;
+import com.taskforce.tf_api.core.service.agent.AgentService;
 import com.taskforce.tf_api.core.service.agent.ModelCapabilityService;
 import com.taskforce.tf_api.core.service.ai.ChosenModel;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -40,6 +45,7 @@ public class AiConversationController {
     private final BrainAccessGuard access;
     private final UserRepository userRepository;
     private final ModelCapabilityService capabilities;
+    private final AgentService agent;
 
     private record Ctx(Long workspaceId, Long userId) {}
 
@@ -64,16 +70,29 @@ public class AiConversationController {
         return ResponseEntity.ok(ApiResponse.success(service.detail(id, c.userId())));
     }
 
+    /** Le projet où la conversation travaille (R135), choisi dans la rangée sous le compositeur ; null pour « No project ». */
+    @PutMapping("/{id}/project")
+    public ResponseEntity<ApiResponse<ConversationSummary>> setProject(
+        @PathVariable String slug, @PathVariable Long id, @Valid @RequestBody ConversationProjectRequest body,
+        @AuthenticationPrincipal Jwt jwt) {
+        Ctx c = ctx(slug, jwt);
+        return ResponseEntity.ok(ApiResponse.success(service.setProject(id, c.userId(), c.workspaceId(), body.projectId())));
+    }
+
+    /** {@code projectId} : un projet de l'espace, ou null pour aucun. */
+    public record ConversationProjectRequest(@Positive Long projectId) {}
+
     /**
      * « /compact » (TF-J1-13) : condense maintenant les messages anciens dans le résumé de la conversation, même sous le
-     * seuil, avec le modèle que la personne a choisi (R113), et le dit dans la conversation.
+     * seuil, avec le modèle que la personne a choisi (R113), et le dit dans la conversation. La réponse donne le résumé
+     * et ce qu'il reste à envoyer au modèle : la jauge prend sa nouvelle valeur tout de suite (TF-J1-15).
      */
     @PostMapping("/{id}/compact")
     public ResponseEntity<ApiResponse<Compaction>> compact(
         @PathVariable String slug, @PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
         Ctx c = ctx(slug, jwt);
-        int summarized = ChosenModel.using(capabilities.chosenModel(c.userId()), () -> service.compact(id, c.userId()));
-        return ResponseEntity.ok(ApiResponse.success(new Compaction(summarized)));
+        Compaction done = ChosenModel.using(capabilities.chosenModel(c.userId()), () -> service.compact(id, c.userId()));
+        return ResponseEntity.ok(ApiResponse.success(done.withBaseline(agent.baselineTokens())));
     }
 
     @DeleteMapping("/{id}")

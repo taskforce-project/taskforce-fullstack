@@ -36,6 +36,8 @@ final class RepoMatch {
 
     private static final Set<String> NEW_WORDS = Set.of("new", "nouveau", "nouvelle", "creer", "cree", "creez", "creates",
         "create");
+    /** Les mots qui nomment un dépôt : « crée un projet » n'en demande pas un, « avec un nouveau repo » si. */
+    private static final Set<String> REPOSITORY_WORDS = Set.of("repo", "repos", "repository", "repositories", "depot", "depots", "github");
     private static final Set<String> PRIVATE_WORDS = Set.of("private", "prive", "privee");
     private static final Set<String> PUBLIC_WORDS = Set.of("public", "publique");
 
@@ -140,6 +142,11 @@ final class RepoMatch {
     /** La réponse demande un nouveau dépôt (« un nouveau dépôt privé », « create a new one », « crée-le »). */
     static boolean wantsNew(String said) {
         return plainWords(said).stream().anyMatch(NEW_WORDS::contains);
+    }
+
+    /** La demande parle d'un dépôt, en ces mots. */
+    static boolean namesRepository(String said) {
+        return plainWords(said).stream().anyMatch(REPOSITORY_WORDS::contains);
     }
 
     /** La visibilité qu'elle dit d'un nouveau dépôt : {@code private}, {@code public}, ou null. */

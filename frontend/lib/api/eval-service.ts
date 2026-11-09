@@ -12,6 +12,8 @@ export const NO_TOOL = "none"
 
 /** Ce qu'un cas vérifie. Un champ vide n'est pas vérifié ; il faut au moins un critère. */
 export interface EvalCriteria {
+  /** Ce qu'il aurait fallu faire, dans les mots de la personne : une phrase ne se vérifie pas, elle reste avec le cas. */
+  expected?: string
   /** L'outil attendu, `NO_TOOL` pour aucun, vide pour ne pas le vérifier. */
   tool: string
   /** Pour chaque argument de l'outil attendu, les valeurs acceptées (la casse ne compte pas). */
@@ -35,6 +37,10 @@ export interface EvalCaseSummary {
   /** Quand les critères ont été figés : un rejeu ne compte que les cas figés avant son départ. */
   criteriaAt: string
   mine: boolean
+  /** Ce qu'il aurait fallu faire, dans les mots de la personne ; vide sinon. */
+  expected?: string
+  /** Le cas n'est encore qu'une phrase : aucun rejeu ne le note avant ses critères (R61). */
+  waiting?: boolean
 }
 
 export interface EvalRunSummary {
@@ -150,6 +156,12 @@ export interface EvalHistoryCase {
   origin: EvalCaseOrigin
   /** Dans l'ordre des rejeux. */
   grades: EvalGrade[]
+  /** Ce qu'il aurait fallu faire, dans les mots de la personne ; vide sinon. */
+  expected?: string
+  /** Le cas attend ses critères (R137). */
+  waiting?: boolean
+  /** Le dossier d'un cas qui attend ses critères : leur formulaire s'en tire. */
+  record?: string | null
 }
 
 export interface EvalHistory {
@@ -182,6 +194,26 @@ export async function createEvalCase(
   slug: string, record: string, title: string, criteria: EvalCriteria,
 ): Promise<EvalCaseSummary> {
   const res = await apiClient.post<{ data: EvalCaseSummary }>(EVAL_ROUTES.CASES(slug), { record, title, criteria })
+  return res.data.data
+}
+
+/** « Bien » (R137) : ce qui a été observé devient ce qu'on attend, d'un clic. */
+export async function keepGoodCase(slug: string, record: string): Promise<EvalCaseSummary> {
+  const res = await apiClient.post<{ data: EvalCaseSummary }>(EVAL_ROUTES.CASE_GOOD(slug), { record })
+  return res.data.data
+}
+
+/** « Pas bien » (R137) : une phrase, ce qu'il aurait fallu faire ; le cas attend ses critères. */
+export async function keepBadCase(slug: string, record: string, expected: string): Promise<EvalCaseSummary> {
+  const res = await apiClient.post<{ data: EvalCaseSummary }>(EVAL_ROUTES.CASE_BAD(slug), { record, expected })
+  return res.data.data
+}
+
+/** Écrit les critères d'un cas qui les attend, une fois : le serveur les date maintenant. */
+export async function giveEvalCriteria(
+  slug: string, caseId: number, title: string, criteria: EvalCriteria,
+): Promise<EvalCaseSummary> {
+  const res = await apiClient.put<{ data: EvalCaseSummary }>(EVAL_ROUTES.CASE_CRITERIA(slug, caseId), { title, criteria })
   return res.data.data
 }
 

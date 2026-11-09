@@ -119,7 +119,7 @@ export function RedistributionDialog({ slug, targetUserId, trigger, onApplied }:
         )}
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Scale className="size-4 text-primary" /> Suggested redistribution

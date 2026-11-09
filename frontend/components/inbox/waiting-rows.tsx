@@ -44,9 +44,9 @@ function WaitingRow({ item, onOpen }: Readonly<{ item: WaitingItem; onOpen: (ite
 }
 
 /**
- * Ce qui attend la personne, une ligne par chose (R127, R129, séance n°19) : la même ligne dans l'arrivée et dans le
- * volet « Waiting for you ». Un clic ouvre son issue dans le volet ; une mention lue par ce clic quitte la liste. Dans
- * l'arrivée, au-delà de trois, `more` montre « See all » et le total.
+ * Ce qui attend la personne, sur l'arrivée, une ligne par chose (R127, R129, séance n°19) ; le volet « Waiting for you »
+ * a la sienne, avec la clé et le moment (`ListRow`, R141). Un clic ouvre son issue dans le volet ; une mention lue par ce
+ * clic quitte la liste. Au-delà de trois, `more` montre « See all » et le total.
  */
 export function WaitingRows({ slug, items, more }: Readonly<{
   slug: string

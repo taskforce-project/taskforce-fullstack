@@ -18,6 +18,8 @@ import com.taskforce.tf_api.core.service.ai.ModelDeadline;
 import com.taskforce.tf_api.core.service.ai.ModelGateway;
 import com.taskforce.tf_api.core.service.ai.ModelProviderException;
 import com.taskforce.tf_api.core.service.ai.ModelWindow;
+import com.taskforce.tf_api.core.service.ai.TurnStop;
+import com.taskforce.tf_api.core.service.ai.TurnStoppedException;
 import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.extern.slf4j.Slf4j;
@@ -142,6 +144,8 @@ public class AiGatewayClient implements LlmClient {
 
     private JsonNode callChat(List<?> messages, List<Map<String, Object>> tools, boolean jsonMode, String tier,
                               String model) {
+        // La personne a arrêté ce tour (R134) : rien ne part.
+        TurnStop.check();
         AiStatusService.Snapshot snapshot = status.snapshot();
         AiStatus current = snapshot.status();
         if (!current.chatAvailable()) {
@@ -157,6 +161,12 @@ public class AiGatewayClient implements LlmClient {
             accumulateUsage(reply.usage());
             remember(reply);
             return reply.message();
+        } catch (TurnStoppedException stopped) {
+            // L'appel coupé n'a pas dit son usage : le prompt que le modèle a commencé à lire compte quand même, estimé
+            // comme le budget de la requête. Ce n'est pas une panne : l'état de l'IA reste valable.
+            long read = ContextBudget.tokens(String.valueOf(messages));
+            accumulateUsage(new LlmUsage(read, 0, read));
+            throw stopped;
         } catch (ModelProviderException.ToolsRefused refused) { // le fournisseur répond : son état reste valable
             log.error("AI provider refused the tools: {}", LogSafe.of(refused.getMessage()));
             throw new LlmToolsRefusedException("The AI provider refused the tools", refused);

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -36,20 +37,27 @@ import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantStep;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantToolCall;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage;
 import com.taskforce.tf_api.core.dto.response.ChatTurnResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.enums.NodeDomain;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.security.DelegatedAgent;
+import com.taskforce.tf_api.core.service.AiConversationService;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.LlmContext;
 import com.taskforce.tf_api.core.service.LlmToolsRefusedException;
 import com.taskforce.tf_api.core.service.LlmUsage;
+import com.taskforce.tf_api.core.service.agent.TurnInput.LastCard;
+import com.taskforce.tf_api.core.service.agent.tools.ProjectResolver;
+import com.taskforce.tf_api.core.service.ai.AttachedFile;
 import com.taskforce.tf_api.core.service.ai.ContextBudget;
+import com.taskforce.tf_api.core.service.ai.ModelFailure;
 import com.taskforce.tf_api.core.service.ai.ModelWindow;
 import com.taskforce.tf_api.core.service.ai.TurnHistory;
+import com.taskforce.tf_api.core.service.ai.TurnStoppedException;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.core.service.mcp.ExternalMcpTool;
@@ -94,6 +102,8 @@ public class AgentService {
     private final CortexUndo          undo;
     private final ScreenContext       screens;
     private final IssueMaterial       material;
+    private final ProjectResolver     projects;
+    private final AiConversationService conversations;
 
     // Tier des tours avec outils externes MCP. Défaut "fast" ; "standard" pour plus de fiabilité
     // multi-outils si le matériel suit.
@@ -112,6 +122,12 @@ public class AgentService {
 
     private static final String STEP_SEARCH = "Searching your workspace's notes";
     private static final String STEP_ANSWER = "Writing the answer";
+
+    /**
+     * Ce qu'une demande apporte à la recherche dans les notes : ses deux bouts, assez pour la question d'un long texte
+     * collé, où qu'elle soit, sans envoyer tout le texte au service de vecteurs ni à {@code to_tsquery}.
+     */
+    private static final int SEARCH_END = 2_000;
 
     public AssistantAnswer run(String slug, Long userId, String message) {
         return run(slug, userId, message, List.of());
@@ -247,9 +263,21 @@ public class AgentService {
             new Screen(longOrNull(where.path("projectId")), longOrNull(where.path("issueId"))));
         String argsJson = args.toString();
         ToolOutcome outcome = new Kernel(ctx, record).apply(tool, toolName, argsJson);
+        // Le projet que la personne vient de choisir sur la carte devient celui de sa conversation (R135) : la rangée le
+        // montre, et la question ne revient pas au geste suivant.
+        if (said.containsKey(ProjectResolver.FIELD) && "pending".equals(outcome.status())) {
+            adoptProject(asked.path("conversation"), said.get(ProjectResolver.FIELD), ws.getId(), ctx);
+        }
         String shown = outcome.input() != null ? outcome.input() : argsJson;
         return new AssistantToolCall(toolName, outcome.status(), shown, outcome.result(), record.toString(), outcome.ref(),
             outcome.target(), card(outcome.questions()));
+    }
+
+    private void adoptProject(JsonNode conversation, String project, Long workspaceId, AgentContext ctx) {
+        Long conversationId = longOrNull(conversation);
+        if (conversationId == null) return;
+        ProjectResolver.Resolution where = projects.resolve(project, ctx);
+        if (where.found()) conversations.setProject(conversationId, ctx.userId(), workspaceId, where.project().getId());
     }
 
     /**
@@ -411,16 +439,35 @@ public class AgentService {
      */
     public AssistantAnswer run(String slug, Long userId, String message, TurnHistory memory, Screen screen,
                                List<Screen> attached) {
-        Workspace ws = access.resolveAndAuthorize(slug, userId);
-        AgentContext ctx = new AgentContext(slug, ws.getId(), userId, screen, message);
+        return run(slug, userId, new TurnInput(message, memory, screen, attached, List.of(), null, null, null));
+    }
 
-        // Salutation ou remerciement : réponse directe, sans recherche (pas de sources hors sujet).
-        if (isConversational(message)) {
+    /**
+     * Un tour tel que le compositeur l'envoie (R134, R135) : avec le projet de la conversation, que les gestes prennent
+     * quand la demande n'en nomme pas, et les fichiers joints, comptés comme ce qui est joint. La personne peut l'arrêter :
+     * ce qui a tourné est compté, et la réponse le dit.
+     */
+    public AssistantAnswer run(String slug, Long userId, TurnInput input) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        String message = input.message();
+        TurnHistory memory = input.memory();
+        List<Screen> attached = input.attached();
+        AgentContext ctx = new AgentContext(slug, ws.getId(), userId, input.screen(), message, projectOf(input),
+            input.conversation());
+
+        // « Tu t'es trompé de projet », après une carte : le choix du projet, sans le modèle (R135).
+        AssistantAnswer corrected = input.lastCard() == null ? null : correctProject(ws.getId(), ctx, message, input.lastCard());
+        if (corrected != null) return corrected;
+
+        // Salutation ou remerciement : réponse directe, sans recherche (pas de sources hors sujet). Ce qui est joint se lit.
+        if (isConversational(message) && attached.isEmpty() && input.files().isEmpty()) {
             return runConversational(ws.getId(), message, memory);
         }
 
+        long startedAt = System.nanoTime();
         // ── Recherche (RAG), réelle avec ou sans IA, dans les notes que la personne lit ──
-        List<KnowledgeNode> hits = search.retrieveRelevant(access.viewer(ws.getId(), userId), message, 5);
+        TurnProgress.say(TurnProgress.NOTES);
+        List<KnowledgeNode> hits = search.retrieveRelevant(access.viewer(ws.getId(), userId), searchQuery(message), 5);
         List<AssistantSource> sources = hits.stream()
             .map(n -> new AssistantSource(n.getTitle(), n.getDomain().name(), null))
             .toList();
@@ -443,11 +490,11 @@ public class AgentService {
         // Hors du try : si le modèle ou le fournisseur s'arrête après une écriture, la réponse doit encore la montrer.
         List<AssistantToolCall> toolCalls = new ArrayList<>();
         // Ce que TaskForce donne à lire au modèle, compté à mesure : la ligne grise sous la réponse (R123).
-        Reading reading = new Reading(hits.size());
+        Reading reading = new Reading(hits);
         try {
             steps.add(new AssistantStep(STEP_ANSWER, "active", "Cortex answers, with its tools if needed"));
             // Un geste qui se demande parle par sa carte : la phrase du modèle ne dit pas « je supprime » à sa place.
-            String modelAnswer = cardAnswer(runToolLoop(message, hits, ctx, toolCalls, memory, attached, reading), toolCalls);
+            String modelAnswer = cardAnswer(runToolLoop(message, hits, ctx, toolCalls, memory, attached, input.files(), reading), toolCalls);
             // R116 : une phrase qui annonce une action sans son résultat d'outil est remplacée par la vérité, signée par
             // TaskForce, et l'incident entre au dossier de la réponse (E17).
             ActionClaimCheck.Checked checked = ActionClaimCheck.check(modelAnswer, ActionClaimCheck.Ran.of(toolCalls));
@@ -461,17 +508,22 @@ public class AgentService {
                 steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
                     "Cortex said something was done that no action did: TaskForce corrected it"));
             }
-            // La question d'un geste est la parole de TaskForce (R115), signée ; et quand Cortex n'a rien dit (qwen3:8b,
-            // souvent, après une demande de suppression), TaskForce dit ce qui s'est passé.
+            // La question d'un geste se reconnaît à sa marque (R115) : la carte la montre à sa place ; et quand Cortex n'a
+            // rien dit (qwen3:8b, souvent, après une demande de suppression), ce qui s'est passé se dit à sa place.
             String asked = askedAnswer(checked.answer(), toolCalls);
-            String answer = silentAnswer(asked, toolCalls);
+            String answer = silentAnswer(asked, toolCalls, llm.currentModel());
             if (!answer.equals(asked)) {
-                steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", "Cortex said nothing: TaskForce said what happened"));
+                steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", "Cortex said nothing: what happened was said instead"));
             }
+            // Toute réponse d'un modèle a son dossier : « bien » et « pas bien » en font un cas (R137, R61).
+            if (record == null) record = recordForTheBank(ctx, message, hits);
             LlmUsage usage = llm.currentUsage();
             recordUsage(ws.getId(), usage);
             return new AssistantAnswer(answer, null, toolCalls.isEmpty() ? "fast" : "deep",
-                sources, steps, toolCalls, usage(usage), record, llm.currentModel(), reading.read());
+                sources, steps, toolCalls, usage(usage), record, llm.currentModel(),
+                reading.read(toolCalls, record, startedAt));
+        } catch (TurnStoppedException stopped) {
+            return stoppedByPerson(ws.getId(), steps, sources, toolCalls, reading);
         } catch (TooBig tooBig) {
             log.info("Cortex (ws={}) : une demande d'environ {} jetons ne tient pas la fenêtre de {} ({})", ws.getId(),
                 tooBig.budget.fixed(), LogSafe.of(tooBig.budget.window().model()), tooBig.budget.window().tokens());
@@ -484,8 +536,8 @@ public class AgentService {
             LlmUsage usage = llm.currentUsage();
             recordUsage(ws.getId(), usage);
             if (!toolCalls.isEmpty()) {
-                return stopped(steps, sources, toolCalls, usage(usage), llm.currentModel(), "The AI provider refused Cortex's tools")
-                    .withRead(reading.read());
+                return stopped(steps, sources, toolCalls, usage(usage), llm.currentModel(), "The AI provider refused Cortex's tools.")
+                    .withRead(reading.read(toolCalls, null, startedAt));
             }
             steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
                 "The AI provider refused Cortex's tools: nothing was done"));
@@ -494,15 +546,95 @@ public class AgentService {
             log.warn("Agent LLM indisponible (slug={}): {}", LogSafe.of(slug), LogSafe.of(ex.getMessage()));
             LlmUsage usage = llm.currentUsage(); // usage partiel réel (appels déjà faits avant l'échec)
             recordUsage(ws.getId(), usage);
+            // Ce qui s'est vraiment passé, et quoi faire (TF-J1-15) : un délai dépassé n'est pas une IA absente.
+            ModelFailure failure = ModelFailure.of(ex);
             if (!toolCalls.isEmpty()) {
-                return stopped(steps, sources, toolCalls, usage(usage), llm.currentModel(), "The model stopped answering")
-                    .withRead(reading.read());
+                return stopped(steps, sources, toolCalls, usage(usage), llm.currentModel(), failure.said())
+                    .withRead(reading.read(toolCalls, null, startedAt));
             }
-            steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
-                "The model did not answer: here are the notes of your workspace"));
-            return new AssistantAnswer(fallbackAnswer(hits), null, "fallback", sources, steps, List.of(), usage(usage));
+            steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", failure.said()));
+            return new AssistantAnswer(signed(ABOUT_MODELS, List.of(failure.said())), null, "fallback", sources, steps, List.of(), usage(usage));
         } finally {
             llm.endUsageCapture();
+        }
+    }
+
+    /** Le projet de ce tour : celui que la personne a joint à sa demande, quand il n'y en a qu'un, sinon celui de la conversation. */
+    private static Long projectOf(TurnInput input) {
+        List<Long> joined = input.attached().stream().filter(item -> item.issueId() == null && item.projectId() != null)
+            .map(Screen::projectId).distinct().toList();
+        return joined.size() == 1 ? joined.get(0) : input.project();
+    }
+
+    /** Le mode d'un tour que la personne a arrêtée (R134) : la conversation le relit comme tel. */
+    public static final String STOPPED_MODE = "stopped";
+    private static final String STOPPED_TEXT = "Stopped by you.";
+    private static final String STOPPED_AFTER_WORK = STOPPED_TEXT + " What Cortex had already done shows below: check it "
+        + "before asking again, so nothing is done twice.";
+
+    /**
+     * La personne a arrêté le tour (R134) : la réponse le dit, ce qui a déjà été fait reste montré, et ce qui a tourné compte
+     * dans son usage.
+     */
+    private AssistantAnswer stoppedByPerson(Long workspaceId, List<AssistantStep> steps, List<AssistantSource> sources,
+                                            List<AssistantToolCall> toolCalls, Reading reading) {
+        LlmUsage usage = llm.currentUsage();
+        recordUsage(workspaceId, usage);
+        if (!steps.isEmpty()) steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", "Stopped by you"));
+        String record = toolCalls.stream().map(AssistantToolCall::record).filter(Objects::nonNull).findFirst().orElse(null);
+        return new AssistantAnswer(toolCalls.isEmpty() ? STOPPED_TEXT : STOPPED_AFTER_WORK, null, STOPPED_MODE, sources, steps,
+            toolCalls, usage(usage), record, llm.currentModel(), reading.read());
+    }
+
+    /**
+     * « Tu t'es trompé de projet », après une carte (R135 ; l'étape 15 de la recette : la même carte revenait, avec une
+     * description inventée) : la carte de questions, avec les projets en choix, sur les arguments de la carte, sans passer
+     * par le modèle. Quand la phrase nomme un autre projet, la carte y est refaite tout de suite. Null quand la phrase n'en
+     * dit rien, ou qu'il n'y a qu'un projet à proposer : le tour continue comme d'habitude.
+     */
+    private AssistantAnswer correctProject(Long workspaceId, AgentContext ctx, String message, LastCard last) {
+        if (!ProjectCorrection.asks(message)) return null;
+        AgentTool tool = tools.get(last.tool());
+        if (tool == null) return null;
+        ObjectNode args = arguments(last.input());
+        String was = args.path(ProjectResolver.FIELD).asText("");
+        args.remove(ProjectResolver.FIELD);
+        args.remove(Question.ANSWERED);
+        Kernel kernel = new Kernel(ctx, message, origin(null, List.of()));
+        ToolOutcome outcome;
+        Optional<ProjectResponse> written = projects.writtenIn(ctx).filter(project -> !project.getIdentifier().equalsIgnoreCase(was));
+        if (written.isPresent()) {
+            args.put(ProjectResolver.FIELD, written.get().getIdentifier());
+            outcome = kernel.apply(tool, last.tool(), args.toString());
+            if ("pending".equals(outcome.status()) && ctx.conversation() != null) {
+                conversations.setProject(ctx.conversation(), ctx.userId(), workspaceId, written.get().getId());
+            }
+        } else {
+            Optional<Question> question = projects.whichProject(args.path("title").asText(""), ctx);
+            if (question.isEmpty()) return null;
+            outcome = kernel.asks(tool, last.tool(), args.toString(), List.of(question.get()));
+        }
+        String shown = outcome.input() != null ? outcome.input() : args.toString();
+        List<AssistantToolCall> calls = List.of(new AssistantToolCall(last.tool(), outcome.status(), shown, outcome.result(),
+            kernel.recordRef(), outcome.ref(), outcome.target(), card(outcome.questions())));
+        String text;
+        if (outcome.questions() != null) {
+            text = askedAnswer(asking(outcome.questions()), calls);
+        } else if ("pending".equals(outcome.status()) && written.isPresent()) {
+            text = "The card is ready in " + written.get().getName() + ": check it, then create it.";
+        } else {
+            text = silentAnswer("", calls, llm.currentModel());
+        }
+        return new AssistantAnswer(text, null, "deep", List.of(), List.of(), calls, AssistantUsage.NONE, kernel.recordRef());
+    }
+
+    /** Les arguments gardés d'une carte, ou rien de lisible : un objet vide. */
+    private ObjectNode arguments(String input) {
+        try {
+            JsonNode read = objectMapper.readTree(input == null || input.isBlank() ? "{}" : input);
+            return read.isObject() ? (ObjectNode) read : objectMapper.createObjectNode();
+        } catch (JsonProcessingException unreadable) {
+            return objectMapper.createObjectNode();
         }
     }
 
@@ -513,9 +645,9 @@ public class AgentService {
     private static AssistantAnswer stopped(List<AssistantStep> steps, List<AssistantSource> sources,
                                            List<AssistantToolCall> toolCalls, AssistantUsage usage, String model,
                                            String cause) {
-        steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", cause + ": Cortex stopped before the end"));
+        steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", cause));
         String answer = "> [!warning] Cortex stopped before the end\n> " + cause
-            + ". What it had already done shows in its steps: check it before asking again, so nothing is done twice.";
+            + " What it had already done shows above: check it before asking again, so nothing is done twice.";
         return new AssistantAnswer(answer, null, "deep", sources, steps, toolCalls, usage, null, model);
     }
 
@@ -536,6 +668,30 @@ public class AgentService {
             log.warn("Cortex : incident de confiance non gardé au dossier : {}", LogSafe.of(e.getMessage()));
             return record;
         }
+    }
+
+    /**
+     * Le dossier d'une réponse sans outil, ouvert quand elle est écrite : la question, le modèle et les notes servies, de
+     * quoi en faire un cas de la banque. Une panne du dossier ne touche pas la réponse : elle se journalise, et ses gestes
+     * « bien » et « pas bien » ne se montrent pas.
+     */
+    private String recordForTheBank(AgentContext ctx, String message, List<KnowledgeNode> hits) {
+        try {
+            Map<String, Object> origin = new LinkedHashMap<>();
+            origin.put("model", llm.currentModel());
+            origin.putAll(origin(null, hits));
+            UUID record = records.open(ctx, message, origin);
+            return record == null ? null : record.toString();
+        } catch (RuntimeException e) {
+            log.warn("Cortex : dossier de la réponse non ouvert : {}", LogSafe.of(e.getMessage()));
+            return null;
+        }
+    }
+
+    /** Ce que la recherche lit d'une demande : toute la demande, ou ses deux bouts quand c'est un long texte collé. */
+    static String searchQuery(String message) {
+        if (message == null || message.length() <= SEARCH_END * 2) return message;
+        return message.substring(0, SEARCH_END) + " " + message.substring(message.length() - SEARCH_END);
     }
 
     /** Détail de l'étape de réponse une fois terminée : outils mobilisés, s'il y en a eu. */
@@ -586,6 +742,17 @@ public class AgentService {
     }
 
     /**
+     * Ce qui part à chaque demande, quelle que soit la conversation : les consignes et les outils de Cortex. Avec ce qu'il
+     * reste de l'historique, la jauge sait, sans attendre la prochaine réponse, où en est la conversation après une
+     * compaction (TF-J1-15).
+     */
+    public int baselineTokens() {
+        String system = systemPrompt(null, "", List.of(), List.of(), LocalDate.now(ZoneOffset.UTC));
+        return ContextBudget.tokensOf(objectMapper, Map.of("role", "system", "content", system))
+            + ContextBudget.tokensOf(objectMapper, tools.toolDefinitions(List.of()));
+    }
+
+    /**
      * Ce que TaskForce dit quand une demande ne tient pas (décision de la Présidence du 08/11/2026) : la réponse est la
      * sienne, sans modèle ; elle dit la taille et la fenêtre, et propose un modèle servi qui la tient, s'il y en a un.
      */
@@ -597,14 +764,14 @@ public class AgentService {
         // se lirait comme tenant.
         String text = "This request needs about " + number(budget.fixed() + window.answerRoom()) + " tokens with its answer, and "
             + window.model() + "'s context window is " + (window.estimated() ? "about " : "") + number(window.tokens())
-            + ", so it wasn't sent.";
+            + ", so it wasn't sent. Shorten it, or send only the part that matters.";
         ChatTurnResponse.Escalation offer = llm.largerWindow(tooBig.tier, budget.fixed())
             .map(larger -> new ChatTurnResponse.Escalation(Capability.CONTEXT.key(), window.model(), larger.model(),
                 larger.model() + "'s context window is " + number(larger.tokens()) + ". You can send this request to "
                     + larger.model() + "."))
             .orElse(null);
-        return new AssistantAnswer(signed(ABOUT_MODELS, List.of(text)), null, "fallback", sources, steps, List.of(), usage, null, null,
-            null, offer);
+        return new AssistantAnswer(signed(ABOUT_MODELS, List.of(text)), null, AssistantAnswer.NOT_SENT, sources, steps, List.of(), usage,
+            null, null, null, offer);
     }
 
     private static String number(int tokens) {
@@ -629,6 +796,8 @@ public class AgentService {
         + "(greeting, thanks, small talk) briefly, naturally and warmly, in the user's language. Cite NO "
         + "source and invent no project context. One or two sentences at most.";
 
+    private static final int MAX_SMALLTALK = 200;
+
     private static final Set<String> SMALLTALK = Set.of(
         "hello", "hi", "hey", "yo", "thanks", "thank you", "thx", "ok", "okay", "yes", "no", "cool",
         "great", "perfect", "nice", "bye", "good morning", "good evening", "good night", "how are you",
@@ -638,7 +807,8 @@ public class AgentService {
 
     /** Salutation ou remerciement pur : on retire une salutation de tête éventuelle, puis on compare. */
     static boolean isConversational(String message) {
-        if (message == null) return false;
+        // Avant les expressions : un long texte collé n'est pas une salutation, et elles n'ont pas à le parcourir.
+        if (message == null || message.length() > MAX_SMALLTALK) return false;
         String m = message.trim().toLowerCase()
             .replaceAll("[!?.,;:]+$", "").trim()
             .replaceAll("\\s+", " ");
@@ -661,8 +831,9 @@ public class AgentService {
 
         llm.beginUsageCapture();
         try {
+            TurnProgress.say(TurnProgress.WRITING);
             steps.add(new AssistantStep(STEP_ANSWER, "active", "Cortex answers"));
-            Reading reading = new Reading(0);
+            Reading reading = new Reading(List.of());
             ContextBudget budget = budget("fast", CONVERSATIONAL_PROMPT, List.of(), "", message);
             TurnHistory.Fitted fitted = memory.fit(budget, "fast");
             reading.fitted(fitted);
@@ -673,12 +844,15 @@ public class AgentService {
             // Une salutation : le modèle n'a rien lu de l'espace, et la ligne grise le dit (R123).
             return new AssistantAnswer(answer, null, "fast", List.of(), steps, List.of(), usage(usage), null, llm.currentModel(),
                 reading.read());
+        } catch (TurnStoppedException stopped) {
+            return stoppedByPerson(workspaceId, steps, List.of(), List.of(), new Reading(List.of()));
         } catch (Exception ex) {
             log.warn("Cortex (conversation) indisponible : {}", ex.getMessage());
-            steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", "The model did not answer"));
+            ModelFailure failure = ModelFailure.of(ex);
+            steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", failure.said()));
             LlmUsage usage = llm.currentUsage();
             recordUsage(workspaceId, usage);
-            return new AssistantAnswer(smallTalkFallback(), null, "fallback", List.of(), steps, List.of(), usage(usage));
+            return new AssistantAnswer(signed(ABOUT_MODELS, List.of(failure.said())), null, "fallback", List.of(), steps, List.of(), usage(usage));
         } finally {
             llm.endUsageCapture();
         }
@@ -695,7 +869,7 @@ public class AgentService {
 
     private String runToolLoop(String message, List<KnowledgeNode> hits, AgentContext ctx,
                                List<AssistantToolCall> toolCalls, TurnHistory memory,
-                               List<Screen> attached, Reading reading) {
+                               List<Screen> attached, List<AttachedFile> files, Reading reading) {
         // Outils externes (serveurs MCP connectés sur le workspace), découverts par requête et bornés par
         // pertinence avant l'envoi : un gros serveur MCP envoyé en entier sature un petit modèle.
         List<AgentTool> external = relevantExternal(workspaceMcp.toolsFor(ctx), message);
@@ -741,6 +915,15 @@ public class AgentService {
             if (!issue.isEmpty()) blocks.add(issue.strip());
             seen = String.join("\n\n", blocks) + "\n";
         }
+        // Les fichiers joints (R134) sont lus comme le reste de ce qui est joint : le budget les compte, la ligne grise aussi.
+        String joinedFiles = AttachedFile.block(files);
+        if (!joinedFiles.isEmpty()) {
+            seen = seen.isEmpty() ? joinedFiles : seen.strip() + "\n\n" + joinedFiles;
+            files.forEach(file -> reading.file(file.name()));
+        }
+        // Où travaille la conversation (R135), dit au modèle ; l'écran le renseigne, ce projet-ci décide.
+        String workingIn = ctx.project() == null ? "" : screens.conversationProject(ctx);
+        if (workingIn != null && !workingIn.isBlank()) seen = workingIn.strip() + (seen.isEmpty() ? "\n" : "\n\n" + seen);
         String system = systemPrompt(plan, seen, hits, external, LocalDate.now(ZoneOffset.UTC));
         List<Map<String, Object>> toolDefs = tools.toolDefinitions(external);
         String tier = external.isEmpty() ? "fast" : mcpToolTier;
@@ -759,6 +942,7 @@ public class AgentService {
         if (!screen.isEmpty()) origin.put("screen", screen);
         if (!boards.isEmpty()) origin.put("attached", CortexRecordService.shorten(String.join("\n\n", boards)));
         if (!issue.isEmpty()) origin.put("issue", CortexRecordService.shorten(issue));
+        if (!files.isEmpty()) origin.put("files", files.stream().map(AttachedFile::name).toList());
         if (plan != null) origin.put("plan", plan.id());
         Kernel kernel = new Kernel(ctx, message, origin);
         String answer = toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel,
@@ -875,16 +1059,17 @@ public class AgentService {
      * notes servies. Rien n'est deviné après coup.
      */
     static final class Reading {
-        private final int notes;
+        private final List<AssistantRead.NoteRead> notes;
         private final List<AssistantRead.IssueRead> issues = new ArrayList<>();
         private final List<AssistantRead.BoardRead> boards = new ArrayList<>();
         private final Map<String, Integer> tools = new LinkedHashMap<>();
+        private final List<AssistantRead.FileRead> files = new ArrayList<>();
         private int summarized;
         private int leftOut;
         private ToolLoopFit loop;
 
-        Reading(int notes) {
-            this.notes = notes;
+        Reading(List<KnowledgeNode> hits) {
+            notes = hits.stream().map(note -> new AssistantRead.NoteRead(note.getId(), note.getTitle())).toList();
         }
 
         /** Ce qui a changé pour que l'historique tienne (TF-J1-13). */
@@ -910,12 +1095,34 @@ public class AgentService {
             tools.merge(name, 1, Integer::sum);
         }
 
+        void file(String name) {
+            files.add(new AssistantRead.FileRead(name));
+        }
+
         AssistantRead read() {
+            return read(List.of(), null, null);
+        }
+
+        /** Ce qui a été lu, avec ce que la réponse garde pour se relire : ses gestes, son dossier, le temps qu'elle a pris. */
+        AssistantRead read(List<AssistantToolCall> calls, String record, long startedAt) {
+            return read(calls, record, Long.valueOf(java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt)));
+        }
+
+        private AssistantRead read(List<AssistantToolCall> calls, String record, Long workedMs) {
             int out = leftOut + (loop == null ? 0 : loop.leftOut());
             int shortened = loop == null ? 0 : loop.shortened();
             ContextRead context = summarized == 0 && out == 0 && shortened == 0 ? null : new ContextRead(summarized, out, shortened);
+            List<AssistantRead.ActRead> acts = calls.stream()
+                .map(call -> new AssistantRead.ActRead(call.name(), call.status(), keyOf(call.target())))
+                .toList();
             return new AssistantRead(issues, boards,
-                tools.entrySet().stream().map(e -> new AssistantRead.ToolRead(e.getKey(), e.getValue())).toList(), notes, context);
+                tools.entrySet().stream().map(e -> new AssistantRead.ToolRead(e.getKey(), e.getValue())).toList(), notes.size(), context,
+                files, notes, acts, workedMs, record);
+        }
+
+        private static String keyOf(Map<String, Object> target) {
+            Object key = target == null ? null : target.get("key");
+            return key == null ? null : key.toString();
         }
     }
 
@@ -927,7 +1134,7 @@ public class AgentService {
      * et se modifie sur une carte, puis la personne la crée (R47, R78, séance n°13). L'accord passe par le dossier de la
      * réponse, comme pour une action demandée.
      */
-    static final Set<String> PREPARED = Set.of("create_issue");
+    public static final Set<String> PREPARED = Set.of("create_issue");
 
     private static final String PREPARED_TEXT = "Issue prepared as a card in the conversation: the person checks it, "
         + "edits it and creates it. Do not call this tool again; say in one sentence that the card is ready to review, "
@@ -938,7 +1145,7 @@ public class AgentService {
      * montre, Cortex pose une seule question courte (R102 : « pas chiant à remplir »). Statut du résultat : la carte
      * n'attend rien, la question suit dans la réponse.
      */
-    static final String QUESTION = "question";
+    public static final String QUESTION = "question";
 
     private static final String QUESTION_TEXT = " No card is shown yet. Ask the person one short question with the "
         + "choices, then prepare the card with the answer. Do not ask about anything else: the other fields stay editable "
@@ -979,6 +1186,7 @@ public class AgentService {
             if (fit != null && !fit.apply(messages)) {
                 return "Answer interrupted: what the tools returned no longer fits this model's context.";
             }
+            TurnProgress.say(i == 0 ? TurnProgress.THINKING : TurnProgress.WRITING);
             JsonNode msg = model.call(messages, toolDefs);
             JsonNode calls = msg.path("tool_calls");
             if (!calls.isArray() || calls.isEmpty()) {
@@ -991,6 +1199,7 @@ public class AgentService {
                 String name = call.path("function").path("name").asText();
                 String argsJson = call.path("function").path("arguments").asText("{}");
                 AgentTool tool = tools.get(name, external);
+                TurnProgress.tool(name);
                 ToolOutcome outcome = tool == null
                     ? new ToolOutcome("error", "Unknown tool: " + name)
                     : step.apply(tool, name, argsJson);
@@ -1118,6 +1327,20 @@ public class AgentService {
             this.record = record;
         }
 
+        /**
+         * TaskForce pose lui-même la question d'un geste, sans le modèle (R135) : la demande et la décision des règles entrent
+         * au dossier, puis la carte, dont la réponse reprendra ces arguments.
+         */
+        ToolOutcome asks(AgentTool tool, String name, String argsJson, List<Question> questions) {
+            CortexGate.Verdict verdict = judge(tool, argsJson);
+            if (verdict.denied()) {
+                String refused = refusedText(verdict);
+                return new ToolOutcome("refused", refused, null, result(name, "refused", refused, null), null, null);
+            }
+            String said = QUESTION_ASKED + questions.stream().map(Question::asText).collect(Collectors.joining(" "));
+            return new ToolOutcome(QUESTION, said, null, asked(name, argsJson, said, questions), null, questions);
+        }
+
         /** Tracer avant d'agir : la demande et la décision entrent au dossier avant tout effet. */
         @Override
         public ToolOutcome apply(AgentTool tool, String name, String argsJson) {
@@ -1226,6 +1449,7 @@ public class AgentService {
                 screen.put("projectId", ctx.screen().projectId());
                 screen.put("issueId", ctx.screen().issueId());
                 data.put("screen", screen);
+                if (ctx.conversation() != null) data.put("conversation", ctx.conversation());
                 return records.append(record, "action.result", CortexRecordService.Actor.SERVER, data).orElse(null);
             } catch (RuntimeException e) {
                 log.warn("Cortex : question de {} non gardée au dossier : {}", LogSafe.of(tool), LogSafe.of(e.getMessage()));
@@ -1346,9 +1570,10 @@ public class AgentService {
           .append("gives them. Leave the rest empty: the person fills it on the card. Place it in time from its goal: ")
           .append("read the project's columns, active cycle, labels and members with list_projects, keep it in the ")
           .append("Backlog unless the work must start now, and set a due date only when the goal or the person gives ")
-          .append("one. Ask one short question, with the choices, before preparing the card only when what matters is ")
-          .append("unclear: the request does not say which project and there are several, or it names a person who ")
-          .append("matches several members. Never ask about the other fields: they stay editable on the card. ")
+          .append("one. Give the project only when the request names one: otherwise leave it out and never take it from ")
+          .append("the screen, TaskForce uses the project of this conversation or asks the person. Ask one short question, ")
+          .append("with the choices, before preparing the card only when the request names a person who matches several ")
+          .append("members. Never ask about the other fields: they stay editable on the card. ")
           // Les gestes du MCP TaskForce (ADR-024, TF-J1-5) : faits d'emblée quand ils se défont, demandés sinon ; les
           // décisions restent aux boutons des cartes, jamais à un « oui » écrit (R1).
           .append("To change an existing issue (its title, description, priority, column, assignee, labels, points, cycle ")
@@ -1416,14 +1641,18 @@ public class AgentService {
 
     /**
      * Ce que dit la réponse quand Cortex n'a rien dit (décision du CEO, 02/11/2026 : qwen3:8b répond souvent par un texte
-     * vide à une demande de suppression). TaskForce dit à sa place ce qui s'est passé dans le tour, signé comme ses
-     * corrections (R116) : rien, ce que dit la carte qui attend, ou ce qu'un outil a fait ou refusé. Une réponse écrite
-     * reste celle de Cortex.
+     * vide à une demande de suppression) : ce que dit la carte qui attend, ou ce qu'un outil a fait ou refusé, une phrase
+     * par chose, dans la voix de la conversation (R136). Sans aucun geste, c'est le modèle qui n'a rien rendu : TaskForce
+     * le dit, comme tout ce qu'il dit du modèle. Une réponse écrite reste celle de Cortex.
      */
-    static String silentAnswer(String answer, List<AssistantToolCall> toolCalls) {
+    static String silentAnswer(String answer, List<AssistantToolCall> toolCalls, String model) {
         if (answer != null && !answer.isBlank()) return answer;
+        if (toolCalls.isEmpty()) {
+            return signed(ABOUT_MODELS, List.of((model == null || model.isBlank() ? "The model" : model)
+                + " returned an empty answer, so nothing was done. Ask again, or choose another model."));
+        }
         Set<String> said = new LinkedHashSet<>();
-        said.add(toolCalls.isEmpty() ? "Cortex didn't answer. Nothing was done." : "Cortex didn't answer.");
+        List<String> questions = new ArrayList<>();
         for (AssistantToolCall call : toolCalls) {
             String output = call.output() == null ? "" : call.output().strip();
             switch (call.status()) {
@@ -1436,24 +1665,25 @@ public class AgentService {
                 case "error" -> said.add("An action failed, so nothing was done: "
                     + clipped(output.replaceFirst("^Tool \\S+ failed: ", ""), MAX_SAID));
                 case QUESTION -> {
-                    if (call.questions() == null || call.questions().isEmpty()) said.add("TaskForce asks a question below.");
-                    else call.questions().forEach(question -> said.add(question.text()));
+                    if (call.questions() == null || call.questions().isEmpty()) said.add("One question first, below.");
+                    else call.questions().forEach(question -> questions.add(question.text()));
                 }
                 default -> { /* un résultat défait ou inconnu : rien de plus à dire */ }
             }
         }
-        return signed(List.copyOf(said));
+        String plain = String.join("\n\n", said);
+        return questions.isEmpty() ? plain : (plain.isEmpty() ? "" : plain + "\n\n") + signed(ASKS, questions);
     }
 
     /**
-     * La signature des questions de TaskForce (R115) : l'app montre la carte à leur place, et une conversation rouverte,
-     * sans sa carte, les relit sous le nom de TaskForce, comme le modèle dans son historique.
+     * La marque des questions d'un geste (R115) : l'app montre la carte à leur place, et une conversation rouverte, sans sa
+     * carte, les relit comme les mots de Cortex (R136). Une marque pour l'app, jamais une signature à l'écran.
      */
     static final String ASKS = ActionClaimCheck.SIGNATURE + " · asks";
 
     /**
-     * La réponse d'un tour qui s'arrête sur les questions d'un geste (R115) : ce sont celles de TaskForce, pas du modèle,
-     * une par ligne, sous sa signature ; la carte porte leurs choix.
+     * La réponse d'un tour qui s'arrête sur les questions d'un geste (R115) : une par ligne, sous leur marque ; la carte
+     * porte leurs choix.
      */
     static String askedAnswer(String answer, List<AssistantToolCall> toolCalls) {
         if (answer == null) return null;
@@ -1466,11 +1696,7 @@ public class AgentService {
             .orElse(answer);
     }
 
-    /** Un bloc de TaskForce, tel que l'app le montre comme sa parole (R116) : la signature, puis une ligne par phrase. */
-    private static String signed(List<String> lines) {
-        return signed(ActionClaimCheck.SIGNATURE, lines);
-    }
-
+    /** Un bloc marqué, tel que l'app le relit : la marque, puis une ligne par phrase. */
     private static String signed(String signature, List<String> lines) {
         StringBuilder block = new StringBuilder(signature);
         lines.forEach(line -> block.append("\n> ").append(line));
@@ -1501,7 +1727,7 @@ public class AgentService {
         if (hits.isEmpty()) return "I found no relevant note in your workspace for this request.";
         StringBuilder sb = new StringBuilder("Here are the most relevant notes of your workspace:\n\n");
         for (KnowledgeNode n : hits) {
-            sb.append("- [[").append(n.getTitle()).append("]] (").append(n.getDomain()).append(")\n");
+            sb.append("- [[").append(n.getTitle()).append("]]\n");
         }
         return sb.toString().stripTrailing();
     }

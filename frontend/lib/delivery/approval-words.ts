@@ -23,12 +23,13 @@ type Asked = Pick<DeliveryRunApproval, "tool" | "askedBy" | "action" | "reason">
 const isAction = (action: string | null | undefined, t: MissionTexts): action is ActionKey =>
   Boolean(action) && action !== "other" && Object.prototype.hasOwnProperty.call(t.actions, action as string);
 
-export function approvalWords(approval: Asked, t: MissionTexts): ApprovalWords {
+/** `want` : l'action en mots, pour une action que les règles ne nomment pas ; à défaut, le nom de l'outil. */
+export function approvalWords(approval: Asked, t: MissionTexts, want?: string): ApprovalWords {
   const actor = approval.askedBy === "runner" ? t.taskforce : t.agent;
   const known = isAction(approval.action, t) ? t.actions[approval.action] : null;
   const words = known ?? t.actions.other;
   return {
-    title: `${actor} ${t.wantsTo} ${known ? words.want : `${words.want} ${approval.tool}`}`,
+    title: `${actor} ${t.wantsTo} ${known ? words.want : (want ?? `${words.want} ${approval.tool}`)}`,
     will: words.will,
     why: approval.reason?.trim() || t.noRule,
     ifRefused: words.ifRefused,

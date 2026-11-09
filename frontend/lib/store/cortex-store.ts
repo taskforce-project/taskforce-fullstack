@@ -1,19 +1,23 @@
 import { create } from "zustand";
 
 import {
-  answerQuestion as sendAnswer, approveAction, sendAgentMessage, undoAction, type AssistantAnswer, type AssistantToolCall,
+  answerQuestion as sendAnswer, approveAction, sendAgentMessage, stopTurn, undoAction, type AssistantAnswer, type AssistantToolCall,
   type ModelEscalation, type QuestionAnswer,
 } from "@/lib/api/assistant-service";
 import {
-  compactConversation, deleteConversation, getConversation, listConversations,
+  compactConversation, deleteConversation, getConversation, listConversations, setConversationProject,
   type ConversationMessage, type ConversationSummary,
 } from "@/lib/api/ai-conversation-service";
 import { getErrorMessage, getErrorStatus } from "@/lib/api/client";
+import { MAX_FILES, type ComposerFile } from "@/lib/cortex/composer-files";
 import {
   attachmentKey, COMPACT_COMMAND, toRequest, withAttachment, type ComposerAttachment,
 } from "@/lib/cortex/composer-picker";
 import { contextFrom, type CortexContext } from "@/lib/cortex/context-gauge";
+import { failureText } from "@/lib/cortex/failed-turn";
 import { screenFrom } from "@/lib/cortex/screen";
+import type { CortexWorkStep } from "@/lib/cortex/work-lines";
+import { CONSTANTS_EN } from "@/lib/constants_en";
 import { useIssueStore } from "@/lib/store/issue-store";
 import { useScreenStore } from "@/lib/store/screen-store";
 
@@ -29,18 +33,35 @@ export interface CortexTurn {
   role: "user" | "assistant";
   text?: string;
   answer?: AssistantAnswer;
-  /** Tour spécial : plafond de tokens IA atteint (une carte d'information), ou la ligne calme de « /compact » (TF-J1-13). */
-  kind?: "quota" | "compact";
+  /** Tour spécial : plafond de tokens IA atteint (une carte d'information), la ligne calme de « /compact » (TF-J1-13), ou « Stopped by you » (R134). */
+  kind?: "quota" | "compact" | "stopped";
   /** Les messages que « /compact » a condensés ; 0 quand il n'y avait rien à condenser. */
   compacted?: number;
+  /** « /compact » travaille : sa ligne attend là où viendra le résultat, sans rien déplacer (TF-J1-15). */
+  compacting?: boolean;
+  /** Le résumé que « /compact » a écrit : sa ligne l'ouvre, d'un clic. */
+  summary?: string | null;
+  /** Pourquoi « /compact » n'a rien changé, dit à la place de sa ligne. */
+  problem?: string;
   /** Ce que TaskForce propose sous la réponse (R118) ; `escalated` une fois la demande envoyée au modèle proposé. */
   escalation?: ModelEscalation | null;
   escalated?: boolean;
   /** Le modèle vers lequel la personne a envoyé la demande, d'un clic : sur sa demande et sur la réponse. */
   sentTo?: string | null;
-  /** Ce que la personne a joint à sa demande depuis le compositeur (R123), montré sous elle. */
-  attached?: ComposerAttachment[];
+  /** Ce que la personne a joint à sa demande depuis le compositeur (R123, R134), montré sous elle. */
+  attached?: Pick<ComposerAttachment, "label">[];
 }
+
+/** Un message qui attend son tour au-dessus de la boîte (R134) : ce qu'il partira avec. */
+export interface QueuedMessage {
+  id: string;
+  text: string;
+  attachments: ComposerAttachment[];
+  files: ComposerFile[];
+}
+
+/** Les messages qui attendent, au plus (R134). */
+export const MAX_QUEUE = 5;
 
 /** Où en est « Undo » d'un geste : la conversation et « Changes » (R122) montrent le même état. */
 export type UndoState =
@@ -78,6 +99,21 @@ interface CortexState {
   draft: string;
   /** Ce que la personne joint à sa prochaine demande (R123) : des issues et des projets, trois au plus. */
   attachments: ComposerAttachment[];
+  /** Les fichiers texte joints à sa prochaine demande (R134), cinq au plus. */
+  files: ComposerFile[];
+  /** Les messages tapés pendant que Cortex travaille (R134), visibles au-dessus de la boîte : cinq au plus. */
+  queue: QueuedMessage[];
+  /** Après un arrêt ou un échec, la file ne repart pas toute seule : un clic envoie le suivant. */
+  queueHalted: boolean;
+  /** Une ligne dans le compositeur : ce qui n'a pas marché, et quoi faire. */
+  notice: string | null;
+  /**
+   * Le projet où la conversation travaille (R135) : il se voit sous la boîte et se change d'un clic, null pour « No project ».
+   * Celui du volet ouvert tant que la conversation n'a pas commencé et que la personne n'en a pas choisi.
+   */
+  project: number | null;
+  /** Le projet ne suit plus le volet : la personne l'a choisi, ou la conversation a commencé. */
+  projectPinned: boolean;
   /** L'espace de la conversation en cours : changer d'espace repart d'une conversation neuve. */
   workspace: string | null;
   turns: CortexTurn[];
@@ -92,6 +128,10 @@ interface CortexState {
   context: CortexContext | null;
   /** Une réponse est attendue depuis cet instant (ms), sinon null. */
   sentAt: number | null;
+  /** Ce que Cortex fait en ce moment, annoncé par le serveur (R137) ; null entre deux réponses, et avant la première étape. */
+  workStep: CortexWorkStep | null;
+  /** Le tour en cours peut s'arrêter : le bouton d'envoi est un carré (R134). */
+  stoppable: boolean;
   /** Durée de la dernière réponse, en ms. */
   lastMs: number | null;
   /** La conversation est dépliée au-dessus de la barre. */
@@ -109,14 +149,34 @@ interface CortexState {
   deletions: Record<string, CardDeletion>;
 
   setDraft: (text: string) => void;
+  /** Une étape de la réponse attendue : ignorée hors d'une attente, et celle d'une autre conversation de la personne. */
+  noteWorkStep: (step: CortexWorkStep) => void;
   /** Joint une issue ou un projet à la prochaine demande : false quand il y est déjà, ou qu'il y en a trois. */
   attach: (item: ComposerAttachment) => boolean;
   /** Retire une pièce jointe, par `attachmentKey`. */
   detach: (key: string) => void;
+  /** Ajoute des fichiers lus à la prochaine demande, dans la place qui reste. */
+  addFiles: (files: ComposerFile[]) => void;
+  /** Retire un fichier de la prochaine demande. */
+  removeFile: (id: string) => void;
+  /** La ligne du compositeur : ce qui n'a pas marché ; null la retire. */
+  setNotice: (text: string | null) => void;
+  /** Tant que la conversation n'a pas commencé et que la personne n'a rien choisi, son projet est celui du volet ouvert. */
+  followPane: (projectId: number | null) => void;
+  /** Choisit le projet de la conversation, gardé tout de suite si elle existe ; false si le serveur le refuse (rien ne change). */
+  chooseProject: (slug: string, projectId: number | null) => Promise<boolean>;
   /** L'espace affiché : en changer repart d'une conversation neuve, celle de l'autre espace reste dans son historique. */
   enterWorkspace: (slug: string) => void;
   /** Envoie le texte de la barre : false pour une barre vide, sans espace, ou pendant qu'une réponse est attendue. */
   send: (slug: string) => Promise<boolean>;
+  /** Pendant que Cortex travaille, le message tapé attend son tour au-dessus de la boîte : false si la file est pleine. */
+  enqueue: () => boolean;
+  /** Retire un message de la file. */
+  unqueue: (id: string) => void;
+  /** Envoie le premier message de la file, d'un clic de la personne après un arrêt ou un échec ; false sinon. */
+  sendNext: (slug: string) => Promise<boolean>;
+  /** Arrête le tour en cours, tout de suite (R134) : false quand rien ne peut s'arrêter. */
+  stop: (slug: string) => boolean;
   /** « /compact » (TF-J1-13) : condense maintenant la conversation, même sous le seuil, et le dit ; false si ça échoue. */
   compact: (slug: string) => Promise<boolean>;
   /**
@@ -161,6 +221,47 @@ interface CortexState {
 let lastId = 0;
 const nextId = (prefix: string) => `${prefix}${++lastId}`;
 
+/** Ce qu'une demande emporte. */
+interface Outgoing {
+  text: string;
+  attached: ComposerAttachment[];
+  files: ComposerFile[];
+}
+
+/** L'argument d'une carte de questions qui demande le projet (R135). */
+const PROJECT_FIELD = "project";
+
+/** Le tour en cours côté client : on l'arrête, ou on le laisse finir sans lui quand la personne change de conversation. */
+interface TurnRun {
+  controller: AbortController;
+  turn: string;
+}
+
+let current: TurnRun | null = null;
+/** Chaque changement de conversation : ce qui arrive d'un tour d'avant ne touche pas la conversation à l'écran. */
+let conversationEpoch = 0;
+/** Ce que le serveur finit de dire d'un tour arrêté : le tour suivant l'attend, il continue la même conversation. */
+let settling: Promise<void> | null = null;
+
+/** Le nom d'un tour ; `crypto.randomUUID` n'existe qu'en contexte sécurisé, et une instance peut tourner en http. */
+const newTurnName = (): string =>
+  globalThis.crypto?.randomUUID?.() ?? `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+
+const beginRun = (): TurnRun => {
+  current = { controller: new AbortController(), turn: newTurnName() };
+  return current;
+};
+
+/** Le tour en cours continue sur le serveur, mais la fenêtre ne l'attend plus : la personne a changé de conversation. */
+const leaveRun = () => {
+  current = null;
+  conversationEpoch += 1;
+};
+
+/** L'écran de maintenant (R114) : il renseigne Cortex. */
+const screenNow = () =>
+  screenFrom(typeof window === "undefined" ? null : window.location.pathname, useScreenStore.getState().openIssue);
+
 /** Une réponse de repli, rendue comme une réponse de Cortex pour rester dans le fil. */
 function fallbackAnswer(text: string): AssistantAnswer {
   return {
@@ -169,6 +270,11 @@ function fallbackAnswer(text: string): AssistantAnswer {
   };
 }
 
+/** Ce que « /compact » gardait avant de garder son résumé : rien à ouvrir. */
+const LEGACY_COMPACT_LINE = "Conversation compacted";
+/** Ce que le serveur garde d'un tour arrêté sans rien avoir fait (R134) : la fenêtre le relit comme une ligne calme. */
+const STOPPED_TEXT = "Stopped by you.";
+
 /**
  * Reconstruit des tours à partir des messages gardés par le serveur (l'historique d'une conversation) : le modèle et ce
  * qu'il a lu restent avec chaque réponse, la ligne grise se relit pareil (R123).
@@ -176,9 +282,14 @@ function fallbackAnswer(text: string): AssistantAnswer {
 export function messagesToTurns(messages: ConversationMessage[]): CortexTurn[] {
   return messages.map((m) =>
     m.role === "user"
-      ? { id: `m${m.id}`, role: "user", text: m.content }
+      ? { id: `m${m.id}`, role: "user", text: m.content, ...(m.files?.length ? { attached: m.files.map((file) => ({ label: file.name })) } : {}) }
       : m.mode === "compact"
-      ? { id: `m${m.id}`, role: "assistant", kind: "compact", compacted: m.read?.context?.summarized ?? 0 }
+      ? {
+          id: `m${m.id}`, role: "assistant", kind: "compact", compacted: m.read?.context?.summarized ?? 0,
+          ...(m.content === LEGACY_COMPACT_LINE ? {} : { summary: m.content }),
+        }
+      : m.mode === "stopped" && m.content === STOPPED_TEXT
+      ? { id: `m${m.id}`, role: "assistant", kind: "stopped" }
       : {
           id: `m${m.id}`, role: "assistant",
           answer: {
@@ -187,6 +298,7 @@ export function messagesToTurns(messages: ConversationMessage[]): CortexTurn[] {
             usage: { promptTokens: 0, completionTokens: 0, totalTokens: m.totalTokens },
             model: m.model ?? null,
             read: m.read ?? null,
+            record: m.read?.record ?? null,
           },
         },
   );
@@ -194,6 +306,7 @@ export function messagesToTurns(messages: ConversationMessage[]): CortexTurn[] {
 
 const EMPTY_CONVERSATION = {
   turns: [], conversationId: null, tokens: 0, context: null, lastMs: null, unread: false, done: [], deletions: {},
+  project: null, projectPinned: false,
 };
 
 /** L'archivage d'une carte de suppression, gardé pour « Changes » sous le dossier et l'issue de sa carte. */
@@ -206,30 +319,136 @@ const withoutArchive = (done: AssistantToolCall[], key: string): AssistantToolCa
 
 /**
  * Le tour d'une demande qui n'a pas abouti. 409 : le plafond de tokens de l'instance, une carte d'information plutôt
- * qu'un « réessayez » trompeur. 429 : le frein de débit, avec sa limite et la vraie attente (R52). Le reste : un repli.
+ * qu'un « réessayez » trompeur. Le reste dit ce qui s'est passé et quoi faire, depuis la vraie cause (TF-J1-15) : la
+ * taille refusée, le délai, le serveur, le frein de débit avec sa limite et la vraie attente (R52).
  */
 function failedTurn(e: unknown): CortexTurn {
-  const status = getErrorStatus(e);
-  return status === 409
+  return getErrorStatus(e) === 409
     ? { id: nextId("a"), role: "assistant", kind: "quota" }
-    : {
-        id: nextId("a"), role: "assistant",
-        answer: fallbackAnswer(status === 429 ? getErrorMessage(e) : "Sorry, I couldn't answer. Please try again."),
-      };
+    : { id: nextId("a"), role: "assistant", answer: fallbackAnswer(failureText(e, CONSTANTS_EN.thread)) };
+}
+
+/** Le tour se finit : la file repart s'il a abouti ; après un échec, elle attend un clic (R134). */
+function afterTurn(slug: string, ok: boolean): void {
+  const { queue, queueHalted } = useCortexStore.getState();
+  if (queue.length === 0) {
+    if (queueHalted) useCortexStore.setState({ queueHalted: false });
+    return;
+  }
+  if (!ok || queueHalted) {
+    useCortexStore.setState({ queueHalted: true });
+    return;
+  }
+  const [next, ...rest] = queue;
+  useCortexStore.setState({ queue: rest });
+  void dispatch(slug, next);
+}
+
+/** Fait partir un message de la file : « /compact » garde son geste. */
+function dispatch(slug: string, message: QueuedMessage): Promise<boolean> {
+  if (message.text.toLowerCase() === COMPACT_COMMAND) return useCortexStore.getState().compact(slug);
+  return speak(slug, { text: message.text, attached: message.attachments, files: message.files });
+}
+
+/**
+ * Envoie une demande à Cortex, avec son projet (R135) et ce qui est joint (R123, R134), et attend sa réponse. Elle peut
+ * s'arrêter (`stop`) ; quand la personne change de conversation, le tour finit sur le serveur, sans toucher celle à l'écran.
+ */
+async function speak(slug: string, out: Outgoing): Promise<boolean> {
+  const { text, attached, files } = out;
+  const run = beginRun();
+  const sentAt = Date.now();
+  // Ce qui est joint part avec la demande, et se montre sous elle (R123).
+  const shown = [...attached.map((a) => ({ label: a.label })), ...files.map((f) => ({ label: f.name }))];
+  useCortexStore.setState((s) => ({
+    sentAt, stoppable: true, workStep: null, open: true, unread: false, projectPinned: true,
+    turns: [...s.turns, { id: nextId("u"), role: "user", text, ...(shown.length > 0 ? { attached: shown } : {}) }],
+  }));
+  let ok = false;
+  try {
+    if (settling) await settling;
+    if (current !== run) return false;
+    const { conversationId, project } = useCortexStore.getState();
+    const res = await sendAgentMessage(slug, text, conversationId, screenNow(), null, toRequest(attached), {
+      turn: run.turn, project, signal: run.controller.signal,
+      files: files.map((file) => ({ name: file.name, text: file.text })),
+    });
+    if (current !== run) return false;
+    useCortexStore.setState((s) => ({
+      conversationId: res.conversationId,
+      tokens: s.tokens + (res.answer.usage?.totalTokens ?? 0),
+      // Une réponse sans modèle (un repli) ne mesure rien : la jauge garde la dernière mesure.
+      context: contextFrom(res.answer.usage) ?? s.context,
+      ...(res.projectId !== undefined ? { project: res.projectId } : {}),
+      turns: [...s.turns, { id: nextId("a"), role: "assistant", answer: res.answer, escalation: res.escalation ?? null }],
+    }));
+    void useCortexStore.getState().loadConversations(slug);
+    ok = true;
+    return true;
+  } catch (e) {
+    if (current === run) useCortexStore.setState((s) => ({ turns: [...s.turns, failedTurn(e)] }));
+    return false;
+  } finally {
+    if (current === run) {
+      current = null;
+      // Repliée pendant l'attente : la barre signale qu'une réponse attend d'être lue.
+      useCortexStore.setState((s) => ({ sentAt: null, stoppable: false, workStep: null, lastMs: Date.now() - sentAt, unread: !s.open }));
+      afterTurn(slug, ok);
+    }
+  }
+}
+
+/**
+ * Ce que le serveur dit du tour arrêté (R134) : sa conversation, quand c'était la première demande ; ce qu'il a coûté ; et ce
+ * qu'il a déjà fait, qui remplace la ligne « Stopped by you ». Une panne ici ne change rien à ce que la personne voit.
+ */
+async function settleStop(slug: string, turn: string, line: string): Promise<void> {
+  const epoch = conversationEpoch;
+  const res = await stopTurn(slug, turn).catch(() => null);
+  void useCortexStore.getState().loadConversations(slug);
+  if (!res || epoch !== conversationEpoch) return;
+  const worked = res.answer.mode !== "stopped" || res.answer.toolCalls.length > 0;
+  useCortexStore.setState((s) => ({
+    conversationId: res.conversationId,
+    tokens: s.tokens + (res.answer.usage?.totalTokens ?? 0),
+    context: contextFrom(res.answer.usage) ?? s.context,
+    ...(res.projectId !== undefined ? { project: res.projectId } : {}),
+    turns: worked ? s.turns.map((t) => (t.id === line ? { id: line, role: "assistant" as const, answer: res.answer } : t)) : s.turns,
+  }));
+}
+
+/** Après la réponse à une carte qui demandait le projet : la conversation y travaille désormais (R135). */
+async function adoptProject(slug: string): Promise<void> {
+  const store = useCortexStore.getState();
+  await store.loadConversations(slug);
+  const { conversations, conversationId } = useCortexStore.getState();
+  const conversation = conversations.find((c) => c.id === conversationId);
+  if (conversation) useCortexStore.setState({ project: conversation.projectId ?? null, projectPinned: true });
 }
 
 export const useCortexStore = create<CortexState>()((set, get) => ({
   draft: "",
   attachments: [],
+  files: [],
+  queue: [],
+  queueHalted: false,
+  notice: null,
   workspace: null,
   ...EMPTY_CONVERSATION,
   conversations: [],
   sentAt: null,
+  workStep: null,
+  stoppable: false,
   open: false,
   undos: {},
   deletions: {},
 
   setDraft: (text) => set({ draft: text }),
+
+  noteWorkStep: (step) => set((s) => {
+    if (s.sentAt === null || (s.conversationId !== null && step.conversationId !== s.conversationId)) return {};
+    return { workStep: step };
+  }),
 
   attach: (item) => {
     const before = get().attachments;
@@ -241,10 +460,37 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
 
   detach: (key) => set((s) => ({ attachments: s.attachments.filter((a) => attachmentKey(a) !== key) })),
 
+  addFiles: (files) => set((s) => ({ files: [...s.files, ...files].slice(0, MAX_FILES) })),
+
+  removeFile: (id) => set((s) => ({ files: s.files.filter((file) => file.id !== id) })),
+
+  setNotice: (text) => set({ notice: text }),
+
+  followPane: (projectId) => {
+    const { projectPinned, conversationId, turns, project } = get();
+    if (projectPinned || conversationId !== null || turns.length > 0 || project === projectId) return;
+    set({ project: projectId });
+  },
+
+  chooseProject: async (slug, projectId) => {
+    const { conversationId, project: before, projectPinned: pinnedBefore } = get();
+    set({ project: projectId, projectPinned: true });
+    if (conversationId === null) return true;
+    try {
+      await setConversationProject(slug, conversationId, projectId);
+      set((s) => ({ conversations: s.conversations.map((c) => (c.id === conversationId ? { ...c, projectId } : c)) }));
+      return true;
+    } catch {
+      set({ project: before, projectPinned: pinnedBefore });
+      return false;
+    }
+  },
+
   enterWorkspace: (slug) => {
     if (!slug || get().workspace === slug) return;
-    // Les pièces jointes d'un autre espace n'y ont pas de sens : elles partent avec sa conversation.
-    set({ ...EMPTY_CONVERSATION, conversations: [], workspace: slug, attachments: [] });
+    if (get().workspace !== null) leaveRun();
+    // Ce qui est joint et ce qui attend n'ont pas de sens dans un autre espace : ils partent avec sa conversation.
+    set({ ...EMPTY_CONVERSATION, conversations: [], workspace: slug, attachments: [], files: [], queue: [], queueHalted: false, notice: null, sentAt: null, stoppable: false });
   },
 
   send: async (slug) => {
@@ -253,68 +499,93 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
     if (text.toLowerCase() === COMPACT_COMMAND) return get().compact(slug);
     // Une conversation appartient à son espace : une demande d'un autre espace en ouvre une neuve.
     get().enterWorkspace(slug);
-    const sentAt = Date.now();
-    // Ce qui est joint part avec la demande, et se montre sous elle (R123).
-    const attached = get().attachments;
+    const { attachments, files } = get();
+    set({ draft: "", attachments: [], files: [], notice: null });
+    return speak(slug, { text, attached: attachments, files });
+  },
+
+  enqueue: () => {
+    const { draft, attachments, files, queue } = get();
+    const text = draft.trim();
+    if (!text || queue.length >= MAX_QUEUE) return false;
+    set({ draft: "", attachments: [], files: [], queue: [...queue, { id: nextId("q"), text, attachments, files }] });
+    return true;
+  },
+
+  unqueue: (id) => set((s) => {
+    const queue = s.queue.filter((message) => message.id !== id);
+    return { queue, queueHalted: s.queueHalted && queue.length > 0 };
+  }),
+
+  sendNext: async (slug) => {
+    const { queue, sentAt } = get();
+    if (!slug || sentAt !== null || queue.length === 0) return false;
+    const [next, ...rest] = queue;
+    set({ queue: rest, queueHalted: rest.length > 0 });
+    return dispatch(slug, next);
+  },
+
+  stop: (slug) => {
+    const run = current;
+    if (!run) return false;
+    current = null;
+    run.controller.abort();
+    const line = nextId("a");
     set((s) => ({
-      draft: "", attachments: [], sentAt, open: true, unread: false,
-      turns: [...s.turns, { id: nextId("u"), role: "user", text, ...(attached.length > 0 ? { attached } : {}) }],
+      sentAt: null, stoppable: false, workStep: null, lastMs: s.sentAt === null ? s.lastMs : Date.now() - s.sentAt, unread: !s.open,
+      queueHalted: s.queue.length > 0,
+      turns: [...s.turns, { id: line, role: "assistant" as const, kind: "stopped" as const }],
     }));
-    // Ce que la personne voit (R114) : le projet de la route, l'issue de la route ou de la fiche ouverte.
-    const screen = screenFrom(typeof window === "undefined" ? null : window.location.pathname,
-      useScreenStore.getState().openIssue);
-    try {
-      const res = attached.length > 0
-        ? await sendAgentMessage(slug, text, get().conversationId, screen, null, toRequest(attached))
-        : screen
-          ? await sendAgentMessage(slug, text, get().conversationId, screen)
-          : await sendAgentMessage(slug, text, get().conversationId);
-      set((s) => ({
-        conversationId: res.conversationId,
-        tokens: s.tokens + (res.answer.usage?.totalTokens ?? 0),
-        // Une réponse sans modèle (un repli) ne mesure rien : la jauge garde la dernière mesure.
-        context: contextFrom(res.answer.usage) ?? s.context,
-        turns: [...s.turns, { id: nextId("a"), role: "assistant", answer: res.answer, escalation: res.escalation ?? null }],
-      }));
-      void get().loadConversations(slug);
-      return true;
-    } catch (e) {
-      set((s) => ({ turns: [...s.turns, failedTurn(e)] }));
-      return false;
-    } finally {
-      // Repliée pendant l'attente : la barre signale qu'une réponse attend d'être lue.
-      set((s) => ({ sentAt: null, lastMs: Date.now() - sentAt, unread: !s.open }));
-    }
+    settling = settleStop(slug, run.turn, line).finally(() => { settling = null; });
+    return true;
   },
 
   compact: async (slug) => {
     if (!slug || get().sentAt !== null) return false;
     get().enterWorkspace(slug);
     const sentAt = Date.now();
-    set({ draft: "", sentAt, open: true, unread: false });
-    const say = (compacted: number) => (s: CortexState) => ({
-      turns: [...s.turns, { id: nextId("a"), role: "assistant" as const, kind: "compact" as const, compacted }],
-      // Le prochain prompt sera plus court : la jauge ne garde pas la mesure d'avant.
-      context: compacted > 0 ? null : s.context,
+    // La ligne attend là où viendra le résultat, et le fil reste à sa place (TF-J1-15 : « ca scroll dans le chat pour
+    // aucune raison », « la ca supp tout le context ??? ») : rien des tours d'avant ne bouge, rien n'en disparaît.
+    const line = nextId("a");
+    set((s) => ({
+      draft: "", sentAt, open: true, unread: false,
+      turns: [...s.turns, { id: line, role: "assistant", kind: "compact", compacted: 0, compacting: true }],
+    }));
+    const settle = (patch: Partial<CortexTurn>) => (s: CortexState) => ({
+      turns: s.turns.map((turn) => (turn.id === line ? { ...turn, ...patch, compacting: false } : turn)),
     });
+    let ok = false;
     try {
       const id = get().conversationId;
       if (id === null) {
-        set(say(0));
+        set(settle({ compacted: 0 }));
+        ok = true;
         return true;
       }
-      const { summarized } = await compactConversation(slug, id);
-      set(say(summarized));
+      const done = await compactConversation(slug, id);
+      set((s) => ({
+        ...settle({ compacted: done.summarized, summary: done.summary ?? null })(s),
+        // La jauge prend sa nouvelle valeur tout de suite : le serveur a compté ce qui partirait maintenant. Un serveur
+        // plus ancien ne le dit pas : elle oublie sa mesure, le prochain prompt sera plus court.
+        context: done.summarized === 0 ? s.context : (done.contextTokens ?? 0) > 0
+          ? {
+              tokens: done.contextTokens ?? 0,
+              window: done.contextWindow ?? null,
+              ...(done.contextEstimated ? { estimated: true } : {}),
+            }
+          : null,
+      }));
+      ok = true;
       return true;
     } catch (e) {
-      // 400 : ce que le serveur dit de son échec (rien n'a changé) ; le quota et le frein gardent leur tour.
-      const status = getErrorStatus(e);
-      set((s) => ({ turns: [...s.turns, status === 400
-        ? { id: nextId("a"), role: "assistant", answer: fallbackAnswer(getErrorMessage(e)) }
-        : failedTurn(e)] }));
+      // Le plafond de tokens garde sa carte ; le reste se dit à la place de la ligne : rien n'a changé.
+      set((s) => (getErrorStatus(e) === 409
+        ? { turns: s.turns.map((turn) => (turn.id === line ? { id: turn.id, role: "assistant", kind: "quota" } : turn)) }
+        : settle({ problem: failureText(e, CONSTANTS_EN.thread) })(s)));
       return false;
     } finally {
       set((s) => ({ sentAt: null, lastMs: Date.now() - sentAt, unread: !s.open }));
+      afterTurn(slug, ok);
     }
   },
 
@@ -324,20 +595,23 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
     const offer = at >= 0 ? turns[at].escalation : null;
     const asked = turns.slice(0, Math.max(at, 0)).reverse().find((turn) => turn.role === "user")?.text;
     if (!offer || turns[at].escalated || !asked || !slug || get().sentAt !== null) return false;
+    const run = beginRun();
     const sentAt = Date.now();
     // La demande repart telle quelle, vers le modèle proposé : la conversation montre où elle va.
     set((s) => ({
-      sentAt, open: true, unread: false,
+      sentAt, stoppable: true, workStep: null, open: true, unread: false,
       turns: [
         ...s.turns.map((turn) => (turn.id === turnId ? { ...turn, escalated: true } : turn)),
         { id: nextId("u"), role: "user", text: asked, sentTo: offer.to },
       ],
     }));
+    let ok = false;
     try {
       // L'écran de maintenant (R114), comme pour une demande écrite dans la barre.
-      const screen = screenFrom(typeof window === "undefined" ? null : window.location.pathname,
-        useScreenStore.getState().openIssue);
-      const res = await sendAgentMessage(slug, asked, get().conversationId, screen, offer.to);
+      const res = await sendAgentMessage(slug, asked, get().conversationId, screenNow(), offer.to, null, {
+        turn: run.turn, project: get().project, signal: run.controller.signal,
+      });
+      if (current !== run) return false;
       set((s) => ({
         conversationId: res.conversationId,
         tokens: s.tokens + (res.answer.usage?.totalTokens ?? 0),
@@ -345,12 +619,17 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
         turns: [...s.turns, { id: nextId("a"), role: "assistant", answer: res.answer, sentTo: res.sentTo ?? offer.to }],
       }));
       void get().loadConversations(slug);
+      ok = true;
       return true;
     } catch (e) {
-      set((s) => ({ turns: [...s.turns, failedTurn(e)] }));
+      if (current === run) set((s) => ({ turns: [...s.turns, failedTurn(e)] }));
       return false;
     } finally {
-      set((s) => ({ sentAt: null, lastMs: Date.now() - sentAt, unread: !s.open }));
+      if (current === run) {
+        current = null;
+        set((s) => ({ sentAt: null, stoppable: false, workStep: null, lastMs: Date.now() - sentAt, unread: !s.open }));
+        afterTurn(slug, ok);
+      }
     }
   },
 
@@ -368,18 +647,25 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
   openConversation: async (slug, id) => {
     try {
       const detail = await getConversation(slug, id);
-      // Les gestes faits sur les cartes restent à la conversation qui les a faits : « Changes » repart de celle-ci.
-      set({
+      leaveRun();
+      // Les gestes faits sur les cartes restent à la conversation qui les a faits : « Changes » repart de celle-ci. Son
+      // projet est le sien (R135). Ce qui attendait reste visible, et ne part que d'un clic.
+      set((s) => ({
         workspace: slug, turns: messagesToTurns(detail.messages), conversationId: detail.id,
         tokens: detail.totalTokens, context: null, lastMs: null, unread: false, done: [], deletions: {},
-      });
+        project: detail.projectId ?? null, projectPinned: true, sentAt: null, stoppable: false,
+        queueHalted: s.queue.length > 0,
+      }));
       return true;
     } catch {
       return false;
     }
   },
 
-  newConversation: () => set({ ...EMPTY_CONVERSATION }),
+  newConversation: () => {
+    leaveRun();
+    set((s) => ({ ...EMPTY_CONVERSATION, sentAt: null, stoppable: false, queueHalted: s.queue.length > 0 }));
+  },
 
   removeConversation: async (slug, id) => {
     try {
@@ -387,7 +673,7 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
     } catch {
       return false;
     }
-    if (get().conversationId === id) set({ ...EMPTY_CONVERSATION });
+    if (get().conversationId === id) get().newConversation();
     set((s) => ({ conversations: s.conversations.filter((c) => c.id !== id) }));
     return true;
   },
@@ -406,6 +692,7 @@ export const useCortexStore = create<CortexState>()((set, get) => ({
     try {
       const next = await sendAnswer(slug, call, said);
       if (next.status === "success") get().noteDone(next);
+      if (next.status === "pending" && said.some((answer) => answer.field === PROJECT_FIELD)) void adoptProject(slug);
       return next;
     } catch (e) {
       set({ questionProblem: getErrorMessage(e) });

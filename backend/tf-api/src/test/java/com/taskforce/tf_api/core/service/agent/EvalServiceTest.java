@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
@@ -213,6 +214,98 @@ class EvalServiceTest {
             "[{\"tool\":\"list_projects\",\"arguments\":\"{}\",\"output\":\"- CLEANU Cleanup check: 1/1 open\"}]");
         assertThat(created.tool()).isEqualTo("create_issue");
         assertThat(created.mine()).isTrue();
+    }
+
+    /** « Bien », d'un clic (R137) : ce qui a été observé devient ce qu'on attend. */
+    @Test
+    @DisplayName("bien : un clic garde le cas, avec ce qui a été observé, daté maintenant")
+    void good_keeps_what_was_observed() throws Exception {
+        stubRecord(answerThatCreatedAnIssue());
+
+        EvalBankResponse.CaseSummary kept = service.keepGood("acme", 7L, RECORD.toString());
+
+        ArgumentCaptor<EvalCase> saved = ArgumentCaptor.forClass(EvalCase.class);
+        verify(cases).save(saved.capture());
+        assertThat(saved.getValue().waiting()).isFalse();
+        assertThat(saved.getValue().getCriteria()).contains("\"tool\":\"create_issue\"").contains("CLEANU");
+        assertThat(kept.waiting()).isFalse();
+        assertThat(kept.tool()).isEqualTo("create_issue");
+    }
+
+    /** « Pas bien » (R137) : une phrase seule ; R61 tient : aucun rejeu ne la note, ses critères viendront datés. */
+    @Test
+    @DisplayName("pas bien : la phrase seule fait un cas qui attend ses critères, à l'écart de tout rejeu")
+    void bad_keeps_a_sentence_waiting_for_its_criteria() throws Exception {
+        stubRecord(answerThatCreatedAnIssue());
+
+        EvalBankResponse.CaseSummary kept = service.keepBad("acme", 7L, RECORD.toString(), "  It should have asked which project.  ");
+
+        ArgumentCaptor<EvalCase> saved = ArgumentCaptor.forClass(EvalCase.class);
+        verify(cases).save(saved.capture());
+        EvalCase waiting = saved.getValue();
+        assertThat(waiting.waiting()).isTrue();
+        assertThat(waiting.getCriteriaAt()).isAfter(LocalDateTime.of(9000, 1, 1, 0, 0));
+        assertThat(kept.waiting()).isTrue();
+        assertThat(kept.expected()).isEqualTo("It should have asked which project.");
+        assertThat(kept.tool()).isEmpty();
+    }
+
+    @ParameterizedTest(name = "« {0} »")
+    @ValueSource(strings = {"", "   "})
+    void bad_needs_its_sentence(String sentence) {
+        assertThatThrownBy(() -> service.keepBad("acme", 7L, RECORD.toString(), sentence))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("one sentence");
+        verify(cases, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("bien ou pas bien : la même réponse ne se garde qu'une fois")
+    void the_same_answer_is_kept_once() {
+        EvalCase kept = storedCase(LocalDateTime.of(2026, 11, 9, 10, 0));
+        when(cases.findFirstByWorkspaceIdAndSourceRecordAndArchivedFalseOrderByIdDesc(1L, RECORD)).thenReturn(Optional.of(kept));
+
+        assertThat(service.keepGood("acme", 7L, RECORD.toString()).id()).isEqualTo(40L);
+        assertThat(service.keepBad("acme", 7L, RECORD.toString(), "Autrement").id()).isEqualTo(40L);
+        verify(cases, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("les critères d'un cas qui les attend s'écrivent une fois, datés maintenant, la phrase gardée")
+    void criteria_are_written_once() throws Exception {
+        EvalCase waiting = storedCase(EvalCase.WAITING_FOR_CRITERIA);
+        waiting.setCriteria("{\"expected\":\"It should have asked.\"}");
+        when(cases.findByIdAndWorkspaceId(40L, 1L)).thenReturn(Optional.of(waiting));
+
+        EvalBankResponse.CaseSummary done = service.giveCriteria("acme", 7L, 40L, "Asks first",
+            new EvalCriteria(EvalCriteria.NO_TOOL, null, null, null, null, null, false));
+
+        assertThat(done.waiting()).isFalse();
+        assertThat(done.expected()).isEqualTo("It should have asked.");
+        assertThat(waiting.getTitle()).isEqualTo("Asks first");
+        assertThat(waiting.getCriteriaAt()).isBefore(LocalDateTime.now().plusSeconds(1));
+
+        // Datés, ils ne changent plus : un modèle a pu être noté dessus.
+        assertThatThrownBy(() -> service.giveCriteria("acme", 7L, 40L, null,
+            new EvalCriteria(EvalCriteria.NO_TOOL, null, null, null, null, null, false)))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("already has its criteria");
+    }
+
+    @Test
+    @DisplayName("un cas qui attend ses critères n'est pas noté, et seul son auteur ou un gestionnaire les écrit")
+    void a_waiting_case_is_never_graded() {
+        EvalCase waiting = storedCase(EvalCase.WAITING_FOR_CRITERIA);
+        when(cases.findByIdAndWorkspaceId(40L, 1L)).thenReturn(Optional.of(waiting));
+        when(runs.findByIdAndWorkspaceId(9L, 1L)).thenReturn(Optional.of(
+            EvalRun.builder().id(9L).workspaceId(1L).startedAt(LocalDateTime.of(2026, 11, 9, 10, 0)).model("default").total(1).passed(0).build()));
+        when(results.findByRunIdAndCaseId(9L, 40L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.runCase("acme", 7L, 9L, 40L))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("waiting for its criteria");
+
+        waiting.setCreatedBy(99L);
+        when(authorization.isManager(1L, 7L)).thenReturn(false);
+        assertThatThrownBy(() -> service.giveCriteria("acme", 7L, 40L, null, new EvalCriteria(EvalCriteria.NO_TOOL, null, null, null, null, null, false)))
+            .isInstanceOf(ForbiddenException.class);
     }
 
     @Test

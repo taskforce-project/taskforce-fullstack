@@ -23,4 +23,10 @@ public class SearchBrainRequest {
 
     /** Filtre optionnel par domaine (NodeDomain). */
     private String domain;
+
+    /**
+     * Plein texte seulement, sans le modèle de vecteurs (Ctrl+K, R141) : on répond à la frappe, sans occuper le modèle
+     * local, et une note ne sort que si elle contient ce qu'on tape. Chaque résultat porte son passage.
+     */
+    private Boolean textOnly;
 }

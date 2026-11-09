@@ -38,6 +38,27 @@ export function takePending(dir: string): PendingUpdate | null {
 }
 
 /**
+ * La passation de l'écran de la mise à jour (cf. desktop/installer.nsh) : ce fichier, posé par l'installeur dans le
+ * dossier de l'app, existe tant que sa fenêtre est à l'écran. L'ancienne app attend qu'il apparaisse pour quitter, la
+ * nouvelle l'efface en montrant sa première fenêtre. Ainsi, du clic sur « Restart now » à la nouvelle fenêtre, il y a
+ * toujours une fenêtre de TaskForce à l'écran.
+ */
+export const SCREEN_FILE = "update-screen";
+
+export function updateScreenIsUp(dir: string): boolean {
+  return existsSync(join(dir, SCREEN_FILE));
+}
+
+/** Dit à l'installeur que sa fenêtre peut partir. Un fichier qui reste fait attendre son délai à la fenêtre, rien de plus. */
+export function releaseUpdateScreen(dir: string): void {
+  try {
+    rmSync(join(dir, SCREEN_FILE), { force: true });
+  } catch {
+    // La fenêtre de l'installeur partira à la fin de son délai.
+  }
+}
+
+/**
  * Ce que le lancement suivant en conclut : `installed` (la nouvelle version tourne), `not-installed` (l'app tourne encore
  * sur la version d'avant : l'installeur a échoué, ou n'est pas parti), ou `null` (rien à dire, l'app a changé autrement).
  */

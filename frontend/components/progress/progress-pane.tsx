@@ -64,7 +64,7 @@ function History({ slug }: Readonly<{ slug: string }>) {
     <div className="flex flex-col gap-4">
       <ModelRuns />
       <BankHistory slug={slug} />
-      <Improvements />
+      <Improvements slug={slug} />
     </div>
   )
 }

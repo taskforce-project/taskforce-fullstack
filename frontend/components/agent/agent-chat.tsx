@@ -6,10 +6,7 @@ import { useReducedMotion } from "framer-motion"
 import {
   Sparkles, ChevronDown, ChevronUp, Plus, Trash2, Play, CircleAlert,
 } from "lucide-react"
-import {
-  Message, Steps, Reasoning, Tool, Sources, ThinkingBar, FeedbackBar, TokenMeter,
-  type ToolStatus,
-} from "@/components/chat"
+import { Message, TokenMeter } from "@/components/chat"
 import { cn } from "@/lib/utils"
 import { fillModelText } from "@/lib/ai/model-table"
 import {
@@ -18,23 +15,29 @@ import {
   type AssistantAnswer, type AssistantToolCall,
 } from "@/lib/api/assistant-service"
 import { getErrorMessage } from "@/lib/api/client"
-import { readLine } from "@/lib/cortex/read-line"
+import { outcomeLine, plainOutput, proposalLine } from "@/lib/cortex/work-lines"
+import { useCortexWork } from "@/lib/hooks/use-cortex-work"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { useCortexStore } from "@/lib/store/cortex-store"
+import { useEvalStore } from "@/lib/store/eval-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { IS_DESKTOP } from "@/lib/desktop"
+import { AnswerActions } from "./answer-actions"
 import { AnswerText } from "./answer-text"
 import { Arrival } from "./arrival"
 import { CompactedNotice, ContextFitNotice } from "./context-fit-notice"
 import { CortexUsage } from "./cortex-usage"
 import { DeleteIssueCard } from "./delete-issue-card"
-import { EvalCaseButton } from "./eval-case-dialog"
 import { IssueDraftCard } from "./issue-draft-card"
 import { MissionInChat } from "./mission-in-chat"
 import { ModelOffer } from "./model-offer"
 import { QuestionCard } from "./question-card"
+import { ReadLine } from "./read-line"
+import { StoppedNotice } from "./stopped-notice"
 import { UndoAction } from "./undo-action"
+import { UserMessage } from "./user-message"
+import { WorkedLine, WorkingLine } from "./work-line"
 
 /**
  * Plafond mensuel de tokens IA de l'instance atteint (HTTP 409) - carte d'**information** (pas
@@ -82,12 +85,6 @@ function AiUnavailableNotice() {
   )
 }
 
-const OUTCOME: Record<"success" | "refused" | "error", string> = {
-  success: "Done. ",
-  refused: "",
-  error: "The action failed: ",
-}
-
 /**
  * Action proposée par Cortex, interne (une note, un projet) ou dans un outil connecté : les règles de l'espace la
  * demandent à la personne. Rien n'est fait sans son clic ; l'accord part avec le dossier de la réponse, où le serveur
@@ -98,7 +95,8 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
   const [output, setOutput] = useState<string | null>(null)
   const [result, setResult] = useState<AssistantActionResult | null>(null)
   const noteDone = useCortexStore((s) => s.noteDone)
-  const external = call.name.includes("__")
+  const t = usePreferencesStore((s) => s.t.thread)
+  const outcome = { success: t.outcomeDone, refused: "", error: t.outcomeFailed }
   // Accordée et faite : l'appel tel qu'il a abouti, avec l'empreinte que « Undo » nomme et l'issue qu'il touche.
   const done: AssistantToolCall = { ...call, status: "success", output, ref: result?.ref ?? null, target: result?.target ?? null }
 
@@ -121,10 +119,7 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
 
   return (
     <div className="my-2 flex flex-col gap-2 border border-shape-yellow/35 bg-shape-yellow/[0.06] p-2.5 text-xs">
-      <p className="text-muted-foreground">
-        Cortex proposes to run <span className="font-mono text-foreground">{call.name}</span>
-        {external ? " on a connected tool. Nothing is sent until you approve it." : ". Nothing changes until you approve it."}
-      </p>
+      <p className="text-muted-foreground">{proposalLine(call.name, t)}</p>
       {state === "idle" || state === "running" ? (
         <button
           type="button"
@@ -132,13 +127,13 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
           disabled={state === "running"}
           className="flex h-7 w-fit items-center gap-1.5 bg-primary px-2.5 font-medium text-primary-foreground shadow-key transition-colors hover:bg-primary-hover disabled:opacity-60"
         >
-          <Play className="size-4" /> {state === "running" ? "Running…" : "Approve and run"}
+          <Play className="size-4" /> {state === "running" ? t.approving : t.approve}
         </button>
       ) : (
         <>
           <p className={cn("whitespace-pre-wrap break-words",
             state === "success" ? "text-ink-green" : state === "refused" ? "text-ink-red" : "text-destructive")}>
-            {OUTCOME[state]}{output}
+            {outcome[state]}{plainOutput(output ?? "")}
           </p>
           {/* Accordée et faite, une création se défait aussi d'un geste (R77). */}
           {state === "success" && isUndoable(done) && <UndoAction slug={slug} call={done} />}
@@ -149,6 +144,9 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
     </div>
   )
 }
+
+/** En deçà du bas du fil, la personne le lit encore (en pixels). */
+const BOTTOM_MARGIN = 32
 
 const HEADER_BUTTON =
   "flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -193,11 +191,16 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
   const threadRef = useRef<HTMLDivElement>(null)
   const askRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
-  const thinking = sentAt !== null
+  // La personne lit le bas du fil : la ligne de « /compact » y reste en vue, sans animation.
+  const atBottom = useRef(true)
+  // « /compact » attend sur sa propre ligne : ce n'est pas une réponse qui travaille.
+  const compacting = turns.at(-1)?.compacting === true
+  const thinking = sentAt !== null && !compacting
   // L'échange en cours : la dernière demande de la personne et la réponse qui la suit, en grand une fois arrivée. Ce
-  // qui précède la demande est plus petit.
+  // qui précède la demande est plus petit. La ligne de « /compact » ne change pas ce qui se lit en grand.
   const lastAsk = turns.findLastIndex((turn) => turn.role === "user")
-  const latest = !thinking && turns.at(-1)?.role === "assistant" ? turns.at(-1)?.id : undefined
+  const lastSaid = turns.findLast((turn) => turn.kind !== "compact")
+  const latest = !thinking && lastSaid?.role === "assistant" ? lastSaid.id : undefined
 
   const aiStatus = useAiStatusStore((s) => s.status)
   const fetchAiStatus = useAiStatusStore((s) => s.fetchStatus)
@@ -205,11 +208,21 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
 
   useEffect(() => { void loadConversations(slug) }, [loadConversations, slug])
 
+  // Ce que Cortex fait, annoncé par le serveur (R137) ; la banque dit si « bien » et « pas bien » ont leur place (R15).
+  useCortexWork()
+  const fetchBank = useEvalStore((s) => s.fetchBank)
+  useEffect(() => { if (slug) void fetchBank(slug) }, [fetchBank, slug])
+
   // L'échange en cours reste en vue, juste au-dessus de la barre où la personne vient d'écrire. Plus haut que ce qui se
   // lit sous le fondu du haut (le retrait du fil), il se lit depuis son début : sa demande, juste sous le fondu.
   useEffect(() => {
     const el = threadRef.current
     if (!el) return
+    // « /compact » ne fait rien défiler (TF-J1-15) : sa ligne s'ajoute en bas, et qui lit le bas la voit, sans animation.
+    if (turns.at(-1)?.kind === "compact") {
+      if (atBottom.current) el.scrollTop = el.scrollHeight
+      return
+    }
     const ask = askRef.current
     const askTop = ask ? ask.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop : 0
     const fade = Number.parseFloat(getComputedStyle(el).paddingTop) || 0
@@ -248,7 +261,14 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
 
   return (
     <div className={cn("flex min-h-0 flex-col", column && "flex-1")}>
-      <div ref={threadRef} className={cn("cortex-thread min-h-0 overflow-y-auto px-3 md:px-4", column && "flex flex-1 flex-col")}>
+      <div
+        ref={threadRef}
+        onScroll={(e) => {
+          const el = e.currentTarget
+          atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_MARGIN
+        }}
+        className={cn("cortex-thread min-h-0 overflow-y-auto px-3 md:px-4", column && "flex flex-1 flex-col")}
+      >
         {/* En colonne, les tours se posent juste au-dessus du compositeur et montent à mesure. */}
         <div className={cn("flex flex-col", column && "mx-auto mt-auto w-full max-w-[720px] pt-4")}>
           {turns.length === 0 && !thinking ? (
@@ -267,7 +287,7 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
               >
                 {turn.role === "user" ? (
                   <>
-                    <Message role="user" content={turn.text} />
+                    <UserMessage text={turn.text} />
                     {/* Ce que la personne a joint à sa demande (R123) : Cortex en a reçu le contenu. */}
                     {turn.attached && turn.attached.length > 0 && (
                       <p className="mt-0.5 text-right text-xs text-muted-foreground">
@@ -286,7 +306,9 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
                     <QuotaNotice />
                   </Message>
                 ) : turn.kind === "compact" ? (
-                  <CompactedNotice compacted={turn.compacted ?? 0} />
+                  <CompactedNotice compacted={turn.compacted ?? 0} compacting={turn.compacting} summary={turn.summary} problem={turn.problem} />
+                ) : turn.kind === "stopped" ? (
+                  <StoppedNotice />
                 ) : (
                   <Message role="assistant">
                     {turn.answer && <AgentAnswerView answer={turn.answer} slug={slug} />}
@@ -298,7 +320,7 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
           )}
           {thinking && (
             <Message role="assistant">
-              <ThinkingBar />
+              <WorkingLine />
             </Message>
           )}
         </div>
@@ -394,14 +416,16 @@ export function AgentChat({ onFold, layout = "folded" }: Readonly<{
 }
 
 /**
- * Un appel d'outil de la réponse, et la carte qui va avec : les questions de TaskForce (R115), la carte d'une issue
- * préparée, d'une suppression, d'une action demandée, d'Undo ou d'une mission. Après les réponses à une carte de
- * questions, la suite du geste se rend ici à son tour, sous elle.
+ * La carte d'un appel d'outil de la réponse, quand il en a une : les questions de Cortex (R115, R136), une issue préparée,
+ * une suppression, une action demandée, Undo ou une mission. Elles restent visibles, hors du pli du travail (R137) ; un
+ * appel sans carte ne montre rien ici, il se raconte dans le pli. Après les réponses à une carte de questions, la suite du
+ * geste se rend ici à son tour, sous elle.
  */
-function ToolCallView({ slug, call }: { slug: string; call: AssistantToolCall }) {
-  // TaskForce demande ce qu'il manque au geste (R115) : une carte de deux questions au plus, et la suite sur son envoi.
+function ToolCallView({ slug, call, followUp = false }: { slug: string; call: AssistantToolCall; followUp?: boolean }) {
+  const t = usePreferencesStore((s) => s.t.thread)
+  // Cortex demande ce qu'il manque au geste (R115) : une carte de deux questions au plus, et la suite sur son envoi.
   if (isQuestionCard(call)) {
-    return <QuestionCard slug={slug} call={call} then={(next) => <ToolCallView slug={slug} call={next} />} />
+    return <QuestionCard slug={slug} call={call} then={(next) => <ToolCallView slug={slug} call={next} followUp />} />
   }
   // Cortex demande d'abord ce qui compte (R102) : rien n'est préparé, sa question est la réponse.
   if (isQuestion(call)) return null
@@ -409,9 +433,13 @@ function ToolCallView({ slug, call }: { slug: string; call: AssistantToolCall })
   if (isPreparedIssue(call)) return <IssueDraftCard slug={slug} call={call} />
   // Une suppression demandée : archiver d'abord, qui se défait, ou supprimer, d'un clic de la personne (R1).
   if (isDeletion(call)) return <DeleteIssueCard slug={slug} call={call} target={call.target} />
+  // Repris sur une carte, le geste n'a pas de réponse du modèle : ce qu'il a fait se dit ici, en une phrase.
+  const said = followUp ? outcomeLine(call, t) : null
+  // Un appel sans carte se raconte dans le pli du travail : ici, il ne prend aucune place.
+  if (!said && !isApprovable(call) && !isUndoable(call) && !isMission(call)) return null
   return (
     <div>
-      <Tool name={call.name} status={call.status as ToolStatus} input={call.input ?? undefined} output={call.output ?? undefined} />
+      {said && <p className="whitespace-pre-wrap break-words text-sm text-foreground">{said}</p>}
       {/* Action demandée par les règles de l'espace : validation explicite de l'utilisateur. */}
       {isApprovable(call) && <PendingAction slug={slug} call={call} />}
       {/* Ce que Cortex vient de faire se défait d'un geste (R77). */}
@@ -423,56 +451,25 @@ function ToolCallView({ slug, call }: { slug: string; call: AssistantToolCall })
 }
 
 /**
- * Rend la réponse structurée : étapes, raisonnement, la réponse, puis ce qu'elle propose ou a fait (les cartes), puis
- * les sources repliées. Les cartes viennent après le texte, au plus près de la barre : le serveur écrit « the action
- * below » ou « check the issue below », et c'est la dernière chose à décider.
+ * Rend la réponse structurée : le pli du travail (R137), la réponse, puis ce qu'elle propose ou a fait (les cartes), puis
+ * sa ligne grise et, au survol, les gestes sur elle. Les cartes viennent après le texte, au plus près de la barre : le
+ * serveur écrit « the action below » ou « check the issue below », et c'est la dernière chose à décider.
  */
 function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: string }) {
-  const t = usePreferencesStore((s) => s.t.cortex)
-  const c = usePreferencesStore((s) => s.t.conversation)
-  // La ligne grise (R123) : le modèle qui a répondu et ce que TaskForce lui a donné à lire, compté par le serveur.
-  const line = readLine(answer.model, answer.read, c)
-  const usage = answer.usage && answer.usage.totalTokens > 0
-    ? `${answer.mode} · ${answer.usage.totalTokens.toLocaleString("en-US")} tokens`
-      + (answer.usage.promptTokens > 0 || answer.usage.completionTokens > 0
-        ? ` (${answer.usage.promptTokens}↑ ${answer.usage.completionTokens}↓)`
-        : "")
-    : null
-  // Le dossier de la réponse, que porte chacun de ses appels d'outil : il fait d'elle un cas de la banque (R61,
-  // séance n°10). Une réponse sans outil que TaskForce a corrigée a le sien (R116).
-  const record = answer.record ?? answer.toolCalls.find((tc) => tc.record)?.record
-  // Les questions de TaskForce se lisent sur leur carte (R115) : le texte de la réponse ne les répète pas au-dessus.
+  // Le dossier de la réponse : il fait d'elle un cas de la banque (R61, R137), même une fois la conversation rouverte.
+  const record = answer.record ?? answer.read?.record ?? answer.toolCalls.find((tc) => tc.record)?.record
+  // Les questions d'un geste se lisent sur leur carte (R115) : le texte de la réponse ne les répète pas au-dessus.
   const asking = answer.toolCalls.some(isQuestionCard)
   return (
     <div className="group/answer space-y-1">
-      {answer.steps.length > 0 && (
-        <Steps steps={answer.steps.map((s) => ({ title: s.label, status: s.status, description: s.description ?? undefined }))} />
-      )}
-      {answer.reasoning && <Reasoning content={answer.reasoning} />}
+      <WorkedLine answer={answer} />
       {/* Ce qu'il a fallu condenser ou couper pour tenir la fenêtre du modèle, avant que la requête parte (TF-J1-13). */}
       <ContextFitNotice context={answer.read?.context} model={answer.model} />
-      {/* Ce que TaskForce dit à la place d'une phrase fausse se montre comme sa parole, pas celle du modèle (R116). */}
+      {/* La correction d'une phrase fausse se montre comme la parole de TaskForce, pas celle du modèle (R116). */}
       <AnswerText text={answer.answer} withCard={asking} toolCalls={answer.toolCalls} />
       {answer.toolCalls.map((tc, i) => <ToolCallView key={i} slug={slug} call={tc} />)}
-      {answer.sources.length > 0 && (
-        <Sources items={answer.sources.map((s) => ({ title: s.title, snippet: s.domain, score: s.score ?? undefined }))} />
-      )}
-      {/* Sous la réponse, une ligne grise et calme : le modèle qui a répondu (test du CEO du 05/11/2026 : « jsp avec quel
-          model il a fait ca ») et ce qu'il a lu (« qwen3:8b · read OPS-35 and 3 comments »), toujours visible ; le mode
-          et les tokens au survol, pour qui les cherche. Puis les gestes sur la réponse. */}
-      {line && (
-        <p
-          className="mt-1 truncate text-xs text-muted-foreground"
-          aria-label={`${c.readLine}: ${line}`}
-          title={[answer.model ? fillModelText(t.answeredWith, { model: answer.model }) : null, line, usage].filter(Boolean).join("\n")}
-        >
-          {line}
-        </p>
-      )}
-      <div className="flex items-center gap-1">
-        <FeedbackBar onCopy={() => navigator.clipboard?.writeText(answer.answer)} />
-        {record && <EvalCaseButton slug={slug} record={record} />}
-      </div>
+      <ReadLine slug={slug} answer={answer} />
+      <AnswerActions slug={slug} text={answer.answer} record={record} />
     </div>
   )
 }

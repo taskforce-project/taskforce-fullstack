@@ -27,10 +27,10 @@ export function awaitsJudgment(run: DeliveryRun): boolean {
   return run.status === "DONE" && !run.outcome && !run.refused
 }
 
-/** Une mission refusée au départ par une règle n'est pas une panne (R38) : elle est finie, sans rien faire. */
+/** Une mission refusée au départ par une règle n'est pas une panne (R38), ni celle que la personne a arrêtée : elles sont finies. */
 export function runState(run: DeliveryRun): WorkState {
   if (isActiveRun(run.status)) return "working"
-  if (run.status === "FAILED") return run.refused ? "done" : "failed"
+  if (run.status === "FAILED") return run.refused || run.outcome === "STOPPED" ? "done" : "failed"
   return awaitsJudgment(run) ? "waiting" : "done"
 }
 

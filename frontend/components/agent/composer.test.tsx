@@ -9,6 +9,7 @@ vi.mock("next/navigation", () => ({
 }))
 vi.mock("./cortex-usage", () => ({ CortexUsage: () => <span>context gauge</span> }))
 vi.mock("@/lib/api/issue-service", () => ({ searchIssues: vi.fn().mockResolvedValue([]) }))
+vi.mock("@/lib/hooks/use-connector-lines", () => ({ useConnectorLines: () => [{ key: "linear", name: "Linear", reconnect: false }] }))
 const voice = vi.hoisted(() => ({ voiceKind: vi.fn() }))
 vi.mock("@/lib/store/voice-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/store/voice-store")>()),
@@ -21,6 +22,7 @@ import { searchIssues, type IssueHit } from "@/lib/api/issue-service"
 import type { Project } from "@/lib/api/project-service"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { useCortexStore } from "@/lib/store/cortex-store"
+import { useModelCapabilityStore } from "@/lib/store/model-capability-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { searchKey, useSearchStore } from "@/lib/store/search-store"
 import { useVoiceStore } from "@/lib/store/voice-store"
@@ -37,8 +39,9 @@ describe("Composer", () => {
     vi.clearAllMocks()
     // La recherche de l'espace rend la même issue que celle déjà gardée : la pause de la frappe ne la retire pas.
     vi.mocked(searchIssues).mockResolvedValue([hit])
-    useCortexStore.setState({ ...initial, draft: "", attachments: [], turns: [], open: true, unread: false, sentAt: null, tokens: 1200, send })
+    useCortexStore.setState({ ...initial, draft: "", attachments: [], files: [], queue: [], notice: null, turns: [], open: true, unread: false, sentAt: null, stoppable: false, tokens: 1200, send })
     useAiStatusStore.setState({ status: { configured: true, fastModel: "qwen3:8b", chatModel: "qwen3:14b" } as AiStatus })
+    useModelCapabilityStore.setState({ table: null, fetchTable: vi.fn().mockResolvedValue(null) })
     useSearchStore.setState({ hits: { [searchKey("acme", "")]: [hit], [searchKey("acme", "ops")]: [hit] }, latest: {}, pending: {} })
     useProjectStore.setState({ projects: [{ id: 3, name: "Operations", identifier: "OPS", status: "ACTIVE" } as unknown as Project] })
     useWorkspaceStore.setState({ members: [], fetchMembers: vi.fn().mockResolvedValue([]) })
@@ -108,18 +111,17 @@ describe("Composer", () => {
     })
   })
 
-  it("in its column, shows the model, which opens Progress in the pane, and the context indicator, and no toggle", () => {
+  it("in its column, shows the row under the box: the project, the model that answers, the ring, and no toggle", () => {
     render(<Composer variant="column" />)
 
-    const model = screen.getByRole("link", { name: "qwen3:8b" })
-    expect(model).toHaveAttribute("href", "/acme/progress")
-    fireEvent.click(model)
-    expect(push).toHaveBeenCalledWith("/acme/progress", { scroll: false })
+    expect(screen.getByRole("button", { name: "Model that answers: qwen3:8b" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /Project of this conversation/ })).toBeInTheDocument()
     expect(screen.getByText("context gauge")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /conversation with Cortex/ })).toBeNull()
+    expect(push).not.toHaveBeenCalled()
   })
 
-  it("sends with Enter only what is written, and nothing while Cortex answers", () => {
+  it("sends with Enter only what is written", () => {
     render(<Composer variant="column" />)
     const input = screen.getByLabelText("What do you want done?")
 
@@ -129,10 +131,186 @@ describe("Composer", () => {
     fireEvent.change(input, { target: { value: "Move WEB-12 to Done" } })
     fireEvent.keyDown(input, { key: "Enter" })
     expect(send).toHaveBeenCalledWith("acme")
+  })
 
-    act(() => useCortexStore.setState({ sentAt: Date.now() }))
-    fireEvent.click(screen.getByRole("button", { name: "Send" }))
-    expect(send).toHaveBeenCalledTimes(1)
+  it("is a field that wraps, and Shift+Enter goes to the next line without sending", () => {
+    render(<Composer variant="column" />)
+    const input = screen.getByLabelText("What do you want done?")
+
+    expect(input.tagName).toBe("TEXTAREA")
+    fireEvent.change(input, { target: { value: "First line" } })
+    fireEvent.keyDown(input, { key: "Enter", shiftKey: true })
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ["an IME composition", { isComposing: true }],
+    ["the key of an IME", { keyCode: 229 }],
+  ])("sends nothing during %s", (_label, event) => {
+    render(<Composer variant="column" />)
+    const input = screen.getByLabelText("What do you want done?")
+    fireEvent.change(input, { target: { value: "にほんご" } })
+
+    fireEvent.keyDown(input, { key: "Enter", ...event })
+
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it("never announces « @ » or « / », and says 17 lines at most", () => {
+    render(<Composer variant="column" />)
+    const input = screen.getByLabelText("What do you want done?")
+
+    expect(input.getAttribute("placeholder")).not.toMatch(/[@/]/)
+    expect((input as HTMLTextAreaElement).style.maxHeight).toBe("340px")
+  })
+
+  describe("while Cortex works (R134)", () => {
+    const stop = vi.fn().mockReturnValue(true)
+
+    beforeEach(() => {
+      useCortexStore.setState({ sentAt: Date.now(), stoppable: true, stop })
+    })
+
+    it("the send button is a square, and a click stops at once", () => {
+      render(<Composer variant="column" />)
+
+      expect(screen.queryByRole("button", { name: "Send" })).toBeNull()
+      fireEvent.click(screen.getByRole("button", { name: "Stop" }))
+
+      expect(stop).toHaveBeenCalledWith("acme")
+    })
+
+    it("Escape stops from the field, before anything else folds", () => {
+      const parent = vi.fn()
+      render(<div onKeyDown={parent}><Composer variant="column" /></div>)
+
+      fireEvent.keyDown(screen.getByLabelText("What do you want done?"), { key: "Escape" })
+
+      expect(stop).toHaveBeenCalledWith("acme")
+      expect(parent).not.toHaveBeenCalled()
+    })
+
+    it("Escape stops from anywhere, unless something else takes it first", () => {
+      render(<Composer variant="column" />)
+
+      fireEvent.keyDown(window, { key: "Escape" })
+      expect(stop).toHaveBeenCalledTimes(1)
+
+      const dialog = document.createElement("div")
+      dialog.setAttribute("role", "dialog")
+      dialog.setAttribute("data-state", "open")
+      document.body.append(dialog)
+      fireEvent.keyDown(window, { key: "Escape" })
+      expect(stop).toHaveBeenCalledTimes(1)
+      dialog.remove()
+
+      const taken = new KeyboardEvent("keydown", { key: "Escape", cancelable: true })
+      taken.preventDefault()
+      window.dispatchEvent(taken)
+      expect(stop).toHaveBeenCalledTimes(1)
+    })
+
+    it("Enter puts the message in the queue, visible above the box", () => {
+      useCortexStore.setState({ enqueue: initial.enqueue })
+      render(<Composer variant="column" />)
+      const input = screen.getByLabelText("What do you want done?")
+      fireEvent.change(input, { target: { value: "And then this" } })
+
+      fireEvent.keyDown(input, { key: "Enter" })
+
+      expect(send).not.toHaveBeenCalled()
+      expect(screen.getByRole("list", { name: "Waiting to be sent" })).toHaveTextContent("And then this")
+      expect(useCortexStore.getState().draft).toBe("")
+    })
+
+    it("says when five messages already wait", () => {
+      useCortexStore.setState({
+        enqueue: initial.enqueue,
+        queue: [1, 2, 3, 4, 5].map((n) => ({ id: `q${n}`, text: `m${n}`, attachments: [], files: [] })),
+      })
+      render(<Composer variant="column" />)
+      const input = screen.getByLabelText("What do you want done?")
+      fireEvent.change(input, { target: { value: "sixth" } })
+
+      fireEvent.keyDown(input, { key: "Enter" })
+
+      expect(screen.getByRole("status")).toHaveTextContent("Five messages can wait at most")
+      expect(useCortexStore.getState().draft).toBe("sixth")
+    })
+
+    it("a compaction shows it works, and cannot be stopped", () => {
+      useCortexStore.setState({ stoppable: false })
+      render(<Composer variant="column" />)
+
+      expect(screen.queryByRole("button", { name: "Stop" })).toBeNull()
+      expect(screen.getByRole("button", { name: "Send" })).toBeDisabled()
+    })
+  })
+
+  describe("files (R134)", () => {
+    const named = (name: string, content: string) =>
+      ({ name, size: content.length, text: () => Promise.resolve(content) }) as unknown as File
+
+    it("dropped on the box become a chip above the text, removable", async () => {
+      render(<Composer variant="column" />)
+      const box = screen.getByLabelText("What do you want done?").closest(".cortex-composer") as HTMLElement
+
+      fireEvent.dragOver(box, { dataTransfer: { types: ["Files"], files: [] } })
+      expect(box.className).toContain("ring-primary")
+      fireEvent.drop(box, { dataTransfer: { types: ["Files"], files: [named("notes.md", "body")] } })
+
+      expect(await screen.findByRole("button", { name: "Remove notes.md" })).toBeInTheDocument()
+      expect(box.className).not.toContain("ring-primary")
+      fireEvent.click(screen.getByRole("button", { name: "Remove notes.md" }))
+      expect(useCortexStore.getState().files).toEqual([])
+    })
+
+    it("ignores a drag that holds no file", () => {
+      render(<Composer variant="column" />)
+      const box = screen.getByLabelText("What do you want done?").closest(".cortex-composer") as HTMLElement
+
+      fireEvent.dragOver(box, { dataTransfer: { types: ["text/plain"], files: [] } })
+
+      expect(box.className).not.toContain("ring-primary")
+    })
+
+    it("pasted, are taken; pasted text stays text", async () => {
+      render(<Composer variant="column" />)
+      const input = screen.getByLabelText("What do you want done?")
+
+      fireEvent.paste(input, { clipboardData: { files: [named("data.csv", "a,b")], getData: () => "" } })
+      expect(await screen.findByRole("button", { name: "Remove data.csv" })).toBeInTheDocument()
+
+      fireEvent.paste(input, { clipboardData: { files: [named("sheet.csv", "x,y")], getData: () => "a cell" } })
+      await act(async () => { await Promise.resolve() })
+      expect(screen.queryByRole("button", { name: "Remove sheet.csv" })).toBeNull()
+    })
+
+    it.each([
+      [["report.pdf"], "report.pdf can't be read here"],
+      [["a.pdf", "b.png"], "2 files can't be read here"],
+    ])("say in one line what is supported: %s", async (names, line) => {
+      render(<Composer variant="column" />)
+      const box = screen.getByLabelText("What do you want done?").closest(".cortex-composer") as HTMLElement
+
+      fireEvent.drop(box, { dataTransfer: { types: ["Files"], files: names.map((name) => named(name, "x")) } })
+
+      const notice = await screen.findByRole("status")
+      expect(notice).toHaveTextContent(line)
+      expect(notice).toHaveTextContent("text files and source code, up to 256 KB")
+      fireEvent.click(screen.getByRole("button", { name: "Dismiss" }))
+      expect(screen.queryByRole("status")).toBeNull()
+    })
+
+    it("say when there is no room left", async () => {
+      useCortexStore.setState({ files: [1, 2, 3, 4, 5].map((n) => ({ id: `f${n}`, name: `f${n}.md`, size: 1, text: "x" })) })
+      render(<Composer variant="column" />)
+      const box = screen.getByLabelText("What do you want done?").closest(".cortex-composer") as HTMLElement
+
+      fireEvent.drop(box, { dataTransfer: { types: ["Files"], files: [named("sixth.md", "x")] } })
+
+      expect(await screen.findByRole("status")).toHaveTextContent("Five files at most")
+    })
   })
 
   it("replies in a conversation that has turns", () => {
@@ -204,24 +382,7 @@ describe("Composer", () => {
     expect(useCortexStore.getState().attachments.map((a) => a.label)).toEqual(["OPS-35"])
   })
 
-  it("« + » finds an issue or a project to attach, three at most", () => {
-    render(<Composer variant="column" />)
-
-    fireEvent.click(screen.getByRole("button", { name: "Attach an issue or a project" }))
-    const search = screen.getByRole("combobox", { name: "Find an issue or a project" })
-    fireEvent.change(search, { target: { value: "ops" } })
-    fireEvent.keyDown(search, { key: "Enter" })
-
-    expect(useCortexStore.getState().attachments.map((a) => a.label)).toEqual(["OPS-35"])
-    expect(screen.queryByRole("combobox", { name: "Find an issue or a project" })).toBeNull()
-
-    act(() => useCortexStore.setState({
-      attachments: [1, 2, 3].map((id) => ({ kind: "issue" as const, projectId: 3, issueId: id, label: `OPS-${id}`, title: null })),
-    }))
-    expect(screen.getByRole("button", { name: "Attach an issue or a project" })).toBeDisabled()
-  })
-
-  it("folded, unfolds the conversation, and holds no invented example", () => {
+  it("folded, unfolds the conversation, holds no invented example, and keeps the row under the box", () => {
     const onToggle = vi.fn()
     useCortexStore.setState({ open: false, unread: true, turns: [{ id: "u1", role: "user", text: "Hi" }] })
     render(<Composer variant="folded" onToggle={onToggle} />)
@@ -230,6 +391,13 @@ describe("Composer", () => {
     fireEvent.click(screen.getByRole("button", { name: "A new answer from Cortex is waiting" }))
     expect(onToggle).toHaveBeenCalled()
     expect(screen.queryByRole("button", { name: "Create an issue" })).toBeNull()
-    expect(screen.queryByText("qwen3:8b")).toBeNull()
+    expect(screen.getByRole("button", { name: "Model that answers: qwen3:8b" })).toBeInTheDocument()
+    expect(screen.getByText("context gauge")).toBeInTheDocument()
+  })
+
+  it("folded and unfolded, leaves the gauge to the line of tools above the bar", () => {
+    useCortexStore.setState({ open: true })
+    render(<Composer variant="folded" onToggle={vi.fn()} />)
+    expect(screen.queryByText("context gauge")).toBeNull()
   })
 })

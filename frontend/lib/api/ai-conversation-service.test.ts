@@ -17,7 +17,7 @@ describe("compactConversation", () => {
 
     await expect(compactConversation("acme", 7)).resolves.toEqual({ summarized: 12 })
 
-    expect(apiClient.post).toHaveBeenCalledWith(AI_ROUTES.CONVERSATION_COMPACT("acme", 7), undefined, { timeout: AI_TIMEOUT_MS })
+    expect(apiClient.post).toHaveBeenCalledWith(AI_ROUTES.CONVERSATION_COMPACT("acme", 7), undefined, { timeout: AI_TIMEOUT_MS, silentError: true })
     expect(AI_ROUTES.CONVERSATION_COMPACT("acme", 7)).toBe("/api/workspaces/acme/ai/conversations/7/compact")
   })
 })
