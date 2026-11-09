@@ -75,14 +75,26 @@ public record AssistantAnswer(
      * nombre de commentaires donnés ; {@code boards} : les tableaux montrés (celui de l'écran, ceux joints), avec le nombre
      * d'issues montrées et l'issue ouverte ; {@code tools} : les outils qui lisent et ont abouti, avec leur nombre
      * d'appels ; {@code notes} : les notes du Brain OS servies au modèle ; {@code context} : ce que TaskForce a fait pour
-     * que la requête tienne la fenêtre de ce modèle (TF-J1-13), null quand rien n'a été touché.
+     * que la requête tienne la fenêtre de ce modèle (TF-J1-13), null quand rien n'a été touché. Gardé avec la réponse, de
+     * quoi la relire pareil dans une conversation rouverte (R137) : {@code notesRead}, ces notes par leur nom ;
+     * {@code acts}, ce que Cortex a fait, geste par geste ; {@code workedMs}, le temps que la réponse a pris ;
+     * {@code record}, son dossier, qui fait d'elle un cas de la banque.
      */
     public record AssistantRead(List<IssueRead> issues, List<BoardRead> boards, List<ToolRead> tools, int notes,
-                                ContextRead context) {
+                                ContextRead context, List<NoteRead> notesRead, List<ActRead> acts, Long workedMs,
+                                String record) {
         public AssistantRead {
             issues = issues == null ? List.of() : List.copyOf(issues);
             boards = boards == null ? List.of() : List.copyOf(boards);
             tools = tools == null ? List.of() : List.copyOf(tools);
+            notesRead = notesRead == null ? List.of() : List.copyOf(notesRead);
+            acts = acts == null ? List.of() : List.copyOf(acts);
+        }
+
+        /** Ce qui a été lu, et ce qu'il a fallu faire pour tenir la fenêtre du modèle. */
+        public AssistantRead(List<IssueRead> issues, List<BoardRead> boards, List<ToolRead> tools, int notes,
+                             ContextRead context) {
+            this(issues, boards, tools, notes, context, null, null, null, null);
         }
 
         /** Ce qui a été lu, rien n'a dû être condensé ni coupé. */
@@ -104,6 +116,12 @@ public record AssistantAnswer(
 
         /** Un outil qui lit : son nom, et ses appels qui ont abouti. */
         public record ToolRead(String name, int calls) {}
+
+        /** Une note servie au modèle : de quoi la nommer et l'ouvrir. */
+        public record NoteRead(Long id, String title) {}
+
+        /** Un geste de la réponse : l'outil, ce qu'il est devenu, et la clé de l'issue qu'il touche (null sans elle). */
+        public record ActRead(String name, String status, String key) {}
     }
 
     /** Une note Brain OS utilisée pour fonder la réponse (RAG). */

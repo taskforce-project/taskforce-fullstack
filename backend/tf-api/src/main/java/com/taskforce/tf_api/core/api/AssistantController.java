@@ -27,6 +27,8 @@ import com.taskforce.tf_api.core.service.agent.ModelCapabilityService;
 import com.taskforce.tf_api.core.service.agent.Question;
 import com.taskforce.tf_api.core.service.agent.QuestionNeeded;
 import com.taskforce.tf_api.core.service.agent.Screen;
+import com.taskforce.tf_api.core.service.agent.TurnProgress;
+import com.taskforce.tf_api.core.service.agent.TurnProgressPublisher;
 import com.taskforce.tf_api.core.service.ai.ChosenModel;
 import com.taskforce.tf_api.core.service.ai.TurnHistory;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
@@ -61,6 +63,14 @@ public class AssistantController {
     private final BrainAccessGuard      access;
     private final AiConversationService conversationService;
     private final ModelCapabilityService capabilities;
+    private final TurnProgressPublisher turnProgress;
+
+    /**
+     * La borne d'un message : elle ne protège que le serveur (R143). Ce qui compte pour la conversation, c'est la fenêtre
+     * du modèle, que la réponse dit quand un message ne la tient pas : 4 000 caractères refusaient le texte de la recette
+     * avant que le budget de la requête le voie, et le front répondait « Sorry, I couldn't answer ».
+     */
+    static final int MAX_MESSAGE = 400_000;
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
@@ -94,8 +104,8 @@ public class AssistantController {
         // (R113), sinon celui de l'instance. TaskForce ne change jamais de modèle sans elle.
         String sentTo = capabilities.requestedModel(body.model());
         String chosen = sentTo != null ? sentTo : capabilities.chosenModel(userId);
-        AssistantAnswer answer = ChosenModel.using(chosen, () -> agentService.run(slug, userId, body.message(), memory,
-            body.screenOf(), body.attachedOf()));
+        AssistantAnswer answer = ChosenModel.using(chosen, () -> TurnProgress.during(turnProgress.sinkFor(userId, conv.getId()),
+            () -> agentService.run(slug, userId, body.message(), memory, body.screenOf(), body.attachedOf())));
         // Ce que TaskForce dit sous la réponse : un modèle qui tient une demande trop grande (TF-J1-13), la proposition d'un
         // modèle plus fort, ou la demande envoyée à un autre.
         ChatTurnResponse.Escalation escalation = sentTo != null ? null : answer.offer() != null ? answer.offer()
@@ -174,7 +184,9 @@ public class AssistantController {
      * son id), que TaskForce lit comme avant un résumé, ou un projet (sans issue), dont il montre le tableau.
      */
     public record AssistantRequest(
-        @NotBlank @Size(max = 4000) String message,
+        @NotBlank
+        @Size(max = MAX_MESSAGE, message = "This message is too long: TaskForce takes 400,000 characters at most. Shorten it, or split it in two.")
+        String message,
         Long conversationId,
         @Valid ScreenRequest screen,
         @Size(max = 128) String model,

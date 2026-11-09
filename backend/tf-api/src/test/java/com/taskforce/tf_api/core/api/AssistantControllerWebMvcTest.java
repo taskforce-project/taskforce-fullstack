@@ -59,6 +59,7 @@ class AssistantControllerWebMvcTest {
     @MockitoBean private WorkspaceRepository workspaceRepository;
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository;
     @MockitoBean private ModelCapabilityService capabilities;
+    @MockitoBean private com.taskforce.tf_api.core.service.agent.TurnProgressPublisher turnProgress;
 
     private static final String EMAIL = "dev@it.dev";
     private static final String URL = "/api/workspaces/acme/assistant";
@@ -256,6 +257,33 @@ class AssistantControllerWebMvcTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"hi\",\"attach\":["
                     + "{\"projectId\":1},{\"projectId\":2},{\"projectId\":3},{\"projectId\":4}]}"))
             .andExpect(status().isBadRequest());
+        verify(agentService, never()).run(any(), any(), any(), any(), any(), any());
+    }
+
+    /**
+     * La recette de la 1.13 (étapes 35 et 38) : un texte de 11 000 caractères était refusé avant que le budget de la
+     * requête le voie. La borne ne protège plus que le serveur : un long message passe, la réponse dit le reste.
+     */
+    @org.junit.jupiter.params.ParameterizedTest(name = "{0} caractères : {1}")
+    @org.junit.jupiter.params.provider.CsvSource({"11482, 200", "400000, 200", "400001, 400"})
+    void a_long_message_is_only_bounded_to_protect_the_server(int length, int expected) throws Exception {
+        answering("Answered.");
+
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"" + "a".repeat(length) + "\"}"))
+            .andExpect(status().is(expected));
+    }
+
+    @Test
+    @DisplayName("POST assistant trop long : le refus dit la limite et quoi faire, dans le champ du message")
+    void a_refused_message_says_the_limit() throws Exception {
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"" + "a".repeat(400_001) + "\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.validationErrors.message[0]").value(
+                "This message is too long: TaskForce takes 400,000 characters at most. Shorten it, or split it in two."));
         verify(agentService, never()).run(any(), any(), any(), any(), any(), any());
     }
 

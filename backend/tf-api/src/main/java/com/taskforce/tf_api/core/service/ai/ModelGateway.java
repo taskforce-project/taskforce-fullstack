@@ -138,11 +138,15 @@ public class ModelGateway {
         if (call.tools() != null) {
             call.tools().forEach(tool -> tools.add(mapper.valueToTree(tool)));
         }
-        return switch (settings.provider()) {
-            case ANTHROPIC -> anthropic(settings, call, tools);
-            case OLLAMA -> ollama(settings, call, tools);
-            case OPENAI -> openAi(settings, call, tools);
-        };
+        try {
+            return switch (settings.provider()) {
+                case ANTHROPIC -> anthropic(settings, call, tools);
+                case OLLAMA -> ollama(settings, call, tools);
+                case OPENAI -> openAi(settings, call, tools);
+            };
+        } catch (ModelProviderException failed) {
+            throw failed.about(call.model()); // la conversation nomme le modèle qui n'a pas répondu
+        }
     }
 
     /**
@@ -285,7 +289,7 @@ public class ModelGateway {
                 attempt = fewerTools(reply.status(), attempt);
                 continue;
             }
-            throw new ModelProviderException("AI provider refused the request (HTTP " + reply.status() + ")");
+            throw ModelProviderException.refused(reply.status(), reply.body());
         }
     }
 
@@ -319,7 +323,7 @@ public class ModelGateway {
                 withTools(body, attempt, AiProvider.OLLAMA);
                 continue;
             }
-            throw new ModelProviderException("AI provider refused the request (HTTP " + reply.status() + ")");
+            throw ModelProviderException.refused(reply.status(), reply.body());
         }
     }
 
@@ -417,7 +421,7 @@ public class ModelGateway {
                 continue;
             }
             log.warn("AI provider refused the request (HTTP {}): {}", reply.status(), LogSafe.of(error));
-            throw new ModelProviderException("AI provider refused the request (HTTP " + reply.status() + ")");
+            throw ModelProviderException.refused(reply.status(), reply.body());
         }
     }
 
@@ -433,7 +437,7 @@ public class ModelGateway {
         if (keep == 0) {
             log.error("AI provider answered {} even with a single tool", status);
             if (status == 413) {
-                throw new ModelProviderException("AI provider: the request is too large (HTTP 413)");
+                throw ModelProviderException.tooLarge("AI provider: the request is too large (HTTP 413)");
             }
             throw new ModelProviderException.ToolsRefused("AI provider refused the tools (HTTP " + status + ")");
         }
@@ -466,7 +470,7 @@ public class ModelGateway {
         try {
             return http.send("POST", url, headers, write(body), timeout);
         } catch (IOException unreachable) {
-            throw new ModelProviderException("AI provider unreachable: " + reason(unreachable), unreachable);
+            throw ModelProviderException.transport(reason(unreachable), unreachable, timeout);
         }
     }
 
