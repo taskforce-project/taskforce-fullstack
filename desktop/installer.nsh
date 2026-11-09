@@ -37,6 +37,23 @@
     Call tfUpdateScreen
   !macroend
 
+  ; Sans ce crochet, le gabarit montre une boîte de dialogue système quand l'ancien désinstalleur échoue : même en silence,
+  ; elle attend un clic, et le travailleur reste bloqué derrière. Pour une mise à jour, c'est l'écran qui le dit ; une
+  ; installation depuis le site garde sa boîte.
+  !macro customUnInstallCheck
+    IfErrors 0 +3
+    DetailPrint `Uninstall was not successful. Not able to launch uninstaller!`
+    Return
+    ${if} $R0 != 0
+      ${ifNot} ${isUpdated}
+        MessageBox MB_OK|MB_ICONEXCLAMATION "$(uninstallFailed): $R0"
+      ${endIf}
+      DetailPrint `Uninstall was not successful. Uninstaller error code: $R0.`
+      SetErrorLevel 2
+      Quit
+    ${endIf}
+  !macroend
+
   ; En points de 96 ppp, comme desktop/static/splash.html, et mêmes couleurs : on passe d'une fenêtre à l'autre sans le voir.
   !define TF_WIDTH 420
   !define TF_HEIGHT 280

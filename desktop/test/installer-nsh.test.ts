@@ -51,6 +51,10 @@ describe("the installer's update screen and the app", () => {
     assert.doesNotMatch(code, /\.(ps1|vbs|hta|bat|cmd)\b/i);
   });
 
+  it("keeps the template's system dialog out of a failed update: it would block the install behind the window", () => {
+    assert.match(code, /!macro customUnInstallCheck[\s\S]*?\$\{ifNot\} \$\{isUpdated\}\s+MessageBox/);
+  });
+
   it("stands up only for an update the person is waiting for, and never in the uninstaller", () => {
     assert.match(code, /\$\{ifNot\} \$\{isUpdated\}\s+\$\{orIfNot\} \$\{isForceRun\}\s+Return/);
     assert.match(code, /!ifndef BUILD_UNINSTALLER\s+!define TF_WORKER_FLAG/);
