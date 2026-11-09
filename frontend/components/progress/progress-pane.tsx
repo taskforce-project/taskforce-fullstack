@@ -22,7 +22,7 @@ function History({ slug }: Readonly<{ slug: string }>) {
   return (
     <div className="flex flex-col gap-4">
       <BankHistory slug={slug} />
-      <Improvements />
+      <Improvements slug={slug} />
     </div>
   )
 }

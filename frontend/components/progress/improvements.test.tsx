@@ -21,6 +21,11 @@ const HISTORY: EvalHistory = {
       origin: { kind: "incident", said: ["I deleted TESTTA-2."], shown: "Nothing was deleted." },
       grades: [{ runId: 8, passed: false }, { runId: 9, passed: true }],
     },
+    {
+      id: 42, title: "Create an issue Test", question: "Crée une issue Test", askedOn: "2026-11-09",
+      addedAt: "2026-11-09T01:00:00", mine: true, origin: { kind: "answer", said: [], shown: null }, grades: [],
+      expected: "It should have asked which project.", waiting: true, record: "r-42",
+    },
   ],
 }
 
@@ -31,8 +36,40 @@ const open = (title: string) => fireEvent.click(within(row(title)).getAllByRole(
 describe("Improvements", () => {
   beforeEach(() => useEvalStore.setState({ history: HISTORY }))
 
+  /** R137, R61 : un cas fait d'une phrase se lit avec elle, en attente de ses critères ; aucun rejeu ne le note avant. */
+  it("shows a case made of a sentence, waiting for its criteria", () => {
+    render(<Improvements slug="acme" />)
+
+    const sentence = "It should have asked which project."
+    expect(within(row(sentence)).getByRole("img", { name: "Waiting for its criteria" })).toBeInTheDocument()
+    expect(within(row(sentence)).getByText("Waiting for its criteria")).toBeInTheDocument()
+    open(sentence)
+    const item = row(sentence)
+    expect(within(item).getByText("Crée une issue Test")).toBeInTheDocument()
+    expect(within(item).queryByText("Not replayed since it was added.")).not.toBeInTheDocument()
+    expect(within(item).getByRole("button", { name: "Write its criteria" })).toBeInTheDocument()
+  })
+
+  it("says what it should have done once the criteria are written", () => {
+    useEvalStore.setState({ history: { ...HISTORY, cases: [{ ...HISTORY.cases[2], waiting: false, record: null }] } })
+    render(<Improvements slug="acme" />)
+
+    open("Create an issue Test")
+
+    expect(screen.getByText("It should have: It should have asked which project.")).toBeInTheDocument()
+  })
+
+  it("only its author can write the criteria from here", () => {
+    useEvalStore.setState({ history: { ...HISTORY, cases: [{ ...HISTORY.cases[2], mine: false }] } })
+    render(<Improvements slug="acme" />)
+
+    open("It should have asked which project.")
+
+    expect(screen.queryByRole("button", { name: "Write its criteria" })).not.toBeInTheDocument()
+  })
+
   it("shows one line per case and its last result; nothing else at first", () => {
-    render(<Improvements />)
+    render(<Improvements slug="acme" />)
 
     expect(screen.getByRole("region", { name: "What improved it" })).toBeInTheDocument()
     expect(within(row("R118 4/6: delete TESTTA-2")).getByRole("img", { name: "qwen3:8b, 7 Nov: passed" })).toBeInTheDocument()
@@ -42,7 +79,7 @@ describe("Improvements", () => {
   })
 
   it("tells where a case came from, one click away: the trust incident, what Cortex said and what TaskForce showed", () => {
-    render(<Improvements />)
+    render(<Improvements slug="acme" />)
 
     open("R118 4/6: delete TESTTA-2")
     const incident = row("R118 4/6: delete TESTTA-2")
@@ -54,7 +91,7 @@ describe("Improvements", () => {
   })
 
   it("gives a case's result at each replay since, by model, and the last one", () => {
-    render(<Improvements />)
+    render(<Improvements slug="acme" />)
 
     open("R118 4/6: delete TESTTA-2")
     const incident = row("R118 4/6: delete TESTTA-2")
@@ -63,7 +100,7 @@ describe("Improvements", () => {
   })
 
   it("says a case not replayed since it was added, from an answer of someone else; a click closes it", () => {
-    render(<Improvements />)
+    render(<Improvements slug="acme" />)
 
     open("What changed this week")
     const answer = row("What changed this week")
@@ -79,7 +116,7 @@ describe("Improvements", () => {
     useEvalStore.setState({
       history: { ...HISTORY, cases: [{ ...HISTORY.cases[1], grades: [{ runId: 8, passed: true }, { runId: 9, passed: false }] }] },
     })
-    render(<Improvements />)
+    render(<Improvements slug="acme" />)
 
     expect(screen.getByRole("img", { name: "qwen3:8b, 7 Nov: failed" })).toBeInTheDocument()
     open("R118 4/6: delete TESTTA-2")
@@ -88,11 +125,11 @@ describe("Improvements", () => {
 
   it("leaves the empty and reading states to the line above it", () => {
     useEvalStore.setState({ history: null, historyFailed: false })
-    const { container, rerender } = render(<Improvements />)
+    const { container, rerender } = render(<Improvements slug="acme" />)
     expect(container).toBeEmptyDOMElement()
 
     useEvalStore.setState({ history: { runs: [], cases: [] }, historyFailed: false })
-    rerender(<Improvements />)
+    rerender(<Improvements slug="acme" />)
     expect(container).toBeEmptyDOMElement()
   })
 })
