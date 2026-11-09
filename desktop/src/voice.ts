@@ -12,9 +12,11 @@ import { SAMPLE_RATE, type FromWorker, type ToWorker } from "./voice-worker";
 
 /**
  * La voix de l'app desktop (R80, R132, E15) : la personne parle, le texte arrive dans le compositeur, et rien ne quitte
- * l'ordinateur. Le modèle se télécharge une fois, au premier clic, après que sa taille a été dite, et chaque fichier est
- * vérifié contre son empreinte. La transcription tourne dans un processus à part (voice-worker.ts), rendu à l'inactivité.
- * Le journal ne garde que des durées, jamais le texte.
+ * l'ordinateur. Le modèle se prépare seul, quelques minutes après l'ouverture de l'app (R143, le CEO : « pk je dois dl un
+ * truc c'est chelou ? ») : une fois, en arrière-plan, sans étape à valider, avec un débit retenu, repris là où il s'était
+ * arrêté, et chaque fichier est vérifié contre son empreinte. Un échec se retente au lancement suivant. La transcription
+ * tourne dans un processus à part (voice-worker.ts), rendu à l'inactivité. Le journal ne garde que des durées, jamais le
+ * texte.
  */
 
 export interface VoiceModelFile {
@@ -57,6 +59,12 @@ const TRANSCRIBE_TIMEOUT_MS = 3 * 60_000;
 /** Marge laissée sur le disque au-delà de ce qu'il reste à télécharger. */
 const DISK_MARGIN_BYTES = 64 * 1024 * 1024;
 
+/** Le modèle se prépare quelques minutes après l'ouverture de l'app : le démarrage et le travail qui suit d'abord. */
+const BACKGROUND_DELAY_MS = 3 * 60_000;
+
+/** Débit du téléchargement en arrière-plan : assez pour finir en quelques minutes, sans jamais gêner le travail. */
+const BACKGROUND_BYTES_PER_SECOND = 2 * 1024 * 1024;
+
 const MARKER = "verified.json";
 
 export type VoiceStatus =
@@ -85,6 +93,8 @@ export interface VoiceOptions {
   threads?: number;
   idleMs?: number;
   timeoutMs?: number;
+  /** Débit du téléchargement en arrière-plan, en octets par seconde. */
+  backgroundRate?: number;
 }
 
 class ChecksumError extends Error {}
@@ -117,6 +127,10 @@ export class Voice {
   private abort: AbortController | null = null;
   private received = 0;
   private lastNotice = 0;
+  /** Le débit reste retenu tant que personne n'attend le modèle. */
+  private background = false;
+  private pacedSince = 0;
+  private pacedBytes = 0;
 
   private child: VoiceProcess | null = null;
   private loaded: Promise<VoiceProcess> | null = null;
@@ -163,14 +177,31 @@ export class Voice {
     return { state: "missing", bytes: this.total, received: await this.onDisk() };
   }
 
-  /** Télécharge le modèle, ou reprend là où il s'était arrêté. Un seul téléchargement à la fois. */
-  download(): Promise<VoiceResult<void>> {
+  /**
+   * Télécharge le modèle, ou reprend là où il s'était arrêté. Un seul téléchargement à la fois. Un clic sur le micro
+   * pendant un téléchargement d'arrière-plan le rejoint : la personne attend, le débit n'est plus retenu.
+   */
+  download(background = false): Promise<VoiceResult<void>> {
+    if (!background) this.background = false;
+    else if (!this.downloading) this.background = true;
     this.downloading ??= this.fetchModel().finally(() => {
       this.downloading = null;
       this.abort = null;
       void this.status().then((status) => this.options.onStatus?.(status));
     });
     return this.downloading;
+  }
+
+  /**
+   * Prépare le modèle de lui-même, une fois, quelques minutes après l'ouverture de l'app. Un échec ne dit rien ici : il
+   * est noté au journal et se retente au lancement suivant, ou au premier clic sur le micro.
+   */
+  prepareInBackground(delayMs: number = BACKGROUND_DELAY_MS): void {
+    setTimeout(() => {
+      void this.status()
+        .then((status) => (status.state === "missing" ? this.download(true) : undefined))
+        .catch((error: Error) => log.warn(`voice: model not prepared: ${error.message}`));
+    }, delayMs).unref();
   }
 
   cancelDownload(): void {
@@ -180,6 +211,8 @@ export class Voice {
   private async fetchModel(): Promise<VoiceResult<void>> {
     const started = Date.now();
     this.abort = new AbortController();
+    this.pacedSince = Date.now();
+    this.pacedBytes = 0;
     try {
       await mkdir(this.options.dir, { recursive: true });
       this.received = await this.onDisk();
@@ -260,10 +293,22 @@ export class Voice {
         this.received += value.byteLength;
         this.notify();
         if (!sink.write(value)) await Promise.race([once(sink, "drain"), failed]);
+        await this.pace(value.byteLength);
       }
     } finally {
       sink.end();
       await Promise.race([once(sink, "close"), failed]).catch(() => undefined);
+    }
+  }
+
+  /** Retient le débit en arrière-plan : le flux n'est lu qu'à ce rythme, le réseau suit. Un clic sur le micro lève la retenue. */
+  private async pace(bytes: number): Promise<void> {
+    if (!this.background) return;
+    this.pacedBytes += bytes;
+    const rate = this.options.backgroundRate ?? BACKGROUND_BYTES_PER_SECOND;
+    const due = this.pacedSince + (this.pacedBytes / rate) * 1000;
+    while (this.background && Date.now() < due) {
+      await new Promise((resolve) => setTimeout(resolve, Math.min(200, due - Date.now())));
     }
   }
 
@@ -405,6 +450,14 @@ export function voiceAvailable(): boolean {
   return !fromStore() && enginePresent();
 }
 
+/** Une fois l'app ouverte, quelques minutes plus tard : le modèle se prépare (cf. `Voice.prepareInBackground`). */
+let prepareVoice: () => void = () => undefined;
+
+/** Lance la préparation du modèle, à l'ouverture de l'app. La version du Store n'a pas de micro : rien ne se télécharge. */
+export function prepareVoiceInBackground(): void {
+  prepareVoice();
+}
+
 /** Relie la voix à la fenêtre : le pont `voice` (preload.ts) passe par ces canaux. */
 export function registerVoice(window: () => BrowserWindow | null): void {
   if (!voiceAvailable()) return;
@@ -423,9 +476,9 @@ export function registerVoice(window: () => BrowserWindow | null): void {
         stdio: "ignore",
       }) as unknown as VoiceProcess,
   });
+  prepareVoice = () => voice.prepareInBackground();
   ipcMain.handle("desktop:voice-get-status", () => voice.status());
   ipcMain.handle("desktop:voice-download", () => voice.download());
-  ipcMain.handle("desktop:voice-cancel-download", () => voice.cancelDownload());
   ipcMain.on("desktop:voice-prepare", () => voice.prepare());
   ipcMain.handle("desktop:voice-transcribe", (_event, samples: unknown) =>
     samples instanceof Float32Array ? voice.transcribe(samples) : { ok: false, error: "engine" });

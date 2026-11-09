@@ -24,7 +24,6 @@ function installBridge(status: DesktopVoiceStatus = READY) {
   const voice = {
     status: vi.fn().mockResolvedValue(status),
     download: vi.fn().mockResolvedValue({ ok: true, value: undefined }),
-    cancelDownload: vi.fn().mockResolvedValue(undefined),
     onStatus: vi.fn((callback: (status: DesktopVoiceStatus) => void) => {
       listeners.push(callback)
       return () => listeners.splice(listeners.indexOf(callback), 1)
@@ -84,48 +83,44 @@ describe("useVoiceStore", () => {
   })
 
   describe("in the desktop app", () => {
-    it("says the size of the model before downloading it", async () => {
-      installBridge(MISSING)
-      const { useVoiceStore } = await loadStore()
-
-      await useVoiceStore.getState().press("7", vi.fn())
-
-      expect(useVoiceStore.getState().phase).toBe("offer")
-      expect(useVoiceStore.getState().model).toEqual({ bytes: 671_000_000, received: 0 })
-      expect(recorder.openRecorder).not.toHaveBeenCalled()
-    })
-
-    it("downloads, shows the progress, and does not open the microphone by itself", async () => {
+    it("a click while the model is missing starts its preparation: nothing to validate, the microphone stays shut", async () => {
       const { voice, listeners } = installBridge(MISSING)
-      const { useVoiceStore } = await loadStore()
-      await useVoiceStore.getState().press("7", vi.fn())
-
       let resolve: (value: unknown) => void = () => undefined
       voice.download.mockReturnValue(new Promise((done) => (resolve = done)))
-      const downloading = useVoiceStore.getState().startDownload()
+      const { useVoiceStore } = await loadStore()
 
+      const pressing = useVoiceStore.getState().press("7", vi.fn())
+      await flush()
+
+      expect(voice.download).toHaveBeenCalledTimes(1)
       expect(useVoiceStore.getState().phase).toBe("downloading")
+      expect(useVoiceStore.getState().model).toEqual({ bytes: 671_000_000, received: 0 })
+
       listeners[0]?.({ state: "downloading", bytes: 1000, received: 250 })
       listeners[0]?.({ state: "ready", bytes: 1000 })
       expect(useVoiceStore.getState().model).toEqual({ bytes: 1000, received: 250 })
 
       resolve({ ok: true, value: undefined })
+      await pressing
 
-      await expect(downloading).resolves.toBe(true)
       expect(useVoiceStore.getState().phase).toBe("idle")
       expect(useVoiceStore.getState().notice).toBe("ready")
+      expect(useVoiceStore.getState().model).toBeNull()
       expect(listeners.length).toBe(0)
       expect(recorder.openRecorder).not.toHaveBeenCalled()
     })
 
-    it("rejoins a download already running", async () => {
+    it("a click during the preparation joins it, with what is already there", async () => {
       const { voice } = installBridge({ state: "downloading", bytes: 100, received: 10 })
+      voice.download.mockReturnValue(new Promise(() => undefined))
       const { useVoiceStore } = await loadStore()
 
-      await useVoiceStore.getState().press("7", vi.fn())
+      void useVoiceStore.getState().press("7", vi.fn())
+      await flush()
 
       expect(voice.download).toHaveBeenCalledTimes(1)
-      expect(useVoiceStore.getState().phase).toBe("idle")
+      expect(useVoiceStore.getState().phase).toBe("downloading")
+      expect(useVoiceStore.getState().model).toEqual({ bytes: 100, received: 10 })
     })
 
     it.each([
@@ -133,42 +128,43 @@ describe("useVoiceStore", () => {
       ["checksum", "checksum"],
       ["disk", "disk"],
       ["engine", "network"],
-    ] as const)("says that the download failed (%s) and offers it again", async (error, notice) => {
+    ] as const)("says that the preparation failed (%s): the next click tries again", async (error, notice) => {
       const { voice } = installBridge(MISSING)
       voice.download.mockResolvedValue({ ok: false, error })
       const { useVoiceStore } = await loadStore()
+
       await useVoiceStore.getState().press("7", vi.fn())
 
-      await expect(useVoiceStore.getState().startDownload()).resolves.toBe(false)
-
-      expect(useVoiceStore.getState().phase).toBe("offer")
+      expect(useVoiceStore.getState().phase).toBe("idle")
       expect(useVoiceStore.getState().notice).toBe(notice)
+
+      await useVoiceStore.getState().press("7", vi.fn())
+      expect(voice.download).toHaveBeenCalledTimes(2)
     })
 
-    it("says the download failed when the shell does not answer", async () => {
+    it("says the preparation failed when the shell does not answer", async () => {
       const { voice } = installBridge(MISSING)
       voice.download.mockRejectedValue(new Error("no handler"))
       const { useVoiceStore } = await loadStore()
 
       await expect(useVoiceStore.getState().startDownload()).resolves.toBe(false)
 
+      expect(useVoiceStore.getState().phase).toBe("idle")
       expect(useVoiceStore.getState().notice).toBe("network")
     })
 
-    it("stops quietly when the person cancels the download", async () => {
+    it("says nothing when the app, closing, stopped the preparation", async () => {
       const { voice } = installBridge(MISSING)
       voice.download.mockResolvedValue({ ok: false, error: "cancelled" })
       const { useVoiceStore } = await loadStore()
 
       await useVoiceStore.getState().startDownload()
-      useVoiceStore.getState().cancelDownload()
 
       expect(useVoiceStore.getState().phase).toBe("idle")
       expect(useVoiceStore.getState().notice).toBeNull()
-      expect(voice.cancelDownload).toHaveBeenCalled()
     })
 
-    it("does nothing to download outside the app", async () => {
+    it("has nothing to prepare outside the app", async () => {
       const { useVoiceStore } = await loadStore()
 
       await expect(useVoiceStore.getState().startDownload()).resolves.toBe(false)
@@ -415,16 +411,6 @@ describe("useVoiceStore", () => {
       expect(useVoiceStore.getState().phase).toBe("downloading")
     })
 
-    it("a second click closes the question", async () => {
-      installBridge(MISSING)
-      const { useVoiceStore } = await loadStore()
-
-      await useVoiceStore.getState().press("7", vi.fn())
-      await useVoiceStore.getState().press("7", vi.fn())
-
-      expect(useVoiceStore.getState().phase).toBe("idle")
-    })
-
     it("closes the microphone by itself after two minutes and writes the text", async () => {
       vi.useFakeTimers()
       installBridge()
@@ -501,6 +487,16 @@ describe("useVoiceStore", () => {
 
       await useVoiceStore.getState().press("8", onText)
       expect(useVoiceStore.getState().phase).toBe("consent")
+    })
+
+    it("a second click closes the question", async () => {
+      openSpeech()
+      const { useVoiceStore } = await loadStore(false)
+
+      await useVoiceStore.getState().press("7", vi.fn())
+      await useVoiceStore.getState().press("7", vi.fn())
+
+      expect(useVoiceStore.getState().phase).toBe("idle")
     })
 
     it("keeps typing when the person says so", async () => {

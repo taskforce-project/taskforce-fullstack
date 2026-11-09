@@ -11,15 +11,13 @@ import type { AuthUser } from "@/lib/api/auth-service"
 /** La ligne de la voix : rien au premier regard (R129), une phrase courte après un geste. */
 describe("VoiceLine", () => {
   const acceptConsent = vi.fn().mockResolvedValue(undefined)
-  const startDownload = vi.fn().mockResolvedValue(true)
-  const cancelDownload = vi.fn()
   const dismiss = vi.fn()
   const dismissNotice = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
     useUserStore.setState({ user: { id: 7 } as unknown as AuthUser })
-    useVoiceStore.setState({ phase: "idle", notice: null, model: null, acceptConsent, startDownload, cancelDownload, dismiss, dismissNotice })
+    useVoiceStore.setState({ phase: "idle", notice: null, model: null, acceptConsent, dismiss, dismissNotice })
   })
 
   it("says nothing at first", () => {
@@ -49,40 +47,11 @@ describe("VoiceLine", () => {
     expect(acceptConsent).toHaveBeenCalledWith(null)
   })
 
-  it("says the size of the model before downloading it", () => {
-    useVoiceStore.setState({ phase: "offer", model: { bytes: 670_576_784, received: 0 } })
-    render(<VoiceLine />)
-
-    expect(screen.getByText("Voice needs a one-time download: 671 MB.")).toBeInTheDocument()
-    fireEvent.click(screen.getByRole("button", { name: "Download" }))
-    expect(startDownload).toHaveBeenCalled()
-    fireEvent.click(screen.getByRole("button", { name: "Not now" }))
-    expect(dismiss).toHaveBeenCalled()
-  })
-
-  it("offers the download again after a failure", () => {
-    useVoiceStore.setState({ phase: "offer", model: { bytes: 100, received: 10 }, notice: "network" })
-    render(<VoiceLine />)
-
-    expect(screen.getByText("The download stopped. Check your connection.")).toBeInTheDocument()
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }))
-    expect(startDownload).toHaveBeenCalled()
-  })
-
-  it("shows the progress and can stop", () => {
+  it("says nothing while the model gets ready: the icon shows it, there is nothing to validate", () => {
     useVoiceStore.setState({ phase: "downloading", model: { bytes: 1000, received: 237 } })
-    render(<VoiceLine />)
+    const { container } = render(<VoiceLine />)
 
-    expect(screen.getByText("Downloading voice: 23%")).toBeInTheDocument()
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }))
-    expect(cancelDownload).toHaveBeenCalled()
-  })
-
-  it("starts its progress at zero", () => {
-    useVoiceStore.setState({ phase: "downloading", model: null })
-    render(<VoiceLine />)
-
-    expect(screen.getByText("Downloading voice: 0%")).toBeInTheDocument()
+    expect(container).toBeEmptyDOMElement()
   })
 
   it.each(Object.keys(CONSTANTS_EN.voice.notices) as VoiceNotice[])("says %s in one short line, which can be dismissed", (notice) => {

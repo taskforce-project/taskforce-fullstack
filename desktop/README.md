@@ -31,8 +31,11 @@ This folder holds the Electron shell. The app itself is the rest of the reposito
 - **Voice.** The microphone of the composer records in the window and the shell transcribes on the computer, in a
   utility process (`src/voice.ts`, `src/voice-worker.ts`), with sherpa-onnx (npm, prebuilt N-API binaries, unpacked
   from the app's archive) and Parakeet TDT 0.6b v3 by NVIDIA (CC BY 4.0, int8 export for sherpa-onnx, 671 MB). The model
-  is downloaded once from Hugging Face at the person's first click, from a pinned revision, checked against SHA-256 and
-  kept in the app's folder (`voice/`). Audio never leaves the computer; the log keeps durations, never the text.
+  is downloaded once from Hugging Face a few minutes after the app opens, in the background and at a limited rate, from
+  a pinned revision, checked against SHA-256 and kept in the app's folder (`voice/`). A click on the microphone during
+  the download shows its progress on the icon and lifts the limit; a failure retries at the next start. There is no
+  download in the Microsoft Store version, which has no microphone. Audio never leaves the computer; the log keeps
+  durations, never the text.
 - **Updates.** The app checks the `desktop-latest` release at start and every six hours, downloads in the background
   and installs on quit. The installer never shows a system window for an update: on quit it installs silently. With
   "Restart now", there is a TaskForce window on screen from the click to the new version: the app's own update screen

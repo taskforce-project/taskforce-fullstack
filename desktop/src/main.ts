@@ -16,7 +16,7 @@ import { startStack, type Stack } from "./stack";
 import { toolsStatus } from "./tools";
 import { readMove, readWorkspaceMove, Transfer, type LocalApi } from "./transfer";
 import { announceInstalled, check, installNow, releaseUpdateScreenOnFirstWindow, restartApp, startUpdater, updateState } from "./updater";
-import { registerVoice, voiceAvailable } from "./voice";
+import { prepareVoiceInBackground, registerVoice, voiceAvailable } from "./voice";
 import {
   integratedTitleBar,
   MAIN_TITLE_BAR_HEIGHT,
@@ -98,6 +98,7 @@ async function main(): Promise<void> {
     return;
   }
   startUpdater();
+  prepareVoiceInBackground();
 }
 
 /**
