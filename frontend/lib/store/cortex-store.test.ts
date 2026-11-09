@@ -625,6 +625,21 @@ describe("useCortexStore : le compositeur (R134, R135)", () => {
       await vi.waitFor(() => expect(useCortexStore.getState().sentAt).toBeNull());
     });
 
+    it("sends nothing if the person moved on while the stopped turn was settling", async () => {
+      let tell: (value: ChatTurnResponse | null) => void = () => undefined;
+      vi.mocked(stopTurn).mockReturnValue(new Promise((resolve) => { tell = resolve; }));
+      waiting();
+      void sendText("first");
+      useCortexStore.getState().stop("acme");
+      const second = sendText("second");
+
+      useCortexStore.getState().newConversation();
+      tell(null);
+
+      await expect(second).resolves.toBe(false);
+      expect(sendAgentMessage).toHaveBeenCalledTimes(1);
+    });
+
     it("ignores what the server says once the person is in another conversation", async () => {
       let tell: (value: ChatTurnResponse | null) => void = () => undefined;
       vi.mocked(stopTurn).mockReturnValue(new Promise((resolve) => { tell = resolve; }));

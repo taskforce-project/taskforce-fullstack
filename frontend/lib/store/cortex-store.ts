@@ -351,6 +351,7 @@ async function speak(slug: string, out: Outgoing): Promise<boolean> {
   let ok = false;
   try {
     if (settling) await settling;
+    if (current !== run) return false;
     const { conversationId, project } = useCortexStore.getState();
     const res = await sendAgentMessage(slug, text, conversationId, screenNow(), null, toRequest(attached), {
       turn: run.turn, project, signal: run.controller.signal,
