@@ -4049,6 +4049,45 @@
         }
       }
     },
+    "/api/workspaces/{slug}/delivery/runs/{runId}/stop": {
+      "post": {
+        "tags": [
+          "Coding agents"
+        ],
+        "operationId": "stop",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/delivery/runs/{runId}/retry": {
       "post": {
         "tags": [
