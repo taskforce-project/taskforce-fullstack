@@ -24,10 +24,18 @@ public record EvalHistoryResponse(List<Run> runs, List<Case> cases) {
 
     /**
      * Un cas : son titre, la question telle qu'elle a été posée et son jour, quand il est entré dans la banque, s'il vient
-     * de la personne qui lit, d'où il vient, et sa note dans chaque rejeu depuis, dans l'ordre des rejeux.
+     * de la personne qui lit, d'où il vient, et sa note dans chaque rejeu depuis, dans l'ordre des rejeux. {@code expected}
+     * : ce qu'il aurait fallu faire, dans ses mots (vide sinon) ; {@code waiting} : il attend ses critères ; {@code record} :
+     * le dossier d'un cas qui les attend, d'où se tire leur formulaire (null sinon).
      */
     public record Case(Long id, String title, String question, LocalDate askedOn, LocalDateTime addedAt, boolean mine,
-                       Origin origin, List<Grade> grades) {
+                       Origin origin, List<Grade> grades, String expected, boolean waiting, String record) {
+
+        /** Un cas qui n'attend rien. */
+        public Case(Long id, String title, String question, LocalDate askedOn, LocalDateTime addedAt, boolean mine,
+                    Origin origin, List<Grade> grades) {
+            this(id, title, question, askedOn, addedAt, mine, origin, grades, "", false, null);
+        }
     }
 
     /**
