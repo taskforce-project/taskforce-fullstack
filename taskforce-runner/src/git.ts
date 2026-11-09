@@ -119,6 +119,7 @@ export function isCommitSha(sha: unknown): sha is string {
 
 /** Le dossier de travail d'une mission : une reprise revient au même, Claude Code range ses sessions par dossier. */
 export function worktreeDir(home: string, runId: number): string {
+  if (!Number.isSafeInteger(runId) || runId <= 0) throw new Error("Not a mission number.");
   return join(home, "worktrees", `run-${runId}`);
 }
 

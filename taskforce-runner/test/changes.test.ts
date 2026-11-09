@@ -608,6 +608,10 @@ describe("reprendre la branche d'une mission (R139)", () => {
     }
   });
 
+  for (const bad of [0, -1, 1.5, Number.NaN, "7/../.." as unknown as number]) {
+    it(`numéro de mission refusé pour un dossier : ${String(bad)}`, () => assert.throws(() => worktreeDir("/tmp/h", bad), /Not a mission number/));
+  }
+
   it("nulle part : une erreur qui se reconnaît", async () => {
     const { home, repo, cleanup } = fixture();
     try {

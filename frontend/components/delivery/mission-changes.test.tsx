@@ -249,6 +249,14 @@ describe("MissionChanges", () => {
     expect(within(await screen.findByRole("alertdialog")).getByText(new RegExp(words))).toBeInTheDocument()
   })
 
+  it("says when a file is back: its row leaves the list", () => {
+    seed(changes({ files: [file({ reverting: true })] }))
+    render(<MissionChanges run={RUN} />)
+    expect(toaster.success).not.toHaveBeenCalled()
+    act(() => useDeliveryStore.setState({ missionChanges: { 100: changes({ files: [] }) } }))
+    expect(toaster.success).toHaveBeenCalledWith("footer.tsx is back as it was")
+  })
+
   it("does not offer to put a file back when it can't be done (R15), and says why when the person can act", () => {
     seed(changes({ canRevert: false, canComment: false, blockedReason: "Open TaskForce on the computer that ran this mission." }))
     render(<MissionChanges run={RUN} />)

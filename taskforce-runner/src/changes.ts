@@ -132,8 +132,8 @@ export async function repoChanges(dir: string, base: string, liveIndex?: string)
     mkdirSync(dirname(liveIndex), { recursive: true });
     env = { ...process.env, GIT_INDEX_FILE: liveIndex };
     await git(["read-tree", "HEAD"], env);
-    // --ignore-errors : un fichier que l'agent tient ouvert sous Windows ne coûte pas tout le relevé.
-    await git(["add", "-A", "--ignore-errors"], env);
+    // --ignore-errors, et son code de retour ignoré : un fichier que l'agent tient ouvert sous Windows ne coûte pas le relevé.
+    await run("git", ["-C", dir, ...SAFE_GIT, "add", "-A", "--ignore-errors"], { timeoutMs: 120_000, env });
     target = ["--cached", base];
   } else {
     target = [base, "HEAD"];

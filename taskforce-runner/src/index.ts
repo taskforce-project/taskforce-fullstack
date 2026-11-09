@@ -136,7 +136,8 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       // Les changements sous les yeux (R139) : ce que porte le dossier de travail contre le commit d'où part la mission.
       const open = worktree;
       const changes = new ChangeTracker(api, claim.runId, () => repoChanges(open.path, open.baseSha, liveIndex));
-      if (followUp) await changes.publish();
+      // Un premier relevé tout de suite : ce que la branche porte déjà sur une reprise, et TaskForce sait qu'il peut suivre.
+      await changes.publish();
       const { agentConfig, token } = await startAgentSession(config, api);
       log.info("Claude Code at work (follow it live in TaskForce)...");
       const outcome = await runAgent(agentConfig, claim, worktree.path, token, {
@@ -228,6 +229,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       // Un dossier jetable n'a pas d'avant : les fichiers s'y montrent écrits, avec leur contenu (R139).
       const folder = scratch;
       const changes = new ChangeTracker(api, claim.runId, () => scratchChanges(folder));
+      await changes.publish();
       const { agentConfig, token } = await startAgentSession(config, api);
       log.info("Claude Code at work on a repo-less task (follow it live in TaskForce)...");
       const outcome = await runAgent(agentConfig, claim, scratch, token, {

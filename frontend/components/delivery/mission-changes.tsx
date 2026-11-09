@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react"
 import { useParams } from "next/navigation"
 import { ChevronRight, FileMinus2, FilePen, FilePlus2, FileText, Loader2, MessageSquarePlus, Send, Undo2, X } from "lucide-react"
 import { toast } from "sonner"
@@ -26,6 +26,9 @@ const NO_FILES: readonly MissionFileChange[] = []
 const NO_COMMENTS: readonly DraftChangeComment[] = []
 
 const FILE_ICON = { added: FilePlus2, modified: FilePen, deleted: FileMinus2, written: FileText } as const
+
+/** L'anneau de focus des boutons nus de cette vue, comme celui des boutons de l'interface. */
+const FOCUS = "outline-none focus-visible:ring-1 focus-visible:ring-ring"
 
 type Words = ReturnType<typeof usePreferencesStore.getState>["t"]["missionChanges"]
 
@@ -53,7 +56,7 @@ function Line({ row, plain, t, onComment }: Readonly<{ row: DiffLine; plain: boo
       <span className="min-w-0 flex-1 whitespace-pre-wrap break-all pr-7 text-foreground">{row.text || " "}</span>
       {onComment && (
         <button type="button" onClick={() => onComment(row)} title={t.comments.add} aria-label={t.comments.add}
-          className="absolute right-1 top-0 flex size-5 items-center justify-center text-muted-foreground opacity-0 transition-opacity duration-150 hover:text-foreground focus-visible:opacity-100 group-hover/line:opacity-100 motion-reduce:transition-none">
+          className={cn("absolute right-1 top-0 flex size-5 items-center justify-center text-muted-foreground opacity-0 transition-opacity duration-150 hover:text-foreground focus-visible:opacity-100 group-hover/line:opacity-100 motion-reduce:transition-none", FOCUS)}>
           <MessageSquarePlus className="size-3.5" aria-hidden="true" />
         </button>
       )}
@@ -67,7 +70,7 @@ function Comment({ comment, t, onRemove }: Readonly<{ comment: DraftChangeCommen
     <div className="my-1 ml-[5.25rem] mr-2 flex items-start gap-2 border-l-2 border-primary bg-muted/60 py-1.5 pl-2 pr-1 text-xs">
       <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-foreground">{comment.text}</span>
       <button type="button" onClick={onRemove} title={t.comments.remove} aria-label={t.comments.remove}
-        className="flex size-5 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground">
+        className={cn("flex size-5 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground", FOCUS)}>
         <X className="size-3.5" aria-hidden="true" />
       </button>
     </div>
@@ -183,10 +186,10 @@ function FileRow({ slug, runId, file, canRevert, canComment, error, t }: Readonl
 
   return (
     <li className="group/file flex flex-col">
-      <div className="flex h-9 items-center gap-1.5 pr-1">
+      <div className="flex h-9 items-center gap-1.5 pr-1 transition-colors duration-150 hover:bg-muted/50 motion-reduce:transition-none">
         <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}
           aria-label={fillText(open ? t.close : t.open, { path: file.path })}
-          className="flex h-full min-w-0 flex-1 items-center gap-2 pl-1 text-left text-xs hover:text-foreground">
+          className={cn("flex h-full min-w-0 flex-1 items-center gap-2 pl-1 text-left text-xs", FOCUS)}>
           <ChevronRight aria-hidden="true" className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none", open && "rotate-90")} />
           <span title={t.kinds[file.status]} className="shrink-0"><Icon className="size-3.5 text-muted-foreground" aria-label={t.kinds[file.status]} /></span>
           <span className="flex min-w-0 items-baseline font-mono text-[12px]" title={file.path}>
@@ -207,7 +210,7 @@ function FileRow({ slug, runId, file, canRevert, canComment, error, t }: Readonl
         )}
         {canRevert && (
           <button type="button" onClick={() => setConfirming(true)} disabled={file.reverting} title={t.revert.hint} aria-label={`${t.revert.hint}: ${file.path}`}
-            className="flex size-7 shrink-0 items-center justify-center text-muted-foreground opacity-0 transition-opacity duration-150 hover:text-foreground focus-visible:opacity-100 group-hover/file:opacity-100 disabled:invisible motion-reduce:transition-none">
+            className={cn("flex size-7 shrink-0 items-center justify-center text-muted-foreground opacity-0 transition-opacity duration-150 hover:text-foreground focus-visible:opacity-100 group-hover/file:opacity-100 disabled:invisible motion-reduce:transition-none", FOCUS)}>
             <Undo2 className="size-3.5" aria-hidden="true" />
           </button>
         )}
@@ -300,6 +303,16 @@ export function MissionChanges({ run }: Readonly<{ run: DeliveryRun }>) {
     const id = setInterval(() => { void fetchMissionChanges(slug, run.id) }, POLL_MS)
     return () => clearInterval(id)
   }, [slug, run.id, run.status, follow, fetchMissionChanges])
+
+  // Un fichier en cours de retour qui quitte la liste est revenu comme avant : la ligne part, une phrase le dit.
+  const wasReverting = useRef<ReadonlySet<string>>(new Set())
+  useEffect(() => {
+    const present = new Set(files.map((file) => file.path))
+    for (const path of wasReverting.current) {
+      if (!present.has(path)) toast.success(fillText(t.revert.done, { name: splitPath(path).name }))
+    }
+    wasReverting.current = new Set(files.filter((file) => file.reverting).map((file) => file.path))
+  }, [files, t.revert.done])
 
   const send = useCallback(async () => {
     setAsking(true)

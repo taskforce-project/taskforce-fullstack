@@ -101,9 +101,10 @@ export async function executeRevert(config: Pick<RunnerConfig, "home" | "repos" 
       ok: true,
       message: commit ? `Put ${path} back as it was before the mission.` : `${path} was already as it was before the mission.`,
       ...(commit ? { commit } : {}), commits, pushed: Boolean(commit && pushed), trace,
+      // Sans les textes : les autres fichiers n'ont pas changé, TaskForce garde ce qu'il a déjà reçu.
       changes: {
         mode: "repo", base, more: snapshot.more, added: snapshot.added, removed: snapshot.removed, final: true,
-        files: snapshot.files.map(({ body, ...file }) => (body === null ? file : { ...file, body })),
+        files: snapshot.files.map(({ body: _body, ...file }) => file),
       },
     };
   } catch (e) {
@@ -132,7 +133,7 @@ export async function drainCommands(api: CommandApi, handle: (command: RunnerCom
   const commands = await api.commands();
   for (const command of commands) {
     const result = await handle(command).catch((e: unknown): CommandResult => ({ ok: false, message: e instanceof Error ? e.message.slice(0, 300) : "The command failed." }));
-    await api.commandResult(command.commandId, result)
+    await api.commandResult(command.commandId, { ...result, message: result.message.slice(0, 1000) })
       .catch((e: unknown) => log.warn(`Command result not sent to TaskForce: ${(e as Error).message}`));
   }
   return commands.length;
