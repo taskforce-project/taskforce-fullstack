@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.service;
 
+import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -9,9 +10,11 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.taskforce.tf_api.core.service.AiStatusService.AiStatus;
+import com.taskforce.tf_api.core.service.ai.AiProviderSettings;
 import com.taskforce.tf_api.core.service.ai.ChosenModel;
 import com.taskforce.tf_api.core.service.ai.ContextBudget;
 import com.taskforce.tf_api.core.service.ai.ModelChoice;
+import com.taskforce.tf_api.core.service.ai.ModelDeadline;
 import com.taskforce.tf_api.core.service.ai.ModelGateway;
 import com.taskforce.tf_api.core.service.ai.ModelProviderException;
 import com.taskforce.tf_api.core.service.ai.ModelWindow;
@@ -149,7 +152,7 @@ public class AiGatewayClient implements LlmClient {
         String chosen = model != null && !model.isBlank() ? model : modelOf(tier, current);
         boolean think = "deep".equals(tier);
         try {
-            ModelGateway.ChatReply reply = gateway.chat(snapshot.settings(),
+            ModelGateway.ChatReply reply = gateway.chat(settingsOf(snapshot),
                 new ModelGateway.ChatCall(messages, tools, jsonMode, chosen, think));
             accumulateUsage(reply.usage());
             remember(reply);
@@ -157,11 +160,23 @@ public class AiGatewayClient implements LlmClient {
         } catch (ModelProviderException.ToolsRefused refused) { // le fournisseur répond : son état reste valable
             log.error("AI provider refused the tools: {}", LogSafe.of(refused.getMessage()));
             throw new LlmToolsRefusedException("The AI provider refused the tools", refused);
+        } catch (ModelProviderException.TimedOut late) { // le fournisseur est là, le modèle est lent : son état reste valable
+            log.warn("AI provider call timed out: {}", LogSafe.of(late.getMessage()));
+            throw new LlmTimedOutException("The model did not answer in time", late);
         } catch (RuntimeException ex) {
+            if (Thread.currentThread().isInterrupted()) throw new LlmException("Stopped", ex); // « Stop » du banc, pas une panne
             log.error("AI provider call failed: {}", LogSafe.of(ex.getMessage()));
             status.invalidate(); // le fournisseur est peut-être tombé : on relira son état au prochain appel
             throw new LlmException("AI service unavailable: " + ex.getMessage(), ex);
         }
+    }
+
+    /** Les réglages de cet appel : le temps qu'il reste au cas du banc en cours (R142), sinon le délai général de l'IA. */
+    private static AiProviderSettings settingsOf(AiStatusService.Snapshot snapshot) {
+        Optional<Duration> left = ModelDeadline.remaining();
+        if (left.isEmpty()) return snapshot.settings();
+        if (!left.get().isPositive()) throw new ModelProviderException.TimedOut("The time given to this request is over", null);
+        return snapshot.settings().withTimeout(left.get());
     }
 
     /** Additionne l'usage d'une réponse à l'accumulateur du thread (si la capture est active). */
