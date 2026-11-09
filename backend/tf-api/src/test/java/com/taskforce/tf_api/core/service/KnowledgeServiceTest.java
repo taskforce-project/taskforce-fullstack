@@ -208,4 +208,25 @@ class KnowledgeServiceTest {
         assertThat(kept).contains(container);                       // l'ossature n'est jamais larguee
         assertThat(kept.stream().filter(n -> n.getParentNodeId() != null)).hasSize(4); // + feuilles jusqu'au plafond
     }
+
+    @Test
+    @DisplayName("getNode : la note que la personne lit, pour le volet")
+    void get_node_reads_a_note() {
+        workspace();
+        when(access.requireNode(5L, VIEWER)).thenReturn(node(5L, null));
+
+        assertThat(service.getNode(SLUG, 5L, USER).getTitle()).isEqualTo("N5");
+    }
+
+    @Test
+    @DisplayName("getNode : une note archivée répond comme une note absente")
+    void get_node_hides_an_archived_note() {
+        workspace();
+        KnowledgeNode archived = node(5L, null);
+        archived.setStatus(NodeStatus.ARCHIVED);
+        when(access.requireNode(5L, VIEWER)).thenReturn(archived);
+
+        assertThatThrownBy(() -> service.getNode(SLUG, 5L, USER))
+            .isInstanceOf(com.taskforce.tf_api.shared.exception.ResourceNotFoundException.class);
+    }
 }

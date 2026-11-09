@@ -67,11 +67,23 @@ public class KnowledgeController {
         @Valid @RequestBody SearchBrainRequest request
     ) {
         Long userId = resolveUserId(jwt);
-        return ResponseEntity.ok(ApiResponse.success("Results",
-            brainSearchService.search(slug, userId, request.getQuery(), request.getTopK(), request.getDomain())));
+        return ResponseEntity.ok(ApiResponse.success("Results", Boolean.TRUE.equals(request.getTextOnly())
+            ? brainSearchService.searchText(slug, userId, request.getQuery(), request.getTopK())
+            : brainSearchService.search(slug, userId, request.getQuery(), request.getTopK(), request.getDomain())));
     }
 
     // ── Nodes ────────────────────────────────────────────────────────────────
+
+    /** Une note, pour la lire dans le volet (Ctrl+K, R141) ; une note que la personne ne lit pas répond 404. */
+    @GetMapping("/nodes/{nodeId}")
+    public ResponseEntity<ApiResponse<KnowledgeNodeResponse>> getNode(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long nodeId
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success("Page retrieved", knowledgeService.getNode(slug, nodeId, userId)));
+    }
 
     @PostMapping("/nodes")
     public ResponseEntity<ApiResponse<KnowledgeNodeResponse>> createNode(

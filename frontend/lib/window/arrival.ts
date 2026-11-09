@@ -33,6 +33,14 @@ export interface WaitingItem {
   href: string | null
   /** Le signal qu'un clic marque lu ; null pour ce qui ne vient pas d'une notification. */
   signalId: string | null
+  /** La clé de l'issue (« OPS-12 ») : la ligne du volet la montre à droite (R141) ; null sans clé. */
+  key: string | null
+  /** Le titre de l'issue, sans sa clé : la phrase de la ligne du volet le reprend. */
+  title: string
+  /** Le moment du résultat ou de la mention ; null pour une demande, qui attend maintenant. */
+  at: string | null
+  /** Qui a mentionné la personne ; null ailleurs. */
+  who: string | null
 }
 
 /** Les lignes de l'arrivée au plus (R127) ; au-delà, « See all » ouvre le volet. */
@@ -59,6 +67,10 @@ export function waitingItems(
       issue: row.projectId === null ? null : { projectId: row.projectId, issueId: row.issueId },
       href: null,
       signalId: null,
+      key: row.issueKey,
+      title: row.issueTitle ?? "",
+      at: null,
+      who: null,
     }
   })
   const results: WaitingItem[] = resultsToJudge(runs, me).map((run) => {
@@ -72,6 +84,10 @@ export function waitingItems(
       issue: run.projectId === null ? null : { projectId: run.projectId, issueId: run.issueId },
       href: null,
       signalId: null,
+      key: run.issueKey,
+      title: run.issueTitle ?? "",
+      at: run.updatedAt ?? run.createdAt,
+      who: null,
     }
   })
   return [...requests, ...results]
@@ -91,6 +107,10 @@ export function mentionItems(signals: readonly Signal[], t: ConversationTexts): 
       issue,
       href: issue ? null : (signal.issueUrl || signal.operationUrl || null),
       signalId: signal.id,
+      key: signal.issueId || null,
+      title: signal.title,
+      at: signal.createdAt,
+      who: signal.actor?.name ?? null,
     }
   })
 }

@@ -31,6 +31,7 @@ import com.taskforce.tf_api.core.service.brain.BrainMapper;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.core.service.brain.BrainSeedingService;
 import com.taskforce.tf_api.core.service.brain.BrainViewer;
+import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -127,6 +128,15 @@ public class KnowledgeService {
             if (!containerIds.contains(n.getId())) kept.add(n);
         }
         return kept;
+    }
+
+    /** Une note que la personne lit, pour le volet (Ctrl+K, R141) : une note archivée répond comme une note absente. */
+    @Transactional(readOnly = true)
+    public KnowledgeNodeResponse getNode(String slug, Long nodeId, Long userId) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        KnowledgeNode node = access.requireNode(nodeId, access.viewer(ws.getId(), userId));
+        if (node.getStatus() != NodeStatus.ACTIVE) throw new ResourceNotFoundException("Page not found: " + nodeId);
+        return BrainMapper.toNodeResponse(node);
     }
 
     // =========================================================================

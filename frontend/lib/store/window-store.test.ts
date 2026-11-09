@@ -23,11 +23,11 @@ describe("useWindowStore", () => {
   })
 
 
-  it("starts beside the conversation, the right panel open with its six rows folded", () => {
+  it("starts beside the conversation, the right panel open with its cards folded", () => {
     expect(useWindowStore.getState()).toMatchObject({
       paneFull: false, paneWidth: null, rightOpen: true, rightDrawer: false, rows: {}, searchOpen: false,
     })
-    expect(WINDOW_ROWS).toEqual(["environment", "context", "connectors", "results", "changes", "missions"])
+    expect(WINDOW_ROWS).toEqual(["environment", "context", "connectors", "missions", "changes"])
   })
 
   it("puts the pane in full width and back", () => {
