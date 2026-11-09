@@ -195,13 +195,16 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
       <details className="px-3 py-2">
         <summary className="cursor-pointer text-muted-foreground hover:text-foreground">{r.howItWasDone}</summary>
         <p className="mt-1.5 text-muted-foreground">{card.how}</p>
-        <p className="mt-1 flex items-center gap-1.5 text-muted-foreground">
-          <FileCheck2 className="size-3 shrink-0" />
-          {r.downloadRecord}
-          <button type="button" className="hover:text-foreground hover:underline" onClick={() => void download("json")}>JSON</button>
-          <span aria-hidden="true">·</span>
-          <button type="button" className="hover:text-foreground hover:underline" onClick={() => void download("md")}>Markdown</button>
-        </p>
+        {/* Dans la vue du travail, le dossier se télécharge depuis la ligne de la preuve, juste en dessous. */}
+        {!embedded && (
+          <p className="mt-1 flex items-center gap-1.5 text-muted-foreground">
+            <FileCheck2 className="size-3 shrink-0" />
+            {r.downloadRecord}
+            <button type="button" className="hover:text-foreground hover:underline" onClick={() => void download("json")}>JSON</button>
+            <span aria-hidden="true">·</span>
+            <button type="button" className="hover:text-foreground hover:underline" onClick={() => void download("md")}>Markdown</button>
+          </p>
+        )}
       </details>
     </section>
   )

@@ -63,7 +63,7 @@ function StopMission({ slug, run, agent }: Readonly<{ slug: string; run: Deliver
         <Square className="size-3" aria-hidden="true" /> {t.action}
       </Button>
       <AlertDialog open={asking} onOpenChange={setAsking}>
-        <AlertDialogContent className="max-w-[420px]">
+        <AlertDialogContent className="sm:max-w-[420px]">
           <AlertDialogHeader>
             <AlertDialogTitle>{t.title}</AlertDialogTitle>
             <AlertDialogDescription>{fillText(t.body, { agent })}</AlertDialogDescription>
@@ -133,7 +133,9 @@ function ProofRow({ slug, runId, count, sealed }: Readonly<{ slug: string; runId
 
   return (
     <p className="flex min-h-9 flex-wrap items-center gap-x-2.5 gap-y-1 px-2 py-1 text-xs text-muted-foreground" title={t.hint}>
-      <FileCheck2 className="size-4 shrink-0" aria-hidden="true" />
+      <span role="img" aria-label={t.name} title={t.name} className="inline-flex shrink-0">
+        <FileCheck2 className="size-4" aria-hidden="true" />
+      </span>
       <span className="tabular-nums text-foreground">{said}</span>
       {count > 0 && (
         <span className="ml-auto flex items-center gap-1.5">
@@ -273,7 +275,8 @@ export function WorkView({ runId }: Readonly<{ runId: number }>) {
           <WorkDot state={runState(run)} />
           <span className="min-w-0 break-words">{sequence.status}</span>
         </p>
-        {pull && (
+        {/* La carte de résultat a son propre lien : un seul à l'écran. */}
+        {pull && !judged && (
           <a href={pull.url} target="_blank" rel="noopener noreferrer"
             className="mt-1 inline-flex w-fit items-center gap-1 border border-border px-2 py-1 text-xs text-foreground hover:bg-muted">
             <ExternalLink className="size-3" aria-hidden="true" /> {fillText(t.pullRequest, { repo: pull.repo, number: pull.number })}

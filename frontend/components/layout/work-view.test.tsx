@@ -118,8 +118,10 @@ describe("WorkView", () => {
 
     const region = within(steps())
     expect(region.getAllByRole("button", { expanded: false }).map((b) => b.textContent)).toEqual([
-      "UnderstandRead footer.tsx", "PlanI'll fix the three links.", "CheckNot started", "Hand overNot started",
+      "UnderstandRead footer.tsx", "PlanI'll fix the three links.",
     ])
+    expect(region.getByText("Check").parentElement).toHaveTextContent("CheckNot started")
+    expect(region.getByText("Hand over").parentElement).toHaveTextContent("Hand overNot started")
     expect(region.getByRole("button", { expanded: true })).toHaveTextContent("DoThat didn't work")
     expect(region.getByText("Edited footer.tsx")).toBeInTheDocument()
     expect(region.getByText("Commented on the issue")).toBeInTheDocument()
@@ -342,7 +344,7 @@ describe("WorkView", () => {
       render(<WorkView runId={100} />)
 
       expect(screen.getAllByRole("img", { name: "Waiting for you" })).toHaveLength(2)
-      expect(within(steps()).getByRole("button", { expanded: true })).toHaveTextContent("Hand overReady for your review")
+      expect(within(steps()).getByText("Hand over").parentElement).toHaveTextContent("Hand overReady for your review")
       expect(screen.getByRole("article", { name: "result of WEB-28, embedded" })).toBeInTheDocument()
       expect(screen.getAllByText("Ready for your review")).toHaveLength(2)
     })
@@ -395,9 +397,15 @@ describe("WorkView", () => {
     })
   })
 
-  it("links to the pull request, when there is one", () => {
+  it("links to the pull request once decided; while it waits for review, the result card has the link", () => {
     const pr = { ...DONE, resultUrl: "https://github.com/acme/website/pull/212" }
     useDeliveryStore.setState({ workspaceRuns: [pr], runs: { 28: pr } })
+    const { unmount } = render(<WorkView runId={100} />)
+    expect(screen.queryByRole("link", { name: "Pull request acme/website#212" })).toBeNull()
+    unmount()
+
+    const applied = { ...pr, outcome: "APPLIED" as const }
+    useDeliveryStore.setState({ workspaceRuns: [applied], runs: { 28: applied } })
     render(<WorkView runId={100} />)
 
     expect(screen.getByRole("link", { name: "Pull request acme/website#212" })).toHaveAttribute("href", "https://github.com/acme/website/pull/212")

@@ -110,7 +110,7 @@ export async function retryRun(slug: string, runId: number, note: string): Promi
 
 /** « Stop » : la mission se clôt, au nom de la personne ; le runner arrête l'agent à son prochain signe de vie (R138). */
 export async function stopRun(slug: string, runId: number): Promise<void> {
-  await apiClient.post(DELIVERY_ROUTES.STOP(slug, runId), {});
+  await apiClient.post(DELIVERY_ROUTES.STOP(slug, runId), {}, { silentError: true });
 }
 
 /** Délègue une issue à un agent (crée un run, exécuté en arrière-plan côté serveur). */

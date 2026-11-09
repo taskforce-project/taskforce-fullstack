@@ -94,30 +94,43 @@ export function MissionSteps({ steps, showCommands, waiting, waitingLabel }: Rea
     <ol className="flex flex-col divide-y divide-border border-y border-border">
       {steps.map((step) => {
         const holdsRequest = step.state === "waiting" && Boolean(waiting)
-        const open = holdsRequest || (touched[step.key] ?? step.current)
+        // Une étape sans détail ne se déplie pas : elle a sa ligne, pas de chevron qui ne mène à rien.
+        const unfolds = step.lines.length > 0 || holdsRequest
+        const open = unfolds && (holdsRequest || (touched[step.key] ?? step.current))
         const stateName = step.state === "waiting" && waitingLabel ? waitingLabel : states[step.state]
-        return (
-          <li key={step.key}>
-            <button
-              type="button"
-              aria-expanded={open}
-              onClick={() => setTouched((was) => ({ ...was, [step.key]: !open }))}
-              className="flex h-10 w-full items-center gap-2.5 px-2 text-left text-[13px] transition-colors duration-150 hover:bg-muted/60 motion-reduce:transition-none"
+        const row = (
+          <>
+            <MissionStepIcon state={step.state} label={stateName} />
+            <span className="w-[72px] shrink-0 font-medium text-foreground">{step.name}</span>
+            <span
+              title={step.sentence}
+              className={cn("min-w-0 flex-1 truncate", step.state === "not-started" || step.state === "skipped" ? "text-muted-foreground/70" : "text-muted-foreground")}
             >
-              <MissionStepIcon state={step.state} label={stateName} />
-              <span className="w-[72px] shrink-0 font-medium text-foreground">{step.name}</span>
-              <span
-                title={step.sentence}
-                className={cn("min-w-0 flex-1 truncate", step.state === "not-started" || step.state === "skipped" ? "text-muted-foreground/70" : "text-muted-foreground")}
-              >
-                {step.sentence}
-              </span>
+              {step.sentence}
+            </span>
+            {unfolds && (
               <ChevronRight
                 aria-hidden="true"
                 className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none", open && "rotate-90")}
               />
-            </button>
-            {open && (step.lines.length > 0 || holdsRequest) && (
+            )}
+          </>
+        )
+        return (
+          <li key={step.key}>
+            {unfolds ? (
+              <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => setTouched((was) => ({ ...was, [step.key]: !open }))}
+                className="flex h-10 w-full items-center gap-2.5 px-2 text-left text-[13px] transition-colors duration-150 hover:bg-muted/60 motion-reduce:transition-none"
+              >
+                {row}
+              </button>
+            ) : (
+              <div className="flex h-10 items-center gap-2.5 px-2 text-[13px]">{row}</div>
+            )}
+            {open && (
               <div className="flex flex-col gap-2 pb-2.5 pl-[34px] pr-2">
                 {holdsRequest && waiting}
                 {step.lines.length > 0 && <StepLines lines={step.lines} showCommands={showCommands} />}

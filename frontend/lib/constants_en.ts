@@ -881,6 +881,7 @@ export const CONSTANTS_EN = {
       waitingOtherOne: "Waiting for {who}: 1 request",
       waitingOtherMany: "Waiting for {who}: {count} requests",
       review: "Ready for your review",
+      reviewOther: "Ready for review by {who}",
       working: {
         understand: "Reading up on the task",
         plan: "Working out what to do",
@@ -1006,6 +1007,7 @@ export const CONSTANTS_EN = {
     },
     // The proof folds into one line.
     proof: {
+      name: "Proof",
       none: "No record yet",
       buildingOne: "1 event so far",
       building: "{count} events so far",
@@ -1137,9 +1139,6 @@ export const CONSTANTS_EN = {
     // The result card on the issue (R78, the Review screen): checks from the record, never from the agent's summary.
     result: {
       ready: "Ready to review",
-      readyAbove: "Ready to review: see the result under the title",
-      applied: "Applied: the pull request is merged",
-      discarded: "Discarded",
       responsible: "{who} is responsible",
       delegatedTo: "delegated to {agent}",
       minutes: "{minutes} min",

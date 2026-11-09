@@ -561,13 +561,15 @@ function testsWords(run: SequencedRun, t: SequenceTexts): string | null {
 const testsFailed = (run: SequencedRun): boolean => run.tests?.ran === true && !run.tests.passed
 const stoppedByPerson = (run: SequencedRun): boolean => run.outcome === "STOPPED"
 
-function outcomeWords(run: SequencedRun, t: SequenceTexts): string {
+const delegatorOf = (run: SequencedRun, t: SequenceTexts): string => run.startedByName?.trim() || t.requests.theDelegator
+
+function outcomeWords(run: SequencedRun, t: SequenceTexts, you: boolean): string {
   switch (run.outcome) {
     case "APPLIED": return t.status.applied
     case "DISCARDED": return t.status.discarded
     case "MARKED_DONE": return t.status.markedDone
     case "RETRIED": return t.status.retried
-    default: return t.status.review
+    default: return you ? t.status.review : fillText(t.status.reviewOther, { who: delegatorOf(run, t) })
   }
 }
 
@@ -597,13 +599,14 @@ interface StepFacts {
   readonly placed: readonly Placed[]
   readonly reached: boolean
   readonly request: DeliveryRunApproval | undefined
+  readonly you: boolean
 }
 
-function doneSentence({ key, placed }: StepFacts, run: SequencedRun, t: SequenceTexts): string {
+function doneSentence({ key, placed, you }: StepFacts, run: SequencedRun, t: SequenceTexts): string {
   switch (key) {
     case "plan": return intentOf(placed, t)
     case "check": return testsWords(run, t) ?? summaryOf(placed, t)
-    case "handover": return outcomeWords(run, t)
+    case "handover": return outcomeWords(run, t, you)
     default: return summaryOf(placed, t)
   }
 }
@@ -617,7 +620,7 @@ function sentenceOf(facts: StepFacts, run: SequencedRun, t: SequenceTexts): stri
       if (key === "check" && run.tests?.ran === false) return t.tests.notRun
       return reached || key === "handover" ? t.skipped[key] : t.notReached
     case "waiting":
-      return request ? fillText(t.wants, { want: wantOf(requestGesture(request, run), t) }) : t.status.review
+      return request ? fillText(t.wants, { want: wantOf(requestGesture(request, run), t) }) : outcomeWords(run, t, facts.you)
     case "failed":
       return key === "check" && testsFailed(run) ? (testsWords(run, t) as string) : t.failedHere
     case "stopped":
@@ -640,14 +643,12 @@ function statusOf(run: SequencedRun, pending: readonly DeliveryRunApproval[], cu
       if (pending.some((approval) => approval.canDecide)) {
         return pending.length === 1 ? s.waitingOne : fillText(s.waitingMany, { count: pending.length })
       }
-      return fillText(pending.length === 1 ? s.waitingOtherOne : s.waitingOtherMany, {
-        who: run.startedByName?.trim() || t.requests.theDelegator, count: pending.length,
-      })
+      return fillText(pending.length === 1 ? s.waitingOtherOne : s.waitingOtherMany, { who: delegatorOf(run, t), count: pending.length })
     case "DONE":
-      return outcomeWords(run, t)
+      return outcomeWords(run, t, you)
     default:
       if (run.refused) return run.error ? fillText(s.notStarted, { reason: run.error }) : t.states["not-started"]
-      if (stoppedByPerson(run)) return you ? s.stoppedByYou : fillText(s.stoppedBy, { who: run.startedByName?.trim() || t.requests.theDelegator })
+      if (stoppedByPerson(run)) return you ? s.stoppedByYou : fillText(s.stoppedBy, { who: delegatorOf(run, t) })
       return run.error ? fillText(s.failed, { reason: run.error }) : s.failedNoReason
   }
 }
@@ -657,7 +658,7 @@ export function missionSequence(
   run: SequencedRun,
   activity: Pick<DeliveryRunActivity, "events" | "approvals"> | undefined,
   t: SequenceTexts,
-  you = false,
+  you = true,
 ): MissionSequence {
   const { placed, wrote, planned } = readEvents(run, activity?.events ?? [], t)
   const pending = run.status === "RUNNING" ? (activity?.approvals ?? []).filter((approval) => approval.status === "PENDING") : []
@@ -679,7 +680,7 @@ export function missionSequence(
       key,
       name: t.steps[key],
       state,
-      sentence: sentenceOf({ key, state, placed: own, reached, request: waitingHere ? request : undefined }, run, t),
+      sentence: sentenceOf({ key, state, placed: own, reached, request: waitingHere ? request : undefined, you }, run, t),
       lines: own.map((entry) => entry.line),
       current: key === current,
     }

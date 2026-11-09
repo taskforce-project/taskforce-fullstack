@@ -59,7 +59,7 @@ const approval = (over: Partial<DeliveryRunApproval> = {}): DeliveryRunApproval 
 
 const DONE: DeliveryRun = { ...RUN, status: "DONE", endedAt: "2026-11-09T00:54:20", summary: "Deliverable posted." }
 
-const sequence = (run: DeliveryRun, events: readonly DeliveryRunEvent[], approvals: readonly DeliveryRunApproval[] = [], you = false) =>
+const sequence = (run: DeliveryRun, events: readonly DeliveryRunEvent[], approvals: readonly DeliveryRunApproval[] = [], you = true) =>
   missionSequence(run, { events: [...events], approvals: [...approvals] }, t, you)
 const stateOf = (run: DeliveryRun, events: readonly DeliveryRunEvent[], approvals: readonly DeliveryRunApproval[] = []) =>
   Object.fromEntries(sequence(run, events, approvals).steps.map((step) => [step.key, step.state]))
@@ -462,6 +462,13 @@ describe("Hand over: the end of the mission", () => {
     expect(seq.steps[4]).toMatchObject({ state: "done", sentence })
   })
 
+  it("for a teammate, the review is someone else's", () => {
+    const seq = sequence(DONE, S08, [], false)
+    expect(seq.status).toBe("Ready for review by Pierre")
+    expect(seq.steps[4].sentence).toBe("Ready for review by Pierre")
+    expect(sequence({ ...DONE, startedByName: null }, S08, [], false).status).toBe("Ready for review by the person who delegated")
+  })
+
   it("the last words of a finished mission are the hand-over only when no action followed", () => {
     const events = [ev("text", null, "Done."), ev("tool", "Read", "a.ts")]
     expect(step(DONE, events, "plan").lines).toHaveLength(1)
@@ -551,7 +558,7 @@ describe("When it doesn't go to the end", () => {
     const stopped = { ...failed, outcome: "STOPPED" as const }
     expect(sequence(stopped, S08.slice(0, 13), [], true).status).toBe("Stopped by you")
     expect(sequence(stopped, S08.slice(0, 13), [], false).status).toBe("Stopped by Pierre")
-    expect(sequence({ ...stopped, startedByName: " " }, []).status).toBe("Stopped by the person who delegated")
+    expect(sequence({ ...stopped, startedByName: " " }, [], [], false).status).toBe("Stopped by the person who delegated")
     expect(sequence(stopped, S08.slice(0, 13)).steps[2]).toMatchObject({ state: "stopped", sentence: "Stopped here" })
   })
 

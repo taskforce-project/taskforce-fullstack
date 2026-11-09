@@ -70,6 +70,8 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
     expect(screen.queryByText("Fix the footer links")).toBeNull();
     expect(screen.queryByText("Ready to review")).toBeNull();
     expect(screen.getByText("Pull request #212 on acme/website.")).toBeInTheDocument();
+    // Le dossier se télécharge depuis la ligne de la preuve, dans la vue.
+    expect(screen.queryByRole("button", { name: "JSON" })).toBeNull();
   });
 
   it("Apply goes through the store", async () => {

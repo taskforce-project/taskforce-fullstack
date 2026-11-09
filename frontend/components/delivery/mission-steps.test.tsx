@@ -15,7 +15,6 @@ const STEPS: readonly MissionStep[] = [
   { key: "handover", name: "Hand over", state: "not-started", sentence: "Not started", lines: [], current: false },
 ]
 
-const rows = () => screen.getAllByRole("listitem").filter((li) => within(li).queryAllByRole("button").length > 0)
 const row = (name: RegExp) => screen.getByRole("button", { name })
 
 /** Le déroulé : cinq lignes, l'étape en cours ouverte, chacune se déplie d'un clic (R138, « Le dessin »). */
@@ -23,11 +22,21 @@ describe("MissionSteps", () => {
   it("shows the five steps, with their state and their sentence", () => {
     render(<MissionSteps steps={STEPS} showCommands={false} />)
 
-    expect(rows()).toHaveLength(5)
+    const items = screen.getAllByRole("list")[0].children
+    expect(items).toHaveLength(5)
     expect(row(/^Done Understand Read the issue/)).toHaveAttribute("aria-expanded", "false")
-    expect(row(/^Did not happen Plan Skipped/)).toBeInTheDocument()
+    expect(items[1]).toHaveTextContent("PlanSkipped")
     expect(row(/^In progress Do Wrote c2.md/)).toHaveAttribute("aria-expanded", "true")
-    expect(row(/^Not started Check/)).toBeInTheDocument()
+    expect(items[3]).toHaveTextContent("CheckNot started")
+    expect(within(items[3] as HTMLElement).getByRole("img", { name: "Not started" })).toBeInTheDocument()
+  })
+
+  it("a step with nothing to show doesn't pretend it unfolds", () => {
+    render(<MissionSteps steps={STEPS} showCommands={false} />)
+
+    expect(screen.queryByRole("button", { name: /Plan Skipped/ })).toBeNull()
+    expect(screen.queryByRole("button", { name: /Check/ })).toBeNull()
+    expect(screen.getAllByRole("button")).toHaveLength(2)
   })
 
   it("opens the current step, and only it", () => {
@@ -116,6 +125,14 @@ describe("MissionSteps", () => {
     it("names the wait for a teammate", () => {
       render(<MissionSteps steps={waiting} showCommands={false} waitingLabel="Waiting for an answer" />)
       expect(row(/^Waiting for an answer Do/)).toBeInTheDocument()
+    })
+
+    it("a request waiting in a step with no line yet opens it", () => {
+      const first = STEPS.map((step) => step.key === "plan" ? { ...step, state: "waiting" as MissionStepState, sentence: "Wants to run a script" } : step)
+      render(<MissionSteps steps={first} showCommands={false} waiting={<p>The request</p>} />)
+
+      expect(row(/^Waiting for you Plan/)).toHaveAttribute("aria-expanded", "true")
+      expect(screen.getByText("The request")).toBeInTheDocument()
     })
 
     it("a hand-over waiting for a review has no request to hold: it folds", () => {
