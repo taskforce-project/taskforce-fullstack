@@ -8,6 +8,9 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Le transport HTTP de la passerelle. Une interface pour que les tests rejouent un fournisseur sans réseau.
@@ -36,6 +39,8 @@ public interface ModelHttp {
     /**
      * Le client du JDK, en HTTP/1.1 : en clair, le passage à HTTP/2 qu'il tente sinon ({@code Upgrade: h2c}) n'est
      * pas compris par tous les serveurs locaux. Le délai de connexion est court, celui de la réponse vient des réglages.
+     * L'appel est asynchrone pour que l'arrêt d'un tour le coupe ({@link TurnStop}) : le fournisseur voit la connexion
+     * se fermer, et cesse de calculer.
      */
     static ModelHttp jdk() {
         HttpClient client = HttpClient.newBuilder()
@@ -55,12 +60,22 @@ public interface ModelHttp {
                 // Adresse mal formée, ou clé qui contient un caractère interdit dans un en-tête : jamais citées.
                 throw new IOException("invalid address or header");
             }
+            CompletableFuture<HttpResponse<String>> call =
+                client.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            TurnStop.watch(call);
             try {
-                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                HttpResponse<String> response = call.get();
                 return new Reply(response.statusCode(), response.body());
+            } catch (CancellationException stopped) {
+                throw new TurnStoppedException();
+            } catch (ExecutionException failed) {
+                throw failed.getCause() instanceof IOException io ? io : new IOException(failed.getCause());
             } catch (InterruptedException interrupted) {
+                call.cancel(true);
                 Thread.currentThread().interrupt();
                 throw new IOException("interrupted", interrupted);
+            } finally {
+                TurnStop.done();
             }
         };
     }
