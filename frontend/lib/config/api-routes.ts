@@ -379,6 +379,15 @@ export const EVAL_ROUTES = {
   SETTINGS: (slug: string) => `/api/workspaces/${slug}/evals/settings`,
   /** L'histoire de la banque (R125) : ses rejeux par modèle et par date, l'origine de chaque cas et ses notes. */
   HISTORY: (slug: string) => `/api/workspaces/${slug}/evals/history`,
+  /** « Bien » et « pas bien », sous une réponse (R137) ; les critères d'un cas qui les attend. */
+  CASE_GOOD: (slug: string) => `/api/workspaces/${slug}/evals/cases/good`,
+  CASE_BAD: (slug: string) => `/api/workspaces/${slug}/evals/cases/bad`,
+  CASE_CRITERIA: (slug: string, caseId: number) => `/api/workspaces/${slug}/evals/cases/${caseId}/criteria`,
+} as const;
+
+/** Une note du Brain OS, lue avec les droits de la personne : ce que Cortex a lu s'ouvre d'un clic (R137). */
+export const NOTE_ROUTES = {
+  NOTE: (slug: string, nodeId: number) => `/api/workspaces/${slug}/brain/nodes/${nodeId}`,
 } as const;
 
 /**
