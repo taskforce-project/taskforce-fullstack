@@ -111,7 +111,8 @@ export function AddCardDialog({ slug, open, onOpenChange }: AddCardDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      {/* Pas de focus sur la première carte : un clic d'ouverture n'a pas à dessiner son contour sur la liste. */}
+      <DialogContent className="max-h-[85vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Add a card</DialogTitle>
           <DialogDescription>

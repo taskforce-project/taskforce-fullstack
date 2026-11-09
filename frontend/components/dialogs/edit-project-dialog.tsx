@@ -87,10 +87,7 @@ export function EditProjectDialog({ project, slug, open, onOpenChange }: EditPro
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-1">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Icon</span>
-            <ProjectIconPicker value={iconUrl} onChange={setIconUrl} />
-          </div>
+          <ProjectIconPicker value={iconUrl} onChange={setIconUrl} />
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-muted-foreground">Name</label>
             <Input

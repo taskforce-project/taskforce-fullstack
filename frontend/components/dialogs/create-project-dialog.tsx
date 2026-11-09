@@ -352,7 +352,8 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      {/* Le corps défile, l'action principale reste en bas à droite, toujours visible. */}
+      <DialogContent className="flex max-h-[85vh] flex-col">
         <DialogHeader>
           <DialogTitle>Create project</DialogTitle>
           <DialogDescription>
@@ -398,13 +399,11 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
           </button>
         </div>
 
+        <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
         {mode === "blank" ? (
           <div className="flex flex-col gap-5 py-2">
-            {/* Icon, then Name: one column (R133). */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-foreground">Icon</span>
-              <ProjectIconPicker value={iconUrl} onChange={setIconUrl} />
-            </div>
+            {/* Icon (it has its own label), then Name: one column (R133). */}
+            <ProjectIconPicker value={iconUrl} onChange={setIconUrl} />
 
             <div className="flex flex-col gap-1.5">
               <label htmlFor="project-name" className="text-sm font-medium text-foreground">Project name</label>
@@ -642,8 +641,9 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
             )}
           </div>
         )}
+        </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="shrink-0 gap-2">
           <Button variant="outline" size="sm" onClick={() => changeOpen(false)} disabled={busy}>
             Cancel
           </Button>

@@ -243,13 +243,14 @@ export function CreateIssueDialog({
         )}
       </DialogTrigger>
 
-      <DialogContent size="lg" className="max-h-[85vh] overflow-y-auto">
+      {/* Le corps défile, l'action principale reste en bas à droite, toujours visible. */}
+      <DialogContent size="lg" className="flex max-h-[85vh] flex-col">
         <DialogHeader>
           <DialogTitle>Create issue</DialogTitle>
           <DialogDescription className="sr-only">Fill in the details to create a new issue.</DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-5 py-2">
+        <div className="-mx-1 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-1 py-2">
           {/* Title : les libellés au-dessus des champs (R133). */}
           <div className="flex flex-col gap-1.5">
             <label htmlFor="issue-title" className="text-xs font-medium text-muted-foreground">Title</label>
@@ -571,7 +572,7 @@ export function CreateIssueDialog({
           )}
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="shrink-0 gap-2">
           <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
             Cancel
           </Button>
