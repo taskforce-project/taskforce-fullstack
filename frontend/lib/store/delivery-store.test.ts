@@ -88,6 +88,18 @@ describe('delivery-store', () => {
       expect(svc.getMissionChanges).toHaveBeenCalled();
     });
 
+    it('a failure without a reason from the server is kept empty: the screen says what to do in its own words (R133)', async () => {
+      vi.mocked(svc.revertMissionFile).mockRejectedValueOnce(new AxiosError('Network Error'));
+      await useDeliveryStore.getState().revertFile('acme', 1, 'a.txt');
+      expect(useDeliveryStore.getState().changeErrors[1]?.['a.txt']).toBe('');
+      const internal = new AxiosError('Failed', 'ERR', undefined, undefined, {
+        status: 500, data: { message: 'An unexpected error occurred' }, statusText: '', headers: {}, config: {} as InternalAxiosRequestConfig,
+      } as AxiosResponse);
+      vi.mocked(svc.sendCorrection).mockRejectedValueOnce(internal);
+      await useDeliveryStore.getState().sendCorrection('acme', 1, 'x');
+      expect(useDeliveryStore.getState().changeErrors[1]?.['']).toBe('');
+    });
+
     it('comments are added and removed one by one, by mission', () => {
       const { addChangeComment } = useDeliveryStore.getState();
       act(() => addChangeComment(1, { path: 'a.txt', line: 2, side: 'new', text: 'one' }));

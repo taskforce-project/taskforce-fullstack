@@ -277,6 +277,17 @@ describe("MissionChanges", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Refused.")
   })
 
+  it("a failure with no reason says what to do in its own words (R133)", () => {
+    seed(changes())
+    act(() => useDeliveryStore.setState({
+      changeErrors: { 100: { "src/footer.tsx": "", "": "" } },
+      changeComments: { 100: [{ id: "c1", path: "src/footer.tsx", side: "new", line: 2, text: "x" }] },
+    }))
+    render(<MissionChanges run={RUN} />)
+    const alerts = screen.getAllByRole("alert").map((a) => a.textContent)
+    expect(alerts).toEqual(["TaskForce couldn't put this file back. Try again in a moment.", "TaskForce couldn't send your comments. Try again in a moment."])
+  })
+
   const commentOnNewLine = async () => {
     openRow()
     await screen.findByText("new line")
@@ -424,6 +435,13 @@ describe("MissionChanges", () => {
       act(() => useDeliveryStore.setState({ changeErrors: { 100: { "": "The agent isn't working any more." } } }))
       render(<MissionChanges run={{ ...RUN, status: "RUNNING" }} />)
       expect(screen.getByRole("alert")).toHaveTextContent("isn't working any more")
+    })
+
+    it("says what to do when it failed with no reason", () => {
+      seed(live())
+      act(() => useDeliveryStore.setState({ changeErrors: { 100: { "": "" } } }))
+      render(<MissionChanges run={{ ...RUN, status: "RUNNING" }} />)
+      expect(screen.getByRole("alert")).toHaveTextContent("TaskForce couldn't send this. Try again in a moment.")
     })
   })
 })

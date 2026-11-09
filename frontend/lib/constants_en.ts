@@ -916,8 +916,6 @@ export const CONSTANTS_EN = {
       tooLong: "This file is too long to show in full.",
       empty: "No line changed: only this file's permissions did.",
       gap: "Unchanged lines",
-      lineOld: "Line {line} before",
-      lineNew: "Line {line}",
     },
     revert: {
       hint: "Put this file back as it was",

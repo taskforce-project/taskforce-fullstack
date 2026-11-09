@@ -67,7 +67,10 @@ interface DeliveryState {
   fileDiffs: Record<number, Record<string, MissionFileDiff | null>>;
   /** Par runId : les commentaires de relecture en cours, pas encore envoyés (ils survivent à un changement de volet). */
   changeComments: Record<number, DraftChangeComment[]>;
-  /** Par runId puis par fichier (`""` : la relecture) : pourquoi le dernier geste a été refusé. */
+  /**
+   * Par runId puis par fichier (`""` : la relecture) : pourquoi le dernier geste a été refusé. Une raison vide : il a échoué
+   * sans raison à montrer, l'écran le dit avec ses mots.
+   */
   changeErrors: Record<number, Record<string, string>>;
 
   fetchProviders: (slug: string) => Promise<DeliveryProvider[]>;
@@ -118,6 +121,15 @@ export interface DraftChangeComment extends ChangeComment {
 
 /** La clé d'une erreur qui ne porte pas sur un fichier : la relecture. */
 const REVIEW_ERROR = "";
+
+/**
+ * La raison d'un refus, quand le serveur en donne une (4xx) ; sinon vide, et l'écran dit quoi faire avec ses propres mots :
+ * un échec du réseau ou une erreur interne n'a pas à s'afficher tel quel (R133).
+ */
+function refusalOf(e: unknown): string {
+  const status = getErrorStatus(e);
+  return status !== undefined && status >= 400 && status < 500 ? getErrorMessage(e) : "";
+}
 
 /** Les raisons gardées d'une mission, avec ou sans celle de ce fichier. */
 function withChangeError(errors: Record<number, Record<string, string>>, runId: number, path: string, reason: string | null): Record<number, Record<string, string>> {
@@ -188,7 +200,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
       await get().fetchMissionChanges(slug, runId);
       return true;
     } catch (e) {
-      set((state) => ({ changeErrors: withChangeError(state.changeErrors, runId, path, getErrorMessage(e)) }));
+      set((state) => ({ changeErrors: withChangeError(state.changeErrors, runId, path, refusalOf(e)) }));
       return false;
     }
   },
@@ -222,7 +234,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
       });
       return next;
     } catch (e) {
-      set((state) => ({ changeErrors: withChangeError(state.changeErrors, runId, REVIEW_ERROR, getErrorMessage(e)) }));
+      set((state) => ({ changeErrors: withChangeError(state.changeErrors, runId, REVIEW_ERROR, refusalOf(e)) }));
       return null;
     }
   },
@@ -234,7 +246,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
       await get().fetchMissionChanges(slug, runId);
       return true;
     } catch (e) {
-      set((state) => ({ changeErrors: withChangeError(state.changeErrors, runId, REVIEW_ERROR, getErrorMessage(e)) }));
+      set((state) => ({ changeErrors: withChangeError(state.changeErrors, runId, REVIEW_ERROR, refusalOf(e)) }));
       return false;
     }
   },

@@ -240,7 +240,7 @@ function FileRow({ slug, runId, file, canRevert, canComment, error, t }: Readonl
 }
 
 /** Dire quelque chose à l'agent pendant qu'il travaille : il le lit à sa prochaine étape (R140). */
-function Correction({ slug, runId, changes, error, t }: Readonly<{ slug: string; runId: number; changes: Changes; error: string | undefined; t: Words }>) {
+function Correction({ slug, runId, changes, error, t }: Readonly<{ slug: string; runId: number; changes: Changes; error: string | null; t: Words }>) {
   const sendCorrection = useDeliveryStore((s) => s.sendCorrection)
   const [text, setText] = useState("")
   const [busy, setBusy] = useState(false)
@@ -266,7 +266,7 @@ function Correction({ slug, runId, changes, error, t }: Readonly<{ slug: string;
           {busy ? <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Send className="size-3.5" aria-hidden="true" />}
         </Button>
       </div>
-      {error ? <p role="alert" className="text-xs text-destructive">{error}</p>
+      {error !== null ? <p role="alert" className="text-xs text-destructive">{error || t.correction.failed}</p>
         : failed ? <p role="alert" className="text-xs text-destructive">{last.message ?? t.correction.failed}</p>
         : last && <p role="status" className="truncate text-xs text-muted-foreground" title={last.text}>{t.correction.sent}</p>}
     </form>
@@ -327,7 +327,12 @@ export function MissionChanges({ run }: Readonly<{ run: DeliveryRun }>) {
   // Un runner qui n'a rien relevé (plus ancien, ou une mission d'un autre agent) : rien à montrer ici.
   if (!changes || changes.mode === null) return null
 
-  const review = errors?.[""]
+  // Une raison vide veut dire : échoué sans raison à montrer. L'écran le dit alors avec ses mots (R133).
+  const review = errors?.[""] ?? null
+  const fileError = (file: MissionFileChange): string | undefined => {
+    const refused = errors?.[file.path]
+    return file.error ?? (refused === undefined ? undefined : refused || t.revert.failed)
+  }
   const count = files.length + changes.more
   const empty = files.length === 0
 
@@ -344,7 +349,7 @@ export function MissionChanges({ run }: Readonly<{ run: DeliveryRun }>) {
         <ul className="flex flex-col divide-y divide-border border-y border-border" aria-label={t.title}>
           {files.map((file) => (
             <FileRow key={file.path} slug={slug} runId={run.id} file={file} canRevert={changes.canRevert} canComment={changes.canComment}
-              error={file.error ?? errors?.[file.path]} t={t} />
+              error={fileError(file)} t={t} />
           ))}
         </ul>
       )}
@@ -353,7 +358,7 @@ export function MissionChanges({ run }: Readonly<{ run: DeliveryRun }>) {
       {changes.canCorrect && <Correction slug={slug} runId={run.id} changes={changes} error={review} t={t} />}
       {comments.length > 0 && changes.canComment && (
         <div className="flex items-center justify-end gap-3 pt-1">
-          {review && <p role="alert" className="min-w-0 flex-1 text-xs text-destructive">{review}</p>}
+          {review !== null && <p role="alert" className="min-w-0 flex-1 text-xs text-destructive">{review || t.comments.failed}</p>}
           <span className="text-xs text-muted-foreground">{comments.length === 1 ? t.comments.one : fillText(t.comments.many, { count: comments.length })}</span>
           <Button size="sm" className="h-8 text-xs" disabled={asking} onClick={() => void send()}>
             {asking && <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
