@@ -1136,9 +1136,11 @@ public class AgentService {
      */
     public static final Set<String> PREPARED = Set.of("create_issue");
 
-    private static final String PREPARED_TEXT = "Issue prepared as a card in the conversation: the person checks it, "
-        + "edits it and creates it. Do not call this tool again; say in one sentence that the card is ready to review, "
-        + "and do not say that the issue exists.";
+    // Le modèle répète ce texte dans la langue de la personne : « the person » y devenait « le personnage » (recette 1.13,
+    // 09/11/2026). Il s'adresse donc à elle, à la deuxième personne.
+    private static final String PREPARED_TEXT = "Issue prepared as a card in the conversation, for the user to check, edit "
+        + "and create. Do not call this tool again; tell the user directly, in their language and in one sentence, that "
+        + "their card is ready to review, and do not say that the issue exists.";
 
     /**
      * Ce qui manque pour préparer la carte, que seule la personne peut dire (le projet, la personne nommée) : rien ne se
