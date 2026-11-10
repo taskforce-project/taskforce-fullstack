@@ -394,6 +394,13 @@
           System::Call 'user32::DispatchMessageW(p $tfMsg)'
           Goto tfMore
         ${endIf}
+      ; Tant que cette fenêtre est au premier plan, l'app qui s'ouvre ensuite peut y venir : le gabarit la lance par
+      ; l'Explorateur (ExecShellAsUser), et Windows laisserait sinon sa fenêtre derrière celle-ci, puis rendrait la main à
+      ; la fenêtre d'avant la mise à jour quand celle-ci part. ASFW_ANY.
+      System::Call 'user32::GetForegroundWindow() p .r0'
+      ${if} $0 == $tfHwnd
+        System::Call 'user32::AllowSetForegroundWindow(i -1)'
+      ${endIf}
       ${if} $tfMoves == 1
         Call tfDrawBar
         IntOp $tfFrame $tfFrame + 1

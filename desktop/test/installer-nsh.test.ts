@@ -107,6 +107,10 @@ describe("the installer's update screen and the app", () => {
     assert.doesNotMatch(code, /\.(ps1|vbs|hta|bat|cmd)\b/i);
   });
 
+  it("lets the new version's window come to the front: the template starts it through the shell", () => {
+    assert.match(code, /GetForegroundWindow\(\) p \.r0'\s+\$\{if\} \$0 == \$tfHwnd\s+System::Call 'user32::AllowSetForegroundWindow\(i -1\)'/);
+  });
+
   it("leaves as soon as the new version has shown its window, without waiting for the worker to tidy up", () => {
     assert.match(code, /\$\{andIfNot\} \$\{FileExists\} "\$tfMark"\s+Call tfCloseScreen/);
   });
