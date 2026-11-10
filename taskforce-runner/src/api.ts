@@ -17,6 +17,100 @@ export interface Claim {
   rules?: unknown;
   /** Commande de test du projet, lancée par le runner après l'agent (S1, R32) ; absente : aucun test lancé. */
   testCommand?: string | null;
+  /** Une reprise : la personne a commenté des lignes, l'agent repart sur la même branche (R139). */
+  followUp?: FollowUp | null;
+}
+
+/** Un commentaire de la personne sur une ligne du diff. */
+export interface FollowUpComment {
+  path: string;
+  line: number;
+  /** `new` : la ligne de la version de l'agent ; `old` : une ligne qu'il a retirée. */
+  side: "new" | "old";
+  text: string;
+}
+
+/** Ce qu'une reprise emporte de la mission d'avant : sa branche, sa base, sa session, et les commentaires. */
+export interface FollowUp {
+  parentRunId: number;
+  /** Le run qui a créé le dossier de travail : Claude Code range ses sessions par dossier. */
+  worktreeRun: number;
+  branch: string;
+  base: string;
+  /** La session de Claude Code à reprendre ; absente, l'agent repart du brief. */
+  sessionId?: string | null;
+  /** La pull request déjà ouverte : la reprise la met à jour au lieu d'en ouvrir une autre. */
+  pullRequestUrl?: string | null;
+  comments: FollowUpComment[];
+}
+
+/** Un fichier de la mission (miroir de `RunnerChangesRequest.File` côté backend). */
+export interface RunnerFileChange {
+  path: string;
+  status: "added" | "modified" | "deleted" | "written";
+  /** null pour un binaire. */
+  added: number | null;
+  removed: number | null;
+  binary: boolean;
+  /** Le texte est coupé, ou n'a pas pu partir : le compte reste vrai, l'écran le dit. */
+  truncated: boolean;
+  /** Un fichier qui peut porter un secret : son texte ne quitte jamais le poste. */
+  withheld: boolean;
+  /** L'empreinte de ce qui a changé : même empreinte, TaskForce garde le texte déjà reçu. */
+  revision: string;
+  /** Le patch (dépôt) ou le contenu (dossier jetable) ; absent quand il n'a pas changé. */
+  body?: string | null;
+}
+
+/** Ce que la mission a changé, relevé par le runner (miroir de `RunnerChangesRequest` côté backend). */
+export interface RunnerChanges {
+  mode: "repo" | "scratch";
+  base?: string;
+  files: RunnerFileChange[];
+  /** Les fichiers au-delà du plafond, comptés dans les totaux. */
+  more: number;
+  added: number;
+  removed: number;
+  /** L'état final de la mission : il entre au dossier de preuve. */
+  final: boolean;
+}
+
+/** Un ordre de TaskForce pour ce poste (R139, R140). */
+export interface RunnerCommand {
+  commandId: number;
+  runId: number;
+  kind: "REVERT_FILE" | "CORRECTION";
+  /** `REVERT_FILE` : le fichier à remettre comme avant, et de quoi retrouver la branche. */
+  path?: string | null;
+  branch?: string | null;
+  base?: string | null;
+  worktreeRun?: number | null;
+  repoFullName?: string | null;
+  rules?: unknown;
+  /** `CORRECTION` : ce que la personne a tapé. */
+  text?: string | null;
+}
+
+/** Ce que les règles ont dit d'un geste du runner, pour le dossier de preuve. */
+export interface CommandTrace {
+  action: string;
+  effect: "allow" | "ask" | "deny";
+  rule?: string;
+}
+
+export interface CommandResult {
+  ok: boolean;
+  /** Ce qui s'est passé, en mots ; montré à la personne quand le geste échoue. */
+  message: string;
+  /** La branche n'existe plus sur ce poste ni sur GitHub : l'action disparaît, et l'écran dit pourquoi. */
+  gone?: boolean;
+  commit?: string;
+  commits?: number;
+  pushed?: boolean;
+  trace?: CommandTrace[];
+  changes?: RunnerChanges;
+  /** Le détail technique d'un échec : pour le dossier de preuve, jamais pour l'écran (R133). */
+  detail?: string;
 }
 
 export interface RunResult {
@@ -29,6 +123,8 @@ export interface RunResult {
   /** La branche de l'agent et ses commits, pour la carte de résultat (R78). */
   branch?: string;
   commits?: number;
+  /** La session de Claude Code, pour qu'une reprise la continue (R139). */
+  agentSession?: string;
   /** Les tests du projet tels que le runner les a lancés (R32) : jamais ce que l'agent en dit. */
   tests?: {
     command: string;
@@ -134,6 +230,20 @@ export class TaskforceApi {
 
   approvalStatus(runId: number, approvalId: number): Promise<Approval> {
     return this.send<Approval>("GET", `/delivery/runner/runs/${runId}/approvals/${approvalId}`);
+  }
+
+  /** Ce que la mission a changé jusqu'ici (R139). */
+  async changes(runId: number, changes: RunnerChanges): Promise<void> {
+    await this.send("POST", `/delivery/runner/runs/${runId}/changes`, changes);
+  }
+
+  /** Les ordres en attente pour ce poste (remettre un fichier, une correction). */
+  async commands(): Promise<RunnerCommand[]> {
+    return (await this.send<RunnerCommand[] | null>("POST", "/delivery/runner/commands")) ?? [];
+  }
+
+  async commandResult(commandId: number, result: CommandResult): Promise<void> {
+    await this.send("POST", `/delivery/runner/commands/${commandId}/result`, result);
   }
 
   private async send<T>(method: "GET" | "POST", path: string, body?: unknown, authenticated = true): Promise<T> {

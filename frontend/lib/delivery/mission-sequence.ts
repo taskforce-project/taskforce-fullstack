@@ -570,6 +570,7 @@ function outcomeWords(run: SequencedRun, t: SequenceTexts, you: boolean): string
     case "DISCARDED": return t.status.discarded
     case "MARKED_DONE": return t.status.markedDone
     case "RETRIED": return t.status.retried
+    case "FOLLOWED_UP": return t.status.followedUp
     default: return you ? t.status.review : fillText(t.status.reviewOther, { who: delegatorOf(run, t) })
   }
 }

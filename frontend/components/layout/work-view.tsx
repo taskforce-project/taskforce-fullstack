@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 import { ChevronRight, ExternalLink, FileCheck2, Loader2, ShieldCheck, Square } from "lucide-react"
 import { toast } from "sonner"
 
+import { MissionChanges } from "@/components/delivery/mission-changes"
 import { MissionFiles } from "@/components/delivery/mission-files"
 import { MissionDetailLine, MissionSteps } from "@/components/delivery/mission-steps"
 import { PaneLink } from "@/components/layout/pane-link"
@@ -165,6 +166,8 @@ export function WorkView({ runId }: Readonly<{ runId: number }>) {
   const latest = useDeliveryStore((s) => (listed ? s.runs[listed.issueId] : undefined))
   const activity = useDeliveryStore((s) => s.activity[runId])
   const evidence = useDeliveryStore((s) => s.evidence[runId])
+  // Le runner relève les changements (R139) : la liste d'après la chronologie ne sert plus qu'aux missions d'avant.
+  const tracked = useDeliveryStore((s) => Boolean(s.missionChanges[runId]?.mode))
   const fetchWorkspaceRuns = useDeliveryStore((s) => s.fetchWorkspaceRuns)
   const fetchRun = useDeliveryStore((s) => s.fetchRun)
   const fetchActivity = useDeliveryStore((s) => s.fetchActivity)
@@ -303,8 +306,9 @@ export function WorkView({ runId }: Readonly<{ runId: number }>) {
         />
       </section>
 
-      {/* La place de <MissionChanges run={run} /> (TF-J1-17) : les fichiers de la mission, leurs lignes et leur diff. */}
-      <MissionFiles run={run} events={events} />
+      <MissionChanges run={run} />
+      {/* Le relevé du runner tient la liste des fichiers : ceux d'après la chronologie ne servent qu'aux missions d'avant (R139). */}
+      <MissionFiles run={run} events={events} documentsOnly={tracked} />
 
       {judged ? (
         <section aria-label={t.result}>

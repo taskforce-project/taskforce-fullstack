@@ -1,5 +1,7 @@
 package com.taskforce.tf_api.core.api;
 
+import java.util.List;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -12,13 +14,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.RunnerApprovalRequest;
+import com.taskforce.tf_api.core.dto.request.RunnerChangesRequest;
+import com.taskforce.tf_api.core.dto.request.RunnerCommandResultRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerReadinessRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerClaimResponse;
+import com.taskforce.tf_api.core.dto.response.RunnerCommandResponse;
 import com.taskforce.tf_api.core.service.delivery.LocalRunnerService;
 import com.taskforce.tf_api.core.service.delivery.LocalRunnerSettings;
+import com.taskforce.tf_api.core.service.delivery.MissionChangesService;
 import com.taskforce.tf_api.core.service.delivery.RunnerIdentityResolver;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 
@@ -41,6 +47,7 @@ import lombok.RequiredArgsConstructor;
 public class DeliveryRunnerController {
 
     private final LocalRunnerService localRunnerService;
+    private final MissionChangesService missionChanges;
     private final RunnerIdentityResolver identityResolver;
 
     /**
@@ -83,6 +90,37 @@ public class DeliveryRunnerController {
     ) {
         localRunnerService.appendEvents(runId, identityResolver.resolve(jwt), request);
         return ResponseEntity.ok(ApiResponse.success("Events saved", null));
+    }
+
+    /** POST /api/delivery/runner/runs/{runId}/changes : ce que la mission a changé jusqu'ici, relevé par le runner (R139). */
+    @PostMapping("/runs/{runId}/changes")
+    public ResponseEntity<ApiResponse<Void>> changes(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long runId,
+        @Valid @RequestBody RunnerChangesRequest request
+    ) {
+        missionChanges.saveChanges(runId, identityResolver.resolve(jwt), request);
+        return ResponseEntity.ok(ApiResponse.success("Changes saved", null));
+    }
+
+    /**
+     * POST /api/delivery/runner/commands : les ordres qui attendent ce runner (remettre un fichier, une correction). Un
+     * POST : chaque ordre n'est remis qu'une fois.
+     */
+    @PostMapping("/commands")
+    public ResponseEntity<ApiResponse<List<RunnerCommandResponse>>> commands(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success("Commands", missionChanges.takeCommands(identityResolver.resolve(jwt))));
+    }
+
+    /** POST /api/delivery/runner/commands/{commandId}/result : ce que le runner a fait d'un ordre. */
+    @PostMapping("/commands/{commandId}/result")
+    public ResponseEntity<ApiResponse<Void>> commandResult(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long commandId,
+        @Valid @RequestBody RunnerCommandResultRequest request
+    ) {
+        missionChanges.finishCommand(commandId, identityResolver.resolve(jwt), request);
+        return ResponseEntity.ok(ApiResponse.success("Result saved", null));
     }
 
     /** POST /api/delivery/runner/runs/{runId}/approvals : l'agent demande une action hors de son socle (OSS-5.4). */

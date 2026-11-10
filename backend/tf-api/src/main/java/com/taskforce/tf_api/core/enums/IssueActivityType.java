@@ -32,5 +32,7 @@ public enum IssueActivityType {
     MISSION_DISCARDED,
     MISSION_RETRIED,
     /** L'issue terminée par la personne, la mission n'ayant rien changé (rejeu de la 1.8.0, V114). */
-    MISSION_MARKED_DONE
+    MISSION_MARKED_DONE,
+    /** La personne a commenté des lignes du diff : la mission repart sur la même branche (R139, V122). */
+    MISSION_CHANGES_ASKED
 }

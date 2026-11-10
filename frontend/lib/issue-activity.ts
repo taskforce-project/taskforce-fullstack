@@ -78,6 +78,8 @@ export function describeActivity(a: IssueActivity, t: ActivityTexts): ActivityLi
     // La mission n'a rien changé : la personne a terminé l'issue (rejeu de la 1.8.0).
     case "MISSION_MARKED_DONE":
       return { ...line, what: t.markedDone };
+    case "MISSION_CHANGES_ASKED":
+      return { ...line, what: t.askedForChanges };
     default:
       return {
         ...line,

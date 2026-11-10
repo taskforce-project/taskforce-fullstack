@@ -25,12 +25,17 @@ function useDiffAnchors(paths: readonly string[]): Readonly<Record<string, strin
 }
 
 /**
- * La liste des fichiers et des documents d'une mission, en attendant `<MissionChanges run={run} />` (TF-J1-17) qui prendra
- * cette place dans la vue du travail. Une ligne par fichier ; les commentaires, comptés. Rien tant qu'il n'y a rien.
+ * Les fichiers et les documents d'une mission d'après sa chronologie, sous `<MissionChanges run={run} />` (R139). Une ligne
+ * par fichier ; les commentaires, comptés. Une mission que le runner relève n'y garde que ses documents : ses fichiers sont
+ * déjà au-dessus, avec leurs lignes (`documentsOnly`). Rien tant qu'il n'y a rien.
  */
-export function MissionFiles({ run, events }: Readonly<{ run: Pick<DeliveryRun, "resultUrl">; events: readonly DeliveryRunEvent[] }>) {
+export function MissionFiles({ run, events, documentsOnly = false }: Readonly<{
+  run: Pick<DeliveryRun, "resultUrl">
+  events: readonly DeliveryRunEvent[]
+  documentsOnly?: boolean
+}>) {
   const t = usePreferencesStore((s) => s.t.workView)
-  const files = useMemo(() => fileChanges(events), [events])
+  const files = useMemo(() => (documentsOnly ? [] : fileChanges(events)), [events, documentsOnly])
   const documents = useMemo(() => {
     const counted = new Map<DocumentGesture, number>()
     for (const document of documentChanges(events)) counted.set(document.gesture, (counted.get(document.gesture) ?? 0) + 1)

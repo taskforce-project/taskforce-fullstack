@@ -15,7 +15,7 @@ const EVENTS = [
   tool(6, "taskforce: update_issue", '{"issue":"WEB-28"}'),
 ]
 
-/** La place de la liste des changements (TF-J1-17), tant que MissionChanges n'y est pas. */
+/** Ce que la chronologie dit des fichiers et des documents, sous la liste des changements (R139). */
 describe("MissionFiles", () => {
   it("lists each file once, what happened to it, and counts the comments", () => {
     render(<MissionFiles run={{ resultUrl: null }} events={EVENTS} />)
@@ -25,6 +25,13 @@ describe("MissionFiles", () => {
       "src/footer.tsxEdited", "src/links.tsWritten · 2 times", "Commented2 times", "Updated an issue",
     ])
     expect(within(list).queryByRole("link")).toBeNull()
+  })
+
+  it("keeps only the documents once the runner reports the files (R139)", () => {
+    render(<MissionFiles run={{ resultUrl: null }} events={EVENTS} documentsOnly />)
+
+    const list = screen.getByRole("region", { name: "Files and documents" })
+    expect(within(list).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Commented2 times", "Updated an issue"])
   })
 
   it("links each file to its diff in the pull request", async () => {
