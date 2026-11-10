@@ -1,0 +1,75 @@
+/* L'écran de la coque, le même pour chaque fenêtre hors de la fenêtre principale : la connexion, le démarrage, la mise
+   à jour, la déconnexion et leurs échecs (le CEO, 10/11/2026 : « vraiment le mm ecran que l ecran de login [...] Juste
+   la partie droite qui change »). À gauche le panneau peint (panel.js), le même partout ; à droite ce que l'écran dit.
+   L'installeur d'une mise à jour dessine le même écran (installer.nsh) : le panneau d'après une image tirée de celui-ci
+   (scripts/make-screen-panel.mjs), la droite d'après les mesures ci-dessous, qu'un test compare aux siennes. */
+:root { color-scheme: light dark; --bg: #ffffff; --ink: #191715; --muted: #6b6762; --line: #e6e4e0;
+  --button: #ffffff; --accent: #2f6bf6; --accent-ink: #ffffff; --error: #b42318;
+  /* La droite d'un écran d'attente, en points : colonne, haut du bloc, logo, étape, barre, note. */
+  --panel: 520px; --column: 340px; --top: 236px; --logo: 48px; --step-gap: 24px; --step: 24px; --step-line: 30px;
+  --bar-gap: 20px; --bar: 3px; --note: 14px; --note-line: 21px; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0b0e19; --ink: #f3f2f0; --muted: #9a978f; --line: #242a40;
+  --button: #12172a; --error: #f97066; } }
+html, body { height: 100%; margin: 0; }
+body { display: grid; grid-template-columns: var(--panel) 1fr; overflow: hidden; background: var(--bg); color: var(--ink);
+  font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  -webkit-app-region: drag; user-select: none; }
+button, summary, .detail { -webkit-app-region: no-drag; }
+
+/* Le symbole de la marque (panel.js), hors de la grille. */
+.defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* Le panneau peint reste clair dans les deux thèmes, comme sur la page de connexion de la webapp : la peinture de l'accueil
+   du site, le titre et l'app. */
+.paint { position: relative; overflow: hidden; color: #191715; border-right: 1px solid #e6e4e0; }
+.paint > .bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 72%; }
+/* Voile clair et doux sous le texte : la peinture reste visible autour, le texte se lit. */
+.paint > .veil { position: absolute; inset: 0;
+  background: radial-gradient(85% 52% at 26% 20%, rgb(255 255 255 / 0.7) 0%, rgb(255 255 255 / 0.32) 55%, rgb(255 255 255 / 0) 85%); }
+.paint-content { position: relative; display: flex; flex-direction: column; height: 100%; box-sizing: border-box;
+  padding: 40px 40px 0; gap: 22px; }
+.paint h2 { margin: 18px 0 0; font-size: 29px; font-weight: 600; line-height: 1.14; letter-spacing: -0.03em;
+  text-wrap: balance; max-width: 400px; }
+.paint p { margin: 10px 0 0; max-width: 400px; color: rgb(25 23 21 / 0.72); font-size: 14.5px; }
+.shot { margin-top: auto; }
+.shot img { display: block; width: 100%; border: 1px solid rgb(25 23 21 / 0.08); border-bottom: none;
+  border-radius: 10px 10px 0 0; box-shadow: 0 1px 0 #1917150a, 0 18px 40px -16px #19171538; transform: translateY(6px); }
+
+/* La droite de la connexion : centrée, une colonne. */
+main { align-self: center; justify-self: center; width: min(var(--column), calc(100% - 48px)); display: grid; gap: 20px; }
+h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+main p { margin: 0; color: var(--muted); }
+.lead { margin-top: 6px !important; }
+.actions { display: grid; gap: 10px; }
+.actions button { font: inherit; font-weight: 500; height: 40px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--button); color: var(--ink); }
+.actions button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.actions button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.actions button:disabled { opacity: 0.6; cursor: default; }
+.status { min-height: 21px; }
+.status.error { color: var(--error); }
+.note { font-size: 12.5px; }
+
+/* La droite d'un écran d'attente : le logo, l'étape sur une ligne, la barre, la note, toujours aux mêmes places
+   (l'installeur les dessine aux mêmes). Un échec garde le logo et l'étape : la barre s'efface, la note dit quoi faire,
+   ses actions viennent dessous. */
+.wait { align-self: start; display: block; margin-top: var(--top); }
+.wait .logo { display: block; width: var(--logo); height: var(--logo); }
+.wait h1 { margin-top: var(--step-gap); font-size: var(--step); line-height: var(--step-line); letter-spacing: normal;
+  white-space: nowrap; }
+.bar { height: var(--bar); margin-top: var(--bar-gap); border-radius: var(--bar); background: var(--line); overflow: hidden; }
+.bar::after { content: ""; display: block; width: 40%; height: 100%; background: var(--accent); border-radius: var(--bar);
+  animation: slide 1.4s ease-in-out infinite; }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) { .bar::after { animation: none; width: 100%; opacity: 0.5; } }
+/* Les lignes de la note sont celles du texte (l'installeur les dessine une à une), puis passent à la ligne au besoin. */
+.wait .note { margin-top: var(--bar-gap); font-size: var(--note); line-height: var(--note-line); color: var(--muted);
+  white-space: pre-line; }
+.wait.failed .bar { display: none; }
+.wait.failed .note { margin-top: 8px; }
+.wait .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+.wait .actions button { height: 32px; padding: 0 14px; }
+.wait details { margin-top: 16px; color: var(--muted); }
+.wait summary { cursor: pointer; width: max-content; font-size: 12.5px; }
+.wait .detail { margin: 8px 0 0; max-height: 96px; overflow: auto; font: 12px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }

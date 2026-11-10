@@ -4,7 +4,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
-import { PENDING_FILE, pendingOutcome, releaseUpdateScreen, savePending, SCREEN_FILE, takePending, updateScreenIsUp, type PendingUpdate } from "../src/update-pending";
+import {
+  PENDING_FILE,
+  pendingOutcome,
+  readPending,
+  releaseUpdateScreen,
+  savePending,
+  SCREEN_FILE,
+  takePending,
+  updateScreenIsUp,
+  updateScreenRect,
+  type PendingUpdate,
+} from "../src/update-pending";
 
 let dir = "";
 
@@ -38,6 +49,14 @@ describe("the update noted before quitting, read once at the next start", () => 
   }
 
   it("has nothing to say without a note", () => assert.equal(takePending(dir), null));
+
+  it("lets the first screen read the note without forgetting it", () => {
+    savePending(dir, { version: "1.7.1", from: "1.7.0" });
+
+    assert.deepEqual(readPending(dir), { version: "1.7.1", from: "1.7.0" });
+    assert.deepEqual(takePending(dir), { version: "1.7.1", from: "1.7.0" });
+    assert.equal(readPending(dir), null);
+  });
 });
 
 describe("the hand-over of the update screen between the installer and the app", () => {
@@ -58,6 +77,16 @@ describe("the hand-over of the update screen between the installer and the app",
 
   it("does not fail when the folder cannot be written to", () => {
     assert.doesNotThrow(() => releaseUpdateScreen(join(dir, "missing", "folder")));
+  });
+
+  it("says where the installer's window is, for the new app's first window", () => {
+    assert.equal(updateScreenRect(dir), null);
+
+    writeFileSync(join(dir, SCREEN_FILE), "-1250 120 1250 800\r\n");
+    assert.deepEqual(updateScreenRect(dir), { x: -1250, y: 120, width: 1250, height: 800 });
+
+    writeFileSync(join(dir, SCREEN_FILE), "");
+    assert.equal(updateScreenRect(dir), null);
   });
 });
 
