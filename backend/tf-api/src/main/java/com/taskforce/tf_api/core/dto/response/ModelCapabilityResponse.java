@@ -61,10 +61,10 @@ public record ModelCapabilityResponse(
     /**
      * Une cellule : la dernière note de chaque cas de la capacité. {@code capable} quand tous ses cas sont mesurés et
      * réussis. {@code heldWords}, pour le contexte : le plus long document tenu, en mots (0 si aucun ; {@code null} sans
-     * mesure).
+     * mesure). {@code tooSlow} : les cas qui n'ont pas répondu dans leur budget, ni réussis ni comptés dans {@code measured}.
      */
     public record Score(String capability, int passed, int measured, int total, boolean capable, Integer heldWords,
-                        LocalDateTime measuredAt) {
+                        LocalDateTime measuredAt, int tooSlow) {
     }
 
     /** Le premier modèle capable d'une capacité, dans l'ordre de la table. */
@@ -75,8 +75,8 @@ public record ModelCapabilityResponse(
     public record RunStarted(Long runId, String model, LocalDateTime startedAt, List<String> cases) {
     }
 
-    /** La note d'un cas : chaque critère, ce que le modèle a appelé, un extrait de sa réponse, la taille du prompt. */
+    /** La note d'un cas : chaque critère, ce que le modèle a appelé, un extrait de sa réponse, la taille du prompt, s'il a été trop lent. */
     public record CaseResult(String caseKey, String capability, boolean passed, List<EvalGrader.Check> checks,
-                             List<ReplayOutcome.ReplayCall> calls, String answer, String model, long promptTokens) {
+                             List<ReplayOutcome.ReplayCall> calls, String answer, String model, long promptTokens, boolean tooSlow) {
     }
 }

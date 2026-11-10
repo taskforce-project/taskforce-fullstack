@@ -21,6 +21,8 @@ public interface ModelCapabilityResultRepository extends JpaRepository<ModelCapa
 
         Boolean getPassed();
 
+        Boolean getTooSlow();
+
         LocalDateTime getCreatedAt();
     }
 
@@ -39,6 +41,8 @@ public interface ModelCapabilityResultRepository extends JpaRepository<ModelCapa
         Boolean getPersonPassed();
 
         Long getPersonId();
+
+        Boolean getTooSlow();
 
         LocalDateTime getCreatedAt();
     }

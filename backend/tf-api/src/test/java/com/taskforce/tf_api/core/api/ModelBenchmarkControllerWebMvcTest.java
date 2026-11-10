@@ -57,7 +57,8 @@ class ModelBenchmarkControllerWebMvcTest {
     private static final ModelBenchmarkResponse MATRIX = new ModelBenchmarkResponse("OLLAMA", "qwen3:8b", 1, 22,
         List.of(new ModelBenchmarkResponse.TaskInfo("summarize", "Summarize", "An issue", 3, true)),
         List.of(new ModelBenchmarkResponse.ModelRow("qwen3:8b", true, AT, 660,
-            List.of(new ModelBenchmarkResponse.Cell("summarize", "give_it", 3, 3, 3, "you")))));
+            List.of(new ModelBenchmarkResponse.Cell("summarize", "give_it", 3, 3, 3, "you", 0)),
+            new ModelBenchmarkResponse.ModelFacts("qwen3", "8.2B", 5_225_388_164L, 40960, true, true, 6_740_000_000L, 6_170_000_000L, null))));
     private static final ModelBenchmarkResponse.ModelDetail DETAIL = new ModelBenchmarkResponse.ModelDetail("qwen3:8b", true, AT, 22, List.of(), List.of());
 
     private RequestPostProcessor auth() {
@@ -76,7 +77,55 @@ class ModelBenchmarkControllerWebMvcTest {
             .andExpect(jsonPath("$.data.models[0].estimateSeconds").value(660))
             .andExpect(jsonPath("$.data.models[0].cells[0].verdict").value("give_it"))
             .andExpect(jsonPath("$.data.models[0].cells[0].judge").value("you"))
+            .andExpect(jsonPath("$.data.models[0].facts.family").value("qwen3"))
+            .andExpect(jsonPath("$.data.models[0].facts.gpuBytes").value(6_170_000_000L))
             .andExpect(jsonPath("$.data.tasks[0].trial").value(true));
+    }
+
+    @Test
+    @DisplayName("POST load : charge le modèle du passage ; un modèle qui ne se charge pas est un résultat, 200")
+    void load_200() throws Exception {
+        var a = auth();
+        when(benchmark.load("acme", 7L, 9L)).thenReturn(new ModelBenchmarkResponse.LoadResult("too_slow", null, null, null, null));
+
+        mockMvc.perform(post(URL + "/runs/9/load").with(a))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("too_slow"));
+    }
+
+    @Test
+    @DisplayName("POST stop : coupe l'appel en cours de la personne")
+    void stop_200() throws Exception {
+        var a = auth();
+
+        mockMvc.perform(post(URL + "/stop").with(a)).andExpect(status().isOk());
+
+        verify(benchmark).stop("acme", 7L);
+    }
+
+    @Test
+    @DisplayName("GET history : les passages de l'espace")
+    void history_200() throws Exception {
+        var a = auth();
+        when(benchmark.history("acme", 7L)).thenReturn(List.of(new ModelBenchmarkResponse.RunLine(9L, "qwen3:14b", AT, 22, 22, 15, 3)));
+
+        mockMvc.perform(get(URL + "/history").with(a))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].model").value("qwen3:14b"))
+            .andExpect(jsonPath("$.data[0].tooSlow").value(3));
+    }
+
+    @Test
+    @DisplayName("POST trials : un seul modèle suffit")
+    void trial_oneModel() throws Exception {
+        var a = auth();
+        when(benchmark.startTrial("acme", 7L, 3L, 40L, "summarize", List.of("qwen3:8b")))
+            .thenReturn(new ModelBenchmarkResponse.TrialStarted(4L, "summarize", "OPS-35", List.of("A")));
+
+        mockMvc.perform(post(URL + "/trials").with(a).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"projectId\":3,\"issueId\":40,\"task\":\"summarize\",\"models\":[\"qwen3:8b\"]}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.letters[0]").value("A"));
     }
 
     @Test
@@ -95,7 +144,7 @@ class ModelBenchmarkControllerWebMvcTest {
         var a = auth();
         when(benchmark.start("acme", 7L, "qwen3:14b")).thenReturn(new ModelBenchmarkResponse.RunStarted(9L, "qwen3:14b", AT, List.of("code-slugify-ts")));
         when(benchmark.play("acme", 7L, 9L, "code-slugify-ts")).thenReturn(new ModelBenchmarkResponse.CaseDetail(55L, "code-slugify-ts", "A title", true, true,
-            null, null, List.of(), List.of(), "An answer", 12_000L, AT));
+            null, null, List.of(), List.of(), "An answer", 12_000L, AT, false));
 
         mockMvc.perform(post(URL + "/runs").with(a).contentType(MediaType.APPLICATION_JSON).content("{\"model\":\"qwen3:14b\"}"))
             .andExpect(status().isOk())
@@ -134,9 +183,9 @@ class ModelBenchmarkControllerWebMvcTest {
         var a = auth();
         when(benchmark.startTrial("acme", 7L, 3L, 40L, "summarize", List.of("qwen3:8b", "qwen3:14b")))
             .thenReturn(new ModelBenchmarkResponse.TrialStarted(4L, "summarize", "OPS-35", List.of("A", "B")));
-        when(benchmark.playTrial("acme", 7L, 4L, "A")).thenReturn(new ModelBenchmarkResponse.TrialLetterAnswer("A", "An answer", 3000L));
+        when(benchmark.playTrial("acme", 7L, 4L, "A")).thenReturn(new ModelBenchmarkResponse.TrialLetterAnswer("A", "An answer", 3000L, false));
         when(benchmark.chooseTrial("acme", 7L, 4L, "A")).thenReturn(new ModelBenchmarkResponse.TrialResult(4L, "summarize", "OPS-35", "A", "qwen3:14b", AT,
-            List.of(new ModelBenchmarkResponse.TrialAnswer("A", "qwen3:14b", "An answer", 3000L))));
+            List.of(new ModelBenchmarkResponse.TrialAnswer("A", "qwen3:14b", "An answer", 3000L, false))));
 
         mockMvc.perform(post(URL + "/trials").with(a).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"projectId\":3,\"issueId\":40,\"task\":\"summarize\",\"models\":[\"qwen3:8b\",\"qwen3:14b\"]}"))
@@ -156,10 +205,10 @@ class ModelBenchmarkControllerWebMvcTest {
         "{\"issueId\":40,\"task\":\"summarize\",\"models\":[\"a\",\"b\"]}",
         "{\"projectId\":3,\"task\":\"summarize\",\"models\":[\"a\",\"b\"]}",
         "{\"projectId\":3,\"issueId\":40,\"models\":[\"a\",\"b\"]}",
-        "{\"projectId\":3,\"issueId\":40,\"task\":\"summarize\",\"models\":[\"a\"]}",
+        "{\"projectId\":3,\"issueId\":40,\"task\":\"summarize\",\"models\":[]}",
         "{\"projectId\":3,\"issueId\":40,\"task\":\"summarize\",\"models\":[\"a\",\"b\",\"c\",\"d\"]}",
     })
-    @DisplayName("POST trials : il faut l'issue, la tâche et deux ou trois modèles")
+    @DisplayName("POST trials : il faut l'issue, la tâche et un à trois modèles")
     void trial_400(String body) throws Exception {
         mockMvc.perform(post(URL + "/trials").with(auth()).contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isBadRequest());

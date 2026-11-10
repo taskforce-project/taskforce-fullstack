@@ -37,13 +37,17 @@ import com.taskforce.tf_api.core.repository.ModelBlindTrialAnswerRepository;
 import com.taskforce.tf_api.core.repository.ModelBlindTrialRepository;
 import com.taskforce.tf_api.core.repository.ModelCapabilityResultRepository;
 import com.taskforce.tf_api.core.repository.ModelCapabilityRunRepository;
+import com.taskforce.tf_api.core.service.AiGatewayClient;
 import com.taskforce.tf_api.core.service.AiStatusService;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.IssueService;
+import com.taskforce.tf_api.core.service.LlmTimedOutException;
 import com.taskforce.tf_api.core.service.LlmToolsRefusedException;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.core.service.ai.AiProviderSettings;
+import com.taskforce.tf_api.core.service.ai.ModelGateway;
+import com.taskforce.tf_api.core.service.ai.ModelProviderException;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
@@ -82,6 +86,8 @@ class ModelBenchmarkServiceTest {
     @Mock private AgentService agent;
     @Mock private AiUsageService aiUsage;
     @Mock private ModelCapabilityService capabilities;
+    @Mock private EvalService evals;
+    @org.mockito.Spy private ModelCallStops stops = new ModelCallStops();
     @Mock private IssueMaterial material;
     @Mock private ScreenContext screens;
     @Mock private ProjectService projects;
@@ -95,7 +101,10 @@ class ModelBenchmarkServiceTest {
 
     /** Une note telle que le banc la lit. */
     private record Row(Long getId, Long getRunId, String getCaseKey, Boolean getPassed, Long getDurationMs, Boolean getPersonPassed,
-                       Long getPersonId, LocalDateTime getCreatedAt) implements ModelCapabilityResultRepository.BenchmarkRow {
+                       Long getPersonId, Boolean getTooSlow, LocalDateTime getCreatedAt) implements ModelCapabilityResultRepository.BenchmarkRow {
+        Row(Long id, Long runId, String caseKey, Boolean passed, Long durationMs, Boolean personPassed, Long personId, LocalDateTime createdAt) {
+            this(id, runId, caseKey, passed, durationMs, personPassed, personId, false, createdAt);
+        }
     }
 
     private final List<ModelCapabilityRun> played = new ArrayList<>();
@@ -121,6 +130,7 @@ class ModelBenchmarkServiceTest {
             .thenReturn(played);
         lenient().when(results.findBenchmarkRowsByRunIdIn(anyCollection())).thenReturn(notes);
         lenient().when(trials.findTop30ByWorkspaceIdAndUserIdAndDecidedAtIsNotNullOrderByDecidedAtDesc(1L, 7L)).thenReturn(List.of());
+        lenient().when(evals.scores(1L)).thenReturn(new EvalService.BankScores(0, Map.of()));
     }
 
     /** Un passage de {@code model}, à {@code at} : chaque cas réussi, sauf ceux de {@code failed}. */
@@ -157,12 +167,91 @@ class ModelBenchmarkServiceTest {
         assertThat(matrix.tasks().get(0).trial()).isTrue();
     }
 
-    @ParameterizedTest(name = "{0} sur {1} (de {2}) : {3}")
-    @CsvSource({"3,3,3,give_it", "4,4,4,give_it", "2,3,3,with_review", "2,4,4,with_review", "1,3,3,not_yet", "0,3,3,not_yet", "1,4,4,not_yet",
-        "3,3,4,", "0,0,3,"})
-    @DisplayName("le verdict : tous les cas, au moins la moitié, moins, et rien tant que la tâche n'est pas finie")
-    void theVerdictInWords(int passed, int measured, int total, String expected) {
-        assertThat(ModelBenchmarkService.verdict(passed, measured, total)).isEqualTo(expected);
+    @ParameterizedTest(name = "{0} sur {1} (de {2}), {3} trop lents : {4}")
+    @CsvSource({"3,3,3,0,give_it", "4,4,4,0,give_it", "2,3,3,0,with_review", "2,4,4,0,with_review", "1,3,3,0,not_yet", "0,3,3,0,not_yet", "1,4,4,0,not_yet",
+        "3,3,4,0,", "0,0,3,0,", "2,3,3,1,too_slow", "0,3,3,3,too_slow", "1,2,3,1,"})
+    @DisplayName("le verdict : tous les cas, au moins la moitié, moins, trop lent, et rien tant que la tâche n'est pas finie")
+    void theVerdictInWords(int passed, int measured, int total, int tooSlow, String expected) {
+        assertThat(ModelBenchmarkService.verdict(passed, measured, total, tooSlow)).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("un cas trop lent donne le verdict « Too slow here » à sa tâche, qui n'est ni raté ni réussi")
+    void aCaseTooSlowMarksItsTask() {
+        played.add(ModelCapabilityRun.builder().id(1L).model("qwen3:8b").suite(BenchmarkSuite.SUITE).suiteVersion(BenchmarkSuite.VERSION).startedAt(AT).build());
+        for (BenchmarkSuite.BenchmarkCase c : BenchmarkSuite.cases()) {
+            boolean late = "triage-outage-en".equals(c.key());
+            notes.add(new Row(nextResult++, 1L, c.key(), !late, 20_000L, null, null, late, AT));
+        }
+
+        ModelBenchmarkResponse matrix = service.matrix("acme", 7L);
+
+        Cell triage = cell(matrix, "qwen3:8b", BenchmarkTask.TRIAGE);
+        assertThat(triage.verdict()).isEqualTo("too_slow");
+        assertThat(triage.tooSlow()).isEqualTo(1);
+        assertThat(triage.passed()).isEqualTo(2);
+        assertThat(cell(matrix, "qwen3:8b", BenchmarkTask.SUMMARIZE).verdict()).isEqualTo("give_it");
+    }
+
+    @Test
+    @DisplayName("chaque ligne dit ce qu'on sait du modèle : sa fiche, et où il tenait à son dernier chargement")
+    void theFactsOfAModel() {
+        when(aiStatus.describe(anyString())).thenAnswer(call -> "qwen3:14b".equals(call.getArgument(0))
+            ? Optional.of(new ModelGateway.ModelCard("14.8B", 40960, true, "qwen3", true, 9_276_198_565L))
+            : Optional.empty());
+        played.add(ModelCapabilityRun.builder().id(2L).model("qwen3:14b").suite(BenchmarkSuite.SUITE).suiteVersion(BenchmarkSuite.VERSION).startedAt(AT)
+            .loadMs(10_000L).memoryBytes(10_950_000_000L).gpuBytes(6_120_000_000L).build());
+        played.add(ModelCapabilityRun.builder().id(1L).model("qwen3:14b").suite(BenchmarkSuite.SUITE).suiteVersion(BenchmarkSuite.VERSION).startedAt(AT.minusDays(1))
+            .loadProblem("too_slow").build());
+
+        ModelBenchmarkResponse.ModelFacts facts = service.matrix("acme", 7L).models().stream()
+            .filter(row -> row.model().equals("qwen3:14b")).findFirst().orElseThrow().facts();
+
+        assertThat(facts.family()).isEqualTo("qwen3");
+        assertThat(facts.parameters()).isEqualTo("14.8B");
+        assertThat(facts.diskBytes()).isEqualTo(9_276_198_565L);
+        assertThat(facts.chat()).isTrue();
+        assertThat(facts.memoryBytes()).isEqualTo(10_950_000_000L);
+        assertThat(facts.gpuBytes()).isEqualTo(6_120_000_000L);
+        assertThat(facts.loadProblem()).as("le dernier chargement a abouti").isNull();
+    }
+
+    @Test
+    @DisplayName("la colonne « Your tests » n'existe que si l'espace a des cas, et dit le dernier rejeu de chaque modèle")
+    void yourTests() {
+        assertThat(service.matrix("acme", 7L).tasks()).hasSize(7);
+
+        when(evals.scores(1L)).thenReturn(new EvalService.BankScores(3, Map.of("qwen3:8b", new EvalService.BankScore(2, 3, 3, AT))));
+        ModelBenchmarkResponse matrix = service.matrix("acme", 7L);
+
+        assertThat(matrix.tasks()).hasSize(8);
+        assertThat(matrix.tasks().get(7).key()).isEqualTo(ModelBenchmarkService.YOUR_TESTS);
+        assertThat(matrix.tasks().get(7).label()).isEqualTo("Your tests");
+        assertThat(matrix.models().get(0).cells().get(7)).isEqualTo(new Cell("bank", "with_review", 2, 3, 3, null, 0));
+        assertThat(matrix.models().get(1).cells().get(7)).isEqualTo(new Cell("bank", null, 0, 0, 3, null, 0));
+    }
+
+    @Test
+    @DisplayName("l'histoire : les passages qui ont noté quelque chose, le plus récent d'abord")
+    void theHistory() {
+        run(2L, "qwen3:8b", AT, List.of("triage-outage-en"));
+        played.add(ModelCapabilityRun.builder().id(1L).model("qwen3:14b").suite(BenchmarkSuite.SUITE).suiteVersion(BenchmarkSuite.VERSION).startedAt(AT.minusDays(1)).total(22).build());
+
+        List<ModelBenchmarkResponse.RunLine> history = service.history("acme", 7L);
+
+        assertThat(history).singleElement().satisfies(line -> {
+            assertThat(line.model()).isEqualTo("qwen3:8b");
+            assertThat(line.measured()).isEqualTo(BenchmarkSuite.cases().size());
+            assertThat(line.passed()).isEqualTo(BenchmarkSuite.cases().size() - 1);
+            assertThat(line.tooSlow()).isZero();
+        });
+    }
+
+    @Test
+    @DisplayName("sans passage, l'histoire est vide et ne lit rien")
+    void noHistory() {
+        assertThat(service.history("acme", 7L)).isEmpty();
+        verify(results, never()).findBenchmarkRowsByRunIdIn(any(Collection.class));
     }
 
     @Test
@@ -207,16 +296,17 @@ class ModelBenchmarkServiceTest {
     }
 
     @Test
-    @DisplayName("la durée approchée : les derniers temps du modèle, à défaut ceux des autres, à défaut une estimation")
+    @DisplayName("la durée approchée : le chargement, les capacités et les tâches ; les derniers temps du modèle, à défaut ceux des autres, à défaut une estimation")
     void theRoughDuration() {
+        long everyCase = BenchmarkSuite.cases().size() + CapabilitySuite.cases().size();
+        long load = ModelBenchmarkService.DEFAULT_LOAD_MS / 1000;
         ModelBenchmarkResponse none = service.matrix("acme", 7L);
-        assertThat(none.models().get(1).estimateSeconds())
-            .isEqualTo(BenchmarkSuite.cases().size() * ModelBenchmarkService.DEFAULT_CASE_MS / 1000);
+        assertThat(none.models().get(1).estimateSeconds()).isEqualTo(load + everyCase * ModelBenchmarkService.DEFAULT_CASE_MS / 1000);
 
         run(1L, "qwen3:8b", AT, List.of());
         ModelBenchmarkResponse some = service.matrix("acme", 7L);
-        assertThat(some.models().get(0).estimateSeconds()).isEqualTo(BenchmarkSuite.cases().size() * 20L);
-        assertThat(some.models().get(1).estimateSeconds()).isEqualTo(BenchmarkSuite.cases().size() * 20L);
+        assertThat(some.models().get(0).estimateSeconds()).isEqualTo(load + everyCase * 20L);
+        assertThat(some.models().get(1).estimateSeconds()).isEqualTo(load + everyCase * 20L);
     }
 
     @Test
@@ -328,13 +418,145 @@ class ModelBenchmarkServiceTest {
     }
 
     @Test
-    @DisplayName("une panne du modèle remonte sans note, pour que le cas se rejoue")
+    @DisplayName("une panne du modèle se dit, sans 500 et sans note, pour que le cas se rejoue")
     void aFailureIsNotAGrade() {
         benchmarkRun();
-        when(agent.answerFrom(any(), anyString(), any(), anyString())).thenThrow(new RuntimeException("down"));
+        when(agent.answerFrom(any(), anyString(), any(), anyString())).thenThrow(new AiGatewayClient.LlmException("down", null));
 
-        assertThatThrownBy(() -> service.play("acme", 7L, 9L, "summarize-thin-fr")).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> service.play("acme", 7L, 9L, "summarize-thin-fr"))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("qwen3:8b stopped answering");
         verify(results, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("un cas qui dépasse son budget est un verdict, jamais une erreur : il se note « trop lent », avec son temps")
+    void aCaseTooSlow() {
+        benchmarkRun();
+        savesResults();
+        when(agent.answerFrom(any(), anyString(), any(), anyString())).thenThrow(new LlmTimedOutException("late", null));
+
+        ModelBenchmarkResponse.CaseDetail result = service.play("acme", 7L, 9L, "summarize-thin-fr");
+
+        assertThat(result.tooSlow()).isTrue();
+        assertThat(result.passed()).isFalse();
+        assertThat(result.answer()).isEmpty();
+        assertThat(result.durationMs()).isNotNull();
+        assertThat(result.checks()).singleElement().satisfies(check -> {
+            assertThat(check.criterion()).isEqualTo(ModelCapabilityService.ANSWERS_IN_TIME);
+            assertThat(check.detail()).contains("too slow here");
+        });
+        ArgumentCaptor<ModelCapabilityResult> saved = ArgumentCaptor.forClass(ModelCapabilityResult.class);
+        verify(results).save(saved.capture());
+        assertThat(saved.getValue().isTooSlow()).isTrue();
+        verify(aiUsage, never()).record(any(), org.mockito.ArgumentMatchers.argThat(usage -> usage != null && usage.totalTokens() > 0));
+    }
+
+    @Test
+    @DisplayName("un cas d'Act trop lent : même verdict, le budget vaut pour tous ses appels au modèle")
+    void aCaseWithToolsTooSlow() {
+        benchmarkRun();
+        savesResults();
+        when(agent.replay(any(), any(), eq("qwen3:8b"))).thenAnswer(call -> {
+            assertThat(com.taskforce.tf_api.core.service.ai.ModelDeadline.remaining()).hasValueSatisfying(left ->
+                assertThat(left).isLessThanOrEqualTo(BenchmarkSuite.CASE_BUDGET));
+            throw new LlmTimedOutException("late", null);
+        });
+
+        assertThat(service.play("acme", 7L, 9L, "act-three-steps").tooSlow()).isTrue();
+    }
+
+    @Test
+    @DisplayName("un cas arrêté par la personne ne se note pas")
+    void aStoppedCaseIsNotGraded() {
+        benchmarkRun();
+        when(agent.answerFrom(any(), anyString(), any(), anyString())).thenAnswer(call -> {
+            Thread.currentThread().interrupt();
+            throw new AiGatewayClient.LlmException("Stopped", null);
+        });
+
+        assertThatThrownBy(() -> service.play("acme", 7L, 9L, "summarize-thin-fr")).isInstanceOf(ModelCallStops.Stopped.class);
+        verify(results, never()).save(any());
+        assertThat(Thread.currentThread().isInterrupted()).isFalse();
+    }
+
+    @Test
+    @DisplayName("« Stop » : la personne, dans son espace")
+    void stopping() {
+        service.stop("acme", 7L);
+        verify(stops).stop(1L, 7L);
+    }
+
+    @Test
+    @DisplayName("un modèle de base complète du texte : il le dit, il ne se passe pas et ne s'essaie pas")
+    void aBaseModelIsNotRun() {
+        when(aiStatus.describe("qwen3:14b")).thenReturn(Optional.of(new ModelGateway.ModelCard("7.6B", 32768, false, "qwen2", false, null)));
+
+        assertThatThrownBy(() -> service.start("acme", 7L, "qwen3:14b"))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("can't hold a conversation");
+        assertThatThrownBy(() -> service.startTrial("acme", 7L, 3L, 4L, "summarize", List.of("qwen3:14b")))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("can't hold a conversation");
+        verify(runs, never()).save(any());
+    }
+
+    // -------------------------------------------------------------------------
+    // Le chargement
+    // -------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("charger le modèle d'un passage : son temps, et où il tient, retenus avec le passage")
+    void loadingAModel() {
+        ModelCapabilityRun run = benchmarkRun();
+        when(aiStatus.load("qwen3:8b", BenchmarkSuite.LOAD_BUDGET)).thenReturn(Optional.of(new ModelGateway.LoadedModel(6_740_000_000L, 6_170_000_000L)));
+
+        ModelBenchmarkResponse.LoadResult result = service.load("acme", 7L, 9L);
+
+        assertThat(result.status()).isEqualTo("loaded");
+        assertThat(result.memoryBytes()).isEqualTo(6_740_000_000L);
+        assertThat(result.gpuBytes()).isEqualTo(6_170_000_000L);
+        assertThat(result.loadMs()).isNotNull();
+        assertThat(run.getLoadMs()).isNotNull();
+        assertThat(run.getGpuBytes()).isEqualTo(6_170_000_000L);
+        verify(runs).save(run);
+    }
+
+    @Test
+    @DisplayName("hors d'Ollama, rien à charger : le passage continue, sans chiffre de mémoire")
+    void nothingToLoad() {
+        ModelCapabilityRun run = benchmarkRun();
+        when(aiStatus.load("qwen3:8b", BenchmarkSuite.LOAD_BUDGET)).thenReturn(Optional.empty());
+
+        assertThat(service.load("acme", 7L, 9L).status()).isEqualTo("loaded");
+        assertThat(run.getGpuBytes()).isNull();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("loadProblems")
+    @DisplayName("un chargement qui n'aboutit pas est un résultat, jamais une erreur")
+    void loadProblems(RuntimeException failure, String status, String kept) {
+        ModelCapabilityRun run = benchmarkRun();
+        when(aiStatus.load("qwen3:8b", BenchmarkSuite.LOAD_BUDGET)).thenThrow(failure);
+
+        ModelBenchmarkResponse.LoadResult result = service.load("acme", 7L, 9L);
+
+        assertThat(result.status()).isEqualTo(status);
+        assertThat(run.getLoadProblem()).isEqualTo(kept);
+    }
+
+    static Stream<Arguments> loadProblems() {
+        return Stream.of(
+            Arguments.of(new ModelProviderException.TimedOut("late", null), "too_slow", "too_slow"),
+            Arguments.of(new ModelProviderException("refused"), "failed", "failed"),
+            Arguments.of(new ModelProviderException.Unreachable("gone", null), "unreachable", null));
+    }
+
+    @Test
+    @DisplayName("une IA qui ne répond plus dit quoi faire, sans rien retenir sur le modèle")
+    void anUnreachableAiSaysWhatToDo() {
+        benchmarkRun();
+        when(aiStatus.load("qwen3:8b", BenchmarkSuite.LOAD_BUDGET)).thenThrow(new ModelProviderException.Unreachable("gone", null));
+
+        assertThat(service.load("acme", 7L, 9L).message()).contains("Check that it is running");
+        verify(runs, never()).save(any());
     }
 
     @Test
@@ -425,6 +647,19 @@ class ModelBenchmarkServiceTest {
     }
 
     @Test
+    @DisplayName("un cas trop lent n'a pas de réponse à juger : sa note ne se retourne pas")
+    void aCaseTooSlowCannotBeOverturned() throws Exception {
+        ModelCapabilityResult result = stored(55L, 9L, "summarize-thin-fr", false, null, null);
+        result = ModelCapabilityResult.builder().id(55L).runId(9L).caseKey("summarize-thin-fr").capability("summarize").passed(false)
+            .details(result.getDetails()).tooSlow(true).createdAt(AT).build();
+        benchmarkRun();
+        when(results.findById(55L)).thenReturn(Optional.of(result));
+
+        assertThatThrownBy(() -> service.overturn("acme", 7L, 55L, true)).isInstanceOf(BusinessException.class).hasMessageContaining("no answer to judge");
+        verify(results, never()).save(any());
+    }
+
+    @Test
     @DisplayName("retourner une note d'un autre espace : introuvable, rien ne change")
     void overturningElsewhere() throws Exception {
         ModelCapabilityResult result = stored(55L, 99L, "summarize-thin-fr", false, null, null);
@@ -480,15 +715,14 @@ class ModelBenchmarkServiceTest {
         return Stream.of(
             Arguments.of("act", List.of("qwen3:8b", "qwen3:14b")),      // pas une tâche qui s'essaie
             Arguments.of("nope", List.of("qwen3:8b", "qwen3:14b")),
-            Arguments.of("summarize", List.of("qwen3:8b")),             // un seul modèle
-            Arguments.of("summarize", List.of("qwen3:8b", "qwen3:8b")),  // le même deux fois
+            Arguments.of("summarize", List.of()),                        // aucun modèle
             Arguments.of("summarize", List.of("qwen3:8b", "qwen3:14b", "qwen3.5:9b", "qwen3:14b", "qwen2")),  // non servi
             Arguments.of("summarize", List.of("qwen3:8b", "gone")));
     }
 
     @ParameterizedTest(name = "{0} {1}")
     @MethodSource("refusedTrials")
-    @DisplayName("un essai se fait sur une tâche permise, avec deux ou trois modèles servis")
+    @DisplayName("un essai se fait sur une tâche permise, avec un à trois modèles servis")
     void refusedTrials(String task, List<String> models) {
         assertThatThrownBy(() -> service.startTrial("acme", 7L, 3L, 4L, task, models)).isInstanceOf(BusinessException.class);
         verify(trials, never()).save(any());
@@ -545,6 +779,55 @@ class ModelBenchmarkServiceTest {
         verify(agent, never()).replay(any(), any(), anyString());
         verify(aiUsage).assertWithinQuota(1L);
         verify(aiUsage).record(eq(1L), any());
+    }
+
+    @Test
+    @DisplayName("un essai à un seul modèle : une lettre, aucun choix à faire, il se referme à sa réponse")
+    void aTrialWithOneModel() {
+        readsTheIssue();
+        List<ModelBlindTrialAnswer> saved = new ArrayList<>();
+        savesTrials(saved);
+        assertThat(service.startTrial("acme", 7L, 3L, 4L, "summarize", List.of("qwen3:8b")).letters()).containsExactly("A");
+
+        ModelBlindTrial open = trial(null, null);
+        ModelBlindTrialAnswer alone = letter("A", "qwen3:8b", null);
+        when(trialAnswers.findByTrialIdAndLetter(4L, "A")).thenReturn(Optional.of(alone));
+        when(trialAnswers.findByTrialIdOrderByLetterAsc(4L)).thenReturn(List.of(alone));
+        when(agent.answerFrom(anyString(), anyString(), any(), eq("qwen3:8b"))).thenReturn(ANSWERED);
+
+        assertThat(service.playTrial("acme", 7L, 4L, "A").answer()).isEqualTo("Une réponse.");
+        assertThat(open.getDecidedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("une lettre trop lente : rien à lire, et l'essai continue")
+    void aLetterTooSlow() {
+        trial(null, null);
+        readsTheIssue();
+        when(screens.attached(any(), eq(3L))).thenReturn(new ScreenContext.Seen("The board", "OPS", 5, null));
+        ModelBlindTrialAnswer a = letter("A", "qwen3:14b", null);
+        when(trialAnswers.findByTrialIdAndLetter(4L, "A")).thenReturn(Optional.of(a));
+        when(trialAnswers.findByTrialIdOrderByLetterAsc(4L)).thenReturn(List.of(a, letter("B", "qwen3:8b", null)));
+        when(agent.answerFrom(anyString(), anyString(), any(), eq("qwen3:14b"))).thenThrow(new LlmTimedOutException("late", null));
+
+        ModelBenchmarkResponse.TrialLetterAnswer answered = service.playTrial("acme", 7L, 4L, "A");
+
+        assertThat(answered.tooSlow()).isTrue();
+        assertThat(answered.answer()).isEmpty();
+        assertThat(a.isTooSlow()).isTrue();
+        assertThat(service.playTrial("acme", 7L, 4L, "A").tooSlow()).as("relue, elle le dit encore").isTrue();
+    }
+
+    @Test
+    @DisplayName("une panne pendant un essai se dit, sans 500")
+    void aTrialFailureSaysSo() {
+        trial(null, null);
+        readsTheIssue();
+        when(screens.attached(any(), eq(3L))).thenReturn(new ScreenContext.Seen("The board", "OPS", 5, null));
+        when(trialAnswers.findByTrialIdAndLetter(4L, "A")).thenReturn(Optional.of(letter("A", "qwen3:14b", null)));
+        when(agent.answerFrom(anyString(), anyString(), any(), eq("qwen3:14b"))).thenThrow(new AiGatewayClient.LlmException("down", null));
+
+        assertThatThrownBy(() -> service.playTrial("acme", 7L, 4L, "A")).isInstanceOf(BusinessException.class).hasMessageContaining("stopped answering");
     }
 
     @Test

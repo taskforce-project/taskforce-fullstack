@@ -193,6 +193,12 @@ public record AiProviderSettings(
             positive(first(env, "", "AI_DEFAULT_CONTEXT"), DEFAULT_CONTEXT));
     }
 
+    /** Les mêmes réglages, avec un autre délai de réponse : le budget d'un cas du banc (R142, {@link ModelDeadline}). */
+    public AiProviderSettings withTimeout(Duration other) {
+        return new AiProviderSettings(enabled, provider, baseUrl, apiKey, model, modelFast, embedBaseUrl, embedApiKey, embedModel,
+            other, maxTokens, ollamaMaxContext, hostedMaxContext, defaultContext);
+    }
+
     /** Les vecteurs passent par le même point d'accès, avec la même clé, que la conversation. */
     public boolean sameEmbedEndpoint() {
         return provider != AiProvider.ANTHROPIC && embedBaseUrl.equals(baseUrl) && embedApiKey.equals(apiKey);

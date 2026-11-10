@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { AI_TIMEOUT_MS, apiClient } from "./client"
+import { apiClient } from "./client"
 import {
   archiveEvalCase, createEvalCase, draftEvalCase, getEvalBank, getEvalHistory, getEvalRun, giveEvalCriteria, keepBadCase,
   keepGoodCase, runEvalCase, setEvalBankEnabled, startEvalRun, NO_TOOL, type EvalCriteria,
 } from "./eval-service"
+import { BENCHMARK_CASE_TIMEOUT_MS } from "./model-benchmark-service"
 
 vi.mock("./client", () => ({
-  AI_TIMEOUT_MS: 200_000,
   apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }))
 
@@ -90,7 +90,7 @@ describe("eval-service", () => {
     vi.mocked(apiClient.post).mockResolvedValue(envelope({ caseId: 40, passed: true }))
 
     expect(await runEvalCase("acme", 9, 40)).toEqual({ caseId: 40, passed: true })
-    expect(apiClient.post).toHaveBeenCalledWith(`${BASE}/runs/9/cases/40`, {}, { timeout: AI_TIMEOUT_MS, silentError: true })
+    expect(apiClient.post).toHaveBeenCalledWith(`${BASE}/runs/9/cases/40`, {}, { timeout: BENCHMARK_CASE_TIMEOUT_MS, silentError: true })
   })
 
   it("reads a run with its grades", async () => {

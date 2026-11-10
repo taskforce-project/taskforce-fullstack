@@ -57,7 +57,7 @@ class ModelGatewayTest {
         record Sent(String method, String url, Map<String, String> headers, JsonNode body, Duration timeout) {
         }
 
-        private static final List<String> READS = List.of("/api/show", "/api/ps");
+        private static final List<String> READS = List.of("/api/show", "/api/ps", "/api/tags");
 
         final List<Sent> sent = new ArrayList<>();
         final List<Sent> reads = new ArrayList<>();
@@ -529,12 +529,99 @@ class ModelGatewayTest {
                 + "\"qwen3\",\"qwen3.context_length\":40960},\"capabilities\":[\"completion\",\"tools\"]}");
 
             assertThat(gateway.describe(settings(OLLAMA), "qwen3:8b"))
-                .contains(new ModelGateway.ModelCard("8.2B", 40960, true));
+                .contains(new ModelGateway.ModelCard("8.2B", 40960, true, null, true, null));
             assertThat(gateway.describe(settings(OLLAMA), "qwen3:8b")).isPresent();
             assertThat(gateway.contextWindow(settings(OLLAMA), "qwen3:8b")).contains(16_384);
 
-            assertThat(http.reads).hasSize(1);
+            assertThat(http.reads).extracting(FakeHttp.Sent::url).filteredOn(url -> url.endsWith("/api/show")).hasSize(1);
             assertThat(http.reads.get(0).body().path("model").asText()).isEqualTo("qwen3:8b");
+        }
+
+        @Test
+        @DisplayName("la place d'un modèle sur le disque se lit dans /api/tags, une fois pour toute la liste")
+        void theDiskSizeComesFromTheList() {
+            http.read("/api/show", "{\"details\":{\"parameter_size\":\"14.8B\",\"family\":\"qwen3\"},"
+                + "\"capabilities\":[\"completion\",\"tools\",\"thinking\"]}");
+            http.read("/api/tags", "{\"models\":[{\"name\":\"qwen3:14b\",\"size\":9276198565},{\"name\":\"qwen3:8b\",\"size\":5225388164}]}");
+
+            assertThat(gateway.describe(settings(OLLAMA), "qwen3:14b")).hasValueSatisfying(card -> {
+                assertThat(card.diskBytes()).isEqualTo(9_276_198_565L);
+                assertThat(card.family()).isEqualTo("qwen3");
+            });
+            assertThat(gateway.describe(settings(OLLAMA), "qwen3:8b")).hasValueSatisfying(card -> assertThat(card.diskBytes()).isEqualTo(5_225_388_164L));
+            assertThat(http.reads).extracting(FakeHttp.Sent::url).filteredOn(url -> url.endsWith("/api/tags")).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("un modèle que la liste ne nomme pas n'a pas de taille, et la liste ne se relit pas pour lui à chaque lecture")
+        void aModelTheListDoesNotName() {
+            http.read("/api/show", "{\"details\":{\"parameter_size\":\"14.8B\"},\"capabilities\":[\"completion\",\"tools\"]}");
+            http.read("/api/tags", "{\"models\":[]}");
+
+            assertThat(gateway.describe(settings(OLLAMA), "gone:1b")).hasValueSatisfying(card -> assertThat(card.diskBytes()).isNull());
+            assertThat(gateway.describe(settings(OLLAMA), "gone:1b")).hasValueSatisfying(card -> assertThat(card.diskBytes()).isNull());
+
+            assertThat(http.reads).extracting(FakeHttp.Sent::url).filteredOn(url -> url.endsWith("/api/tags")).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("charger un modèle : une conversation sans message, à sa plus grande fenêtre, puis /api/ps dit où il tient")
+        void loadingAModel() {
+            http.read("/api/show", QWEN3_SHOW);
+            http.read("/api/ps", "{\"models\":[{\"name\":\"qwen3:14b\",\"size\":10950000000,\"size_vram\":6120000000,\"context_length\":16384}]}");
+            http.reply(200, "{\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done_reason\":\"load\"}");
+
+            assertThat(gateway.load(settings(OLLAMA), "qwen3:14b", Duration.ofMinutes(5)))
+                .contains(new ModelGateway.LoadedModel(10_950_000_000L, 6_120_000_000L));
+
+            FakeHttp.Sent request = http.sent.get(0);
+            assertThat(request.url()).endsWith("/api/chat");
+            assertThat(request.body().path("messages")).isEmpty();
+            assertThat(request.body().path("options").path("num_ctx").asInt()).isEqualTo(16_384);
+            assertThat(request.timeout()).isEqualTo(Duration.ofMinutes(5));
+        }
+
+        @Test
+        @DisplayName("hors d'Ollama, rien ne se charge")
+        void nothingToLoadElsewhere() {
+            assertThat(gateway.load(settings(COMPATIBLE), "gpt-x", Duration.ofMinutes(5))).isEmpty();
+            assertThat(gateway.load(settings(Map.of("AI_PROVIDER", "none")), "qwen3:8b", Duration.ofMinutes(5))).isEmpty();
+            assertThat(http.sent).isEmpty();
+        }
+
+        static Stream<Arguments> loadFailures() {
+            return Stream.of(
+                Arguments.of(new java.net.http.HttpTimeoutException("request timed out"), ModelProviderException.TimedOut.class),
+                Arguments.of(new java.net.http.HttpConnectTimeoutException("connect timed out"), ModelProviderException.Unreachable.class),
+                Arguments.of(new ConnectException("refused"), ModelProviderException.Unreachable.class));
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @MethodSource("loadFailures")
+        @DisplayName("un chargement trop long, ou un fournisseur absent : deux choses différentes")
+        void loadFailuresAreNamed(IOException failure, Class<? extends Throwable> expected) {
+            http.fail(failure);
+
+            assertThatThrownBy(() -> gateway.load(settings(OLLAMA), "qwen3:14b", Duration.ofMinutes(5))).isInstanceOf(expected);
+        }
+
+        @Test
+        @DisplayName("un chargement refusé par Ollama (plus de mémoire, par exemple) le dit")
+        void aRefusedLoad() {
+            http.reply(500, "{\"error\":\"model requires more system memory\"}");
+
+            assertThatThrownBy(() -> gateway.load(settings(OLLAMA), "qwen3:14b", Duration.ofMinutes(5)))
+                .isExactlyInstanceOf(ModelProviderException.class).hasMessageContaining("500").hasMessageNotContaining("memory");
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @MethodSource("loadFailures")
+        @DisplayName("une conversation : un délai dépassé se distingue d'un fournisseur absent")
+        void chatFailuresAreNamed(IOException failure, Class<? extends Throwable> expected) {
+            http.fail(failure);
+
+            assertThatThrownBy(() -> gateway.chat(settings(OLLAMA), new ModelGateway.ChatCall(List.of(Map.of("role", "user", "content", "hi")),
+                List.of(), false, "qwen3:8b", false))).isInstanceOf(expected);
         }
 
         @Test

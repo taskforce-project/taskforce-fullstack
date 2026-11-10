@@ -12,6 +12,7 @@ import { fillText } from "@/lib/delivery/result-card"
 import { bankCurve, isFinished, runModel, type CurvePoint } from "@/lib/progress/bank-history"
 import { dayOf } from "@/lib/progress/day"
 import { useEvalStore } from "@/lib/store/eval-store"
+import { useModelBenchmarkStore } from "@/lib/store/model-benchmark-store"
 import { useModelCapabilityStore } from "@/lib/store/model-capability-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 
@@ -31,7 +32,8 @@ export function BankHistory({ slug }: Readonly<{ slug: string }>) {
   const stopRun = useEvalStore((s) => s.stopRun)
   // Le modèle avec lequel Cortex répond à la personne : la banque se rejoue sur lui. L'onglet peut s'ouvrir le premier.
   const model = useModelCapabilityStore((s) => s.table?.current ?? null)
-  const measuring = useModelCapabilityStore((s) => s.progress !== null)
+  // La file des modèles tient déjà le modèle : un rejeu attend qu'elle finisse.
+  const measuring = useModelBenchmarkStore((s) => s.progress !== null)
   const fetchTable = useModelCapabilityStore((s) => s.fetchTable)
 
   useEffect(() => {

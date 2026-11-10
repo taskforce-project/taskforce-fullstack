@@ -39,12 +39,14 @@ public class ModelProviderException extends RuntimeException {
 
     /**
      * Le transport a échoué. Le JDK distingue la réponse qui n'est pas venue à temps (le modèle travaillait, il était trop
-     * lent) d'une connexion qui ne s'ouvre pas (il n'y a personne au bout).
+     * lent) d'une connexion qui ne s'ouvre pas (il n'y a personne au bout). La conversation en fait une phrase, le banc un
+     * verdict ou un arrêt (R142).
      */
     public static ModelProviderException transport(String reason, IOException failure, Duration timeout) {
         boolean tooSlow = failure instanceof HttpTimeoutException && !(failure instanceof HttpConnectTimeoutException);
-        return new ModelProviderException("AI provider unreachable: " + reason, failure,
-            tooSlow ? Why.TIMEOUT : Why.UNREACHABLE, tooSlow ? timeout : null);
+        return tooSlow
+            ? new TimedOut("AI provider did not answer within " + timeout.toSeconds() + " s", failure, timeout)
+            : new Unreachable("AI provider unreachable: " + reason, failure);
     }
 
     /** Le fournisseur a répondu, et refusé : son statut et ses mots disent pourquoi, sans sortir du journal. */
@@ -95,6 +97,29 @@ public class ModelProviderException extends RuntimeException {
 
         public ToolsRefused(String message) {
             super(message);
+        }
+    }
+
+    /**
+     * Le fournisseur n'a pas répondu dans le délai : il est là, mais trop lent pour cette demande. Le banc en fait un
+     * verdict (R142), pas une panne : le passage continue.
+     */
+    public static class TimedOut extends ModelProviderException {
+
+        public TimedOut(String message, Throwable cause) {
+            this(message, cause, null);
+        }
+
+        TimedOut(String message, Throwable cause, Duration waited) {
+            super(message, cause, Why.TIMEOUT, waited);
+        }
+    }
+
+    /** Le fournisseur ne répond pas du tout : éteint, adresse fausse, réseau coupé. Là, le passage s'arrête et le dit. */
+    public static class Unreachable extends ModelProviderException {
+
+        public Unreachable(String message, Throwable cause) {
+            super(message, cause, Why.UNREACHABLE, null);
         }
     }
 }

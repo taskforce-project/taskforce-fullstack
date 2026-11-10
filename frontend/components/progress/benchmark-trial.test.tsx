@@ -14,7 +14,8 @@ const TASKS: BenchmarkTaskInfo[] = [
   { key: "act", label: "Act", description: "The board", cases: 4, trial: false },
   { key: "plan", label: "Plan", description: "Steps", cases: 3, trial: true },
 ]
-const MODELS = ["qwen3:8b", "qwen3:14b", "qwen3.5:9b", "llama3.2"].map((model) => ({ model })) as BenchmarkModelRow[]
+const MODELS = ["qwen3:8b", "qwen3:14b", "qwen3.5:9b", "llama3.2"].map((model) => ({ model, facts: { chat: true } })) as BenchmarkModelRow[]
+const answer = (letter: string, text: string, durationMs: number, tooSlow = false) => ({ letter, answer: text, durationMs, tooSlow })
 
 const ISSUE: PickOption = {
   id: "issue:40", group: "issues", label: "OPS-35", detail: "Itération #35", insert: "OPS-35",
@@ -27,10 +28,10 @@ const PROJECT: PickOption = {
 const TRIAL: BlindTrialStarted = { trialId: 4, task: "summarize", issueKey: "OPS-35", letters: ["A", "B"] }
 const REVEAL: BlindTrialResult = {
   trialId: 4, task: "summarize", issueKey: "OPS-35", chosenLetter: "B", chosenModel: "qwen3:14b", decidedAt: "2026-11-08T10:00:00",
-  answers: [{ letter: "A", model: "qwen3:8b", answer: "Answer one", durationMs: 1000 }, { letter: "B", model: "qwen3:14b", answer: "Answer two", durationMs: 2000 }],
+  answers: [{ letter: "A", model: "qwen3:8b", answer: "Answer one", durationMs: 1000, tooSlow: false }, { letter: "B", model: "qwen3:14b", answer: "Answer two", durationMs: 2000, tooSlow: false }],
 }
 
-/** L'essai à l'aveugle (R131) : l'issue, la tâche, les modèles ; les réponses sous des lettres ; le choix ; les noms. */
+/** L'essai sur son travail (R131, R142) : l'issue, la tâche, les modèles ; un seul, nommé ; plusieurs, sous des lettres ; le choix ; les noms. */
 describe("BenchmarkTrial", () => {
   const startTrial = vi.fn()
   const chooseTrial = vi.fn()
@@ -56,17 +57,36 @@ describe("BenchmarkTrial", () => {
     expect(screen.queryByRole("radio", { name: "Act" })).not.toBeInTheDocument()
 
     expect(screen.getByRole("checkbox", { name: "qwen3:8b" })).toBeChecked()
-    expect(screen.getByRole("checkbox", { name: "qwen3:14b" })).toBeChecked()
+    expect(screen.getByRole("checkbox", { name: "qwen3:14b" })).not.toBeChecked()
     expect(screen.getByRole("button", { name: "Try" })).toBeDisabled()
   })
 
-  it("starts a trial on the chosen issue, with the chosen task and models", () => {
+  it("tries one model, the one opened, without being asked for a second", () => {
+    show()
+    fireEvent.click(screen.getByRole("option", { name: /OPS-35/ }))
+
+    expect(screen.getByRole("button", { name: "Try" })).toBeEnabled()
+    expect(screen.queryByText(/names stay hidden/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Try" }))
+
+    expect(startTrial).toHaveBeenCalledWith("acme", { projectId: 3, issueId: 40, task: "summarize", models: ["qwen3:8b"] })
+  })
+
+  it("needs at least one model; a model that can't chat is not offered", () => {
+    render(<BenchmarkTrial slug="acme" model="qwen3:8b" tasks={TASKS} models={[...MODELS, { model: "qwen2.5-coder:7b-base", facts: { chat: false } } as BenchmarkModelRow]} onClose={onClose} />)
+    fireEvent.click(screen.getByRole("option", { name: /OPS-35/ }))
+    fireEvent.click(screen.getByRole("checkbox", { name: "qwen3:8b" }))
+
+    expect(screen.getByRole("button", { name: "Try" })).toBeDisabled()
+    expect(screen.queryByRole("checkbox", { name: "qwen2.5-coder:7b-base" })).not.toBeInTheDocument()
+  })
+
+  it("starts a blind trial on the chosen issue, with the chosen task and models, and says the names stay hidden", () => {
     show()
     fireEvent.click(screen.getByRole("option", { name: /OPS-35/ }))
     fireEvent.click(screen.getByRole("radio", { name: "Plan" }))
-    fireEvent.click(screen.getByRole("checkbox", { name: "qwen3:14b" }))
-    expect(screen.getByRole("button", { name: "Try" })).toBeDisabled()
     fireEvent.click(screen.getByRole("checkbox", { name: "qwen3.5:9b" }))
+    expect(screen.getByText("With two or three models, their names stay hidden until you choose.")).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole("button", { name: "Try" }))
 
@@ -91,6 +111,7 @@ describe("BenchmarkTrial", () => {
 
   it("takes three models at most", () => {
     show()
+    fireEvent.click(screen.getByRole("checkbox", { name: "qwen3:14b" }))
     fireEvent.click(screen.getByRole("checkbox", { name: "qwen3.5:9b" }))
     expect(screen.getByRole("checkbox", { name: "llama3.2" })).toBeDisabled()
     fireEvent.click(screen.getByRole("checkbox", { name: "llama3.2" }))
@@ -111,7 +132,7 @@ describe("BenchmarkTrial", () => {
   })
 
   it("shows the answers as they come, under their letters, no name, no choice yet", () => {
-    useModelBenchmarkStore.setState({ blind: { phase: "answering", trial: TRIAL, answers: { A: { letter: "A", answer: "Answer one", durationMs: 1000 } }, result: null, waitSeconds: null } })
+    useModelBenchmarkStore.setState({ blind: { phase: "answering", trial: TRIAL, answers: { A: answer("A", "Answer one", 1000) }, result: null, model: null, waitSeconds: null } })
     const { rerender } = show()
 
     expect(screen.getByRole("status")).toHaveTextContent("1 of 2 answers")
@@ -120,16 +141,47 @@ describe("BenchmarkTrial", () => {
     expect(screen.queryByText(/qwen3/)).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Choose" })).not.toBeInTheDocument()
 
-    useModelBenchmarkStore.setState({ blind: { phase: "answering", trial: TRIAL, answers: {}, result: null, waitSeconds: 20 } })
+    useModelBenchmarkStore.setState({ blind: { phase: "answering", trial: TRIAL, answers: {}, result: null, model: null, waitSeconds: 20 } })
     rerender(<BenchmarkTrial slug="acme" model="qwen3:8b" tasks={TASKS} models={MODELS} onClose={onClose} />)
     expect(screen.getByRole("status")).toHaveTextContent("Next case in 20 s")
+  })
+
+  it("a single model shows its name, its answer and its time, and asks to choose nothing", () => {
+    useModelBenchmarkStore.setState({
+      blind: { phase: "tried", trial: { ...TRIAL, letters: ["A"] }, answers: { A: answer("A", "Only answer", 3000) }, result: null, model: "qwen3:8b", waitSeconds: null },
+    })
+    show()
+
+    const article = screen.getByRole("article", { name: "Answer A" })
+    expect(within(article).getByText("qwen3:8b")).toBeInTheDocument()
+    expect(within(article).getByText("Only answer")).toBeInTheDocument()
+    expect(within(article).getByText("3 s")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Choose" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "None of them" })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Done" }))
+    expect(closeTrial).toHaveBeenCalled()
+  })
+
+  it("an answer too slow says so, and can't be chosen", () => {
+    useModelBenchmarkStore.setState({
+      blind: {
+        phase: "choosing", trial: TRIAL, result: null, model: null, waitSeconds: null,
+        answers: { A: answer("A", "", 300_000, true), B: answer("B", "Answer two", 2000) },
+      },
+    })
+    show()
+
+    const a = screen.getByRole("article", { name: "Answer A" })
+    expect(within(a).getByText("Too slow here: no answer in 5 minutes.")).toBeInTheDocument()
+    expect(within(a).queryByRole("button", { name: "Choose" })).not.toBeInTheDocument()
+    expect(within(screen.getByRole("article", { name: "Answer B" })).getByRole("button", { name: "Choose" })).toBeInTheDocument()
   })
 
   it("lets the person choose a letter, or none, with one gesture", () => {
     useModelBenchmarkStore.setState({
       blind: {
-        phase: "choosing", trial: TRIAL, result: null, waitSeconds: null,
-        answers: { A: { letter: "A", answer: "Answer one", durationMs: 1000 }, B: { letter: "B", answer: "", durationMs: 2000 } },
+        phase: "choosing", trial: TRIAL, result: null, model: null, waitSeconds: null,
+        answers: { A: answer("A", "Answer one", 1000), B: answer("B", "", 2000) },
       },
     })
     show()
@@ -144,8 +196,8 @@ describe("BenchmarkTrial", () => {
   it("then shows the names, the chosen one, and closes when done", () => {
     useModelBenchmarkStore.setState({
       blind: {
-        phase: "revealed", trial: TRIAL, result: REVEAL, waitSeconds: null,
-        answers: { A: { letter: "A", answer: "Answer one", durationMs: 1000 }, B: { letter: "B", answer: "Answer two", durationMs: 2000 } },
+        phase: "revealed", trial: TRIAL, result: REVEAL, model: null, waitSeconds: null,
+        answers: { A: answer("A", "Answer one", 1000), B: answer("B", "Answer two", 2000) },
       },
     })
     show()

@@ -41,4 +41,9 @@ public class ModelBlindTrialAnswer {
 
     @Column(name = "duration_ms")
     private Long durationMs;
+
+    /** Le modèle n'a pas répondu dans le budget d'un cas (R142) : pas de réponse à lire, et rien à choisir. */
+    @Builder.Default
+    @Column(name = "too_slow", nullable = false)
+    private boolean tooSlow = false;
 }

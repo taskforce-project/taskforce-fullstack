@@ -235,7 +235,8 @@ export const useEvalStore = create<EvalState>((set, get) => {
           progress({ done: (get().progress?.done ?? 0) + 1 });
         }
       } catch (err) {
-        set({ error: getErrorMessage(err) });
+        // Arrêté par la personne : ce n'est pas une panne à afficher.
+        if (!get().progress?.stopping) set({ error: getErrorMessage(err) });
       }
       try {
         if (runId === null) return null;

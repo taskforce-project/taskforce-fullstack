@@ -6,8 +6,8 @@ import { CONSTANTS_EN } from "@/lib/constants_en"
 
 const t = CONSTANTS_EN.benchmark
 
-const cell = (verdict: BenchmarkVerdict | null, judge: BenchmarkCell["judge"] = null): BenchmarkCell => ({
-  task: "summarize", verdict, passed: 2, measured: 3, total: 3, judge,
+const cell = (verdict: BenchmarkVerdict | null, judge: BenchmarkCell["judge"] = null, tooSlow = 0): BenchmarkCell => ({
+  task: "summarize", verdict, passed: 2, measured: 3, total: 3, judge, tooSlow,
 })
 
 /** Le verdict du banc (R131), dans les mots de l'interface : le signe, le mot, le survol, un temps, une durée approchée. */
@@ -16,6 +16,7 @@ describe("benchmark", () => {
     ["give_it", "passed", "Give it"],
     ["with_review", "partly", "With review"],
     ["not_yet", "failed", "Not yet"],
+    ["too_slow", "slow", "Too slow here"],
     [null, "none", "Not run"],
   ] as const)("reads the verdict %s as the sign %s and the word %s", (verdict, sign, word) => {
     expect(verdictSign(verdict)).toBe(sign)
@@ -34,6 +35,11 @@ describe("benchmark", () => {
     expect(cellTitle("Summarize", cell("with_review"), t)).toBe("Summarize: With review, 2 of 3 cases")
     expect(cellTitle("Summarize", cell("give_it", "you"), t)).toBe("Summarize: Give it, 2 of 3 cases · Your verdict")
     expect(cellTitle("Summarize", cell(null), t)).toBe("Summarize: Not run")
+  })
+
+  it("says that too slow speaks of this machine, not of the model", () => {
+    expect(cellTitle("Summarize", cell("too_slow", null, 2), t))
+      .toBe("Summarize: Too slow here, 2 of 3 cases got no answer in time. This says nothing about the model, only about this machine.")
   })
 
   it.each([

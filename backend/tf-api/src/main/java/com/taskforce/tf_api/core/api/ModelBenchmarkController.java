@@ -61,11 +61,35 @@ public class ModelBenchmarkController {
         return ResponseEntity.ok(ApiResponse.success(benchmark.start(slug, resolveUserId(jwt), body.model())));
     }
 
+    /**
+     * Charge le modèle d'un passage avant que rien ne soit chronométré (R142) : un démarrage à froid ne compte pas contre lui.
+     * Un modèle qui ne se charge pas est un résultat, pas une erreur.
+     */
+    @PostMapping("/runs/{runId}/load")
+    public ResponseEntity<ApiResponse<ModelBenchmarkResponse.LoadResult>> loadBenchmarkModel(
+        @PathVariable String slug, @PathVariable Long runId, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(benchmark.load(slug, resolveUserId(jwt), runId)));
+    }
+
     /** Joue et note un cas : un cas par requête, pour qu'aucune ne tienne plusieurs réponses du modèle. */
     @PostMapping("/runs/{runId}/cases/{caseKey}")
     public ResponseEntity<ApiResponse<ModelBenchmarkResponse.CaseDetail>> playBenchmarkCase(
         @PathVariable String slug, @PathVariable Long runId, @PathVariable String caseKey, @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(ApiResponse.success(benchmark.play(slug, resolveUserId(jwt), runId, caseKey)));
+    }
+
+    /** « Stop » : coupe l'appel au modèle en cours de la personne, pour qu'elle n'attende pas la fin d'un cas. */
+    @PostMapping("/stop")
+    public ResponseEntity<ApiResponse<Void>> stopBenchmark(@PathVariable String slug, @AuthenticationPrincipal Jwt jwt) {
+        benchmark.stop(slug, resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    /** Les passages de l'espace, le plus récent d'abord : ce qui remplit « History » avant toute banque de tests (R142). */
+    @GetMapping("/history")
+    public ResponseEntity<ApiResponse<List<ModelBenchmarkResponse.RunLine>>> benchmarkHistory(
+        @PathVariable String slug, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(benchmark.history(slug, resolveUserId(jwt))));
     }
 
     /** Retourne la note d'un cas : réussi, raté, ou {@code null} pour la rendre au code. */
@@ -75,7 +99,7 @@ public class ModelBenchmarkController {
         return ResponseEntity.ok(ApiResponse.success(benchmark.overturn(slug, resolveUserId(jwt), resultId, body.passed())));
     }
 
-    /** Ouvre un essai à l'aveugle sur une issue que la personne lit : deux ou trois modèles, tirés sous des lettres. */
+    /** Ouvre un essai sur une issue que la personne lit : un modèle, nommé ; ou deux ou trois, à l'aveugle, tirés sous des lettres. */
     @PostMapping("/trials")
     public ResponseEntity<ApiResponse<ModelBenchmarkResponse.TrialStarted>> startBlindTrial(
         @PathVariable String slug, @Valid @RequestBody TrialRequest body, @AuthenticationPrincipal Jwt jwt) {
@@ -112,7 +136,7 @@ public class ModelBenchmarkController {
     }
 
     public record TrialRequest(@NotNull Long projectId, @NotNull Long issueId, @NotBlank @Size(max = 32) String task,
-                               @NotEmpty @Size(min = 2, max = 3) List<@NotBlank @Size(max = 128) String> models) {
+                               @NotEmpty @Size(min = 1, max = 3) List<@NotBlank @Size(max = 128) String> models) {
     }
 
     /** {@code letter} : la lettre choisie ; {@code null} : aucune. */

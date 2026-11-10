@@ -5617,6 +5617,36 @@
         }
       }
     },
+    "/api/workspaces/{slug}/ai/benchmark/stop": {
+      "post": {
+        "tags": [
+          "Model benchmark"
+        ],
+        "operationId": "stopBenchmark",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/ai/benchmark/runs": {
       "post": {
         "tags": [
@@ -5650,6 +5680,45 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseRunStarted"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/ai/benchmark/runs/{runId}/load": {
+      "post": {
+        "tags": [
+          "Model benchmark"
+        ],
+        "operationId": "loadBenchmarkModel",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoadResult"
                 }
               }
             }
@@ -10219,6 +10288,36 @@
         }
       }
     },
+    "/api/workspaces/{slug}/ai/benchmark/history": {
+      "get": {
+        "tags": [
+          "Model benchmark"
+        ],
+        "operationId": "benchmarkHistory",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListRunLine"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/ai/benchmark/detail": {
       "get": {
         "tags": [
@@ -12346,6 +12445,10 @@
           "measuredAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "tooSlow": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -12476,6 +12579,9 @@
           "at": {
             "type": "string",
             "format": "date-time"
+          },
+          "tooSlow": {
+            "type": "boolean"
           }
         }
       },
@@ -12565,6 +12671,10 @@
           "judge": {
             "type": "string"
           },
+          "tooSlow": {
+            "type": "integer",
+            "format": "int32"
+          },
           "cases": {
             "type": "array",
             "items": {
@@ -12588,6 +12698,9 @@
           "durationMs": {
             "type": "integer",
             "format": "int64"
+          },
+          "tooSlow": {
+            "type": "boolean"
           }
         }
       },
@@ -17261,6 +17374,9 @@
           "promptTokens": {
             "type": "integer",
             "format": "int64"
+          },
+          "tooSlow": {
+            "type": "boolean"
           }
         }
       },
@@ -17333,7 +17449,7 @@
               "minLength": 0
             },
             "maxItems": 3,
-            "minItems": 2
+            "minItems": 1
           }
         },
         "required": [
@@ -17412,6 +17528,9 @@
           "durationMs": {
             "type": "integer",
             "format": "int64"
+          },
+          "tooSlow": {
+            "type": "boolean"
           }
         }
       },
@@ -17440,6 +17559,47 @@
           "timestamp": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseLoadResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/LoadResult"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "LoadResult": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "loadMs": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "memoryBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gpuBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": "string"
           }
         }
       },
@@ -22077,6 +22237,64 @@
           }
         }
       },
+      "BenchmarkModelRow": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "lastRunAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "estimateSeconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Cell"
+            }
+          },
+          "facts": {
+            "$ref": "#/components/schemas/ModelFacts"
+          }
+        }
+      },
+      "Cell": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "measured": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "judge": {
+            "type": "string"
+          },
+          "tooSlow": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "ModelBenchmarkResponse": {
         "type": "object",
         "properties": {
@@ -22103,8 +22321,44 @@
           "models": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ModelRow"
+              "$ref": "#/components/schemas/BenchmarkModelRow"
             }
+          }
+        }
+      },
+      "ModelFacts": {
+        "type": "object",
+        "properties": {
+          "family": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "string"
+          },
+          "diskBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "contextWindow": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tools": {
+            "type": "boolean"
+          },
+          "chat": {
+            "type": "boolean"
+          },
+          "memoryBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gpuBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "loadProblem": {
+            "type": "string"
           }
         }
       },
@@ -22126,6 +22380,59 @@
           },
           "trial": {
             "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseListRunLine": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunLine"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RunLine": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "model": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "measured": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "passed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tooSlow": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

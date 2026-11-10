@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.service;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
@@ -99,6 +100,14 @@ public class AiStatusService {
      */
     public Optional<ModelGateway.ModelCard> describe(String model) {
         return gateway.describe(snapshot().settings(), model);
+    }
+
+    /**
+     * Charge un modèle avant qu'on ne chronomètre rien (R142) : ce qu'Ollama dit de sa place en mémoire ; vide chez un autre
+     * fournisseur, où il n'y a rien à charger.
+     */
+    public Optional<ModelGateway.LoadedModel> load(String model, Duration budget) {
+        return gateway.load(snapshot().settings(), model, budget);
     }
 
     /** Oublie l'état en cache : le prochain appel relit le fournisseur (après un échec d'appel au modèle). */

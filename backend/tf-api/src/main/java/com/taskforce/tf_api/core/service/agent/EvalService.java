@@ -41,11 +41,14 @@ import com.taskforce.tf_api.core.repository.EvalCaseRepository;
 import com.taskforce.tf_api.core.repository.EvalResultRepository;
 import com.taskforce.tf_api.core.repository.EvalRunRepository;
 import com.taskforce.tf_api.core.repository.KnowledgeNodeRepository;
+import com.taskforce.tf_api.core.service.AiGatewayClient;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
+import com.taskforce.tf_api.core.service.LlmTimedOutException;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.agent.ReplayCase.CassetteEntry;
 import com.taskforce.tf_api.core.service.agent.ReplayCase.FrozenNote;
+import com.taskforce.tf_api.core.service.ai.ModelDeadline;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
@@ -102,6 +105,7 @@ public class EvalService {
     private final AgentToolRegistry tools;
     private final AgentService agent;
     private final AiUsageService aiUsage;
+    private final ModelCallStops stops;
     private final EvalCaseRepository cases;
     private final EvalRunRepository runs;
     private final EvalResultRepository results;
@@ -154,6 +158,34 @@ public class EvalService {
                 evalCase.waiting() && evalCase.getSourceRecord() != null ? evalCase.getSourceRecord().toString() : null))
             .toList();
         return new EvalHistoryResponse(points, history);
+    }
+
+    /** Le dernier rejeu de la banque sur un modèle : réussis, notés, cas du rejeu, sa date. */
+    public record BankScore(int passed, int graded, int total, LocalDateTime at) {
+    }
+
+    /** Pour la colonne « Your tests » du banc (R142) : les cas actifs de la banque, et le dernier rejeu de chaque modèle. */
+    public record BankScores(int cases, Map<String, BankScore> byModel) {
+    }
+
+    /** Ce que le banc montre de la banque d'un espace ; sans cas actif, pas de colonne. Un rejeu sans aucune note ne compte pas. */
+    @Transactional(readOnly = true)
+    public BankScores scores(Long workspaceId) {
+        int active = (int) cases.countByWorkspaceIdAndArchivedFalse(workspaceId);
+        if (active == 0) return new BankScores(0, Map.of());
+        List<EvalRun> recent = runs.findTop100ByWorkspaceIdOrderByStartedAtDesc(workspaceId);
+        Map<Long, Integer> graded = new HashMap<>();
+        if (!recent.isEmpty()) {
+            results.findRowsByRunIdIn(recent.stream().map(EvalRun::getId).toList())
+                .forEach(row -> graded.merge(row.getRunId(), 1, Integer::sum));
+        }
+        Map<String, BankScore> byModel = new HashMap<>();
+        for (EvalRun run : recent) { // du plus récent au plus ancien : le premier vu est le dernier rejeu de ce modèle
+            int notes = graded.getOrDefault(run.getId(), 0);
+            String model = notes == 0 ? null : answeredBy(run);
+            if (model != null) byModel.putIfAbsent(model, new BankScore(run.getPassed(), notes, run.getTotal(), run.getStartedAt()));
+        }
+        return new BankScores(active, byModel);
     }
 
     /** Le brouillon d'un cas, tiré du dossier d'une réponse de la personne ; elle le confirme ou le corrige. */
@@ -291,8 +323,9 @@ public class EvalService {
     }
 
     /**
-     * Rejoue un cas dans un rejeu, une seule fois. Le quota et le frein de débit de l'IA valent comme pour une réponse ;
-     * une panne du modèle remonte telle quelle, sans note, pour qu'on rejoue le cas.
+     * Rejoue un cas dans un rejeu, une seule fois. Le quota et le frein de débit de l'IA valent comme pour une réponse. Un
+     * cas trop lent (le budget d'un cas du banc, R142) ne se note pas et n'arrête pas le rejeu ; une panne du modèle se dit,
+     * sans note, pour qu'on rejoue le cas.
      */
     public Result runCase(String slug, Long userId, Long runId, Long caseId) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
@@ -309,7 +342,18 @@ public class EvalService {
         }
         aiUsage.assertWithinQuota(ws.getId());
         String model = DEFAULT_MODEL.equals(run.getModel()) ? null : run.getModel();
-        ReplayOutcome outcome = agent.replay(new AgentContext(slug, ws.getId(), userId), replayCase(evalCase), model);
+        ReplayOutcome outcome;
+        try {
+            outcome = stops.during(ws.getId(), userId, () -> ModelDeadline.within(BenchmarkSuite.CASE_BUDGET,
+                () -> agent.replay(new AgentContext(slug, ws.getId(), userId), replayCase(evalCase), model)));
+        } catch (LlmTimedOutException late) {
+            return new Result(caseId, evalCase.getTitle(), false,
+                List.of(new EvalGrader.Check(ModelCapabilityService.ANSWERS_IN_TIME, false, ModelCapabilityService.TOO_SLOW_DETAIL)),
+                List.of(), "", model);
+        } catch (AiGatewayClient.LlmException down) {
+            throw new BusinessException("MODEL_FAILED", (model == null ? "This model" : model)
+                + " stopped answering on this machine. Replay it again, or replay another model.");
+        }
         recordUsage(ws.getId(), outcome.usage());
         EvalGrader.Grade grade = EvalGrader.grade(read(evalCase.getCriteria(), EvalCriteria.class), outcome);
         Details details = new Details(grade.checks(), outcome.calls(), shorten(outcome.answer(), MAX_ANSWER), outcome.model());
