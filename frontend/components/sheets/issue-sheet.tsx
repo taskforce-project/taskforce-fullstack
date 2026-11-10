@@ -1363,9 +1363,15 @@ export function IssueDetail({ issue, onClose, workspaceSlug, projectId }: Readon
 
   async function saveDueDate(val: string) {
     const next = val || null
+    const previous = dueDate
     setDueDate(next)
-    // callUpdate toaste deja l'erreur : on ne confirme QUE si l'ecriture a reussi.
-    if (await callUpdate({ dueDate: next })) toast.success(next ? "Due date updated" : "Due date removed")
+    // Un dueDate à null ne retire rien (patch partiel) : retirer l'échéance passe par clearDueDate.
+    // callUpdate toaste deja l'erreur : on ne confirme QUE si l'ecriture a reussi, sinon la date d'avant revient.
+    if (await callUpdate(next ? { dueDate: next } : { clearDueDate: true })) {
+      toast.success(next ? "Due date updated" : "Due date removed")
+    } else {
+      setDueDate(previous)
+    }
   }
 
   function toggleLabel(l: IssueLabel) {
@@ -1686,21 +1692,24 @@ export function IssueDetail({ issue, onClose, workspaceSlug, projectId }: Readon
                   projectId={projectId}
                   issueId={issueId}
                   assignee={assignee}
-                  working={agentWorking ? { label: agentWorking, hint: missionsText.workingHint } : null}
+                  working={agentWorking ? { label: agentWorking, hint: missionsText.workingHint, logoKey: deliveryProviders?.find((p) => p.key === deliveryRun?.providerKey)?.logoKey } : null}
                   members={projectMembers}
                   agents={availableAgents}
                   onAssign={async (userId) => {
                     const m = projectMembers.find((x) => x.userId === userId)
                     if (!m) return
                     const name = m.displayName ?? m.email
+                    const previous = assignee
                     setAssignee({ name, userId: m.userId, email: m.email, avatarUrl: m.avatarUrl })
-                    await callUpdate({ assigneeId: m.userId })
-                    toast.success(`Assigned to ${name}`)
+                    if (await callUpdate({ assigneeId: m.userId })) toast.success(`Assigned to ${name}`)
+                    else setAssignee(previous)
                   }}
                   onUnassign={async () => {
+                    const previous = assignee
                     setAssignee(null)
-                    await callUpdate({ assigneeId: null })
-                    toast.success("Unassigned")
+                    // Un assigneeId à null ne retire rien (patch partiel) : retirer l'assigné passe par unassign.
+                    if (await callUpdate({ unassign: true })) toast.success("Unassigned")
+                    else setAssignee(previous)
                   }}
                   onDelegate={async (agentKey) => {
                     const agent = availableAgents.find((a) => a.key === agentKey)

@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.service;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -17,6 +18,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.service.AiStatusService.AiStatus;
 import com.taskforce.tf_api.core.service.ai.AiProviderSettings;
 import com.taskforce.tf_api.core.service.ai.ChosenModel;
+import com.taskforce.tf_api.core.service.ai.ModelDeadline;
 import com.taskforce.tf_api.core.service.ai.ModelGateway;
 import com.taskforce.tf_api.core.service.ai.ModelWindow;
 import com.taskforce.tf_api.core.service.ai.ModelProviderException;
@@ -58,6 +60,36 @@ class AiGatewayClientTest {
     private static ModelGateway.ChatReply reply(String model, String content) {
         ObjectNode message = new ObjectMapper().createObjectNode().put("role", "assistant").put("content", content);
         return new ModelGateway.ChatReply(model, message, new LlmUsage(3, 2, 5));
+    }
+
+    @Test
+    @DisplayName("un cas du banc : son budget remplace le délai général de l'IA, le temps de l'action")
+    void theBudgetOfACaseReplacesTheTimeout() {
+        ArgumentCaptor<AiProviderSettings> settings = ArgumentCaptor.forClass(AiProviderSettings.class);
+        when(gateway.chat(settings.capture(), any())).thenReturn(reply("qwen3:14b", "ok"));
+
+        ModelDeadline.within(Duration.ofMinutes(5), () -> client.rawChatWithModel(List.of(), List.of(), "qwen3:14b"));
+        client.rawChatWithModel(List.of(), List.of(), "qwen3:14b");
+
+        assertThat(settings.getAllValues().get(0).timeout()).isGreaterThan(Duration.ofMinutes(4)).isLessThanOrEqualTo(Duration.ofMinutes(5));
+        assertThat(settings.getAllValues().get(1)).isSameAs(SETTINGS);
+    }
+
+    @Test
+    @DisplayName("un budget épuisé n'appelle plus le modèle : le cas est trop lent")
+    void aSpentBudgetIsTooSlow() {
+        assertThatThrownBy(() -> ModelDeadline.within(Duration.ZERO, () -> client.rawChatWithModel(List.of(), List.of(), "qwen3:14b")))
+            .isInstanceOf(LlmTimedOutException.class);
+        verifyNoInteractions(gateway);
+    }
+
+    @Test
+    @DisplayName("un modèle trop lent n'est pas un fournisseur tombé : son état reste valable")
+    void aTimeoutIsNotAnOutage() {
+        when(gateway.chat(any(), any())).thenThrow(new ModelProviderException.TimedOut("late", null));
+
+        assertThatThrownBy(() -> client.rawChatWithModel(List.of(), List.of(), "qwen3:14b")).isInstanceOf(LlmTimedOutException.class);
+        verify(status, never()).invalidate();
     }
 
     @Test

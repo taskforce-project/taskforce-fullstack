@@ -22,7 +22,9 @@ export type IssueActivityType =
   | "CHECKLIST_CHECKED" | "CHECKLIST_UNCHECKED" | "PULL_REQUEST_OPENED"
   | "MISSION_APPLIED" | "MISSION_DISCARDED" | "MISSION_RETRIED"
   // L'issue terminée par la personne, la mission n'ayant rien changé (V114, rejeu de la 1.8.0).
-  | "MISSION_MARKED_DONE";
+  | "MISSION_MARKED_DONE"
+  // La personne a commenté des lignes du diff : la mission repart sur la même branche (V122, R139).
+  | "MISSION_CHANGES_ASKED";
 
 export interface UserSummary {
   id: number;
@@ -184,16 +186,24 @@ export interface CreateIssuePayload {
   labelIds?: number[];
 }
 
+/**
+ * Patch partiel : un champ absent ne change rien, et le serveur lit un champ à null de la même façon.
+ * Retirer l'assigné ou l'échéance passe donc par `unassign` et `clearDueDate`.
+ */
 export interface UpdateIssuePayload {
   title?: string;
   description?: string;
   statusId?: number;
   typeId?: number;
   priority?: IssuePriority;
-  assigneeId?: number | null;
-  parentId?: number | null;
-  startDate?: string | null;
-  dueDate?: string | null;
+  assigneeId?: number;
+  /** true = retirer l'assigné. */
+  unassign?: boolean;
+  parentId?: number;
+  startDate?: string;
+  dueDate?: string;
+  /** true = retirer l'échéance. */
+  clearDueDate?: boolean;
   position?: number;
   /** Story points : undefined = pas de changement ; 0 = retirer l'estimation ; >0 = valeur */
   storyPoints?: number;
@@ -262,6 +272,24 @@ export async function listMyIssues(slug: string): Promise<Issue[]> {
  */
 export async function searchIssues(slug: string, query: string, limit = 8): Promise<IssueHit[]> {
   const res = await apiClient.get<{ data: IssueHit[] }>(ISSUE_ROUTES.SEARCH(slug), { params: { q: query, limit } });
+  return res.data.data ?? [];
+}
+
+/** Une issue trouvée par ce qu'on a écrit dessous (Ctrl+K, R141) : le passage du commentaire qui répond. */
+export interface IssueCommentHit {
+  issueId: number;
+  projectId: number;
+  key: string;
+  title: string;
+  excerpt: string;
+}
+
+/** Les issues dont un commentaire répond, une ligne par issue. Appel de fond (à la frappe) : jamais de toast. */
+export async function searchIssueComments(slug: string, query: string, limit = 5): Promise<IssueCommentHit[]> {
+  const res = await apiClient.get<{ data: IssueCommentHit[] }>(ISSUE_ROUTES.SEARCH_COMMENTS(slug), {
+    params: { q: query, limit },
+    silentError: true,
+  });
   return res.data.data ?? [];
 }
 

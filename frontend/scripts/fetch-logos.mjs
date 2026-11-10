@@ -159,8 +159,9 @@ const BRANDS = [
   { key: "pipedream", search: "Pipedream" },
   // Modèles IA
   { key: "openai", search: "OpenAI" },
-  // Pas d'Anthropic : ses conditions interdisent d'utiliser son logo sans permission (ADR-013). La marque
-  // est nommée en texte (NAME_ONLY dans components/ui/brand-logo.tsx), le fichier n'est jamais vendorisé.
+  // La marque de Claude, pour Claude Code et Claude (le connecteur porte la clé « anthropic ») : la décision du CEO du
+  // 09/11/2026 (R144), comme sur le site. ADR-013 note ce que demandent les conditions d'Anthropic.
+  { key: "anthropic", search: "Claude", match: "Claude AI" },
   { key: "gemini", search: "Gemini", match: "Google Gemini" },
   { key: "mistral", search: "Mistral" },
   { key: "huggingface", search: "Hugging Face", match: "Hugging Face" },

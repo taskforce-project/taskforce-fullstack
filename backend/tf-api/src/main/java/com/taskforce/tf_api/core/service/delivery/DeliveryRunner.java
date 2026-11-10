@@ -13,6 +13,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.taskforce.tf_api.core.enums.DeliveryRunOutcome;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkType;
@@ -244,9 +245,11 @@ public class DeliveryRunner {
                 run.setStatus(DeliveryRunStatus.FAILED);
                 run.setError(poll.error());
                 evidenceService.end(run, poll);
-                // Une mission refusée au départ par une règle n'est pas une panne : l'issue reste où elle est (R38).
-                if (!run.isRefused()) moveIssueTo(run, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
-                notifyFinished(run);
+                // Une mission refusée au départ par une règle n'est pas une panne : l'issue reste où elle est (R38). Une
+                // mission que la personne a arrêtée non plus (R138), et elle n'a pas besoin qu'on le lui apprenne.
+                boolean stopped = run.getOutcome() == DeliveryRunOutcome.STOPPED;
+                if (!run.isRefused() && !stopped) moveIssueTo(run, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
+                if (!stopped) notifyFinished(run);
             }
             default -> run.setStatus(DeliveryRunStatus.RUNNING); // encore en cours (poll ultérieur)
         }

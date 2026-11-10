@@ -202,7 +202,7 @@ const doc = [
     "",
     d.intro,
     "",
-    `**${membres.length} entités** : ${membres.map((e) => `\`${e.nom}\``).join(", ")}.`,
+    `**${membres.length} ${membres.length > 1 ? "entités" : "entité"}** : ${membres.map((e) => `\`${e.nom}\``).join(", ")}.`,
     "",
     bloc,
     "",

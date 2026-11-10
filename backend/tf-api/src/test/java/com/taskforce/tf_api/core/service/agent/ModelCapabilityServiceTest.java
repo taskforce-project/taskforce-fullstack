@@ -60,6 +60,7 @@ class ModelCapabilityServiceTest {
     @Mock private AiStatusService aiStatus;
     @Mock private AgentService agent;
     @Mock private AiUsageService aiUsage;
+    @org.mockito.Spy private ModelCallStops stops = new ModelCallStops();
     @Mock private ModelCapabilityRunRepository runs;
     @Mock private ModelCapabilityResultRepository results;
     @Mock private AiModelChoiceRepository choices;
@@ -67,7 +68,7 @@ class ModelCapabilityServiceTest {
     @InjectMocks private ModelCapabilityService service;
 
     /** Une note telle que la table la lit. */
-    private record Row(Long getRunId, String getCaseKey, Boolean getPassed, LocalDateTime getCreatedAt)
+    private record Row(Long getRunId, String getCaseKey, Boolean getPassed, Boolean getTooSlow, LocalDateTime getCreatedAt)
         implements ModelCapabilityResultRepository.Row {
     }
 
@@ -91,7 +92,7 @@ class ModelCapabilityServiceTest {
         measured.add(ModelCapabilityRun.builder().id(runId).model(model).suiteVersion(CapabilitySuite.VERSION)
             .startedAt(at).total(CapabilitySuite.cases().size()).build());
         for (CapabilitySuite.CapabilityCase c : CapabilitySuite.cases()) {
-            notes.add(new Row(runId, c.key(), !failed.contains(c.key()), at));
+            notes.add(new Row(runId, c.key(), !failed.contains(c.key()), false, at));
         }
     }
 
@@ -237,6 +238,61 @@ class ModelCapabilityServiceTest {
             assertThat(check.detail()).contains("can't answer as Cortex");
         });
         assertThat(result.promptTokens()).isZero();
+    }
+
+    @Test
+    @DisplayName("un cas trop lent est un verdict à part (R142) : il se note, sans compter comme raté ni comme mesure")
+    void aCaseTooSlowIsItsOwnVerdict() {
+        ModelCapabilityRun run = ModelCapabilityRun.builder().id(9L).workspaceId(1L).model("qwen3:14b")
+            .suiteVersion(CapabilitySuite.VERSION).total(CapabilitySuite.cases().size()).build();
+        when(runs.findByIdAndWorkspaceId(9L, 1L)).thenReturn(Optional.of(run));
+        when(results.findByRunIdAndCaseKey(9L, "context-long")).thenReturn(Optional.empty());
+        when(agent.replay(any(), any(), eq("qwen3:14b"))).thenThrow(new com.taskforce.tf_api.core.service.LlmTimedOutException("late", null));
+        when(results.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        ModelCapabilityResponse.CaseResult result = service.measure("acme", 7L, 9L, "context-long");
+
+        assertThat(result.passed()).isFalse();
+        assertThat(result.tooSlow()).isTrue();
+        assertThat(result.checks()).singleElement().satisfies(check -> {
+            assertThat(check.criterion()).isEqualTo(ModelCapabilityService.ANSWERS_IN_TIME);
+            assertThat(check.detail()).contains("too slow here");
+        });
+
+        // Dans la table : ni un raté, ni une mesure, et la proposition d'un autre modèle ne s'y fie pas.
+        measured.add(ModelCapabilityRun.builder().id(9L).model("qwen3:14b").suiteVersion(CapabilitySuite.VERSION).startedAt(MEASURED).build());
+        notes.add(new Row(9L, "context-short", true, false, MEASURED));
+        notes.add(new Row(9L, "context-long", false, true, MEASURED));
+        ModelCapabilityResponse table = service.table("acme", 7L);
+        ModelCapabilityResponse.Score context = cell(table, "qwen3:14b", "context");
+        assertThat(context.tooSlow()).isEqualTo(1);
+        assertThat(context.measured()).isEqualTo(1);
+        assertThat(context.capable()).isFalse();
+        assertThat(table.models().stream().filter(row -> row.model().equals("qwen3:14b")).findFirst().orElseThrow().failedCases()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("une panne du modèle se dit, sans 500 et sans note, pour que le cas se rejoue")
+    void aModelFailureSaysSo() {
+        ModelCapabilityRun run = ModelCapabilityRun.builder().id(9L).workspaceId(1L).model("qwen3:14b")
+            .suiteVersion(CapabilitySuite.VERSION).total(CapabilitySuite.cases().size()).build();
+        when(runs.findByIdAndWorkspaceId(9L, 1L)).thenReturn(Optional.of(run));
+        when(results.findByRunIdAndCaseKey(9L, "tools-move")).thenReturn(Optional.empty());
+        when(agent.replay(any(), any(), eq("qwen3:14b"))).thenThrow(new com.taskforce.tf_api.core.service.AiGatewayClient.LlmException("down", null));
+
+        assertThatThrownBy(() -> service.measure("acme", 7L, 9L, "tools-move"))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("qwen3:14b stopped answering");
+        verify(results, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("un modèle de base complète du texte et ne converse pas : il le dit, on ne le mesure pas")
+    void aBaseModelIsNotMeasured() {
+        when(aiStatus.describe("qwen3:14b")).thenReturn(Optional.of(new ModelGateway.ModelCard("7.6B", 32768, false, "qwen2", false, null)));
+
+        assertThatThrownBy(() -> service.start("acme", 7L, "qwen3:14b"))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("can't hold a conversation");
+        verify(runs, never()).save(any());
     }
 
     @Test

@@ -64,31 +64,6 @@ function RunLine({ slug, run, aside, opens }: Readonly<{
   )
 }
 
-/** Results : les missions finies dont le résultat attend le jugement de la personne ; un clic ouvre l'issue et sa carte. */
-export function ResultsRow() {
-  const slug = useSlug()
-  const t = usePreferencesStore((s) => s.t.window)
-  const runs = useDeliveryStore((s) => s.workspaceRuns)
-  const me = useUserStore((s) => s.user?.id)
-  const results = resultsToJudge(runs, me)
-
-  return (
-    <PanelRow row="results" value={results.length > 0 ? results.length : undefined}>
-      {results.length === 0 ? (
-        <p className="px-2 text-xs text-muted-foreground">{t.noResults}</p>
-      ) : (
-        <ul className="flex flex-col">
-          {results.map((run) => (
-            <li key={run.id}>
-              <RunLine slug={slug} run={run} opens="issue" />
-            </li>
-          ))}
-        </ul>
-      )}
-    </PanelRow>
-  )
-}
-
 /**
  * « Undo » d'un archivage fait sur la carte de suppression : l'issue revient sur son tableau, et la ligne part de
  * « Changes ». Son état est celui de la carte, dans `useCortexStore`.
@@ -114,9 +89,10 @@ function ArchiveUndo({ slug, change }: Readonly<{ slug: string; change: Change }
 }
 
 /**
- * Changes : ce que la conversation a changé dans TaskForce (créé, déplacé, assigné, commenté, archivé, supprimé), avec
- * « Undo » là où la conversation l'offre, et les pull requests ouvertes par ses missions. L'archivage et la suppression
- * faits sur la carte de suppression y entrent aussi : la carte tient son résultat dans le store.
+ * Changes : d'un regard, le dernier changement de la conversation dans TaskForce, et leur nombre ; un clic plus loin, tous
+ * (créé, déplacé, assigné, commenté, archivé, supprimé), avec « Undo » là où la conversation l'offre, et les pull requests
+ * ouvertes par ses missions. L'archivage et la suppression faits sur la carte de suppression y entrent aussi : la carte
+ * tient son résultat dans le store. Rien n'a changé : pas de carte.
  */
 export function ChangesRow() {
   const slug = useSlug()
@@ -135,23 +111,23 @@ export function ChangesRow() {
       .filter((pull): pull is PullRequest => pull !== null)
   }, [changes, runs, me])
 
+  if (changes.length === 0) return null
+  // Le plus récent d'abord (`changesOf`) : la première ligne dit ce qui vient de se passer.
+  const [latest] = changes
+
   return (
-    <PanelRow row="changes" value={changes.length > 0 ? changes.length : undefined}>
-      {changes.length === 0 ? (
-        <p className="px-2 text-xs text-muted-foreground">{t.noChanges}</p>
-      ) : (
-        <ul className="flex flex-col gap-1">
-          {changes.map((change) => (
-            <li key={change.id} className="px-2 py-1 text-xs">
-              <p className="min-w-0 break-words text-foreground">
-                <span className="text-muted-foreground">{t.changeKinds[change.kind]}</span> {change.what}
-              </p>
-              {isUndoable(change.call) && <UndoAction slug={slug} call={change.call} />}
-              {change.kind === "archived" && <ArchiveUndo slug={slug} change={change} />}
-            </li>
-          ))}
-        </ul>
-      )}
+    <PanelRow row="changes" summary={`${t.changeKinds[latest.kind]} ${latest.what}`} value={changes.length > 1 ? changes.length : undefined}>
+      <ul className="flex flex-col gap-1">
+        {changes.map((change) => (
+          <li key={change.id} className="px-2 py-1 text-xs">
+            <p className="min-w-0 break-words text-foreground">
+              <span className="text-muted-foreground">{t.changeKinds[change.kind]}</span> {change.what}
+            </p>
+            {isUndoable(change.call) && <UndoAction slug={slug} call={change.call} />}
+            {change.kind === "archived" && <ArchiveUndo slug={slug} change={change} />}
+          </li>
+        ))}
+      </ul>
       {pulls.length > 0 && (
         <ul className="mt-1 flex flex-col border-t border-border pt-1">
           {pulls.map((pull) => (
@@ -229,13 +205,16 @@ function JobLine({ slug, job, aside }: Readonly<{ slug: string; job: AnalysisJob
 }
 
 /**
- * Missions : celles qui tournent, avec leur durée, puis « Done: N », qui déplie l'historique. Les missions sont celles
- * de la personne, les analyses celles de l'espace qu'elle voit ; aucune mesure d'agent, aucun classement (R57). Une
- * mission ne s'arrête pas encore depuis l'app : pas de bouton « Stop ».
+ * Missions, le travail de fond : d'un regard, ce qui tourne et ce qui attend le jugement de la personne ; un clic plus
+ * loin, les résultats à juger (leur issue et leur carte), ce qui tourne avec sa durée, puis « Done: N », qui déplie
+ * l'historique sans répéter ce qui attend. Les missions sont celles de la personne, les analyses celles de l'espace
+ * qu'elle voit ; aucune mesure d'agent, aucun classement (R57). Une mission ne s'arrête pas encore depuis l'app : pas de
+ * bouton « Stop ». Aucune mission ni analyse : pas de carte.
  */
 export function MissionsRow() {
   const slug = useSlug()
   const t = usePreferencesStore((s) => s.t.window)
+  const r = usePreferencesStore((s) => s.t.rail.missions)
   const runs = useDeliveryStore((s) => s.workspaceRuns)
   const jobs = useWorkflowStore((s) => s.jobs)
   const me = useUserStore((s) => s.user?.id)
@@ -244,12 +223,21 @@ export function MissionsRow() {
   const [canvasOpen, setCanvasOpen] = useState(false)
 
   const mine = runs.filter((run) => isMine(run, me))
+  const results = resultsToJudge(runs, me)
+  const toJudge = new Set(results.map((run) => run.id))
   const runningRuns = mine.filter((run) => isActiveRun(run.status))
   const runningJobs = jobs.filter((job) => isActiveJob(job.status))
-  const doneRuns = mine.filter((run) => !isActiveRun(run.status))
+  const doneRuns = mine.filter((run) => !isActiveRun(run.status) && !toJudge.has(run.id))
   const doneJobs = jobs.filter((job) => !isActiveJob(job.status))
   const running = runningRuns.length + runningJobs.length
   const doneCount = doneRuns.length + doneJobs.length
+
+  if (running + results.length + doneCount === 0) return null
+
+  const glance = [
+    running > 0 ? fillText(r.running, { count: running }) : null,
+    results.length > 0 ? fillText(r.toReview, { count: results.length }) : null,
+  ].filter(Boolean).join(", ") || r.nothing
 
   const duration = (since: string | null | undefined): string | null => {
     const minutes = elapsedMinutes(since, now)
@@ -258,10 +246,17 @@ export function MissionsRow() {
   }
 
   return (
-    <PanelRow row="missions" value={running > 0 ? running : undefined}>
-      {running === 0 ? (
-        <p className="px-2 text-xs text-muted-foreground">{t.noMissions}</p>
-      ) : (
+    <PanelRow row="missions" summary={glance}>
+      {results.length > 0 && (
+        <ul className="flex flex-col">
+          {results.map((run) => (
+            <li key={`result-${run.id}`}>
+              <RunLine slug={slug} run={run} aside={r.review} opens="issue" />
+            </li>
+          ))}
+        </ul>
+      )}
+      {running > 0 && (
         <ul className="flex flex-col">
           {runningRuns.map((run) => (
             <li key={`run-${run.id}`}>

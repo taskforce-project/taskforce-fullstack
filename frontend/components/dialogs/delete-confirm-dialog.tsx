@@ -100,7 +100,7 @@ export function DeleteConfirmDialog({
         </DialogTrigger>
       )}
 
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent size="sm">
         <DialogHeader>
           <div className="flex items-center gap-3 mb-1">
             <div className={`size-10 rounded-full flex items-center justify-center shrink-0 ${variant === "warning" ? "bg-shape-yellow/10" : "bg-destructive/10"}`}>
@@ -129,7 +129,7 @@ export function DeleteConfirmDialog({
           </div>
         )}
 
-        <DialogFooter className="gap-2 sm:justify-between">
+        <DialogFooter className="gap-2">
           <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
             Cancel
           </Button>

@@ -20,6 +20,40 @@ export interface AgentOutcome {
   text: string;
   costUsd: number | null;
   turns: number | null;
+  /** La session de Claude Code, pour qu'une reprise la continue (R139). */
+  sessionId?: string | null;
+  /** La session à reprendre n'existe plus sur ce poste (dossier `.claude` vidé, autre ordinateur). */
+  sessionLost?: boolean;
+}
+
+/** Les outils qui peuvent changer un fichier : après chacun, le relevé des changements repart. */
+const WRITERS: ReadonlySet<string> = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit", "Bash", "PowerShell", "Task", "Agent"]);
+
+/**
+ * Lit la sortie de l'agent pour savoir quand un outil qui écrit vient de finir : c'est le moment où le dossier de
+ * travail a changé (son appel seul ne dit rien : l'écriture n'a pas encore eu lieu).
+ */
+export class WriteWatcher {
+  private readonly open = new Set<string>();
+
+  /** Vrai si cette ligne de la sortie clôt un outil qui a pu écrire. */
+  wrote(message: unknown): boolean {
+    if (!message || typeof message !== "object") return false;
+    const line = message as Record<string, unknown>;
+    const content = ((line.message ?? {}) as Record<string, unknown>).content;
+    if (!Array.isArray(content)) return false;
+    let wrote = false;
+    for (const part of content as Array<Record<string, unknown>>) {
+      if (line.type === "assistant" && part.type === "tool_use" && typeof part.id === "string"
+        && typeof part.name === "string" && WRITERS.has(part.name)) {
+        this.open.add(part.id);
+      } else if (line.type === "user" && part.type === "tool_result" && typeof part.tool_use_id === "string"
+        && this.open.delete(part.tool_use_id)) {
+        wrote = true;
+      }
+    }
+    return wrote;
+  }
 }
 
 const MAX_TEXT = 600;
@@ -134,18 +168,22 @@ export function parseAgentOutput(code: number | null, stdout: string, stderr: st
   const costUsd = typeof result?.total_cost_usd === "number" ? result.total_cost_usd : null;
   const turns = typeof result?.num_turns === "number" ? result.num_turns : null;
   const resultText = typeof result?.result === "string" ? result.result.trim() : "";
+  const sessionId = typeof result?.session_id === "string" ? result.session_id : null;
   const failed = code !== 0 || result?.is_error === true
     || (typeof result?.subtype === "string" && result.subtype !== "success");
 
   if (failed) {
-    const reason = resultText
+    // Une session introuvable se dit sur stderr, avec un résultat vide : le runner repart alors du brief.
+    const lost = /No conversation found with session ID/i.test(stderr);
+    const reason = (lost ? stderr.trim().split(/\r?\n/).slice(-1)[0] : "")
+      || resultText
       || (typeof result?.subtype === "string" ? `Claude Code stopped: ${result.subtype}` : "")
       || stderr.trim().split(/\r?\n/).slice(-3).join(" | ")
       || `Claude Code exited with code ${code}`;
-    return { ok: false, text: reason.slice(0, 3900), costUsd, turns };
+    return { ok: false, text: reason.slice(0, 3900), costUsd, turns, sessionId, sessionLost: lost };
   }
   if (!resultText) {
-    return { ok: false, text: "Claude Code finished without a summary.", costUsd, turns };
+    return { ok: false, text: "Claude Code finished without a summary.", costUsd, turns, sessionId };
   }
-  return { ok: true, text: resultText, costUsd, turns };
+  return { ok: true, text: resultText, costUsd, turns, sessionId };
 }

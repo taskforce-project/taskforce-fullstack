@@ -50,6 +50,8 @@ public class StompAuthInterceptor implements ChannelInterceptor {
 
     /** Topic dont la clé EST l'identité de l'abonné : {@code /topic/notifications.{userId}}. */
     private static final String USER_TOPIC_PREFIX     = "/topic/notifications.";
+    /** Les étapes des réponses de Cortex : même règle, {@code /topic/cortex.{userId}} n'est lu que par cette personne. */
+    private static final String CORTEX_TOPIC_PREFIX   = "/topic/cortex.";
     /**
      * Flux temps réel d'un projet, autorisés par visibilité projet : {@code /topic/projects.{projectId}} (le board) et
      * {@code /topic/projects.{projectId}.analysis} (ses workflows d'analyse IA).
@@ -168,9 +170,11 @@ public class StompAuthInterceptor implements ChannelInterceptor {
             throw new MessageDeliveryException("Unreadable identity");
         }
 
-        if (destination.startsWith(USER_TOPIC_PREFIX)) {
-            if (!principal.equals(destination.substring(USER_TOPIC_PREFIX.length()))) {
-                log.warn("STOMP SUBSCRIBE refusé : user {} a tenté de lire les notifications d'un autre", principal);
+        String ownTopic = destination.startsWith(USER_TOPIC_PREFIX) ? USER_TOPIC_PREFIX
+            : destination.startsWith(CORTEX_TOPIC_PREFIX) ? CORTEX_TOPIC_PREFIX : null;
+        if (ownTopic != null) {
+            if (!principal.equals(destination.substring(ownTopic.length()))) {
+                log.warn("STOMP SUBSCRIBE refusé : user {} a tenté de lire le canal personnel d'un autre", principal);
                 throw new MessageDeliveryException("Access to this channel is denied");
             }
         } else if (destination.startsWith(PROJECT_TOPIC_PREFIX)) {

@@ -164,7 +164,9 @@ public class ListIssuesTool implements AgentTool {
                     .collect(Collectors.joining(", ")));
             }
             deliveryService.latestRun(ctx.slug(), i.getId(), ctx.userId())
-                .filter(run -> "FAILED".equals(run.status()) && run.error() != null && !run.error().isBlank())
+                // Arrêtée par la personne (R138) : ce n'est pas la cause d'un blocage.
+                .filter(run -> "FAILED".equals(run.status()) && !"STOPPED".equals(run.outcome())
+                    && run.error() != null && !run.error().isBlank())
                 .ifPresent(run -> sb.append(run.refused() ? ", the agent did not start: " : ", the agent's run failed: ")
                     .append(shorten(run.error())));
         } catch (RuntimeException e) {

@@ -63,4 +63,20 @@ public class ModelCapabilityRun {
 
     @Column(nullable = false)
     private int passed;
+
+    /** Le temps du premier appel, qui charge le modèle avant que rien ne soit chronométré (R142) ; null sans chargement. */
+    @Column(name = "load_ms")
+    private Long loadMs;
+
+    /** La mémoire que le modèle occupait une fois chargé, en octets, d'après Ollama ; null chez un autre fournisseur. */
+    @Column(name = "memory_bytes")
+    private Long memoryBytes;
+
+    /** Ce qui en tenait sur la carte graphique, en octets ; le reste tournait sur le processeur. */
+    @Column(name = "gpu_bytes")
+    private Long gpuBytes;
+
+    /** Le chargement n'a pas abouti : {@code too_slow} ou {@code failed} ; null quand il a abouti, ou s'il n'y en a pas eu. */
+    @Column(name = "load_problem", length = 16)
+    private String loadProblem;
 }

@@ -133,16 +133,20 @@ const ISSUE_COLUMNS: DataTableColumn<Issue>[] = [
       </span>
     ),
     sortValue: (i) => i.status,
-  },
-  {
-    key: "identifier", header: "ID", icon: <Hash className="size-3" />, className: "w-20",
-    render: (i) => <span className="font-mono text-xs tabular-nums text-muted-foreground">{i.identifier}</span>,
-    sortValue: (i) => i.identifier,
+    listCell: (i) => <span className="flex items-center" title={STATUS_LABEL[i.status]}>{STATUS_ICON[i.status]}</span>,
   },
   {
     key: "title", header: "Title",
     render: (i) => <span className="text-sm text-foreground">{i.title}</span>,
     sortValue: (i) => i.title.toLowerCase(),
+    listCell: (i) => i.title,
+    listGrow: true,
+  },
+  {
+    key: "identifier", header: "ID", icon: <Hash className="size-3" />, className: "w-20",
+    render: (i) => <span className="font-mono text-xs tabular-nums text-muted-foreground">{i.identifier}</span>,
+    sortValue: (i) => i.identifier,
+    listCell: (i) => <span className="font-mono text-xs text-muted-foreground">{i.identifier}</span>,
   },
   {
     key: "project", header: "Project", icon: <Layers className="size-3" />, className: "hidden w-40 sm:table-cell",
@@ -153,6 +157,7 @@ const ISSUE_COLUMNS: DataTableColumn<Issue>[] = [
     key: "due", header: "Due", icon: <CalendarDays className="size-3" />, align: "right", className: "hidden w-24 md:table-cell",
     render: (i) => <span className="text-xs text-muted-foreground">{i.dueDate ?? "-"}</span>,
     sortValue: (i) => i.dueTs ?? Number.POSITIVE_INFINITY,
+    listCell: (i) => (i.dueDate ? <span className="text-xs tabular-nums text-muted-foreground">{i.dueDate}</span> : null),
   },
 ]
 
@@ -161,6 +166,8 @@ const CYCLE_COLUMNS: DataTableColumn<Cycle>[] = [
     key: "title", header: "Sprint", icon: <RefreshCw className="size-3" />,
     render: (c) => <span className="text-sm font-medium text-foreground">{c.title}</span>,
     sortValue: (c) => c.title.toLowerCase(),
+    listCell: (c) => c.title,
+    listGrow: true,
   },
   {
     key: "project", header: "Project", icon: <Layers className="size-3" />, className: "hidden w-40 sm:table-cell",
@@ -182,6 +189,7 @@ const CYCLE_COLUMNS: DataTableColumn<Cycle>[] = [
       )
     },
     sortValue: (c) => c.status,
+    listCell: (c) => <span className="text-xs text-muted-foreground">{CYCLE_STATUS[c.status].label}</span>,
   },
   {
     key: "progress", header: "Progress", className: "hidden w-32 lg:table-cell",
@@ -198,6 +206,7 @@ const CYCLE_COLUMNS: DataTableColumn<Cycle>[] = [
   {
     key: "count", header: "Issues", align: "right", className: "hidden w-16 lg:table-cell",
     render: (c) => <span className="text-xs tabular-nums text-muted-foreground">{c.completedIssues}/{c.totalIssues}</span>,
+    listCell: (c) => <span className="text-xs tabular-nums text-muted-foreground">{c.completedIssues}/{c.totalIssues}</span>,
     sortValue: (c) => c.totalIssues,
   },
 ]
@@ -337,6 +346,23 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
     }
   }
 
+  const assignmentActions = (issue: Issue) =>
+    issue.assignmentStatus === "PENDING" ? (
+      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs" onClick={() => handleAccept(issue)}>
+          <Check className="size-3.5" /> Accept
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-destructive"
+          onClick={() => handleDecline(issue)}
+        >
+          <X className="size-3.5" /> Decline
+        </Button>
+      </div>
+    ) : null
+
   // Colonnes de base + une colonne Accept/Decline quand l'assignation est en attente (PENDING).
   const issueColumns: DataTableColumn<Issue>[] = [
     ...ISSUE_COLUMNS,
@@ -344,22 +370,8 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
       key: "assignment",
       header: "Assignment",
       className: "w-[150px]",
-      render: (issue) =>
-        issue.assignmentStatus === "PENDING" ? (
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs" onClick={() => handleAccept(issue)}>
-              <Check className="size-3.5" /> Accept
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-destructive"
-              onClick={() => handleDecline(issue)}
-            >
-              <X className="size-3.5" /> Decline
-            </Button>
-          </div>
-        ) : null,
+      render: assignmentActions,
+      listCell: assignmentActions,
     },
   ]
 

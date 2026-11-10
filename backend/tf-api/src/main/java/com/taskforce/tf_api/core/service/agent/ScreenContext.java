@@ -80,6 +80,22 @@ public class ScreenContext {
         return board(ctx, screen.projectId(), screen.issueId(), HEADER);
     }
 
+    /**
+     * La ligne qui dit au modèle où travaille la conversation (R135, séance n°20) : ses gestes y vont quand la demande n'en
+     * nomme pas un autre. Vide sans projet, ou quand la personne ne le voit plus.
+     */
+    public String conversationProject(AgentContext ctx) {
+        if (ctx.project() == null) return "";
+        try {
+            ProjectResponse project = projectService.getProject(ctx.slug(), ctx.project(), ctx.userId());
+            return "This conversation works in the project " + project.getIdentifier() + " \"" + clip(project.getName())
+                + "\": what the person asks is about it unless they name another.\n";
+        } catch (RuntimeException e) {
+            log.debug("Cortex : projet de la conversation non lu ({}) : {}", ctx.project(), LogSafe.of(e.getMessage()));
+            return "";
+        }
+    }
+
     /** Le tableau d'un projet que la personne a joint à sa demande, lu avec ses droits ; rien quand elle ne le voit pas. */
     public Seen attached(AgentContext ctx, Long projectId) {
         return projectId == null ? Seen.NOTHING : board(ctx, projectId, null, ATTACHED);

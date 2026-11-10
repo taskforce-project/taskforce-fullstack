@@ -28,6 +28,26 @@ class RunnerPresenceServiceTest {
     private final RunnerPresenceService presence = new RunnerPresenceService(clock);
 
     @Test
+    @DisplayName("un runner qui vient de passer est là ; deux minutes sans nouvelles, il n'y est plus")
+    void online_for_two_minutes() {
+        assertThat(presence.online(7L, "tf-runner-pierre")).isFalse();
+        presence.seen(7L, "tf-runner-pierre");
+        assertThat(presence.online(7L, "tf-runner-pierre")).isTrue();
+        assertThat(presence.online(7L, "tf-runner-other")).isFalse();
+        assertThat(presence.online(7L, null)).isFalse();
+        clock.advance(Duration.ofSeconds(130));
+        assertThat(presence.online(7L, "tf-runner-pierre")).isFalse();
+    }
+
+    @Test
+    @DisplayName("un signe de vie garde le problème signalé par le runner")
+    void seen_keeps_the_problem() {
+        presence.report(7L, "tf-runner-pierre", "claude-signed-out");
+        presence.seen(7L, "tf-runner-pierre");
+        assertThat(presence.problem(7L)).contains("claude-signed-out");
+    }
+
+    @Test
     @DisplayName("sans nouvelles d'un runner : aucun problème")
     void nothing_reported() {
         assertThat(presence.problem(7L)).isEmpty();

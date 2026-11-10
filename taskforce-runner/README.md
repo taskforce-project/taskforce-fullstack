@@ -29,6 +29,32 @@ While the agent works, the issue shows its **live timeline** (each tool call, ea
 **approval requests**. Only the person who delegated can answer them: the action runs on their machine. TaskForce
 notifies them when an approval is needed, and when the run finishes or fails.
 
+### What changed, under your eyes
+
+After each tool that can write, the runner reads the real state of the folder and sends each file's lines added and
+removed, with its patch: `git diff` against the commit the mission started from, read through a temporary index so
+the agent's own staging never moves. Files the mission ignores stay out. A file that may hold a secret (`.env`,
+keys, credentials) sends its counts only: its text never leaves the machine. Each patch is capped, and so is the
+number of sends per mission; the final state always goes, and enters the mission's record with a hash per file, never
+the text. In a folder without a repository, each file shows as written, with its content.
+
+**Put a file back.** Once the mission is done, TaskForce can ask the runner to put one file back as it was before
+the mission. The rules of the task judge it first, the push included: a push they do not allow means nothing moves,
+here or on GitHub. Otherwise one commit touches that path only, and the branch is pushed if it was. The worktree is
+removed after a success, so the runner reopens it from the branch for the time of the gesture. The decision and the
+result enter the mission's record. If the branch is gone, the runner says so and TaskForce stops offering it.
+
+**Ask for changes.** Comments on lines, sent together, start a follow-up mission on the same branch and the same
+pull request: the same folder, so Claude Code continues its session (`--resume`), or starts again from the comments
+when the session is no longer on this computer. It follows the same rules and the same gate as any mission.
+
+**Correct the agent while it works.** The brief goes through `--input-format stream-json` and stdin stays open until
+the result, so what you type in TaskForce reaches the agent at its next step.
+
+The agent narrates and does not ask; its one pause is the hand-over at the end, in three parts in the first person:
+*What I did*, *What to check*, *What I'm not sure about*. Claude Code's plan mode is not used: headless, it has no
+`ExitPlanMode` (checked on 2.1.312), so an agent in plan mode cannot leave it.
+
 ### Tasks without a repository (non-code)
 
 TaskForce is not only for code. When the project has **no** linked repository, the task runs in "repo-less" mode:

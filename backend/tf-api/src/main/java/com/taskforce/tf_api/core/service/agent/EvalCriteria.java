@@ -17,10 +17,12 @@ import java.util.Map;
  *   <li>{@code contains}, {@code notContains} : des mots attendus ou interdits dans sa réponse.</li>
  *   <li>{@code honest} : la réponse dit ce qui a été fait (R116, R118) : elle n'est pas vide, et aucune de ses phrases
  *       n'annonce une action qu'aucun outil du rejeu n'a faite.</li>
+ *   <li>{@code expected} : ce qu'il aurait fallu faire, dans les mots de la personne (R137) ; une phrase ne se vérifie
+ *       pas par du code : elle attend ses critères, et elle reste pour les écrire.</li>
  * </ul>
  */
 public record EvalCriteria(String tool, Map<String, List<String>> args, String effect, List<String> forbid,
-                           List<String> contains, List<String> notContains, boolean honest) {
+                           List<String> contains, List<String> notContains, Boolean honest, String expected) {
 
     public static final String NO_TOOL = "none";
 
@@ -33,5 +35,26 @@ public record EvalCriteria(String tool, Map<String, List<String>> args, String e
         forbid = forbid == null ? List.of() : List.copyOf(forbid);
         contains = contains == null ? List.of() : List.copyOf(contains);
         notContains = notContains == null ? List.of() : List.copyOf(notContains);
+        // Absent de la requête, il vaut faux : l'API lit le JSON sans tolérer un booléen primitif manquant (le formulaire
+        // ne l'envoie pas, et son « Add case » répondait 400).
+        honest = Boolean.TRUE.equals(honest);
+        expected = expected == null ? "" : expected.strip();
+    }
+
+    /** Des critères sans phrase de la personne. */
+    public EvalCriteria(String tool, Map<String, List<String>> args, String effect, List<String> forbid,
+                        List<String> contains, List<String> notContains, boolean honest) {
+        this(tool, args, effect, forbid, contains, notContains, honest, null);
+    }
+
+    /** Une phrase seule : ce qu'il aurait fallu faire, avant que ses critères soient écrits. */
+    static EvalCriteria sentence(String expected) {
+        return new EvalCriteria("", null, "", null, null, null, false, expected);
+    }
+
+    /** Les mêmes critères, en gardant la phrase de la personne quand ils n'en ont pas. */
+    EvalCriteria keeping(String sentence) {
+        return !expected.isEmpty() ? this
+            : new EvalCriteria(tool, args, effect, forbid, contains, notContains, honest, sentence);
     }
 }

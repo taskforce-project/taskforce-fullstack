@@ -149,6 +149,21 @@ class ListIssuesToolTest {
     }
 
     @Test
+    @DisplayName("une mission arrêtée par la personne n'est pas une cause de blocage (R138)")
+    void a_stopped_mission_is_no_cause() {
+        when(issueService.listIssues("acme", 3L, 7L)).thenReturn(List.of(
+            issue(4L, "TF-4", "Deploy", "In Progress", IssueStatusCategory.STARTED, 3L, "TaskForce", null)));
+        ListIssuesTool tool = tool();
+        when(deliveryService.latestRun("acme", 4L, 7L)).thenReturn(Optional.of(new DeliveryRunResponse(1L, 40L, "TF-4", "Fix", 3L,
+            "TaskForce", "claude-code", null, "FAILED", null, null, "Stopped by Ada.", false, 7L, null, null, null, null, null, null,
+            null, null, null, "STOPPED", null)));
+
+        String out = tool.execute(Map.of("project", "TF"), CTX);
+
+        assertThat(out).contains("TF-4 Deploy [In Progress]").doesNotContain("failed");
+    }
+
+    @Test
     @DisplayName("une issue terminée ne se détaille pas : aucune cause cherchée")
     void a_closed_issue_has_no_cause() {
         when(issueService.listIssues("acme", 3L, 7L)).thenReturn(List.of(

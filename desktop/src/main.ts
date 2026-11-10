@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, screen, session, shell } from "electron";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -14,9 +14,33 @@ import { applyPermissions } from "./permissions";
 import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
 import { toolsStatus } from "./tools";
+import {
+  centeredIn,
+  firstScreen,
+  isScreenAction,
+  placeFromArgs,
+  relaunchArgs,
+  SCREEN_SIZE,
+  screenHash,
+  SCREENS,
+  withNote,
+  type Point,
+  type ScreenState,
+} from "./screen";
 import { readMove, readWorkspaceMove, Transfer, type LocalApi } from "./transfer";
-import { check, installNow, restartApp, startUpdater, updateState } from "./updater";
-import { registerVoice, voiceAvailable } from "./voice";
+import { pendingOutcome, readPending, updateScreenRect } from "./update-pending";
+import {
+  announceInstalled,
+  check,
+  installNow,
+  releaseUpdateScreenOnFirstWindow,
+  restartApp,
+  SETTLE_MS,
+  startUpdater,
+  updateState,
+  type RestartScreen,
+} from "./updater";
+import { prepareVoiceInBackground, registerVoice, voiceAvailable } from "./voice";
 import {
   integratedTitleBar,
   MAIN_TITLE_BAR_HEIGHT,
@@ -33,6 +57,8 @@ import {
 
 let stack: Stack | null = null;
 let mainWindow: BrowserWindow | null = null;
+/** L'écran de la coque ouvert, s'il y en a un : démarrage, mise à jour, déconnexion, ou leur échec. */
+let screenWin: BrowserWindow | null = null;
 let quitting = false;
 const githubSignIn = new GitHubSignIn();
 
@@ -49,9 +75,11 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on("second-instance", () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
+    // La fenêtre de l'app, ou l'écran de la coque tant qu'elle n'est pas là.
+    const window = mainWindow ?? BrowserWindow.getAllWindows()[0];
+    if (window) {
+      if (window.isMinimized()) window.restore();
+      window.focus();
     }
   });
   app.whenReady().then(main).catch(fatal);
@@ -66,8 +94,15 @@ async function main(): Promise<void> {
   Menu.setApplicationMenu(buildMenu());
   registerIpc();
   registerVoice(() => mainWindow);
+  releaseUpdateScreenOnFirstWindow();
   // Micro pour la seule origine de la fenêtre ; ce que l'interface n'utilise pas est refusé (cf. permissions.ts).
   applyPermissions(session.defaultSession, () => stack?.origin ?? null, voiceAvailable());
+
+  // La première fenêtre s'ouvre là où était l'écran d'avant, et dit d'abord ce qu'il disait : celui de l'installeur qui
+  // passe la main après une mise à jour, ou celui de l'instance qui s'est relancée.
+  const place = initialPlace();
+  const pending = readPending(app.getPath("userData"));
+  const first = firstScreen(pending && { outcome: pendingOutcome(pending, app.getVersion()), version: pending.version });
 
   // Un compte connecté par un autre service de comptes (développement, changement d'adresse) demande une reconnexion.
   let account = settings.account();
@@ -75,28 +110,43 @@ async function main(): Promise<void> {
   let signInWin: BrowserWindow | null = null;
   let refreshed: Promise<"valid" | "ended" | "offline"> = Promise.resolve("valid");
   if (!account) {
-    ({ account, window: signInWin } = await signInWindow());
+    ({ account, window: signInWin } = await signInWindow(place));
   } else if (!account.profile || account.avatarUrl === undefined) {
     // Compte connecté par une version qui ne gardait pas les réglages ou la photo du compte en ligne : on les relit
     // avant de démarrer, pour que l'app les reprenne dès ce lancement (hors ligne, elle démarre sans).
     const state = await refreshAccount(account);
     if (state === "ended") {
-      await sessionEnded();
+      sessionEnded(place);
       return;
     }
     account = settings.account() ?? account;
   } else {
     refreshed = refreshAccount(account);
   }
-  await openApp(account, signInWin);
+  if (!(await openApp(account, signInWin, first, place))) return;
   // Session fermée en ligne : traitée une fois la pile démarrée, pour qu'elle s'arrête proprement. Les mises à jour
   // attendent l'app relancée : démarrées pendant l'arrêt, elles pourraient retrouver une version téléchargée lors d'un
   // lancement précédent, qui s'installerait en quittant et fermerait l'app relancée.
   if ((await refreshed) === "ended") {
-    await sessionEnded();
+    sessionEnded(place);
     return;
   }
   startUpdater();
+  prepareVoiceInBackground();
+}
+
+/**
+ * La place de la première fenêtre, en points : celle que l'instance d'avant a donnée en se relançant (déconnexion, nouvel
+ * essai), ou celle de la fenêtre de l'installeur encore à l'écran après une mise à jour. Sinon, centrée.
+ */
+function initialPlace(): Point | null {
+  const given = placeFromArgs(process.argv);
+  if (given) return given;
+  if (process.platform !== "win32") return null;
+  const rect = updateScreenRect(app.getPath("userData"));
+  if (!rect) return null;
+  const { x, y } = screen.screenToDipRect(null, rect);
+  return { x, y };
 }
 
 /**
@@ -118,40 +168,22 @@ async function refreshAccount(account: Account): Promise<"valid" | "ended" | "of
 }
 
 /**
- * Session fermée en ligne : l'app le dit, oublie le compte sur ce poste et revient à l'écran de connexion. Le compte
- * s'efface avant le redémarrage : l'app rouverte, par la relance ou par l'installeur d'une mise à jour prête (cf.
- * `restartApp`), montre la connexion.
+ * Session fermée en ligne : l'app oublie le compte sur ce poste et le dit dans l'écran de la coque, à la place de sa
+ * fenêtre ; « Sign in » la redémarre sur la connexion (`screen:act`). Le compte s'efface avant : l'app rouverte, par la
+ * relance ou par l'installeur d'une mise à jour prête (cf. `restartApp`), montre la connexion.
  */
-async function sessionEnded(): Promise<void> {
+function sessionEnded(place: Point | null): void {
   log.info("Session ended online: signing out of this computer");
   settings.clearAccount();
-  await dialog.showMessageBox({
-    type: "info",
-    buttons: ["Sign in"],
-    message: "You're signed out of this computer",
-    detail: "Your session ended, or this computer was signed out from your account settings. Sign in again to keep using TaskForce here. Your projects stay on this computer.",
-  });
-  await restartApp(prepareUpdate);
+  if (mainWindow) void screenOver(mainWindow, SCREENS.signedOut);
+  else openScreen(SCREENS.signedOut, place);
 }
 
 /** Écran de connexion : se résout une fois le compte connecté, la fenêtre encore ouverte (cf. `openApp`). */
-function signInWindow(): Promise<{ account: Account; window: BrowserWindow }> {
+function signInWindow(place: Point | null): Promise<{ account: Account; window: BrowserWindow }> {
   return new Promise((resolve) => {
     // Comme la page de connexion de la webapp : la peinture et l'app à gauche, la connexion à droite.
-    const dark = nativeTheme.shouldUseDarkColors;
-    const window = new BrowserWindow({
-      width: 1000,
-      height: 640,
-      resizable: false,
-      maximizable: false,
-      fullscreenable: false,
-      title: "Sign in to TaskForce",
-      backgroundColor: dark ? "#0b0e19" : "#ffffff",
-      ...titleBarOptions(process.platform, dark, SIGNIN_TITLE_BAR_HEIGHT),
-      webPreferences: { preload: join(__dirname, "signin-preload.js"), contextIsolation: true, sandbox: true },
-    });
-    window.setMenuBarVisibility(false);
-    lockNavigation(window, null);
+    const window = shellWindow({ place, title: "Sign in to TaskForce", preload: "signin-preload.js", controls: true });
     void window.loadFile(staticPage("signin.html"));
 
     ipcMain.removeHandler("signin:start");
@@ -186,71 +218,171 @@ function openBrowser(url: string): Promise<void> {
   return shell.openExternal(url);
 }
 
-/** L'écran d'attente : au démarrage, ses étapes arrivent ensuite (cf. `openApp`) ; pour une mise à jour, `hash` les donne. */
-function splashWindow(hash?: string): BrowserWindow {
+/**
+ * Une fenêtre de la coque hors de la fenêtre principale : la taille, le fond et le thème de la connexion, à `place` ou au
+ * centre de l'écran principal. Les boutons du système sur la seule connexion (`controls`) : un écran d'attente n'en a
+ * pas, comme la fenêtre de l'installeur qui le relaie. Montrée une fois peinte, images décodées : elle s'ouvre par-dessus
+ * l'écran d'avant, à l'identique, et seule la droite change.
+ */
+function shellWindow(options: { place: Point | null; title: string; preload: string; controls: boolean; toFront?: boolean }): BrowserWindow {
+  const dark = nativeTheme.shouldUseDarkColors;
+  const { x, y } = options.place ?? centeredIn(screen.getPrimaryDisplay().workArea);
   const window = new BrowserWindow({
-    width: 420,
-    height: 280,
-    // Sans barre de titre ni boutons, mais avec le cadre du système : Windows 11 en arrondit les coins.
-    ...(integratedTitleBar(process.platform) ? { titleBarStyle: "hidden" as const } : { frame: false }),
+    ...SCREEN_SIZE,
+    x,
+    y,
     resizable: false,
     maximizable: false,
-    minimizable: false,
+    fullscreenable: false,
+    minimizable: options.controls,
     show: false,
-    backgroundColor: "#fbfbfc",
-    webPreferences: { contextIsolation: true, sandbox: true },
+    title: options.title,
+    backgroundColor: dark ? "#0b0e19" : "#ffffff",
+    // Sans barre de titre, avec le cadre du système : Windows 11 en arrondit les coins.
+    ...(options.controls
+      ? titleBarOptions(process.platform, dark, SIGNIN_TITLE_BAR_HEIGHT)
+      : integratedTitleBar(process.platform) ? { titleBarStyle: "hidden" as const } : { frame: false }),
+    webPreferences: { preload: join(__dirname, options.preload), contextIsolation: true, sandbox: true },
   });
-  void window.loadFile(staticPage("splash.html"), hash ? { hash } : undefined);
-  window.once("ready-to-show", () => window.show());
+  // À 125 %, la taille donnée à la création laisse une page de 1004 x 644 points ; celle du contenu, donnée ensuite, est
+  // exacte : la page fait celle de l'écran que l'installeur dessine.
+  window.setContentSize(SCREEN_SIZE.width, SCREEN_SIZE.height);
+  window.setMenuBarVisibility(false);
+  lockNavigation(window, null);
+  window.once("ready-to-show", () => {
+    void window.webContents
+      .executeJavaScript("Promise.all([...document.images].map((image) => image.decode().catch(() => undefined)))")
+      .catch(() => undefined)
+      .finally(() => {
+        if (window.isDestroyed()) return;
+        if (options.toFront) {
+          // Après la connexion, la personne est dans son navigateur : Windows ne laisse une app revenir au premier plan
+          // que si elle passe un instant au-dessus des autres fenêtres.
+          window.setAlwaysOnTop(true);
+          window.show();
+          window.setAlwaysOnTop(false);
+          window.focus();
+        } else {
+          window.show();
+        }
+      });
+  });
   return window;
 }
 
-/**
- * Avant d'installer une mise à jour (« Restart now », cf. `installNow` dans updater.ts) : l'écran d'attente de l'app, à
- * ses couleurs, remplace la fenêtre pendant que la pile s'arrête proprement. L'installeur, lui, ne montre plus rien.
- */
-async function prepareUpdate(version: string): Promise<void> {
-  quitting = true;
-  const splash = splashWindow(new URLSearchParams({
-    step: `Installing TaskForce ${version}`,
-    note: "TaskForce closes, installs it, then opens again.",
-  }).toString());
-  // La fenêtre se ferme une fois l'écran affiché : l'app n'a jamais zéro fenêtre, ce qui la ferait quitter.
-  await new Promise<void>((resolve) => {
-    splash.once("show", () => resolve());
-    setTimeout(resolve, 2_000).unref();
+/** L'écran de la coque (static/splash.html) : ce qui fait attendre, ou ce qui a échoué et ses actions (`screen:act`). */
+function openScreen(state: ScreenState, place: Point | null, toFront = false): BrowserWindow {
+  const window = shellWindow({ place, title: "TaskForce", preload: "screen-preload.js", controls: false, toFront });
+  screenWin = window;
+  window.on("closed", () => {
+    if (screenWin === window) screenWin = null;
   });
-  mainWindow?.close();
-  await stopStack();
+  void window.loadFile(staticPage("splash.html"), { hash: screenHash(state) });
+  return window;
+}
+
+/** Ce que dit l'écran ouvert : seule l'adresse change, la page reste (pas de rechargement, le panneau ne bouge pas). */
+function showScreen(window: BrowserWindow, state: ScreenState): void {
+  if (!window.isDestroyed()) void window.loadFile(staticPage("splash.html"), { hash: screenHash(state) });
+}
+
+/** Les fenêtres qui ont laissé leur place : elles se ferment, aucun écran ne les reprend. */
+const leaving = new WeakSet<BrowserWindow>();
+
+/** `next` prend la place de `previous`, qui se ferme une fois `next` entièrement apparue par-dessus. */
+function closeWhenShown(next: BrowserWindow, previous: BrowserWindow): void {
+  leaving.add(previous);
+  const close = () => setTimeout(() => {
+    if (!previous.isDestroyed()) previous.close();
+  }, SETTLE_MS);
+  if (next.isVisible()) close();
+  else next.once("show", close);
+}
+
+/** L'écran de la coque à l'écran, s'il y en a un qui reste. */
+function currentScreen(): BrowserWindow | null {
+  return screenWin && !screenWin.isDestroyed() && !leaving.has(screenWin) ? screenWin : null;
+}
+
+/** Résolue quand la fenêtre est à l'écran, ou au plus tard après `timeoutMs`. */
+function shown(window: BrowserWindow, timeoutMs: number): Promise<void> {
+  if (window.isVisible()) return Promise.resolve();
+  return new Promise((resolve) => {
+    window.once("show", () => setTimeout(resolve, SETTLE_MS));
+    setTimeout(resolve, timeoutMs).unref();
+  });
 }
 
 /**
- * Démarre la pile du compte derrière l'écran d'attente, puis ouvre la fenêtre de l'app. La fenêtre précédente (connexion)
- * se ferme une fois l'écran d'attente affiché : l'app n'a jamais zéro fenêtre, ce qui la ferait quitter.
+ * L'écran de la coque à la place de la fenêtre principale (mise à jour, déconnexion), au centre de l'écran où elle était.
+ * Elle se ferme une fois l'écran à l'écran : l'app n'a jamais zéro fenêtre, ce qui la ferait quitter.
  */
-async function openApp(account: Account, previous: BrowserWindow | null): Promise<void> {
-  const splash = splashWindow();
-  if (previous) splash.once("show", () => previous.close());
-  const step = (text: string) => {
-    if (!splash.isDestroyed()) void splash.loadFile(staticPage("splash.html"), { hash: "step=" + encodeURIComponent(text) });
-  };
+async function screenOver(previous: BrowserWindow | null, state: ScreenState): Promise<BrowserWindow> {
+  let window = currentScreen();
+  if (window) {
+    showScreen(window, state);
+  } else {
+    const display = previous && !previous.isDestroyed() ? screen.getDisplayMatching(previous.getBounds()) : screen.getPrimaryDisplay();
+    window = openScreen(state, centeredIn(display.workArea));
+  }
+  await shown(window, 2_000);
+  if (previous && !previous.isDestroyed()) previous.close();
+  return window;
+}
+
+/** La poignée de la fenêtre, pour l'installeur qui la remplace (Windows) ; `null` ailleurs. */
+function nativeHandle(window: BrowserWindow): string | null {
+  if (process.platform !== "win32" || window.isDestroyed()) return null;
+  const handle = window.getNativeWindowHandle();
+  return handle.length >= 8 ? handle.readBigUInt64LE(0).toString() : handle.readUInt32LE(0).toString();
+}
+
+/**
+ * Avant d'installer une mise à jour (« Restart now », cf. `installNow` dans updater.ts) : l'écran de la coque remplace la
+ * fenêtre pendant que la pile s'arrête proprement. Il reste jusqu'à ce que la fenêtre de l'installeur, dessinée à
+ * l'identique à sa place (installer.nsh, mêmes phrases), prenne le relais : elle la trouve par la poignée rendue ici.
+ */
+async function prepareUpdate(version: string): Promise<string | null> {
+  quitting = true;
+  const window = await screenOver(mainWindow, SCREENS.installing(version));
+  await stopStack();
+  return nativeHandle(window);
+}
+
+/**
+ * Redémarre l'app sans mise à jour (déconnexion, session fermée, nouvel essai) : si la pile tourne, l'écran de la coque
+ * dit `stopping` pendant qu'elle s'arrête (ou garde ce qu'il dit, sans `stopping`) ; l'app se relance ensuite à sa place.
+ */
+async function relaunchApp(stopping: ScreenState | null): Promise<void> {
+  quitting = true;
+  if (stack) {
+    if (stopping || !currentScreen()) await screenOver(mainWindow, stopping ?? SCREENS.signingOut);
+    await stopStack();
+  }
+  const place = currentScreen()?.getBounds() ?? null;
+  app.relaunch({ args: relaunchArgs(process.argv.slice(1), place) });
+  app.quit();
+}
+
+/** Ce que l'écran fait pour redémarrer, par la mise à jour ou par une relance (cf. updater.ts). */
+const restart: RestartScreen = { prepare: prepareUpdate, relaunch: () => relaunchApp(SCREENS.signingOut) };
+
+/**
+ * Démarre la pile du compte derrière l'écran de la coque, puis ouvre la fenêtre de l'app. La fenêtre précédente
+ * (connexion) laisse sa place à l'écran, qui s'ouvre à l'identique par-dessus : seule la droite change. `false` si la
+ * pile n'a pas démarré : l'écran le dit, avec ses actions.
+ */
+async function openApp(account: Account, previous: BrowserWindow | null, first: ScreenState, place: Point | null): Promise<boolean> {
+  const splash = openScreen(first, previous ? previous.getBounds() : place, previous !== null);
+  if (previous) closeWhenShown(splash, previous);
   try {
-    stack = await startStack(account, step);
+    stack = await startStack(account, (text) => showScreen(splash, withNote(first, text)));
   } catch (error) {
     log.error(`Start failed: ${(error as Error).stack ?? error}`);
-    // Le message d'abord : fermer l'écran d'attente avant lui laisserait l'app sans fenêtre, et elle quitterait.
+    // L'échec se dit dans l'écran, à la place des étapes : essayer encore, ouvrir les journaux, quitter.
     quitting = true;
-    if (!splash.isDestroyed()) splash.hide();
-    const { response } = await dialog.showMessageBox({
-      type: "error",
-      buttons: ["Open logs", "Quit"],
-      defaultId: 1,
-      message: "TaskForce could not start",
-      detail: (error as Error).message,
-    });
-    if (response === 0) await shell.openPath(appLogDir());
-    app.quit();
-    return;
+    showScreen(splash, SCREENS.startFailed((error as Error).message));
+    return false;
   }
 
   mainWindow = new BrowserWindow({
@@ -280,17 +412,13 @@ async function openApp(account: Account, previous: BrowserWindow | null): Promis
     } else {
       mainWindow.show();
     }
-    if (!splash.isDestroyed()) splash.close();
-    // Premier lancement d'une nouvelle version : la personne voit que la mise à jour est faite.
-    if (stack?.updateNotice && Notification.isSupported()) {
-      const updated = new Notification(stack.updateNotice);
-      notices.add(updated);
-      updated.on("close", () => notices.delete(updated));
-      updated.show();
-    }
+    closeWhenShown(mainWindow, splash);
   });
   mainWindow.on("closed", () => (mainWindow = null));
+  // Premier lancement d'une nouvelle version : la fenêtre le dit à son ouverture, plus de notification du système.
+  if (stack.updateNotice) announceInstalled(stack.updateNotice);
   await mainWindow.loadURL(stack.origin);
+  return true;
 }
 
 /**
@@ -371,7 +499,16 @@ function registerIpc(): void {
   ipcMain.handle("desktop:check-updates", () => check());
   // Le toast de la mise à jour lit l'état à son ouverture, puis le reçoit à chaque changement (cf. updater.ts).
   ipcMain.handle("desktop:update-state", () => updateState());
-  ipcMain.handle("desktop:install-update", () => installNow(prepareUpdate));
+  ipcMain.handle("desktop:install-update", () => installNow(restart));
+  // Les actions d'un écran d'échec de la coque (static/splash.html), de lui seul.
+  ipcMain.handle("screen:act", async (event, action: unknown) => {
+    const current = currentScreen();
+    if (!isScreenAction(action) || !current || BrowserWindow.fromWebContents(event.sender) !== current) return;
+    if (action === "quit") app.quit();
+    else if (action === "logs") await shell.openPath(appLogDir());
+    else if (action === "retry") await relaunchApp(null);
+    else await restartApp(restart);
+  });
   ipcMain.handle("desktop:open-logs", () => shell.openPath(appLogDir()));
   // Copies de la base faites avant chaque mise à jour (cf. backup.ts).
   ipcMain.handle("desktop:open-backups", () => {
@@ -458,7 +595,7 @@ function registerIpc(): void {
     // prête (cf. `restartApp`), montre la connexion.
     settings.clearAccount();
     log.info("Signed out");
-    await restartApp(prepareUpdate);
+    await restartApp(restart);
   });
 }
 
@@ -554,8 +691,21 @@ app.on("before-quit", (event) => {
 
 app.on("window-all-closed", () => app.quit());
 
+/**
+ * Une erreur que rien n'attendait : l'écran de la coque la dit comme un démarrage manqué, avec ses actions ; la pile, si
+ * elle tourne, s'arrête en quittant. Sans écran possible, la boîte du système.
+ */
 function fatal(error: unknown): void {
   log.error(`Fatal: ${(error as Error)?.stack ?? String(error)}`);
-  dialog.showErrorBox("TaskForce could not start", (error as Error)?.message ?? String(error));
-  app.exit(1);
+  const message = (error as Error)?.message ?? String(error);
+  try {
+    const state = SCREENS.startFailed(message);
+    const current = currentScreen();
+    if (current) showScreen(current, state);
+    else openScreen(state, mainWindow ? centeredIn(screen.getDisplayMatching(mainWindow.getBounds()).workArea) : null);
+    mainWindow?.destroy();
+  } catch {
+    dialog.showErrorBox("TaskForce could not start", message);
+    app.exit(1);
+  }
 }

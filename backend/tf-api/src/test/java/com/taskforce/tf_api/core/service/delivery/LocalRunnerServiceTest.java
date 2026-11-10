@@ -181,6 +181,54 @@ class LocalRunnerServiceTest {
     }
 
     @Test
+    @DisplayName("claim : une reprise emporte la branche, la base, la session, la pull request, les commentaires et le premier dossier (R139)")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void claim_of_a_follow_up() {
+        DeliveryRun first = run(50L, DeliveryRunStatus.DONE, "tf-runner-pierre", owner, LocalDateTime.now());
+        DeliveryRun second = run(60L, DeliveryRunStatus.DONE, "tf-runner-pierre", owner, LocalDateTime.now());
+        second.setParentRun(first);
+        second.setAgentSession("79b0a053-7a97-4bc5-9b64-628da46559e3");
+        second.setResultUrl("https://github.com/acme/website/pull/212");
+        DeliveryRun queued = run(100L, DeliveryRunStatus.QUEUED, null, owner, null);
+        queued.setParentRun(second);
+        queued.setBranch("tf/web-4-fix-r50");
+        queued.setBaseSha("a".repeat(40));
+        queued.setFollowUp(List.of(java.util.Map.of("path", "src/a.ts", "line", 12, "side", "new", "text", "Use the helper")));
+        when(userRepository.findByEmail(OWNER_EMAIL)).thenReturn(Optional.of(owner));
+        when(runRepository.findClaimable(eq("claude-code"), eq(DeliveryRunStatus.QUEUED), eq(7L), any())).thenReturn(List.of(queued));
+        when(visibilityGuard.canWrite(any(Project.class), eq(7L))).thenReturn(true);
+        when(runRepository.claim(eq(100L), eq("tf-runner-pierre"), anyString(), any(), any(), any())).thenReturn(1);
+        when(rulesService.bundleFor(any())).thenReturn(RULES);
+        when(runRepository.findById(100L)).thenReturn(Optional.of(queued));
+
+        RunnerClaimResponse.FollowUp followUp = service.claim(RUNNER).orElseThrow().followUp();
+
+        assertThat(followUp.parentRunId()).isEqualTo(60L);
+        assertThat(followUp.worktreeRun()).isEqualTo(50L);
+        assertThat(followUp.branch()).isEqualTo("tf/web-4-fix-r50");
+        assertThat(followUp.base()).isEqualTo("a".repeat(40));
+        assertThat(followUp.sessionId()).isEqualTo("79b0a053-7a97-4bc5-9b64-628da46559e3");
+        assertThat(followUp.pullRequestUrl()).isEqualTo("https://github.com/acme/website/pull/212");
+        assertThat(followUp.comments()).containsExactly(new RunnerClaimResponse.Comment("src/a.ts", 12, "new", "Use the helper"));
+        ArgumentCaptor<java.util.Map<String, Object>> data = (ArgumentCaptor) ArgumentCaptor.forClass(java.util.Map.class);
+        verify(evidenceService).append(eq(queued), eq("mission.started"), any(), data.capture());
+        assertThat(data.getValue()).containsEntry("followUpOf", 60L).containsEntry("comments", 1);
+    }
+
+    @Test
+    @DisplayName("claim : une mission neuve n'a pas de reprise")
+    void claim_of_a_new_mission_has_no_follow_up() {
+        DeliveryRun queued = run(100L, DeliveryRunStatus.QUEUED, null, owner, null);
+        when(userRepository.findByEmail(OWNER_EMAIL)).thenReturn(Optional.of(owner));
+        when(runRepository.findClaimable(eq("claude-code"), eq(DeliveryRunStatus.QUEUED), eq(7L), any())).thenReturn(List.of(queued));
+        when(visibilityGuard.canWrite(any(Project.class), eq(7L))).thenReturn(true);
+        when(runRepository.claim(eq(100L), eq("tf-runner-pierre"), anyString(), any(), any(), any())).thenReturn(1);
+        when(rulesService.bundleFor(any())).thenReturn(RULES);
+
+        assertThat(service.claim(RUNNER).orElseThrow().followUp()).isNull();
+    }
+
+    @Test
     @DisplayName("claim : aucun run en attente -> vide")
     void claim_empty_queue() {
         when(userRepository.findByEmail(OWNER_EMAIL)).thenReturn(Optional.of(owner));

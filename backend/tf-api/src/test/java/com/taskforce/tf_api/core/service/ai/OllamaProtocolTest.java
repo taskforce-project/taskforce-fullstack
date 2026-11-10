@@ -99,21 +99,79 @@ class OllamaProtocolTest {
         return Stream.of(
             Arguments.of("{\"details\":{\"parameter_size\":\"8.2B\",\"quantization_level\":\"Q4_K_M\"},"
                 + "\"model_info\":{\"general.architecture\":\"qwen3\",\"qwen3.context_length\":40960},"
-                + "\"capabilities\":[\"completion\",\"tools\",\"thinking\"]}", "8.2B", 40960, true),
+                + "\"capabilities\":[\"completion\",\"tools\",\"thinking\"]}", "8.2B", 40960, true, true),
             // Une fiche sans outils : la liste le dit, le modèle n'en prend pas.
             Arguments.of("{\"details\":{\"parameter_size\":\"567.75M\"},\"model_info\":{\"general.architecture\":\"bert\"},"
-                + "\"capabilities\":[\"embedding\"]}", "567.75M", null, false),
+                + "\"capabilities\":[\"embedding\"]}", "567.75M", null, false, false),
             // Un Ollama d'avant la liste des capacités : on ne sait pas.
             Arguments.of("{\"details\":{\"parameter_size\":\" 7.6B \"},\"model_info\":{\"llama.context_length\":131072}}",
-                "7.6B", 131072, null),
-            Arguments.of("{\"error\":\"model 'nope' not found\"}", null, null, null));
+                "7.6B", 131072, null, null),
+            Arguments.of("{\"error\":\"model 'nope' not found\"}", null, null, null, null));
     }
 
     @ParameterizedTest
     @MethodSource("cards")
     @DisplayName("la fiche d'un modèle se lit dans /api/show : sa taille, sa fenêtre, ses outils, sans rien inventer")
-    void card(String show, String parameters, Integer contextLength, Boolean tools) throws Exception {
-        assertThat(OllamaProtocol.card(json(show))).isEqualTo(new ModelGateway.ModelCard(parameters, contextLength, tools));
+    void card(String show, String parameters, Integer contextLength, Boolean tools, Boolean chat) throws Exception {
+        ModelGateway.ModelCard card = OllamaProtocol.card(json(show));
+
+        assertThat(card.parameters()).isEqualTo(parameters);
+        assertThat(card.contextLength()).isEqualTo(contextLength);
+        assertThat(card.tools()).isEqualTo(tools);
+        assertThat(card.chat()).isEqualTo(chat);
+    }
+
+    /** Les fiches telles qu'Ollama 0.40.15 les rend pour les modèles de la Présidence (09/11/2026), réduites à ce qui décide. */
+    static Stream<Arguments> realCards() {
+        String fim = "{{- if .Suffix }}<|fim_prefix|>{{ .Prompt }}<|fim_suffix|>{{ .Suffix }}<|fim_middle|>{{ else }}{{ .Prompt }}{{ end }}";
+        String chatml = "{{- range $i, $_ := .Messages }}<|im_start|>{{ .Role }}\\n{{ .Content }}<|im_end|>{{ end }}";
+        return Stream.of(
+            Arguments.of("qwen2.5-coder:7b-base", "[\"completion\",\"insert\"]", fim, false),
+            Arguments.of("qwen2.5-coder:3b-base", "[\"completion\",\"insert\"]", fim, false),
+            Arguments.of("qwen3:8b", "[\"completion\",\"tools\",\"thinking\"]", chatml, true),
+            Arguments.of("qwen3:14b", "[\"completion\",\"tools\",\"thinking\"]", chatml, true),
+            Arguments.of("qwen2.5:7b-instruct", "[\"completion\",\"tools\"]", chatml, true),
+            Arguments.of("qwen2.5:14b-instruct", "[\"completion\",\"tools\"]", chatml, true),
+            // Son gabarit, rendu par Ollama lui-même, ne nomme pas les messages : ses outils disent qu'il converse.
+            Arguments.of("qwen3.5:9b", "[\"completion\",\"vision\",\"tools\",\"thinking\"]", "", true),
+            // Un modèle de conversation sans outils : c'est son gabarit qui le dit.
+            Arguments.of("llama2", "[\"completion\"]", "[INST] <<SYS>>{{ .System }}<</SYS>> {{ .Prompt }} [/INST]", true));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("realCards")
+    @DisplayName("un modèle sait-il converser ? ses capacités, puis son gabarit")
+    void whoCanChat(String model, String capabilities, String template, boolean chat) throws Exception {
+        String show = "{\"capabilities\":" + capabilities + ",\"template\":\"" + template.replace("\"", "\\\"") + "\"}";
+
+        assertThat(OllamaProtocol.card(json(show)).chat()).isEqualTo(chat);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({"qwen3:14b, 10950000000, 6120000000", "qwen3:8b, 0, 0"})
+    @DisplayName("où tient un modèle chargé se lit dans /api/ps ; pas chargé, rien")
+    void whereAModelSits(String model, long memory, long gpu) throws Exception {
+        JsonNode ps = json("{\"models\":[{\"name\":\"qwen3:14b\",\"model\":\"qwen3:14b\",\"size\":10950000000,\"size_vram\":6120000000}]}");
+
+        assertThat(OllamaProtocol.loaded(ps, model)).isEqualTo(new ModelGateway.LoadedModel(memory, gpu));
+    }
+
+    @org.junit.jupiter.api.Test
+    @DisplayName("la requête qui charge : aucun message, la fenêtre demandée")
+    void theLoadRequest() {
+        com.fasterxml.jackson.databind.node.ObjectNode request = OllamaProtocol.loadRequest(new com.fasterxml.jackson.databind.ObjectMapper(), "qwen3:8b", 16_384);
+
+        assertThat(request.path("model").asText()).isEqualTo("qwen3:8b");
+        assertThat(request.path("messages")).isEmpty();
+        assertThat(request.path("options").path("num_ctx").asInt()).isEqualTo(16_384);
+        assertThat(request.path("stream").asBoolean(true)).isFalse();
+    }
+
+    @org.junit.jupiter.api.Test
+    @DisplayName("la place sur le disque de chaque modèle se lit dans /api/tags")
+    void theDiskSizes() throws Exception {
+        assertThat(OllamaProtocol.diskSizes(json("{\"models\":[{\"name\":\"qwen3:14b\",\"size\":9276198565},{\"name\":\"\",\"size\":1},{\"name\":\"nope\"}]}")))
+            .containsOnly(org.assertj.core.api.Assertions.entry("qwen3:14b", 9_276_198_565L));
     }
 
     @ParameterizedTest(name = "{0}")

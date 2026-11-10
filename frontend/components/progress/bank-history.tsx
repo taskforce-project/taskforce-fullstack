@@ -12,6 +12,7 @@ import { fillText } from "@/lib/delivery/result-card"
 import { bankCurve, isFinished, runModel, type CurvePoint } from "@/lib/progress/bank-history"
 import { dayOf } from "@/lib/progress/day"
 import { useEvalStore } from "@/lib/store/eval-store"
+import { useModelBenchmarkStore } from "@/lib/store/model-benchmark-store"
 import { useModelCapabilityStore } from "@/lib/store/model-capability-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 
@@ -31,7 +32,8 @@ export function BankHistory({ slug }: Readonly<{ slug: string }>) {
   const stopRun = useEvalStore((s) => s.stopRun)
   // Le modèle avec lequel Cortex répond à la personne : la banque se rejoue sur lui. L'onglet peut s'ouvrir le premier.
   const model = useModelCapabilityStore((s) => s.table?.current ?? null)
-  const measuring = useModelCapabilityStore((s) => s.progress !== null)
+  // La file des modèles tient déjà le modèle : un rejeu attend qu'elle finisse.
+  const measuring = useModelBenchmarkStore((s) => s.progress !== null)
   const fetchTable = useModelCapabilityStore((s) => s.fetchTable)
 
   useEffect(() => {
@@ -46,9 +48,10 @@ export function BankHistory({ slug }: Readonly<{ slug: string }>) {
     return <p className="text-xs text-muted-foreground">{failed ? tp.readFailed : tp.reading}</p>
   }
 
-  const count = history.cases.length
   // Une banque vide : une ligne, et le prochain geste (R129).
-  if (count === 0) return <p className="text-xs text-muted-foreground">{tp.noCases}</p>
+  if (history.cases.length === 0) return <p className="text-xs text-muted-foreground">{tp.noCases}</p>
+  // Un cas qui attend ses critères n'est pas rejoué (R61).
+  const count = history.cases.filter((item) => !item.waiting).length
 
   const target = model ?? tp.cortexModel
   const passedText = (point: CurvePoint) => fillText(tp.passed, { passed: point.passed, total: point.total })
@@ -76,7 +79,7 @@ export function BankHistory({ slug }: Readonly<{ slug: string }>) {
   ) : (
     <Named name={`${replayName}. ${tp.replayHint}`} wide>
       <span className="inline-flex">
-        <Button variant="outline" size="sm" onClick={() => void runBank(slug, model ?? "")} disabled={measuring} aria-label={replayName} className="gap-1.5">
+        <Button variant="outline" size="sm" onClick={() => void runBank(slug, model ?? "")} disabled={measuring || count === 0} aria-label={replayName} className="gap-1.5">
           <Play className="size-3" /> {tp.replayShort}
         </Button>
       </span>

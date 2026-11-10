@@ -1,16 +1,26 @@
 /**
- * Le banc des modèles (R131, séance n°19) : `/api/workspaces/{slug}/ai/benchmark`. Une matrice par tâche du vrai travail,
- * un passage rejoué cas par cas, le détail d'un modèle où la personne peut retourner une note, et l'essai à l'aveugle
- * sur une de ses issues. Aucune adresse ni clé n'est exposée, seulement les noms de modèles, leurs réponses et leurs notes.
+ * Le banc des modèles (R131, séance n°19 ; R142, séance n°20) : `/api/workspaces/{slug}/ai/benchmark`. Une matrice par tâche
+ * du vrai travail, un passage modèle après modèle (un premier appel charge le modèle, puis cas par cas), le détail d'un modèle
+ * où la personne peut retourner une note, et l'essai sur une de ses issues. Aucune adresse ni clé n'est exposée, seulement les
+ * noms de modèles, leurs réponses et leurs notes.
  */
-import { AI_TIMEOUT_MS, apiClient } from "./client"
+import { apiClient } from "./client"
 import { AI_BENCHMARK_ROUTES } from "../config/api-routes"
 
-/** Le verdict d'une tâche (R131) ; null quand elle n'a pas été passée. */
-export type BenchmarkVerdict = "give_it" | "with_review" | "not_yet"
+/**
+ * Le temps qu'on attend la réponse à un cas : les cinq minutes de son budget côté serveur (R142, `BenchmarkSuite.CASE_BUDGET`),
+ * plus de quoi recevoir le verdict. Le serveur répond toujours avant, même « trop lent ».
+ */
+export const BENCHMARK_CASE_TIMEOUT_MS = 330_000
+
+/** Le verdict d'une tâche (R131, R142) ; null quand elle n'a pas été passée. */
+export type BenchmarkVerdict = "give_it" | "with_review" | "not_yet" | "too_slow"
 
 /** Qui a retourné une note : la personne qui lit, un autre membre, ou personne. */
 export type BenchmarkJudge = "you" | "member"
+
+/** La clé de la colonne « Your tests » : la banque de tests de l'espace, à côté des tâches. */
+export const BANK_TASK = "bank"
 
 /** Une colonne : une tâche du vrai travail. `trial` : elle s'essaie à l'aveugle sur une issue. */
 export interface BenchmarkTaskInfo {
@@ -29,6 +39,30 @@ export interface BenchmarkCell {
   measured: number
   total: number
   judge: BenchmarkJudge | null
+  /** Ses cas qui n'ont pas répondu dans leur budget : « Too slow here ». */
+  tooSlow: number
+}
+
+/**
+ * Ce qu'on sait d'un modèle, sans le noter (R142) : ce que dit sa fiche chez son fournisseur, ce qu'on a vu quand il s'est
+ * chargé. Chaque valeur est null quand personne ne la dit ; rien n'est deviné.
+ */
+export interface BenchmarkModelFacts {
+  /** Telle qu'Ollama la nomme : « qwen3 ». */
+  family: string | null
+  /** « 14.8B ». */
+  parameters: string | null
+  diskBytes: number | null
+  /** En jetons. */
+  contextWindow: number | null
+  tools: boolean | null
+  /** false : un modèle de base, qui complète du texte, ne se passe pas. */
+  chat: boolean | null
+  /** La mémoire qu'il occupait à son dernier chargement ici. */
+  memoryBytes: number | null
+  /** Ce qui en tenait sur la carte graphique ; le reste tournait sur le processeur. */
+  gpuBytes: number | null
+  loadProblem: "too_slow" | "failed" | null
 }
 
 export interface BenchmarkModelRow {
@@ -39,6 +73,7 @@ export interface BenchmarkModelRow {
   /** Environ, en secondes : d'après ses derniers temps, sinon d'après ce que les autres ont pris. */
   estimateSeconds: number
   cells: BenchmarkCell[]
+  facts: BenchmarkModelFacts
 }
 
 export interface BenchmarkMatrix {
@@ -56,6 +91,29 @@ export interface BenchmarkRunStarted {
   model: string
   startedAt: string
   cases: string[]
+}
+
+/**
+ * Le premier appel d'un passage, qui charge le modèle avant que rien ne soit chronométré. `too_slow` et `failed` : le modèle
+ * se passe pour cette fois, sa ligne le dit. `unreachable` : l'IA ne répond plus, `message` dit quoi faire.
+ */
+export interface BenchmarkLoadResult {
+  status: "loaded" | "too_slow" | "failed" | "unreachable"
+  loadMs: number | null
+  memoryBytes: number | null
+  gpuBytes: number | null
+  message: string | null
+}
+
+/** Un passage dans l'histoire de l'espace. */
+export interface BenchmarkRunLine {
+  runId: number
+  model: string
+  startedAt: string
+  total: number
+  measured: number
+  passed: number
+  tooSlow: number
 }
 
 export interface BenchmarkCheck {
@@ -88,6 +146,8 @@ export interface BenchmarkCaseDetail {
   answer: string
   durationMs: number | null
   at: string | null
+  /** Le modèle n'a pas répondu dans le budget du cas : il n'y a rien à juger. */
+  tooSlow: boolean
 }
 
 export interface BenchmarkTaskDetail extends BenchmarkCell {
@@ -99,6 +159,7 @@ export interface BlindTrialAnswer {
   model: string
   answer: string
   durationMs: number | null
+  tooSlow: boolean
 }
 
 /** Un essai à l'aveugle tranché : visible de la seule personne qui l'a lancé. */
@@ -134,6 +195,7 @@ export interface BlindTrialLetterAnswer {
   letter: string
   answer: string
   durationMs: number | null
+  tooSlow: boolean
 }
 
 export interface BlindTrialRequest {
@@ -161,11 +223,30 @@ export async function startBenchmarkRun(slug: string, model: string): Promise<Be
   return res.data.data
 }
 
-/** Passe un cas sur le modèle du passage : une réponse du modèle, donc le délai de l'IA. */
+/** Le premier appel d'un passage : charge le modèle avant que rien ne soit chronométré. Jamais une erreur pour un modèle qui ne se charge pas. */
+export async function loadBenchmarkModel(slug: string, runId: number): Promise<BenchmarkLoadResult> {
+  const res = await apiClient.post<{ data: BenchmarkLoadResult }>(
+    AI_BENCHMARK_ROUTES.RUN_LOAD(slug, runId), undefined, { timeout: BENCHMARK_CASE_TIMEOUT_MS, silentError: true },
+  )
+  return res.data.data
+}
+
+/** Passe un cas sur le modèle du passage : une réponse du modèle, dans le budget du cas. Sans toast : le store dit pourquoi un passage s'arrête. */
 export async function playBenchmarkCase(slug: string, runId: number, caseKey: string): Promise<BenchmarkCaseDetail> {
   const res = await apiClient.post<{ data: BenchmarkCaseDetail }>(
-    AI_BENCHMARK_ROUTES.RUN_CASE(slug, runId, caseKey), undefined, { timeout: AI_TIMEOUT_MS },
+    AI_BENCHMARK_ROUTES.RUN_CASE(slug, runId, caseKey), undefined, { timeout: BENCHMARK_CASE_TIMEOUT_MS, silentError: true },
   )
+  return res.data.data
+}
+
+/** « Stop » : coupe l'appel au modèle en cours de la personne, pour qu'elle n'attende pas la fin d'un cas. */
+export async function stopBenchmark(slug: string): Promise<void> {
+  await apiClient.post(AI_BENCHMARK_ROUTES.STOP(slug), undefined, { silentError: true })
+}
+
+/** Les passages de l'espace, le plus récent d'abord. Appel de fond : jamais de toast. */
+export async function getBenchmarkHistory(slug: string): Promise<BenchmarkRunLine[]> {
+  const res = await apiClient.get<{ data: BenchmarkRunLine[] }>(AI_BENCHMARK_ROUTES.HISTORY(slug), { silentError: true })
   return res.data.data
 }
 
@@ -182,10 +263,10 @@ export async function startBlindTrial(slug: string, request: BlindTrialRequest):
   return res.data.data
 }
 
-/** Fait répondre le modèle d'une lettre : une réponse du modèle, donc le délai de l'IA. */
+/** Fait répondre le modèle d'une lettre : une réponse du modèle, dans le budget d'un cas. */
 export async function playBlindTrialLetter(slug: string, trialId: number, letter: string): Promise<BlindTrialLetterAnswer> {
   const res = await apiClient.post<{ data: BlindTrialLetterAnswer }>(
-    AI_BENCHMARK_ROUTES.TRIAL_LETTER(slug, trialId, letter), undefined, { timeout: AI_TIMEOUT_MS },
+    AI_BENCHMARK_ROUTES.TRIAL_LETTER(slug, trialId, letter), undefined, { timeout: BENCHMARK_CASE_TIMEOUT_MS },
   )
   return res.data.data
 }

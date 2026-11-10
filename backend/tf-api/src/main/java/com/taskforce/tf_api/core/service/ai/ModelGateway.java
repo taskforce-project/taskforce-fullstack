@@ -67,6 +67,8 @@ public class ModelGateway {
     private final ModelHttp http;
     /** La fiche de chaque modèle d'Ollama ({@code /api/show}), par adresse : elle ne change qu'avec le modèle. */
     private final Map<String, ModelCard> modelCards = new ConcurrentHashMap<>();
+    /** La place de chaque modèle d'Ollama sur le disque ({@code /api/tags}), par adresse : elle ne change qu'avec le modèle. */
+    private final Map<String, Long> diskSizes = new ConcurrentHashMap<>();
     /** La fenêtre que chaque fournisseur hébergé dit de ses modèles, par adresse, relue avec sa liste (état de l'IA, 30 s). */
     private final Map<String, Integer> reportedWindows = new ConcurrentHashMap<>();
 
@@ -113,17 +115,34 @@ public class ModelGateway {
 
     /**
      * Ce que la fiche d'un modèle dit de lui chez son fournisseur, telle qu'Ollama la donne : sa taille (« 8.2B »), sa
-     * fenêtre de contexte en jetons, et s'il prend des outils ; chaque valeur est {@code null} quand la fiche ne la dit
-     * pas. Ce n'est pas une mesure : la table des capacités la montre comme telle tant que le modèle n'est pas mesuré ici
-     * (R113, R125).
+     * fenêtre de contexte en jetons, s'il prend des outils, sa famille (« qwen3 »), s'il sait converser ({@code chat},
+     * {@link OllamaProtocol#chats}), et sa place sur le disque en octets ; chaque valeur est {@code null} quand la fiche ne
+     * la dit pas. Ce n'est pas une mesure : la table des capacités la montre comme telle tant que le modèle n'est pas mesuré
+     * ici (R113, R125, R142).
      */
-    public record ModelCard(String parameters, Integer contextLength, Boolean tools) {
+    public record ModelCard(String parameters, Integer contextLength, Boolean tools, String family, Boolean chat, Long diskBytes) {
 
         static final ModelCard NONE = new ModelCard(null, null, null);
 
-        boolean empty() {
-            return parameters == null && contextLength == null && tools == null;
+        /** Une fiche réduite à ce que disent la liste des modèles ou un fournisseur hébergé. */
+        public ModelCard(String parameters, Integer contextLength, Boolean tools) {
+            this(parameters, contextLength, tools, null, null, null);
         }
+
+        boolean empty() {
+            return parameters == null && contextLength == null && tools == null && family == null && chat == null;
+        }
+
+        ModelCard onDisk(Long bytes) {
+            return new ModelCard(parameters, contextLength, tools, family, chat, bytes);
+        }
+    }
+
+    /**
+     * Un modèle d'Ollama une fois chargé (R142) : la mémoire qu'il occupe avec sa fenêtre de contexte, ce qui en tient sur
+     * la carte graphique (le reste tourne sur le processeur). Mesuré, pas estimé : {@code /api/ps}.
+     */
+    public record LoadedModel(long memoryBytes, long gpuBytes) {
     }
 
     /** Une conversation, chez le fournisseur des réglages. */
@@ -138,11 +157,15 @@ public class ModelGateway {
         if (call.tools() != null) {
             call.tools().forEach(tool -> tools.add(mapper.valueToTree(tool)));
         }
-        return switch (settings.provider()) {
-            case ANTHROPIC -> anthropic(settings, call, tools);
-            case OLLAMA -> ollama(settings, call, tools);
-            case OPENAI -> openAi(settings, call, tools);
-        };
+        try {
+            return switch (settings.provider()) {
+                case ANTHROPIC -> anthropic(settings, call, tools);
+                case OLLAMA -> ollama(settings, call, tools);
+                case OPENAI -> openAi(settings, call, tools);
+            };
+        } catch (ModelProviderException failed) {
+            throw failed.about(call.model()); // la conversation nomme le modèle qui n'a pas répondu
+        }
     }
 
     /**
@@ -199,8 +222,67 @@ public class ModelGateway {
             Integer reported = reportedWindow(settings, model);
             return reported == null ? Optional.empty() : Optional.of(new ModelCard(null, reported, null));
         }
-        ModelCard card = card(OllamaProtocol.nativeBase(settings.baseUrl()), openAiHeaders(settings.apiKey()), model);
-        return card.empty() ? Optional.empty() : Optional.of(card);
+        String base = OllamaProtocol.nativeBase(settings.baseUrl());
+        Map<String, String> headers = openAiHeaders(settings.apiKey());
+        ModelCard card = card(base, headers, model);
+        return card.empty() ? Optional.empty() : Optional.of(card.onDisk(diskBytes(base, headers, model)));
+    }
+
+    /**
+     * Charge un modèle d'Ollama, avant qu'on ne chronomètre rien (R142) : une conversation sans message le monte en mémoire,
+     * à la plus grande fenêtre qu'il recevra, pour qu'aucun cas ne paie un rechargement ({@link OllamaProtocol#window} garde
+     * la fenêtre déjà chargée). Rend ce qu'Ollama dit de sa place ; vide chez un autre fournisseur, où rien ne se charge.
+     *
+     * @throws ModelProviderException.TimedOut    le chargement dépasse {@code budget}
+     * @throws ModelProviderException.Unreachable Ollama ne répond pas
+     * @throws ModelProviderException             Ollama refuse de le charger (plus de mémoire, par exemple)
+     */
+    public Optional<LoadedModel> load(AiProviderSettings settings, String model, Duration budget) {
+        if (!settings.enabled() || settings.provider() != AiProvider.OLLAMA || model == null || model.isBlank()) {
+            return Optional.empty();
+        }
+        String base = OllamaProtocol.nativeBase(settings.baseUrl());
+        Map<String, String> headers = openAiHeaders(settings.apiKey());
+        int window = OllamaProtocol.ceiling(settings.ollamaMaxContext(), modelMaximum(base, headers, model));
+        ModelHttp.Reply reply = send(base + "/api/chat", headers, OllamaProtocol.loadRequest(mapper, model, window), budget);
+        if (!reply.ok()) {
+            log.warn("AI provider refused to load {} (HTTP {})", LogSafe.of(model), reply.status());
+            throw new ModelProviderException("AI provider refused to load the model (HTTP " + reply.status() + ")");
+        }
+        return Optional.of(placement(base, headers, model));
+    }
+
+    /** Où tient un modèle chargé, selon {@code /api/ps} ; 0 octet s'il n'est pas dit. */
+    private LoadedModel placement(String base, Map<String, String> headers, String model) {
+        try {
+            ModelHttp.Reply reply = http.send("GET", base + "/api/ps", headers, null, LOADED_TIMEOUT);
+            return reply.ok() ? OllamaProtocol.loaded(read(reply.body()), model) : new LoadedModel(0, 0);
+        } catch (IOException | RuntimeException unknown) {
+            return new LoadedModel(0, 0);
+        }
+    }
+
+    /**
+     * La place d'un modèle sur le disque, lue dans {@code /api/tags} (toute la liste d'un coup) ; null si elle n'y est pas.
+     * Une liste lue qui ne le nomme pas compte aussi (0) : la matrice se relit à chaque cas, sans relire la liste pour autant.
+     */
+    private Long diskBytes(String base, Map<String, String> headers, String model) {
+        String key = base + " " + model;
+        Long known = diskSizes.get(key);
+        if (known != null) {
+            return known > 0 ? known : null;
+        }
+        try {
+            ModelHttp.Reply reply = http.send("GET", base + "/api/tags", headers, null, PROBE_TIMEOUT);
+            if (reply.ok()) {
+                OllamaProtocol.diskSizes(read(reply.body())).forEach((name, bytes) -> diskSizes.put(base + " " + name, bytes));
+                diskSizes.putIfAbsent(key, 0L);
+            }
+        } catch (IOException | RuntimeException unreadable) {
+            return null;
+        }
+        Long read = diskSizes.get(key);
+        return read != null && read > 0 ? read : null;
     }
 
     /** Vecteurs des textes, dans l'ordre, chez le fournisseur des vecteurs. */
@@ -285,7 +367,7 @@ public class ModelGateway {
                 attempt = fewerTools(reply.status(), attempt);
                 continue;
             }
-            throw new ModelProviderException("AI provider refused the request (HTTP " + reply.status() + ")");
+            throw ModelProviderException.refused(reply.status(), reply.body());
         }
     }
 
@@ -319,7 +401,7 @@ public class ModelGateway {
                 withTools(body, attempt, AiProvider.OLLAMA);
                 continue;
             }
-            throw new ModelProviderException("AI provider refused the request (HTTP " + reply.status() + ")");
+            throw ModelProviderException.refused(reply.status(), reply.body());
         }
     }
 
@@ -417,7 +499,7 @@ public class ModelGateway {
                 continue;
             }
             log.warn("AI provider refused the request (HTTP {}): {}", reply.status(), LogSafe.of(error));
-            throw new ModelProviderException("AI provider refused the request (HTTP " + reply.status() + ")");
+            throw ModelProviderException.refused(reply.status(), reply.body());
         }
     }
 
@@ -433,7 +515,7 @@ public class ModelGateway {
         if (keep == 0) {
             log.error("AI provider answered {} even with a single tool", status);
             if (status == 413) {
-                throw new ModelProviderException("AI provider: the request is too large (HTTP 413)");
+                throw ModelProviderException.tooLarge("AI provider: the request is too large (HTTP 413)");
             }
             throw new ModelProviderException.ToolsRefused("AI provider refused the tools (HTTP " + status + ")");
         }
@@ -465,8 +547,8 @@ public class ModelGateway {
     private ModelHttp.Reply send(String url, Map<String, String> headers, ObjectNode body, Duration timeout) {
         try {
             return http.send("POST", url, headers, write(body), timeout);
-        } catch (IOException unreachable) {
-            throw new ModelProviderException("AI provider unreachable: " + reason(unreachable), unreachable);
+        } catch (IOException failed) {
+            throw ModelProviderException.transport(reason(failed), failed, timeout);
         }
     }
 
