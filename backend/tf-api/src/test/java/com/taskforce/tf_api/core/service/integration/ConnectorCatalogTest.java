@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests unitaires de {@link ConnectorCatalog} : trois intégrations natives et 25 préréglages de serveurs MCP
- * (ADR-020).
+ * (ADR-020), dont un seul essayé de bout en bout et montré à tous (TF-J1-3).
  *
  * <p>Le catalogue est déclaratif : une erreur de déclaration ne casse rien à la compilation et ne se voit qu'à
  * l'écran (tuile sans URL, catégorie vide) ou en base (champ de secret oublié en clair). D'où des tests
@@ -134,10 +134,47 @@ class ConnectorCatalogTest {
 
     @ParameterizedTest
     @NullSource
-    @DisplayName("une clé nulle n'est ni trouvée ni un préréglage")
+    @DisplayName("une clé nulle n'est ni trouvée ni un préréglage, ni montrée")
     void cleNulle(String cle) {
         assertThat(catalogue.byKey(cle)).isEmpty();
         assertThat(catalogue.isMcpPreset(cle)).isFalse();
+        assertThat(catalogue.isTriedPreset(cle)).isFalse();
+        assertThat(catalogue.isShown(cle, true)).isFalse();
+    }
+
+    // ── Préréglages essayés (TF-J1-3) ────────────────────────────────────────
+
+    @Test
+    @DisplayName("un seul préréglage essayé de bout en bout : Linear ; les 24 autres restent déclarés")
+    void unSeulPrereglageEssaye() {
+        assertThat(catalogue.all()).filteredOn(d -> catalogue.isTriedPreset(d.key()))
+            .extracting(ConnectorDescriptor::key).containsExactly("linear");
+        assertThat(catalogue.all()).filteredOn(d -> d.authType() == ConnectorAuthType.MCP)
+            .filteredOn(d -> !catalogue.isTriedPreset(d.key())).hasSize(24);
+    }
+
+    @ParameterizedTest(name = "{0} -> {1}")
+    @CsvSource({"linear, true", "jira, false", "cloudflare, false", "github, false", "plane, false", "trello, false"})
+    @DisplayName("isTriedPreset : vrai pour un préréglage essayé seulement, jamais pour une native ou une clé inconnue")
+    void isTriedPreset(String cle, boolean attendu) {
+        assertThat(catalogue.isTriedPreset(cle)).isEqualTo(attendu);
+    }
+
+    @ParameterizedTest(name = "{0}, connecté ici = {1} -> montré = {2}")
+    @CsvSource({
+        "plane,      false, true",
+        "github,     false, true",
+        "slack,      false, true",
+        "linear,     false, true",
+        "jira,       false, false",
+        "cloudflare, false, false",
+        "cloudflare, true,  true",
+        "zapier,     true,  true",
+        "trello,     true,  false",
+    })
+    @DisplayName("isShown : natives et préréglage essayé pour tous ; un préréglage jamais essayé pour l'espace qui l'a connecté")
+    void isShown(String cle, boolean connecteIci, boolean attendu) {
+        assertThat(catalogue.isShown(cle, connecteIci)).isEqualTo(attendu);
     }
 
     // ── Intégrations natives ─────────────────────────────────────────────────
@@ -156,6 +193,20 @@ class ConnectorCatalogTest {
             assertThat(f.required()).isTrue();
             assertThat(f.secret()).isEqualTo(f.key().equals("apiKey"));
         });
+    }
+
+    @ParameterizedTest(name = "{0} : « {1} »")
+    @CsvSource(delimiter = '|', value = {
+        "plane  | Syncs your Plane projects and work items into the workspace's knowledge.",
+        "github | Links pull requests and commits to your issues; a merged pull request completes its issue.",
+        "slack  | Posts issue notifications to your channels and brings their history into the workspace's knowledge.",
+    })
+    @DisplayName("chaque native dit en une phrase ce qu'elle fait, à côté des préréglages (rejeu de la 1.8.0)")
+    void chaqueNativeDitCeQuElleFait(String cle, String ligne) {
+        ConnectorDescriptor d = catalogue.byKey(cle).orElseThrow();
+
+        assertThat(d.description()).isEqualTo(ligne);
+        assertThat(catalogue.isShown(cle, false)).isTrue();
     }
 
     @ParameterizedTest(name = "{0}")

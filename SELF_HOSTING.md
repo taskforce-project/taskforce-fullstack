@@ -1,8 +1,8 @@
 # Self-hosting TaskForce
 
-TaskForce runs on one machine with Docker: the app, its API, sign-in (Keycloak), the database (PostgreSQL), file
-storage (MinIO) and a small AI gateway. Your data stays on that machine. AI comes from Ollama on the same machine by
-default, or from any OpenAI-compatible API you choose.
+TaskForce runs on one machine with Docker: the app, its API, sign-in (Keycloak), the database (PostgreSQL) and file
+storage (MinIO). Your data stays on that machine. AI comes from Ollama on the same machine by default, or from any
+OpenAI-compatible API or Anthropic's API you choose: the API talks to the provider itself.
 
 ## Requirements
 
@@ -40,8 +40,29 @@ to plain text.
   settings).
 - **Ollama in a container**: `docker compose --profile ollama up -d`, set `OLLAMA_BASE_URL=http://ollama:11434` in
   `.env`, then `docker compose exec ollama ollama pull qwen3:8b` and the same for `bge-m3`.
-- **An OpenAI-compatible API** (OpenAI, Groq, Mistral, a vLLM server...): set `AI_BASE_URL`, `AI_API_KEY`,
-  `AI_MODEL` and `AI_MODEL_FAST` in `.env`.
+- **An OpenAI-compatible API** (OpenAI, Groq, Mistral, a vLLM server...): set `AI_PROVIDER=openai`, `AI_BASE_URL`,
+  `AI_API_KEY`, `AI_MODEL` and `AI_MODEL_FAST` in `.env`. Search uses the same API: set `AI_EMBED_MODEL` to one of
+  its models that returns vectors of 1024 dimensions, or point `AI_EMBED_BASE_URL` at Ollama.
+- **Anthropic's API**: set `AI_PROVIDER=anthropic` and `AI_API_KEY`. Without `AI_MODEL`, TaskForce picks Claude Opus
+  for answers and Claude Haiku for quick ones. Anthropic has no search model: search keeps using Ollama (set
+  `AI_EMBED_MODEL=bge-m3` to keep the vectors already computed), or the OpenAI-compatible API set in
+  `AI_EMBED_BASE_URL`, `AI_EMBED_API_KEY` and `AI_EMBED_MODEL`.
+
+With `AI_PROVIDER` set, a model left empty is picked among those the provider lists; without it, TaskForce uses
+`qwen3:8b` and `bge-m3`, as before. `AI_PROVIDER=none` turns AI off.
+
+With Ollama, TaskForce sizes the context window of each request to what it carries (Cortex's instructions and tools,
+the screen, the notes, the conversation): from 8,192 tokens up to `AI_OLLAMA_MAX_CONTEXT`, 16,384 by default, or the
+model's own maximum if it is smaller. A larger window takes more GPU memory: on an 8 GB GPU, `qwen3:8b` stays
+entirely on the GPU up to 16,384 tokens with Ollama's `OLLAMA_KV_CACHE_TYPE=q8_0`. With more memory, set
+`AI_OLLAMA_MAX_CONTEXT=32768` in `.env`; with less, `8192`.
+
+With a hosted provider, TaskForce reads each model's context window from the provider's list of models when the
+provider gives it (Anthropic, Groq, Mistral, OpenRouter) and sizes the conversation to it; `AI_HOSTED_MAX_CONTEXT`
+caps what it counts on, for a plan that refuses requests below the advertised window (12,000 tokens by default on Groq,
+whose on-demand tier stops at 8,000 tokens per minute). When the provider says nothing (OpenAI), it assumes
+`AI_DEFAULT_CONTEXT`, 16,384 tokens by default, and shows it as an estimate. Set it to the model's real window to keep
+more of a conversation before it is summarized.
 
 After a change in `.env`: `docker compose up -d`.
 

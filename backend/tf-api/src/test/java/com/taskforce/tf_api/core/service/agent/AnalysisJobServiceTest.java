@@ -156,7 +156,7 @@ class AnalysisJobServiceTest {
     // ---- flux temps réel ----
 
     /** Les changements d'état qu'un workflow publie. */
-    enum Change { LAUNCH, ANSWER, STEP, SUSPEND, FAIL }
+    enum Change { LAUNCH, ANSWER, START, SUSPEND, FAIL }
 
     @ParameterizedTest(name = "{0} → /topic/projects.1.analysis")
     @EnumSource(Change.class)
@@ -165,9 +165,9 @@ class AnalysisJobServiceTest {
         AnalysisJob job = AnalysisJob.builder()
             .id(4L).workspace(ws).project(project).user(user).depth(AnalysisDepth.DEEP)
             .status(AnalysisJobStatus.WAITING_FOR_INPUT)
-            .planJson(AnalysisPlan.initial(objectMapper, true).toJson())
             .build();
         when(projectRepository.findByIdAndWorkspaceId(1L, 5L)).thenReturn(Optional.of(project));
+        when(projectRepository.findById(1L)).thenReturn(Optional.of(project));
         when(userRepository.findById(9L)).thenReturn(Optional.of(user));
         when(jobRepository.findByIdAndWorkspaceId(4L, 5L)).thenReturn(Optional.of(job));
         when(jobRepository.findById(4L)).thenReturn(Optional.of(job));
@@ -175,13 +175,28 @@ class AnalysisJobServiceTest {
         switch (change) {
             case LAUNCH -> service.launch("acme", 1L, 9L, AnalysisDepth.QUICK);
             case ANSWER -> service.answer("acme", 4L, 9L, "focus on security");
-            case STEP -> service.step(4L, AnalysisPlan.OBSERVE, AnalysisPlan.COMPLETED);
+            case START -> service.startJob(4L);
             case SUSPEND -> service.suspend(4L, "Which deadline matters most?");
             case FAIL -> service.fail(4L, "model unavailable");
         }
 
         verify(messagingTemplate).convertAndSend(eq("/topic/projects.1.analysis"), any(AnalysisJobResponse.class));
         verify(messagingTemplate, never()).convertAndSend(startsWith("/topic/analysis."), any(Object.class));
+    }
+
+    @Test
+    @DisplayName("suspend : sans plan d'étapes, le statut et la question disent seuls que le workflow attend la personne")
+    void suspend_waits_for_the_person() {
+        AnalysisJob job = AnalysisJob.builder()
+            .id(4L).workspace(ws).project(project).user(user).depth(AnalysisDepth.DEEP)
+            .status(AnalysisJobStatus.RUNNING)
+            .build();
+        when(jobRepository.findById(4L)).thenReturn(Optional.of(job));
+
+        service.suspend(4L, "Which deadline matters most?");
+
+        assertThat(job.getStatus()).isEqualTo(AnalysisJobStatus.WAITING_FOR_INPUT);
+        assertThat(job.getQuestion()).isEqualTo("Which deadline matters most?");
     }
 
     // ---- answer / dismiss ----

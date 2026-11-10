@@ -20,7 +20,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now tf-backup.timer
 # Lister les sauvegardes
 ls -1t ~/backups/
 
-# Restaurer un instantané (arrête/redémarre backend+keycloak+ai-service automatiquement)
+# Restaurer un instantané (arrête/redémarre backend+keycloak automatiquement)
 ~/ops/backup/pg_restore.sh ~/backups/taskforce-cluster-AAAAMMJJ-HHMMSS.sql.gz
 
 # État du timer / prochaine exécution

@@ -38,8 +38,9 @@ coding agents work.
 ## Issues
 
 An issue carries a status, a priority, labels, a due date, story points, an assignee, subtasks, a checklist, relations
-to other issues, attachments, comments and time tracking. Its activity shows who changed what, and its GitHub tab
-lists the pull requests and commits linked to it.
+to other issues, attachments, comments and time tracking. Its activity shows who changed what, and through which
+agent: Cortex when it prepared the issue, a coding agent when it acted for you. Its GitHub tab lists the pull requests
+and commits linked to it.
 
 The assignee can be a person or a coding agent: see [Coding agents](/guides/coding-agents).
 

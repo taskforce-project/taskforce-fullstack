@@ -9,26 +9,29 @@
 export const IS_DESKTOP = process.env.NEXT_PUBLIC_DESKTOP === "true";
 
 /**
- * App desktop : la connexion de GitHub et de Slack par OAuth n'y marche pas encore (PC-060) ; on ne montre que ce qui
- * marche (R12), ni dans le catalogue ni dans la pilule de l'accueil. Masqués avec revue au 30/11/2026 ; d'ici là,
- * GitHub passe par le GitHub CLI de la personne.
+ * App desktop : la connexion de GitHub et de Slack par OAuth n'y marche pas encore (PC-060) ; la pilule de l'accueil
+ * ne les propose pas (R12). Masqués avec revue au 30/11/2026 ; d'ici là, GitHub passe par le GitHub CLI de la personne.
+ * Le catalogue des intégrations, lui, les montre avec leur état (rejeu de la 1.8.0) : GitHub par le GitHub CLI, Slack
+ * sans geste de connexion.
  */
 export const DESKTOP_HIDDEN_CONNECTORS: ReadonlySet<string> = new Set(["github", "slack"]);
 
 /** Fournisseur d'IA choisi sur cet ordinateur (cf. `desktop/src/ai.ts`). Un modèle vide est choisi automatiquement. */
 export interface DesktopAiSettings {
-  provider: "ollama" | "custom" | "off";
+  provider: "ollama" | "custom" | "anthropic" | "off";
   baseUrl: string;
   model: string;
   modelFast: string;
   embedModel: string;
 }
 
-/** État lu chez le fournisseur : joignable ou non, modèles installés, modèles retenus. */
+/** État lu chez le fournisseur par le backend : joignable ou non, modèles installés, modèles retenus. */
 export interface DesktopAiState {
   configured: boolean;
   reachable: boolean;
   models: string[];
+  /** Modèles du fournisseur des vecteurs (Ollama sur l'ordinateur quand la conversation passe par Anthropic). */
+  embedModels?: string[];
   chat: { model: string | null; model_fast: string | null; available: boolean };
   embeddings: { model: string | null; dimensions: number; available: boolean };
 }
@@ -118,13 +121,24 @@ export type DesktopUpdateCheck =
 
 /**
  * État de la mise à jour, envoyé par la coque à chaque changement (cf. `desktop/src/update-state.ts`) : le toast de la
- * mise à jour en montre l'avancement, puis le bouton de redémarrage.
+ * mise à jour en montre l'avancement, puis le bouton de redémarrage. `retry` : cette version devait déjà s'installer au
+ * dernier arrêt, et l'app tourne encore sur la précédente (l'installeur tourne sans fenêtre, c'est le toast qui le dit).
  */
 export type DesktopUpdateState =
   | { status: "idle" }
+  | { status: "installed"; version: string; from: string }
   | { status: "downloading"; version: string; percent: number }
-  | { status: "ready"; version: string }
+  | { status: "ready"; version: string; retry?: boolean }
   | { status: "failed"; version: string; message: string };
+
+/** État du modèle de la voix (cf. `desktop/src/voice.ts`) : sa taille, et ce qui en est déjà sur l'ordinateur. */
+export type DesktopVoiceStatus =
+  | { state: "missing"; bytes: number; received: number }
+  | { state: "downloading"; bytes: number; received: number }
+  | { state: "ready"; bytes: number };
+
+export type DesktopVoiceError = "model" | "engine" | "network" | "checksum" | "disk" | "cancelled";
+export type DesktopVoiceResult<T> = { ok: true; value: T } | { ok: false; error: DesktopVoiceError };
 
 /** Ce que la coque expose à la fenêtre de l'app. */
 export interface DesktopBridge {
@@ -203,6 +217,18 @@ export interface DesktopBridge {
     /** Ouvre une adresse de la webapp dans le navigateur. */
     openWeb(url: string): Promise<void>;
   };
+  /** La voix transcrite sur l'ordinateur (R80, R132). Absente là où le moteur n'est pas embarqué (version du Store). */
+  readonly voice?: {
+    status(): Promise<DesktopVoiceStatus>;
+    /** Rejoint la préparation du modèle, ou la lance : il se télécharge seul, une fois, peu après l'ouverture de l'app. */
+    download(): Promise<DesktopVoiceResult<void>>;
+    /** Avancement du téléchargement ; rend de quoi arrêter l'écoute. */
+    onStatus(callback: (status: DesktopVoiceStatus) => void): () => void;
+    /** Charge le modèle pendant que la personne parle. */
+    prepare(): void;
+    /** Échantillons mono à 16 kHz ; rend le texte dit. */
+    transcribe(samples: Float32Array): Promise<DesktopVoiceResult<string>>;
+  };
   /** Claude Code de la personne et le serveur MCP d'un espace : le jeton personnel va de la page à `claude`. */
   claude: {
     mcpStatus(slug: string): Promise<DesktopResult<DesktopMcpConnection>>;
@@ -227,12 +253,4 @@ export function notifySystem(input: { title: string; body?: string | null; path?
     ...(input.body ? { body: input.body } : {}),
     ...(input.path ? { path: input.path } : {}),
   });
-}
-
-/**
- * App desktop d'un compte déjà configuré en ligne : la personne connaît TaskForce, l'app ne lui remontre pas l'accueil
- * des nouveaux comptes (la visite guidée reste rejouable depuis Ctrl+K). Toujours faux sur la webapp.
- */
-export function onboardedOnline(): boolean {
-  return desktopBridge()?.onboardedOnline === true;
 }

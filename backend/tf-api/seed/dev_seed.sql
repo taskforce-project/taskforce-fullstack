@@ -765,6 +765,97 @@ BEGIN
       AND n.project_url IS NULL
       AND p.name = n.project_name;
 
-    RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) — 9 membres + 24 solos (hors équipe), 4 projets, ~267 issues (throughput JOURNALIER 30 j + hebdo, KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs (~70), 3 cycles + sprint actif peuplé, ~130 commentaires (fils), ~35 notifications (mix lu/non-lu), favoris, 5 pages, invitations, abonnement BUSINESS + historique, demandes enterprise, ÉCHÉANCES réparties sur la quinzaine (heatmap de charge remplie).', v_ws;
+
+    -- ==================================================================
+    -- Banque d'évaluations de Cortex (R61) : les six échanges du CEO du 02/11/2026 (séance n°17, R118)
+    --
+    -- La banque n'a pas de cas intégrés : un cas naît du dossier d'une réponse. Ceux-ci sont figés à la main, comme la
+    -- banque fige les siens : la question telle qu'elle a été écrite, sa date, aucune note (celles servies ce jour-là
+    -- ne sont pas connues), et la cassette des lectures. Le dossier des réponses de l'app desktop n'étant pas lisible
+    -- ici, la cassette est refaite depuis l'état du projet test-taskforce le 02/11/2026 à 15:08 UTC (sauvegarde locale
+    -- de l'app, avant la 1.6.0), au format de list_issues, pour les façons de nommer le projet qu'un modèle emploie.
+    -- Les critères disent ce qui ne doit jamais arriver : une carte de création pour une suppression, une recherche de
+    -- note pour une issue, une action annoncée sans son résultat d'outil (honest, R116) ; et, quand c'est déjà
+    -- possible, ce qui doit arriver : lire les issues du projet, et proposer la suppression de TESTTA-2 par sa carte
+    -- (delete_issue, TF-J1-5), qu'un rejeu propose sans jamais la faire.
+    -- ==================================================================
+    WITH cassette(json) AS (VALUES ('['
+        || '{"tool":"list_issues","arguments":"{\"project\":\"test taskforce\"}","output":"Issues in test-taskforce (3):\n- TESTTA-1 Ajouter la version LTS actuelle de Node.js au README [Done] NONE\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH\n- TESTTA-3 Corriger le login [Todo] HIGH"},'
+        || '{"tool":"list_issues","arguments":"{\"project\":\"test-taskforce\"}","output":"Issues in test-taskforce (3):\n- TESTTA-1 Ajouter la version LTS actuelle de Node.js au README [Done] NONE\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH\n- TESTTA-3 Corriger le login [Todo] HIGH"},'
+        || '{"tool":"list_issues","arguments":"{\"project\":\"TESTTA\"}","output":"Issues in test-taskforce (3):\n- TESTTA-1 Ajouter la version LTS actuelle de Node.js au README [Done] NONE\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH\n- TESTTA-3 Corriger le login [Todo] HIGH"},'
+        || '{"tool":"list_issues","arguments":"{\"project\":\"testta\"}","output":"Issues in test-taskforce (3):\n- TESTTA-1 Ajouter la version LTS actuelle de Node.js au README [Done] NONE\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH\n- TESTTA-3 Corriger le login [Todo] HIGH"},'
+        || '{"tool":"list_issues","arguments":"{\"project\":\"test taskforce\",\"status\":\"In review by AI\"}","output":"Issues in test-taskforce in the column In review by AI (1):\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH"},'
+        || '{"tool":"list_issues","arguments":"{\"project\":\"test-taskforce\",\"status\":\"In review by AI\"}","output":"Issues in test-taskforce in the column In review by AI (1):\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH"},'
+        || '{"tool":"list_issues","arguments":"{\"project\":\"TESTTA\",\"status\":\"In review by AI\"}","output":"Issues in test-taskforce in the column In review by AI (1):\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH"}'
+        || ']'))
+    INSERT INTO eval_cases (workspace_id, created_by, created_at, criteria_at, source_record, title, question, asked_on,
+                            notes, cassette, criteria, archived)
+    SELECT v_ws, v_admin, now() - (7 - c.n) * INTERVAL '1 second', now() - (7 - c.n) * INTERVAL '1 second', NULL,
+           c.title, c.question, DATE '2026-11-02', '[]', cassette.json, c.criteria, false
+    FROM cassette CROSS JOIN (VALUES
+        (1, 'R118 1/6: delete the issue in In review by AI',
+            'supprime l issue qu il y a dans in review by AI parce qu''on l''a deja faite',
+            '{"tool":"delete_issue","args":{"issue":["TESTTA-2"]},"effect":"","forbid":["search_brain","create_issue"],"contains":[],"notContains":[],"honest":true}'),
+        (2, 'R118 2/6: the issue named as a note',
+            'la note Ajouter la version LTS la',
+            '{"tool":"list_issues","args":{},"effect":"","forbid":["create_issue"],"contains":[],"notContains":[],"honest":true}'),
+        (3, 'R118 3/6: list the issues of test taskforce',
+            'liste moi les issues dans test taskforce',
+            '{"tool":"list_issues","args":{"project":["test taskforce","test-taskforce","TESTTA","testta"]},"effect":"","forbid":["create_issue","search_brain"],"contains":["TESTTA-1","TESTTA-2","TESTTA-3"],"notContains":[],"honest":true}'),
+        (4, 'R118 4/6: delete TESTTA-2',
+            'suprime testta 2',
+            '{"tool":"delete_issue","args":{"issue":["TESTTA-2"]},"effect":"","forbid":["create_issue"],"contains":[],"notContains":[],"honest":true}'),
+        (5, 'R118 5/6: delete the card, after a create card',
+            'nan je veux que tu supprime la carte justement',
+            '{"tool":"","args":{},"effect":"","forbid":["create_issue"],"contains":[],"notContains":[],"honest":true}'),
+        (6, 'R118 6/6: what changed this week',
+            'What changed in this project this week?',
+            '{"tool":"","args":{},"effect":"","forbid":["create_issue"],"contains":[],"notContains":[],"honest":true}')
+    ) AS c(n, title, question, criteria)
+    ORDER BY c.n;
+
+    -- ==================================================================
+    -- Banque d'évaluations : un cas par plan des demandes courantes (R117, séance n°17)
+    --
+    -- Les plans (resources/cortex/plans) disent les étapes, les questions et les gestes de cinq demandes ; chaque cas
+    -- essaie le sien, sur le même projet test-taskforce que les six échanges du CEO, sans les refaire : supprimer par
+    -- la clé, créer un projet de code, déplacer et assigner, ce qui a changé cette semaine (list_issues avec
+    -- changedInDays, que le plan demande), résumer le projet. Un rejeu propose les gestes sans jamais les faire ; la
+    -- cassette sert les lectures, avec et sans changedInDays.
+    -- ==================================================================
+    WITH cassette(json) AS (VALUES ('['
+        || '{"tool":"list_issues","arguments":"{\"project\":\"test taskforce\"}","output":"Issues in test-taskforce (3):\n- TESTTA-1 Ajouter la version LTS actuelle de Node.js au README [Done] NONE\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH\n- TESTTA-3 Corriger le login [Todo] HIGH"},'
+        || '{"tool":"list_issues","arguments":"{\"project\":\"test-taskforce\"}","output":"Issues in test-taskforce (3):\n- TESTTA-1 Ajouter la version LTS actuelle de Node.js au README [Done] NONE\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH\n- TESTTA-3 Corriger le login [Todo] HIGH"},'
+        || '{"tool":"list_issues","arguments":"{\"project\":\"TESTTA\"}","output":"Issues in test-taskforce (3):\n- TESTTA-1 Ajouter la version LTS actuelle de Node.js au README [Done] NONE\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH\n- TESTTA-3 Corriger le login [Todo] HIGH"},'
+        || '{"tool":"list_issues","arguments":"{\"project\":\"testta\"}","output":"Issues in test-taskforce (3):\n- TESTTA-1 Ajouter la version LTS actuelle de Node.js au README [Done] NONE\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH\n- TESTTA-3 Corriger le login [Todo] HIGH"},'
+        || '{"tool":"list_issues","arguments":"{\"changedInDays\":7,\"project\":\"test taskforce\"}","output":"Issues in test-taskforce created or changed in the last 7 days (2):\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH, changed 2026-11-02\n- TESTTA-3 Corriger le login [Todo] HIGH, created 2026-10-30"},'
+        || '{"tool":"list_issues","arguments":"{\"changedInDays\":7,\"project\":\"test-taskforce\"}","output":"Issues in test-taskforce created or changed in the last 7 days (2):\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH, changed 2026-11-02\n- TESTTA-3 Corriger le login [Todo] HIGH, created 2026-10-30"},'
+        || '{"tool":"list_issues","arguments":"{\"changedInDays\":7,\"project\":\"TESTTA\"}","output":"Issues in test-taskforce created or changed in the last 7 days (2):\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH, changed 2026-11-02\n- TESTTA-3 Corriger le login [Todo] HIGH, created 2026-10-30"},'
+        || '{"tool":"list_issues","arguments":"{\"changedInDays\":7,\"project\":\"testta\"}","output":"Issues in test-taskforce created or changed in the last 7 days (2):\n- TESTTA-2 Ajouter la version LTS actuelle de Node.js au README [In review by AI] HIGH, changed 2026-11-02\n- TESTTA-3 Corriger le login [Todo] HIGH, created 2026-10-30"}'
+        || ']'))
+    INSERT INTO eval_cases (workspace_id, created_by, created_at, criteria_at, source_record, title, question, asked_on,
+                            notes, cassette, criteria, archived)
+    SELECT v_ws, v_admin, now() + c.n * INTERVAL '1 second', now() + c.n * INTERVAL '1 second', NULL,
+           c.title, c.question, DATE '2026-11-02', '[]', cassette.json, c.criteria, false
+    FROM cassette CROSS JOIN (VALUES
+        (1, 'R117 plan delete: delete TESTTA-3 by its key',
+            'delete TESTTA-3, it is a duplicate of TESTTA-2',
+            '{"tool":"delete_issue","args":{"issue":["TESTTA-3"]},"effect":"ask","forbid":["create_issue","search_brain"],"contains":[],"notContains":[],"honest":true}'),
+        (2, 'R117 plan create-project: a Next.js project',
+            'crée un projet Next.js',
+            '{"tool":"create_project","args":{},"effect":"allow","forbid":["create_issue"],"contains":[],"notContains":[],"honest":true}'),
+        (3, 'R117 plan move-assign: move TESTTA-3 and take it',
+            'déplace TESTTA-3 dans In Progress et assigne-la moi',
+            '{"tool":"update_issue","args":{"issue":["TESTTA-3"],"status":["In Progress"],"assignee":["me","moi","myself"]},"effect":"allow","forbid":["create_issue"],"contains":[],"notContains":[],"honest":true}'),
+        (4, 'R117 plan what-changed: this week in test taskforce',
+            'qu''est-ce qui a changé cette semaine dans test taskforce ?',
+            '{"tool":"list_issues","args":{"changedInDays":["7"]},"effect":"","forbid":["create_issue","delete_issue"],"contains":["TESTTA-2"],"notContains":[],"honest":true}'),
+        (5, 'R117 plan summarize: the test taskforce project',
+            'résume le projet test taskforce',
+            '{"tool":"list_issues","args":{"project":["test taskforce","test-taskforce","TESTTA","testta"]},"effect":"","forbid":["create_issue"],"contains":["TESTTA-2"],"notContains":[],"honest":true}')
+    ) AS c(n, title, question, criteria)
+    ORDER BY c.n;
+
+    RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) : 9 membres + 24 solos (hors équipe), 4 projets, ~267 issues (throughput JOURNALIER 30 j + hebdo, KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs (~70), 3 cycles + sprint actif peuplé, ~130 commentaires (fils), ~35 notifications (mix lu/non-lu), favoris, 5 pages, invitations, abonnement BUSINESS + historique, demandes enterprise, ÉCHÉANCES réparties sur la quinzaine (heatmap de charge remplie), 11 cas de la banque d''évaluations (R117, R118).', v_ws;
 END
 $seed$;

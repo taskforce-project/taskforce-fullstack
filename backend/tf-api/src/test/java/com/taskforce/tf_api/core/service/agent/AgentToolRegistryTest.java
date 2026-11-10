@@ -17,7 +17,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import com.taskforce.tf_api.core.service.agent.tools.CreateIssueTool;
 import com.taskforce.tf_api.core.service.agent.tools.CreateNoteTool;
-import com.taskforce.tf_api.core.service.agent.tools.CreateProjectTool;
 import com.taskforce.tf_api.core.service.agent.tools.FindIntegrationTool;
 import com.taskforce.tf_api.core.service.agent.tools.ListIssuesTool;
 import com.taskforce.tf_api.core.service.agent.tools.ListProjectsTool;
@@ -33,10 +32,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("AgentToolRegistry")
 class AgentToolRegistryTest {
 
-    /** Les sept outils internes ; leurs schémas ne touchent pas aux services, d'où les dépendances nulles. */
+    /**
+     * Les six outils internes ; leurs schémas ne touchent pas aux services, d'où les dépendances nulles. Créer un projet
+     * est un geste du MCP TaskForce depuis R115 (ADR-024).
+     */
     static Stream<Arguments> internalTools() {
-        return Stream.<AgentTool>of(new CreateIssueTool(null, null), new CreateNoteTool(null), new CreateProjectTool(null),
-                new FindIntegrationTool(null), new ListIssuesTool(null, null, null), new ListProjectsTool(null, null, null),
+        return Stream.<AgentTool>of(new CreateIssueTool(null, null, null, null), new CreateNoteTool(null),
+                new FindIntegrationTool(null), new ListIssuesTool(null, null, null), new ListProjectsTool(null, null, null, null),
                 new SearchBrainTool(null, null))
             .map(tool -> Arguments.of(tool.name(), tool));
     }
@@ -57,7 +59,7 @@ class AgentToolRegistryTest {
     @DisplayName("régression : le paramètre title de create_issue reste un schéma de texte")
     void createIssueKeepsItsTitleParameter() {
         Map<String, Object> parameters = parametersOf(
-            new AgentToolRegistry(List.of(new CreateIssueTool(null, null))).toolDefinitions().get(0));
+            new AgentToolRegistry(List.of(new CreateIssueTool(null, null, null, null))).toolDefinitions().get(0));
 
         assertThat(properties(parameters).get("title")).isInstanceOf(Map.class);
         assertThat(asMap(properties(parameters).get("title"))).containsEntry("type", "string");

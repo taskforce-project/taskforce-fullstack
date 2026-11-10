@@ -161,6 +161,30 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
+        @DisplayName("depuis la carte de Cortex : l'activité dit « prepared by Cortex », les points et les labels du projet seuls (V112)")
+        void created_from_cortex_card_keeps_its_agent_points_and_own_labels() {
+            Project other = projectRepository.save(Project.builder()
+                .workspace(workspace).name("Other").identifier("OTH").createdBy(owner).build());
+            ProjectLabel bug = projectLabelRepository.save(ProjectLabel.builder()
+                .project(project).name("Bug").color("#123456").build());
+            ProjectLabel foreign = projectLabelRepository.save(ProjectLabel.builder()
+                .project(other).name("Foreign").color("#123456").build());
+            CreateIssueRequest req = createRequest("From the card", null);
+            req.setStoryPoints(3);
+            req.setLabelIds(List.of(bug.getId(), foreign.getId()));
+
+            IssueResponse res = issueService.createIssue(SLUG, project.getId(), req, owner.getId(), "Cortex");
+
+            assertThat(res.getStoryPoints()).isEqualTo(3);
+            // Un label d'un autre projet ne s'attache pas.
+            assertThat(res.getLabels()).extracting(l -> l.getName()).containsExactly("Bug");
+            var created = issueService.listActivity(SLUG, project.getId(), res.getId(), owner.getId()).get(0);
+            assertThat(created.getAction()).isEqualTo(com.taskforce.tf_api.core.enums.IssueActivityType.CREATED);
+            assertThat(created.getVia()).isEqualTo("Cortex");
+            assertThat(created.getActor().getId()).isEqualTo(owner.getId());
+        }
+
+        @Test
         @DisplayName("attribue des numéros de séquence atomiques croissants")
         void should_increment_sequence() {
             IssueResponse first = issueService.createIssue(SLUG, project.getId(), createRequest("A", null), owner.getId());
@@ -430,6 +454,35 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             assertThat(updated.isDone()).isTrue();
 
             assertThat(issueService.listChecklist(SLUG, project.getId(), id, owner.getId())).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("cocher puis décocher une ligne entre à l'activité, avec son texte ; recocher une ligne cochée, non (V112)")
+        void checking_an_item_shows_in_the_activity() {
+            Long id = newIssueId("Checklist activity");
+            var add = new com.taskforce.tf_api.core.dto.request.CreateChecklistItemRequest();
+            add.setContent("Update the README");
+            var item = issueService.addChecklistItem(SLUG, project.getId(), id, owner.getId(), add);
+            var check = new com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest();
+            check.setDone(true);
+            var uncheck = new com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest();
+            uncheck.setDone(false);
+
+            issueService.updateChecklistItem(SLUG, project.getId(), id, item.getId(), owner.getId(), check);
+            issueService.updateChecklistItem(SLUG, project.getId(), id, item.getId(), owner.getId(), check);
+            issueService.updateChecklistItem(SLUG, project.getId(), id, item.getId(), owner.getId(), uncheck);
+
+            var checklist = issueService.listActivity(SLUG, project.getId(), id, owner.getId()).stream()
+                .filter(a -> a.getAction() != com.taskforce.tf_api.core.enums.IssueActivityType.CREATED)
+                .toList();
+            // Une seule ligne par changement : le second « cocher » ne change rien, il n'entre pas à l'activité.
+            assertThat(checklist).extracting(a -> a.getAction()).containsExactlyInAnyOrder(
+                com.taskforce.tf_api.core.enums.IssueActivityType.CHECKLIST_CHECKED,
+                com.taskforce.tf_api.core.enums.IssueActivityType.CHECKLIST_UNCHECKED);
+            assertThat(checklist).allSatisfy(a -> {
+                assertThat(a.getNewValue()).isEqualTo("Update the README");
+                assertThat(a.getVia()).isNull(); // la personne elle-même, pas l'agent d'une mission
+            });
         }
 
         @Test

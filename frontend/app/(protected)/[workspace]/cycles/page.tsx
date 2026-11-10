@@ -375,7 +375,6 @@ export default function CyclesPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Cycles"
         description={isLoading ? "Loading…" : `${active.length} active · ${upcoming.length} upcoming · ${completed.length} completed`}
         actions={
           <CreateCycleDialog>

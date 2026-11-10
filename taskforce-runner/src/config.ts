@@ -46,7 +46,19 @@ export interface AgentConfig {
    * délai, l'action est refusée.
    */
   approvalTimeoutMinutes: number;
+  /**
+   * Changements de l'agent dans TaskForce (champs et colonne de l'issue, lignes de la checklist, commentaires, issues
+   * créées) que les règles laissent passer sans demander, par mission (R110, séance n°16). Au-delà, chacun attend
+   * l'accord de la personne ; un accord « pour cette mission » lève le plafond jusqu'à la fin de la mission.
+   */
+  maxTaskForceChanges: number;
 }
+
+/**
+ * Une première valeur, à mesurer sur des missions réelles avant de la fixer : le plafond se mesure, il ne se devine pas
+ * (la réserve de Bengio sur R110).
+ */
+export const DEFAULT_MAX_TASKFORCE_CHANGES = 30;
 
 export interface RunnerConfig {
   apiUrl: string;
@@ -175,6 +187,8 @@ export function parseRunnerConfigFile(json: unknown): Omit<RunnerConfig, "apiUrl
       attribution: rawAgent.attribution === true,
       extraAllowedTools: asStringArray(rawAgent.extraAllowedTools, "agent.extraAllowedTools"),
       approvalTimeoutMinutes: Math.min(asPositiveInt(rawAgent.approvalTimeoutMinutes, 10, "agent.approvalTimeoutMinutes"), 60),
+      maxTaskForceChanges: asPositiveInt(rawAgent.maxTaskForceChanges, DEFAULT_MAX_TASKFORCE_CHANGES,
+        "agent.maxTaskForceChanges"),
     },
   };
 }

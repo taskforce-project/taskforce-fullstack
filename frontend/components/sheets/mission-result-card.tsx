@@ -5,25 +5,30 @@ import { ExternalLink, FileCheck2, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
-import { fillText, resultCard, resultLine } from "@/lib/delivery/result-card"
+import { Markdown } from "@/components/ui/lightweight-markdown"
+import { agentWords, fillText, missionAgentName, resultCard } from "@/lib/delivery/result-card"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { cn } from "@/lib/utils"
 
 /**
- * « Relire » (R78, séance n°13 ; J3, R50) : la carte de résultat d'une mission finie, sous le titre de l'issue. Le
- * résultat, les contrôles tirés du dossier (jamais du résumé de l'agent), ce qui changera si l'on applique, les mots de
- * l'agent pour ce qu'ils sont, puis trois gestes : « Discard », « Try again », « Apply ». Seule la personne qui a délégué
- * tranche : les gestes ne s'affichent que pour elle, le serveur le vérifie, et la carte dit pourquoi il refuse. Des tests
- * en échec éteignent « Apply » (R87, séance n°14) : on ne passe outre que par « Apply anyway », en écrivant pourquoi.
+ * « Relire » (R78, séance n°13 ; J3, R50 ; R138, séance n°20) : la carte de résultat d'une mission finie. Elle se lit de
+ * haut en bas : ce qui est rendu, ce que l'agent dit avoir fait, les contrôles tirés du dossier (jamais du résumé de
+ * l'agent), ce qui changera si l'on applique, puis trois gestes : « Discard », « Try again », « Apply ». Seule la personne
+ * qui a délégué tranche : les gestes ne s'affichent que pour elle, le serveur le vérifie, et la carte dit pourquoi il refuse.
+ * Des tests en échec éteignent « Apply » (R87, séance n°14) : on ne passe outre que par « Apply anyway », en écrivant
+ * pourquoi. Une mission qui n'a rien changé n'a rien à appliquer : le geste principal devient « Mark as done », qui termine
+ * l'issue (rejeu de la 1.8.0, TESTTA-2 : « Apply » restait éteint sans dire pourquoi). `embedded` : dans la vue du travail,
+ * dont l'en-tête dit déjà le titre et l'état.
  */
-export function MissionResultCard({ slug, issueId, issueKey, issueTitle, responsible }: Readonly<{
+export function MissionResultCard({ slug, issueId, issueKey, issueTitle, responsible, embedded = false }: Readonly<{
   slug: string
   issueId: number
   issueKey: string | null
   issueTitle: string
   responsible: string | null
+  embedded?: boolean
 }>) {
   const t = usePreferencesStore((s) => s.t.missions)
   const run = useDeliveryStore((s) => s.runs[issueId])
@@ -31,11 +36,12 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
   const error = useDeliveryStore((s) => (run ? s.resultErrors[run.id] : undefined))
   const applyRun = useDeliveryStore((s) => s.applyRun)
   const discardRun = useDeliveryStore((s) => s.discardRun)
+  const markRunDone = useDeliveryStore((s) => s.markRunDone)
   const retryRun = useDeliveryStore((s) => s.retryRun)
   const downloadEvidence = useDeliveryStore((s) => s.downloadEvidence)
   // `id` est typé `string` mais l'API /users/me le sérialise en `number` : comparer en chaînes.
   const viewerId = useUserStore((s) => s.user?.id)
-  const [busy, setBusy] = useState<"apply" | "discard" | "retry" | null>(null)
+  const [busy, setBusy] = useState<Gesture | null>(null)
   const [retrying, setRetrying] = useState(false)
   const [note, setNote] = useState("")
   const [overriding, setOverriding] = useState(false)
@@ -49,18 +55,19 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
   const testsFailed = run.tests?.ran === true && !run.tests.passed
   const who = [
     responsible ? fillText(r.responsible, { who: responsible }) : null,
-    fillText(r.delegatedTo, { agent: t.agent }),
+    fillText(r.delegatedTo, { agent: missionAgentName(run, t.agent) }),
     card.minutes === null ? null : card.minutes < 1 ? r.underAMinute : fillText(r.minutes, { minutes: card.minutes }),
   ].filter(Boolean).join(" · ")
 
-  async function act(kind: "apply" | "discard" | "retry") {
+  async function act(kind: Gesture) {
     if (!run) return
     setBusy(kind)
     const ok = kind === "apply" ? await applyRun(slug, issueId, run.id, overriding ? reason : undefined)
       : kind === "discard" ? await discardRun(slug, issueId, run.id)
+      : kind === "done" ? await markRunDone(slug, issueId, run.id)
       : (await retryRun(slug, issueId, run.id, note)) !== null
     setBusy(null)
-    if (ok) toast.success(kind === "apply" ? r.apply : kind === "discard" ? r.discard : r.tryAgain)
+    if (ok) toast.success({ apply: r.apply, discard: r.discard, done: r.markedDone, retry: r.tryAgain }[kind])
   }
 
   async function download(format: "json" | "md") {
@@ -69,23 +76,32 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
 
   return (
     <section className="flex flex-col border border-border text-xs" aria-label={`${r.theResult}: ${issueTitle}`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-3 py-2.5">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <span className="text-sm font-semibold text-foreground">{issueTitle}</span>
-          <span className="text-muted-foreground">{who}</span>
+      {!embedded && (
+        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-3 py-2.5">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-sm font-semibold text-foreground">{issueTitle}</span>
+            <span className="text-muted-foreground">{who}</span>
+          </div>
+          <span className="border border-shape-green/40 px-1.5 py-0.5 text-[11px] text-ink-green">{r.ready}</span>
         </div>
-        <span className="border border-shape-green/40 px-1.5 py-0.5 text-[11px] text-ink-green">{r.ready}</span>
-      </div>
+      )}
 
-      <Zone label={r.theResult}>
-        <p className="text-foreground">{resultLine(run, r)}</p>
+      {/* Ce qui est rendu, puis ce que l'agent en dit : le rapport se lit en premier (R138), rendu comme une description. */}
+      <div className="flex flex-col gap-1.5 border-b border-border px-3 py-2.5">
+        <p className="text-sm font-medium text-foreground">{card.delivered}</p>
         {card.pr && (
           <a href={card.pr.url} target="_blank" rel="noopener noreferrer"
             className="inline-flex w-fit items-center gap-1 border border-border px-2 py-1 text-foreground hover:bg-muted">
-            <ExternalLink className="size-3" /> {r.openPullRequest}
+            <ExternalLink className="size-3" aria-hidden="true" /> {r.openPullRequest}
           </a>
         )}
-      </Zone>
+      </div>
+
+      {run.summary && (
+        <Zone label={r.inItsWords}>
+          <Markdown content={agentWords(run.summary)} compact className="space-y-1.5 break-words leading-relaxed text-foreground" />
+        </Zone>
+      )}
 
       <Zone label={r.isItGood}>
         <ul className="flex flex-col gap-1">
@@ -101,7 +117,7 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
       </Zone>
 
       {card.changes.length > 0 && (
-        <Zone label={r.willChange}>
+        <Zone label={card.noChange ? r.willChangeDone : r.willChange}>
           <ul className="flex flex-col gap-1">
             {card.changes.map((change) => (
               <li key={change.text} className="flex items-baseline justify-between gap-2">
@@ -110,12 +126,6 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
               </li>
             ))}
           </ul>
-        </Zone>
-      )}
-
-      {run.summary && (
-        <Zone label={r.inItsWords}>
-          <p className="line-clamp-6 whitespace-pre-wrap break-words text-muted-foreground">{run.summary}</p>
         </Zone>
       )}
 
@@ -150,16 +160,23 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <Button variant="outline" size="sm" className="h-8 text-xs" disabled={busy !== null} onClick={() => void act("discard")}>
                 {busy === "discard" ? <Loader2 className="size-3 animate-spin" /> : r.discard}
               </Button>
               <Button variant="outline" size="sm" className="h-8 text-xs" disabled={busy !== null} onClick={() => setRetrying(true)}>
                 {r.tryAgain}
               </Button>
-              <Button size="sm" className="h-8 text-xs" disabled={busy !== null || !card.pr || testsFailed} onClick={() => void act("apply")}>
-                {busy === "apply" ? <Loader2 className="size-3 animate-spin" /> : r.apply}
-              </Button>
+              {card.noChange ? (
+                // Rien à appliquer : le travail était déjà fait, l'issue se termine.
+                <Button size="sm" className="h-8 text-xs" disabled={busy !== null} onClick={() => void act("done")}>
+                  {busy === "done" ? <Loader2 className="size-3 animate-spin" /> : r.markDone}
+                </Button>
+              ) : (
+                <Button size="sm" className="h-8 text-xs" disabled={busy !== null || !card.pr || testsFailed} onClick={() => void act("apply")}>
+                  {busy === "apply" ? <Loader2 className="size-3 animate-spin" /> : r.apply}
+                </Button>
+              )}
             </div>
             {testsFailed && card.pr && (
               <p className="flex flex-wrap items-baseline gap-x-2 text-muted-foreground">
@@ -178,22 +195,28 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
       <details className="px-3 py-2">
         <summary className="cursor-pointer text-muted-foreground hover:text-foreground">{r.howItWasDone}</summary>
         <p className="mt-1.5 text-muted-foreground">{card.how}</p>
-        <p className="mt-1 flex items-center gap-1.5 text-muted-foreground">
-          <FileCheck2 className="size-3 shrink-0" />
-          {r.downloadRecord}
-          <button type="button" className="hover:text-foreground hover:underline" onClick={() => void download("json")}>JSON</button>
-          <span aria-hidden="true">·</span>
-          <button type="button" className="hover:text-foreground hover:underline" onClick={() => void download("md")}>Markdown</button>
-        </p>
+        {/* Dans la vue du travail, le dossier se télécharge depuis la ligne de la preuve, juste en dessous. */}
+        {!embedded && (
+          <p className="mt-1 flex items-center gap-1.5 text-muted-foreground">
+            <FileCheck2 className="size-3 shrink-0" />
+            {r.downloadRecord}
+            <button type="button" className="hover:text-foreground hover:underline" onClick={() => void download("json")}>JSON</button>
+            <span aria-hidden="true">·</span>
+            <button type="button" className="hover:text-foreground hover:underline" onClick={() => void download("md")}>Markdown</button>
+          </p>
+        )}
       </details>
     </section>
   )
 }
 
+/** Les gestes de la carte : « done » termine l'issue d'une mission qui n'a rien changé. */
+type Gesture = "apply" | "discard" | "done" | "retry"
+
 function Zone({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
     <div className="flex flex-col gap-1.5 border-b border-border px-3 py-2.5">
-      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
       {children}
     </div>
   )

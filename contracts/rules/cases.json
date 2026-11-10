@@ -90,6 +90,71 @@
       "pattern": "{npm,yarn,pnpm} {test,run}**",
       "value": "npm install",
       "match": false
+    },
+    {
+      "pattern": "{cd,ls}{, **}",
+      "value": "ls",
+      "match": true
+    },
+    {
+      "pattern": "{cd,ls}{, **}",
+      "value": "ls -la src",
+      "match": true
+    },
+    {
+      "pattern": "{cd,ls}{, **}",
+      "value": "cd \"/work/run-6\"",
+      "match": true
+    },
+    {
+      "pattern": "{cd,ls}{, **}",
+      "value": "lsof -i",
+      "match": false
+    },
+    {
+      "pattern": "git {status,diff}{, **}",
+      "value": "git status",
+      "match": true
+    },
+    {
+      "pattern": "git {status,diff}{, **}",
+      "value": "git status --short --branch",
+      "match": true
+    },
+    {
+      "pattern": "git {status,diff}{, **}",
+      "value": "git difftool",
+      "match": false
+    },
+    {
+      "pattern": "git {branch,branch -v,branch --list **}",
+      "value": "git branch",
+      "match": true
+    },
+    {
+      "pattern": "git {branch,branch -v,branch --list **}",
+      "value": "git branch -v",
+      "match": true
+    },
+    {
+      "pattern": "git {branch,branch -v,branch --list **}",
+      "value": "git branch --list 'tf/*'",
+      "match": true
+    },
+    {
+      "pattern": "git {branch,branch -v,branch --list **}",
+      "value": "git branch -v new-feature",
+      "match": false
+    },
+    {
+      "pattern": "git {branch,branch -v,branch --list **}",
+      "value": "git branch -D main",
+      "match": false
+    },
+    {
+      "pattern": "git {branch,branch -v,branch --list **}",
+      "value": "git branches",
+      "match": false
     }
   ],
   "decisions": [
@@ -483,6 +548,16 @@
       }
     },
     {
+      "name": "deleting an issue asks: it cannot be undone",
+      "facts": {
+        "action": "issue.delete"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": "delete-issue"
+      }
+    },
+    {
       "name": "commenting is allowed",
       "facts": {
         "action": "comment.create"
@@ -641,10 +716,285 @@
         "effect": "ask",
         "rule": null
       }
+    },
+    {
+      "name": "listing the copy from the shell is allowed: reading changes nothing",
+      "facts": {
+        "action": "shell",
+        "command": "ls -la"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-reads"
+      }
+    },
+    {
+      "name": "printing a file of the copy is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "cat README.md"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-reads"
+      }
+    },
+    {
+      "name": "going into the copy with cd is allowed (the runner bounds its target)",
+      "facts": {
+        "action": "shell",
+        "command": "cd \"/work/run-6\""
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-reads"
+      }
+    },
+    {
+      "name": "a program that only starts like a read is not one",
+      "facts": {
+        "action": "shell",
+        "command": "lsof -i"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "find can delete files or run a program, so it asks",
+      "facts": {
+        "action": "shell",
+        "command": "find . -name *.tmp -delete"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "sed can rewrite a file, so it asks",
+      "facts": {
+        "action": "shell",
+        "command": "sed -i s/a/b/ README.md"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "a read the runner cannot bound has no action, so it asks",
+      "facts": {
+        "tool": "Bash",
+        "command": "cat /etc/passwd"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "a short option with its value attached inside the copy stays allowed",
+      "facts": {
+        "action": "shell",
+        "command": "grep -fpatterns.txt src"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-reads"
+      }
+    },
+    {
+      "name": "a short option whose attached value leaves the copy is not bounded: no action, so it asks",
+      "facts": {
+        "tool": "Bash",
+        "command": "grep -f/etc/hosts x"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "echo prints a line in the copy and changes nothing, so it is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "echo \"---\""
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-reads"
+      }
+    },
+    {
+      "name": "echo redirected to a file writes it: the runner cannot bound it, no action, so it asks",
+      "facts": {
+        "tool": "Bash",
+        "command": "echo done > notes.txt"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "git status with its options is a local read",
+      "facts": {
+        "action": "shell",
+        "command": "git status --short --branch"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-reads"
+      }
+    },
+    {
+      "name": "git difftool only starts like git diff: it runs another program, so it asks",
+      "facts": {
+        "action": "shell",
+        "command": "git difftool"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "reading the current branch is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "git branch --show-current"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-info"
+      }
+    },
+    {
+      "name": "listing the branches with their upstream is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "git branch -vv"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-info"
+      }
+    },
+    {
+      "name": "listing the branches that match a pattern is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "git branch --list 'tf/*'"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-info"
+      }
+    },
+    {
+      "name": "creating a branch still asks",
+      "facts": {
+        "action": "shell",
+        "command": "git branch new-feature"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "a listing option followed by a name creates a branch, so it asks",
+      "facts": {
+        "action": "shell",
+        "command": "git branch -v new-feature"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "deleting a branch still asks",
+      "facts": {
+        "action": "shell",
+        "command": "git branch -D main"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "renaming a branch still asks",
+      "facts": {
+        "action": "shell",
+        "command": "git branch -m main trunk"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
+    },
+    {
+      "name": "git rev-parse reads where the copy stands",
+      "facts": {
+        "action": "shell",
+        "command": "git rev-parse --abbrev-ref HEAD"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-info"
+      }
+    },
+    {
+      "name": "git ls-files lists the tracked files",
+      "facts": {
+        "action": "shell",
+        "command": "git ls-files src"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-info"
+      }
+    },
+    {
+      "name": "git blame reads a file's history",
+      "facts": {
+        "action": "shell",
+        "command": "git blame src/app.ts"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-info"
+      }
+    },
+    {
+      "name": "listing the remotes is allowed",
+      "facts": {
+        "action": "shell",
+        "command": "git remote -v"
+      },
+      "expect": {
+        "effect": "allow",
+        "rule": "run-git-info"
+      }
+    },
+    {
+      "name": "adding a remote still asks",
+      "facts": {
+        "action": "shell",
+        "command": "git remote add mirror https://example.com/x.git"
+      },
+      "expect": {
+        "effect": "ask",
+        "rule": null
+      }
     }
   ],
   "digest": {
     "description": "The digest of default.rules.json as it is, with or without null members and its own digest field.",
-    "expected": "sha256:96423074a5d1f108bd150bee2ef11ea894cb4e9ad84764344d0c8443112ad80e"
+    "expected": "sha256:83a5e35b6d63820f5869077f8a422fff74c515166f4c8ce3af33fe92c1d131a4"
   }
 }

@@ -54,7 +54,8 @@ const PM_CATEGORY = "PROJECT_MANAGEMENT"
 
 // ---------------------------------------------------------------------------
 // CreateProjectDialog - deux modes : projet vierge, ou import d'un projet depuis un outil connecté
-// en MCP (TF-MCP-04). En mode import : grille de logos (Linear, Asana, Jira…), avec connexion 1-clic
+// en MCP (TF-MCP-04). En mode import : grille de logos des préréglages de gestion de projet que montre le
+// catalogue (ceux essayés, Linear seul aujourd'hui, et ceux déjà connectés : TF-J1-3), avec connexion 1-clic
 // inline pour les outils pas encore branchés.
 // ---------------------------------------------------------------------------
 
@@ -351,7 +352,8 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogContent className="sm:max-w-lg">
+      {/* Le corps défile, l'action principale reste en bas à droite, toujours visible. */}
+      <DialogContent className="flex max-h-[85vh] flex-col">
         <DialogHeader>
           <DialogTitle>Create project</DialogTitle>
           <DialogDescription>
@@ -397,24 +399,23 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
           </button>
         </div>
 
+        <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
         {mode === "blank" ? (
           <div className="flex flex-col gap-5 py-2">
-            {/* Icon + Name row */}
-            <div className="flex items-end gap-4">
-              <ProjectIconPicker value={iconUrl} onChange={setIconUrl} />
+            {/* Icon (it has its own label), then Name: one column (R133). */}
+            <ProjectIconPicker value={iconUrl} onChange={setIconUrl} />
 
-              <div className="flex-1 flex flex-col gap-1.5 pb-0.5">
-                <label htmlFor="project-name" className="text-sm font-medium text-foreground">Project name</label>
-                <Input
-                  id="project-name"
-                  value={name}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="My New Project"
-                  className="h-control"
-                  autoFocus
-                  onKeyDown={(e) => e.key === "Enter" && name.trim() && identifier.trim() && handleCreate()}
-                />
-              </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="project-name" className="text-sm font-medium text-foreground">Project name</label>
+              <Input
+                id="project-name"
+                value={name}
+                onChange={(e) => handleNameChange(e.target.value)}
+                placeholder="My New Project"
+                className="h-control"
+                autoFocus
+                onKeyDown={(e) => e.key === "Enter" && name.trim() && identifier.trim() && handleCreate()}
+              />
             </div>
 
             {/* Identifier */}
@@ -499,14 +500,14 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                   </div>
 
                   {repoMode === "create" && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-1.5">
                       <Input
                         value={repoName}
                         onChange={(e) => setRepoName(e.target.value.replaceAll(/\s+/g, "-"))}
                         placeholder="my-repo"
                         className="h-control font-mono"
                       />
-                      <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
+                      <label className="flex w-fit items-center gap-1.5 text-xs text-muted-foreground">
                         <input type="checkbox" checked={repoPrivate} onChange={(e) => setRepoPrivate(e.target.checked)} />
                         Private
                       </label>
@@ -582,27 +583,29 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-3 gap-2">
+                {/* Une ligne par outil, une colonne (R133). */}
+                <div className="flex flex-col">
                   {tools.map((t) => {
                     const selected = importSource === t.key
                     return (
                       <button
                         key={t.key}
                         type="button"
+                        aria-pressed={selected}
                         disabled={connectingKey !== null && connectingKey !== t.key}
                         onClick={() => (t.connected ? setImportSource(selected ? "" : t.key) : handleConnect(t))}
                         className={cn(
-                          "flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-colors",
-                          selected ? "border-primary bg-primary/5" : "border-border hover:bg-accent",
+                          "flex h-9 items-center gap-2 rounded-md px-2 text-left transition-colors duration-150 motion-reduce:transition-none",
+                          selected ? "bg-primary/5 ring-1 ring-primary/40" : "hover:bg-muted",
                           connectingKey !== null && connectingKey !== t.key && "opacity-50",
                         )}
                       >
-                        <BrandLogo slug={t.key} name={t.name} className="size-7" />
-                        <span className="text-[12.5px] font-medium text-foreground">{t.name}</span>
+                        <BrandLogo slug={t.key} name={t.name} className="size-4 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate text-sm text-foreground">{t.name}</span>
                         {t.connected ? (
-                          <span className="text-[10px] font-medium text-ink-green">Connected</span>
+                          <span className="shrink-0 text-xs text-ink-green">Connected</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary">
+                          <span className="inline-flex shrink-0 items-center gap-1 text-xs text-primary">
                             {connectingKey === t.key ? (
                               <Loader2 className="size-3 animate-spin" />
                             ) : (
@@ -638,8 +641,9 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
             )}
           </div>
         )}
+        </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="shrink-0 gap-2">
           <Button variant="outline" size="sm" onClick={() => changeOpen(false)} disabled={busy}>
             Cancel
           </Button>

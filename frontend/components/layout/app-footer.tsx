@@ -4,6 +4,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { analyticsConfigured, openConsentPreferences } from "@/lib/analytics/consent"
+import { appVersion } from "@/lib/app-version"
 
 interface AppFooterProps {
   /**
@@ -17,22 +18,14 @@ interface AppFooterProps {
 }
 
 /**
- * Footer minimaliste (1 ligne), partagé par l'application et les pages d'authentification.
- *
- * Dans l'application il est placé en fin du flux de défilement (`mt-auto`) : il reste caché tant
- * qu'on n'a pas atteint le bas de la page. Sur les pages d'authentification, qui ne défilent pas,
- * il occupe la dernière bande de la grille.
+ * Footer minimaliste (1 ligne) des pages d'authentification, où il occupe la dernière bande de la grille. Dans
+ * l'application, la version et les liens légaux sont dans le menu du compte (revue UX du 01/11/2026) : un pied de
+ * site s'intercalait entre l'écran de travail et la barre unique.
  */
 export function AppFooter({ bleed = true }: AppFooterProps) {
   const { t } = usePreferencesStore()
   const year = new Date().getFullYear()
-  // Version affichée : la version PRODUIT unique (« v0.18.0 » - MÊME numéro que le footer landing ;
-  // source frontend/product-version.json injectée via next.config) plutôt que le SHA opaque - lisible,
-  // on voit d'un coup quelle version tourne. Le SHA reste consultable au survol (title).
-  const semver = process.env.NEXT_PUBLIC_APP_SEMVER
-  const commit = process.env.NEXT_PUBLIC_APP_VERSION
-  const version = semver ? `v${semver}` : (commit ?? "v1.0")
-  const versionTitle = commit ? `commit ${commit}` : undefined
+  const { label: version, title: versionTitle } = appVersion()
 
   return (
     <footer

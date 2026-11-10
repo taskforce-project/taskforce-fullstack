@@ -39,27 +39,35 @@ a token that is random for each run (`taskforce-runner/src/approvals.ts`):
 
 | Hook | When | What the runner answers |
 | --- | --- | --- |
-| `PreToolUse` | Before every tool call | The rules' decision: `allow` or `deny`, naming the rule and its reason. For `ask` it gives no decision |
-| `PermissionRequest` | An action with no decision, not allowed in advance | The person's decision in TaskForce, or `deny` when the wait runs out |
+| `PreToolUse` | Before every tool call | The rules' decision: `allow` or `deny`, naming the rule and its reason. For `ask`, the person's decision in TaskForce, asked before answering, or `deny` when the wait runs out |
+| `PermissionRequest` | What Claude Code still asks for (a tool the person allowed in advance) | The person's decision in TaskForce, or `deny` when the wait runs out |
 
-- Nothing is allowed in advance (no `--allowedTools`), so every `ask` reaches `PermissionRequest`: in headless mode, an
-  `ask` from `PreToolUse` would end as a refusal, and an action allowed in advance would skip a rule that asks. A
-  person can still allow tools in advance on their own computer (`agent.extraAllowedTools`); a rule that denies blocks
-  those tools anyway.
+- The gate never leaves an action without a decision: what the rules ask for, the person decides before the action
+  runs, whatever Claude Code's own permissions say. In headless mode, an `ask` returned to Claude Code would end as a
+  refusal. A person can still allow tools in advance on their own computer (`agent.extraAllowedTools`): for those
+  tools, what the rules ask for goes to Claude Code's own permissions; a rule that denies blocks them anyway.
+- An approval for the mission (R46) covers each part of the command that asked: a later command passes without asking
+  only when every part of it that asks is already covered.
+- Changes to TaskForce have a cap per mission (R110): the gate counts the calls of the TaskForce tools mapped to
+  `issue.update`, `issue.create` and `comment.create` that the rules allow, and past `agent.maxTaskForceChanges` (30 by
+  default) each one is asked like a rule that asks, with the number of changes already made as its reason. An approval
+  for the mission lifts the cap until the mission ends.
 - Both hooks use `onFailure: "block"`: if the runner does not answer, the action is blocked instead of let through.
   Claude Code 2.1.295 is the first version with it, according to its changelog, and the runner checks the version
   before each mission.
 - The facts come from the tool call (`taskforce-runner/src/harness/facts.ts`):
   - files: `file.read`, `file.search`, `file.write`, with the path relative to the copy, links followed;
   - commands: split on `&&`, `||`, `;`, `|`, `&` and new lines outside quotes, each part judged alone, the strictest
-    decision wins; `git commit` is `git.commit`, any other command is `shell`;
+    decision wins; `git commit` is `git.commit`, any other command is `shell`; `cd` changes the folder the next parts
+    are read from, and after a `cd` that cannot be bounded no part is bounded;
   - TaskForce MCP tools: one action each (`issue.read`, `comment.create`...);
   - web: `web.search` and `web.fetch`;
   - internal tools of the agent (`TodoWrite`, `Task`, `ToolSearch`...): no facts, allowed. The actions of a subagent
     go through the hook themselves.
 - What cannot be bounded can be denied or asked by a rule, never allowed. That covers a path outside the copy or
   inside `.git` (a hook written there would run at the next commit), a search pattern that leaves the copy, and a
-  command with a substitution, a redirection to a file, `--output`, or an argument naming a path outside the copy
+  command with a substitution, a variable or another expansion of the shell, a redirection to a file, `--output`, or an
+  argument naming a path outside the copy (a link of the repository included, or a value attached to a short option)
   (`npm test --prefix ../elsewhere`, `--outDir=../../x`: an allowed name doing its work elsewhere). The commit message form that Claude Code uses
   (`"$(cat <<'EOF' ... EOF)"`, quoted delimiter) is plain text and is read as such.
 - Not described yet, so always asked: the `PowerShell` tool, and any tool this list does not name.

@@ -15,6 +15,8 @@ import {
 export interface MarkdownProps {
   content: string
   className?: string
+  /** Titres à la taille du texte, pour un rendu dans une petite carte (les mots de l'agent sur la carte de résultat). */
+  compact?: boolean
   onWikiLink?: (title: string) => void
   onTag?: (tag: string) => void
   /**
@@ -23,6 +25,11 @@ export interface MarkdownProps {
    * Utiliser {@link toggleTaskInMarkdown} pour reconstruire le markdown côté appelant.
    */
   onToggleTask?: (taskIndex: number, checked: boolean) => void
+  /**
+   * Rend le texte courant (hors code et liens) : la conversation y fait des liens de ce qu'il nomme, une issue ou un
+   * projet, qui ouvrent leur volet (R120). Sans elle, le texte reste tel quel.
+   */
+  renderText?: (text: string, key: string) => ReactNode
 }
 
 // Détection d'un item de checklist markdown : `- [ ] …`, `* [x] …`, `+ [X] …`.
@@ -79,9 +86,10 @@ function renderInline(text: string, keyPrefix: string, opts: MarkdownProps): Rea
   let last = 0
   let m: RegExpExecArray | null
   let i = 0
+  const plain = (s: string, k: string): ReactNode => (opts.renderText ? opts.renderText(s, k) : s)
   INLINE_RE.lastIndex = 0
   while ((m = INLINE_RE.exec(text)) !== null) {
-    if (m.index > last) out.push(text.slice(last, m.index))
+    if (m.index > last) out.push(plain(text.slice(last, m.index), `${keyPrefix}-t${i}`))
     const token = m[0]
     const key = `${keyPrefix}-${i++}`
     if (token.startsWith("`")) {
@@ -96,24 +104,29 @@ function renderInline(text: string, keyPrefix: string, opts: MarkdownProps): Rea
     } else if (token.startsWith("[[")) {
       const title = token.slice(2, -2).trim()
       out.push(
-        <button key={key} type="button" onClick={opts.onWikiLink ? () => opts.onWikiLink!(title) : undefined}
-          className="text-primary underline decoration-dotted underline-offset-2 hover:bg-primary/10 rounded px-0.5">
-          {title}
-        </button>,
+        // Sans geste à faire, le lien ne se présente pas comme cliquable.
+        opts.onWikiLink ? (
+          <button key={key} type="button" onClick={() => opts.onWikiLink!(title)}
+            className="text-primary underline decoration-dotted underline-offset-2 hover:bg-primary/10 rounded px-0.5">
+            {title}
+          </button>
+        ) : <span key={key} className="text-primary">{title}</span>,
       )
     } else if (token.startsWith("==")) {
       out.push(<mark key={key} className="rounded bg-shape-yellow/30 px-0.5">{token.slice(2, -2)}</mark>)
     } else if (token.startsWith("**")) {
-      out.push(<strong key={key}>{token.slice(2, -2)}</strong>)
+      out.push(<strong key={key}>{plain(token.slice(2, -2), `${key}-b`)}</strong>)
     } else if (token.startsWith("*") || token.startsWith("_")) {
       out.push(<em key={key}>{token.slice(1, -1)}</em>)
     } else if (token.startsWith("#")) {
       const tag = token.slice(1)
       out.push(
-        <button key={key} type="button" onClick={opts.onTag ? () => opts.onTag!(tag) : undefined}
-          className="inline-flex items-center rounded-full bg-primary/10 px-1.5 text-[0.8em] font-medium text-primary hover:bg-primary/20">
-          #{tag}
-        </button>,
+        opts.onTag ? (
+          <button key={key} type="button" onClick={() => opts.onTag!(tag)}
+            className="inline-flex items-center rounded-full bg-primary/10 px-1.5 text-[0.8em] font-medium text-primary hover:bg-primary/20">
+            #{tag}
+          </button>
+        ) : <span key={key} className="inline-flex items-center rounded-full bg-primary/10 px-1.5 text-[0.8em] font-medium text-primary">#{tag}</span>,
       )
     } else {
       const mm = /\[([^\]]+)\]\(([^)]+)\)/.exec(token)
@@ -125,7 +138,7 @@ function renderInline(text: string, keyPrefix: string, opts: MarkdownProps): Rea
     }
     last = m.index + token.length
   }
-  if (last < text.length) out.push(text.slice(last))
+  if (last < text.length) out.push(plain(text.slice(last), `${keyPrefix}-t${i}`))
   return out
 }
 
@@ -261,13 +274,16 @@ function parseBlocks(content: string): Block[] {
 }
 
 const H_CLS = ["text-xl font-bold", "text-lg font-semibold", "text-base font-semibold", "text-sm font-semibold"]
+const H_CLS_COMPACT = ["font-semibold text-foreground", "font-semibold text-foreground", "font-medium text-foreground", "font-medium text-foreground"]
 
 export function Markdown(props: MarkdownProps) {
   const { content, className } = props
+  const headings = props.compact ? H_CLS_COMPACT : H_CLS
   const blocks = parseBlocks(content)
   const inl = (s: string, k: string) => renderInline(s, k, props)
   return (
-    <div className={className ?? "space-y-2 text-sm leading-relaxed"}>
+    // `data-markdown` : le texte rédigé, que la conversation de Cortex agrandit pour sa dernière réponse (globals.css).
+    <div data-markdown="" className={className ?? "space-y-2 text-sm leading-relaxed"}>
       {blocks.map((b, i) => {
         if (b.type === "code") return <CodeBlock key={i} code={b.code} lang={b.lang} />
         if (b.type === "callout") {
@@ -292,7 +308,7 @@ export function Markdown(props: MarkdownProps) {
             </blockquote>
           )
         }
-        if (b.type === "h") return <p key={i} className={H_CLS[Math.min(b.level, 4) - 1]}>{inl(b.text, `h${i}`)}</p>
+        if (b.type === "h") return <p key={i} className={headings[Math.min(b.level, 4) - 1]}>{inl(b.text, `h${i}`)}</p>
         if (b.type === "tasks") {
           const boxCls = (checked: boolean) =>
             `mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border transition-colors ${checked ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40"}`

@@ -97,10 +97,7 @@ describe("prune", () => {
 
 describe("updateNotice", () => {
   it("says which version replaced which, on the first launch after an update", () => {
-    assert.deepEqual(updateNotice("1.2.0", "1.2.1", false), {
-      title: "TaskForce 1.2.1 is installed",
-      body: "Updated from version 1.2.0.",
-    });
+    assert.deepEqual(updateNotice("1.2.0", "1.2.1", false), { version: "1.2.1", from: "1.2.0" });
   });
 
   for (const [name, previous, fresh] of [

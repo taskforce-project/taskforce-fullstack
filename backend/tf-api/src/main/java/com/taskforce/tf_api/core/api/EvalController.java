@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.response.EvalBankResponse;
+import com.taskforce.tf_api.core.dto.response.EvalHistoryResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.agent.EvalCriteria;
@@ -43,6 +44,16 @@ public class EvalController {
         return ResponseEntity.ok(ApiResponse.success(evalService.bank(slug, resolveUserId(jwt))));
     }
 
+    /**
+     * L'histoire de la banque (R125) : ses rejeux par modèle et par date, et chaque cas avec son origine et sa note à
+     * chaque rejeu. Le volet « Progress » la lit ; tout membre de l'espace aussi, comme la banque.
+     */
+    @GetMapping("/history")
+    public ResponseEntity<ApiResponse<EvalHistoryResponse>> history(@PathVariable String slug,
+                                                                    @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(evalService.history(slug, resolveUserId(jwt))));
+    }
+
     /** Le brouillon d'un cas, tiré du dossier d'une réponse : les critères proposés viennent de ce que la personne a validé. */
     @PostMapping("/cases/draft")
     public ResponseEntity<ApiResponse<EvalBankResponse.Draft>> draft(
@@ -55,6 +66,28 @@ public class EvalController {
         @PathVariable String slug, @Valid @RequestBody CaseRequest body, @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(ApiResponse.success(
             evalService.create(slug, resolveUserId(jwt), body.record(), body.title(), body.criteria())));
+    }
+
+    /** « Bien », sous une réponse (R137) : ce qui a été observé devient ce qu'on attend, d'un clic. */
+    @PostMapping("/cases/good")
+    public ResponseEntity<ApiResponse<EvalBankResponse.CaseSummary>> good(
+        @PathVariable String slug, @Valid @RequestBody DraftRequest body, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(evalService.keepGood(slug, resolveUserId(jwt), body.record())));
+    }
+
+    /** « Pas bien », sous une réponse (R137) : une phrase, ce qu'il aurait fallu faire ; le cas attend ses critères. */
+    @PostMapping("/cases/bad")
+    public ResponseEntity<ApiResponse<EvalBankResponse.CaseSummary>> bad(
+        @PathVariable String slug, @Valid @RequestBody BadCaseRequest body, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(evalService.keepBad(slug, resolveUserId(jwt), body.record(), body.expected())));
+    }
+
+    /** Les critères d'un cas qui les attend : une fois, datés maintenant, avant tout rejeu qui le notera (R61). */
+    @PutMapping("/cases/{caseId}/criteria")
+    public ResponseEntity<ApiResponse<EvalBankResponse.CaseSummary>> criteria(
+        @PathVariable String slug, @PathVariable Long caseId, @Valid @RequestBody CriteriaRequest body, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(
+            evalService.giveCriteria(slug, resolveUserId(jwt), caseId, body.title(), body.criteria())));
     }
 
     @DeleteMapping("/cases/{caseId}")
@@ -105,6 +138,12 @@ public class EvalController {
 
     public record CaseRequest(@NotBlank @Size(max = 64) String record, @Size(max = 200) String title,
                               @NotNull EvalCriteria criteria) {
+    }
+
+    public record BadCaseRequest(@NotBlank @Size(max = 64) String record, @NotBlank @Size(max = EvalService.MAX_EXPECTED) String expected) {
+    }
+
+    public record CriteriaRequest(@Size(max = 200) String title, @NotNull EvalCriteria criteria) {
     }
 
     public record RunRequest(@Size(max = 128) String model) {

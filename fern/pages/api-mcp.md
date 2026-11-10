@@ -38,13 +38,14 @@ The server uses the Streamable HTTP transport without sessions: every message is
 | --- | --- |
 | `list_projects` | Lists the workspace's projects. |
 | `list_issues` | Lists the issues of a project. |
-| `get_issue` | Reads one issue with its description and comments. |
+| `get_issue` | Reads one issue with its description, its checklist (each item with its id) and comments. |
 | `list_issue_statuses` | Lists a project's statuses, to change an issue's status. |
 | `list_my_issues` | Lists the issues assigned to you. |
 | `workspace_kpis` | Resolved issues, velocity, work in progress and issues at risk. |
 | `brain_search` | Searches the Brain OS notes. |
 | `create_issue` | Creates an issue. |
 | `update_issue` | Changes an issue's status, assignee, priority, title, description or due date. |
+| `check_checklist_item` | Checks or unchecks one item of an issue's checklist, by its id. |
 | `add_comment` | Comments on an issue, in Markdown. |
 | `smart_assign` | Recommends an assignee, with the reasons, without assigning. |
 | `ask_cortex` | Asks Cortex, which answers from the Brain OS and the projects. |
@@ -53,4 +54,5 @@ The tools act with your rights: a project you cannot see stays invisible, and a 
 refused.
 
 When you delegate an issue to Claude Code through the [local runner](/guides/coding-agents), the agent uses this same
-server, with a session limited to the run.
+server, with a session limited to the run: it reads the workspace, creates issues in the delegated issue's project, and
+changes only the delegated issue. Any other change is refused.

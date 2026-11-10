@@ -54,6 +54,26 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
     expect(screen.getByText("Fixed 3 links in the footer.")).toBeInTheDocument();
   });
 
+  it("reads top-down: what is delivered, what the agent says, is it good, what will change, the buttons", () => {
+    show();
+
+    const order = ["Pull request #212 on acme/website.", "Fixed 3 links in the footer.", "12 of 12 passed", "Merge pull request #212 on GitHub", "Apply"];
+    const at = order.map((text) => document.body.textContent?.indexOf(text) ?? -1);
+    expect(at.every((position) => position >= 0)).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+    expect(screen.getByText("What it says it did")).toBeInTheDocument();
+  });
+
+  it("embedded in the work view, it doesn't repeat the title of the mission", () => {
+    render(<MissionResultCard slug="acme" issueId={28} issueKey="TF-28" issueTitle="Fix the footer links" responsible="Pierre" embedded />);
+
+    expect(screen.queryByText("Fix the footer links")).toBeNull();
+    expect(screen.queryByText("Ready to review")).toBeNull();
+    expect(screen.getByText("Pull request #212 on acme/website.")).toBeInTheDocument();
+    // Le dossier se télécharge depuis la ligne de la preuve, dans la vue.
+    expect(screen.queryByRole("button", { name: "JSON" })).toBeNull();
+  });
+
   it("Apply goes through the store", async () => {
     applyRun.mockResolvedValue(true);
     show();
@@ -137,6 +157,18 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
     expect(screen.queryByRole("button", { name: "Discard" })).toBeNull();
   });
 
+  it("renders the agent's words as Markdown, not as raw marks", () => {
+    const summary = "## What changed\n- **Footer**: fixed 3 links\n- Kept the `Privacy` link\n\nSee [the issue](https://github.com/acme/website/issues/9).";
+    useDeliveryStore.setState({ runs: { 28: { ...RUN, summary } } });
+    show();
+
+    expect(screen.getByText("What changed")).toBeInTheDocument();
+    expect(screen.getByText("Footer").tagName).toBe("STRONG");
+    expect(screen.getByText("Privacy").tagName).toBe("CODE");
+    expect(screen.getByRole("link", { name: "the issue" })).toHaveAttribute("href", "https://github.com/acme/website/issues/9");
+    expect(document.body.textContent).not.toMatch(/##|\*\*/);
+  });
+
   it("shows why the server refused", () => {
     useDeliveryStore.setState({ resultErrors: { 100: "GitHub can't merge pull request #212 on acme/website right now." } });
     show();
@@ -152,6 +184,56 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
     expect((screen.getByRole("button", { name: "Apply" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  describe("a mission that changed nothing (replay of 1.8.0, TESTTA-2)", () => {
+    const NO_CHANGE: DeliveryRun = { ...RUN, resultUrl: null, commits: 0, summary: "The footer links were already fixed." };
+
+    it("offers Mark as done instead of a greyed Apply, and says what it will change", () => {
+      useDeliveryStore.setState({ runs: { 28: NO_CHANGE } });
+      show();
+
+      expect(screen.getByText("No code change was needed.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Apply" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Mark as done" })).toBeEnabled();
+      expect(screen.getByText("What will change if you mark it done")).toBeInTheDocument();
+      expect(screen.getByText("Move TF-28 to Done")).toBeInTheDocument();
+      // Discard et Try again restent.
+      expect(screen.getByRole("button", { name: "Discard" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+    });
+
+    it("doesn't headline a mission that delivered comments with No code change was needed (s08)", () => {
+      const COMMENT = { seq: 1, kind: "tool" as const, tool: "taskforce: add_comment", text: "{}", at: null };
+      useDeliveryStore.setState({
+        runs: { 28: { ...NO_CHANGE, summary: "No code change was needed.\n\nDeliverable posted." } },
+        activity: { 100: { events: [COMMENT, { ...COMMENT, seq: 2 }, { ...COMMENT, seq: 3 }, { ...COMMENT, seq: 4 }], approvals: [] } },
+      });
+      show();
+
+      expect(screen.getByText("Delivered 4 comments on TF-28.")).toBeInTheDocument();
+      expect(screen.getByText("Deliverable posted.")).toBeInTheDocument();
+      expect(document.body.textContent).not.toContain("No code change was needed");
+    });
+
+    it("Mark as done goes through the store, and says it is done", async () => {
+      const markRunDone = vi.fn().mockResolvedValue(true);
+      useDeliveryStore.setState({ runs: { 28: NO_CHANGE }, markRunDone });
+      show();
+
+      fireEvent.click(screen.getByRole("button", { name: "Mark as done" }));
+
+      await waitFor(() => expect(markRunDone).toHaveBeenCalledWith("acme", 28, 100));
+      const { toast } = await import("sonner");
+      expect(toast.success).toHaveBeenCalledWith("Marked as done");
+    });
+
+    it("an older runner that says nothing about the branch counts as no change", () => {
+      useDeliveryStore.setState({ runs: { 28: { ...RUN, resultUrl: null, branch: null, commits: null } } });
+      show();
+
+      expect(screen.getByRole("button", { name: "Mark as done" })).toBeInTheDocument();
+    });
+  });
+
   it("downloads the record from How it was done", async () => {
     show();
 
@@ -159,12 +241,13 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
     fireEvent.click(screen.getByRole("button", { name: "Markdown" }));
 
     await waitFor(() => expect(downloadEvidence).toHaveBeenCalledWith("acme", 100, "md"));
-    expect(screen.getByText("Rules v12 · 0 steps · 0 requests, 0 answered")).toBeInTheDocument();
+    expect(screen.getByText("Rules v12 · 0 actions · 0 requests, 0 answered")).toBeInTheDocument();
   });
 
   it.each([
     ["a mission still running", { ...RUN, status: "RUNNING" as const }],
     ["a result already applied", { ...RUN, outcome: "APPLIED" as const }],
+    ["an issue already marked done", { ...RUN, resultUrl: null, commits: 0, outcome: "MARKED_DONE" as const }],
   ])("shows nothing for %s", (_label, run) => {
     useDeliveryStore.setState({ runs: { 28: run } });
     const { container } = render(<MissionResultCard slug="acme" issueId={28} issueKey="TF-28" issueTitle="x" responsible={null} />);

@@ -1,0 +1,82 @@
+package com.taskforce.tf_api.core.model;
+
+import java.time.LocalDateTime;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+ * Une mesure de ce que sait faire un modèle (V115, R113) : les cas fixes d'une version de la suite, rejoués sur ce modèle.
+ * L'espace et la personne qui l'ont lancée portent son coût (quota, frein de débit) ; la table, elle, vaut pour l'instance.
+ */
+@Entity
+@Table(name = "model_capability_runs")
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ModelCapabilityRun {
+
+    /** La suite d'une mesure de capacité (V121) ; celle du banc des modèles est {@code BenchmarkSuite.SUITE}. */
+    public static final String CAPABILITY = "capability";
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    /** La suite de cas : les capacités (R113) ou le banc des modèles (R131). */
+    @Builder.Default
+    @Column(nullable = false, updatable = false, length = 32)
+    private String suite = CAPABILITY;
+
+    @Column(name = "workspace_id", nullable = false, updatable = false)
+    private Long workspaceId;
+
+    @Column(name = "started_by", updatable = false)
+    private Long startedBy;
+
+    @Column(name = "started_at", nullable = false, updatable = false)
+    private LocalDateTime startedAt;
+
+    @Column(name = "finished_at")
+    private LocalDateTime finishedAt;
+
+    @Column(nullable = false, updatable = false, length = 128)
+    private String model;
+
+    @Column(name = "suite_version", nullable = false, updatable = false)
+    private int suiteVersion;
+
+    @Column(nullable = false, updatable = false)
+    private int total;
+
+    @Column(nullable = false)
+    private int passed;
+
+    /** Le temps du premier appel, qui charge le modèle avant que rien ne soit chronométré (R142) ; null sans chargement. */
+    @Column(name = "load_ms")
+    private Long loadMs;
+
+    /** La mémoire que le modèle occupait une fois chargé, en octets, d'après Ollama ; null chez un autre fournisseur. */
+    @Column(name = "memory_bytes")
+    private Long memoryBytes;
+
+    /** Ce qui en tenait sur la carte graphique, en octets ; le reste tournait sur le processeur. */
+    @Column(name = "gpu_bytes")
+    private Long gpuBytes;
+
+    /** Le chargement n'a pas abouti : {@code too_slow} ou {@code failed} ; null quand il a abouti, ou s'il n'y en a pas eu. */
+    @Column(name = "load_problem", length = 16)
+    private String loadProblem;
+}

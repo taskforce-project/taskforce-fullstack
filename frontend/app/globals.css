@@ -858,12 +858,166 @@ textarea:not([disabled]) { cursor: text; }
   .auth-step-seg[data-state="current"] { background: var(--primary); }
 }
 
+/* Une carte qui arrive sur le board (créée ici, par un coéquipier ou par Cortex) s'allume une fois, d'un anneau bleu
+   qui s'éteint : l'œil trouve où l'action a eu lieu (revue UX du 01/11/2026). Un fondu de couleur, pas un mouvement. */
+@keyframes card-arrive {
+  0%, 35% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 55%, transparent); }
+  100% { box-shadow: 0 0 0 2px transparent; }
+}
+.card-arrive {
+  animation: card-arrive 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CORTEX - le composeur flottant et la conversation sur son dégradé
+   ─────────────────────────────────────────────────────────────────────────
+   La barre et la conversation parlent la langue du composeur du site (landing-page, Composer.astro). La barre flotte
+   en bas de chaque écran. La conversation n'est pas une carte (le CEO, 02/11/2026 : « je veux pas de card, comme sur
+   le site genre un bg simple ») : son texte se pose sur un dégradé qui monte de la barre, le fond de l'écran presque
+   plein sous le texte, qui s'efface vers les bords et vers le haut, avec un cœur bleu sous la barre ; l'écran se voit
+   autour. Ce sont les seules surfaces arrondies et en dégradé de l'app (.ai/design-grammar.md). Pas de
+   backdrop-filter : le dégradé n'est qu'un dégradé, flouter une grande surface coûte cher au rendu (notes du site,
+   .ai/site-desktop.md).
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* Un seul rayon pour ce qui flotte avec Cortex, celui du composeur du site. */
+  --cortex-radius: 1.125rem;
+  /* Le cœur bleu du dégradé, sous la barre. */
+  --cortex-aura: color-mix(in srgb, var(--primary) 14%, transparent);
+  /* La largeur du dégradé, en part de l'écran (le site : 72 %, 130 % sur un téléphone). */
+  --cortex-wash-x: 72%;
+  /* Ce que le dégradé monte au-dessus de la conversation, pour que le texte du haut se lise encore sur l'écran. */
+  --cortex-rise: 4rem;
+  /* Le fondu du haut de la conversation, où les tours d'avant s'effacent. */
+  --cortex-fade: 2.5rem;
+}
+.dark {
+  --cortex-aura: color-mix(in srgb, var(--primary) 26%, transparent);
+}
+@media (max-width: 759px) {
+  :root {
+    --cortex-wash-x: 130%;
+  }
+}
+.cortex-composer {
+  border-radius: var(--cortex-radius);
+  background: var(--card);
+  box-shadow: var(--shadow-window);
+  transition: box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.cortex-composer:focus-within {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ring) 55%, transparent), var(--shadow-window);
+}
+/* Le dégradé, celui du parcours du site (.flow-glow) : une ellipse posée au bas du volet, sous la barre, qui monte
+   au-dessus du texte. Presque plein au centre, il s'efface vers les bords et vers le haut ; il ne capte aucun clic. */
+.cortex-wash {
+  position: absolute;
+  inset: calc(-1 * var(--cortex-rise)) 0 -4.5rem;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse var(--cortex-wash-x) 100% at 50% 100%,
+    color-mix(in srgb, var(--background) 97%, transparent) 0%,
+    color-mix(in srgb, var(--background) 95%, transparent) 66%,
+    color-mix(in srgb, var(--background) 78%, transparent) 84%,
+    transparent 100%
+  );
+}
+/* Derrière la colonne du texte, comme derrière le texte d'une étape sur le site (.flow-panels::before) : le fond plus
+   plein, aux côtés fondus, qui s'éteint vers le haut. Sans bord net, ce n'est pas une carte. */
+.cortex-wash::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 50%;
+  width: min(100%, 54rem);
+  transform: translateX(-50%);
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--background) 92%, transparent) 0%,
+    color-mix(in srgb, var(--background) 86%, transparent) 70%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(to right, transparent, black 3rem, black calc(100% - 3rem), transparent);
+  mask-image: linear-gradient(to right, transparent, black 3rem, black calc(100% - 3rem), transparent);
+}
+.cortex-wash::after {
+  content: "";
+  position: absolute;
+  inset: 55% 24% -30%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--cortex-aura), transparent);
+}
+/* La conversation : pas de cadre, pas de fond, pas d'ombre. Elle prend la place de son texte, jusqu'à un plafond qui
+   laisse l'écran au-dessus à voir (et, dans l'app desktop, loin des boutons de la fenêtre). */
+.cortex-conversation {
+  max-height: min(30rem, 56dvh);
+}
+/* Le fil : en haut, les tours qui montent s'effacent dans un fondu ; au repos, son retrait le laisse vide. Sa barre de
+   défilement ne se montre qu'au survol, comme celle de la barre latérale : pas de bord visible. */
+.cortex-thread {
+  padding-top: var(--cortex-fade);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--cortex-fade));
+  mask-image: linear-gradient(to bottom, transparent, black var(--cortex-fade));
+}
+.cortex-thread::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+.cortex-thread:hover::-webkit-scrollbar-thumb {
+  background: var(--fill-primary);
+}
+/* Le texte de Cortex se détache de l'écran comme sur le site : un liseré du fond autour des lettres. */
+.cortex-thread [data-role="assistant"] > * > [data-markdown],
+.cortex-say {
+  text-shadow: 0 0 2px var(--background), 0 0 14px var(--background);
+}
+/* La dernière réponse se lit en grand, ses titres avec elle ; les cartes qu'elle porte gardent leur taille. */
+.cortex-latest [data-role="assistant"] > * > [data-markdown] {
+  --text-sm: 1.125rem;
+  --text-base: 1.25rem;
+  --text-lg: 1.375rem;
+  --text-xl: 1.5rem;
+  line-height: 1.55;
+  letter-spacing: -0.011em;
+}
+/* Les tours d'avant l'échange en cours restent à la taille du texte de l'app, un ton plus bas. */
+.cortex-earlier :is([data-role="assistant"] > * > [data-markdown], [data-role="user"]) {
+  color: var(--label-secondary);
+}
+/* La demande de la personne : une pastille à peine plus sombre que le fond, arrondie sauf du côté de qui parle. */
+.cortex-thread [data-role="user"] {
+  border-radius: 0.875rem 0.875rem 0.25rem 0.875rem;
+  background: color-mix(in srgb, var(--foreground) 6%, var(--background));
+  color: var(--foreground);
+}
+/* La conversation dans sa colonne (R119, R124) : une police, trois tailles. Les tours à une taille de lecture, titres
+   compris, la demande de la personne avec eux ; l'accueil au-dessus ; le reste (outils, cartes, la ligne sous le
+   compositeur) au petit corps de l'app. Rien ne passe sous le texte : ni liseré, ni tour d'avant pâli. */
+.cortex-column .cortex-thread [data-role="assistant"] > * > [data-markdown] {
+  --text-sm: 0.9375rem;
+  --text-base: 0.9375rem;
+  --text-lg: 0.9375rem;
+  --text-xl: 0.9375rem;
+  line-height: 1.65;
+  letter-spacing: normal;
+  text-shadow: none;
+}
+.cortex-column .cortex-say {
+  text-shadow: none;
+}
+.cortex-column .cortex-thread [data-role="user"] {
+  font-size: 0.9375rem;
+}
+.cortex-column .cortex-earlier :is([data-role="assistant"] > * > [data-markdown], [data-role="user"]) {
+  color: var(--foreground);
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    APP DESKTOP - haut de la fenêtre dessiné par l'interface
    ─────────────────────────────────────────────────────────────────────────
-   La coque n'a ni barre de titre ni menu du système (desktop/src/window-chrome.ts) : la barre du haut et
-   l'en-tête de la barre latérale déplacent la fenêtre, leurs contrôles restent cliquables, et la barre du
-   haut laisse à droite la place des boutons du système (Window Controls Overlay : titlebar-area-*).
+   La coque n'a ni barre de titre ni menu du système (desktop/src/window-chrome.ts) : la ligne du haut de la
+   fenêtre (44 px, R119) et l'en-tête de la barre de gauche déplacent la fenêtre, leurs contrôles restent
+   cliquables, et la ligne du haut laisse à droite la place des boutons du système (Window Controls Overlay :
+   titlebar-area-*).
    ══════════════════════════════════════════════════════════════════════════ */
 .desktop-titlebar,
 .desktop-drag {
@@ -881,6 +1035,14 @@ textarea:not([disabled]) { cursor: text; }
   .desktop-content {
     border-radius: 0.75rem;
   }
+}
+/* Un panneau qui s'ouvre à droite (la fiche d'une issue) commence sous la bande des boutons du système : à pleine
+   hauteur, ses propres boutons, en haut à droite, passaient sous « Agrandir » et « Fermer » de la fenêtre, qui se
+   dessinent par-dessus la page (revue UX du 01/11/2026). Hors couche, cette règle l'emporte sur `inset-y-0` et
+   `h-full`. */
+.desktop-sheet-right {
+  top: env(titlebar-area-height, 0px);
+  height: auto;
 }
 /* Bande au-dessus du contenu arrondi : elle déplace aussi la fenêtre. */
 .desktop-top-drag {

@@ -17,7 +17,14 @@ export type IssueActivityType =
   | "CREATED" | "STATUS_CHANGED" | "PRIORITY_CHANGED" | "ASSIGNEE_CHANGED"
   | "TYPE_CHANGED" | "TITLE_CHANGED" | "DESCRIPTION_CHANGED" | "LABEL_ADDED"
   | "LABEL_REMOVED" | "DUE_DATE_CHANGED" | "START_DATE_CHANGED" | "PARENT_CHANGED"
-  | "COMMENT_ADDED" | "COMMENT_DELETED" | "COMPLETED" | "REOPENED";
+  | "COMMENT_ADDED" | "COMMENT_DELETED" | "COMPLETED" | "REOPENED"
+  // Ce qu'une mission fait sur l'issue, puis le geste de la personne sur son résultat (V112).
+  | "CHECKLIST_CHECKED" | "CHECKLIST_UNCHECKED" | "PULL_REQUEST_OPENED"
+  | "MISSION_APPLIED" | "MISSION_DISCARDED" | "MISSION_RETRIED"
+  // L'issue terminée par la personne, la mission n'ayant rien changé (V114, rejeu de la 1.8.0).
+  | "MISSION_MARKED_DONE"
+  // La personne a commenté des lignes du diff : la mission repart sur la même branche (V122, R139).
+  | "MISSION_CHANGES_ASKED";
 
 export interface UserSummary {
   id: number;
@@ -92,6 +99,10 @@ export interface IssueComment {
   id: number;
   author: UserSummary;
   content: string;
+  /** L'agent qui l'a écrit pour son auteur (« qwen3:8b », « Claude Code », « Cortex ») ; absent quand l'auteur l'a écrit. */
+  via?: string | null;
+  /** Le modèle qui faisait parler cet agent (« qwen3:8b » pour Cortex, R123) ; absent sinon. */
+  model?: string | null;
   isEdited: boolean;
   createdAt: string;
   updatedAt: string;
@@ -103,7 +114,29 @@ export interface IssueActivity {
   action: IssueActivityType;
   oldValue: string | null;
   newValue: string | null;
+  /**
+   * L'agent par qui l'action est passée : « Cortex » qui a préparé l'issue, ou l'agent d'une mission qui a agi au nom
+   * de `actor` (« Claude Code ») ; null quand la personne a agi seule.
+   */
+  via?: string | null;
+  /** Le modèle qui faisait parler cet agent (« qwen3:8b » pour Cortex, R123) ; absent sinon. */
+  model?: string | null;
   createdAt: string;
+}
+
+/**
+ * Une issue trouvée par la recherche de la fenêtre (R123, R124) : de quoi la reconnaître, l'ouvrir dans le volet ou la
+ * joindre à une demande à Cortex.
+ */
+export interface IssueHit {
+  id: number;
+  projectId: number;
+  /** La clé de l'issue (« OPS-35 »). */
+  key: string;
+  title: string;
+  /** Le nom de sa colonne ; null sans colonne. */
+  status: string | null;
+  statusCategory: string | null;
 }
 
 export interface SmartAssignCandidate {
@@ -225,6 +258,33 @@ export async function listMyIssues(slug: string): Promise<Issue[]> {
 /**
  * Retourne les issues planifiées (startDate ou dueDate renseigné) du workspace - roadmap.
  */
+/**
+ * Cherche les issues de l'espace par leur clé (« OPS-35 », « ops 35 ») ou leur titre, dans les projets que la personne
+ * voit, la clé exacte d'abord ; sans texte, les dernières changées.
+ */
+export async function searchIssues(slug: string, query: string, limit = 8): Promise<IssueHit[]> {
+  const res = await apiClient.get<{ data: IssueHit[] }>(ISSUE_ROUTES.SEARCH(slug), { params: { q: query, limit } });
+  return res.data.data ?? [];
+}
+
+/** Une issue trouvée par ce qu'on a écrit dessous (Ctrl+K, R141) : le passage du commentaire qui répond. */
+export interface IssueCommentHit {
+  issueId: number;
+  projectId: number;
+  key: string;
+  title: string;
+  excerpt: string;
+}
+
+/** Les issues dont un commentaire répond, une ligne par issue. Appel de fond (à la frappe) : jamais de toast. */
+export async function searchIssueComments(slug: string, query: string, limit = 5): Promise<IssueCommentHit[]> {
+  const res = await apiClient.get<{ data: IssueCommentHit[] }>(ISSUE_ROUTES.SEARCH_COMMENTS(slug), {
+    params: { q: query, limit },
+    silentError: true,
+  });
+  return res.data.data ?? [];
+}
+
 export async function getScheduledIssues(slug: string): Promise<Issue[]> {
   const res = await apiClient.get<{ data: Issue[] }>(ROADMAP_ROUTES.SCHEDULED(slug));
   return res.data.data;

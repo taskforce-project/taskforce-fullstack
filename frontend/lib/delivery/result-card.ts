@@ -1,6 +1,7 @@
 import type { DeliveryRun, DeliveryRunActivity } from "@/lib/api/delivery-service";
 import type { CONSTANTS_EN } from "@/lib/constants_en";
 import { parseServerDate } from "@/lib/utils/server-date";
+import { documentChanges, fileChanges } from "@/lib/window/work-view";
 
 // ---------------------------------------------------------------------------
 // La carte de résultat d'une mission (R78, séance n°13 ; J3, R50) : ce qui est rendu, les contrôles tirés du dossier
@@ -29,6 +30,13 @@ export interface Change {
 
 export interface ResultCardModel {
   pr: PullRequest | null;
+  /**
+   * Ni pull request ni commit : le travail était déjà fait. Rien ne s'applique, la carte propose « Mark as done » (rejeu
+   * de la 1.8.0, TESTTA-2 : « Apply » restait éteint sans dire pourquoi).
+   */
+  noChange: boolean;
+  /** Ce que la mission a rendu, en une phrase : le titre de la carte. */
+  delivered: string;
   /** Minutes de travail, du moment où le runner a pris la mission à sa fin ; null sans fin connue. */
   minutes: number | null;
   checks: Check[];
@@ -60,6 +68,8 @@ function testsCheck(run: DeliveryRun, t: ResultTexts): Check {
   const tests = run.tests;
   if (!tests) return { label: t.noTestCommand, value: "", ok: null };
   if (!tests.ran) return { label: t.testsNotRun, value: t.testsNotRunValue, ok: false };
+  // Un fichier remis comme avant après leur passage : leur résultat porte sur une version qui n'existe plus (R139).
+  if (tests.stale) return { label: t.testsStale, value: "", ok: null };
   const counted = tests.passedCount != null && tests.total != null;
   const value = counted
     ? fill(t.testsCount, { passed: tests.passedCount as number, total: tests.total as number })
@@ -79,14 +89,14 @@ export function resultCard(
   const answered = approvals.filter((a) => a.status === "ALLOWED" || a.status === "DENIED").length;
   const checks: Check[] = [testsCheck(run, t)];
   if (asked > 0) checks.push({ label: t.requestsAnswered, value: fill(t.requestsCount, { answered, asked }), ok: answered === asked });
-  const changes: Change[] = pr
-    ? [
-        { text: fill(t.mergeChange, { number: pr.number }), final: true },
-        ...(issueKey ? [{ text: fill(t.moveChange, { key: issueKey }), final: false }] : []),
-      ]
-    : [];
+  const noChange = changedNothing(run);
+  const move: Change[] = issueKey ? [{ text: fill(t.moveChange, { key: issueKey }), final: false }] : [];
+  const changes: Change[] = pr ? [{ text: fill(t.mergeChange, { number: pr.number }), final: true }, ...move]
+    : noChange ? move : [];
   return {
     pr,
+    noChange,
+    delivered: deliveredLine(run, activity, issueKey, t),
     minutes: workMinutes(run),
     checks,
     changes,
@@ -96,12 +106,66 @@ export function resultCard(
   };
 }
 
-/** La phrase du résultat : la pull request, sinon la branche, sinon rien à changer. */
+/**
+ * Une mission qui n'a rien changé : ni pull request, ni commit sur sa branche. Le serveur lit les mêmes faits avant de
+ * terminer l'issue (`MissionResultService.markDone`).
+ */
+export function changedNothing(run: Pick<DeliveryRun, "resultUrl" | "branch" | "commits">): boolean {
+  return !pullRequestOf(run.resultUrl) && !(run.branch && run.commits);
+}
+
+/** L'agent à l'essai de R51 : la boucle de TaskForce sur un modèle, qui répond en commentaire. À l'écran, c'est Cortex (R144). */
+export const TRIAL_AGENT = "taskforce-agent";
+
+/** La phrase du résultat : la pull request, sinon la branche, sinon le commentaire de l'agent à l'essai, sinon rien. */
 export function resultLine(run: DeliveryRun, t: ResultTexts): string {
   const pr = pullRequestOf(run.resultUrl);
   if (pr) return fill(t.pullRequest, { number: pr.number, repo: pr.repo });
   if (run.branch && run.commits) return fill(t.branchOnly, { commits: run.commits, branch: run.branch });
-  return t.noChange;
+  return run.providerKey === TRIAL_AGENT ? t.answeredInComment : t.noChange;
+}
+
+const amount = (count: number, one: string, many: string): string | null =>
+  count === 0 ? null : count === 1 ? one : fill(many, { count });
+
+/**
+ * Ce que la mission a rendu : la pull request ou la branche quand il y en a, sinon ce qu'elle a écrit. « No code change
+ * was needed » ne titre pas une mission qui a livré quatre commentaires (recette 1.13, étape 8) : il reste pour celle
+ * qui n'a vraiment rien produit.
+ */
+export function deliveredLine(
+  run: DeliveryRun,
+  activity: DeliveryRunActivity | undefined,
+  issueKey: string | null,
+  t: ResultTexts,
+): string {
+  if (!changedNothing(run) || run.providerKey === TRIAL_AGENT) return resultLine(run, t);
+  const events = activity?.events ?? [];
+  const documents = documentChanges(events);
+  const made = (gesture: (typeof documents)[number]["gesture"]): number => documents.filter((d) => d.gesture === gesture).length;
+  const what = [
+    amount(made("comment"), t.oneComment, t.comments),
+    amount(made("issue"), t.oneIssue, t.issues),
+    amount(made("update"), t.oneUpdate, t.updates),
+    amount(made("checklist"), t.oneChecked, t.checked),
+  ].filter((part): part is string => part !== null);
+  if (what.length > 0) {
+    const list = what.length > 1 ? `${what.slice(0, -1).join(", ")}${t.and}${what[what.length - 1]}` : what[0];
+    return issueKey ? fill(t.deliveredOn, { what: list, key: issueKey }) : fill(t.delivered, { what: list });
+  }
+  const files = amount(fileChanges(events).length, t.oneFile, t.files);
+  return files ? fill(t.delivered, { what: files }) : t.noChange;
+}
+
+/** Le compte rendu de l'agent, sans la phrase que le runner met devant celui d'une mission sans commit : elle ne le titre pas. */
+export function agentWords(summary: string): string {
+  return summary.replace(/^No code change was needed\.\s*/, "");
+}
+
+/** Le nom de l'agent d'une mission : Cortex suivi de son modèle pour l'agent de TaskForce (R144) ; sinon {@code fallback}. */
+export function missionAgentName(run: Pick<DeliveryRun, "providerKey" | "model">, fallback: string): string {
+  if (run.providerKey !== TRIAL_AGENT) return fallback;
+  return run.model ? `Cortex · ${run.model}` : "Cortex";
 }
 
 export { fill as fillText };

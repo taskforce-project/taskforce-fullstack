@@ -92,6 +92,26 @@ class CortexGateTest {
         assertThat(verdict.facts()).containsEntry("tool", name);
     }
 
+    /** Les gestes du MCP TaskForce portent leur action (ADR-024) : la même que la table juge pour Claude Code. */
+    @ParameterizedTest(name = "{0} ({1}) : {2}, règle {3}")
+    @CsvSource({
+        "update_issue,   issue.update,   allow, update-issue",
+        "add_comment,    comment.create, allow, comment",
+        "delegate_issue, mission.start,  allow, start-mission",
+        "get_mission,    issue.read,     allow, read-issues",
+        "delete_issue,   issue.delete,   ask,   delete-issue",   // ne se défait pas : la personne confirme (R1)
+    })
+    void a_gesture_is_judged_on_the_action_it_carries(String name, String action, String effect, String ruleId) {
+        AgentTool tool = internal(name);
+        when(tool.action()).thenReturn(action);
+
+        CortexGate.Verdict verdict = gate.judge(defaults, tool);
+
+        assertThat(verdict.effect()).isEqualTo(effect);
+        assertThat(verdict.ruleId()).isEqualTo(ruleId);
+        assertThat(verdict.facts()).containsEntry("action", action).containsEntry("tool", name);
+    }
+
     @Test
     @DisplayName("une action qu'aucune règle ne couvre attend la personne, et le dit")
     void an_uncovered_action_waits_for_the_person() {

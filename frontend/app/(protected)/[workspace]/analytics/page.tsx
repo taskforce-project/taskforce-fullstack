@@ -155,7 +155,6 @@ export default function AnalyticsPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Intelligence"
         description="What the AI observes about your operations - and what it recommends doing next."
       />
 

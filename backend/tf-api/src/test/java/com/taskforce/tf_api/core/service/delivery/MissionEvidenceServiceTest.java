@@ -73,6 +73,32 @@ class MissionEvidenceServiceTest {
     }
 
     @Test
+    @DisplayName("un geste après la fin de la mission : à la suite de la chaîne, le sceau passe au dernier maillon, rien n'est réécrit (R139)")
+    void a_gesture_after_the_end_moves_the_seal() {
+        startAndAct();
+        service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "done", null, null));
+        String sealed = run.getEvidenceRoot();
+        String firstHash = stored.getFirst().getHash();
+
+        service.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", "ada@taskforce.dev"),
+            Map.of("decision", "REVERT_FILE", "path", "a.txt"));
+
+        assertThat(run.getEvidenceRoot()).isNotEqualTo(sealed).isEqualTo(stored.getLast().getHash());
+        assertThat(stored.getLast().getPrev()).isEqualTo(sealed);
+        assertThat(stored.getFirst().getHash()).isEqualTo(firstHash);
+    }
+
+    @Test
+    @DisplayName("sans sceau, un geste s'ajoute sans en poser un (mission encore en cours)")
+    void a_gesture_during_the_mission_seals_nothing() {
+        startAndAct();
+
+        service.appendAfterEnd(run, "action.result", MissionEvidenceService.Actor.SERVER, Map.of("kind", "correction"));
+
+        assertThat(run.getEvidenceRoot()).isNull();
+    }
+
+    @Test
     @DisplayName("chaque événement porte l'empreinte du précédent, la chaîne part de l'empreinte nulle")
     void events_are_chained() {
         startAndAct();

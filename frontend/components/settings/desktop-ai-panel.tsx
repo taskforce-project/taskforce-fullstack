@@ -4,12 +4,17 @@ import { useEffect, useState } from "react"
 import { CircleAlert, CircleCheck, Loader2 } from "lucide-react"
 
 import { CopyableCode } from "@/components/settings/copyable-code"
+import { ModelProposal } from "@/components/settings/cortex-model-choice"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { fillModelText } from "@/lib/ai/model-table"
 import { desktopBridge, type DesktopAiSettings, type DesktopAiView } from "@/lib/desktop"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
+import { useModelCapabilityStore } from "@/lib/store/model-capability-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
 
 /** Valeur des listes de modèles pour « choisi automatiquement » (un élément de liste ne peut pas être vide). */
 const AUTO = "__auto"
@@ -21,15 +26,26 @@ const PROVIDERS: { value: DesktopAiSettings["provider"]; label: string; hint: st
     label: "An OpenAI-compatible API",
     hint: "OpenAI, Mistral, Groq, OpenRouter, LM Studio... The text of each request goes to that provider.",
   },
+  {
+    value: "anthropic",
+    label: "Anthropic's API",
+    hint: "Claude models. The text of each request goes to Anthropic; search uses Ollama on this computer.",
+  },
   { value: "off", label: "No AI", hint: "Projects, issues and notes keep working. Search uses full text." },
 ]
 
 /**
  * Réglages « AI » de l'app desktop : où tourne l'IA de TaskForce. Le choix et la clé d'API restent dans la coque (clé
- * dans le trousseau du système), qui relaie les appels du backend vers ce fournisseur (cf. `desktop/src/ai.ts`).
+ * dans le trousseau du système), qui les passe au backend : sa passerelle de modèles parle elle-même au fournisseur, et
+ * un changement vaut tout de suite (cf. `desktop/src/ai.ts`).
  */
 export function DesktopAiPanel() {
   const fetchAiStatus = useAiStatusStore((s) => s.fetchStatus)
+  // La fenêtre de contexte que reçoit le modèle de conversation, sur Ollama (taillée à chaque requête, jusque-là).
+  const contextWindow = useAiStatusStore((s) => s.status?.contextWindow ?? null)
+  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug) ?? ""
+  const fetchModels = useModelCapabilityStore((s) => s.fetchTable)
+  const instanceChanged = useModelCapabilityStore((s) => s.instanceChanged)
   const [view, setView] = useState<DesktopAiView | null>(null)
   const [draft, setDraft] = useState<DesktopAiSettings | null>(null)
   const [apiKey, setApiKey] = useState("")
@@ -55,6 +71,13 @@ export function DesktopAiPanel() {
   useEffect(() => {
     void load()
   }, [])
+  useEffect(() => {
+    void fetchAiStatus()
+  }, [fetchAiStatus])
+  // La table des capacités dit ce que TaskForce propose ; elle se lit dans le volet « Progress » (R125).
+  useEffect(() => {
+    if (slug) void fetchModels(slug)
+  }, [slug, fetchModels])
 
   const save = async () => {
     const bridge = desktopBridge()
@@ -74,6 +97,7 @@ export function DesktopAiPanel() {
     setSaved(true)
     // Cortex et les autres écrans relisent l'état tout de suite, sans attendre les caches.
     void fetchAiStatus(true)
+    if (slug) void instanceChanged(slug)
   }
 
   if (!draft || !view) {
@@ -89,6 +113,15 @@ export function DesktopAiPanel() {
     setSaved(false)
     setDraft({ ...draft, ...patch })
   }
+  // Les modèles d'un fournisseur ne valent pas chez un autre : un autre fournisseur repart sur « Automatic ».
+  const chooseProvider = (provider: DesktopAiSettings["provider"]) => {
+    const stored = view.settings
+    update(
+      provider === stored.provider
+        ? { provider, model: stored.model, modelFast: stored.modelFast, embedModel: stored.embedModel }
+        : { provider, model: "", modelFast: "", embedModel: "" },
+    )
+  }
   const unchanged = JSON.stringify(draft) === JSON.stringify(view.settings) && !apiKey
   const { state } = view
 
@@ -103,7 +136,7 @@ export function DesktopAiPanel() {
         </div>
         <RadioGroup
           value={draft.provider}
-          onValueChange={(value) => update({ provider: value as DesktopAiSettings["provider"] })}
+          onValueChange={(value) => chooseProvider(value as DesktopAiSettings["provider"])}
           className="flex flex-col gap-3"
         >
           {PROVIDERS.map((p) => (
@@ -118,16 +151,18 @@ export function DesktopAiPanel() {
         </RadioGroup>
       </section>
 
-      {draft.provider === "custom" && (
+      {(draft.provider === "custom" || draft.provider === "anthropic") && (
         <section className="flex flex-col gap-4 border-b border-border/60 pb-6">
-          <Field label="API address" hint="With /v1 at the end.">
-            <Input
-              value={draft.baseUrl}
-              onChange={(e) => update({ baseUrl: e.target.value })}
-              placeholder="https://api.openai.com/v1"
-              spellCheck={false}
-            />
-          </Field>
+          {draft.provider === "custom" && (
+            <Field label="API address" hint="With /v1 at the end.">
+              <Input
+                value={draft.baseUrl}
+                onChange={(e) => update({ baseUrl: e.target.value })}
+                placeholder="https://api.openai.com/v1"
+                spellCheck={false}
+              />
+            </Field>
+          )}
           <Field label="API key" hint="Kept in your system keychain, never shown again.">
             <Input
               type="password"
@@ -136,7 +171,14 @@ export function DesktopAiPanel() {
                 setSaved(false)
                 setApiKey(e.target.value)
               }}
-              placeholder={view.hasApiKey ? "Saved. Type a new key to replace it." : "sk-..."}
+              placeholder={
+                // Chaque fournisseur a sa clé : celle qui est gardée ne vaut que pour le fournisseur enregistré.
+                view.hasApiKey && draft.provider === view.settings.provider
+                  ? "Saved. Type a new key to replace it."
+                  : draft.provider === "anthropic"
+                    ? "sk-ant-..."
+                    : "sk-..."
+              }
               autoComplete="off"
               spellCheck={false}
             />
@@ -169,14 +211,22 @@ export function DesktopAiPanel() {
           <ModelField
             label="Search"
             value={draft.embedModel}
-            models={state.models}
+            models={state.embedModels ?? state.models}
             current={state.embeddings.model}
             onChange={(embedModel) => update({ embedModel })}
           />
         </section>
       )}
 
-      <StatusLine view={view} />
+      <StatusLine view={view} contextWindow={contextWindow} />
+
+      {/* Ce que TaskForce propose d'après ce qu'il a mesuré sur l'ordinateur (R113), et le lien vers « Progress », où
+          se lit ce que sait faire chaque modèle (R125). Le choix reste ici, dans les modèles ci-dessus. */}
+      {slug && draft.provider !== "off" && state.reachable && (
+        <div className="border-t border-border/60 pt-6">
+          <ModelProposal />
+        </div>
+      )}
 
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex flex-wrap items-center gap-2">
@@ -238,7 +288,8 @@ function ModelField({
 }
 
 /** Ce qui marche maintenant, et quoi faire sinon. */
-function StatusLine({ view }: Readonly<{ view: DesktopAiView }>) {
+function StatusLine({ view, contextWindow }: Readonly<{ view: DesktopAiView; contextWindow: number | null }>) {
+  const t = usePreferencesStore((s) => s.t.models)
   const { settings, state } = view
   if (settings.provider === "off") {
     return <p className="text-xs text-muted-foreground">AI is off. Cortex still searches your notes and cites what it finds.</p>
@@ -261,24 +312,50 @@ function StatusLine({ view }: Readonly<{ view: DesktopAiView }>) {
       </div>
     ) : (
       <p className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-        <CircleAlert className="size-3.5 text-ink-yellow" /> TaskForce can&apos;t reach this API. Check the address and the key.
+        <CircleAlert className="size-3.5 text-ink-yellow" />{" "}
+        {settings.provider === "anthropic"
+          ? "TaskForce can't reach Anthropic's API. Check the key."
+          : "TaskForce can't reach this API. Check the address and the key."}
       </p>
     )
   }
+  const local = settings.provider === "ollama"
   return (
     <ul className="flex flex-col gap-1.5 text-xs">
-      <StatusItem ok={state.chat.available} label="Conversation" model={state.chat.model} missing="pull a conversation model, for example qwen3:8b" />
-      <StatusItem ok={state.embeddings.available} label="Search" model={state.embeddings.model} missing="pull bge-m3 for semantic search (full text works meanwhile)" />
+      <StatusItem
+        ok={state.chat.available}
+        label="Conversation"
+        model={state.chat.model}
+        detail={local && contextWindow ? fillModelText(t.contextWindow, { tokens: contextWindow.toLocaleString("en-US") }) : null}
+        missing={local ? "pull a conversation model, for example qwen3:8b" : "choose a model in the list above"}
+      />
+      <StatusItem
+        ok={state.embeddings.available}
+        label="Search"
+        model={state.embeddings.model}
+        missing={
+          settings.provider === "custom"
+            ? "choose a search model of 1024 dimensions (full text works meanwhile)"
+            : "pull bge-m3 in Ollama for semantic search (full text works meanwhile)"
+        }
+      />
     </ul>
   )
 }
 
-function StatusItem({ ok, label, model, missing }: Readonly<{ ok: boolean; label: string; model: string | null; missing: string }>) {
+function StatusItem({ ok, label, model, detail = null, missing }: Readonly<{
+  ok: boolean
+  label: string
+  model: string | null
+  /** Ce qui suit le modèle prêt, par exemple sa fenêtre de contexte. */
+  detail?: string | null
+  missing: string
+}>) {
   return (
     <li className="flex items-center gap-1.5 text-muted-foreground">
       {ok ? <CircleCheck className="size-3.5 text-ink-green" /> : <CircleAlert className="size-3.5 text-ink-yellow" />}
       <span className="font-medium text-foreground">{label}</span>
-      {ok ? `ready with ${model}` : `not ready: ${missing}`}
+      {ok ? `ready with ${model}${detail ? `, ${detail}` : ""}` : `not ready: ${missing}`}
     </li>
   )
 }

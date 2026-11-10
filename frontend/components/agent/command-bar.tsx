@@ -1,94 +1,71 @@
 "use client"
 
 import { useRef } from "react"
-import { usePathname } from "next/navigation"
-import { MessageSquare, Send, Sparkles } from "lucide-react"
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 
 import { AgentChat } from "./agent-chat"
-import { suggestionsFor } from "@/lib/cortex/suggestions"
+import { Composer } from "./composer"
 import { useCortexStore } from "@/lib/store/cortex-store"
-import { usePanelStore } from "@/lib/store/panel-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 
-/** Le panneau de la conversation, ouvert par la barre : le même partout, réouvert sans doublon. */
-export const CORTEX_PANEL = {
-  id: "assistant",
-  side: "right" as const,
-  title: "Cortex",
-  icon: <Sparkles className="size-4 text-primary" />,
-  content: <AgentChat />,
-}
-
 /**
- * La barre unique, en bas de chaque écran (R76, séance n°13) : on y écrit ce qu'on veut faire, et la conversation
- * s'ouvre à droite. Rien ne part tant que la personne n'envoie pas elle-même, par Entrée ou par le bouton ; une
- * suggestion remplit la barre, elle n'envoie rien. Elle remplace le bouton « Ask AI » de la barre du haut.
+ * La conversation repliée dans le compositeur, en bas au centre du volet, quand il prend toute la largeur ou que la
+ * fenêtre est étroite (R120, séance n°18). C'est le motif du 02/11/2026, gardé tel quel : le compositeur flotte,
+ * détaché des bords ; la conversation n'est pas une carte, son texte se pose sur un dégradé qui monte de la barre, la
+ * dernière réponse en grand. Rien n'est modal : hors du texte, le volet se clique. La conversation se réduit dans le
+ * compositeur (Échap, ou son chevron) ; une réponse arrivée pendant qu'elle est réduite s'y signale.
  */
 export function CommandBar() {
-  const pathname = usePathname()
-  const t = usePreferencesStore((s) => s.t)
-  const draft = useCortexStore((s) => s.draft)
-  const setDraft = useCortexStore((s) => s.setDraft)
-  const submit = useCortexStore((s) => s.submit)
-  const openPanel = usePanelStore((s) => s.openPanel)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const t = usePreferencesStore((s) => s.t.shell)
+  const reduceMotion = useReducedMotion()
+  const open = useCortexStore((s) => s.open)
+  const setOpen = useCortexStore((s) => s.setOpen)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  const send = () => {
-    if (submit()) openPanel(CORTEX_PANEL)
-  }
-
-  const suggest = (text: string) => {
-    setDraft(text)
+  const show = () => {
+    setOpen(true)
     inputRef.current?.focus()
   }
 
+  const fold = () => {
+    setOpen(false)
+    inputRef.current?.focus()
+  }
+
+  // La conversation monte de la barre ; avec le mouvement réduit, elle apparaît en fondu, sans se déplacer.
+  const away = reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }
+
   return (
-    <div className="shrink-0 border-t border-border/70 bg-background px-3 pb-2.5 pt-2 md:px-6" data-tour="command-bar">
-      <div className="flex h-11 items-center gap-2 border border-border bg-background px-2 focus-within:border-foreground/30">
-        <button
-          type="button"
-          onClick={() => openPanel(CORTEX_PANEL)}
-          aria-label={t.shell.barOpenConversation}
-          title={t.shell.barOpenConversation}
-          className="flex size-8 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <MessageSquare className="size-4" />
-        </button>
-        <input
-          ref={inputRef}
-          id="command-bar-input"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-              e.preventDefault()
-              send()
-            }
-          }}
-          placeholder={t.shell.barPlaceholder}
-          aria-label={t.shell.barPlaceholder}
-          className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
-        />
-        <button
-          type="button"
-          onClick={send}
-          disabled={!draft.trim()}
-          className="flex h-8 shrink-0 items-center gap-1.5 bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:opacity-40"
-        >
-          <Send className="size-3.5" /> {t.shell.barSend}
-        </button>
-      </div>
-      <div className="mt-1.5 flex flex-wrap gap-1.5" aria-label={t.shell.barSuggestions}>
-        {suggestionsFor(pathname).map((s) => (
-          <button
-            key={s.label}
-            type="button"
-            onClick={() => suggest(s.text)}
-            className="h-6 border border-border/70 bg-muted/40 px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+    <div
+      className="relative shrink-0 px-3 pb-3 pt-2 md:px-6"
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && open && !e.defaultPrevented) {
+          e.preventDefault()
+          fold()
+        }
+      }}
+    >
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="conversation"
+            initial={away}
+            animate={{ opacity: 1, y: 0 }}
+            exit={away}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            // Au-dessus du volet, sans le bloquer : seul le texte capte les clics, pas le dégradé autour.
+            className="pointer-events-none absolute inset-x-0 bottom-full z-30 px-3 md:px-6"
           >
-            {s.label}
-          </button>
-        ))}
+            <span className="cortex-wash" aria-hidden="true" />
+            <section aria-label={t.chatLabel} className="cortex-conversation pointer-events-auto relative mx-auto flex w-full max-w-3xl flex-col">
+              <AgentChat onFold={fold} />
+            </section>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="mx-auto w-full max-w-3xl">
+        <Composer variant="folded" inputRef={inputRef} onToggle={open ? fold : show} />
       </div>
     </div>
   )

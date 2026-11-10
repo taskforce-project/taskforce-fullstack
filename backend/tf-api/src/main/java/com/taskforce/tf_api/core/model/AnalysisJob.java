@@ -26,9 +26,9 @@ import lombok.Setter;
 /**
  * Un workflow d'analyse IA, exécuté en arrière-plan et observable en direct.
  *
- * <p>C'est la trace durable de ce que l'agent a fait : le {@code planJson} contient les étapes
- * (contrat {@code PlanTask} du front) mises à jour au fil de l'exécution puis poussées en STOMP,
- * si bien qu'on peut rouvrir le dock et retrouver un workflow là où il en était.
+ * <p>C'est la trace durable de ce que l'agent a fait : son statut, poussé en STOMP à chaque changement, la question
+ * et la réponse, l'erreur, le brief produit. On peut rouvrir le panneau « AI Workflows » et retrouver un workflow
+ * là où il en était. Le plan d'étapes figé qu'il portait (colonne {@code plan_json}) est supprimé (TF-J1-3).
  *
  * <p>Boucle <b>HITL</b> : en mode {@link AnalysisDepth#DEEP}, le modèle peut suspendre le workflow
  * ({@link AnalysisJobStatus#WAITING_FOR_INPUT}) en posant une {@code question} ; la {@code answer}
@@ -75,11 +75,6 @@ public class AnalysisJob extends AuditableEntity {
     @Column(nullable = false, length = 24)
     @Builder.Default
     private AnalysisJobStatus status = AnalysisJobStatus.QUEUED;
-
-    /** Array JSON d'étapes (contrat {@code PlanTask} du front). */
-    @Column(name = "plan_json", nullable = false, columnDefinition = "TEXT")
-    @Builder.Default
-    private String planJson = "[]";
 
     /** HITL : question posée par le modèle (non nulle ssi {@code status = WAITING_FOR_INPUT}). */
     @Column(columnDefinition = "TEXT")

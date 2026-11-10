@@ -8,7 +8,7 @@
 set -euo pipefail
 
 CONTAINER="${PG_CONTAINER:-taskforce-postgres-prod}"
-SERVICES="${PG_CLIENTS:-taskforce-backend-prod taskforce-keycloak-prod taskforce-ai-service-prod}"
+SERVICES="${PG_CLIENTS:-taskforce-backend-prod taskforce-keycloak-prod}"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/backups}"
 FILE="${1:-}"
 

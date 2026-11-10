@@ -13,7 +13,9 @@ import java.util.Set;
  *   <li>un seul workspace, celui du run ;</li>
  *   <li>en <b>lecture</b>, une liste fermée de sous-arbres utiles au travail (projets, Brain OS, mes
  *       issues, analytics) ;</li>
- *   <li>en <b>écriture</b>, les issues du projet du run et rien d'autre ;</li>
+ *   <li>en <b>écriture</b>, l'issue du run et ce qui en dépend (ses champs, sa colonne, sa checklist, ses
+ *       commentaires), plus la création d'une issue dans le projet du run, et rien d'autre : aucune autre
+ *       issue, même du même projet (R110, séance n°16) ;</li>
  *   <li><b>jamais de suppression</b> : la décision destructive reste humaine (spec D6) ;</li>
  *   <li>le serveur MCP de l'instance ({@code mcp}), où chaque outil est rejugé ici sur son équivalent REST
  *       ({@code McpServerService}).</li>
@@ -21,7 +23,8 @@ import java.util.Set;
  *
  * <p>Liste <b>d'autorisation</b>, pas d'interdiction : tout chemin absent est refusé, y compris les futurs
  * endpoints. Un agent lit du texte écrit par d'autres (issues, notes) : une instruction glissée dans ce
- * texte ne doit pas pouvoir toucher un autre projet, les membres, la facturation ou les intégrations.</p>
+ * texte ne doit pas pouvoir toucher une autre issue, un autre projet, les membres, la facturation ou les
+ * intégrations.</p>
  */
 public final class DeliverySessionScope {
 
@@ -44,9 +47,11 @@ public final class DeliverySessionScope {
      * @param path          chemin brut de la requête ({@code getRequestURI})
      * @param workspaceSlug workspace de la session
      * @param projectId     projet de la session
+     * @param issueId       issue de la session, la seule modifiable
      */
-    public static boolean allows(String method, String path, String workspaceSlug, Long projectId) {
-        if (method == null || path == null || workspaceSlug == null || workspaceSlug.isBlank() || projectId == null) {
+    public static boolean allows(String method, String path, String workspaceSlug, Long projectId, Long issueId) {
+        if (method == null || path == null || workspaceSlug == null || workspaceSlug.isBlank()
+            || projectId == null || issueId == null) {
             return false;
         }
         // Défense en profondeur (le pare-feu HTTP de Spring refuse déjà ces formes) : un slug et des ids
@@ -72,7 +77,9 @@ public final class DeliverySessionScope {
             return true;
         }
         if (WRITE_METHODS.contains(verb)) {
-            return isUnder(rest, "projects/" + projectId + "/issues");
+            String issues = "projects/" + projectId + "/issues";
+            // Créer une issue dans le projet du run (règle create-issue) ; sinon, l'issue du run et rien d'autre.
+            return ("POST".equals(verb) && rest.equals(issues)) || isUnder(rest, issues + "/" + issueId);
         }
         return false; // DELETE, OPTIONS, TRACE... : jamais
     }

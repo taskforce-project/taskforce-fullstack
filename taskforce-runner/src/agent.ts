@@ -5,11 +5,11 @@ import type { Claim } from "./api.js";
 import { ApprovalServer, type ApprovalApi } from "./approvals.js";
 import type { RunnerConfig } from "./config.js";
 import { EventRelay, type EventSink } from "./events.js";
-import type { RulesBundle } from "./harness/rules.js";
+import type { RulesBundle } from "./harness/engine/rules-engine.js";
 import { log } from "./log.js";
-import { run } from "./proc.js";
-import { buildPrompt, buildReplyPrompt } from "./prompt.js";
-import { describeToolInput, parseAgentOutput, toEvents, toolLabel, type AgentOutcome } from "./stream.js";
+import { run, type StdinChannel } from "./proc.js";
+import { buildFollowUpPrompt, buildPrompt, buildReplyPrompt } from "./prompt.js";
+import { describeToolInput, parseAgentOutput, toEvents, toolLabel, WriteWatcher, type AgentOutcome } from "./stream.js";
 
 export type { AgentOutcome } from "./stream.js";
 export { parseAgentOutput } from "./stream.js";
@@ -45,15 +45,80 @@ export function safeModel(model: string | null | undefined): string | null {
   return typeof model === "string" && /^[A-Za-z0-9][A-Za-z0-9._\[\]-]{0,79}$/.test(model) ? model : null;
 }
 
+/** Identifiant de session de Claude Code sûr à poser sur une ligne de commande, ou null. Il revient du serveur. */
+export function safeSession(session: string | null | undefined): string | null {
+  return typeof session === "string" && /^[0-9a-fA-F-]{8,64}$/.test(session) ? session : null;
+}
+
+/** Une ligne de l'entrée `stream-json` : un message de la personne. */
+export function userMessage(text: string): string {
+  return `${JSON.stringify({ type: "user", message: { role: "user", content: text } })}\n`;
+}
+
+/** Sans nouvelle de l'agent après un résultat alors qu'une correction attend, l'entrée se ferme quand même. */
+const CORRECTION_GRACE_MS = 120_000;
+
+/**
+ * La conversation avec l'agent pendant la mission (R140) : le brief, puis les corrections de la personne, qu'il lit à sa
+ * prochaine étape. Claude Code attend sur son entrée tant qu'elle est ouverte : elle se ferme à son résultat. Une
+ * correction restée sans réponse à ce résultat ouvre un dernier tour, qui finit par le sien.
+ */
+export class AgentConversation {
+  private unanswered = 0;
+  private grace: NodeJS.Timeout | null = null;
+  private closed = false;
+
+  constructor(private readonly stdin: StdinChannel, private readonly graceMs = CORRECTION_GRACE_MS) {}
+
+  start(prompt: string): void {
+    this.stdin.write(userMessage(prompt));
+  }
+
+  /** Vrai si le texte est parti ; faux si l'agent a déjà fini. */
+  tell(text: string): boolean {
+    if (this.closed) return false;
+    const sent = this.stdin.write(userMessage(text));
+    if (sent) this.unanswered++;
+    return sent;
+  }
+
+  /** Chaque ligne de la sortie, déjà lue en JSON. */
+  heard(message: unknown): void {
+    if (this.grace) clearTimeout(this.grace);
+    this.grace = null;
+    const type = message && typeof message === "object" ? (message as { type?: unknown }).type : undefined;
+    if (type === "assistant") {
+      this.unanswered = 0;
+    } else if (type === "result") {
+      if (this.unanswered === 0) {
+        this.close();
+      } else {
+        this.unanswered = 0;
+        this.grace = setTimeout(() => this.close(), this.graceMs);
+        this.grace.unref();
+      }
+    }
+  }
+
+  close(): void {
+    if (this.grace) clearTimeout(this.grace);
+    this.grace = null;
+    this.closed = true;
+    this.stdin.end();
+  }
+}
+
 /** Arguments de `claude -p`. Exporté pour les tests : c'est la frontière de sécurité de l'exécution locale. */
-export function agentArgs(config: RunnerConfig, claim: Claim, mcpConfigPath: string, settingsPath: string): string[] {
+export function agentArgs(config: RunnerConfig, claim: Claim, mcpConfigPath: string, settingsPath: string, resume: string | null = null): string[] {
   const args = [
     "-p",
     // Suivi en direct : une ligne JSON par message, relayée à la chronologie du run dans TaskForce.
     "--output-format", "stream-json",
     "--verbose",
+    // Le brief et les corrections de la personne passent par l'entrée, jamais par la ligne de commande (R140).
+    "--input-format", "stream-json",
     // Les règles de la mission jugent chaque action (hook PreToolUse du fichier --settings). Une action qu'elles
-    // demandent attend une décision humaine (hook PermissionRequest) ; personne d'autre ne répond : sans décision, refus.
+    // demandent attend, dans ce même hook, la décision de la personne qui a délégué ; sans décision, refus.
     "--permission-mode", "manual",
     "--permission-prompts", "none",
     "--disallowedTools", DENIED_TOOLS.join(","),
@@ -73,6 +138,9 @@ export function agentArgs(config: RunnerConfig, claim: Claim, mcpConfigPath: str
   if (extra.length > 0) args.push("--allowedTools", extra.join(","));
   const model = safeModel(config.agent.model) ?? safeModel(claim.model);
   if (model) args.push("--model", model);
+  // Une reprise continue la conversation de l'agent : il sait déjà ce qu'il a fait et pourquoi (R139).
+  const session = safeSession(resume);
+  if (session) args.push("--resume", session);
   return args;
 }
 
@@ -114,17 +182,18 @@ export function mcpConfig(config: RunnerConfig, claim: Claim, sessionToken: stri
 
 /**
  * Réglages imposés à la session : pas d'attribution (sauf choix contraire), et deux hooks vers le serveur local du
- * runner : les règles avant chaque action, la décision humaine pour ce qu'elles demandent. Le délai du second dépasse
- * l'attente du serveur : c'est le serveur qui répond « refusé ».
+ * runner : les règles avant chaque action, avec la décision humaine pour ce qu'elles demandent, puis, en secours, ce
+ * que Claude Code demande encore. Le délai de chacun dépasse l'attente du serveur : c'est le serveur qui répond
+ * « refusé ».
  */
 export function agentSettings(config: RunnerConfig, hookUrl: string, preToolUseUrl: string): Record<string, unknown> {
   return {
     // Les deux clés, l'ancienne et la nouvelle, pour couvrir les versions de Claude Code.
     ...(config.agent.attribution ? {} : { includeCoAuthoredBy: false, attribution: { commit: "", pr: "" } }),
     hooks: {
-      // Avant CHAQUE action, autorisée d'avance ou non : les règles de la mission, jugées sur place. Garde fermée : un
-      // serveur local injoignable bloque l'action au lieu de la laisser passer (onFailure, Claude Code 2.1.295,
-      // d'après son journal des versions).
+      // Avant CHAQUE action, autorisée d'avance ou non : les règles de la mission, jugées sur place, et la personne pour
+      // ce qu'elles demandent. Garde fermée : un serveur local injoignable bloque l'action au lieu de la laisser passer
+      // (onFailure, Claude Code 2.1.295, d'après son journal des versions).
       PreToolUse: [{
         matcher: ".*",
         hooks: [{
@@ -132,7 +201,7 @@ export function agentSettings(config: RunnerConfig, hookUrl: string, preToolUseU
           url: preToolUseUrl,
           headers: { Authorization: `Bearer $${HOOK_TOKEN_ENV}` },
           allowedEnvVars: [HOOK_TOKEN_ENV],
-          timeout: 30,
+          timeout: config.agent.approvalTimeoutMinutes * 60 + 60,
           onFailure: "block",
         }],
       }],
@@ -159,6 +228,10 @@ export interface AgentRunOptions {
   branch?: string;
   /** Arrêt du runner : Claude Code est arrêté tout de suite, le run finit en échec. */
   signal?: AbortSignal;
+  /** Un outil qui a pu écrire vient de finir : le relevé des changements repart (R139). */
+  onWrite?: () => void;
+  /** Le moyen de parler à l'agent pendant son travail, le temps qu'il tourne (R140). */
+  onConversation?: (tell: ((text: string) => boolean) | null) => void;
 }
 
 /**
@@ -181,6 +254,9 @@ export async function runAgent(
   const approvals = new ApprovalServer(api, claim.runId, workDir, {
     waitMs: config.agent.approvalTimeoutMinutes * 60_000,
     rules: opts.rules,
+    allowedInAdvance: config.agent.extraAllowedTools,
+    // Au-delà de ce nombre de changements dans TaskForce sur la mission, chacun se demande (R110).
+    maxTaskForceChanges: config.agent.maxTaskForceChanges,
     // Chaque décision des règles va au dossier de preuve de la mission (le serveur ne l'affiche pas dans la chronologie).
     onDecision: (tool, d, input) => {
       log.info(`Rule decision: ${tool} ${d.effect}${d.rule ? ` (${d.rule.id})` : ""}`);
@@ -203,28 +279,58 @@ export async function runAgent(
   writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig(config, claim, sessionToken)), { encoding: "utf8", mode: 0o600 });
   writeFileSync(settingsPath, JSON.stringify(agentSettings(config, hookUrl, approvals.preToolUseUrl)), { encoding: "utf8", mode: 0o600 });
 
+  const prompt = opts.mode === "repoless" ? buildReplyPrompt(claim)
+    : claim.followUp ? buildFollowUpPrompt(claim, opts.branch ?? "", claim.followUp.comments)
+    : buildPrompt(claim, opts.branch ?? "");
+
+  /** Un passage de l'agent ; `resume` : la session à continuer. */
+  const attempt = async (resume: string | null): Promise<AgentOutcome> => {
+    let conversation: AgentConversation | null = null;
+    const watcher = new WriteWatcher();
+    try {
+      const result = await run(config.agent.command, agentArgs(config, claim, mcpConfigPath, settingsPath, resume), {
+        cwd: workDir,
+        env: agentEnv(config, process.env, approvals.token),
+        timeoutMs: config.agent.timeoutMinutes * 60_000,
+        signal: opts.signal,
+        onStdin: (stdin) => {
+          conversation = new AgentConversation(stdin);
+          conversation.start(prompt);
+          opts.onConversation?.((text) => conversation?.tell(text) ?? false);
+        },
+        onStdoutLine: (line) => {
+          try {
+            const message: unknown = JSON.parse(line);
+            relay.push(toEvents(message, workDir));
+            if (watcher.wrote(message)) opts.onWrite?.();
+            (conversation as AgentConversation | null)?.heard(message);
+          } catch {
+            // ligne non JSON (avertissement de la CLI) : rien pour la chronologie
+          }
+        },
+      });
+      if (result.aborted) {
+        return { ok: false, text: "The runner stopped while Claude Code was working (TaskForce was closed). Delegate the task again.", costUsd: null, turns: null };
+      }
+      if (result.timedOut) {
+        return { ok: false, text: `The agent was stopped after ${config.agent.timeoutMinutes} min (timeout).`, costUsd: null, turns: null };
+      }
+      return parseAgentOutput(result.code, result.stdout, result.stderr);
+    } finally {
+      opts.onConversation?.(null);
+      (conversation as AgentConversation | null)?.close();
+    }
+  };
+
   try {
-    const result = await run(config.agent.command, agentArgs(config, claim, mcpConfigPath, settingsPath), {
-      cwd: workDir,
-      env: agentEnv(config, process.env, approvals.token),
-      input: opts.mode === "repoless" ? buildReplyPrompt(claim) : buildPrompt(claim, opts.branch ?? ""),
-      timeoutMs: config.agent.timeoutMinutes * 60_000,
-      signal: opts.signal,
-      onStdoutLine: (line) => {
-        try {
-          relay.push(toEvents(JSON.parse(line), workDir));
-        } catch {
-          // ligne non JSON (avertissement de la CLI) : rien pour la chronologie
-        }
-      },
-    });
-    if (result.aborted) {
-      return { ok: false, text: "The runner stopped while Claude Code was working (TaskForce was closed). Delegate the task again.", costUsd: null, turns: null };
+    const session = claim.followUp?.sessionId ?? null;
+    const outcome = await attempt(session);
+    if (session && outcome.sessionLost) {
+      // Le brief d'une reprise se suffit à lui-même : l'agent repart de lui, sans sa conversation d'avant.
+      log.warn("The agent's session is no longer on this computer: it starts again from the comments alone.");
+      return await attempt(null);
     }
-    if (result.timedOut) {
-      return { ok: false, text: `The agent was stopped after ${config.agent.timeoutMinutes} min (timeout).`, costUsd: null, turns: null };
-    }
-    return parseAgentOutput(result.code, result.stdout, result.stderr);
+    return outcome;
   } finally {
     await relay.close().catch((e: unknown) => log.warn(`Live timeline: ${(e as Error).message}`));
     await approvals.stop();

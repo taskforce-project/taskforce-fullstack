@@ -1,20 +1,22 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, session, shell } from "electron";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { ACCOUNT_SERVER, accountPageUrl, refresh, revoke, SessionEndedError, signIn, signInError } from "./account";
-import { parseAiInput } from "./ai";
+import { aiEnvironment, keySlot, parseAiInput, type AiState } from "./ai";
 import { BACKUPS } from "./backup";
 import { connectMcp, disconnectMcp, isPersonalToken, isWorkspaceSlug, mcpConnection } from "./claude";
 import { createRepo, DEVICE_PAGE, findRepo, GitHubSignIn, isNewRepoName, isRepoFullName, listRepos } from "./github";
 import { initLog, log } from "./log";
 import { APP_ID, readNotice } from "./notify";
 import { appLogDir, fromStore, storeDataDir } from "./paths";
+import { applyPermissions } from "./permissions";
 import { settings, type Account } from "./settings";
 import { startStack, type Stack } from "./stack";
 import { toolsStatus } from "./tools";
 import { readMove, readWorkspaceMove, Transfer, type LocalApi } from "./transfer";
-import { check, installNow, startUpdater, updateState } from "./updater";
+import { announceInstalled, check, installNow, releaseUpdateScreenOnFirstWindow, restartApp, startUpdater, updateState } from "./updater";
+import { prepareVoiceInBackground, registerVoice, voiceAvailable } from "./voice";
 import {
   integratedTitleBar,
   MAIN_TITLE_BAR_HEIGHT,
@@ -63,6 +65,10 @@ async function main(): Promise<void> {
   if (process.platform === "win32" && !fromStore()) app.setAppUserModelId(APP_ID);
   Menu.setApplicationMenu(buildMenu());
   registerIpc();
+  registerVoice(() => mainWindow);
+  releaseUpdateScreenOnFirstWindow();
+  // Micro pour la seule origine de la fenêtre ; ce que l'interface n'utilise pas est refusé (cf. permissions.ts).
+  applyPermissions(session.defaultSession, () => stack?.origin ?? null, voiceAvailable());
 
   // Un compte connecté par un autre service de comptes (développement, changement d'adresse) demande une reconnexion.
   let account = settings.account();
@@ -84,9 +90,15 @@ async function main(): Promise<void> {
     refreshed = refreshAccount(account);
   }
   await openApp(account, signInWin);
-  // Session fermée en ligne : traitée une fois la pile démarrée, pour qu'elle s'arrête proprement.
-  if ((await refreshed) === "ended") await sessionEnded();
+  // Session fermée en ligne : traitée une fois la pile démarrée, pour qu'elle s'arrête proprement. Les mises à jour
+  // attendent l'app relancée : démarrées pendant l'arrêt, elles pourraient retrouver une version téléchargée lors d'un
+  // lancement précédent, qui s'installerait en quittant et fermerait l'app relancée.
+  if ((await refreshed) === "ended") {
+    await sessionEnded();
+    return;
+  }
   startUpdater();
+  prepareVoiceInBackground();
 }
 
 /**
@@ -107,7 +119,11 @@ async function refreshAccount(account: Account): Promise<"valid" | "ended" | "of
   }
 }
 
-/** Session fermée en ligne : l'app le dit, oublie le compte sur ce poste et revient à l'écran de connexion. */
+/**
+ * Session fermée en ligne : l'app le dit, oublie le compte sur ce poste et revient à l'écran de connexion. Le compte
+ * s'efface avant le redémarrage : l'app rouverte, par la relance ou par l'installeur d'une mise à jour prête (cf.
+ * `restartApp`), montre la connexion.
+ */
 async function sessionEnded(): Promise<void> {
   log.info("Session ended online: signing out of this computer");
   settings.clearAccount();
@@ -117,8 +133,7 @@ async function sessionEnded(): Promise<void> {
     message: "You're signed out of this computer",
     detail: "Your session ended, or this computer was signed out from your account settings. Sign in again to keep using TaskForce here. Your projects stay on this computer.",
   });
-  app.relaunch();
-  app.quit();
+  await restartApp(prepareUpdate);
 }
 
 /** Écran de connexion : se résout une fois le compte connecté, la fenêtre encore ouverte (cf. `openApp`). */
@@ -173,7 +188,8 @@ function openBrowser(url: string): Promise<void> {
   return shell.openExternal(url);
 }
 
-function splashWindow(): BrowserWindow {
+/** L'écran d'attente : au démarrage, ses étapes arrivent ensuite (cf. `openApp`) ; pour une mise à jour, `hash` les donne. */
+function splashWindow(hash?: string): BrowserWindow {
   const window = new BrowserWindow({
     width: 420,
     height: 280,
@@ -186,9 +202,29 @@ function splashWindow(): BrowserWindow {
     backgroundColor: "#fbfbfc",
     webPreferences: { contextIsolation: true, sandbox: true },
   });
-  void window.loadFile(staticPage("splash.html"));
+  void window.loadFile(staticPage("splash.html"), hash ? { hash } : undefined);
   window.once("ready-to-show", () => window.show());
   return window;
+}
+
+/**
+ * Avant d'installer une mise à jour (« Restart now », cf. `installNow` dans updater.ts) : l'écran d'attente de l'app, à
+ * ses couleurs, remplace la fenêtre pendant que la pile s'arrête proprement. Il reste jusqu'à ce que la fenêtre de
+ * l'installeur, dessinée à l'identique (installer.nsh, mêmes phrases), prenne le relais.
+ */
+async function prepareUpdate(version: string): Promise<void> {
+  quitting = true;
+  const splash = splashWindow(new URLSearchParams({
+    step: `Installing TaskForce ${version}`,
+    note: "It takes a minute or two. TaskForce opens again by itself.",
+  }).toString());
+  // La fenêtre se ferme une fois l'écran affiché : l'app n'a jamais zéro fenêtre, ce qui la ferait quitter.
+  await new Promise<void>((resolve) => {
+    splash.once("show", () => resolve());
+    setTimeout(resolve, 2_000).unref();
+  });
+  mainWindow?.close();
+  await stopStack();
 }
 
 /**
@@ -248,15 +284,10 @@ async function openApp(account: Account, previous: BrowserWindow | null): Promis
       mainWindow.show();
     }
     if (!splash.isDestroyed()) splash.close();
-    // Premier lancement d'une nouvelle version : la personne voit que la mise à jour est faite.
-    if (stack?.updateNotice && Notification.isSupported()) {
-      const updated = new Notification(stack.updateNotice);
-      notices.add(updated);
-      updated.on("close", () => notices.delete(updated));
-      updated.show();
-    }
   });
   mainWindow.on("closed", () => (mainWindow = null));
+  // Premier lancement d'une nouvelle version : la fenêtre le dit à son ouverture, plus de notification du système.
+  if (stack.updateNotice) announceInstalled(stack.updateNotice);
   await mainWindow.loadURL(stack.origin);
 }
 
@@ -293,6 +324,8 @@ function registerIpc(): void {
       onboardedOnline: stack?.account.profile?.onboardingCompleted === true,
       // Qui installe les mises à jour : l'app elle-même, ou le Microsoft Store pour sa version Store.
       updates: fromStore() ? "store" : "app",
+      // La voix transcrite sur la machine, là où le moteur est embarqué (cf. voice.ts).
+      voice: voiceAvailable(),
     };
   });
   ipcMain.handle("desktop:account-page", () => shell.openExternal(accountPageUrl()));
@@ -316,15 +349,19 @@ function registerIpc(): void {
     shown.show();
   });
   // Réglages d'IA du compte : fournisseur et modèles dans les réglages, clé dans le trousseau, jamais renvoyée à la page.
+  // Le backend les reçoit tout de suite (sans redémarrer) et rend l'état lu chez le nouveau fournisseur.
   ipcMain.handle("desktop:ai-get", () => aiView());
   ipcMain.handle("desktop:ai-save", async (_event, input: unknown) => {
     if (!stack) return { ok: false, error: "TaskForce is still starting" };
+    const subject = stack.account.subject;
     try {
       const { settings: next, apiKey } = parseAiInput(input);
-      settings.setAiSettings(stack.account.subject, next);
-      if (apiKey !== undefined) settings.setSecret(stack.account.subject, "aiApiKey", apiKey || undefined);
-      stack.ai.invalidate();
-      return { ok: true, view: await aiView() };
+      settings.setAiSettings(subject, next);
+      // Une clé par fournisseur : celle qu'on tape va au fournisseur choisi, jamais à un autre.
+      const slot = keySlot(next.provider);
+      if (apiKey !== undefined && slot) settings.setSecret(subject, slot, apiKey || undefined);
+      const state = await stack.ai.apply(aiEnvironment(next, settings.aiKey(subject, next.provider)));
+      return { ok: true, view: await aiView(state) };
     } catch (error) {
       return { ok: false, error: (error as Error).message };
     }
@@ -332,7 +369,7 @@ function registerIpc(): void {
   ipcMain.handle("desktop:check-updates", () => check());
   // Le toast de la mise à jour lit l'état à son ouverture, puis le reçoit à chaque changement (cf. updater.ts).
   ipcMain.handle("desktop:update-state", () => updateState());
-  ipcMain.handle("desktop:install-update", () => installNow());
+  ipcMain.handle("desktop:install-update", () => installNow(prepareUpdate));
   ipcMain.handle("desktop:open-logs", () => shell.openPath(appLogDir()));
   // Copies de la base faites avant chaque mise à jour (cf. backup.ts).
   ipcMain.handle("desktop:open-backups", () => {
@@ -415,10 +452,11 @@ function registerIpc(): void {
       const sessionToken = settings.secret(account.subject, "sessionToken");
       if (sessionToken) await revoke(sessionToken).catch((error: Error) => log.warn(`Revoke failed: ${error.message}`));
     }
+    // Le compte s'efface avant le redémarrage : l'app rouverte, par la relance ou par l'installeur d'une mise à jour
+    // prête (cf. `restartApp`), montre la connexion.
     settings.clearAccount();
     log.info("Signed out");
-    app.relaunch();
-    app.quit();
+    await restartApp(prepareUpdate);
   });
 }
 
@@ -451,14 +489,18 @@ async function settle<T>(promise: Promise<T>): Promise<{ ok: true; value: T } | 
   }
 }
 
-/** Réglages d'IA tels que l'écran les montre, avec l'état lu à l'instant chez le fournisseur. */
-async function aiView() {
+/**
+ * Réglages d'IA tels que l'écran les montre, avec l'état que le backend lit à l'instant chez le fournisseur ; `state`
+ * quand il vient d'être lu (après un changement de fournisseur).
+ */
+async function aiView(state?: AiState) {
   if (!stack) throw new Error("TaskForce is still starting");
   const subject = stack.account.subject;
+  const chosen = settings.aiSettings(subject);
   return {
-    settings: settings.aiSettings(subject),
-    hasApiKey: Boolean(settings.secret(subject, "aiApiKey")),
-    state: await stack.ai.state(true),
+    settings: chosen,
+    hasApiKey: Boolean(settings.aiKey(subject, chosen.provider)),
+    state: state ?? (await stack.ai.state(true)),
   };
 }
 
@@ -492,15 +534,20 @@ function buildMenu(): Menu {
 }
 
 /** Arrêt propre : l'interface, le backend puis la base, avant de rendre la main au système. */
-app.on("before-quit", (event) => {
-  if (quitting || !stack) return;
-  event.preventDefault();
-  quitting = true;
+async function stopStack(): Promise<void> {
+  if (!stack) return;
   githubSignIn.cancel();
   const current = stack;
   stack = null;
   log.info("Stopping");
-  void current.stop().finally(() => app.quit());
+  await current.stop();
+}
+
+app.on("before-quit", (event) => {
+  if (quitting || !stack) return;
+  event.preventDefault();
+  quitting = true;
+  void stopStack().finally(() => app.quit());
 });
 
 app.on("window-all-closed", () => app.quit());

@@ -2,13 +2,11 @@ package com.taskforce.tf_api.core.service.agent;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
@@ -48,8 +46,8 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Persistance et transactions des <b>workflows d'analyse IA</b>.
  *
- * <p>Ce service ne raisonne pas : il crée, met à jour et expose les workflows. L'exécution (les
- * étapes, le LLM, la boucle HITL) vit dans {@link AnalysisJobRunner}, qui appelle ici les petites
+ * <p>Ce service ne raisonne pas : il crée, met à jour et expose les workflows. L'exécution (le
+ * contexte, le LLM, la boucle HITL) vit dans {@link AnalysisJobRunner}, qui appelle ici les petites
  * unités transactionnelles ci-dessous et laisse ce service pousser l'état sur STOMP.
  *
  * <p><b>Piège assumé</b> : {@link #launch} et {@link #answer} ne déclenchent pas le runner
@@ -92,14 +90,12 @@ public class AnalysisJobService {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        AnalysisDepth resolved = depth != null ? depth : AnalysisDepth.QUICK;
         AnalysisJob job = jobRepository.save(AnalysisJob.builder()
             .workspace(ws)
             .project(project)
             .user(user)
-            .depth(resolved)
+            .depth(depth != null ? depth : AnalysisDepth.QUICK)
             .status(AnalysisJobStatus.QUEUED)
-            .planJson(AnalysisPlan.initial(objectMapper, resolved == AnalysisDepth.DEEP).toJson())
             .build());
 
         return publish(job);
@@ -146,14 +142,13 @@ public class AnalysisJobService {
     // Unités transactionnelles appelées par le runner
     // =========================================================================
 
-    /** Passe le workflow en RUNNING et démarre la première étape. */
+    /** Passe le workflow en RUNNING. */
     @Transactional
     public JobContext startJob(Long jobId) {
         AnalysisJob job = jobRepository.findById(jobId)
             .orElseThrow(() -> new ResourceNotFoundException("Workflow not found: " + jobId));
         job.setStatus(AnalysisJobStatus.RUNNING);
         job.setError(null);
-        applyPlan(job, plan -> plan.status(AnalysisPlan.OBSERVE, AnalysisPlan.IN_PROGRESS));
         publish(job);
 
         // Le projet est chargé pour de bon (et non laissé en proxy paresseux) : le runner le lit
@@ -164,22 +159,12 @@ public class AnalysisJobService {
         return new JobContext(job.getWorkspace().getId(), project, job.getDepth(), job.getAnswer());
     }
 
-    @Transactional
-    public void step(Long jobId, String stepId, String status) {
-        AnalysisJob job = jobRepository.findById(jobId).orElseThrow();
-        applyPlan(job, plan -> plan.status(stepId, status));
-        publish(job);
-    }
-
     /** Suspend le workflow sur une question du modèle (HITL). */
     @Transactional
     public void suspend(Long jobId, String question) {
         AnalysisJob job = jobRepository.findById(jobId).orElseThrow();
         job.setStatus(AnalysisJobStatus.WAITING_FOR_INPUT);
         job.setQuestion(question);
-        applyPlan(job, plan -> plan
-            .status(AnalysisPlan.ANALYZE, AnalysisPlan.COMPLETED)
-            .status(AnalysisPlan.CLARIFY, AnalysisPlan.NEED_HELP));
         publish(job);
     }
 
@@ -191,7 +176,6 @@ public class AnalysisJobService {
 
         job.setBrief(entity);
         job.setStatus(AnalysisJobStatus.DONE);
-        applyPlan(job, plan -> plan.status(AnalysisPlan.PERSIST, AnalysisPlan.COMPLETED));
         publish(job);
     }
 
@@ -200,7 +184,6 @@ public class AnalysisJobService {
         AnalysisJob job = jobRepository.findById(jobId).orElseThrow();
         job.setStatus(AnalysisJobStatus.FAILED);
         job.setError(message);
-        applyPlan(job, AnalysisPlan::failRunning);
         publish(job);
     }
 
@@ -336,12 +319,6 @@ public class AnalysisJobService {
         return priority;
     }
 
-    /** Mute le plan stocké puis le réécrit. */
-    private void applyPlan(AnalysisJob job, java.util.function.UnaryOperator<AnalysisPlan> mutation) {
-        AnalysisPlan plan = AnalysisPlan.parse(objectMapper, job.getPlanJson());
-        job.setPlanJson(mutation.apply(plan).toJson());
-    }
-
     /**
      * Flux temps réel des workflows d'un projet, ouvert à qui voit le projet, la règle du flux de son board
      * ({@code StompAuthInterceptor}). Un flux par espace montrait le nom d'un projet privé et la question du modèle à
@@ -370,7 +347,6 @@ public class AnalysisJobService {
             job.getProject().getName(),
             job.getDepth().name(),
             job.getStatus().name(),
-            readPlan(job.getPlanJson()),
             job.getQuestion(),
             job.getError(),
             job.getBrief() != null ? job.getBrief().getId() : null,
@@ -432,20 +408,6 @@ public class AnalysisJobService {
             return objectMapper.readTree(json);
         } catch (Exception ex) {
             return objectMapper.createArrayNode();
-        }
-    }
-
-    /**
-     * Relit le plan en structures neutres (listes/maps du JDK) plutôt qu'en {@code JsonNode} :
-     * cf. {@link AnalysisJobResponse} — le sérialiseur HTTP (Jackson 3) ne connaît pas les nœuds
-     * Jackson 2 et les rendrait comme des POJO.
-     */
-    private List<Map<String, Object>> readPlan(String json) {
-        try {
-            return objectMapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {});
-        } catch (Exception ex) {
-            log.warn("Plan illisible, workflow rendu sans étapes : {}", ex.getMessage());
-            return List.of();
         }
     }
 

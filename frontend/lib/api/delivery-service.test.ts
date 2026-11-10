@@ -4,14 +4,23 @@ import {
   delegateIssue,
   getIssueRun,
   listWorkspaceRuns,
+  listOpenApprovals,
   getRunnerStatus,
   provisionRunner,
   getRunActivity,
   decideApproval,
   downloadEvidence,
+  getEvidence,
   applyRun,
   discardRun,
+  markRunDone,
   retryRun,
+  getMissionChanges,
+  getMissionFileDiff,
+  revertMissionFile,
+  askForChanges,
+  sendCorrection,
+  stopRun,
 } from './delivery-service';
 import { apiClient } from './client';
 import { DELIVERY_ROUTES } from '../config/api-routes';
@@ -30,6 +39,12 @@ const SLUG = 'acme';
 const envelope = <T>(payload: T) => ({ data: { success: true, message: 'ok', data: payload } });
 
 describe('delivery-service', () => {
+  it('stopRun : poste sur la route de la mission, sans toast global (R138)', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({});
+    await stopRun('acme', 100);
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.STOP('acme', 100), {}, { silentError: true });
+  });
+
   beforeEach(() => vi.clearAllMocks());
 
   it('GET la liste des providers et retourne le payload', async () => {
@@ -47,6 +62,38 @@ describe('delivery-service', () => {
   it('propage l’erreur du client', async () => {
     vi.mocked(apiClient.get).mockRejectedValue(new Error('boom'));
     await expect(getDeliveryProviders(SLUG)).rejects.toThrow('boom');
+  });
+
+  // Les changements d'une mission (R139) : lus en boucle, sans toast ; les refus se lisent sur place.
+  it('getMissionChanges lit la liste sans toast', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope({ mode: 'repo', files: [] }));
+    await expect(getMissionChanges(SLUG, 100)).resolves.toEqual({ mode: 'repo', files: [] });
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.CHANGES(SLUG, 100), { silentError: true });
+  });
+
+  it('getMissionFileDiff lit le diff d’un fichier, le chemin en paramètre', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope({ path: 'a b.txt', body: '@@' }));
+    await getMissionFileDiff(SLUG, 100, 'a b.txt');
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.CHANGED_FILE(SLUG, 100), { params: { path: 'a b.txt' }, silentError: true });
+  });
+
+  it('revertMissionFile envoie le fichier', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
+    await revertMissionFile(SLUG, 100, 'a.txt');
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.REVERT_FILE(SLUG, 100), { path: 'a.txt' }, { silentError: true });
+  });
+
+  it('askForChanges envoie les commentaires et rend la nouvelle mission', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope({ id: 101 }));
+    const comments = [{ path: 'a.txt', line: 2, side: 'new' as const, text: 'x' }];
+    await expect(askForChanges(SLUG, 100, comments)).resolves.toEqual({ id: 101 });
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.FOLLOW_UP(SLUG, 100), { comments }, { silentError: true });
+  });
+
+  it('sendCorrection envoie le texte', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
+    await sendCorrection(SLUG, 100, 'use tabs');
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.CORRECTION(SLUG, 100), { text: 'use tabs' }, { silentError: true });
   });
 
   it('delegateIssue POST le provider et retourne le run', async () => {
@@ -85,6 +132,16 @@ describe('delivery-service', () => {
     vi.mocked(apiClient.get).mockResolvedValue(envelope(null));
     const res = await listWorkspaceRuns(SLUG);
     expect(res).toEqual([]);
+  });
+
+  it('listOpenApprovals GET ce qui attend la personne (silentError, [] si vide)', async () => {
+    const rows = [{ runId: 9, issueId: 12, issueKey: 'WEB-12', issueTitle: 'Fix', projectId: 3, requests: 2 }];
+    vi.mocked(apiClient.get).mockResolvedValueOnce(envelope(rows));
+    await expect(listOpenApprovals(SLUG)).resolves.toEqual(rows);
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.OPEN_APPROVALS(SLUG), { silentError: true });
+
+    vi.mocked(apiClient.get).mockResolvedValueOnce(envelope(null));
+    await expect(listOpenApprovals(SLUG)).resolves.toEqual([]);
   });
 
   it('getRunnerStatus GET l’état du runner, en appel de fond (silentError)', async () => {
@@ -147,6 +204,15 @@ describe('delivery-service', () => {
     expect(saveBlob).toHaveBeenCalledWith(blob, `evidence-run-100.${format}`);
   });
 
+  it('GET le dossier de preuve en JSON, pour la vue du travail', async () => {
+    const evidence = { format: 'taskforce-evidence/1', events: [], root: 'h1' };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: evidence });
+
+    await expect(getEvidence(SLUG, 100)).resolves.toEqual(evidence);
+
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.EVIDENCE(SLUG, 100), { params: { format: 'json' }, silentError: true });
+  });
+
   it('GET les agents pour un projet donné', async () => {
     vi.mocked(apiClient.get).mockResolvedValue(envelope([]));
 
@@ -180,6 +246,14 @@ describe('delivery-service : les gestes de la carte de résultat (R78)', () => {
     expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.APPLY(SLUG, 100), {});
     expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DISCARD(SLUG, 100), {});
     expect(DELIVERY_ROUTES.APPLY(SLUG, 100)).toBe('/api/workspaces/acme/delivery/runs/100/apply');
+  });
+
+  it('markRunDone : POST sur la mission qui n\'a rien changé', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
+
+    await markRunDone(SLUG, 100);
+
+    expect(apiClient.post).toHaveBeenCalledWith('/api/workspaces/acme/delivery/runs/100/done', {});
   });
 
   it.each([

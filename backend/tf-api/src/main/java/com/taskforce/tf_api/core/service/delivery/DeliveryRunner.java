@@ -13,9 +13,11 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.taskforce.tf_api.core.enums.DeliveryRunOutcome;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkType;
+import com.taskforce.tf_api.core.enums.IssueActivityType;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Issue;
@@ -26,6 +28,7 @@ import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.IssueGitHubLinkRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.IssueStatusRepository;
+import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.NotificationService;
 
 import lombok.RequiredArgsConstructor;
@@ -60,6 +63,8 @@ public class DeliveryRunner {
     private final NotificationService notificationService;
     private final IssueGitHubLinkRepository linkRepository;
     private final MissionEvidenceService evidenceService;
+    private final IssueService issueService;
+    private final DeliveryActivityService activityService;
 
     /** Adresse d'une pull request sur GitHub : le dépôt et le numéro. */
     private static final Pattern PULL_REQUEST =
@@ -99,7 +104,7 @@ public class DeliveryRunner {
                 project != null ? project.getRepoFullName() : null, run.getModel());
 
             run.setStatus(DeliveryRunStatus.RUNNING);
-            DeliveryDispatch dispatch = provider.dispatch(brief);
+            DeliveryDispatch dispatch = provider.dispatch(run.getId(), brief);
             run.setExternalRef(dispatch.externalRef());
             runRepository.save(run);
 
@@ -219,9 +224,13 @@ public class DeliveryRunner {
 
     /**
      * Applique le résultat d'un poll au run : DONE -> « In review by AI », FAILED -> « Blocked », sinon RUNNING. Une
-     * mission qui a un dossier de preuve y est close ici, quelle que soit la fin : résultat du runner, runner perdu.
+     * mission qui a un dossier de preuve y est close ici, quelle que soit la fin : résultat du runner, runner perdu. Ses
+     * demandes encore ouvertes aussi : elles ne recevront plus de réponse utile (R128), et vont au dossier avant sa clôture.
      */
     private void applyPoll(DeliveryRun run, DeliveryPoll poll) {
+        if (poll.status() == DeliveryRunStatus.DONE || poll.status() == DeliveryRunStatus.FAILED) {
+            activityService.closeApprovals(run);
+        }
         switch (poll.status()) {
             case DONE -> {
                 run.setStatus(DeliveryRunStatus.DONE);
@@ -236,9 +245,11 @@ public class DeliveryRunner {
                 run.setStatus(DeliveryRunStatus.FAILED);
                 run.setError(poll.error());
                 evidenceService.end(run, poll);
-                // Une mission refusée au départ par une règle n'est pas une panne : l'issue reste où elle est (R38).
-                if (!run.isRefused()) moveIssueTo(run, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
-                notifyFinished(run);
+                // Une mission refusée au départ par une règle n'est pas une panne : l'issue reste où elle est (R38). Une
+                // mission que la personne a arrêtée non plus (R138), et elle n'a pas besoin qu'on le lui apprenne.
+                boolean stopped = run.getOutcome() == DeliveryRunOutcome.STOPPED;
+                if (!run.isRefused() && !stopped) moveIssueTo(run, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
+                if (!stopped) notifyFinished(run);
             }
             default -> run.setStatus(DeliveryRunStatus.RUNNING); // encore en cours (poll ultérieur)
         }
@@ -246,7 +257,9 @@ public class DeliveryRunner {
 
     /**
      * La pull request ouverte par l'agent est liée à son ticket : elle apparaît dans l'onglet GitHub avec son statut, et
-     * sa fusion terminera le ticket. Une adresse qui n'est pas celle d'une PR de GitHub ne lie rien. Best-effort.
+     * sa fusion terminera le ticket. L'activité du ticket le dit, au nom de la personne qui a délégué, passé par son
+     * agent (« Claude Code opened pull request #1 »). Une adresse qui n'est pas celle d'une PR de GitHub ne lie rien.
+     * Best-effort.
      */
     private void linkPullRequest(DeliveryRun run) {
         try {
@@ -260,18 +273,27 @@ public class DeliveryRunner {
             if (linkRepository.existsByIssueIdAndRepoFullNameAndPrNumber(issue.getId(), repo, number)) {
                 return;
             }
+            String url = "https://github.com/" + repo + "/pull/" + number;
             linkRepository.save(IssueGitHubLink.builder()
                 .issue(issue)
                 .linkType(GitHubLinkType.PR)
                 .repoFullName(repo)
                 .prNumber(number)
-                .prUrl("https://github.com/" + repo + "/pull/" + number)
+                .prUrl(url)
                 .status(GitHubLinkStatus.OPEN)
                 .linkedBy(run.getStartedBy())
                 .build());
+            issueService.logActivity(issue, run.getStartedBy(), IssueActivityType.PULL_REQUEST_OPENED, null, url,
+                agentName(run));
         } catch (Exception e) {
             log.warn("Delivery run {} : pull request non liée à son ticket : {}", run.getId(), e.getMessage());
         }
+    }
+
+    /** Le nom affiché de l'agent du run (« Claude Code »), ou sa clé quand le registre ne le connaît plus. */
+    private String agentName(DeliveryRun run) {
+        DeliveryAgentProvider provider = registry.get(run.getProviderKey());
+        return provider != null ? provider.displayName() : run.getProviderKey();
     }
 
     private void failRun(DeliveryRun run, String error) {

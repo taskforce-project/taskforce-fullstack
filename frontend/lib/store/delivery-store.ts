@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
   getDeliveryProviders,
   getIssueRun,
+  listOpenApprovals,
   listWorkspaceRuns,
   delegateIssue,
   getRunnerStatus,
@@ -9,16 +10,29 @@ import {
   applyRun as applyRunApi,
   decideApproval as decideApprovalApi,
   discardRun as discardRunApi,
+  markRunDone as markRunDoneApi,
   retryRun as retryRunApi,
+  stopRun as stopRunApi,
   downloadEvidence as downloadEvidenceApi,
+  getEvidence,
   provisionRunner as provisionRunnerApi,
+  getMissionChanges,
+  getMissionFileDiff,
+  revertMissionFile,
+  askForChanges as askForChangesApi,
+  sendCorrection as sendCorrectionApi,
+  type ChangeComment,
   type DeliveryProvider,
   type DeliveryRun,
   type DeliveryRunActivity,
+  type MissionChanges,
+  type MissionEvidence,
+  type MissionFileDiff,
+  type OpenApproval,
   type RunnerProvision,
   type RunnerStatus,
 } from "../api/delivery-service";
-import { getErrorMessage } from "../api/client";
+import { getErrorMessage, getErrorStatus } from "../api/client";
 
 // ---------------------------------------------------------------------------
 // Store de délégation à un agent (TF-AGENT-DELIVERY). Un domaine = un store.
@@ -35,17 +49,37 @@ interface DeliveryState {
   runs: Record<number, DeliveryRun | null>;
   /** Runs de délégation du workspace (vue « workflow »), les plus récents d'abord. */
   workspaceRuns: DeliveryRun[];
+  /**
+   * Ce qui attend la personne (R128, séance n°19) : ses demandes encore ouvertes, une ligne par mission. La liste de
+   * l'arrivée, le nombre de la barre de gauche et le volet « Waiting for you » lisent ceci, jamais les notifications.
+   */
+  openApprovals: OpenApproval[];
   /** Runner local de l'utilisateur (ADR-013). `null` = pas encore chargé. Jamais de secret ici. */
   runner: RunnerStatus | null;
   /** Activité par runId : chronologie cumulée (dans l'ordre) et demandes de validation du run (lot 5). */
   activity: Record<number, DeliveryRunActivity>;
   /** Par runId : pourquoi le dernier geste sur la carte de résultat n'a pas abouti (GitHub refuse, conflits...). */
   resultErrors: Record<number, string>;
+  /** Le dossier de preuve par runId, tel que la vue du travail l'a lu ; `null` : pas (encore) de dossier. */
+  evidence: Record<number, MissionEvidence | null>;
+  /** Par runId : les fichiers changés et ce que la personne peut en faire (R139). */
+  missionChanges: Record<number, MissionChanges>;
+  /** Par runId puis par fichier : le diff lu ; `null` : il n'a pas pu se lire. */
+  fileDiffs: Record<number, Record<string, MissionFileDiff | null>>;
+  /** Par runId : les commentaires de relecture en cours, pas encore envoyés (ils survivent à un changement de volet). */
+  changeComments: Record<number, DraftChangeComment[]>;
+  /**
+   * Par runId puis par fichier (`""` : la relecture) : pourquoi le dernier geste a été refusé. Une raison vide : il a échoué
+   * sans raison à montrer, l'écran le dit avec ses mots.
+   */
+  changeErrors: Record<number, Record<string, string>>;
 
   fetchProviders: (slug: string) => Promise<DeliveryProvider[]>;
   fetchProjectProviders: (slug: string, projectId: number) => Promise<DeliveryProvider[]>;
   fetchRun: (slug: string, issueId: number) => Promise<DeliveryRun | null>;
   fetchWorkspaceRuns: (slug: string) => Promise<DeliveryRun[]>;
+  /** Relit ce qui attend la personne ; `null` en cas d'échec, où la liste d'avant reste. */
+  fetchOpenApprovals: (slug: string) => Promise<OpenApproval[] | null>;
   delegate: (slug: string, issueId: number, providerKey: string, model?: string) => Promise<DeliveryRun | null>;
   fetchRunner: () => Promise<RunnerStatus | null>;
   /** Renvoie les identifiants (secret compris) à l'appelant SANS les garder : le secret ne vit pas dans l'état global. */
@@ -56,10 +90,63 @@ interface DeliveryState {
   decideApproval: (slug: string, runId: number, approvalId: number, allow: boolean, forMission?: boolean) => Promise<boolean>;
   /** Télécharge le dossier de preuve d'un run ; `false` si le run n'en a pas (run de la v1) ou en cas d'erreur. */
   downloadEvidence: (slug: string, runId: number, format: "json" | "md") => Promise<boolean>;
+  /**
+   * Relit le dossier de preuve d'un run, pour le montrer pendant qu'il se construit ; `null` sans dossier (rien d'écrit
+   * encore, run de la v1) ou en cas d'erreur, où le dossier lu d'avant reste.
+   */
+  fetchEvidence: (slug: string, runId: number) => Promise<MissionEvidence | null>;
   /** Les gestes de la carte de résultat (R78) ; `false` (ou `null`) en cas d'échec, la raison dans `resultErrors`. */
   applyRun: (slug: string, issueId: number, runId: number, reason?: string) => Promise<boolean>;
   discardRun: (slug: string, issueId: number, runId: number) => Promise<boolean>;
+  /** Une mission qui n'a rien changé : l'issue se termine (rejeu de la 1.8.0). */
+  markRunDone: (slug: string, issueId: number, runId: number) => Promise<boolean>;
   retryRun: (slug: string, issueId: number, runId: number, note: string) => Promise<DeliveryRun | null>;
+  /** Relit les fichiers de la mission ; `null` en cas d'échec, où la liste d'avant reste. */
+  fetchMissionChanges: (slug: string, runId: number) => Promise<MissionChanges | null>;
+  /** Lit le diff d'un fichier ; `null` en cas d'échec. */
+  fetchFileDiff: (slug: string, runId: number, path: string) => Promise<MissionFileDiff | null>;
+  /** Demande de remettre un fichier comme avant ; `false` en cas de refus, la raison dans `changeErrors`. */
+  revertFile: (slug: string, runId: number, path: string) => Promise<boolean>;
+  addChangeComment: (runId: number, comment: ChangeComment) => void;
+  removeChangeComment: (runId: number, id: string) => void;
+  /** Envoie les commentaires ; rend la mission qui repart, `null` en cas d'échec, la raison dans `changeErrors`. */
+  askForChanges: (slug: string, issueId: number, runId: number) => Promise<DeliveryRun | null>;
+  /** Passe une correction à l'agent ; `false` en cas de refus, la raison dans `changeErrors`. */
+  sendCorrection: (slug: string, runId: number, text: string) => Promise<boolean>;
+  /** « Stop » pendant le travail (R138) : `false` en cas d'échec, l'écran le dit. */
+  stopRun: (slug: string, issueId: number, runId: number) => Promise<boolean>;
+}
+
+/** Un commentaire de relecture pas encore envoyé. */
+export interface DraftChangeComment extends ChangeComment {
+  id: string;
+}
+
+/** La clé d'une erreur qui ne porte pas sur un fichier : la relecture. */
+const REVIEW_ERROR = "";
+
+/**
+ * La raison d'un refus, quand le serveur en donne une (4xx) ; sinon vide, et l'écran dit quoi faire avec ses propres mots :
+ * un échec du réseau ou une erreur interne n'a pas à s'afficher tel quel (R133).
+ */
+function refusalOf(e: unknown): string {
+  const status = getErrorStatus(e);
+  return status !== undefined && status >= 400 && status < 500 ? getErrorMessage(e) : "";
+}
+
+/** Les raisons gardées d'une mission, avec ou sans celle de ce fichier. */
+function withChangeError(errors: Record<number, Record<string, string>>, runId: number, path: string, reason: string | null): Record<number, Record<string, string>> {
+  const rest = { ...(errors[runId] ?? {}) };
+  if (reason === null) delete rest[path];
+  else rest[path] = reason;
+  return { ...errors, [runId]: rest };
+}
+
+/** Une réponse donnée : la mission a une demande ouverte de moins, et quitte la liste à la dernière. */
+function answered(open: OpenApproval[], runId: number): OpenApproval[] {
+  return open
+    .map((row) => (row.runId === runId ? { ...row, requests: row.requests - 1 } : row))
+    .filter((row) => row.requests > 0);
 }
 
 /** Les raisons gardées, sans celle de cette mission. */
@@ -75,9 +162,97 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   providersLoading: false,
   runs: {},
   workspaceRuns: [],
+  openApprovals: [],
   runner: null,
   activity: {},
   resultErrors: {},
+  evidence: {},
+  missionChanges: {},
+  fileDiffs: {},
+  changeComments: {},
+  changeErrors: {},
+
+  fetchMissionChanges: async (slug, runId) => {
+    try {
+      const changes = await getMissionChanges(slug, runId);
+      set((state) => ({ missionChanges: { ...state.missionChanges, [runId]: changes } }));
+      return changes;
+    } catch {
+      return null;
+    }
+  },
+
+  fetchFileDiff: async (slug, runId, path) => {
+    const remember = (diff: MissionFileDiff | null) => set((state) => ({
+      fileDiffs: { ...state.fileDiffs, [runId]: { ...(state.fileDiffs[runId] ?? {}), [path]: diff } },
+    }));
+    try {
+      const diff = await getMissionFileDiff(slug, runId, path);
+      remember(diff);
+      return diff;
+    } catch {
+      remember(null);
+      return null;
+    }
+  },
+
+  revertFile: async (slug, runId, path) => {
+    try {
+      await revertMissionFile(slug, runId, path);
+      set((state) => ({ changeErrors: withChangeError(state.changeErrors, runId, path, null) }));
+      await get().fetchMissionChanges(slug, runId);
+      return true;
+    } catch (e) {
+      set((state) => ({ changeErrors: withChangeError(state.changeErrors, runId, path, refusalOf(e)) }));
+      return false;
+    }
+  },
+
+  addChangeComment: (runId, comment) => set((state) => ({
+    changeComments: {
+      ...state.changeComments,
+      [runId]: [...(state.changeComments[runId] ?? []), { ...comment, id: `${comment.path}:${comment.side}:${comment.line}:${Date.now()}:${Math.random()}` }],
+    },
+  })),
+
+  removeChangeComment: (runId, id) => set((state) => ({
+    changeComments: { ...state.changeComments, [runId]: (state.changeComments[runId] ?? []).filter((comment) => comment.id !== id) },
+  })),
+
+  askForChanges: async (slug, issueId, runId) => {
+    const drafts = get().changeComments[runId] ?? [];
+    if (drafts.length === 0) return null;
+    try {
+      const next = await askForChangesApi(slug, runId, drafts.map(({ path, line, side, text }) => ({ path, line, side, text })));
+      set((state) => {
+        const rest = { ...state.changeComments };
+        delete rest[runId];
+        return {
+          changeComments: rest,
+          runs: { ...state.runs, [issueId]: next },
+          // La mission reprise a un dernier geste : elle n'attend plus de relecture.
+          workspaceRuns: [next, ...state.workspaceRuns.map((run) => (run.id === runId ? { ...run, outcome: "FOLLOWED_UP" as const } : run))],
+          changeErrors: withChangeError(state.changeErrors, runId, REVIEW_ERROR, null),
+        };
+      });
+      return next;
+    } catch (e) {
+      set((state) => ({ changeErrors: withChangeError(state.changeErrors, runId, REVIEW_ERROR, refusalOf(e)) }));
+      return null;
+    }
+  },
+
+  sendCorrection: async (slug, runId, text) => {
+    try {
+      await sendCorrectionApi(slug, runId, text);
+      set((state) => ({ changeErrors: withChangeError(state.changeErrors, runId, REVIEW_ERROR, null) }));
+      await get().fetchMissionChanges(slug, runId);
+      return true;
+    } catch (e) {
+      set((state) => ({ changeErrors: withChangeError(state.changeErrors, runId, REVIEW_ERROR, refusalOf(e)) }));
+      return false;
+    }
+  },
 
   fetchProviders: async (slug) => {
     set({ providersLoading: true });
@@ -118,6 +293,16 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
       return runs;
     } catch {
       return [];
+    }
+  },
+
+  fetchOpenApprovals: async (slug) => {
+    try {
+      const openApprovals = await listOpenApprovals(slug);
+      set({ openApprovals });
+      return openApprovals;
+    } catch {
+      return null;
     }
   },
 
@@ -172,9 +357,13 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   decideApproval: async (slug, runId, approvalId, allow, forMission = false) => {
     try {
       await decideApprovalApi(slug, runId, approvalId, allow, forMission);
-      await get().fetchActivity(slug, runId);
+      // Répondre fait baisser le nombre aussitôt (R128) ; la relecture qui suit dit la vérité du serveur.
+      set((state) => ({ openApprovals: answered(state.openApprovals, runId) }));
+      await Promise.all([get().fetchActivity(slug, runId), get().fetchOpenApprovals(slug)]);
       return true;
     } catch {
+      // Refusée parce que la demande a expiré entre-temps : la liste n'était plus vraie.
+      await get().fetchOpenApprovals(slug);
       return false;
     }
   },
@@ -185,6 +374,18 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
       return true;
     } catch {
       return false;
+    }
+  },
+
+  fetchEvidence: async (slug, runId) => {
+    try {
+      const evidence = await getEvidence(slug, runId);
+      set((state) => ({ evidence: { ...state.evidence, [runId]: evidence } }));
+      return evidence;
+    } catch (e) {
+      // 404 : la mission n'a pas encore de dossier (ou n'en aura pas, run de la v1). Une autre erreur garde la lecture d'avant.
+      if (getErrorStatus(e) === 404) set((state) => ({ evidence: { ...state.evidence, [runId]: null } }));
+      return null;
     }
   },
 
@@ -212,6 +413,18 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
     }
   },
 
+  markRunDone: async (slug, issueId, runId) => {
+    try {
+      await markRunDoneApi(slug, runId);
+      set((state) => ({ resultErrors: withoutError(state.resultErrors, runId) }));
+      await get().fetchRun(slug, issueId);
+      return true;
+    } catch (e) {
+      set((state) => ({ resultErrors: { ...state.resultErrors, [runId]: getErrorMessage(e) } }));
+      return false;
+    }
+  },
+
   retryRun: async (slug, issueId, runId, note) => {
     try {
       const next = await retryRunApi(slug, runId, note);
@@ -220,6 +433,18 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
     } catch (e) {
       set((state) => ({ resultErrors: { ...state.resultErrors, [runId]: getErrorMessage(e) } }));
       return null;
+    }
+  },
+
+  stopRun: async (slug, issueId, runId) => {
+    try {
+      await stopRunApi(slug, runId);
+      await Promise.all([get().fetchRun(slug, issueId), get().fetchActivity(slug, runId), get().fetchOpenApprovals(slug)]);
+      return true;
+    } catch {
+      // Elle a pu finir entre-temps : la relecture dit où elle en est.
+      await get().fetchRun(slug, issueId);
+      return false;
     }
   },
 }));

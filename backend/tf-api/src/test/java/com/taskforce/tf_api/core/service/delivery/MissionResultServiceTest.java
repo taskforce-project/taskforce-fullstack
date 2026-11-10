@@ -14,10 +14,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest;
+import com.taskforce.tf_api.core.dto.request.MissionFollowUpRequest;
+import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunOutcome;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkType;
+import com.taskforce.tf_api.core.enums.IssueActivityType;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueGitHubLink;
@@ -63,6 +66,9 @@ class MissionResultServiceTest {
     @Mock private MergedPullRequests mergedPullRequests;
     @Mock private IssueService issueService;
     @Mock private DeliveryService deliveryService;
+    @Mock private DeliveryRunner deliveryRunner;
+    @Mock private MissionChangesService missionChanges;
+    @Mock private MissionEvidenceService evidenceService;
 
     private MissionResultService service;
     private User delegator;
@@ -72,7 +78,7 @@ class MissionResultServiceTest {
     @BeforeEach
     void setUp() {
         service = new MissionResultService(runRepository, userRepository, linkRepository, visibilityGuard, pullRequests,
-            mergedPullRequests, issueService, deliveryService);
+            mergedPullRequests, issueService, deliveryService, deliveryRunner, missionChanges, evidenceService);
         delegator = User.builder().id(7L).email("ada@taskforce.dev").build();
         Workspace workspace = Workspace.builder().id(1L).slug("acme").build();
         Project project = Project.builder().id(12L).workspace(workspace).build();
@@ -85,6 +91,80 @@ class MissionResultServiceTest {
         lenient().when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(run));
         lenient().when(userRepository.getReferenceById(7L)).thenReturn(delegator);
         lenient().when(linkRepository.findByIssueIdOrderByLinkedAtDesc(55L)).thenReturn(List.of(link));
+    }
+
+    private static final List<MissionFollowUpRequest.Comment> COMMENTS = List.of(
+        new MissionFollowUpRequest.Comment("src/a.ts", 12, "new", " Use the helper "),
+        new MissionFollowUpRequest.Comment("src/b.ts", 4, "old", "Why was this removed?"));
+
+    /** La mission neuve que la délégation rend, telle que la base la garde. */
+    private DeliveryRun delegated() {
+        DeliveryRun next = DeliveryRun.builder().id(200L).issue(run.getIssue()).providerKey("claude-code").build();
+        var response = new DeliveryRunResponse(200L, 55L, "WEB-1", "t", 12L, "p", "claude-code", "sonnet", "QUEUED",
+            null, null, null, false, 7L, null, null);
+        when(deliveryService.delegate("acme", 55L, "claude-code", "sonnet", 7L)).thenReturn(response);
+        when(runRepository.findById(200L)).thenReturn(Optional.of(next));
+        return next;
+    }
+
+    @Test
+    @DisplayName("Ask for changes : une reprise sur la même branche, la pull request reste ouverte, la demande se lit partout")
+    void ask_for_changes() {
+        run.setBaseSha("a".repeat(40));
+        DeliveryRun next = delegated();
+
+        DeliveryRunResponse response = service.askForChanges("acme", 100L, 7L, COMMENTS);
+
+        assertThat(response.id()).isEqualTo(200L);
+        assertThat(next.getParentRun()).isEqualTo(run);
+        assertThat(next.getBranch()).isEqualTo("tf/web-28");
+        assertThat(next.getBaseSha()).isEqualTo("a".repeat(40));
+        assertThat(next.getFollowUp()).hasSize(2);
+        assertThat(next.getFollowUp().get(0)).containsEntry("path", "src/a.ts").containsEntry("line", 12).containsEntry("text", "Use the helper");
+        // Rien n'est écarté : la pull request reçoit la suite.
+        verify(pullRequests, never()).close(anyLong(), any(), anyInt());
+        assertThat(link.getStatus()).isEqualTo(GitHubLinkStatus.OPEN);
+        assertThat(run.getOutcome()).isEqualTo(DeliveryRunOutcome.FOLLOWED_UP);
+        verify(issueService).logActivity(run.getIssue(), delegator, IssueActivityType.MISSION_CHANGES_ASKED, null, null, null);
+        ArgumentCaptor<CreateIssueCommentRequest> comment = ArgumentCaptor.forClass(CreateIssueCommentRequest.class);
+        verify(issueService).addComment(eq("acme"), eq(12L), eq(55L), comment.capture(), eq(7L));
+        assertThat(comment.getValue().getContent()).contains("`src/a.ts`, line 12: Use the helper", "`src/b.ts`, line 4");
+        verify(missionChanges).assertCanAskForChanges(run, 7L, java.util.Set.of("src/a.ts", "src/b.ts"));
+        verify(evidenceService).appendAfterEnd(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), any());
+    }
+
+    @Test
+    @DisplayName("Ask for changes : les commentaires refusés ne lancent rien")
+    void ask_for_changes_refused_first() {
+        org.mockito.Mockito.doThrow(new BusinessException("no")).when(missionChanges).assertCanAskForChanges(any(), anyLong(), any());
+
+        assertThatThrownBy(() -> service.askForChanges("acme", 100L, 7L, COMMENTS)).isInstanceOf(BusinessException.class);
+
+        verify(deliveryService, never()).delegate(any(), anyLong(), any(), any(), anyLong());
+        assertThat(run.getOutcome()).isNull();
+    }
+
+    @ParameterizedTest(name = "pull request {0}")
+    @CsvSource({ "MERGED", "CLOSED" })
+    @DisplayName("Ask for changes : une pull request déjà fusionnée ou fermée ne reçoit plus rien")
+    void ask_for_changes_on_a_closed_pull_request(GitHubLinkStatus status) {
+        link.setStatus(status);
+
+        assertThatThrownBy(() -> service.askForChanges("acme", 100L, 7L, COMMENTS))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("already merged or closed");
+
+        verify(deliveryService, never()).delegate(any(), anyLong(), any(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("un fichier en train d'être remis retient le geste : le résultat ne se tranche pas sous ses pieds")
+    void a_revert_in_progress_holds_the_decision() {
+        when(missionChanges.busy(100L)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.apply("acme", 100L, 7L, null))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("still being put back");
+
+        verify(pullRequests, never()).merge(anyLong(), any(), anyInt());
     }
 
     @Test
@@ -109,6 +189,151 @@ class MissionResultServiceTest {
             .isInstanceOf(BusinessException.class).hasMessageContaining("no pull request to apply");
         verify(pullRequests, never()).merge(anyLong(), any(), anyInt());
         assertThat(run.getOutcome()).isNull();
+        verify(issueService, never()).logActivity(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Stop : la mission en cours se clôt au nom de la personne, et le dossier le garde (R138)")
+    void stop_closes_a_running_mission() {
+        run.setStatus(DeliveryRunStatus.RUNNING);
+        run.setResultUrl(null);
+        delegator.setDisplayName("Ada");
+
+        service.stop("acme", 100L, 7L);
+
+        assertThat(run.getOutcome()).isEqualTo(DeliveryRunOutcome.STOPPED);
+        assertThat(run.getOutcomeBy()).isEqualTo(delegator);
+        assertThat(run.getOutcomeAt()).isNotNull();
+        assertThat(run.getEndedAt()).isNotNull();
+        verify(evidenceService).append(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), any());
+        verify(deliveryRunner).complete(100L, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "Stopped by Ada."));
+    }
+
+    @Test
+    @DisplayName("Stop : une mission encore en file se clôt sans dossier, et sans nom elle dit l'e-mail")
+    void stop_closes_a_queued_mission() {
+        run.setStatus(DeliveryRunStatus.QUEUED);
+        delegator.setDisplayName(" ");
+
+        service.stop("acme", 100L, 7L);
+
+        verify(evidenceService, never()).append(any(), any(), any(), any());
+        verify(deliveryRunner).complete(100L, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "Stopped by ada@taskforce.dev."));
+    }
+
+    @Test
+    @DisplayName("Stop : seule la personne qui a délégué arrête la mission")
+    void stop_is_for_the_delegator() {
+        run.setStatus(DeliveryRunStatus.RUNNING);
+
+        assertThatThrownBy(() -> service.stop("acme", 100L, 8L)).isInstanceOf(ForbiddenException.class)
+            .hasMessageContaining("stop it");
+
+        assertThat(run.getOutcome()).isNull();
+        verify(deliveryRunner, never()).complete(any(), any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"DONE", "FAILED"})
+    @DisplayName("Stop : une mission finie ne s'arrête plus")
+    void stop_refuses_a_mission_that_ended(DeliveryRunStatus status) {
+        run.setStatus(status);
+
+        assertThatThrownBy(() -> service.stop("acme", 100L, 7L)).isInstanceOf(BusinessException.class)
+            .hasMessage("This mission has already ended.");
+
+        verify(deliveryRunner, never()).complete(any(), any());
+    }
+
+    @Test
+    @DisplayName("Stop : Copilot travaille sur GitHub, TaskForce ne prétend pas l'arrêter (R15)")
+    void stop_refuses_copilot() {
+        run.setStatus(DeliveryRunStatus.RUNNING);
+        run.setProviderKey(GitHubCopilotProvider.KEY);
+
+        assertThatThrownBy(() -> service.stop("acme", 100L, 7L)).isInstanceOf(BusinessException.class)
+            .hasMessageContaining("GitHub");
+
+        assertThat(run.getOutcome()).isNull();
+    }
+
+    @Test
+    @DisplayName("Stop : la mission d'un autre workspace n'existe pas")
+    void stop_stays_in_its_workspace() {
+        run.setStatus(DeliveryRunStatus.RUNNING);
+
+        assertThatThrownBy(() -> service.stop("other", 100L, 7L)).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @ParameterizedTest(name = "{0} : {1} à l'activité de l'issue, au nom de la personne")
+    @CsvSource({
+        "apply,   MISSION_APPLIED",
+        "discard, MISSION_DISCARDED",
+        "retry,   MISSION_RETRIED",
+        "done,    MISSION_MARKED_DONE",
+    })
+    @DisplayName("chaque geste entre à l'activité de l'issue : « Pierre applied the result »")
+    void each_gesture_enters_the_activity(String gesture, IssueActivityType expected) {
+        switch (gesture) {
+            case "apply" -> service.apply("acme", 100L, 7L, null);
+            case "discard" -> service.discard("acme", 100L, 7L);
+            case "done" -> {
+                run.setResultUrl(null);
+                service.markDone("acme", 100L, 7L);
+            }
+            default -> service.retry("acme", 100L, 7L, null);
+        }
+
+        verify(issueService).logActivity(run.getIssue(), delegator, expected, null, null, null);
+    }
+
+    @ParameterizedTest(name = "branche [{0}], {1} commits : l'issue terminée, sans rien fusionner ni fermer")
+    @CsvSource({
+        ",          ",   // un runner plus ancien ne dit ni branche ni commits
+        "tf/web-28, 0",  // l'agent n'a rien commité : le travail était déjà fait (TESTTA-2)
+        "tf/web-28, ",
+        "'',        3",  // des commits sans branche ne se relisent nulle part
+    })
+    @DisplayName("Mark as done : une mission qui n'a rien changé termine l'issue, au nom de la personne (rejeu de la 1.8.0)")
+    void mark_done_completes_an_issue_without_change(String branch, Integer commits) {
+        run.setResultUrl(null);
+        run.setBranch(branch);
+        run.setCommits(commits);
+
+        service.markDone("acme", 100L, 7L);
+
+        assertThat(run.getOutcome()).isEqualTo(DeliveryRunOutcome.MARKED_DONE);
+        assertThat(run.getOutcomeBy()).isEqualTo(delegator);
+        assertThat(run.getOutcomeAt()).isNotNull();
+        verify(mergedPullRequests).completeIssue(55L, 7L);
+        verify(pullRequests, never()).merge(anyLong(), any(), anyInt());
+        verify(pullRequests, never()).close(anyLong(), any(), anyInt());
+    }
+
+    @ParameterizedTest(name = "pull request [{0}], {1} commits : refusé")
+    @CsvSource({
+        "https://github.com/acme/website/pull/212, ", // une pull request : elle s'applique ou s'écarte
+        ",                                         2", // des commits sur la branche de l'agent
+    })
+    @DisplayName("Mark as done refusé sur un résultat qui change le code : rien n'est terminé ni gardé")
+    void mark_done_refuses_a_result_with_changes(String resultUrl, Integer commits) {
+        run.setResultUrl(resultUrl);
+        run.setCommits(commits);
+
+        assertThatThrownBy(() -> service.markDone("acme", 100L, 7L))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("apply it or discard it");
+        assertThat(run.getOutcome()).isNull();
+        verify(mergedPullRequests, never()).completeIssue(any(), any());
+        verify(issueService, never()).logActivity(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Mark as done : seule la personne qui a délégué termine l'issue")
+    void only_the_delegator_marks_done() {
+        run.setResultUrl(null);
+
+        assertThatThrownBy(() -> service.markDone("acme", 100L, 8L)).isInstanceOf(ForbiddenException.class);
+        verify(mergedPullRequests, never()).completeIssue(any(), any());
     }
 
     @Test

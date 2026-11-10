@@ -17,6 +17,8 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueRelationRequest;
@@ -27,6 +29,7 @@ import com.taskforce.tf_api.core.dto.request.UpdateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueStatusRequest;
 import com.taskforce.tf_api.core.dto.response.IssueActivityResponse;
 import com.taskforce.tf_api.core.dto.response.IssueCommentResponse;
+import com.taskforce.tf_api.core.dto.response.IssueHitResponse;
 import com.taskforce.tf_api.core.dto.response.IssueRelationResponse;
 import com.taskforce.tf_api.core.dto.request.CreateChecklistItemRequest;
 import com.taskforce.tf_api.core.dto.request.LogWorkRequest;
@@ -75,6 +78,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.security.DelegatedAgent;
 import com.taskforce.tf_api.shared.dto.PageResponse;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
@@ -275,6 +279,57 @@ public class IssueService {
             .toList();
     }
 
+    /** Les issues que la recherche de la fenêtre montre au plus. */
+    public static final int SEARCH_MAX = 20;
+    /** Une clé tapée en entier ou en partie : « OPS-35 », « ops 35 », « OPS-3 », « OPS ». */
+    private static final Pattern SEARCH_KEY = Pattern.compile("^([A-Za-z][A-Za-z0-9]{0,9})(?:[-\\s]+(\\d{0,9}))?$");
+
+    /**
+     * La recherche de la fenêtre (Ctrl+K, le « @ » et le « + » du compositeur ; R123, R124) : les issues des projets que
+     * la personne voit, par leur clé (« OPS-35 », « ops 35 », « OPS » pour celles du projet) ou par leur titre, la clé
+     * exacte d'abord ; sans texte, les dernières changées. Les archivées n'y sont pas ; {@code limit} est borné à
+     * {@link #SEARCH_MAX}.
+     */
+    @Transactional(readOnly = true)
+    public List<IssueHitResponse> searchIssues(String slug, Long userId, String query, int limit) {
+        var ws = workspaceRepository.findBySlug(slug)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
+        assertWorkspaceMember(ws.getId(), userId);
+        List<Long> visible = projectRepository.findByWorkspaceIdOrderByCreatedAtDesc(ws.getId()).stream()
+            .filter(project -> visibilityGuard.canView(project, userId))
+            .map(Project::getId)
+            .toList();
+        if (visible.isEmpty()) return List.of();
+        var page = org.springframework.data.domain.PageRequest.of(0, Math.min(Math.max(limit, 1), SEARCH_MAX));
+        String text = query == null ? "" : query.strip();
+        List<Issue> found;
+        if (text.isEmpty()) {
+            found = issueRepository.findRecentInProjects(visible, page);
+        } else {
+            Matcher key = SEARCH_KEY.matcher(text);
+            boolean typed = key.matches();
+            String prefix = typed ? key.group(1).toUpperCase(java.util.Locale.ROOT) : "";
+            String digits = typed && key.group(2) != null ? key.group(2) : "";
+            Integer exact = digits.isEmpty() ? -1 : Integer.valueOf(digits);
+            found = issueRepository.searchInProjects(visible, "%" + likeEscaped(text.toLowerCase(java.util.Locale.ROOT)) + "%",
+                prefix, digits + "%", exact, page);
+        }
+        return found.stream().map(IssueService::toHit).toList();
+    }
+
+    /** Un texte cherché tel quel dans un LIKE : ses jokers et le caractère d'échappement ({@code !}) échappés. */
+    static String likeEscaped(String text) {
+        return text.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+    }
+
+    private static IssueHitResponse toHit(Issue issue) {
+        IssueStatus status = issue.getStatus();
+        return new IssueHitResponse(issue.getId(), issue.getProject().getId(),
+            issue.getProject().getIdentifier() + "-" + issue.getSequenceNumber(), issue.getTitle(),
+            status == null ? null : status.getName(),
+            status == null || status.getCategory() == null ? null : status.getCategory().name());
+    }
+
     /**
      * Récupère une issue par son identifiant.
      */
@@ -293,6 +348,17 @@ public class IssueService {
     @Transactional
     public IssueResponse createIssue(String workspaceSlug, Long projectId,
                                      CreateIssueRequest request, Long reporterId) {
+        return createIssue(workspaceSlug, projectId, request, reporterId, null);
+    }
+
+    /**
+     * Crée une nouvelle issue dans le projet, en gardant à l'activité l'agent par qui la création passe : Cortex, pour
+     * une issue créée depuis la carte qu'il a préparée (« Pierre created, prepared by Cortex »). Sans {@code via}, celui
+     * de la session déléguée s'il y en a une.
+     */
+    @Transactional
+    public IssueResponse createIssue(String workspaceSlug, Long projectId,
+                                     CreateIssueRequest request, Long reporterId, String via) {
         Project project = resolveWritableProject(workspaceSlug, projectId, reporterId);
 
         User reporter = resolveUser(reporterId);
@@ -348,18 +414,23 @@ public class IssueService {
             .position(issuePosition)
             .startDate(request.getStartDate() != null ? LocalDate.parse(request.getStartDate()) : null)
             .dueDate(request.getDueDate() != null ? LocalDate.parse(request.getDueDate()) : null)
+            .storyPoints(request.getStoryPoints() != null && request.getStoryPoints() > 0 ? request.getStoryPoints() : null)
             .build();
 
         issue = issueRepository.save(issue);
 
         // Labels à la création (après le save : l'id de l'issue est requis pour la table
-        // de jointure issue_label_assignments). Miroir de updateIssue — cf. ISS-01.
+        // de jointure issue_label_assignments). Miroir de updateIssue, cf. ISS-01. Seuls ceux du
+        // projet : un label d'un autre projet ne s'attache pas.
         if (request.getLabelIds() != null && !request.getLabelIds().isEmpty()) {
-            issue.getLabels().addAll(projectLabelRepository.findAllById(request.getLabelIds()));
+            issue.getLabels().addAll(projectLabelRepository.findAllById(request.getLabelIds()).stream()
+                .filter(label -> label.getProject() != null && project.getId().equals(label.getProject().getId()))
+                .toList());
             issue = issueRepository.save(issue);
         }
 
-        logActivity(issue, reporter, IssueActivityType.CREATED, null, issue.getTitle());
+        logActivity(issue, reporter, IssueActivityType.CREATED, null, issue.getTitle(),
+            via != null ? via : DelegatedAgent.current().orElse(null));
 
         // Assignation à la création : statut + notif. Self-assign = accepté d'office (pas de validation).
         if (assignee != null) {
@@ -507,6 +578,13 @@ public class IssueService {
                 issue.setAssignmentStatus(AssignmentStatus.PENDING);
                 notificationService.notifyAssigned(issue, actor);
             }
+        } else if (Boolean.TRUE.equals(request.getUnassign()) && issue.getAssignee() != null) {
+            // Retirer l'assigné : un assigneeId à null ne dit rien dans un patch partiel (« Undo » d'une assignation, R77).
+            String old = issue.getAssignee().getEmail();
+            issue.setAssignee(null);
+            issue.setAssignedBy(null);
+            issue.setAssignmentStatus(null);
+            logActivity(issue, actor, IssueActivityType.ASSIGNEE_CHANGED, old, null);
         }
         if (request.getParentId() != null) {
             Issue newParent = resolveIssue(request.getParentId(), project.getId());
@@ -521,6 +599,10 @@ public class IssueService {
         if (request.getDueDate() != null) {
             issue.setDueDate(LocalDate.parse(request.getDueDate()));
             logActivity(issue, actor, IssueActivityType.DUE_DATE_CHANGED, null, request.getDueDate());
+        } else if (Boolean.TRUE.equals(request.getClearDueDate()) && issue.getDueDate() != null) {
+            String old = issue.getDueDate().toString();
+            issue.setDueDate(null);
+            logActivity(issue, actor, IssueActivityType.DUE_DATE_CHANGED, old, null);
         }
         if (request.getPosition() != null) {
             issue.setPosition(request.getPosition());
@@ -614,17 +696,24 @@ public class IssueService {
         return ChecklistItemResponse.from(checklistRepository.save(item));
     }
 
+    /**
+     * Met à jour une ligne de la checklist. La cocher ou la décocher entre à l'activité de l'issue, avec son texte : par
+     * la personne, ou par l'agent d'une mission qui coche ce qu'il a fait, en son nom.
+     */
     @Transactional
     public ChecklistItemResponse updateChecklistItem(String slug, Long projectId, Long issueId, Long itemId,
                                                      Long userId, UpdateChecklistItemRequest request) {
-        assertWritableChecklistScope(slug, projectId, issueId, userId);
+        Issue issue = assertWritableChecklistScope(slug, projectId, issueId, userId);
         IssueChecklistItem item = checklistRepository.findByIdAndIssueId(itemId, issueId)
             .orElseThrow(() -> new ResourceNotFoundException("Checklist item not found"));
         if (request.getContent() != null && !request.getContent().isBlank()) {
             item.setContent(request.getContent().trim());
         }
-        if (request.getDone() != null) {
+        if (request.getDone() != null && request.getDone() != item.isDone()) {
             item.setDone(request.getDone());
+            logActivity(issue, resolveUser(userId),
+                request.getDone() ? IssueActivityType.CHECKLIST_CHECKED : IssueActivityType.CHECKLIST_UNCHECKED,
+                null, item.getContent());
         }
         if (request.getPosition() != null) {
             item.setPosition(request.getPosition());
@@ -761,7 +850,8 @@ public class IssueService {
         return r.getPosition() != null && r.getTitle() == null && r.getDescription() == null
             && r.getPriority() == null && r.getStatusId() == null && r.getTypeId() == null
             && r.getAssigneeId() == null && r.getParentId() == null && r.getStartDate() == null
-            && r.getDueDate() == null && r.getStoryPoints() == null && r.getLabelIds() == null;
+            && r.getDueDate() == null && r.getStoryPoints() == null && r.getLabelIds() == null
+            && !Boolean.TRUE.equals(r.getUnassign()) && !Boolean.TRUE.equals(r.getClearDueDate());
     }
 
     /** Diffuse un événement issue en temps réel sur le topic projet (best-effort). */
@@ -910,6 +1000,10 @@ public class IssueService {
             .issue(issue)
             .author(author)
             .content(request.getContent())
+            // Écrit par un agent pour la personne (une mission, l'agent à l'essai, Cortex) : le commentaire le dit, avec le
+            // modèle qui le faisait parler (R123 : « Cortex · qwen3:8b »).
+            .via(clip(DelegatedAgent.current().orElse(null), ACTIVITY_VIA_MAX))
+            .model(agentModel(DelegatedAgent.current().orElse(null)))
             .build();
         comment = commentRepository.save(comment);
         logActivity(issue, author, IssueActivityType.COMMENT_ADDED, null, null);
@@ -1117,12 +1211,12 @@ public class IssueService {
         return project;
     }
 
-    /** Idem {@link #resolveChecklistScope} + <b>droit d'écriture</b> (VIEWER exclu ; privé invisible → 404). */
-    private void assertWritableChecklistScope(String slug, Long projectId, Long issueId, Long userId) {
+    /** Idem {@link #resolveChecklistScope} + <b>droit d'écriture</b> (VIEWER exclu ; privé invisible → 404) ; rend l'issue. */
+    private Issue assertWritableChecklistScope(String slug, Long projectId, Long issueId, Long userId) {
         Project project = resolveProject(slug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
         visibilityGuard.assertCanWrite(project, userId);
-        resolveIssue(issueId, project.getId());
+        return resolveIssue(issueId, project.getId());
     }
 
     @Transactional
@@ -1149,15 +1243,75 @@ public class IssueService {
         issueRepository.save(issue);
     }
 
+    /**
+     * Garde une action sur l'issue. Faite par l'agent d'une mission, au nom de la personne qui l'a déléguée (session
+     * déléguée, ADR-013), elle garde aussi le nom de l'agent : l'activité dit qui a fait quoi.
+     */
     private void logActivity(Issue issue, User actor, IssueActivityType action, String oldValue, String newValue) {
+        logActivity(issue, actor, action, oldValue, newValue, DelegatedAgent.current().orElse(null));
+    }
+
+    /**
+     * Garde une action sur l'issue, avec l'agent par qui elle est passée ({@code via}, null quand la personne a agi
+     * seule) : Cortex pour une issue créée depuis sa carte, l'agent d'une mission pour ce qu'il fait au nom de la personne
+     * qui l'a déléguée (la pull request qu'il ouvre). Les valeurs sont coupées à la taille de leur colonne.
+     */
+    @Transactional
+    public void logActivity(Issue issue, User actor, IssueActivityType action, String oldValue, String newValue, String via) {
         IssueActivity activity = IssueActivity.builder()
             .issue(issue)
             .actor(actor)
             .action(action)
-            .oldValue(oldValue)
-            .newValue(newValue)
+            .oldValue(clip(oldValue, ACTIVITY_VALUE_MAX))
+            .newValue(clip(newValue, ACTIVITY_VALUE_MAX))
+            .via(clip(via, ACTIVITY_VIA_MAX))
+            .model(agentModel(via))
             .build();
         activityRepository.save(activity);
+        announceActivity(issue);
+    }
+
+    /**
+     * L'activité de l'issue a bougé : la fiche ouverte de l'issue se relit ({@code activity} sur le topic du projet). Le
+     * commentaire qu'un agent laisse pendant sa mission n'apparaissait qu'en rouvrant l'issue (rejeu de la 1.8.0,
+     * 02/11/2026). Publié après le commit, pour que la relecture trouve ce qui vient d'être écrit ; hors transaction,
+     * tout de suite.
+     */
+    private void announceActivity(Issue issue) {
+        if (issue.getId() == null || issue.getProject() == null || issue.getProject().getId() == null) return;
+        Long projectId = issue.getProject().getId();
+        Long issueId = issue.getId();
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    publishIssueEvent(ACTIVITY_EVENT, projectId, issueId, null);
+                }
+            });
+        } else {
+            publishIssueEvent(ACTIVITY_EVENT, projectId, issueId, null);
+        }
+    }
+
+    /** L'événement temps réel d'une activité de l'issue : sans l'issue, que la fiche ouverte relit. */
+    static final String ACTIVITY_EVENT = "activity";
+
+    /** Tailles des colonnes {@code old_value}/{@code new_value} et {@code via} d'{@code issue_activity}. */
+    private static final int ACTIVITY_VALUE_MAX = 500;
+    private static final int ACTIVITY_VIA_MAX = 60;
+    /** La taille de {@code issue_comments.model} et de {@code issue_activity.model} (V119). */
+    private static final int MODEL_MAX = 128;
+
+    /**
+     * Le modèle d'un agent qui agit pour la personne (Cortex dans la conversation : celui qui a répondu, R123), gardé avec
+     * ce qu'il écrit ; null quand la personne agit seule ({@code via} nul), ou quand l'agent ne dit pas son modèle.
+     */
+    private static String agentModel(String via) {
+        return via == null ? null : clip(DelegatedAgent.model().orElse(null), MODEL_MAX);
+    }
+
+    private static String clip(String value, int max) {
+        return value == null || value.length() <= max ? value : value.substring(0, max);
     }
 
     // =========================================================================
@@ -1237,6 +1391,8 @@ public class IssueService {
             .id(c.getId())
             .author(toUserSummary(c.getAuthor()))
             .content(c.getContent())
+            .via(c.getVia())
+            .model(c.getModel())
             .isEdited(c.isEdited())
             .createdAt(c.getCreatedAt())
             .updatedAt(c.getUpdatedAt())
@@ -1250,6 +1406,8 @@ public class IssueService {
             .action(a.getAction())
             .oldValue(a.getOldValue())
             .newValue(a.getNewValue())
+            .via(a.getVia())
+            .model(a.getModel())
             .createdAt(a.getCreatedAt())
             .build();
     }

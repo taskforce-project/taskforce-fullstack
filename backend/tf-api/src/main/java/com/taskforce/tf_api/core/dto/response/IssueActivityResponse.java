@@ -19,5 +19,9 @@ public class IssueActivityResponse {
     private IssueActivityType action;
     private String oldValue;
     private String newValue;
+    /** L'agent par qui l'action est passée (Cortex qui a préparé l'issue, l'agent d'une mission) ; null sinon. */
+    private String via;
+    /** Le modèle qui faisait parler l'agent de {@code via} (« qwen3:8b » pour Cortex, R123) ; null sinon. */
+    private String model;
     private LocalDateTime createdAt;
 }

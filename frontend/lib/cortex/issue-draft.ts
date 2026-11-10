@@ -2,18 +2,39 @@
 // L'issue que Cortex prépare en carte (R78, séance n°13) : ce que l'outil create_issue a proposé, que la personne relit,
 // modifie et crée. La carte renvoie au serveur les arguments de l'outil, modifiés ; il les rejuge et crée l'issue avec
 // les droits de la personne.
+//
+// La priorité, l'assigné, les labels, les points et le cycle ne se remplissent que de ce qui existe (recette du
+// 01/11/2026) : la carte résout ce que Cortex a écrit parmi les membres, les labels et les cycles du projet, et ce qui ne
+// s'y trouve pas reste vide, à remplir sur la carte. Rien n'est inventé. Le projet et l'assigné arrivent tels que le
+// serveur les a résolus (sa clé, l'e-mail du membre : « moi » est la personne qui demande) ; une colonne qui n'existe pas
+// donne la colonne par défaut du projet, et la carte le dit (rejeu de la 1.8.0, 02/11/2026).
 // ---------------------------------------------------------------------------
+
+export const DRAFT_PRIORITIES = ["NONE", "LOW", "MEDIUM", "HIGH", "URGENT"] as const;
+
+export type DraftPriority = (typeof DRAFT_PRIORITIES)[number];
 
 export interface IssueDraft {
   /** La clé ou le nom du projet, tel que Cortex l'a écrit, puis tel que la personne l'a choisi. */
   project: string;
   title: string;
   description: string;
-  subtasks: string[];
+  /** Les lignes de la checklist de l'issue (pas des sous-issues). */
+  checklist: string[];
   /** AAAA-MM-JJ, ou vide. */
   dueDate: string;
-  /** Le nom de la colonne, ou vide : le Backlog du projet. */
+  /** Le nom de la colonne, ou vide : le Backlog du projet. Une colonne que le projet n'a pas : sa colonne par défaut. */
   status: string;
+  /** La priorité, ou vide : celle par défaut. */
+  priority: DraftPriority | "";
+  /** L'assigné tel que Cortex l'a nommé (nom ou e-mail), puis l'e-mail du membre choisi ; vide : personne. */
+  assignee: string;
+  /** Les noms des labels. */
+  labels: string[];
+  /** L'estimation en points (un entier de 1 à 100, en texte), ou vide. */
+  points: string;
+  /** Le nom du cycle, ou vide. */
+  cycle: string;
 }
 
 /** Ce qui empêche de créer l'issue. */
@@ -30,11 +51,41 @@ interface Column {
   isDefault: boolean;
 }
 
+interface Member {
+  email: string;
+  displayName: string | null;
+}
+
+interface Named {
+  name: string;
+}
+
+interface DatedCycle extends Named {
+  status: string;
+}
+
+/** Les points qu'accepte une issue : de 1 à 100. */
+export const MAX_DRAFT_POINTS = 100;
+
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const text = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 
-/** Lit les arguments que Cortex a donnés à create_issue ; un champ absent ou illisible reste vide. */
+/** Une liste de textes, sans les vides ni ce qui n'est pas du texte. */
+const texts = (value: unknown): string[] => (Array.isArray(value) ? value.map(text).filter(Boolean) : []);
+
+const isPriority = (value: string): value is DraftPriority => (DRAFT_PRIORITIES as readonly string[]).includes(value);
+
+/** Des points lisibles : un entier de 1 à 100, en texte ; sinon vide. */
+function readPoints(value: unknown): string {
+  const n = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value.trim()) : NaN;
+  return Number.isInteger(n) && n >= 1 && n <= MAX_DRAFT_POINTS ? String(n) : "";
+}
+
+/**
+ * Lit les arguments que Cortex a donnés à create_issue ; un champ absent ou illisible reste vide. `subtasks`, l'ancien
+ * nom de la checklist, se lit encore : une carte préparée avant se crée toujours.
+ */
 export function readIssueDraft(input: string | null): IssueDraft {
   let args: Record<string, unknown> = {};
   try {
@@ -44,13 +95,19 @@ export function readIssueDraft(input: string | null): IssueDraft {
     args = {};
   }
   const due = text(args.dueDate);
+  const priority = text(args.priority).toUpperCase();
   return {
     project: text(args.project),
     title: text(args.title),
     description: text(args.description),
-    subtasks: Array.isArray(args.subtasks) ? args.subtasks.map(text).filter(Boolean) : [],
+    checklist: texts(args.checklist ?? args.subtasks),
     dueDate: DAY.test(due) ? due : "",
     status: text(args.status),
+    priority: isPriority(priority) ? priority : "",
+    assignee: text(args.assignee),
+    labels: texts(args.labels),
+    points: readPoints(args.points),
+    cycle: text(args.cycle),
   };
 }
 
@@ -59,11 +116,20 @@ export function issueDraftInput(draft: IssueDraft): string {
   const args: Record<string, unknown> = { project: draft.project.trim(), title: draft.title.trim() };
   const description = draft.description.trim();
   if (description) args.description = description;
-  const subtasks = draft.subtasks.map((s) => s.trim()).filter(Boolean);
-  if (subtasks.length > 0) args.subtasks = subtasks;
+  const checklist = draft.checklist.map((s) => s.trim()).filter(Boolean);
+  if (checklist.length > 0) args.checklist = checklist;
   if (draft.dueDate) args.dueDate = draft.dueDate;
   const status = draft.status.trim();
   if (status) args.status = status;
+  if (draft.priority && draft.priority !== "NONE") args.priority = draft.priority;
+  const assignee = draft.assignee.trim();
+  if (assignee) args.assignee = assignee;
+  const labels = draft.labels.map((l) => l.trim()).filter(Boolean);
+  if (labels.length > 0) args.labels = labels;
+  const points = readPoints(draft.points);
+  if (points) args.points = Number(points);
+  const cycle = draft.cycle.trim();
+  if (cycle) args.cycle = cycle;
   return JSON.stringify(args);
 }
 
@@ -78,11 +144,70 @@ export function findDraftProject<P extends NamedProject>(projects: readonly P[],
   );
 }
 
-/** La colonne où l'issue arrivera : celle que la carte nomme, sinon la première du Backlog, sinon celle par défaut. */
+/**
+ * Le membre du projet que Cortex a nommé, comme le serveur le résout : l'e-mail exact, puis le nom exact, puis une
+ * partie du nom ou le début de l'e-mail s'ils ne désignent qu'une personne. Plusieurs, ou aucun : personne, la carte
+ * laisse choisir. Jamais un membre pris au hasard.
+ */
+export function findDraftMember<M extends Member>(members: readonly M[], asked: string): M | null {
+  const wanted = asked.trim().toLowerCase();
+  if (!wanted) return null;
+  const lower = (value: string | null) => (value ?? "").toLowerCase();
+  const one = (found: M[]) => (found.length === 1 ? found[0] : null);
+  const byName = members.filter((m) => lower(m.displayName) === wanted);
+  return (
+    one(members.filter((m) => lower(m.email) === wanted)) ??
+    one(byName) ??
+    (byName.length > 1 ? null : one(members.filter((m) => lower(m.displayName).includes(wanted) || lower(m.email).startsWith(wanted))))
+  );
+}
+
+/** Le nom d'un membre, ou son e-mail quand il n'en a pas. */
+export const memberName = (member: Member): string => member.displayName?.trim() || member.email;
+
+/** Les labels du projet que Cortex a nommés, par leur nom exact sans tenir compte de la casse ; les autres tombent. */
+export function draftLabels<L extends Named>(labels: readonly L[], asked: readonly string[]): L[] {
+  const found: L[] = [];
+  for (const name of asked) {
+    const label = labels.find((l) => l.name.toLowerCase() === name.trim().toLowerCase());
+    if (label && !found.includes(label)) found.push(label);
+  }
+  return found;
+}
+
+/** Les cycles où une issue peut encore entrer : tous, sauf ceux qui sont terminés. */
+export function openCycles<C extends DatedCycle>(cycles: readonly C[]): C[] {
+  return cycles.filter((c) => c.status !== "COMPLETED");
+}
+
+/** Le cycle que Cortex a nommé, parmi ceux encore ouverts ; un nom inconnu ne donne rien. */
+export function draftCycle<C extends DatedCycle>(cycles: readonly C[], asked: string): C | null {
+  const wanted = asked.trim().toLowerCase();
+  if (!wanted) return null;
+  return openCycles(cycles).find((c) => c.name.toLowerCase() === wanted) ?? null;
+}
+
+/** Un nom sans la casse, les accents, les espaces ni la ponctuation : « To Do » et « Todo » se valent. */
+export const nameKey = (name: string): string =>
+  name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+
+/**
+ * La colonne que la carte nomme, comme le serveur la lit : sans la casse, les espaces ni la ponctuation (rejeu de la
+ * 1.8.0 : Cortex écrivait « To Do » pour la colonne « Todo »). Null quand le projet ne l'a pas.
+ */
+export function namedColumn<S extends Column>(columns: readonly S[], status: string): S | null {
+  const wanted = nameKey(status);
+  return wanted ? (columns.find((c) => nameKey(c.name) === wanted) ?? null) : null;
+}
+
+/**
+ * La colonne où l'issue arrivera : celle que la carte nomme ; une colonne que le projet n'a pas donne sa colonne par
+ * défaut, et la carte le dit. Rien de nommé : la première du Backlog, sinon celle par défaut.
+ */
 export function draftColumn<S extends Column>(columns: readonly S[], status: string): S | null {
-  const wanted = status.trim().toLowerCase();
-  if (wanted) return columns.find((c) => c.name.toLowerCase() === wanted) ?? null;
-  return columns.find((c) => c.category === "BACKLOG") ?? columns.find((c) => c.isDefault) ?? null;
+  const byDefault = columns.find((c) => c.isDefault) ?? null;
+  if (status.trim()) return namedColumn(columns, status) ?? byDefault;
+  return columns.find((c) => c.category === "BACKLOG") ?? byDefault;
 }
 
 /**

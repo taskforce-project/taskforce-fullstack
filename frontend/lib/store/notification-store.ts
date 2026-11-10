@@ -12,13 +12,16 @@ import {
   acknowledge as acknowledgeApi,
   acknowledgeAll as acknowledgeAllApi,
 } from "../api/notification-service";
-import { parseServerDate } from "../utils/server-date";
+import { relativeTime } from "../utils/server-date";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type NotifType = "mention" | "assigned" | "commented" | "statusChanged" | "dueSoon" | "overdue" | "completed";
+/** Les types que le serveur envoie, ceux des agents compris (une demande d'accord, une mission finie, en échec, refusée). */
+export type NotifType =
+  | "mention" | "assigned" | "commented" | "statusChanged" | "dueSoon" | "overdue" | "completed" | "overload"
+  | "agentApproval" | "agentDone" | "agentFailed" | "agentNotStarted";
 export type Urgency   = "critical" | "warning" | "info" | "low";
 
 export interface Signal {
@@ -45,17 +48,6 @@ export interface Signal {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Conversion d'une date ISO en label relatif simple */
-function toRelativeTime(isoDate: string): string {
-  const diff = Date.now() - parseServerDate(isoDate).getTime();
-  const seconds = Math.floor(diff / 1000);
-  if (seconds < 60)       return "just now";
-  if (seconds < 3600)     return `${Math.floor(seconds / 60)} min ago`;
-  if (seconds < 86400)    return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 172800)   return "Yesterday";
-  return `${Math.floor(seconds / 86400)} days ago`;
-}
-
 /** Conversion NotificationResponse → Signal (shape attendue par inbox-view) */
 function toSignal(n: NotificationResponse): Signal {
   return {
@@ -77,7 +69,7 @@ function toSignal(n: NotificationResponse): Signal {
     title:        n.title,
     issueId:      n.issueIdentifier,
     issueUrl:     n.issueUrl,
-    timestamp:    toRelativeTime(n.createdAt),
+    timestamp:    relativeTime(n.createdAt),
     createdAt:    n.createdAt,
     body:         n.body ?? undefined,
   };

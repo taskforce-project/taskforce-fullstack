@@ -20,6 +20,9 @@ extraResources:
       - "**/*"
       - "frontend/.next/**/*"
 asar: true
+# Le moteur de la voix (voice-worker.ts) : un module natif et ses bibliothèques ne se chargent pas depuis l'archive.
+asarUnpack:
+  - "node_modules/sherpa-onnx-*/**"
 
 win:
   target:

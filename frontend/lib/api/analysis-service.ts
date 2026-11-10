@@ -1,14 +1,13 @@
 /**
  * Service des **workflows d'analyse IA** - async, persistés, actionnables.
- * Un workflow (`AnalysisJob`) tourne en arrière-plan ; son plan (`AgentPlan`) reflète
- * les étapes en direct ; quand il aboutit, il produit un `StoredBrief` dont chaque
- * priorité est actionnable (accepter → issue, épingler, écarter, éditer).
+ * Un workflow (`AnalysisJob`) tourne en arrière-plan ; son statut dit où il en est (le plan
+ * d'étapes figé qu'il portait est retiré, TF-J1-3) ; quand il aboutit, il produit un
+ * `StoredBrief` dont chaque priorité est actionnable (accepter → issue, épingler, écarter, éditer).
  *
  * Routes : lib/config/api-routes.ts (ANALYSIS_ROUTES). Enveloppe `response.data.data`.
  */
 import { apiClient, AI_TIMEOUT_MS } from "./client"
 import { ANALYSIS_ROUTES } from "../config/api-routes"
-import type { PlanTask } from "@/components/ui/agent-plan"
 import type { DecisionSnapshot } from "./analytics-service"
 
 // ---------------------------------------------------------------------------
@@ -25,8 +24,6 @@ export interface AnalysisJob {
   projectName: string
   depth: AnalysisDepth
   status: JobStatus
-  /** Étapes du workflow (arbre agent-plan) - mis à jour en direct. */
-  plan: PlanTask[]
   /** HITL : question du modèle quand `status === "WAITING_FOR_INPUT"`. */
   question: string | null
   /** Message d'erreur quand `status === "FAILED"`. */

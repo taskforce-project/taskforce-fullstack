@@ -60,6 +60,7 @@ import com.taskforce.tf_api.core.service.agent.CortexRecordService;
 import com.taskforce.tf_api.core.service.agent.CortexUndo;
 import com.taskforce.tf_api.core.service.agent.tools.SearchBrainTool;
 import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
+import com.taskforce.tf_api.core.service.mcpserver.IssueGestures;
 import com.taskforce.tf_api.core.service.mcpserver.McpServerService;
 import com.taskforce.tf_api.core.service.mcpserver.TaskforceMcpTools;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -70,6 +71,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -219,10 +221,18 @@ class BrainVisibilityIntegrationTest extends AbstractIntegrationTest {
         when(llm.isConfigured()).thenReturn(false); // Cortex répond par les notes trouvées
         cortex = new AgentService(access, search, mock(AgentToolRegistry.class), llm, mapper, mock(AiUsageService.class),
             mock(WorkspaceMcpService.class), mock(AuthorizationService.class), mock(CortexGate.class),
-            mock(CortexRecordService.class), mock(CortexUndo.class));
+            mock(CortexRecordService.class), mock(CortexUndo.class),
+            mock(com.taskforce.tf_api.core.service.agent.ScreenContext.class),
+            mock(com.taskforce.tf_api.core.service.agent.IssueMaterial.class),
+            mock(com.taskforce.tf_api.core.service.agent.tools.ProjectResolver.class),
+            mock(com.taskforce.tf_api.core.service.AiConversationService.class));
         searchBrainTool = new SearchBrainTool(search, access);
+        // Les gestes sur une issue ne servent pas ici : les arguments de brain_search passent tels quels.
+        IssueGestures gestures = mock(IssueGestures.class);
+        when(gestures.withIds(any(), any(), any())).thenAnswer(inv -> inv.getArgument(2));
         TaskforceMcpTools tools = new TaskforceMcpTools(mapper, mock(ProjectService.class), mock(IssueService.class),
-            mock(SmartAssignService.class), search, mock(AnalyticsService.class), cortex);
+            mock(SmartAssignService.class), search, mock(AnalyticsService.class), cortex, gestures,
+            mock(com.taskforce.tf_api.core.service.mcpserver.ProjectGestures.class));
         mcp = new McpServerService(tools, mapper, userRepository, new JwtIdentityResolver(environment));
     }
 
@@ -302,9 +312,11 @@ class BrainVisibilityIntegrationTest extends AbstractIntegrationTest {
         Jwt.Builder jwt = Jwt.withTokenValue("t").header("alg", "none").claim("email", people.get(reader).getEmail());
         return switch (token) {
             case PERSONAL -> jwt.claim(PersonalTokenAuthenticator.TOKEN_CLAIM, 3L).build();
+            // Run et issue fictifs : la recherche est une lecture, que la portée admet quelle que soit l'issue du run.
             case DELEGATED -> jwt.claim(DeliverySessionFilter.RUN_CLAIM, 100L)
                 .claim(DeliverySessionFilter.WORKSPACE_CLAIM, SLUG)
                 .claim(DeliverySessionFilter.PROJECT_CLAIM, publicProject)
+                .claim(DeliverySessionFilter.ISSUE_CLAIM, 1L)
                 .build();
         };
     }

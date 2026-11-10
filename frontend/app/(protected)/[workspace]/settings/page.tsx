@@ -33,6 +33,7 @@ import { EventPicker } from "@/components/settings/event-picker"
 import { AgentsPanel } from "@/components/settings/agents-panel"
 import { DesktopAiPanel } from "@/components/settings/desktop-ai-panel"
 import { EvalBankPanel } from "@/components/settings/eval-bank-panel"
+import { InstanceAiPanel } from "@/components/settings/instance-ai-panel"
 import { DesktopSessionsCard } from "@/components/settings/desktop-sessions-card"
 import { showUpdateState } from "@/components/desktop/desktop-update-toast"
 import { PasskeysCard } from "@/components/settings/passkeys-card"
@@ -99,14 +100,13 @@ const ALL_SECTIONS: SectionConfig[] = [
 ]
 
 /**
- * App desktop : le mot de passe et la double authentification se règlent sur le compte en ligne (« Account ») ; l'IA
- * se choisit sur l'ordinateur (« AI »), section sans objet dans la webapp, où l'instance règle son fournisseur.
+ * App desktop : le mot de passe et la double authentification se règlent sur le compte en ligne (« Account »). « AI »
+ * existe des deux côtés : l'app desktop y choisit son fournisseur sur l'ordinateur ; la webapp, où l'instance règle le
+ * sien, y montre ce que sait faire chaque modèle servi et le modèle de Cortex choisi par la personne (R113).
  */
 const DESKTOP_HIDDEN_SECTIONS: readonly SettingsSection[] = ["security"]
-const DESKTOP_ONLY_SECTIONS: readonly SettingsSection[] = ["ai"]
 
-export const SECTIONS: SectionConfig[] = ALL_SECTIONS.filter((s) =>
-  IS_DESKTOP ? !DESKTOP_HIDDEN_SECTIONS.includes(s.key) : !DESKTOP_ONLY_SECTIONS.includes(s.key))
+export const SECTIONS: SectionConfig[] = ALL_SECTIONS.filter((s) => !IS_DESKTOP || !DESKTOP_HIDDEN_SECTIONS.includes(s.key))
 
 export const SECTION_GROUPS = [
   { label: "Personal",  keys: ["profile", "account", "appearance", "notifications", "security", "privacy"] as const },
@@ -1443,6 +1443,7 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
 function IntegrationsPanel() {
   const { activeWorkspace } = useWorkspaceStore()
   const slug = activeWorkspace?.slug ?? ""
+  const ti = usePreferencesStore((s) => s.t.integrations)
   const {
     githubStatus, slackStatus, slackChannels,
     fetchGitHubStatus, disconnectGitHub,
@@ -1514,9 +1515,7 @@ function IntegrationsPanel() {
       {/* ---- Catalogue (le pool générique) ---- */}
       <SectionCard
         title="Integrations catalog"
-        description={IS_DESKTOP
-          ? "Plane syncs natively; any other tool connects through its MCP server."
-          : "GitHub, Slack and Plane sync natively; any other tool connects through its MCP server."}
+        description={IS_DESKTOP ? ti.catalogDesktop : ti.catalogWeb}
       >
 
         {slug && <IntegrationsCatalog slug={slug} />}
@@ -1922,7 +1921,7 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
       {active === "workspace"     && <WorkspacePanel />}
       {active === "usage"         && <UsagePanel />}
       {active === "evals"         && <EvalBankPanel />}
-      {active === "ai"            && <DesktopAiPanel />}
+      {active === "ai"            && (IS_DESKTOP ? <DesktopAiPanel /> : <InstanceAiPanel />)}
       {active === "integrations"  && <IntegrationsPanel />}
       {active === "agents"        && <AgentsPanel />}
       {active === "audit"         && <AuditLogPanel />}

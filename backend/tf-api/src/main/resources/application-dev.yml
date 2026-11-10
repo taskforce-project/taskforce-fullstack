@@ -207,7 +207,7 @@ server:
 
 # AI Configuration (Phase 4)
 ai:
-  # Fournisseur, modèles et URL de l'ai-service : cf. application.yml (ai.service) et la config de l'ai-service.
+  # Fournisseur et modèles : les variables AI_* lues par la passerelle de modèles (cf. application.yml).
   # Garde-debit IA par minute (AiRateGuard) : protege le budget LLM partage (Groq gpt-oss-120b ~8000 TPM,
   # partage par TOUTE l'org) contre les pics de concurrence. Fenetres-minute Redis (globale + par compte) ;
   # 429 propre au depassement, fail-open sans Redis. 0 = fenetre desactivee. A remonter en Groq Dev / Ollama.

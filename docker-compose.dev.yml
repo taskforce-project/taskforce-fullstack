@@ -99,9 +99,11 @@ services:
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:8180/realms/taskforce-dev}
       KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/taskforce-dev/protocol/openid-connect/certs}
 
-      # IA interne : ai-service, joint avec le secret partagé (valeur de dev par défaut, locale)
-      AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-service:8000}
-      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-dev-ai-service-token}
+      # IA : la passerelle de modèles du backend. Rien de posé : Ollama sur la machine hôte (host.docker.internal),
+      # qwen3:8b s'il est installé, embeddings bge-m3. `.env.dev` (env_file ci-dessus) peut tout surcharger : AI_*,
+      # ou les alias GROQ_* et OLLAMA_*.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      AI_TIMEOUT: ${AI_TIMEOUT:-120}
       INTEGRATIONS_PLANE_API_BASE: ${INTEGRATIONS_PLANE_API_BASE:-https://api.plane.so}
 
       # Email Configuration (Mailtrap)
@@ -161,8 +163,9 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-      ai-service:
-        condition: service_healthy
+    # Ollama de la machine hôte, joint par la passerelle de modèles (Docker Desktop connaît déjà ce nom ; Linux non).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - taskforce-network
     volumes:
@@ -178,43 +181,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    restart: unless-stopped
-
-  # ================================
-  # AI Service (FastAPI interne)
-  # ================================
-  ai-service:
-    build:
-      context: ./ai-service
-      dockerfile: Dockerfile
-    container_name: taskforce-ai-service-dev
-    env_file:
-      - .env.dev
-    environment:
-      TZ: ${TZ:-America/New_York}
-      # Secret partagé avec le backend (valeur de dev par défaut, locale).
-      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-dev-ai-service-token}
-      # Fournisseur d'IA (format générique compatible OpenAI, cf. ai-service/app/config.py). Rien de posé :
-      # Ollama sur la machine hôte (host.docker.internal), qwen3:8b pour les deux tiers, embeddings bge-m3.
-      # `.env.dev` (env_file ci-dessus) peut tout surcharger : AI_*, ou les alias GROQ_* et OLLAMA_*.
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      # Délai d'une réponse du modèle, sous ai.service.read-timeout-ms du backend (150 s).
-      AI_TIMEOUT: ${AI_TIMEOUT:-120}
-      LOG_LEVEL: ${AI_SERVICE_LOG_LEVEL:-INFO}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      - taskforce-network
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)\" || exit 1",
-        ]
-      interval: 20s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
     restart: unless-stopped
 
   # ================================

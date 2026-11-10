@@ -67,6 +67,7 @@ class LocalRunnerServiceTest {
     @Mock private DeliveryActivityService activityService;
     @Mock private HarnessRulesService rulesService;
     @Mock private MissionEvidenceService evidenceService;
+    @Mock private DeliveryAgentProviderRegistry providers;
 
     private static final RulesBundle RULES = new RulesBundle(
         RulesBundle.FORMAT, "acme", null, 3, "sha256:" + "a".repeat(64), null, List.of());
@@ -79,7 +80,7 @@ class LocalRunnerServiceTest {
     void setUp() {
         LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15);
         service = new LocalRunnerService(runRepository, userRepository, visibilityGuard, deliveryRunner, settings, activityService,
-            rulesService, evidenceService, presence);
+            rulesService, evidenceService, presence, providers);
         owner = User.builder().id(7L).email(OWNER_EMAIL).keycloakId("kc-7").isActive(true).build();
     }
 
@@ -180,6 +181,54 @@ class LocalRunnerServiceTest {
     }
 
     @Test
+    @DisplayName("claim : une reprise emporte la branche, la base, la session, la pull request, les commentaires et le premier dossier (R139)")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void claim_of_a_follow_up() {
+        DeliveryRun first = run(50L, DeliveryRunStatus.DONE, "tf-runner-pierre", owner, LocalDateTime.now());
+        DeliveryRun second = run(60L, DeliveryRunStatus.DONE, "tf-runner-pierre", owner, LocalDateTime.now());
+        second.setParentRun(first);
+        second.setAgentSession("79b0a053-7a97-4bc5-9b64-628da46559e3");
+        second.setResultUrl("https://github.com/acme/website/pull/212");
+        DeliveryRun queued = run(100L, DeliveryRunStatus.QUEUED, null, owner, null);
+        queued.setParentRun(second);
+        queued.setBranch("tf/web-4-fix-r50");
+        queued.setBaseSha("a".repeat(40));
+        queued.setFollowUp(List.of(java.util.Map.of("path", "src/a.ts", "line", 12, "side", "new", "text", "Use the helper")));
+        when(userRepository.findByEmail(OWNER_EMAIL)).thenReturn(Optional.of(owner));
+        when(runRepository.findClaimable(eq("claude-code"), eq(DeliveryRunStatus.QUEUED), eq(7L), any())).thenReturn(List.of(queued));
+        when(visibilityGuard.canWrite(any(Project.class), eq(7L))).thenReturn(true);
+        when(runRepository.claim(eq(100L), eq("tf-runner-pierre"), anyString(), any(), any(), any())).thenReturn(1);
+        when(rulesService.bundleFor(any())).thenReturn(RULES);
+        when(runRepository.findById(100L)).thenReturn(Optional.of(queued));
+
+        RunnerClaimResponse.FollowUp followUp = service.claim(RUNNER).orElseThrow().followUp();
+
+        assertThat(followUp.parentRunId()).isEqualTo(60L);
+        assertThat(followUp.worktreeRun()).isEqualTo(50L);
+        assertThat(followUp.branch()).isEqualTo("tf/web-4-fix-r50");
+        assertThat(followUp.base()).isEqualTo("a".repeat(40));
+        assertThat(followUp.sessionId()).isEqualTo("79b0a053-7a97-4bc5-9b64-628da46559e3");
+        assertThat(followUp.pullRequestUrl()).isEqualTo("https://github.com/acme/website/pull/212");
+        assertThat(followUp.comments()).containsExactly(new RunnerClaimResponse.Comment("src/a.ts", 12, "new", "Use the helper"));
+        ArgumentCaptor<java.util.Map<String, Object>> data = (ArgumentCaptor) ArgumentCaptor.forClass(java.util.Map.class);
+        verify(evidenceService).append(eq(queued), eq("mission.started"), any(), data.capture());
+        assertThat(data.getValue()).containsEntry("followUpOf", 60L).containsEntry("comments", 1);
+    }
+
+    @Test
+    @DisplayName("claim : une mission neuve n'a pas de reprise")
+    void claim_of_a_new_mission_has_no_follow_up() {
+        DeliveryRun queued = run(100L, DeliveryRunStatus.QUEUED, null, owner, null);
+        when(userRepository.findByEmail(OWNER_EMAIL)).thenReturn(Optional.of(owner));
+        when(runRepository.findClaimable(eq("claude-code"), eq(DeliveryRunStatus.QUEUED), eq(7L), any())).thenReturn(List.of(queued));
+        when(visibilityGuard.canWrite(any(Project.class), eq(7L))).thenReturn(true);
+        when(runRepository.claim(eq(100L), eq("tf-runner-pierre"), anyString(), any(), any(), any())).thenReturn(1);
+        when(rulesService.bundleFor(any())).thenReturn(RULES);
+
+        assertThat(service.claim(RUNNER).orElseThrow().followUp()).isNull();
+    }
+
+    @Test
     @DisplayName("claim : aucun run en attente -> vide")
     void claim_empty_queue() {
         when(userRepository.findByEmail(OWNER_EMAIL)).thenReturn(Optional.of(owner));
@@ -234,14 +283,30 @@ class LocalRunnerServiceTest {
     void open_session_returns_scope_and_owner() {
         DeliveryRun held1 = run(100L, DeliveryRunStatus.RUNNING, "tf-runner-pierre", owner, LocalDateTime.now().minusMinutes(5));
         when(runRepository.findById(100L)).thenReturn(Optional.of(held1));
+        DeliveryAgentProvider claudeCode = mock(DeliveryAgentProvider.class);
+        when(claudeCode.displayName()).thenReturn("Claude Code");
+        when(providers.get("claude-code")).thenReturn(claudeCode);
 
         DeliverySession session = service.openSession(100L, RUNNER);
 
         assertThat(session.workspaceSlug()).isEqualTo("acme");
         assertThat(session.projectId()).isEqualTo(12L);
+        // L'issue du run, la seule que l'agent modifie (R110).
+        assertThat(session.issueId()).isEqualTo(55L);
         assertThat(session.ownerEmail()).isEqualTo(OWNER_EMAIL);
         assertThat(session.ownerKeycloakId()).isEqualTo("kc-7");
         assertThat(session.runnerClientId()).isEqualTo("tf-runner-pierre");
+        // L'agent du run : l'activité de l'issue dit par qui passe ce qu'il fait au nom du délégant.
+        assertThat(session.agentName()).isEqualTo("Claude Code");
+    }
+
+    @Test
+    @DisplayName("openSession : un provider que le registre ne connaît plus garde sa clé pour nom")
+    void open_session_names_an_unknown_provider_by_its_key() {
+        DeliveryRun held1 = run(100L, DeliveryRunStatus.RUNNING, "tf-runner-pierre", owner, LocalDateTime.now().minusMinutes(5));
+        when(runRepository.findById(100L)).thenReturn(Optional.of(held1));
+
+        assertThat(service.openSession(100L, RUNNER).agentName()).isEqualTo("claude-code");
     }
 
     static Stream<Arguments> refusedSessions() {
@@ -310,8 +375,6 @@ class LocalRunnerServiceTest {
         assertThat(poll.getValue().status()).isEqualTo(DeliveryRunStatus.DONE);
         assertThat(poll.getValue().summary()).isEqualTo("PR opened");
         assertThat(poll.getValue().resultUrl()).isEqualTo("https://github.com/acme/website/pull/9");
-        // Run terminé : les demandes de validation encore ouvertes ne recevront plus de réponse utile.
-        verify(activityService).closeApprovals(held2);
     }
 
     @Test

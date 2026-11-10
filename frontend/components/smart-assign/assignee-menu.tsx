@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Sparkles, Loader2, Check, ChevronDown, UserRound } from "lucide-react"
+import { Bot, Sparkles, Loader2, Check, ChevronDown, UserRound } from "lucide-react"
 
 import {
   Popover,
@@ -22,6 +22,7 @@ import { BrandLogo } from "@/components/ui/brand-logo"
 import { cn } from "@/lib/utils"
 import type { ProjectMember } from "@/lib/api/project-service"
 import type { DeliveryProvider } from "@/lib/api/delivery-service"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 import {
   smartAssignIssue,
   type SmartAssignCandidate,
@@ -61,6 +62,11 @@ interface AssigneeMenuProps {
   onAssign: (userId: number) => void | Promise<void>
   onUnassign: () => void | Promise<void>
   onDelegate: (agentKey: string) => void | Promise<void>
+  /**
+   * L'agent qui travaille sur l'issue au nom de la personne qui l'a déléguée (« Claude Code, for Pierre »), tant que la
+   * mission court ou attend sa relecture : le bouton le montre à la place de l'assigné, qui ne change pas.
+   */
+  working?: { label: string; hint: string; logoKey?: string } | null
 }
 
 /** Résumé court "pourquoi" pour une personne quand le LLM n'a pas rendu de phrase. */
@@ -102,7 +108,9 @@ export function AssigneeMenu({
   onAssign,
   onUnassign,
   onDelegate,
+  working = null,
 }: Readonly<AssigneeMenuProps>) {
+  const models = usePreferencesStore((s) => s.t.models)
   const [open, setOpen] = useState(false)
   const [suggesting, setSuggesting] = useState(false)
   const [ran, setRan] = useState(false)
@@ -145,7 +153,16 @@ export function AssigneeMenu({
           aria-label="Change assignee"
           className="flex min-h-8 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-1 text-left text-sm shadow-xs outline-none transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-input/30 dark:hover:bg-input/50"
         >
-          {assignee ? (
+          {working ? (
+            <span className="flex min-w-0 items-center gap-1.5" title={working.hint}>
+              {working.logoKey ? (
+                <BrandLogo slug={working.logoKey} name={working.label} className="size-4 shrink-0" />
+              ) : (
+                <Bot className="size-4 shrink-0 text-primary" />
+              )}
+              <span className="truncate">{working.label}</span>
+            </span>
+          ) : assignee ? (
             <span className="flex min-w-0 items-center gap-1.5">
               <UserAvatar email={assignee.email ?? undefined} name={assignee.name} avatarUrl={assignee.avatarUrl} className="size-4 shrink-0" fallbackClassName="text-[8px]" />
               <span className="truncate">{assignee.name}</span>
@@ -283,12 +300,18 @@ export function AssigneeMenu({
                       <span className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted p-0.5">
                         <BrandLogo slug={a.logoKey} name={a.displayName} className="size-full" />
                       </span>
-                      {a.ready ? (
+                      {a.ready && !a.trial ? (
                         <span className="truncate">{a.displayName}</span>
                       ) : (
                         <span className="min-w-0">
-                          <span className="block truncate">{a.displayName}</span>
-                          {a.reason && (
+                          <span className="flex items-center gap-1.5">
+                            <span className="truncate">{a.displayName}</span>
+                          </span>
+                          {/* Cortex (R144) dit ce qu'il rend. */}
+                          {a.ready && a.trial && (
+                            <span className="block whitespace-normal text-xs text-muted-foreground">{models.cortexHint}</span>
+                          )}
+                          {!a.ready && a.reason && (
                             <span className="block whitespace-normal text-xs text-muted-foreground">{a.reason}</span>
                           )}
                         </span>

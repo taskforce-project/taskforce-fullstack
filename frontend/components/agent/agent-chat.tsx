@@ -1,63 +1,43 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
-import { Sparkles, MessageSquare, ChevronDown, Plus, Trash2, Plug, Play, CircleAlert } from "lucide-react"
+import { useReducedMotion } from "framer-motion"
 import {
-  Message, Steps, Reasoning, Tool, Sources, ThinkingBar, FeedbackBar, PromptSuggestion, TokenMeter,
-  type ToolStatus,
-} from "@/components/chat"
-import { Markdown } from "@/components/ui/lightweight-markdown"
+  Sparkles, ChevronDown, ChevronUp, Plus, Trash2, Play, CircleAlert,
+} from "lucide-react"
+import { Message, TokenMeter } from "@/components/chat"
 import { cn } from "@/lib/utils"
+import { fillModelText } from "@/lib/ai/model-table"
 import {
-  sendAgentMessage, approveAction, isApprovable, isPreparedIssue, isUndoable, type AssistantAnswer, type AssistantToolCall,
+  approveAction, isApprovable, isDeletion, isMission, isPreparedIssue, isQuestion, isQuestionCard, isUndoable,
+  type AssistantActionResult,
+  type AssistantAnswer, type AssistantToolCall,
 } from "@/lib/api/assistant-service"
-import { getErrorMessage, getErrorStatus } from "@/lib/api/client"
-import {
-  listConversations, getConversation, deleteConversation,
-  type ConversationSummary, type ConversationMessage,
-} from "@/lib/api/ai-conversation-service"
-import { getMcpServers } from "@/lib/api/integration-service"
+import { getErrorMessage } from "@/lib/api/client"
+import { outcomeLine, plainOutput, proposalLine } from "@/lib/cortex/work-lines"
+import { useCortexWork } from "@/lib/hooks/use-cortex-work"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { useCortexStore } from "@/lib/store/cortex-store"
+import { useEvalStore } from "@/lib/store/eval-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { IS_DESKTOP } from "@/lib/desktop"
+import { AnswerActions } from "./answer-actions"
+import { AnswerText } from "./answer-text"
+import { Arrival } from "./arrival"
+import { CompactedNotice, ContextFitNotice } from "./context-fit-notice"
 import { CortexUsage } from "./cortex-usage"
-import { EvalCaseButton } from "./eval-case-dialog"
+import { DeleteIssueCard } from "./delete-issue-card"
 import { IssueDraftCard } from "./issue-draft-card"
+import { MissionInChat } from "./mission-in-chat"
+import { ModelOffer } from "./model-offer"
+import { QuestionCard } from "./question-card"
+import { ReadLine } from "./read-line"
+import { StoppedNotice } from "./stopped-notice"
 import { UndoAction } from "./undo-action"
-
-interface Turn {
-  id: string
-  role: "user" | "assistant"
-  text?: string
-  answer?: AssistantAnswer
-  /** Tour spécial : plafond de tokens IA atteint → carte d'info + CTA (au lieu d'une réponse). */
-  kind?: "quota"
-}
-
-const SUGGESTIONS = [
-  "What changed in this project this week?",
-  "Which issues are blocked, and why?",
-  "Summarize the decisions in our notes",
-]
-
-/** Reconstruit des tours à partir des messages persistés (rendu de l'historique). */
-function messagesToTurns(messages: ConversationMessage[]): Turn[] {
-  return messages.map((m) =>
-    m.role === "user"
-      ? { id: `m${m.id}`, role: "user", text: m.content }
-      : {
-          id: `m${m.id}`, role: "assistant",
-          answer: {
-            answer: m.content, reasoning: null,
-            mode: (m.mode as AssistantAnswer["mode"]) ?? "fast",
-            sources: [], steps: [], toolCalls: [],
-            usage: { promptTokens: 0, completionTokens: 0, totalTokens: m.totalTokens },
-          },
-        },
-  )
-}
+import { UserMessage } from "./user-message"
+import { WorkedLine, WorkingLine } from "./work-line"
 
 /**
  * Plafond mensuel de tokens IA de l'instance atteint (HTTP 409) - carte d'**information** (pas
@@ -68,7 +48,7 @@ function QuotaNotice() {
     <div className="flex flex-col gap-2 rounded-xl border border-primary/25 bg-primary/5 p-3">
       <div className="flex items-center gap-2">
         <div className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
-          <Sparkles className="size-3.5" />
+          <Sparkles className="size-4" />
         </div>
         <p className="text-sm font-medium text-foreground">Monthly AI limit reached</p>
       </div>
@@ -89,7 +69,7 @@ function AiUnavailableNotice() {
   return (
     <div className="flex w-full flex-col gap-1.5 border border-border bg-muted/40 p-3 text-left">
       <p className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-        <CircleAlert className="size-3.5 shrink-0 text-ink-yellow" /> AI is not configured
+        <CircleAlert className="size-4 shrink-0 text-ink-yellow" /> AI is not configured
       </p>
       <p className="text-xs leading-relaxed text-muted-foreground">
         {IS_DESKTOP
@@ -105,12 +85,6 @@ function AiUnavailableNotice() {
   )
 }
 
-const OUTCOME: Record<"success" | "refused" | "error", string> = {
-  success: "Done. ",
-  refused: "",
-  error: "The action failed: ",
-}
-
 /**
  * Action proposée par Cortex, interne (une note, un projet) ou dans un outil connecté : les règles de l'espace la
  * demandent à la personne. Rien n'est fait sans son clic ; l'accord part avec le dossier de la réponse, où le serveur
@@ -119,14 +93,24 @@ const OUTCOME: Record<"success" | "refused" | "error", string> = {
 function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }) {
   const [state, setState] = useState<"idle" | "running" | "success" | "refused" | "error">("idle")
   const [output, setOutput] = useState<string | null>(null)
-  const external = call.name.includes("__")
+  const [result, setResult] = useState<AssistantActionResult | null>(null)
+  const noteDone = useCortexStore((s) => s.noteDone)
+  const t = usePreferencesStore((s) => s.t.thread)
+  const outcome = { success: t.outcomeDone, refused: "", error: t.outcomeFailed }
+  // Accordée et faite : l'appel tel qu'il a abouti, avec l'empreinte que « Undo » nomme et l'issue qu'il touche.
+  const done: AssistantToolCall = { ...call, status: "success", output, ref: result?.ref ?? null, target: result?.target ?? null }
 
   const run = async () => {
     setState("running")
     try {
-      const result = await approveAction(slug, call)
-      setOutput(result.output)
-      setState(result.status)
+      const approved = await approveAction(slug, call)
+      setOutput(approved.output)
+      setResult(approved)
+      setState(approved.status)
+      // La fenêtre la montre dans « Changes » (R122), avec le même « Undo » qu'ici.
+      if (approved.status === "success") {
+        noteDone({ ...call, status: "success", output: approved.output, ref: approved.ref ?? null, target: approved.target ?? null })
+      }
     } catch (e) {
       setOutput(getErrorMessage(e))
       setState("error")
@@ -135,10 +119,7 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
 
   return (
     <div className="my-2 flex flex-col gap-2 border border-shape-yellow/35 bg-shape-yellow/[0.06] p-2.5 text-xs">
-      <p className="text-muted-foreground">
-        Cortex proposes to run <span className="font-mono text-foreground">{call.name}</span>
-        {external ? " on a connected tool. Nothing is sent until you approve it." : ". Nothing changes until you approve it."}
-      </p>
+      <p className="text-muted-foreground">{proposalLine(call.name, t)}</p>
       {state === "idle" || state === "running" ? (
         <button
           type="button"
@@ -146,89 +127,114 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
           disabled={state === "running"}
           className="flex h-7 w-fit items-center gap-1.5 bg-primary px-2.5 font-medium text-primary-foreground shadow-key transition-colors hover:bg-primary-hover disabled:opacity-60"
         >
-          <Play className="size-3" /> {state === "running" ? "Running…" : "Approve and run"}
+          <Play className="size-4" /> {state === "running" ? t.approving : t.approve}
         </button>
       ) : (
         <>
           <p className={cn("whitespace-pre-wrap break-words",
             state === "success" ? "text-ink-green" : state === "refused" ? "text-ink-red" : "text-destructive")}>
-            {OUTCOME[state]}{output}
+            {outcome[state]}{plainOutput(output ?? "")}
           </p>
           {/* Accordée et faite, une création se défait aussi d'un geste (R77). */}
-          {state === "success" && isUndoable({ ...call, status: "success", output }) && (
-            <UndoAction slug={slug} call={{ ...call, status: "success", output }} />
-          )}
+          {state === "success" && isUndoable(done) && <UndoAction slug={slug} call={done} />}
+          {/* Accordée, la mission part : ses demandes et son résultat suivent ici, sur leurs cartes (TF-J1-5). */}
+          {state === "success" && isMission(done) && <MissionInChat slug={slug} target={done.target} />}
         </>
       )}
     </div>
   )
 }
 
+/** En deçà du bas du fil, la personne le lit encore (en pixels). */
+const BOTTOM_MARGIN = 32
+
+const HEADER_BUTTON =
+  "flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+
 /**
- * Chat agentique multi-conversation : liste/historique/nouvelle/suppression, rendu structuré de la
- * réponse (étapes, outils, sources Brain OS), jauge de contexte = empreinte tokens de la conversation.
+ * La conversation avec Cortex. Dans la fenêtre (R119, séance n°18), elle tient sa colonne (`layout="column"`) : ses
+ * tours sur une colonne de 720 px au plus, centrée, au-dessus du compositeur ; son titre est dans la ligne du haut, les
+ * conversations à gauche, la jauge sous le compositeur. Quand le volet prend toute la largeur (`layout="folded"`), elle
+ * se déplie au-dessus du compositeur, comme depuis le 02/11/2026 : pas de carte, ses tours se lisent sur le dégradé qui
+ * monte de la barre (`.cortex-wash`), la dernière réponse en grand, et juste au-dessus de la barre la ligne d'outils du
+ * composeur du site (les conversations, une nouvelle, la jauge, le chevron qui la réduit). Une conversation neuve
+ * s'ouvre sur l'arrivée (R123) : ce qui attend la personne, puis trois suggestions tirées de l'espace. Sous chaque
+ * réponse, la ligne grise dit le modèle et ce qu'il a lu. Elle se lit dans `useCortexStore` ; la saisie reste le
+ * compositeur (R76). Les cartes qu'elle porte (l'issue préparée, Undo, l'accord, la mission) gardent leur allure.
  */
-export function AgentChat() {
+export function AgentChat({ onFold, layout = "folded" }: Readonly<{
+  /** Réduit la conversation dans le compositeur (repliée seulement). */
+  onFold?: () => void
+  layout?: "column" | "folded"
+}>) {
+  const column = layout === "column"
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
+  const t = usePreferencesStore((s) => s.t.shell)
+  const models = usePreferencesStore((s) => s.t.models)
+  const attachedText = usePreferencesStore((s) => s.t.conversation.attached)
+  const reduceMotion = useReducedMotion()
 
-  const [turns, setTurns] = useState<Turn[]>([])
-  const [loading, setLoading] = useState(false)
+  const turns = useCortexStore((s) => s.turns)
+  const conversations = useCortexStore((s) => s.conversations)
+  const conversationId = useCortexStore((s) => s.conversationId)
+  const tokens = useCortexStore((s) => s.tokens)
+  const sentAt = useCortexStore((s) => s.sentAt)
+  const lastMs = useCortexStore((s) => s.lastMs)
+  const loadConversations = useCortexStore((s) => s.loadConversations)
+  const openConversation = useCortexStore((s) => s.openConversation)
+  const newConversation = useCortexStore((s) => s.newConversation)
+  const removeConversation = useCortexStore((s) => s.removeConversation)
 
-  // Multi-conversation
-  const [conversations, setConversations] = useState<ConversationSummary[]>([])
-  const [currentId, setCurrentId] = useState<number | null>(null)
-  const [convTokens, setConvTokens] = useState(0) // empreinte de la conversation (jauge de contexte)
   const [showList, setShowList] = useState(false)
-
-  // Outils MCP externes live (serveurs connectés joignables) - surfacés dans l'empty-state pour que la
-  // personne voie que Cortex peut AGIR, pas seulement lire le Brain. Best-effort : un plan sans
-  // intégrations (409) ou l'absence de serveur MCP donne simplement une liste vide (rien d'affiché).
-  const [mcpTools, setMcpTools] = useState<{ connector: string; name: string }[]>([])
-
   const [elapsed, setElapsed] = useState(0)
-  const [lastMs, setLastMs] = useState<number | null>(null)
-  const startRef = useRef<number>(0)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const threadRef = useRef<HTMLDivElement>(null)
+  const askRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  // La personne lit le bas du fil : la ligne de « /compact » y reste en vue, sans animation.
+  const atBottom = useRef(true)
+  // « /compact » attend sur sa propre ligne : ce n'est pas une réponse qui travaille.
+  const compacting = turns.at(-1)?.compacting === true
+  const thinking = sentAt !== null && !compacting
+  // L'échange en cours : la dernière demande de la personne et la réponse qui la suit, en grand une fois arrivée. Ce
+  // qui précède la demande est plus petit. La ligne de « /compact » ne change pas ce qui se lit en grand.
+  const lastAsk = turns.findLastIndex((turn) => turn.role === "user")
+  const lastSaid = turns.findLast((turn) => turn.kind !== "compact")
+  const latest = !thinking && lastSaid?.role === "assistant" ? lastSaid.id : undefined
 
   const aiStatus = useAiStatusStore((s) => s.status)
   const fetchAiStatus = useAiStatusStore((s) => s.fetchStatus)
   useEffect(() => { void fetchAiStatus() }, [fetchAiStatus])
 
-  const loadConversations = useCallback(async () => {
-    if (!slug) return
-    try { setConversations(await listConversations(slug)) } catch { /* non bloquant */ }
-  }, [slug])
+  useEffect(() => { void loadConversations(slug) }, [loadConversations, slug])
 
-  useEffect(() => { void loadConversations() }, [loadConversations])
+  // Ce que Cortex fait, annoncé par le serveur (R137) ; la banque dit si « bien » et « pas bien » ont leur place (R15).
+  useCortexWork()
+  const fetchBank = useEvalStore((s) => s.fetchBank)
+  useEffect(() => { if (slug) void fetchBank(slug) }, [fetchBank, slug])
 
-  // Découvre les outils MCP live du workspace (best-effort, non bloquant).
+  // L'échange en cours reste en vue, juste au-dessus de la barre où la personne vient d'écrire. Plus haut que ce qui se
+  // lit sous le fondu du haut (le retrait du fil), il se lit depuis son début : sa demande, juste sous le fondu.
   useEffect(() => {
-    if (!slug) return
-    let cancelled = false
-    getMcpServers(slug)
-      .then((servers) => {
-        if (cancelled) return
-        setMcpTools(
-          servers
-            .filter((s) => s.reachable)
-            .flatMap((s) => s.tools.map((name) => ({ connector: s.connectorKey, name }))),
-        )
-      })
-      .catch(() => { /* plan sans intégrations (409) ou aucun serveur MCP → rien à surfacer */ })
-    return () => { cancelled = true }
-  }, [slug])
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [turns, loading])
+    const el = threadRef.current
+    if (!el) return
+    // « /compact » ne fait rien défiler (TF-J1-15) : sa ligne s'ajoute en bas, et qui lit le bas la voit, sans animation.
+    if (turns.at(-1)?.kind === "compact") {
+      if (atBottom.current) el.scrollTop = el.scrollHeight
+      return
+    }
+    const ask = askRef.current
+    const askTop = ask ? ask.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop : 0
+    const fade = Number.parseFloat(getComputedStyle(el).paddingTop) || 0
+    const top = ask && el.scrollHeight - askTop > el.clientHeight - fade ? askTop - fade : el.scrollHeight
+    el.scrollTo?.({ top, behavior: reduceMotion ? "auto" : "smooth" })
+  }, [turns, thinking, reduceMotion])
 
   useEffect(() => {
-    if (!loading) return
-    const id = setInterval(() => setElapsed((Date.now() - startRef.current) / 1000), 100)
+    if (sentAt === null) return
+    const id = setInterval(() => setElapsed((Date.now() - sentAt) / 1000), 100)
     return () => clearInterval(id)
-  }, [loading])
+  }, [sentAt])
 
   useEffect(() => {
     if (!showList) return
@@ -239,285 +245,231 @@ export function AgentChat() {
     return () => document.removeEventListener("mousedown", onDown)
   }, [showList])
 
-  const openConversation = async (id: number) => {
+  const pick = async (id: number) => {
     setShowList(false)
-    try {
-      const detail = await getConversation(slug, id)
-      setTurns(messagesToTurns(detail.messages))
-      setCurrentId(detail.id)
-      setConvTokens(detail.totalTokens)
-    } catch { /* non bloquant */ }
+    await openConversation(slug, id)
   }
 
-  const newConversation = () => {
+  const startNew = () => {
     setShowList(false)
-    setTurns([])
-    setCurrentId(null)
-    setConvTokens(0)
+    newConversation()
   }
 
-  const removeConversation = async (id: number) => {
-    try {
-      await deleteConversation(slug, id)
-      if (id === currentId) newConversation()
-      await loadConversations()
-    } catch { /* non bloquant */ }
-  }
-
-  const send = async (text: string) => {
-    const msg = text.trim()
-    if (!msg || loading || !slug) return
-    setTurns((t) => [...t, { id: `u${Date.now()}`, role: "user", text: msg }])
-    setLoading(true)
-    startRef.current = Date.now()
-    setElapsed(0)
-    try {
-      const res = await sendAgentMessage(slug, msg, currentId)
-      setCurrentId(res.conversationId)
-      setConvTokens((n) => n + (res.answer.usage?.totalTokens ?? 0))
-      setTurns((t) => [...t, { id: `a${Date.now()}`, role: "assistant", answer: res.answer }])
-      void loadConversations()
-    } catch (e) {
-      // 409 = plafond de tokens IA atteint → carte d'info + CTA (pas un repli « réessayez » trompeur
-      // qui laisse croire à un bug). 429 = le frein de débit : sa limite et la vraie attente, comme le toast (R52).
-      // Tout autre cas reste un repli générique.
-      const status = getErrorStatus(e)
-      if (status === 409) {
-        setTurns((t) => [...t, { id: `a${Date.now()}`, role: "assistant", kind: "quota" }])
-      } else {
-        const text = status === 429 ? getErrorMessage(e) : "Sorry, I couldn't answer. Please try again."
-        setTurns((t) => [...t, {
-          id: `a${Date.now()}`, role: "assistant",
-          answer: { answer: text, reasoning: null, mode: "fallback", sources: [], steps: [], toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 } },
-        }])
-      }
-    } finally {
-      setLastMs(Date.now() - startRef.current)
-      setLoading(false)
-    }
-  }
-
-  // La barre unique (R76) envoie ici : la conversation prend la demande une seule fois, quand elle ne répond pas déjà.
-  const pending = useCortexStore((s) => s.pending)
-  const take = useCortexStore((s) => s.take)
-  const setDraft = useCortexStore((s) => s.setDraft)
-  const sendRef = useRef(send)
-  useEffect(() => { sendRef.current = send })
-  useEffect(() => {
-    if (!pending || loading || !slug) return
-    const text = take(pending.id)
-    if (text) void sendRef.current(text)
-  }, [pending, loading, slug, take])
-
-  /** Une suggestion remplit la barre ; rien ne part tant que la personne n'envoie pas. */
-  const suggest = (text: string) => {
-    setDraft(text)
-    document.getElementById("command-bar-input")?.focus()
-  }
-
-  const currentTitle = currentId
-    ? (conversations.find((c) => c.id === currentId)?.title ?? "Conversation")
-    : "New conversation"
+  const currentTitle = conversationId
+    ? (conversations.find((c) => c.id === conversationId)?.title ?? "Conversation")
+    : t.chatNew
 
   return (
-    <div className="flex h-full flex-col">
-      {/* En-tête multi-conversation : switcher + nouvelle */}
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b px-2 py-1.5">
-        <div ref={listRef} className="relative min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={() => { setShowList((v) => !v); if (!showList) void loadConversations() }}
-            className="flex max-w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-muted"
-          >
-            <MessageSquare className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="truncate font-medium">{currentTitle}</span>
-            <ChevronDown className={cn("size-3 shrink-0 transition-transform", showList && "rotate-180")} />
-          </button>
-
-          {showList && (
-            <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-xl border border-border bg-popover p-1 shadow-lg">
-              <button
-                type="button"
-                onClick={newConversation}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-muted"
+    <div className={cn("flex min-h-0 flex-col", column && "flex-1")}>
+      <div
+        ref={threadRef}
+        onScroll={(e) => {
+          const el = e.currentTarget
+          atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_MARGIN
+        }}
+        className={cn("cortex-thread min-h-0 overflow-y-auto px-3 md:px-4", column && "flex flex-1 flex-col")}
+      >
+        {/* En colonne, les tours se posent juste au-dessus du compositeur et montent à mesure. */}
+        <div className={cn("flex flex-col", column && "mx-auto mt-auto w-full max-w-[720px] pt-4")}>
+          {turns.length === 0 && !thinking ? (
+            // L'arrivée (R123) : ce qui attend la personne, puis trois suggestions tirées de l'espace ; le tour guidé
+            // n'existe plus (R124). Sans modèle joignable, la carte le dit d'abord.
+            <div className="flex flex-col gap-3 pb-2">
+              {aiStatus && !aiStatus.chatAvailable && <AiUnavailableNotice />}
+              <Arrival slug={slug} />
+            </div>
+          ) : (
+            turns.map((turn, i) => (
+              <div
+                key={turn.id}
+                ref={i === lastAsk ? askRef : undefined}
+                className={cn(i < lastAsk && "cortex-earlier", turn.id === latest && "cortex-latest")}
               >
-                <Plus className="size-3.5" /> New conversation
-              </button>
-              <div className="my-1 h-px bg-border" />
-              <div className="max-h-64 overflow-y-auto">
-                {conversations.length === 0 ? (
-                  <p className="px-2 py-3 text-center text-xs text-muted-foreground">No conversations.</p>
+                {turn.role === "user" ? (
+                  <>
+                    <UserMessage text={turn.text} />
+                    {/* Ce que la personne a joint à sa demande (R123) : Cortex en a reçu le contenu. */}
+                    {turn.attached && turn.attached.length > 0 && (
+                      <p className="mt-0.5 text-right text-xs text-muted-foreground">
+                        {attachedText}: {turn.attached.map((a) => a.label).join(", ")}
+                      </p>
+                    )}
+                    {/* La demande renvoyée d'un clic au modèle que TaskForce proposait (R118) : on voit où elle part. */}
+                    {turn.sentTo && (
+                      <p className="mt-0.5 text-right text-xs text-muted-foreground">
+                        {fillModelText(models.sentTo, { model: turn.sentTo })}
+                      </p>
+                    )}
+                  </>
+                ) : turn.kind === "quota" ? (
+                  <Message role="assistant">
+                    <QuotaNotice />
+                  </Message>
+                ) : turn.kind === "compact" ? (
+                  <CompactedNotice compacted={turn.compacted ?? 0} compacting={turn.compacting} summary={turn.summary} problem={turn.problem} />
+                ) : turn.kind === "stopped" ? (
+                  <StoppedNotice />
                 ) : (
-                  conversations.map((c) => (
-                    <div
-                      key={c.id}
-                      className={cn(
-                        "group flex items-center gap-1 rounded-md px-2 py-1.5 transition-colors hover:bg-muted",
-                        c.id === currentId && "bg-muted",
-                      )}
-                    >
-                      <button type="button" onClick={() => openConversation(c.id)} className="min-w-0 flex-1 text-left">
-                        <span className="block truncate text-xs">{c.title}</span>
-                        <span className="text-[10px] text-muted-foreground">{c.messageCount} message{c.messageCount > 1 ? "s" : ""}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeConversation(c.id)}
-                        className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                        title="Delete"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </div>
-                  ))
+                  <Message role="assistant">
+                    {turn.answer && <AgentAnswerView answer={turn.answer} slug={slug} />}
+                    <ModelOffer slug={slug} turn={turn} />
+                  </Message>
                 )}
               </div>
-            </div>
+            ))
+          )}
+          {thinking && (
+            <Message role="assistant">
+              <WorkingLine />
+            </Message>
           )}
         </div>
-
-        <button
-          type="button"
-          onClick={newConversation}
-          title="New conversation"
-          className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <Plus className="size-4" />
-        </button>
       </div>
 
-      {/* Conversation */}
-      <div className="flex-1 overflow-y-auto px-3 py-4">
-        {turns.length === 0 && !loading ? (
-          <div className="flex flex-col items-center gap-3 px-2 py-8 text-center">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Sparkles className="size-5" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">Cortex</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                TaskForce&apos;s AI agent, built on your workspace&apos;s knowledge. It cites its sources.
-              </p>
-            </div>
-            {aiStatus && !aiStatus.chatAvailable && <AiUnavailableNotice />}
-            <div className="mt-2 flex w-full flex-col gap-1.5">
-              {SUGGESTIONS.map((s) => (
-                <PromptSuggestion key={s} onClick={() => suggest(s)}>{s}</PromptSuggestion>
-              ))}
-            </div>
+      {/* Les contrôles de la conversation, juste au-dessus de la barre, sans cadre : la ligne d'outils du composeur.
+          En colonne, chacun a sa place dans la fenêtre : le titre en haut, les conversations à gauche, la jauge dessous. */}
+      {!column && (
+        <div className="flex h-9 shrink-0 items-center gap-1 px-1">
+          <div
+            ref={listRef}
+            className="relative min-w-0"
+            onKeyDown={(e) => {
+              // Échap ferme d'abord la liste, puis seulement la conversation.
+              if (e.key === "Escape" && showList) { e.preventDefault(); setShowList(false) }
+            }}
+          >
+            <button
+              type="button"
+              aria-expanded={showList}
+              onClick={() => { setShowList((v) => !v); if (!showList) void loadConversations(slug) }}
+              className="flex max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-xs transition-colors hover:bg-muted"
+            >
+              <Sparkles className="size-4 shrink-0 text-primary" aria-hidden="true" />
+              <span className="truncate font-medium">{currentTitle}</span>
+              <ChevronUp className={cn("size-4 shrink-0 transition-transform duration-150 motion-reduce:transition-none", showList && "rotate-180")} />
+            </button>
 
-            {/* Outils externes (MCP) live : montre que Cortex peut AGIR, pas seulement citer le Brain.
-                N'apparaît que si un serveur MCP joignable est connecté. */}
-            {mcpTools.length > 0 && (
-              <div className="mt-1 w-full rounded-lg border border-border/60 bg-muted/30 p-2.5 text-left">
-                <p className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-                  <Plug className="size-3 shrink-0" /> It can also act on your connected tools
-                </p>
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {mcpTools.slice(0, 10).map((t) => (
-                    <span
-                      key={`${t.connector}-${t.name}`}
-                      title={`${t.connector}: ${t.name}`}
-                      className="rounded-md border border-border/60 bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                    >
-                      {t.name}
-                    </span>
-                  ))}
-                  {mcpTools.length > 10 && (
-                    <span className="self-center text-[10px] text-muted-foreground">+{mcpTools.length - 10} more</span>
+            {/* La liste s'ouvre vers le haut, au-dessus de la conversation : en dessous, il y a la barre. */}
+            {showList && (
+              <div className="absolute bottom-full left-0 z-50 mb-1 w-64 border border-border bg-popover p-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={startNew}
+                  className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-muted"
+                >
+                  <Plus className="size-4" /> {t.chatNew}
+                </button>
+                <div className="my-1 h-px bg-border" />
+                <div className="max-h-64 overflow-y-auto">
+                  {conversations.length === 0 ? (
+                    <p className="px-2 py-3 text-center text-xs text-muted-foreground">{t.chatNone}</p>
+                  ) : (
+                    conversations.map((c) => (
+                      <div
+                        key={c.id}
+                        className={cn("group flex items-center gap-1 px-2 py-1.5 transition-colors hover:bg-muted", c.id === conversationId && "bg-muted")}
+                      >
+                        <button type="button" onClick={() => void pick(c.id)} className="min-w-0 flex-1 text-left">
+                          <span className="block truncate text-xs">{c.title}</span>
+                          <span className="text-xs text-muted-foreground">{c.messageCount} message{c.messageCount > 1 ? "s" : ""}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void removeConversation(slug, c.id)}
+                          className="shrink-0 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+                          aria-label={t.chatDelete}
+                          title={t.chatDelete}
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
+                    ))
                   )}
                 </div>
               </div>
             )}
           </div>
-        ) : (
-          turns.map((t) =>
-            t.role === "user" ? (
-              <Message key={t.id} role="user" content={t.text} />
-            ) : t.kind === "quota" ? (
-              <Message key={t.id} role="assistant">
-                <QuotaNotice />
-              </Message>
-            ) : (
-              <Message key={t.id} role="assistant">
-                {t.answer && <AgentAnswerView answer={t.answer} slug={slug} />}
-              </Message>
-            ),
-          )
-        )}
-        {loading && (
-          <Message role="assistant">
-            <ThinkingBar />
-          </Message>
-        )}
-        <div ref={bottomRef} />
-      </div>
 
-      {/* La saisie est la barre unique, en bas de l'écran (R76) ; ici, le chrono et la consommation. */}
-      <div className="shrink-0 border-t px-2 py-1.5">
-        <div className="flex items-center justify-between gap-2 px-1 text-[10px] text-muted-foreground/50">
-          <span className="flex min-w-0 items-center gap-1.5">
-            {loading ? (
-              <span className="tabular-nums text-primary/70">Cortex is thinking · {elapsed.toFixed(1)} s</span>
-            ) : convTokens > 0 ? (
-              <>
-                <TokenMeter value={convTokens} className="text-muted-foreground/60" />
+          <button type="button" onClick={startNew} aria-label={t.chatNew} title={t.chatNew} className={HEADER_BUTTON}>
+            <Plus className="size-4" />
+          </button>
+
+          <div className="ml-auto flex min-w-0 items-center gap-2 pl-2 text-xs text-muted-foreground">
+            {thinking ? (
+              <span className="hidden tabular-nums text-primary/80 sm:inline">{t.chatThinking} · {elapsed.toFixed(1)} s</span>
+            ) : tokens > 0 ? (
+              <span className="hidden items-center gap-1.5 sm:flex">
+                <TokenMeter value={tokens} className="text-muted-foreground/70" />
                 {lastMs != null && <span className="tabular-nums">· {(lastMs / 1000).toFixed(1)} s</span>}
-              </>
-            ) : (
-              <span>Write in the bar below, then press Enter</span>
-            )}
-          </span>
-          <CortexUsage sessionTokens={convTokens} />
+              </span>
+            ) : null}
+            <CortexUsage />
+          </div>
+
+          <button type="button" onClick={onFold} aria-label={t.chatFold} title={t.chatFold} className={HEADER_BUTTON}>
+            <ChevronDown className="size-4" />
+          </button>
         </div>
-      </div>
+      )}
     </div>
   )
 }
 
-/** Rend la réponse structurée : étapes → raisonnement → outils → texte → sources → feedback. */
-function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: string }) {
-  const hasBreakdown = answer.usage && (answer.usage.promptTokens > 0 || answer.usage.completionTokens > 0)
-  // Le dossier de la réponse, que porte chacun de ses appels d'outil : il fait d'elle un cas de la banque (R61,
-  // séance n°10).
-  const record = answer.toolCalls.find((tc) => tc.record)?.record
+/**
+ * La carte d'un appel d'outil de la réponse, quand il en a une : les questions de Cortex (R115, R136), une issue préparée,
+ * une suppression, une action demandée, Undo ou une mission. Elles restent visibles, hors du pli du travail (R137) ; un
+ * appel sans carte ne montre rien ici, il se raconte dans le pli. Après les réponses à une carte de questions, la suite du
+ * geste se rend ici à son tour, sous elle.
+ */
+function ToolCallView({ slug, call, followUp = false }: { slug: string; call: AssistantToolCall; followUp?: boolean }) {
+  const t = usePreferencesStore((s) => s.t.thread)
+  // Cortex demande ce qu'il manque au geste (R115) : une carte de deux questions au plus, et la suite sur son envoi.
+  if (isQuestionCard(call)) {
+    return <QuestionCard slug={slug} call={call} then={(next) => <ToolCallView slug={slug} call={next} followUp />} />
+  }
+  // Cortex demande d'abord ce qui compte (R102) : rien n'est préparé, sa question est la réponse.
+  if (isQuestion(call)) return null
+  // Une issue que Cortex a préparée : la carte la montre, la personne la modifie et la crée (R78).
+  if (isPreparedIssue(call)) return <IssueDraftCard slug={slug} call={call} />
+  // Une suppression demandée : archiver d'abord, qui se défait, ou supprimer, d'un clic de la personne (R1).
+  if (isDeletion(call)) return <DeleteIssueCard slug={slug} call={call} target={call.target} />
+  // Repris sur une carte, le geste n'a pas de réponse du modèle : ce qu'il a fait se dit ici, en une phrase.
+  const said = followUp ? outcomeLine(call, t) : null
+  // Un appel sans carte se raconte dans le pli du travail : ici, il ne prend aucune place.
+  if (!said && !isApprovable(call) && !isUndoable(call) && !isMission(call)) return null
   return (
-    <div className="space-y-1">
-      {answer.steps.length > 0 && (
-        <Steps steps={answer.steps.map((s) => ({ title: s.label, status: s.status, description: s.description ?? undefined }))} />
-      )}
-      {answer.reasoning && <Reasoning content={answer.reasoning} />}
-      {answer.toolCalls.map((tc, i) =>
-        // Une issue que Cortex a préparée : la carte la montre, la personne la modifie et la crée (R78).
-        isPreparedIssue(tc) ? (
-          <IssueDraftCard key={i} slug={slug} call={tc} />
-        ) : (
-          <div key={i}>
-            <Tool name={tc.name} status={tc.status as ToolStatus} input={tc.input ?? undefined} output={tc.output ?? undefined} />
-            {/* Action demandée par les règles de l'espace : validation explicite de l'utilisateur. */}
-            {isApprovable(tc) && <PendingAction slug={slug} call={tc} />}
-            {/* Ce que Cortex vient de créer se défait d'un geste (R77). */}
-            {isUndoable(tc) && <UndoAction slug={slug} call={tc} />}
-          </div>
-        ),
-      )}
-      <Markdown content={answer.answer} />
-      {answer.sources.length > 0 && (
-        <Sources items={answer.sources.map((s) => ({ title: s.title, snippet: s.domain, score: s.score ?? undefined }))} />
-      )}
-      <div className="mt-1 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1">
-          <FeedbackBar onCopy={() => navigator.clipboard?.writeText(answer.answer)} />
-          {record && <EvalCaseButton slug={slug} record={record} />}
-        </div>
-        {answer.usage && answer.usage.totalTokens > 0 && (
-          <span className="flex shrink-0 items-center gap-1.5 text-[10px] tabular-nums text-muted-foreground/60">
-            <span className="rounded bg-muted px-1 py-px font-medium uppercase tracking-wide">{answer.mode}</span>
-            {answer.usage.totalTokens.toLocaleString("en-US")} tokens
-            {hasBreakdown && <span className="opacity-70">({answer.usage.promptTokens}↑ {answer.usage.completionTokens}↓)</span>}
-          </span>
-        )}
-      </div>
+    <div>
+      {said && <p className="whitespace-pre-wrap break-words text-sm text-foreground">{said}</p>}
+      {/* Action demandée par les règles de l'espace : validation explicite de l'utilisateur. */}
+      {isApprovable(call) && <PendingAction slug={slug} call={call} />}
+      {/* Ce que Cortex vient de faire se défait d'un geste (R77). */}
+      {isUndoable(call) && <UndoAction slug={slug} call={call} />}
+      {/* La mission de l'issue, lue ou confiée : ses demandes et son résultat se décident sur ses cartes (TF-J1-5). */}
+      {isMission(call) && <MissionInChat slug={slug} target={call.target} />}
+    </div>
+  )
+}
+
+/**
+ * Rend la réponse structurée : le pli du travail (R137), la réponse, puis ce qu'elle propose ou a fait (les cartes), puis
+ * sa ligne grise et, au survol, les gestes sur elle. Les cartes viennent après le texte, au plus près de la barre : le
+ * serveur écrit « the action below » ou « check the issue below », et c'est la dernière chose à décider.
+ */
+function AgentAnswerView({ answer, slug }: { answer: AssistantAnswer; slug: string }) {
+  // Le dossier de la réponse : il fait d'elle un cas de la banque (R61, R137), même une fois la conversation rouverte.
+  const record = answer.record ?? answer.read?.record ?? answer.toolCalls.find((tc) => tc.record)?.record
+  // Les questions d'un geste se lisent sur leur carte (R115) : le texte de la réponse ne les répète pas au-dessus.
+  const asking = answer.toolCalls.some(isQuestionCard)
+  return (
+    <div className="group/answer space-y-1">
+      <WorkedLine answer={answer} />
+      {/* Ce qu'il a fallu condenser ou couper pour tenir la fenêtre du modèle, avant que la requête parte (TF-J1-13). */}
+      <ContextFitNotice context={answer.read?.context} model={answer.model} />
+      {/* La correction d'une phrase fausse se montre comme la parole de TaskForce, pas celle du modèle (R116). */}
+      <AnswerText text={answer.answer} withCard={asking} toolCalls={answer.toolCalls} />
+      {answer.toolCalls.map((tc, i) => <ToolCallView key={i} slug={slug} call={tc} />)}
+      <ReadLine slug={slug} answer={answer} />
+      <AnswerActions slug={slug} text={answer.answer} record={record} />
     </div>
   )
 }

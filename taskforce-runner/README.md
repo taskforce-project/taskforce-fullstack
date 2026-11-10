@@ -18,8 +18,8 @@ merges anything: the decision stays human.
 | Where | Rights |
 |---|---|
 | Repository | An **isolated worktree** on a new branch `tf/<key>-<title>-r<run>`. Your checkout and your current branch are never touched. |
-| Machine | Each action is judged before it runs by the **rules of the task**, which TaskForce sends with it (default table in [`contracts/rules`](../contracts/rules/default.rules.json)). By default: reading and editing the copy, local commits and `git status/diff/log/show/add` run freely; the web, publishing, messages, payments and **anything the table does not know** wait for **your approval in TaskForce**, on the issue: Allow or Deny. No answer within 10 minutes means denied. The agent does not run the repository's scripts (`npm`, `yarn` or `pnpm` test and run): while your computer is not isolated, they would run whatever the agent wrote, so the **runner runs the project's test command itself, after the agent** (below). A path outside the copy or in `.git`, a command substitution, a redirection to a file, or an argument naming a path outside the copy is never allowed by a rule: it is asked or denied. `git push` and `gh` are always refused: the runner pushes and opens the pull request itself, after the agent. A mission on a public repository does not start for now (decided on 28/10/2026, until the runner's tests have been tried). The settings of the cloned repository (`.claude/settings*.json`: hooks, API URL) are ignored (`--setting-sources user`): only yours and the runner's apply. |
-| TaskForce | Through the MCP server of the instance, **as the person who delegated**, with their rights as a ceiling, narrowed to: the run's workspace for reading, the issues of the run's project for writing, never a deletion. |
+| Machine | Each action is judged before it runs by the **rules of the task**, which TaskForce sends with it (default table in [`contracts/rules`](../contracts/rules/default.rules.json)). By default: reading and editing the copy, reading commands in the copy (`cd`, `pwd`, `ls`, `cat`, `head`, `tail`, `wc`, `grep`, `stat`, `diff`), local commits and `git status/diff/log/show/add` run freely; the web, publishing, messages, payments and **anything the table does not know** wait for **your approval in TaskForce**, on the issue: Allow or Deny. The runner asks you itself, before the action runs, whatever Claude Code's own permissions say. No answer within 10 minutes means denied. The agent does not run the repository's scripts (`npm`, `yarn` or `pnpm` test and run): while your computer is not isolated, they would run whatever the agent wrote, so the **runner runs the project's test command itself, after the agent** (below). A path outside the copy or in `.git`, a command substitution, a variable or another expansion of the shell, a redirection to a file, or an argument naming a path outside the copy (a value attached to a short option included) is never allowed by a rule: it is asked or denied. `git push` and `gh` are always refused: the runner pushes and opens the pull request itself, after the agent. A mission on a public repository does not start for now (decided on 28/10/2026, until the runner's tests have been tried). The settings of the cloned repository (`.claude/settings*.json`: hooks, API URL) are ignored (`--setting-sources user`): only yours and the runner's apply. |
+| TaskForce | Through the MCP server of the instance, **as the person who delegated**, with their rights as a ceiling, narrowed to: the run's workspace for reading; for writing, the issue it was given (its fields, column, checklist and comments) and new issues in the run's project; never a deletion. Past `agent.maxTaskForceChanges` changes in a mission (30 by default), each further change waits for **your approval in TaskForce**. |
 | GitHub | Nothing. The **runner** pushes the branch and opens the pull request, after the agent, each by the rules of the task. By default the agent's branch goes to a private repository without asking; a public repository, or a visibility `gh` cannot tell, waits for your approval in TaskForce. Refused or not approved, the commits stay on the local branch. |
 
 The text of an issue or a note is written by other people. The brief presents it to the agent as task data, never
@@ -28,6 +28,32 @@ as an instruction, and the scope above bounds what an instruction slipped into t
 While the agent works, the issue shows its **live timeline** (each tool call, each failure, each denial) and the
 **approval requests**. Only the person who delegated can answer them: the action runs on their machine. TaskForce
 notifies them when an approval is needed, and when the run finishes or fails.
+
+### What changed, under your eyes
+
+After each tool that can write, the runner reads the real state of the folder and sends each file's lines added and
+removed, with its patch: `git diff` against the commit the mission started from, read through a temporary index so
+the agent's own staging never moves. Files the mission ignores stay out. A file that may hold a secret (`.env`,
+keys, credentials) sends its counts only: its text never leaves the machine. Each patch is capped, and so is the
+number of sends per mission; the final state always goes, and enters the mission's record with a hash per file, never
+the text. In a folder without a repository, each file shows as written, with its content.
+
+**Put a file back.** Once the mission is done, TaskForce can ask the runner to put one file back as it was before
+the mission. The rules of the task judge it first, the push included: a push they do not allow means nothing moves,
+here or on GitHub. Otherwise one commit touches that path only, and the branch is pushed if it was. The worktree is
+removed after a success, so the runner reopens it from the branch for the time of the gesture. The decision and the
+result enter the mission's record. If the branch is gone, the runner says so and TaskForce stops offering it.
+
+**Ask for changes.** Comments on lines, sent together, start a follow-up mission on the same branch and the same
+pull request: the same folder, so Claude Code continues its session (`--resume`), or starts again from the comments
+when the session is no longer on this computer. It follows the same rules and the same gate as any mission.
+
+**Correct the agent while it works.** The brief goes through `--input-format stream-json` and stdin stays open until
+the result, so what you type in TaskForce reaches the agent at its next step.
+
+The agent narrates and does not ask; its one pause is the hand-over at the end, in three parts in the first person:
+*What I did*, *What to check*, *What I'm not sure about*. Claude Code's plan mode is not used: headless, it has no
+`ExitPlanMode` (checked on 2.1.312), so an agent in plan mode cannot leave it.
 
 ### Tasks without a repository (non-code)
 
@@ -81,8 +107,9 @@ local runner enabled (`DELIVERY_LOCAL_RUNNER_ENABLED=true`, the default in dev).
 | `agent.model` | `null` | `null` = the model chosen when delegating. |
 | `agent.maxTurns` / `agent.timeoutMinutes` | 60 / 45 | Agent bounds. The duration is also capped by the lifetime of the session token. |
 | `agent.approvalTimeoutMinutes` | 10 | How long an action waits for your answer in TaskForce (60 at most). Then it is denied. |
+| `agent.maxTaskForceChanges` | 30 | How many changes Claude Code makes to TaskForce in one mission without asking: the issue's fields and column, checklist items, comments, new issues. Past that, each change waits for your **Allow** or **Deny** on the issue; **Allow for this mission** stops asking until the mission ends. Reads do not count, nor changes the rules already ask you about. 30 is a first value, to be measured on real missions. |
 | `agent.attribution` | `false` | `false` = no "Co-Authored-By: Claude" in the agent's commits. |
-| `agent.extraAllowedTools` | `[]` | Tools you allow in advance on this computer, e.g. `["Bash(mvn test *)"]`: they skip the rules that ask, never one that denies. |
+| `agent.extraAllowedTools` | `[]` | Tools you allow in advance on this computer, e.g. `["Bash(mvn test *)"]`: for these tools, what the rules ask for goes to Claude Code's own permissions (allowed in advance, it runs; otherwise you are asked), and a rule that denies still blocks them. |
 
 ## Subscription or API key
 
@@ -110,10 +137,10 @@ The details are in ADR-013.
 
 ## Test the chain without using Claude
 
-`test/fixtures/stub-agent` (`.cmd` on Windows) runs instead of `claude`: it has three actions judged by the rules
+`test/fixtures/stub-agent` (`.cmd` on Windows) runs instead of `claude`: it has four actions judged by the rules
 through the real `PreToolUse` hook, goes through the **real** MCP server of the instance in a delegated session, reads
-and comments the issue, checks that what must be refused is refused, asks for one approval through the real
-`PermissionRequest` hook, then leaves a commit. Point `agent.command` to it. Never in production.
+and comments the issue, checks that what must be refused is refused, has one action asked to you through the same
+hook, then leaves a commit. Point `agent.command` to it. Never in production.
 
 ```bash
 npm test          # unit tests: rules and facts, branch names, config, tool boundary, live timeline, approvals, result parsing
@@ -140,6 +167,28 @@ recomputing every hash:
 ```bash
 npm run verify -- evidence-run-42.json
 ```
+
+## The rules engine
+
+The runner judges each action with the rules engine of the TaskForce server, not with a copy of it: the Java code of
+`backend/tf-api` (decisions, globs, the digest of a rules bundle, the evidence chain), compiled to JavaScript by TeaVM
+in [`backend/rules-engine-js`](../backend/rules-engine-js/pom.xml). The result, `src/harness/engine/rules-engine.js`,
+and its TypeScript declarations are committed here, so the runner builds and runs without a JDK; `npm run build`
+copies them into `dist`. The runner's own part stays in TypeScript: how a Claude Code tool call becomes facts
+(`src/harness/facts.ts`), what it does with a decision, and the checks of a received bundle or an exported record
+(`src/harness/verify.ts`).
+
+Never edit the two files by hand. After a change to the Java engine, build them again and commit them with the
+change; the CI builds them again from the Java sources and refuses a difference:
+
+```bash
+cd backend/rules-engine-js && mvn -B process-classes      # Java 21
+# or, without a JDK, from the root of the repository:
+docker run --rm -v "$PWD":/work -w /work/backend/rules-engine-js maven:3.9-eclipse-temurin-21 mvn -B process-classes
+```
+
+`npm test` replays the shared cases of [`contracts/`](../contracts/README.md) against the compiled module, as the
+server's tests replay them in Java.
 
 ## Troubleshooting
 

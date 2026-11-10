@@ -6,6 +6,13 @@ import { approvalOutcome, approvalWords, deadlineText } from "./approval-words";
 const t = CONSTANTS_EN.missions;
 
 describe("approvalWords", () => {
+  it("names an action the rules don't know in words, when it has them", () => {
+    expect(approvalWords({ tool: "taskforce: delete_issue", askedBy: "agent", action: null, reason: null }, t, "delete an issue").title)
+      .toBe("Claude Code wants to delete an issue");
+    expect(approvalWords({ tool: "WebFetch", askedBy: "agent", action: "web.fetch", reason: null }, t, "open nodejs.org").title)
+      .toBe("Claude Code wants to open a web page");
+  });
+
   it("says what the agent wants, from the action the rules judged, with the rule's reason", () => {
     const words = approvalWords({
       tool: "WebSearch", askedBy: "agent", action: "web.search",
@@ -34,6 +41,20 @@ describe("approvalWords", () => {
 
     expect(words.title).toBe("Claude Code wants to use WebFetch");
     expect(words.ifRefused).toBe(t.actions.other.ifRefused);
+  });
+
+  it.each([
+    ["issue.update", "Claude Code wants to change this issue"],
+    ["issue.create", "Claude Code wants to create an issue"],
+    ["comment.create", "Claude Code wants to comment on this issue"],
+  ])("says the agent's %s in TaskForce in its own words, past the cap of changes", (action, title) => {
+    const words = approvalWords({
+      tool: "mcp__taskforce__update_issue", askedBy: "agent", action,
+      reason: "Claude Code has already made 30 changes to TaskForce in this mission. Past 30, it asks before each one.",
+    }, t);
+
+    expect(words.title).toBe(title);
+    expect(words.will).not.toBe(t.actions.other.will);
   });
 
   it("says that no rule covers an action without one", () => {

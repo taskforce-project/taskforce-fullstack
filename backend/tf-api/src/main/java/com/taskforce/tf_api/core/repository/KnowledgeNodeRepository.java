@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -9,12 +10,23 @@ import org.springframework.stereotype.Repository;
 import com.taskforce.tf_api.core.enums.NodeDomain;
 import com.taskforce.tf_api.core.enums.NodeRefType;
 import com.taskforce.tf_api.core.enums.NodeStatus;
+import com.taskforce.tf_api.core.enums.NodeType;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 
 @Repository
 public interface KnowledgeNodeRepository extends JpaRepository<KnowledgeNode, Long> {
 
+    /** Une note telle que les sources de Cortex la comptent (R125) : sans son contenu. */
+    interface SourceRow {
+        Long getId();
+        NodeType getType();
+        LocalDateTime getUpdatedAt();
+    }
+
     List<KnowledgeNode> findByWorkspaceIdOrderByDomainAscTitleAsc(Long workspaceId);
+
+    /** Les notes d'un statut dans l'espace, sans leur contenu : de quoi les compter et les dater. */
+    List<SourceRow> findSourceRowsByWorkspaceIdAndStatus(Long workspaceId, NodeStatus status);
 
     List<KnowledgeNode> findByWorkspaceIdAndStatusOrderByDomainAscTitleAsc(Long workspaceId, NodeStatus status);
 

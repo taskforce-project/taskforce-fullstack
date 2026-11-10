@@ -35,8 +35,9 @@ notes in the Brain OS.
 
 ## MCP servers
 
-Any tool with an MCP server can be connected: 25 official servers are listed (Linear, Jira, Notion, Sentry...), and
-any other one can be added by its address. A server connects with one-click OAuth when it supports it, or with a token.
+Any tool with an MCP server can be connected. The catalog lists the official servers that have been tried end to end,
+Linear for now, and any other one can be added by its address. A server connects with one-click OAuth when it supports
+it, or with a token.
 Cortex then uses its tools: reading runs directly, and a change waits for the approval of an owner or an admin.
 
 On a self-hosted instance, MCP servers on your own network are refused unless you set

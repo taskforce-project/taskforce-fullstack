@@ -19,6 +19,8 @@ export interface DeliveryProvider {
   models: string[];
   ready: boolean;
   reason: string | null;
+  /** Un agent à l'essai (R51) : le menu le dit. */
+  trial?: boolean;
 }
 
 /** Agents de la délégation pour la personne connectée, et pour ce projet si `projectId` est donné. */
@@ -48,6 +50,8 @@ export interface DeliveryRun {
   /** Refusée au départ par une règle (FAILED pour la file) : l'écran dit « Not started », pas une panne (R38). */
   refused?: boolean;
   startedById: number | null;
+  /** Le nom de la personne qui a délégué (son e-mail sans nom) : l'issue montre l'agent qui travaille pour elle. */
+  startedByName?: string | null;
   createdAt: string | null;
   updatedAt: string | null;
   /** Le travail commencé (le runner a pris la mission) et fini : la durée de la carte de résultat (R78). */
@@ -63,9 +67,16 @@ export interface DeliveryRun {
   /** Le geste de la personne sur la carte de résultat, et quand ; absents tant qu'elle n'a pas tranché. */
   outcome?: DeliveryRunOutcome | null;
   outcomeAt?: string | null;
+  /** La mission que celle-ci reprend sur la même branche (R139) ; absente d'une mission neuve. */
+  followUpOf?: number | null;
 }
 
-export type DeliveryRunOutcome = "APPLIED" | "DISCARDED" | "RETRIED";
+/**
+ * `MARKED_DONE` : la mission n'a rien changé, la personne a terminé l'issue (rejeu de la 1.8.0). `FOLLOWED_UP` : la
+ * personne a commenté des lignes, une reprise continue la même branche (R139). `STOPPED` : la personne l'a arrêtée
+ * pendant le travail (R138) ; son état reste FAILED pour la file, mais ce n'est pas une panne.
+ */
+export type DeliveryRunOutcome = "APPLIED" | "DISCARDED" | "RETRIED" | "MARKED_DONE" | "FOLLOWED_UP" | "STOPPED";
 
 export interface DeliveryRunTests {
   command: string;
@@ -74,6 +85,102 @@ export interface DeliveryRunTests {
   /** Combien ont passé, sur combien, quand la sortie des tests le dit. */
   passedCount: number | null;
   total: number | null;
+  /** Un fichier a été remis comme avant après leur passage : le résultat porte sur une version d'avant (R139). */
+  stale?: boolean;
+}
+
+/** Un fichier qu'une mission a changé, relevé par le runner (R139). */
+export interface MissionFileChange {
+  path: string;
+  /** `written` : un fichier d'un dossier jetable, qui n'a pas d'« avant ». */
+  status: "added" | "modified" | "deleted" | "written";
+  /** Lignes ajoutées et retirées ; null pour un binaire. */
+  added: number | null;
+  removed: number | null;
+  binary: boolean;
+  truncated: boolean;
+  /** Un fichier qui peut porter un secret : son texte n'a jamais quitté le poste. */
+  withheld: boolean;
+  /** L'empreinte de ce qui a changé : le diff ouvert se relit quand elle bouge. */
+  revision: string;
+  /** Le runner est en train de le remettre comme avant. */
+  reverting: boolean;
+  /** Pourquoi la dernière tentative n'a pas abouti, en mots. */
+  error: string | null;
+  updatedAt: string | null;
+}
+
+/** Ce qu'est devenue la dernière correction de la personne. */
+export interface MissionCorrection {
+  id: number;
+  text: string;
+  status: "PENDING" | "RUNNING" | "DONE" | "FAILED" | "EXPIRED";
+  message: string | null;
+}
+
+/** Les changements d'une mission, et ce que la personne connectée peut en faire maintenant (R139, R15). */
+export interface MissionChanges {
+  /** `repo`, `scratch`, ou null : le runner n'a rien relevé (runner plus ancien, ou pas encore parti). */
+  mode: "repo" | "scratch" | null;
+  live: boolean;
+  added: number;
+  removed: number;
+  /** Les fichiers au-delà du plafond, comptés dans les totaux. */
+  more: number;
+  files: MissionFileChange[];
+  canRevert: boolean;
+  canComment: boolean;
+  canCorrect: boolean;
+  /** Pourquoi ces gestes manquent, quand une phrase utile existe. */
+  blockedReason: string | null;
+  correction: MissionCorrection | null;
+}
+
+/** Le texte d'un fichier de la mission : un patch (`diff`) ou un contenu (`text`, dossier jetable). */
+export interface MissionFileDiff {
+  path: string;
+  format: "diff" | "text";
+  body: string | null;
+  binary: boolean;
+  truncated: boolean;
+  withheld: boolean;
+  revision: string;
+}
+
+/** Un commentaire de relecture sur une ligne : `new` dans la version de l'agent, `old` une ligne qu'il a retirée. */
+export interface ChangeComment {
+  path: string;
+  line: number;
+  side: "new" | "old";
+  text: string;
+}
+
+/** Les changements d'une mission. Lu en boucle pendant le travail : jamais de toast. */
+export async function getMissionChanges(slug: string, runId: number): Promise<MissionChanges> {
+  const res = await apiClient.get<{ data: MissionChanges }>(DELIVERY_ROUTES.CHANGES(slug, runId), { silentError: true });
+  return res.data.data;
+}
+
+/** Le diff d'un fichier de la mission. Une erreur remonte à l'appelant. */
+export async function getMissionFileDiff(slug: string, runId: number, path: string): Promise<MissionFileDiff> {
+  const res = await apiClient.get<{ data: MissionFileDiff }>(DELIVERY_ROUTES.CHANGED_FILE(slug, runId), { params: { path }, silentError: true });
+  return res.data.data;
+}
+
+/** Remet un fichier comme avant la mission : le runner le fait, la liste dit quand c'est fait. */
+export async function revertMissionFile(slug: string, runId: number, path: string): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.REVERT_FILE(slug, runId), { path }, { silentError: true });
+}
+
+/** Les commentaires sur les lignes, envoyés ensemble : rend la mission qui repart sur la même branche. */
+export async function askForChanges(slug: string, runId: number, comments: ChangeComment[]): Promise<DeliveryRun> {
+  const res = await apiClient.post<{ data: DeliveryRun }>(DELIVERY_ROUTES.FOLLOW_UP(slug, runId), { comments }, { silentError: true });
+  return res.data.data;
+}
+
+/** Une correction tapée pendant le travail : l'agent la lit à sa prochaine étape. */
+export async function sendCorrection(slug: string, runId: number, text: string): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.CORRECTION(slug, runId), { text }, { silentError: true });
 }
 
 /**
@@ -89,10 +196,20 @@ export async function discardRun(slug: string, runId: number): Promise<void> {
   await apiClient.post(DELIVERY_ROUTES.DISCARD(slug, runId), {});
 }
 
+/** « Mark as done » : la mission n'a rien changé (ni pull request ni commit), l'issue se termine. */
+export async function markRunDone(slug: string, runId: number): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.DONE(slug, runId), {});
+}
+
 /** « Try again » : le résultat écarté, la remarque postée sur l'issue, une nouvelle mission ; rend cette mission. */
 export async function retryRun(slug: string, runId: number, note: string): Promise<DeliveryRun> {
   const res = await apiClient.post<{ data: DeliveryRun }>(DELIVERY_ROUTES.RETRY(slug, runId), note.trim() ? { note: note.trim() } : {});
   return res.data.data;
+}
+
+/** « Stop » : la mission se clôt, au nom de la personne ; le runner arrête l'agent à son prochain signe de vie (R138). */
+export async function stopRun(slug: string, runId: number): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.STOP(slug, runId), {}, { silentError: true });
 }
 
 /** Délègue une issue à un agent (crée un run, exécuté en arrière-plan côté serveur). */
@@ -118,6 +235,25 @@ export async function getIssueRun(slug: string, issueId: number): Promise<Delive
 /** Runs de délégation du workspace (les plus récents), pour la vue « workflow » (agents en parallèle). */
 export async function listWorkspaceRuns(slug: string): Promise<DeliveryRun[]> {
   const res = await apiClient.get<{ data: DeliveryRun[] }>(DELIVERY_ROUTES.RUNS(slug), { silentError: true });
+  return res.data.data ?? [];
+}
+
+/**
+ * Une mission de la personne qui attend sa réponse (R128, séance n°19) : une ligne par mission, avec le nombre de ses
+ * demandes encore ouvertes. Lue de la demande elle-même, jamais de sa notification.
+ */
+export interface OpenApproval {
+  runId: number;
+  issueId: number;
+  issueKey: string | null;
+  issueTitle: string | null;
+  projectId: number | null;
+  requests: number;
+}
+
+/** Ce qui attend la personne dans l'espace, lu en arrière-plan : la mission qui attend depuis le plus longtemps d'abord. */
+export async function listOpenApprovals(slug: string): Promise<OpenApproval[]> {
+  const res = await apiClient.get<{ data: OpenApproval[] }>(DELIVERY_ROUTES.OPEN_APPROVALS(slug), { silentError: true });
   return res.data.data ?? [];
 }
 
@@ -186,6 +322,37 @@ export async function decideApproval(
 export async function downloadEvidence(slug: string, runId: number, format: "json" | "md"): Promise<void> {
   const res = await apiClient.get(DELIVERY_ROUTES.EVIDENCE(slug, runId), { params: { format }, responseType: "blob", silentError: true });
   saveBlob(res.data as Blob, `evidence-run-${runId}.${format}`);
+}
+
+/** Un événement du dossier de preuve (`taskforce-evidence/1`) : chaîné au précédent par son empreinte. */
+export interface MissionEvidenceEvent {
+  seq: number;
+  /** UTC, avec son « Z ». */
+  at: string;
+  /** `mission.started`, `action.requested`, `action.decided`, `human.decision`, `test.result`, `mission.ended`... */
+  type: string;
+  actor: { kind: string; id: string };
+  data: Record<string, unknown> | null;
+  prev: string;
+  hash: string;
+}
+
+/** Le dossier de preuve d'une mission, tel qu'il se construit : ses événements et l'empreinte du dernier. */
+export interface MissionEvidence {
+  format: string;
+  events: MissionEvidenceEvent[];
+  root: string;
+}
+
+/**
+ * Le dossier de preuve d'un run, en JSON, lu pour la vue du travail (R95, point 3) ; la même route que le
+ * téléchargement. Une erreur (un run sans dossier : 404) remonte à l'appelant.
+ */
+export async function getEvidence(slug: string, runId: number): Promise<MissionEvidence> {
+  const res = await apiClient.get<MissionEvidence>(DELIVERY_ROUTES.EVIDENCE(slug, runId), {
+    params: { format: "json" }, silentError: true,
+  });
+  return res.data;
 }
 
 /** Runner local de l'utilisateur (ADR-013), tel que le serveur le connaît. Ne contient jamais de secret. */

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, useRef } from "react"
-import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useParams } from "next/navigation"
 import {
   Circle,
   RefreshCw,
@@ -28,7 +28,6 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core"
 
-import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
 import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -54,6 +53,7 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { useProjectRealtime } from "@/lib/hooks/use-project-realtime"
 import { downloadProjectBundle, downloadProjectExport } from "@/lib/api/project-service"
 import { SendToWebDialog } from "@/components/desktop/project-transfer"
@@ -90,32 +90,6 @@ function extractParam(p: string | string[] | undefined): string {
   if (typeof p === "string") return p
   if (Array.isArray(p)) return p[0] ?? ""
   return ""
-}
-
-function toSheetIssue(issue: Issue): SheetIssue {
-  const priorityMap: Record<IssuePriority, SheetIssue["priority"]> = {
-    NONE: "NONE", URGENT: "URGENT", HIGH: "HIGH", MEDIUM: "MEDIUM", LOW: "LOW",
-  }
-  return {
-    id:             String(issue.id),
-    identifier:     issue.identifier,
-    title:          issue.title,
-    description:    issue.description ?? undefined,
-    priority:       priorityMap[issue.priority],
-    statusId:       issue.status.id,
-    statusName:     issue.status.name,
-    statusCategory: issue.status.category,
-    assignee:       issue.assignee
-      ? { name: issue.assignee.displayName ?? issue.assignee.email, userId: issue.assignee.id, email: issue.assignee.email }
-      : null,
-    assigneeId:     issue.assignee?.id ?? null,
-    labels:         issue.labels,
-    pinned:         issue.pinned,
-    archived:       issue.archived,
-    dueDate:        issue.dueDate,
-    storyPoints:    issue.storyPoints,
-    createdAt:      issue.createdAt,
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -182,11 +156,16 @@ function IssueCard({
   statuses,
   onStatusChange,
   onOpen,
+  arrived = false,
+  onArrived,
 }: {
   readonly issue: Issue
   readonly statuses: IssueStatus[]
   readonly onStatusChange: (issueId: number, statusId: number) => void
   readonly onOpen: (issue: Issue) => void
+  /** L'issue vient d'arriver sur le board : la carte s'allume une fois. */
+  readonly arrived?: boolean
+  readonly onArrived?: () => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `card-${issue.id}`,
@@ -202,10 +181,12 @@ function IssueCard({
       tabIndex={0}
       onClick={() => onOpen(issue)}
       onKeyDown={(e) => e.key === "Enter" && onOpen(issue)}
+      onAnimationEnd={arrived ? onArrived : undefined}
       className={cn(
         "group/card rounded-lg border border-border bg-card p-3 shadow-xs transition-all cursor-grab active:cursor-grabbing",
         // Le clone suit le curseur via <DragOverlay> ; on laisse un placeholder estompe en place
-        isDragging ? "opacity-40" : "hover:border-primary/30 hover:shadow-md"
+        isDragging ? "opacity-40" : "hover:border-primary/30 hover:shadow-md",
+        arrived && "card-arrive"
       )}
     >
       {/* Priorite + labels */}
@@ -354,6 +335,8 @@ function BoardColumn({
   onChangeColor,
   onOpenIssue,
   isOver,
+  arrivedId,
+  onArrived,
   t,
 }: {
   readonly status: IssueStatus
@@ -367,6 +350,8 @@ function BoardColumn({
   readonly onChangeColor: (statusId: number, color: string) => void
   readonly onOpenIssue: (issue: Issue) => void
   readonly isOver: boolean
+  readonly arrivedId: number | null
+  readonly onArrived: () => void
   readonly t: (k: string) => string
 }) {
   const [editing, setEditing] = useState(false)
@@ -471,26 +456,24 @@ function BoardColumn({
             statuses={statuses}
             onStatusChange={onStatusChange}
             onOpen={onOpenIssue}
+            arrived={issue.id === arrivedId}
+            onArrived={onArrived}
           />
         ))}
 
-        {issues.length === 0 && (
-          <div className="flex items-center justify-center rounded-lg border border-dashed border-border/60 p-5">
-            <p className="text-xs text-muted-foreground/60">{t("projects.detail.noIssues")}</p>
-          </div>
-        )}
+        {/* Ajouter une issue dans la colonne (statut pré-rempli), juste après sa dernière carte : une colonne vide
+            montre le geste sous son titre, au lieu d'un cadre « vide » et d'un bouton tout en bas (revue UX du
+            01/11/2026). Le compteur de l'en-tête dit déjà qu'elle est vide. */}
+        <CreateIssueDialog projectId={projectId} workspaceSlug={workspaceSlug} defaultStatusId={status.id}>
+          <button
+            type="button"
+            className="flex h-control-sm w-full shrink-0 items-center gap-1.5 px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-black/[0.03] hover:text-foreground dark:hover:bg-white/[0.05]"
+          >
+            <Plus className="size-3.5" aria-hidden />
+            {t("projects.detail.addIssue")}
+          </button>
+        </CreateIssueDialog>
       </div>
-
-      {/* Ajouter une tache dans la colonne (statut pre-rempli) */}
-      <CreateIssueDialog projectId={projectId} workspaceSlug={workspaceSlug} defaultStatusId={status.id}>
-        <button
-          type="button"
-          className="mt-2 flex w-full shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-black/[0.03] hover:text-foreground dark:hover:bg-white/[0.05]"
-        >
-          <Plus className="size-3.5" aria-hidden />
-          Add task
-        </button>
-      </CreateIssueDialog>
     </div>
   )
 }
@@ -594,22 +577,27 @@ function AddColumnPopover({
 export default function ProjectBoardPage() {
   const { t } = useTranslation()
   const params = useParams()
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+  const { openIssue } = usePaneNavigation()
   const workspace = extractParam(params.workspace)
   const projectId = Number(extractParam(params.id))
-
-  /** Deep-link `?issue=<id>` : on arrive sur le board et l'issue s'ouvre en sheet. */
-  const deepLinkedIssueId = searchParams.get("issue")
 
   const { issues, statuses, error, fetchIssues, fetchStatuses, createStatus, clearIssues, updateIssue, deleteStatus, updateStatus } = useIssueStore()
 
   // Temps réel : le board se met à jour en direct sur les events d'issues (PROD-1.6)
   useProjectRealtime(projectId || null)
 
+  // Une issue qui arrive sur le board déjà chargé (créée ici, par un coéquipier, ou par Cortex depuis la barre) allume
+  // sa carte une fois : on voit où l'action a eu lieu, sous la conversation dépliée (revue UX du 01/11/2026). Le
+  // premier chargement n'allume rien.
+  const [arrivedId, setArrivedId] = useState<number | null>(null)
+  useEffect(() => useIssueStore.subscribe((state, prev) => {
+    if (prev.loadedProjectId !== projectId || state.issues.length <= prev.issues.length) return
+    const before = new Set(prev.issues.map((i) => i.id))
+    const added = state.issues.find((i) => !before.has(i.id))
+    if (added) setArrivedId(added.id)
+  }), [projectId])
+
   const [initializing, setInitializing] = useState(true)
-  const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
   const [overColumnId, setOverColumnId] = useState<number | null>(null)
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null)
   const [filters, setFilters] = useState<IssueFilterState>(EMPTY_ISSUE_FILTERS)
@@ -620,22 +608,6 @@ export default function ProjectBoardPage() {
     // Distance d'activation : un simple clic ouvre l'issue, un glissé > 6px déclenche le drag
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   )
-
-  // `?issue=<id>` → ouvre la sheet dès que les issues sont chargées. Un lien vers une issue
-  // (décision IA, notification, lien copié) ramène donc sur le board, pas sur une page isolée.
-  //
-  // Le lien est consommé **une seule fois**, et le paramètre retiré aussitôt : sans cela, le
-  // temps réel (`useProjectRealtime`) rafraîchit `issues`, l'effet se rejoue, et rouvre l'issue
-  // du lien par-dessus celle que l'utilisateur venait d'ouvrir.
-  const deepLinkConsumed = useRef(false)
-  useEffect(() => {
-    if (!deepLinkedIssueId || deepLinkConsumed.current) return
-    const target = issues.find((i) => String(i.id) === deepLinkedIssueId)
-    if (!target) return
-    deepLinkConsumed.current = true
-    setSelectedIssue(toSheetIssue(target))
-    router.replace(pathname, { scroll: false })
-  }, [deepLinkedIssueId, issues, router, pathname])
 
   useEffect(() => {
     if (!workspace || !projectId) return
@@ -819,6 +791,11 @@ export default function ProjectBoardPage() {
         </div>
       )}
 
+      {/* Un projet sans issue le dit une fois, avec les deux façons d'en créer une, au lieu de quatre colonnes vides. */}
+      {!initializing && !error && issues.length === 0 && (
+        <p className="mb-3 shrink-0 text-xs text-muted-foreground">{t("projects.detail.emptyBoard")}</p>
+      )}
+
       {initializing ? (
         <div className="flex min-h-0 flex-1 gap-5 overflow-hidden">
           {Array.from({ length: 4 }).map((_, c) => (
@@ -852,8 +829,10 @@ export default function ProjectBoardPage() {
                 onDeleteStatus={handleDeleteStatus}
                 onRenameStatus={handleRenameStatus}
                 onChangeColor={handleChangeColor}
-                onOpenIssue={(issue) => setSelectedIssue(toSheetIssue(issue))}
+                onOpenIssue={(issue) => openIssue({ projectId, issueId: issue.id })}
                 isOver={overColumnId === status.id}
+                arrivedId={arrivedId}
+                onArrived={() => setArrivedId(null)}
                 t={t}
               />
             ))}
@@ -866,14 +845,6 @@ export default function ProjectBoardPage() {
           </DragOverlay>
         </DndContext>
       )}
-
-      <IssueSheet
-        issue={selectedIssue}
-        open={selectedIssue !== null}
-        onOpenChange={(open) => { if (!open) setSelectedIssue(null) }}
-        workspaceSlug={workspace}
-        projectId={projectId}
-      />
     </div>
   )
 }

@@ -6,7 +6,7 @@ import { Markdown } from "@/components/ui/lightweight-markdown"
 
 /**
  * Bulle de message générique (user / assistant / system). Le contenu string est rendu en
- * markdown ; sinon, children libres (pour composer Tool/Reasoning/Steps/Sources).
+ * markdown ; sinon, children libres (une réponse et ses cartes, un texte collé replié).
  */
 export type MessageRole = "user" | "assistant" | "system"
 
@@ -33,7 +33,7 @@ export function Message({ role, content, children, className }: MessageProps) {
           <Sparkles className="size-3 text-primary" />
         </div>
       )}
-      <div className={cn(
+      <div data-role={role} className={cn(
         "max-w-[85%] text-sm leading-relaxed",
         // Réponse assistant : ni bordure ni fond ni ombre (retour user) - juste le texte, façon chat.
         isUser

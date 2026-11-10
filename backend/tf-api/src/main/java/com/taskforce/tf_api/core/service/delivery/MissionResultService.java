@@ -1,20 +1,27 @@
 package com.taskforce.tf_api.core.service.delivery;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest;
+import com.taskforce.tf_api.core.dto.request.MissionFollowUpRequest;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunOutcome;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkStatus;
+import com.taskforce.tf_api.core.enums.IssueActivityType;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.IssueGitHubLinkRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -30,10 +37,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Les trois gestes de la carte de résultat d'une mission (R78, séance n°13) : « Apply » fusionne la pull request sur
- * GitHub et termine l'issue ; « Discard » la ferme et supprime sa branche ; « Try again » écarte le résultat, poste la
- * remarque de la personne sur l'issue (l'agent la lit avec {@code get_issue}) et relance la mission. Seule la personne
- * qui a délégué tranche, une fois : le geste se garde sur la mission (le dossier de preuve est scellé à sa fin).
+ * Les gestes de la carte de résultat d'une mission (R78, séance n°13) : « Apply » fusionne la pull request sur GitHub et
+ * termine l'issue ; « Discard » la ferme et supprime sa branche ; « Try again » écarte le résultat, poste la remarque de
+ * la personne sur l'issue (l'agent la lit avec {@code get_issue}) et relance la mission. Une mission qui n'a rien changé
+ * ne s'applique pas : « Mark as done » termine l'issue (rejeu de la 1.8.0). Seule la personne qui a délégué tranche, une
+ * fois : le geste se garde sur la mission (le dossier de preuve est scellé à sa fin).
  */
 @Slf4j
 @Service
@@ -51,6 +59,9 @@ public class MissionResultService {
     private final MergedPullRequests mergedPullRequests;
     private final IssueService issueService;
     private final DeliveryService deliveryService;
+    private final DeliveryRunner deliveryRunner;
+    private final MissionChangesService missionChanges;
+    private final MissionEvidenceService evidenceService;
 
     private record PullRequest(String repo, int number) {}
 
@@ -80,6 +91,23 @@ public class MissionResultService {
             testsFailed ? ", malgré les tests" : "");
     }
 
+    /**
+     * « Mark as done » : la mission n'a rien changé, ni pull request ni commit, parce que le travail était déjà fait
+     * (rejeu de la 1.8.0, TESTTA-2 : « Apply » restait éteint sans dire pourquoi). L'issue se termine au nom de la
+     * personne, et son activité le dit : « Pierre marked the issue done: no change was needed ». Un résultat qui change
+     * quelque chose s'applique ou s'écarte.
+     */
+    @Transactional
+    public void markDone(String slug, Long runId, Long userId) {
+        DeliveryRun run = decidable(slug, runId, userId);
+        if (changed(run)) {
+            throw new BusinessException("This result changes the code: apply it or discard it.");
+        }
+        decided(run, DeliveryRunOutcome.MARKED_DONE, userId);
+        mergedPullRequests.completeIssue(run.getIssue().getId(), userId);
+        log.info("Run {} : issue terminée sans changement par {}", runId, userId);
+    }
+
     /** Ferme la pull request de l'agent et supprime sa branche ; sans pull request, le résultat est seulement écarté. */
     @Transactional
     public void discard(String slug, Long runId, Long userId) {
@@ -106,10 +134,96 @@ public class MissionResultService {
         return next;
     }
 
+    /**
+     * « Ask for changes » (R139, séance n°20) : la personne a commenté des lignes du diff, envoyées ensemble. Une reprise
+     * part sur la même branche, avec la même pull request : rien n'est écarté. Les commentaires vont à la mission, à l'issue
+     * (l'équipe les lit) et au dossier de preuve. La reprise passe par la même porte qu'une délégation, et par les mêmes règles.
+     */
+    @Transactional
+    public DeliveryRunResponse askForChanges(String slug, Long runId, Long userId, List<MissionFollowUpRequest.Comment> comments) {
+        DeliveryRun run = decidable(slug, runId, userId);
+        missionChanges.assertCanAskForChanges(run, userId,
+            comments.stream().map(MissionFollowUpRequest.Comment::path).collect(Collectors.toSet()));
+        pullRequest(run).ifPresent(pr -> assertStillOpen(run, pr));
+        Issue issue = run.getIssue();
+        DeliveryRunResponse next = deliveryService.delegate(slug, issue.getId(), run.getProviderKey(), run.getModel(), userId);
+        List<Map<String, Object>> asked = comments.stream().map(MissionResultService::commentData).toList();
+        DeliveryRun followUp = runRepository.findById(next.id())
+            .orElseThrow(() -> new ResourceNotFoundException("Run not found"));
+        followUp.setParentRun(run);
+        followUp.setBranch(run.getBranch());
+        followUp.setBaseSha(run.getBaseSha());
+        followUp.setFollowUp(asked);
+        runRepository.save(followUp);
+        decided(run, DeliveryRunOutcome.FOLLOWED_UP, userId);
+        comment(slug, issue, askedComment(comments), userId);
+        Map<String, Object> decision = new LinkedHashMap<>();
+        decision.put("decision", "ASK_FOR_CHANGES");
+        decision.put("followUpRun", next.id());
+        decision.put("comments", asked);
+        evidenceService.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", run.getStartedBy().getEmail()), decision);
+        log.info("Run {} : {} commentaires, reprise {} par {}", runId, comments.size(), next.id(), userId);
+        return next;
+    }
+
+    private static Map<String, Object> commentData(MissionFollowUpRequest.Comment comment) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("path", comment.path());
+        data.put("line", comment.line());
+        data.put("side", comment.side());
+        data.put("text", comment.text().strip());
+        return data;
+    }
+
+    /** Ce que la personne a demandé, sur l'issue, à son nom : un fichier et une ligne par commentaire. */
+    private static String askedComment(List<MissionFollowUpRequest.Comment> comments) {
+        return "Asked the agent for changes:\n" + comments.stream()
+            .map(c -> "- `" + c.path() + "`, line " + c.line() + ": " + c.text().strip())
+            .collect(Collectors.joining("\n"));
+    }
+
+    /** La pull request de la mission ne doit pas avoir été fusionnée ou fermée sur GitHub entre-temps. */
+    private void assertStillOpen(DeliveryRun run, PullRequest pr) {
+        boolean closed = linkRepository.findByIssueIdOrderByLinkedAtDesc(run.getIssue().getId()).stream()
+            .anyMatch(link -> pr.repo().equals(link.getRepoFullName()) && Objects.equals(link.getPrNumber(), pr.number())
+                && link.getStatus() != GitHubLinkStatus.OPEN);
+        if (closed) throw new BusinessException("This pull request is already merged or closed: use Try again to start over.");
+    }
+
+    /**
+     * « Stop » pendant le travail (R138, séance n°20) : la mission se clôt tout de suite, au nom de la personne qui l'a
+     * déléguée. Ce n'est pas une panne : l'issue reste où elle est. La session de l'agent tombe avec le run, il ne touche
+     * plus à TaskForce ; le prochain signe de vie du runner est refusé et il arrête l'agent ; l'agent à l'essai se relit
+     * avant de poster. Copilot travaille sur GitHub : TaskForce ne sait pas l'y arrêter, le geste ne lui est pas proposé.
+     */
+    @Transactional
+    public void stop(String slug, Long runId, Long userId) {
+        DeliveryRun run = delegated(slug, runId, userId, "Only the person who delegated this task can stop it.");
+        boolean working = run.getStatus() == DeliveryRunStatus.RUNNING;
+        if (!working && run.getStatus() != DeliveryRunStatus.QUEUED) throw new BusinessException("This mission has already ended.");
+        if (GitHubCopilotProvider.KEY.equals(run.getProviderKey())) {
+            throw new BusinessException("Copilot works on GitHub: TaskForce can't stop it from here.");
+        }
+        User person = run.getStartedBy();
+        // Une mission encore en file n'a pas de dossier : il s'ouvre quand un runner la prend.
+        if (working) {
+            evidenceService.append(run, "human.decision", new MissionEvidenceService.Actor("person", person.getEmail()),
+                Map.of("decision", "STOP"));
+        }
+        LocalDateTime now = LocalDateTime.now();
+        run.setOutcome(DeliveryRunOutcome.STOPPED);
+        run.setOutcomeBy(person);
+        run.setOutcomeAt(now);
+        run.setEndedAt(now);
+        String who = person.getDisplayName() == null || person.getDisplayName().isBlank() ? person.getEmail() : person.getDisplayName();
+        deliveryRunner.complete(runId, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "Stopped by " + who + "."));
+        log.info("Run {} : arrêté par {}", runId, userId);
+    }
+
     // ---------------------------------------------------------------------
 
-    /** La mission du workspace, finie avec un résultat que personne n'a encore tranché, et la personne qui l'a déléguée. */
-    private DeliveryRun decidable(String slug, Long runId, Long userId) {
+    /** La mission du workspace, déléguée par cette personne, qui peut encore écrire sur le projet. */
+    private DeliveryRun delegated(String slug, Long runId, Long userId, String refused) {
         DeliveryRun run = runRepository.findByIdForUpdate(runId)
             .orElseThrow(() -> new ResourceNotFoundException("Run not found"));
         var project = run.getIssue().getProject();
@@ -118,11 +232,20 @@ public class MissionResultService {
         }
         visibilityGuard.assertCanWrite(project, userId);
         if (run.getStartedBy() == null || !Objects.equals(run.getStartedBy().getId(), userId)) {
-            throw new ForbiddenException("Only the person who delegated this task can apply, discard or retry its result.");
+            throw new ForbiddenException(refused);
         }
+        return run;
+    }
+
+    /** La mission du workspace, finie avec un résultat que personne n'a encore tranché, et la personne qui l'a déléguée. */
+    private DeliveryRun decidable(String slug, Long runId, Long userId) {
+        DeliveryRun run = delegated(slug, runId, userId, "Only the person who delegated this task can apply, discard or retry its result.");
         if (run.getStatus() != DeliveryRunStatus.DONE) throw new BusinessException("This mission has no result to review.");
         if (run.getOutcome() != null) {
             throw new BusinessException("This result was already " + run.getOutcome().name().toLowerCase() + ".");
+        }
+        if (missionChanges.busy(runId)) {
+            throw new BusinessException("A file is still being put back. Wait a moment, then try again.");
         }
         return run;
     }
@@ -143,11 +266,35 @@ public class MissionResultService {
         issueService.addComment(slug, issue.getProject().getId(), issue.getId(), comment, userId);
     }
 
+    /**
+     * Le geste se garde sur la mission, et entre à l'activité de l'issue au nom de la personne : « Pierre applied the
+     * result », après ce que l'agent y a fait en son nom.
+     */
     private void decided(DeliveryRun run, DeliveryRunOutcome outcome, Long userId) {
+        User person = userRepository.getReferenceById(userId);
         run.setOutcome(outcome);
-        run.setOutcomeBy(userRepository.getReferenceById(userId));
+        run.setOutcomeBy(person);
         run.setOutcomeAt(LocalDateTime.now());
         runRepository.save(run);
+        issueService.logActivity(run.getIssue(), person, ACTIVITY.get(outcome), null, null, null);
+    }
+
+    /** Ce que l'activité de l'issue garde de chaque geste. */
+    private static final Map<DeliveryRunOutcome, IssueActivityType> ACTIVITY = Map.of(
+        DeliveryRunOutcome.APPLIED, IssueActivityType.MISSION_APPLIED,
+        DeliveryRunOutcome.DISCARDED, IssueActivityType.MISSION_DISCARDED,
+        DeliveryRunOutcome.RETRIED, IssueActivityType.MISSION_RETRIED,
+        DeliveryRunOutcome.MARKED_DONE, IssueActivityType.MISSION_MARKED_DONE,
+        DeliveryRunOutcome.FOLLOWED_UP, IssueActivityType.MISSION_CHANGES_ASKED);
+
+    /**
+     * La mission a-t-elle changé quelque chose : une pull request, ou des commits sur sa branche ? La carte lit les mêmes
+     * faits pour dire « No code change was needed » ({@code resultLine}).
+     */
+    private static boolean changed(DeliveryRun run) {
+        boolean commits = run.getBranch() != null && !run.getBranch().isBlank()
+            && run.getCommits() != null && run.getCommits() > 0;
+        return pullRequest(run).isPresent() || commits;
     }
 
     /** Le lien de l'issue vers cette pull request suit son nouveau statut, sans attendre la prochaine relecture. */

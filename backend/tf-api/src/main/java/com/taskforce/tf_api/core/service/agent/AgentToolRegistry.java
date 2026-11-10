@@ -7,7 +7,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
+import com.taskforce.tf_api.core.service.mcpserver.TaskforceMcpTools;
 
 /**
  * Registre des outils agentiques (collecte tous les {@link AgentTool} déclarés en beans).
@@ -23,6 +26,16 @@ public class AgentToolRegistry {
 
     public AgentToolRegistry(List<AgentTool> tools) {
         for (AgentTool t : tools) byName.put(t.name(), t);
+    }
+
+    /**
+     * Les outils de Cortex, puis les gestes du MCP TaskForce qu'il fait dans la conversation (ADR-024) : une seule surface
+     * d'outils pour Cortex et pour les agents extérieurs. Ses propres outils gardent la priorité sur un nom partagé.
+     */
+    @Autowired
+    public AgentToolRegistry(List<AgentTool> tools, TaskforceMcpTools taskforce) {
+        this(tools);
+        for (AgentTool gesture : taskforce.forCortex()) byName.putIfAbsent(gesture.name(), gesture);
     }
 
     public Collection<AgentTool> all() { return byName.values(); }

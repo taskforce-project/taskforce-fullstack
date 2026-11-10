@@ -14,9 +14,12 @@ import com.taskforce.tf_api.core.service.agent.ReplayOutcome;
  */
 public record EvalBankResponse(boolean enabled, boolean canManage, List<CaseSummary> cases, List<RunSummary> runs) {
 
-    /** Un cas : ce qu'il demande, et quand ses critères ont été figés. */
+    /**
+     * Un cas : ce qu'il demande, et quand ses critères ont été figés. {@code expected} : ce qu'il aurait fallu faire, dans
+     * les mots de la personne (vide sinon) ; {@code waiting} : il n'est encore que cette phrase, aucun rejeu ne le note.
+     */
     public record CaseSummary(Long id, String title, String question, String tool, LocalDateTime createdAt,
-                              LocalDateTime criteriaAt, boolean mine) {
+                              LocalDateTime criteriaAt, boolean mine, String expected, boolean waiting) {
     }
 
     /** Un rejeu : le modèle, les cas notés, ceux qui passent. */

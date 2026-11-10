@@ -11,6 +11,7 @@ interface Bootstrap {
   email: string;
   onboardedOnline: boolean;
   updates: "app" | "store";
+  voice: boolean;
 }
 
 const bootstrap = ipcRenderer.sendSync("desktop:bootstrap") as Bootstrap;
@@ -83,6 +84,22 @@ contextBridge.exposeInMainWorld("taskforceDesktop", {
     sendWorkspace: (input: { workspace: string }): Promise<unknown> => ipcRenderer.invoke("desktop:send-workspace", input),
     openWeb: (url: string): Promise<void> => ipcRenderer.invoke("desktop:open-web", url),
   },
+  // La voix transcrite sur la machine (voice.ts) : absente là où le moteur n'est pas embarqué. Rien n'en sort.
+  voice: bootstrap.voice
+    ? {
+        status: (): Promise<unknown> => ipcRenderer.invoke("desktop:voice-get-status"),
+        download: (): Promise<unknown> => ipcRenderer.invoke("desktop:voice-download"),
+        onStatus: (callback: (status: unknown) => void): (() => void) => {
+          const listener = (_event: unknown, status: unknown) => callback(status);
+          ipcRenderer.on("desktop:voice-status", listener);
+          return () => {
+            ipcRenderer.removeListener("desktop:voice-status", listener);
+          };
+        },
+        prepare: (): void => ipcRenderer.send("desktop:voice-prepare"),
+        transcribe: (samples: Float32Array): Promise<unknown> => ipcRenderer.invoke("desktop:voice-transcribe", samples),
+      }
+    : undefined,
   // Claude Code de la personne branché sur TaskForce (serveur MCP de l'espace) : le jeton va de la page à `claude`.
   claude: {
     mcpStatus: (slug: string): Promise<unknown> => ipcRenderer.invoke("desktop:claude-mcp-status", slug),

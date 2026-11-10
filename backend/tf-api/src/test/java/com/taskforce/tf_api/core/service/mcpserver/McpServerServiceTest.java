@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -19,9 +20,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
-import com.taskforce.tf_api.core.dto.request.UpdateIssueRequest;
+import com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest;
+import com.taskforce.tf_api.core.dto.response.ChecklistItemResponse;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.model.User;
@@ -39,11 +40,9 @@ import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -66,14 +65,20 @@ class McpServerServiceTest {
     @Mock private AgentService agentService;
     @Mock private UserRepository userRepository;
     @Mock private JwtIdentityResolver identityResolver;
+    @Mock private IssueGestures gestures;
+    @Mock private ProjectGestures projectGestures;
 
     private McpServerService service;
 
     @BeforeEach
     void setUp() {
         TaskforceMcpTools tools = new TaskforceMcpTools(mapper, projectService, issueService, smartAssignService,
-            brainSearchService, analyticsService, agentService);
+            brainSearchService, analyticsService, agentService, gestures, projectGestures);
         service = new McpServerService(tools, mapper, userRepository, identityResolver);
+        // Sans clé d'issue, les arguments passent tels quels ; les gestes répondent par leur phrase.
+        lenient().when(gestures.withIds(any(), any(), any())).thenAnswer(inv -> inv.getArgument(2));
+        lenient().when(gestures.update(any(), any(), any())).thenReturn(gesture("Updated"));
+        lenient().when(gestures.comment(any(), any(), any())).thenReturn(gesture("Commented"));
         lenient().when(identityResolver.resolveEmail(any())).thenAnswer(inv -> ((Jwt) inv.getArgument(0)).getClaimAsString("email"));
         lenient().when(userRepository.findByEmail("ada@taskforce.dev"))
             .thenReturn(Optional.of(User.builder().id(7L).email("ada@taskforce.dev").build()));
@@ -150,26 +155,43 @@ class McpServerServiceTest {
     void tools_list_describes_every_tool() {
         JsonNode tools = call(user(), "tools/list", Map.of()).path("result").path("tools");
 
-        assertThat(tools).hasSize(12);
+        assertThat(tools).hasSize(17);
         for (JsonNode tool : tools) {
             assertThat(tool.path("inputSchema").path("type").asText()).isEqualTo("object");
             assertThat(tool.path("description").asText()).isNotBlank();
         }
-        assertThat(tools.findValuesAsText("name")).contains("get_issue", "add_comment", "brain_search", "ask_cortex");
+        assertThat(tools.findValuesAsText("name"))
+            .contains("get_issue", "add_comment", "brain_search", "ask_cortex", "check_checklist_item", "update_issue",
+                "delegate_issue", "get_mission", "delete_issue", "create_project");
     }
 
     @Test
     void tools_list_of_a_delegated_session_hides_what_it_can_never_use() {
-        JsonNode tools = call(delegated(12L), "tools/list", Map.of()).path("result").path("tools");
+        JsonNode tools = call(delegated(), "tools/list", Map.of()).path("result").path("tools");
 
-        assertThat(tools.findValuesAsText("name")).doesNotContain("ask_cortex").contains("get_issue", "add_comment");
+        // Les outils qui écrivent restent proposés : ils servent sur l'issue du run, ou pour créer une issue.
+        assertThat(tools.findValuesAsText("name")).doesNotContain("ask_cortex")
+            .contains("get_issue", "add_comment", "check_checklist_item", "update_issue", "create_issue");
+        // Confier une issue, lire une mission : jamais depuis la session d'une autre mission.
+        assertThat(tools.findValuesAsText("name")).doesNotContain("delegate_issue", "get_mission", "delete_issue");
+        // Créer un projet sort de la portée d'une mission : jamais proposé non plus.
+        assertThat(tools.findValuesAsText("name")).doesNotContain("create_project");
+    }
+
+    @Test
+    void initialize_asks_to_check_the_checklist_items_the_agent_completes() {
+        JsonNode result = call(user(), "initialize", Map.of("protocolVersion", "2025-06-18")).path("result");
+
+        assertThat(result.path("instructions").asText()).contains("check_checklist_item");
     }
 
     // ------------------------------------------------------------------ outils
 
     @Test
-    void get_issue_returns_the_issue_and_its_thread() {
+    void get_issue_returns_the_issue_its_checklist_and_its_thread() {
         when(issueService.getIssue("acme", 12L, 5L, 7L)).thenReturn(IssueResponse.builder().id(5L).title("Fix the footer").build());
+        when(issueService.listChecklist("acme", 12L, 5L, 7L)).thenReturn(List.of(
+            ChecklistItemResponse.builder().id(31L).content("Update the README").done(false).position(0).build()));
         when(issueService.listComments("acme", 12L, 5L, 7L)).thenReturn(List.of());
 
         JsonNode result = callTool(user(), "get_issue", Map.of("projectId", 12, "issueId", 5));
@@ -177,7 +199,29 @@ class McpServerServiceTest {
         assertThat(result.path("isError").asBoolean()).isFalse();
         assertThat(result.path("structuredContent").path("commentCount").asInt()).isZero();
         assertThat(result.path("structuredContent").path("issue").path("title").asText()).isEqualTo("Fix the footer");
+        // Les lignes de la checklist avec leur id : l'agent coche celle qu'il a faite (check_checklist_item).
+        JsonNode item = result.path("structuredContent").path("checklist").get(0);
+        assertThat(item.path("id").asLong()).isEqualTo(31L);
+        assertThat(item.path("content").asText()).isEqualTo("Update the README");
+        assertThat(item.path("done").asBoolean()).isFalse();
         assertThat(result.path("content").get(0).path("text").asText()).contains("\"commentCount\":0");
+    }
+
+    @ParameterizedTest(name = "done={0}")
+    @ValueSource(booleans = {true, false})
+    void check_checklist_item_checks_or_unchecks_by_id(boolean done) {
+        when(issueService.updateChecklistItem(eq("acme"), eq(12L), eq(5L), eq(31L), eq(7L), any(UpdateChecklistItemRequest.class)))
+            .thenReturn(ChecklistItemResponse.builder().id(31L).content("Update the README").done(done).build());
+
+        JsonNode result = callTool(delegated(), "check_checklist_item",
+            Map.of("projectId", 12, "issueId", 5, "itemId", 31, "done", done));
+
+        assertThat(result.path("isError").asBoolean()).isFalse();
+        assertThat(result.path("structuredContent").path("done").asBoolean()).isEqualTo(done);
+        ArgumentCaptor<UpdateChecklistItemRequest> request = ArgumentCaptor.forClass(UpdateChecklistItemRequest.class);
+        verify(issueService).updateChecklistItem(eq("acme"), eq(12L), eq(5L), eq(31L), eq(7L), request.capture());
+        assertThat(request.getValue().getDone()).isEqualTo(done);
+        assertThat(request.getValue().getContent()).isNull(); // l'agent coche, il ne réécrit pas la ligne
     }
 
     @Test
@@ -208,9 +252,11 @@ class McpServerServiceTest {
         "create_issue | {\"projectId\": \"12\", \"title\": \"x\"}            | projectId must be an integer",
         "create_issue | {\"projectId\": 12, \"title\": \"x\", \"priority\": \"soon\"} | priority has an unknown value",
         "create_issue | {\"projectId\": 12, \"title\": \"x\", \"dueDate\": \"2 nov\"} | dueDate must be a date",
-        "update_issue | {\"projectId\": 12, \"issueId\": 5}                  | Nothing to update",
         "list_issues  | {\"projectId\": 12, \"limit\": 500}                  | limit must be between 1 and 200",
         "get_issue    | {}                                                    | Missing argument: projectId",
+        "check_checklist_item | {\"projectId\": 12, \"issueId\": 5, \"itemId\": 31} | Missing argument: done",
+        "check_checklist_item | {\"projectId\": 12, \"issueId\": 5, \"itemId\": 31, \"done\": \"yes\"} | done must be true or false",
+        "check_checklist_item | {\"projectId\": 12, \"issueId\": 5, \"done\": true} | Missing argument: itemId",
     })
     void invalid_arguments_are_tool_errors_the_model_can_fix(String tool, String arguments, String message) throws Exception {
         JsonNode result = callTool(user(), tool, mapper.readValue(arguments, Map.class));
@@ -222,13 +268,28 @@ class McpServerServiceTest {
 
     @Test
     void a_refusal_of_the_service_is_a_tool_error() {
-        when(issueService.addComment(eq("acme"), eq(12L), eq(5L), any(CreateIssueCommentRequest.class), eq(7L)))
-            .thenThrow(new ForbiddenException("you can't write to this project"));
+        when(gestures.comment(eq("acme"), eq(7L), any())).thenThrow(new ForbiddenException("you can't write to this project"));
 
         JsonNode result = callTool(user(), "add_comment", Map.of("projectId", 12, "issueId", 5, "content", "Done"));
 
         assertThat(result.path("isError").asBoolean()).isTrue();
         assertThat(result.path("content").get(0).path("text").asText()).startsWith("Access denied: you can't write");
+    }
+
+    @Test
+    @DisplayName("un geste rend sa phrase, l'issue et ses changements, jamais de quoi le défaire")
+    void a_gesture_answers_without_what_undoes_it() {
+        when(gestures.update(eq("acme"), eq(7L), any())).thenReturn(new IssueGestures.Gesture("Updated TF-12",
+            Map.of("issueId", 5, "key", "TF-12"), List.of(new IssueGestures.Change("column", "Todo", "Done")), Map.of(),
+            Map.of("fields", Map.of("status", Map.of("from", 2, "to", 3)))));
+
+        JsonNode result = callTool(user(), "update_issue", Map.of("issue", "TF-12", "status", "Done"));
+
+        assertThat(result.path("isError").asBoolean()).isFalse();
+        JsonNode content = result.path("structuredContent");
+        assertThat(content.path("summary").asText()).isEqualTo("Updated TF-12");
+        assertThat(content.path("changes").get(0).path("to").asText()).isEqualTo("Done");
+        assertThat(content.has("undo")).isFalse();
     }
 
     @Test
@@ -240,45 +301,115 @@ class McpServerServiceTest {
 
     // ------------------------------------------------------------------ session déléguée
 
-    @Test
-    void delegated_session_writes_to_its_own_project() {
-        JsonNode result = callTool(delegated(12L), "add_comment", Map.of("projectId", 12, "issueId", 5, "content", "Done"));
+    /** R110 (séance n°16) : la session du run 100 (projet 12, issue 5) change son issue et crée dans son projet. */
+    @ParameterizedTest(name = "admis en session déléguée : {0} {1}")
+    @CsvSource(delimiter = '|', value = {
+        "update_issue         | {\"projectId\": 12, \"issueId\": 5, \"statusId\": 3}                  | update",
+        "add_comment          | {\"projectId\": 12, \"issueId\": 5, \"content\": \"Done\"}            | comment",
+        "check_checklist_item | {\"projectId\": 12, \"issueId\": 5, \"itemId\": 31, \"done\": true} | updateChecklistItem",
+        "create_issue         | {\"projectId\": 12, \"title\": \"Follow-up\"}                         | createIssue",
+    })
+    void delegated_session_changes_its_issue_and_creates_in_its_project(String tool, String arguments,
+                                                                        String serviceMethod) throws Exception {
+        JsonNode result = callTool(delegated(), tool, mapper.readValue(arguments, Map.class));
 
         assertThat(result.path("isError").asBoolean()).isFalse();
-        verify(issueService).addComment(eq("acme"), eq(12L), eq(5L), any(CreateIssueCommentRequest.class), eq(7L));
+        assertThat(java.util.stream.Stream.concat(mockingDetails(issueService).getInvocations().stream(),
+                mockingDetails(gestures).getInvocations().stream())
+            .map(invocation -> invocation.getMethod().getName())
+            .filter(name -> !"withIds".equals(name)))
+            .containsExactly(serviceMethod);
+    }
+
+    /**
+     * L'agent d'une mission nomme son issue par sa clé : la clé devient ses ids avant que la portée juge, et une autre
+     * issue reste hors d'atteinte.
+     */
+    @ParameterizedTest(name = "{0} est l'issue {1} : admis {2}")
+    @CsvSource({"TF-5, 5, true", "TF-6, 6, false"})
+    void a_delegated_agent_names_its_issue_by_its_key(String key, long issueId, boolean allowed) {
+        when(gestures.withIds(eq("acme"), eq(7L), any())).thenAnswer(inv -> {
+            ObjectNode args = ((JsonNode) inv.getArgument(2)).deepCopy();
+            return args.put("projectId", 12).put("issueId", issueId);
+        });
+
+        JsonNode result = callTool(delegated(), "update_issue", Map.of("issue", key, "status", "Done"));
+
+        assertThat(result.path("isError").asBoolean()).isEqualTo(!allowed);
+        if (allowed) {
+            ArgumentCaptor<JsonNode> args = ArgumentCaptor.forClass(JsonNode.class);
+            verify(gestures).update(eq("acme"), eq(7L), args.capture());
+            assertThat(args.getValue().path("issueId").asLong()).isEqualTo(issueId);
+        } else {
+            verify(gestures, org.mockito.Mockito.never()).update(any(), any(), any());
+        }
     }
 
     @ParameterizedTest(name = "refusé en session déléguée : {0} {1}")
     @CsvSource(delimiter = '|', value = {
+        // Une autre issue du même projet : ni ses champs, ni un commentaire, ni sa checklist (R110)
+        "update_issue | {\"projectId\": 12, \"issueId\": 6, \"title\": \"x\"}",
+        "add_comment  | {\"projectId\": 12, \"issueId\": 6, \"content\": \"x\"}",
+        "check_checklist_item | {\"projectId\": 12, \"issueId\": 6, \"itemId\": 31, \"done\": true}",
+        "smart_assign | {\"projectId\": 12, \"issueId\": 6}",
+        // Un autre projet
         "update_issue | {\"projectId\": 99, \"issueId\": 5, \"title\": \"x\"}",
         "add_comment  | {\"projectId\": 99, \"issueId\": 5, \"content\": \"x\"}",
         "create_issue | {\"projectId\": 99, \"title\": \"x\"}",
+        "check_checklist_item | {\"projectId\": 99, \"issueId\": 5, \"itemId\": 31, \"done\": true}",
+        // Le niveau du workspace
         "ask_cortex   | {\"message\": \"what changed?\"}",
     })
     void delegated_session_cannot_reach_beyond_its_scope(String tool, String arguments) throws Exception {
-        JsonNode result = callTool(delegated(12L), tool, mapper.readValue(arguments, Map.class));
+        JsonNode result = callTool(delegated(), tool, mapper.readValue(arguments, Map.class));
 
         assertThat(result.path("isError").asBoolean()).isTrue();
-        assertThat(result.path("content").get(0).path("text").asText()).contains("outside the delegation session");
-        verify(issueService, never()).updateIssue(anyString(), anyLong(), anyLong(), any(UpdateIssueRequest.class), anyLong());
-        verifyNoInteractions(agentService);
+        // Le refus dit à l'agent ce que la tâche lui permet, et l'issue qui est la sienne.
+        assertThat(result.path("content").get(0).path("text").asText())
+            .contains("outside the delegation session").contains("issueId 5").contains("Do not retry");
+        verifyNoInteractions(issueService, smartAssignService, agentService);
+        verify(gestures, org.mockito.Mockito.never()).update(any(), any(), any());
+        verify(gestures, org.mockito.Mockito.never()).comment(any(), any(), any());
     }
 
     @Test
     void delegated_session_of_another_workspace_is_refused() {
-        JsonNode result = callTool(delegated(12L), "get_issue", Map.of("projectId", 12, "issueId", 5), "other");
+        JsonNode result = callTool(delegated(), "get_issue", Map.of("projectId", 12, "issueId", 5), "other");
 
         assertThat(result.path("isError").asBoolean()).isTrue();
         verifyNoInteractions(issueService);
     }
 
-    @Test
-    void delegated_session_reads_other_projects_of_its_workspace() {
-        when(issueService.listIssues("acme", 99L, 7L)).thenReturn(List.of());
-
-        JsonNode result = callTool(delegated(12L), "list_issues", Map.of("projectId", 99));
+    /** Les lectures ne changent pas : tout le workspace du run, toutes ses issues. */
+    @ParameterizedTest(name = "lecture en session déléguée : {0} {1}")
+    @CsvSource(delimiter = '|', value = {
+        "list_issues | {\"projectId\": 99}",
+        "get_issue   | {\"projectId\": 12, \"issueId\": 6}",
+        "get_issue   | {\"projectId\": 99, \"issueId\": 7}",
+    })
+    void delegated_session_reads_the_whole_workspace(String tool, String arguments) throws Exception {
+        JsonNode result = callTool(delegated(), tool, mapper.readValue(arguments, Map.class));
 
         assertThat(result.path("isError").asBoolean()).isFalse();
+    }
+
+    @ParameterizedTest(name = "session déléguée sans son issue : {0} refusé")
+    @CsvSource(delimiter = '|', value = {
+        "get_issue    | {\"projectId\": 12, \"issueId\": 5}",
+        "add_comment  | {\"projectId\": 12, \"issueId\": 5, \"content\": \"x\"}",
+        "create_issue | {\"projectId\": 12, \"title\": \"x\"}",
+    })
+    void delegated_session_without_its_issue_reaches_nothing(String tool, String arguments) throws Exception {
+        Jwt incomplete = base()
+            .claim(DeliverySessionFilter.RUN_CLAIM, 100L)
+            .claim(DeliverySessionFilter.WORKSPACE_CLAIM, "acme")
+            .claim(DeliverySessionFilter.PROJECT_CLAIM, 12L)
+            .build();
+
+        JsonNode result = callTool(incomplete, tool, mapper.readValue(arguments, Map.class));
+
+        assertThat(result.path("isError").asBoolean()).isTrue();
+        verifyNoInteractions(issueService);
     }
 
     @Test
@@ -291,6 +422,10 @@ class McpServerServiceTest {
     }
 
     // ------------------------------------------------------------------ outillage
+
+    private static IssueGestures.Gesture gesture(String summary) {
+        return new IssueGestures.Gesture(summary, Map.of("issueId", 5), List.of(), Map.of(), null);
+    }
 
     private JsonNode callTool(Jwt principal, String tool, Map<?, ?> arguments) {
         return callTool(principal, tool, arguments, "acme");
@@ -321,11 +456,13 @@ class McpServerServiceTest {
         return base().claim(PersonalTokenAuthenticator.TOKEN_CLAIM, 3L).build();
     }
 
-    private static Jwt delegated(Long projectId) {
+    /** Principal délégué, tel que le pose {@code DeliverySessionFilter} : run 100, projet 12, issue 5. */
+    private static Jwt delegated() {
         return base()
             .claim(DeliverySessionFilter.RUN_CLAIM, 100L)
             .claim(DeliverySessionFilter.WORKSPACE_CLAIM, "acme")
-            .claim(DeliverySessionFilter.PROJECT_CLAIM, projectId)
+            .claim(DeliverySessionFilter.PROJECT_CLAIM, 12L)
+            .claim(DeliverySessionFilter.ISSUE_CLAIM, 5L)
             .build();
     }
 }

@@ -4,6 +4,8 @@ import java.util.List;
 
 import com.taskforce.tf_api.core.enums.IssuePriority;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -35,6 +37,11 @@ public class CreateIssueRequest {
 
     private String dueDate;
 
-    /** Optionnel — labels à rattacher dès la création (cf. ISS-01). */
+    /** Optionnel. Labels à rattacher dès la création (cf. ISS-01), parmi ceux du projet : un autre est ignoré. */
     private List<Long> labelIds;
+
+    /** Optionnel : l'estimation en points ; 0 ou absent, aucune. */
+    @Min(value = 0, message = "Points can't be negative")
+    @Max(value = 100, message = "Points can't exceed 100")
+    private Integer storyPoints;
 }
