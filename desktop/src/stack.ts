@@ -99,7 +99,7 @@ export async function startStack(account: Account, onStep: (step: string) => voi
     settings.setWindowPort(account.subject, proxy.port);
     await github.start();
     await avatar;
-    onStep("Starting TaskForce");
+    onStep("Opening your workspace");
     await Promise.all([
       backend.start({
         account,

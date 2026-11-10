@@ -17,6 +17,17 @@ child.once("spawn", () => {
 });
 `;
 
+/** Les arguments de l'installeur pour « Restart now » : mise à jour, sans fenêtre système, l'app rouverte à la fin. */
+const INSTALLER_ARGS = ["--updated", "/S", "--force-run"] as const;
+
+/**
+ * Avec l'écran de l'app que la fenêtre de l'installeur remplace : elle y prend sa place et sa taille (installer.nsh). Une
+ * poignée de fenêtre, un nombre sans signe ; un installeur d'avant cet argument l'ignore.
+ */
+export function installerArgs(screen: string | null): string[] {
+  return screen && /^\d+$/.test(screen) ? [...INSTALLER_ARGS, `--screen=${screen}`] : [...INSTALLER_ARGS];
+}
+
 /** Résolue quand le processus de l'installeur est parti, rejetée s'il n'a pas pu l'être. */
 export function launchInstaller(file: string, args: readonly string[]): Promise<void> {
   return new Promise((resolve, reject) => {
