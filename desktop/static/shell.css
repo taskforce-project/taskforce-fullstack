@@ -11,6 +11,8 @@
 @media (prefers-color-scheme: dark) { :root { --bg: #0b0e19; --ink: #f3f2f0; --muted: #9a978f; --line: #242a40;
   --button: #12172a; --error: #f97066; } }
 html, body { height: 100%; margin: 0; }
+/* Ce qui est caché le reste, même là où une règle donne un affichage (la rangée des actions). */
+[hidden] { display: none !important; }
 body { display: grid; grid-template-columns: var(--panel) 1fr; overflow: hidden; background: var(--bg); color: var(--ink);
   font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
   -webkit-app-region: drag; user-select: none; }
