@@ -42,21 +42,22 @@ export function PageContainer({
   )
 }
 
+/**
+ * L'en-tête d'une page, dans son volet : ce qu'elle dit d'elle et ses gestes. Son titre est celui du volet, dans la
+ * ligne de titre du volet (R124, séance n°18 : un titre par volet) ; la page ne le répète pas.
+ */
 export function PageHeader({
-  title,
   description,
   actions,
   className,
 }: {
-  readonly title: React.ReactNode
   readonly description?: React.ReactNode
   readonly actions?: React.ReactNode
   readonly className?: string
 }) {
   return (
-    <div className={cn("flex items-start justify-between gap-4", className)}>
-      <div className="min-w-0 space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+    <div className={cn("flex items-center justify-between gap-4", className)}>
+      <div className="min-w-0">
         {description && (
           <p className="text-sm text-muted-foreground">{description}</p>
         )}

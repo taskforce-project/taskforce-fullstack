@@ -5,6 +5,6 @@ ask: create_project
 ---
 Plan to create a project:
 1. Call create_project once. Pass name only if the person gave one in their words, and stack if they say what it is built with (Next.js, Spring, a mobile app). Never make up a name.
-2. TaskForce asks the person what is missing, one question at a time: the name, then where its code lives (a new private or public repository, an existing one, or none). Never ask these yourself.
+2. TaskForce asks the person what is missing, on one card: the name and where its code lives (a new private or public repository, an existing one, or none). Never ask these yourself.
 3. Say the project exists only when the result says it was created.
 Never prepare an issue (create_issue) for a project.

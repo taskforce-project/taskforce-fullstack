@@ -2,6 +2,8 @@ package com.taskforce.tf_api.core.service.agent;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -60,6 +62,8 @@ public class CortexRecordService {
     static final int MAX_EVENTS = 200;
     /** Ce qu'un événement garde d'un texte (question, arguments, résultat) : de quoi relire, pas tout recopier. */
     static final int MAX_TEXT = 2000;
+    /** La note d'un incident de confiance ({@code ActionClaimCheck.Checked#incident}) : {@code "incident": "trust"}. */
+    static final String INCIDENT = "trust";
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -165,15 +169,38 @@ public class CortexRecordService {
     }
 
     /**
-     * Garde la réponse de la personne à une question de TaskForce (R115), si le dossier l'attend encore : la question de
-     * cet outil que nomme {@code ref} (l'empreinte de son résultat), à laquelle personne n'a répondu. La réponse entre au
-     * dossier comme une décision de la personne ; rend ce que la question a gardé (les arguments du geste, la question,
-     * l'écran). Vide si la question n'est pas là, déjà répondue, ou si le dossier est plein ; le verrou du dossier sépare
-     * deux clics.
+     * La carte de questions de TaskForce (R115) que le dossier attend encore : celle de cet outil que nomme {@code ref}
+     * (l'empreinte de son résultat), à laquelle personne n'a répondu. Rend ce qu'elle a gardé (les arguments du geste,
+     * ses questions, l'écran), pour juger les réponses avant de les garder ; vide si elle n'est pas là ou déjà répondue.
+     */
+    @Transactional(readOnly = true)
+    public Optional<JsonNode> question(UUID recordId, String tool, String ref) {
+        return open(recordId, tool, ref);
+    }
+
+    /**
+     * Garde les réponses de la personne à une carte de TaskForce (R115), si le dossier l'attend encore : elles entrent au
+     * dossier comme une seule décision de la personne, chaque argument avec ce qu'il a reçu. Rend ce que la carte a
+     * gardé. Vide si la carte n'est pas là, déjà répondue, ou si le dossier est plein ; le verrou du dossier sépare deux
+     * envois.
      */
     @Transactional
-    public Optional<JsonNode> answer(UUID recordId, String tool, String ref, Long userId, String answer) {
+    public Optional<JsonNode> answer(UUID recordId, String tool, String ref, Long userId, Map<String, String> answers) {
         records.findByIdForUpdate(recordId).orElseThrow(() -> new ResourceNotFoundException("Cortex record not found"));
+        Optional<JsonNode> asked = open(recordId, tool, ref);
+        if (asked.isEmpty()) return Optional.empty();
+        Map<String, Object> said = new LinkedHashMap<>();
+        answers.forEach((field, answer) -> said.put(field, shorten(answer)));
+        Map<String, Object> decision = new LinkedHashMap<>();
+        decision.put("tool", tool);
+        decision.put("decision", "answered");
+        decision.put("ref", ref);
+        decision.put("answers", said);
+        return append(recordId, "human.decision", Actor.person(userId), decision).isPresent() ? asked : Optional.empty();
+    }
+
+    /** La carte de cet outil que nomme {@code ref}, si personne n'y a répondu. */
+    private Optional<JsonNode> open(UUID recordId, String tool, String ref) {
         if (ref == null || ref.isBlank()) return Optional.empty();
         JsonNode asked = null;
         boolean answered = false;
@@ -189,15 +216,7 @@ public class CortexRecordService {
                 answered = true;
             }
         }
-        if (asked == null || answered) return Optional.empty();
-        Map<String, Object> decision = new LinkedHashMap<>();
-        decision.put("tool", tool);
-        decision.put("decision", "answered");
-        decision.put("ref", ref);
-        decision.put("field", asked.path("question").path("field").asText());
-        decision.put("answer", shorten(answer));
-        return append(recordId, "human.decision", Actor.person(userId), decision).isPresent()
-            ? Optional.of(asked) : Optional.empty();
+        return asked == null || answered ? Optional.empty() : Optional.of(asked);
     }
 
     /**
@@ -215,10 +234,40 @@ public class CortexRecordService {
         return id;
     }
 
+    /**
+     * L'incident de confiance que garde chacun de ces dossiers (R116, E17), quand il en garde un : la note du serveur,
+     * telle qu'elle est au dossier (ce que le modèle a dit, ce que TaskForce a montré). Le premier de chaque dossier ;
+     * un dossier sans incident n'y est pas.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, JsonNode> incidents(Collection<UUID> recordIds) {
+        if (recordIds.isEmpty()) return Map.of();
+        Map<UUID, JsonNode> found = new HashMap<>();
+        for (CortexRecordEvent event
+            : eventRepository.findByRecordIdInAndTypeAndActorKindOrderBySeqAsc(recordIds, "note", Actor.SERVER.kind())) {
+            ObjectNode data = parse(event.getData());
+            if (INCIDENT.equals(data.path("incident").asText())) found.putIfAbsent(event.getRecordId(), data);
+        }
+        return found;
+    }
+
     /** Vrai si le dossier est celui de cette personne, dans cet espace : un autre ne se prolonge pas. */
     @Transactional(readOnly = true)
     public boolean owns(UUID recordId, AgentContext ctx) {
         return records.findByIdAndWorkspaceIdAndUserId(recordId, ctx.workspaceId(), ctx.userId()).isPresent();
+    }
+
+    /**
+     * Le modèle qui a répondu à la demande du dossier, tel que son ouverture l'a gardé : ce que Cortex écrit plus tard,
+     * sur l'accord ou les réponses de la personne, le garde aussi (R123). Vide quand l'ouverture ne le dit pas.
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> model(UUID recordId) {
+        if (recordId == null) return Optional.empty();
+        return eventRepository.findByRecordIdOrderBySeqAsc(recordId).stream().findFirst()
+            .map(first -> parse(first.getData()).path("model").asText(""))
+            .map(String::strip)
+            .filter(model -> !model.isEmpty());
     }
 
     /** Les événements du dossier, chaînés, tels qu'un export les relit et les vérifie. */

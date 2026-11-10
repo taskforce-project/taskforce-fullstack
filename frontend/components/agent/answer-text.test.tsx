@@ -22,6 +22,25 @@ describe("AnswerText : ce que TaskForce dit se voit comme sa parole (R116)", () 
     expect(screen.queryByText(/\[!taskforce\]/i)).not.toBeInTheDocument()
   })
 
+  /** R115, R136 : les questions d'un geste se lisent sur leur carte ; sans elle (une conversation rouverte), comme les mots de Cortex. */
+  const ASKS = "> [!taskforce] TaskForce · asks\n> What should the project be called?\n> Where does its code live?\n"
+
+  it("reads the questions as Cortex's words when their card is not there: one voice", () => {
+    render(<AnswerText text={ASKS} />)
+
+    expect(screen.queryByRole("note")).not.toBeInTheDocument()
+    expect(screen.queryByText(t.taskforceSays)).not.toBeInTheDocument()
+    expect(screen.getByText("What should the project be called?")).toBeInTheDocument()
+    expect(screen.getByText("Where does its code live?")).toBeInTheDocument()
+  })
+
+  it("leaves the questions to their card, and keeps the rest of the answer", () => {
+    render(<AnswerText text={ASKS + "\n> [!taskforce] TaskForce · models\n> Answered by qwen3:8b, as you asked."} withCard />)
+
+    expect(screen.queryByText("What should the project be called?")).not.toBeInTheDocument()
+    expect(screen.getByText("Answered by qwen3:8b, as you asked.")).toBeInTheDocument()
+  })
+
   it("renders an answer without a correction as Cortex's markdown only", () => {
     render(<AnswerText text={"TESTTA-2 is in **In review by AI**."} />)
 

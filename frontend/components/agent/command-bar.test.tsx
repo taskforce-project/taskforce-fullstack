@@ -6,25 +6,28 @@ import { CommandBar } from "./command-bar";
 import { sendAgentMessage, type AssistantAnswer } from "@/lib/api/assistant-service";
 import { listConversations } from "@/lib/api/ai-conversation-service";
 import { useCortexStore, type CortexTurn } from "@/lib/store/cortex-store";
-import { usePanelStore } from "@/lib/store/panel-store";
 
 // Aucun réseau : la réponse de Cortex, les conversations, l'état de l'IA et les outils connectés sont simulés.
 vi.mock("next/navigation", () => ({
   usePathname: () => "/acme/projects/3",
   useParams: () => ({ workspace: "acme" }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }));
+vi.mock("@/lib/api/issue-service", () => ({ searchIssues: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/lib/api/assistant-service", () => ({
   sendAgentMessage: vi.fn(),
   approveAction: vi.fn(),
   isApprovable: () => false,
   isPreparedIssue: () => false,
   isUndoable: () => false,
+  isQuestionCard: () => false,
 }));
 vi.mock("@/lib/api/ai-conversation-service", () => ({
   listConversations: vi.fn(), getConversation: vi.fn(), deleteConversation: vi.fn(),
 }));
 vi.mock("@/lib/api/ai-status-service", () => ({ getAiStatus: vi.fn().mockResolvedValue(null) }));
 vi.mock("@/lib/api/integration-service", () => ({ getMcpServers: vi.fn().mockResolvedValue([]) }));
+vi.mock("@/lib/hooks/use-connector-lines", () => ({ useConnectorLines: () => [] }));
 
 // Le dépli et le repli sont instantanés en test : happy-dom annule les animations du navigateur, ce qui laisserait des
 // rejets non gérés après le repli.
@@ -53,33 +56,20 @@ function turnWith(text: string): HTMLElement | null {
   return screen.getByText(text).closest<HTMLElement>("[data-role]")?.parentElement?.parentElement ?? null;
 }
 
-describe("CommandBar : la barre flotte, la conversation s'ouvre au-dessus, sans carte, toujours en bas", () => {
+describe("CommandBar : repliée dans le compositeur, la conversation s'ouvre au-dessus, sans carte (R120)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useCortexStore.setState({ ...initial, draft: "", workspace: null, turns: [], conversations: [], open: false, unread: false, sentAt: null });
-    usePanelStore.setState({ panels: [] });
     vi.mocked(listConversations).mockResolvedValue([]);
   });
 
-  it("says what can be asked here, and a suggestion only fills the bar", () => {
+  // R123 : plus d'exemples inventés sous la barre ; l'arrivée de la conversation suggère depuis l'espace.
+  it("folded and empty, holds only what to write: no invented example", () => {
     render(<CommandBar />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Create an issue" }));
-
-    expect(screen.getByLabelText("What do you want done?")).toHaveValue("Create an issue ");
-    expect(sendAgentMessage).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Create an issue" })).toBeNull();
     expect(screen.queryByRole("region", { name: "Conversation with Cortex" })).toBeNull();
-  });
-
-  it("keeps the suggestions out of the way while the person writes", () => {
-    render(<CommandBar />);
-    const input = screen.getByLabelText("What do you want done?");
-
-    fireEvent.change(input, { target: { value: "Move the login issue to Done" } });
-    expect(screen.queryByRole("group", { name: "Suggestions for this screen" })).toBeNull();
-
-    fireEvent.change(input, { target: { value: "" } });
-    expect(screen.getByRole("group", { name: "Suggestions for this screen" })).toBeTruthy();
+    expect(sendAgentMessage).not.toHaveBeenCalled();
   });
 
   it("opens the answer right above the bar, which becomes the reply box", async () => {
@@ -93,13 +83,12 @@ describe("CommandBar : la barre flotte, la conversation s'ouvre au-dessus, sans 
     const conversation = await screen.findByRole("region", { name: "Conversation with Cortex" });
     expect(conversation).toHaveTextContent("Which issues are blocked?");
     await waitFor(() => expect(conversation).toHaveTextContent("Two issues are blocked."));
-    expect(sendAgentMessage).toHaveBeenCalledWith("acme", "Which issues are blocked?", null);
+    expect(sendAgentMessage).toHaveBeenCalledWith("acme", "Which issues are blocked?", null, null, null, [], expect.objectContaining({ files: [] }));
     expect(input).toHaveAttribute("placeholder", "Reply to Cortex…");
-    // Dépliée, la conversation est le contexte : plus de suggestions sous la barre, et les sources restent repliées.
+    // Dépliée, la conversation est le contexte : plus de suggestions sous la barre, et plus de mot « Sources » (R137).
     expect(screen.queryByRole("button", { name: "Create an issue" })).toBeNull();
+    expect(screen.queryByText(/Sources/)).toBeNull();
     expect(screen.queryByText("Runbook")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Sources \(1\)/ }));
-    expect(screen.getByText("Runbook")).toBeTruthy();
   });
 
   it("minimizes with Escape and opens the same conversation again", async () => {
@@ -126,7 +115,7 @@ describe("CommandBar : la barre flotte, la conversation s'ouvre au-dessus, sans 
     expect(screen.getByLabelText("What do you want done?")).toHaveFocus();
   });
 
-  it("stays at the bottom: nothing pins it to the side, sending opens no panel", async () => {
+  it("stays at the bottom: nothing pins it to the side", async () => {
     vi.mocked(sendAgentMessage).mockResolvedValue(answerWith("Done."));
     useCortexStore.setState({ workspace: "acme", open: true });
     render(<CommandBar />);
@@ -137,7 +126,6 @@ describe("CommandBar : la barre flotte, la conversation s'ouvre au-dessus, sans 
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
     await waitFor(() => expect(screen.getByRole("region", { name: "Conversation with Cortex" })).toHaveTextContent("Done."));
-    expect(usePanelStore.getState().panels).toEqual([]);
   });
 
   it("is not modal: only its text catches the pointer, the screen above stays clickable", () => {
@@ -148,8 +136,27 @@ describe("CommandBar : la barre flotte, la conversation s'ouvre au-dessus, sans 
     // Ni carte ni voile : la conversation passe au-dessus de l'écran dans une couche qui laisse passer les clics, et son
     // dégradé n'en capte aucun (`.cortex-wash`, pointer-events: none dans globals.css).
     expect(conversation).toHaveClass("pointer-events-auto");
-    expect(conversation.parentElement?.parentElement).toHaveClass("pointer-events-none");
-    expect(conversation.parentElement?.parentElement?.querySelector(".cortex-wash")).toHaveAttribute("aria-hidden", "true");
+    expect(conversation.parentElement).toHaveClass("pointer-events-none");
+    expect(conversation.parentElement?.querySelector(".cortex-wash")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  // R123 : sous chaque réponse, une ligne grise dit le modèle et ce qu'il a lu ; sous la demande, ce qui était joint.
+  it("says under each answer the model and what TaskForce gave it to read, in one quiet line", () => {
+    const read = { issues: [{ key: "OPS-35", comments: 3 }], boards: [], tools: [], notes: 0 };
+    useCortexStore.setState({
+      workspace: "acme", open: true,
+      turns: [
+        { ...said("u1", "Summarize OPS-35"), attached: [{ kind: "issue", projectId: 3, issueId: 35, label: "OPS-35", title: null }] },
+        { id: "a1", role: "assistant", answer: { ...answered("a1", "OPS-35 is done.").answer!, model: "qwen3:8b", read } },
+        answered("a2", "A fallback without a model."),
+      ],
+    });
+    render(<CommandBar />);
+
+    expect(screen.getByText("qwen3:8b · read OPS-35 and 3 comments")).toBeInTheDocument();
+    expect(screen.getByText("Attached to your request: OPS-35")).toBeInTheDocument();
+    // Sans modèle, pas de ligne : aucun modèle n'a rien lu.
+    expect(screen.getAllByLabelText(/^What the model read/)).toHaveLength(1);
   });
 
   it("reads the latest answer large, and the turns before its request smaller", () => {
@@ -175,16 +182,6 @@ describe("CommandBar : la barre flotte, la conversation s'ouvre au-dessus, sans 
     expect(screen.getByRole("region", { name: "Conversation with Cortex" }).querySelector(".cortex-latest")).toBeNull();
     expect(turnWith("Two issues are blocked.")).toHaveClass("cortex-earlier");
     expect(turnWith("Who owns them?")).not.toHaveClass("cortex-earlier");
-  });
-
-  it("keeps the conversation and the bar clear of a panel open on the right", () => {
-    usePanelStore.getState().openPanel({ id: "workflows", title: "AI Workflows", content: null });
-    useCortexStore.setState({ workspace: "acme", open: true });
-    render(<CommandBar />);
-
-    const room = screen.getByRole("region", { name: "Conversation with Cortex" }).closest<HTMLElement>("[style*='--cortex-right']");
-    expect(room?.style.getPropertyValue("--cortex-right")).toBe("420px");
-    expect(room?.style.getPropertyValue("--cortex-left")).toBe("0px");
   });
 
   it("tells when an answer waits while the conversation is folded", () => {

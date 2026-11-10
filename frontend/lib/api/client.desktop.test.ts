@@ -16,6 +16,7 @@ const { mockInstance, mockAxios } = vi.hoisted(() => {
     create: vi.fn(() => instance),
     post: vi.fn(),
     isAxiosError: vi.fn(),
+    isCancel: vi.fn(() => false),
   };
   return { mockInstance: instance, mockAxios: axiosMock };
 });

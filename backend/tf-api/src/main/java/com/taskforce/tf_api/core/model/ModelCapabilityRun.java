@@ -28,9 +28,17 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ModelCapabilityRun {
 
+    /** La suite d'une mesure de capacité (V121) ; celle du banc des modèles est {@code BenchmarkSuite.SUITE}. */
+    public static final String CAPABILITY = "capability";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    /** La suite de cas : les capacités (R113) ou le banc des modèles (R131). */
+    @Builder.Default
+    @Column(nullable = false, updatable = false, length = 32)
+    private String suite = CAPABILITY;
 
     @Column(name = "workspace_id", nullable = false, updatable = false)
     private Long workspaceId;
@@ -55,4 +63,20 @@ public class ModelCapabilityRun {
 
     @Column(nullable = false)
     private int passed;
+
+    /** Le temps du premier appel, qui charge le modèle avant que rien ne soit chronométré (R142) ; null sans chargement. */
+    @Column(name = "load_ms")
+    private Long loadMs;
+
+    /** La mémoire que le modèle occupait une fois chargé, en octets, d'après Ollama ; null chez un autre fournisseur. */
+    @Column(name = "memory_bytes")
+    private Long memoryBytes;
+
+    /** Ce qui en tenait sur la carte graphique, en octets ; le reste tournait sur le processeur. */
+    @Column(name = "gpu_bytes")
+    private Long gpuBytes;
+
+    /** Le chargement n'a pas abouti : {@code too_slow} ou {@code failed} ; null quand il a abouti, ou s'il n'y en a pas eu. */
+    @Column(name = "load_problem", length = 16)
+    private String loadProblem;
 }

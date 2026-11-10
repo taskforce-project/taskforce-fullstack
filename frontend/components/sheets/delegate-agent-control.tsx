@@ -1,31 +1,39 @@
 "use client"
 
 import { useEffect } from "react"
-import { Ban, Loader2, CircleCheck, TriangleAlert } from "lucide-react"
+import { Activity } from "lucide-react"
 
-import { RunActivity } from "@/components/sheets/run-activity"
+import { MissionStepIcon } from "@/components/delivery/mission-steps"
+import { PaneLink } from "@/components/layout/pane-link"
+import { WorkDot } from "@/components/layout/work-dot"
+import { PendingApproval } from "@/components/sheets/pending-approval"
+import { missionSequence } from "@/lib/delivery/mission-sequence"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { useUserStore } from "@/lib/store/user-store"
+import { missionPath } from "@/lib/window/address"
+import { isMine, runState } from "@/lib/window/missions"
 
 /**
- * État d'un run de délégation sur une issue (TF-AGENT-DELIVERY A2).
- *
- * <p>La délégation elle-même se déclenche depuis le menu <b>Assignee</b> (on choisit un agent comme on
- * choisit une personne) ; la connexion des agents vit dans les réglages « Agents » du workspace. Ce
- * composant montre l'état du run : rien tant qu'aucune délégation, sinon « en cours » (chronologie en direct
- * et validations demandées, lot 5), « terminé » (résumé + lien) ou « échoué » (message). La décision d'accepter
- * le résultat reste humaine.</p>
+ * Une mission en petit, sur l'issue et dans la conversation (R138, TF-J1-16) : la phrase qui dit où elle en est, les cinq
+ * étapes en cinq points, celle en cours, et de quoi ouvrir sa vue du travail. Rien tant qu'aucune délégation ; ce qui attend
+ * la personne se répond ici, là où elle regarde (R133). Le déroulé se lit dans la vue : ceci ne le remplace pas (s10). La
+ * délégation elle-même se déclenche depuis le menu Assignee ; la décision d'accepter le résultat reste humaine.
  */
 export function DelegateAgentControl({
   workspaceSlug,
   issueId,
   goal,
 }: Readonly<{ workspaceSlug: string; projectId: number; issueId: number; goal?: string }>) {
-  const r = usePreferencesStore((s) => s.t.missions.result)
+  const texts = usePreferencesStore((s) => s.t.missionSequence)
+  const workView = usePreferencesStore((s) => s.t.window.workView)
+  const { openMission } = usePaneNavigation()
   const run = useDeliveryStore((s) => s.runs[issueId])
   const fetchRun = useDeliveryStore((s) => s.fetchRun)
   const activity = useDeliveryStore((s) => (run ? s.activity[run.id] : undefined))
   const fetchActivity = useDeliveryStore((s) => s.fetchActivity)
+  const viewerId = useUserStore((s) => s.user?.id)
 
   useEffect(() => {
     fetchRun(workspaceSlug, issueId)
@@ -52,33 +60,40 @@ export function DelegateAgentControl({
 
   if (!run) return null
 
+  const you = isMine(run, viewerId)
+  const sequence = missionSequence(run, activity, texts, you)
+  const current = sequence.steps.find((step) => step.current)
+  const pending = running ? (activity?.approvals ?? []).filter((approval) => approval.status === "PENDING") : []
+
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs">
-      {active ? (
-        <span className="flex items-center gap-1.5 text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin" />
-          {run.status === "QUEUED" ? "Waiting for your runner to pick it up" : "Agent working on it"} ({run.providerKey})…
+    <div className="flex flex-col gap-1.5 border border-border bg-muted/20 px-3 py-2 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <span className="flex min-w-0 items-center gap-2 text-foreground">
+          <WorkDot state={runState(run)} />
+          <span className="min-w-0 break-words">{sequence.status}</span>
         </span>
-      ) : run.status === "DONE" ? (
-        // Le résultat se relit sur sa carte, sous le titre de l'issue (R78) ; ici, où il en est.
-        <span className="flex items-center gap-1.5 font-medium text-ink-green">
-          <CircleCheck className="size-3.5" />
-          {run.outcome === "APPLIED" ? r.applied
-            : run.outcome === "DISCARDED" ? r.discarded
-            : run.outcome === "MARKED_DONE" ? r.markedDone
-            : r.readyAbove}
+        {/* Le pouls de la mission mène à sa vue du travail, dans le volet (R95, point 3). */}
+        <PaneLink
+          href={missionPath(workspaceSlug, run.id)}
+          open={() => openMission(run.id)}
+          className="flex shrink-0 items-center gap-1 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+        >
+          <Activity className="size-3.5" aria-hidden="true" /> {workView}
+        </PaneLink>
+      </div>
+      <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
+        <span className="flex shrink-0 items-center gap-0.5">
+          {sequence.steps.map((step) => (
+            <MissionStepIcon key={step.key} state={step.state} label={`${step.name}: ${texts.states[step.state]}`} className="size-3.5" />
+          ))}
         </span>
-      ) : run.refused ? (
-        // Une règle a refusé la mission au départ : ce n'est pas une panne, la raison dit quoi faire (R38).
-        <span className="flex items-center gap-1.5 text-muted-foreground">
-          <Ban className="size-3.5" /> Not started{run.error ? ` - ${run.error}` : ""}
-        </span>
-      ) : (
-        <span className="flex items-center gap-1.5 text-destructive">
-          <TriangleAlert className="size-3.5" /> Agent failed{run.error ? ` - ${run.error}` : ""}
-        </span>
-      )}
-      <RunActivity slug={workspaceSlug} runId={run.id} activity={activity} live={running} goal={goal} />
+        {current && current.state !== "not-started" && (
+          <span className="min-w-0 truncate" title={current.sentence}>{current.name}: {current.sentence}</span>
+        )}
+      </div>
+      {pending.map((approval) => (
+        <PendingApproval key={approval.id} slug={workspaceSlug} runId={run.id} approval={approval} goal={goal} run={run} compact />
+      ))}
     </div>
   )
 }

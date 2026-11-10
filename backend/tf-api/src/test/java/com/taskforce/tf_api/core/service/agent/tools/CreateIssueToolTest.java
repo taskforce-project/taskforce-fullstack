@@ -35,8 +35,11 @@ import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
+import com.taskforce.tf_api.core.service.agent.Question;
+import com.taskforce.tf_api.core.service.agent.QuestionNeeded;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -100,13 +103,13 @@ class CreateIssueToolTest {
     }
 
     @Test
-    @DisplayName("métadonnées : project et title requis ; chaque description tient dans les 160 caractères envoyés")
+    @DisplayName("métadonnées : seul le titre est requis, le projet vient de la demande ou de la conversation (R135) ; chaque description tient dans les 160 caractères envoyés")
     void metadata() {
         CreateIssueTool t = bare();
         assertThat(t.name()).isEqualTo("create_issue");
         @SuppressWarnings("unchecked")
         List<String> required = (List<String>) t.parametersSchema().get("required");
-        assertThat(required).containsExactly("project", "title");
+        assertThat(required).containsExactly("title");
         assertThat(t.description()).hasSizeLessThanOrEqualTo(160);
         @SuppressWarnings("unchecked")
         Map<String, Map<String, Object>> properties = (Map<String, Map<String, Object>>) t.parametersSchema().get("properties");
@@ -517,14 +520,15 @@ class CreateIssueToolTest {
 
     @ParameterizedTest(name = "projet « {0} » : {1}")
     @CsvSource(delimiter = '|', value = {
-        "''     | The project is missing. The projects are: TF (TaskForce), API (API Platform).",
-        "Mobile | No project matches \"Mobile\".",
+        "''     | Which project should \"Rate limiting\" go in?",
+        "Mobile | No project matches \"Mobile\". Which project should \"Rate limiting\" go in?",
     })
     void prepare_asks_which_project(String project, String question) {
-        AgentTool.Prepared asked = tool().prepare(Map.of("project", project, "title", "Rate limiting"), CTX);
-
-        assertThat(asked.asks()).isTrue();
-        assertThat(asked.question()).startsWith(question).contains("ask the person");
+        assertThatThrownBy(() -> tool().prepare(Map.of("project", project, "title", "Rate limiting"), CTX))
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> {
+                assertThat(needed.question().text()).isEqualTo(question);
+                assertThat(needed.question().choices()).extracting(Question.Choice::value).containsExactly("TF", "API");
+            });
         nothingCreated();
     }
 

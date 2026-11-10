@@ -121,13 +121,24 @@ export type DesktopUpdateCheck =
 
 /**
  * État de la mise à jour, envoyé par la coque à chaque changement (cf. `desktop/src/update-state.ts`) : le toast de la
- * mise à jour en montre l'avancement, puis le bouton de redémarrage.
+ * mise à jour en montre l'avancement, puis le bouton de redémarrage. `retry` : cette version devait déjà s'installer au
+ * dernier arrêt, et l'app tourne encore sur la précédente (l'installeur tourne sans fenêtre, c'est le toast qui le dit).
  */
 export type DesktopUpdateState =
   | { status: "idle" }
+  | { status: "installed"; version: string; from: string }
   | { status: "downloading"; version: string; percent: number }
-  | { status: "ready"; version: string }
+  | { status: "ready"; version: string; retry?: boolean }
   | { status: "failed"; version: string; message: string };
+
+/** État du modèle de la voix (cf. `desktop/src/voice.ts`) : sa taille, et ce qui en est déjà sur l'ordinateur. */
+export type DesktopVoiceStatus =
+  | { state: "missing"; bytes: number; received: number }
+  | { state: "downloading"; bytes: number; received: number }
+  | { state: "ready"; bytes: number };
+
+export type DesktopVoiceError = "model" | "engine" | "network" | "checksum" | "disk" | "cancelled";
+export type DesktopVoiceResult<T> = { ok: true; value: T } | { ok: false; error: DesktopVoiceError };
 
 /** Ce que la coque expose à la fenêtre de l'app. */
 export interface DesktopBridge {
@@ -206,6 +217,18 @@ export interface DesktopBridge {
     /** Ouvre une adresse de la webapp dans le navigateur. */
     openWeb(url: string): Promise<void>;
   };
+  /** La voix transcrite sur l'ordinateur (R80, R132). Absente là où le moteur n'est pas embarqué (version du Store). */
+  readonly voice?: {
+    status(): Promise<DesktopVoiceStatus>;
+    /** Rejoint la préparation du modèle, ou la lance : il se télécharge seul, une fois, peu après l'ouverture de l'app. */
+    download(): Promise<DesktopVoiceResult<void>>;
+    /** Avancement du téléchargement ; rend de quoi arrêter l'écoute. */
+    onStatus(callback: (status: DesktopVoiceStatus) => void): () => void;
+    /** Charge le modèle pendant que la personne parle. */
+    prepare(): void;
+    /** Échantillons mono à 16 kHz ; rend le texte dit. */
+    transcribe(samples: Float32Array): Promise<DesktopVoiceResult<string>>;
+  };
   /** Claude Code de la personne et le serveur MCP d'un espace : le jeton personnel va de la page à `claude`. */
   claude: {
     mcpStatus(slug: string): Promise<DesktopResult<DesktopMcpConnection>>;
@@ -230,12 +253,4 @@ export function notifySystem(input: { title: string; body?: string | null; path?
     ...(input.body ? { body: input.body } : {}),
     ...(input.path ? { path: input.path } : {}),
   });
-}
-
-/**
- * App desktop d'un compte déjà configuré en ligne : la personne connaît TaskForce, l'app ne lui remontre pas l'accueil
- * des nouveaux comptes (la visite guidée reste rejouable depuis Ctrl+K). Toujours faux sur la webapp.
- */
-export function onboardedOnline(): boolean {
-  return desktopBridge()?.onboardedOnline === true;
 }

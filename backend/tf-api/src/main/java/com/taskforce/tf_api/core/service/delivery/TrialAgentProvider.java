@@ -12,8 +12,9 @@ import com.taskforce.tf_api.core.service.ai.AiProvider;
 
 /**
  * L'agent à l'essai de R51 (séance n°8), essayé en J1 sur la passerelle (R113, séance n°16) : la boucle minimale de
- * TaskForce ({@link TrialAgentLoop}) avec le modèle de l'instance, pour les tâches qui se rendent en commentaire. Il
- * porte le nom du modèle qui répond (un seul nom dans le menu, pas une liste de moteurs) et se dit à l'essai.
+ * TaskForce ({@link TrialAgentLoop}) avec le modèle de l'instance, pour les tâches qui se rendent en commentaire. À
+ * l'écran il s'appelle Cortex, suivi du modèle qui répond (R144, séance n°20) : rien ne dit qu'il est à l'essai, ce
+ * n'est qu'un drapeau interne ({@link #trial()}, qui le garde hors des recommandations).
  *
  * <ul>
  *   <li>Il ne paraît dans le menu d'une issue que si son projet n'a pas de dépôt : le code reste à Claude Code.</li>
@@ -26,7 +27,7 @@ import com.taskforce.tf_api.core.service.ai.AiProvider;
 public class TrialAgentProvider implements DeliveryAgentProvider {
 
     public static final String KEY = "taskforce-agent";
-    static final String UNNAMED = "TaskForce agent";
+    static final String NAME = "Cortex";
     /** La taille de {@code issue_activity.via} et de {@code issue_comments.via}. */
     static final int MAX_NAME = 60;
 
@@ -41,11 +42,17 @@ public class TrialAgentProvider implements DeliveryAgentProvider {
     @Override public String key()        { return KEY; }
     @Override public boolean trial()     { return true; }
 
-    /** Le nom du modèle qui répondra, celui de Cortex sur l'instance. */
+    /** Cortex, suivi du modèle qui répondra. */
     @Override
     public String displayName() {
         String model = model();
-        return model == null ? UNNAMED : model.length() <= MAX_NAME ? model : model.substring(0, MAX_NAME);
+        return model == null ? NAME : named(model);
+    }
+
+    /** Le nom à l'écran d'une mission sur ce modèle : Cortex, puis le modèle. */
+    static String named(String model) {
+        String name = NAME + " · " + model;
+        return name.length() <= MAX_NAME ? name : name.substring(0, MAX_NAME);
     }
 
     @Override
@@ -72,10 +79,10 @@ public class TrialAgentProvider implements DeliveryAgentProvider {
     @Override
     public String unavailableReason(DeliveryContext context) {
         if (!available()) {
-            return "The AI of this instance isn't answering, so the trial agent can't take a task. Check Settings > AI.";
+            return "The AI of this instance isn't answering, so Cortex can't take a task. Check Settings > AI.";
         }
         if (context.project() != null && hasRepository(context.project())) {
-            return "The trial agent only takes tasks without a repository: delegate this one to Claude Code.";
+            return "Cortex only takes tasks without a repository: delegate this one to Claude Code.";
         }
         return null;
     }
@@ -95,7 +102,7 @@ public class TrialAgentProvider implements DeliveryAgentProvider {
             return new DeliveryPoll(DeliveryRunStatus.RUNNING, null, null, null);
         }
         return new DeliveryPoll(DeliveryRunStatus.FAILED, null, null,
-            "The trial agent stopped when TaskForce restarted. Delegate the task again.");
+            "Cortex stopped when TaskForce restarted. Delegate the task again.");
     }
 
     private String model() {

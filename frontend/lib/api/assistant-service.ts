@@ -34,22 +34,36 @@ export interface AssistantToolCall {
   ref?: string | null
   /** L'issue que touche un geste du MCP TaskForce, dont la conversation montre les cartes (ADR-024). */
   target?: AssistantTarget | null
-  /** Ce que TaskForce demande avant le geste (R115), avec un statut question : la carte montre ses choix. */
-  question?: AssistantQuestion | null
+  /**
+   * Ce que TaskForce demande avant le geste (R115), avec un statut question : deux questions au plus dans la même carte,
+   * qui montre leurs choix et part d'un seul envoi.
+   */
+  questions?: AssistantQuestion[] | null
 }
 /**
- * Une question de TaskForce (R115, séance n°17) : l'argument que la réponse remplit, la question, et ses choix, le défaut
- * d'abord quand il y en a un. Une réponse tapée est toujours possible.
+ * Une question de TaskForce (R115, séance n°17), dans la forme des questions de Claude (décision du CEO, 05/11/2026) :
+ * l'argument que la réponse remplit, un titre court, la question, si plusieurs choix se cochent, et ses choix, quatre au
+ * plus, le recommandé d'abord. Une réponse tapée (« Other ») est toujours possible.
  */
 export interface AssistantQuestion {
   field: string
+  header: string | null
   text: string
+  multiple: boolean
   choices: AssistantChoice[]
 }
+/** Un choix : la valeur que reçoit le geste, ce que la carte en montre, ce qu'il veut dire en une ligne, s'il est recommandé. */
 export interface AssistantChoice {
   value: string
   label: string
+  description: string | null
   recommended: boolean
+}
+/** La réponse à une question de la carte : les valeurs des choix cochés, et ce qui est tapé dans « Other ». */
+export interface QuestionAnswer {
+  field: string
+  values: string[]
+  other?: string
 }
 /** Ce que la personne voit quand elle écrit (R114) : le projet ouvert et l'issue ouverte, par leurs ids. */
 export interface AssistantScreen {
@@ -62,6 +76,8 @@ export interface AssistantTarget {
   projectId: number
   key: string | null
   title: string
+  /** La colonne où est l'issue, que la carte d'une suppression montre avec sa clé (test du CEO du 05/11/2026). */
+  column?: string | null
   runId?: number | null
   /** Pour une suppression demandée : ce qui partirait avec l'issue, et si elle est déjà archivée. */
   comments?: number
@@ -79,16 +95,24 @@ export interface AssistantActionResult {
   /** L'issue d'un geste accordé (sa mission, une fois confiée à un agent). */
   target?: AssistantTarget | null
 }
-/** Tokens réellement consommés par le tour (usage LLM cumulé). */
+/**
+ * Tokens réellement consommés par le tour (usage LLM cumulé), et ce que le modèle a lu à son dernier appel : la taille de
+ * ce prompt et sa fenêtre de contexte : celle que la passerelle a donnée (Ollama), celle que le fournisseur dit de ce
+ * modèle, ou la valeur prudente des réglages, dite comme telle par `contextEstimated` (TF-J1-13).
+ */
 export interface AssistantUsage {
   promptTokens: number
   completionTokens: number
   totalTokens: number
+  lastPromptTokens?: number
+  contextWindow?: number | null
+  contextEstimated?: boolean
 }
 export interface AssistantAnswer {
   answer: string
   reasoning: string | null
-  mode: "fast" | "deep" | "fallback"
+  /** « stopped » : la personne a arrêté ce tour (R134). « not_sent » : trop grande pour la fenêtre du modèle, elle ne lui a pas été envoyée. */
+  mode: "fast" | "deep" | "fallback" | "stopped" | "not_sent"
   sources: AssistantSource[]
   steps: AssistantStep[]
   toolCalls: AssistantToolCall[]
@@ -98,6 +122,50 @@ export interface AssistantAnswer {
    * corrige une réponse sans outil (R116). Absent d'une réponse rendue avant R116.
    */
   record?: string | null
+  /** Le modèle qui a répondu, tel que la passerelle l'a appelé ; absent d'un repli. */
+  model?: string | null
+  /** Ce que TaskForce a donné à lire à ce modèle, compté (R123, la ligne grise) ; absent d'un repli et des réponses d'avant. */
+  read?: AssistantRead | null
+}
+
+/**
+ * Ce que TaskForce a donné à lire au modèle pour une réponse (R123) : les issues lues en entier et leurs commentaires
+ * donnés, les tableaux montrés (l'écran, ceux joints) et l'issue ouverte, les outils qui lisent et ont abouti, les notes
+ * du Brain OS servies. Compté par le serveur au moment où il le donne, jamais deviné.
+ */
+export interface AssistantRead {
+  issues: { key: string; comments: number }[]
+  boards: { project: string; issues: number; open: string | null }[]
+  tools: { name: string; calls: number }[]
+  notes: number
+  /** Ce que TaskForce a dû faire pour tenir la fenêtre du modèle (TF-J1-13) ; absent quand rien n'a été touché. */
+  context?: ContextRead | null
+  /** Les notes servies au modèle, par leur nom : un clic sur « 5 notes » les nomme (R137). */
+  notesRead?: { id: number; title: string }[]
+  /** Ce que Cortex a fait, geste par geste, gardé pour se relire dans une conversation rouverte. */
+  acts?: { name: string; status: string; key: string | null }[]
+  /** Le temps que la réponse a pris, en millisecondes. */
+  workedMs?: number | null
+  /** Le dossier de la réponse, gardé avec elle : il en fait un cas de la banque, même rouverte. */
+  record?: string | null
+  /** Les fichiers joints à la demande (R134) ; absent des réponses d'avant. */
+  files?: { name: string }[]
+}
+
+/**
+ * Ce qui a changé pour que la requête tienne la fenêtre du modèle : les messages condensés dans le résumé pour ce tour,
+ * ceux qui n'ont pas pu partir, les résultats d'outils raccourcis pendant la boucle. Jamais en silence.
+ */
+export interface ContextRead {
+  summarized: number
+  leftOut: number
+  toolResults: number
+}
+
+/** Ce que la personne joint à sa demande depuis le compositeur (R123) : une issue (son projet et son id), ou un projet. */
+export interface AssistantAttachment {
+  projectId: number
+  issueId?: number | null
 }
 
 /**
@@ -120,6 +188,20 @@ export interface ChatTurnResponse {
   escalation?: ModelEscalation | null
   /** Le modèle vers lequel la personne a envoyé cette demande, d'un clic. */
   sentTo?: string | null
+  /** Le projet de la conversation après ce tour (R135) ; null sans projet, absent d'un serveur plus ancien. */
+  projectId?: number | null
+}
+
+/** Ce qu'un tour envoie en plus de son texte (R134, R135). */
+export interface AgentMessageOptions {
+  /** Le nom de ce tour, pour pouvoir l'arrêter. */
+  turn?: string
+  /** Le projet de la conversation, tel que la rangée le montre : null pour « No project ». */
+  project?: number | null
+  /** Les fichiers texte joints. */
+  files?: readonly { name: string; text: string }[]
+  /** Coupe l'attente côté client, à l'arrêt. */
+  signal?: AbortSignal
 }
 
 /**
@@ -132,32 +214,56 @@ export async function sendAgentMessage(
   conversationId?: number | null,
   screen?: AssistantScreen | null,
   model?: string | null,
+  attach?: readonly AssistantAttachment[] | null,
+  options: AgentMessageOptions = {},
 ): Promise<ChatTurnResponse> {
   // L'écran part avec le message quand la personne regarde un projet (R114) : Cortex le lit avant les notes. Le
-  // modèle, quand la personne envoie la demande à celui que TaskForce propose (R118) ; sans lui, rien ne change.
+  // modèle, quand la personne envoie la demande à celui que TaskForce propose (R118) ; sans lui, rien ne change. Ce
+  // qu'elle a joint depuis le compositeur (R123), quand elle a joint quelque chose. Le projet de la conversation (R135),
+  // dès qu'elle en dit un : c'est lui qui décide, l'écran renseigne.
+  const { turn, project, files, signal } = options
   const body = {
     message, conversationId: conversationId ?? null, ...(screen ? { screen } : {}), ...(model ? { model } : {}),
+    ...(attach && attach.length > 0 ? { attach } : {}),
+    ...(turn ? { turn } : {}),
+    ...(project !== undefined ? { project: { id: project } } : {}),
+    ...(files && files.length > 0 ? { files } : {}),
   }
-  const res = await apiClient.post<{ data: ChatTurnResponse }>(ASSISTANT_ROUTES.CHAT(slug), body, { timeout: AI_TIMEOUT_MS })
+  // Sans toast : ce qui n'a pas marché se dit dans la conversation, là où la réponse devait venir (TF-J1-15).
+  const res = await apiClient.post<{ data: ChatTurnResponse }>(ASSISTANT_ROUTES.CHAT(slug), body, {
+    timeout: AI_TIMEOUT_MS, silentError: true, ...(signal ? { signal } : {}),
+  })
   return res.data.data
 }
 
 /**
- * Une question de TaskForce que la personne peut répondre (R115) : elle porte ses choix, le dossier de la réponse et
- * l'empreinte de la question, que la réponse nomme. Une question d'avant R115 n'a que sa phrase, dans la réponse.
+ * Arrête un tour (R134) : le serveur coupe l'appel au modèle, et rend le tour tel qu'il s'est arrêté, ce qu'il a déjà fait
+ * compris ; null quand il n'a pas encore commencé, qu'il est déjà fini, ou qu'il finit encore.
  */
-export function isQuestionCard(call: AssistantToolCall): call is AssistantToolCall & { question: AssistantQuestion } {
-  return call.status === "question" && Boolean(call.question) && Boolean(call.record) && Boolean(call.ref)
+export async function stopTurn(slug: string, turn: string): Promise<ChatTurnResponse | null> {
+  const res = await apiClient.post<{ data: ChatTurnResponse | null }>(ASSISTANT_ROUTES.STOP(slug), { turn }, { silentError: true })
+  return res.data.data ?? null
 }
 
 /**
- * Répond à une question de TaskForce : la valeur du choix cliqué, ou la réponse tapée. Le geste reprend sur le serveur,
- * sans le modèle, et rend la suite : une autre question, sa carte, ou ce qu'il a fait.
+ * Une carte de questions de TaskForce que la personne peut répondre (R115) : elle porte ses questions, le dossier de la
+ * réponse et l'empreinte de la carte, que les réponses nomment. Une question d'avant R115 n'a que sa phrase, dans la
+ * réponse.
  */
-export async function answerQuestion(slug: string, call: AssistantToolCall, value: string): Promise<AssistantToolCall> {
+export function isQuestionCard(call: AssistantToolCall): call is AssistantToolCall & { questions: AssistantQuestion[] } {
+  return call.status === "question" && (call.questions?.length ?? 0) > 0 && Boolean(call.record) && Boolean(call.ref)
+}
+
+/**
+ * Répond à une carte de TaskForce, toutes ses questions à la fois : pour chacune, les choix cochés ou la réponse tapée.
+ * Le geste reprend sur le serveur, sans le modèle, et rend la suite : d'autres questions, sa carte, ou ce qu'il a fait.
+ */
+export async function answerQuestion(
+  slug: string, call: AssistantToolCall, answers: QuestionAnswer[],
+): Promise<AssistantToolCall> {
   const res = await apiClient.post<{ data: AssistantToolCall }>(
     ASSISTANT_ROUTES.ACTION_ANSWER(slug),
-    { tool: call.name, record: call.record, ref: call.ref, value },
+    { tool: call.name, record: call.record, ref: call.ref, answers },
   )
   return res.data.data
 }
@@ -250,9 +356,4 @@ export function isMission(call: AssistantToolCall): call is AssistantToolCall & 
 export function isDeletion(call: AssistantToolCall): call is AssistantToolCall & { target: AssistantTarget } {
   return call.name === "delete_issue" && call.status === "pending" && Boolean(call.record)
     && typeof call.target?.issueId === "number"
-}
-
-/** Variante texte (compat) : renvoie seulement la réponse markdown. */
-export async function sendAssistantMessage(slug: string, message: string): Promise<string> {
-  return (await sendAgentMessage(slug, message)).answer.answer
 }

@@ -156,5 +156,46 @@ class ScreenContextTest {
         assertThat(shown).isBetween(1L, (long) ScreenContext.MAX_ISSUES);
         // Un titre long se coupe : la clé et le début suffisent.
         assertThat(text).doesNotContain("keeps going on and on");
+        // La ligne grise compte les issues vraiment montrées, sous le plafond (R123).
+        assertThat(screens.read(seeing(12L, null)).issues()).isEqualTo((int) shown);
+    }
+
+    @Test
+    @DisplayName("ce que le tableau a montré, pour la ligne grise (R123) : le projet, les issues montrées, l'issue ouverte")
+    void the_seen_board_is_counted() {
+        IssueResponse open = issue(22L, "TESTTA-2", "Ajouter la version LTS actuelle de Node.js au README", REVIEW, 2);
+        when(issueService.getIssue("acme", 12L, 22L, 7L)).thenReturn(open);
+
+        ScreenContext.Seen seen = screens.read(seeing(12L, 22L));
+
+        assertThat(seen.project()).isEqualTo("TESTTA");
+        assertThat(seen.issues()).isEqualTo(3);
+        assertThat(seen.open()).isEqualTo("TESTTA-2");
+        assertThat(seen.text()).isEqualTo(screens.describe(seeing(12L, 22L)));
+        assertThat(screens.read(new AgentContext("acme", 1L, 7L))).isSameAs(ScreenContext.Seen.NOTHING);
+        assertThat(ScreenContext.Seen.NOTHING.isEmpty()).isTrue();
+    }
+
+    @Test
+    @DisplayName("un projet joint par la personne (R123) : son tableau, sous le titre de ce qu'elle a joint, sans issue ouverte")
+    void an_attached_project_shows_its_board() {
+        ScreenContext.Seen attached = screens.attached(new AgentContext("acme", 1L, 7L), 12L);
+
+        assertThat(attached.text()).startsWith(ScreenContext.ATTACHED).contains("TESTTA-3 Corriger le login");
+        assertThat(attached.project()).isEqualTo("TESTTA");
+        assertThat(attached.open()).isNull();
+        assertThat(screens.attached(new AgentContext("acme", 1L, 7L), null).isEmpty()).isTrue();
+    }
+
+    @Test
+    @DisplayName("la conversation dit où elle travaille (R135) ; sans projet, ou un projet que la personne ne voit plus : rien")
+    void the_project_of_the_conversation() {
+        AgentContext inProject = new AgentContext("acme", 1L, 7L, Screen.NONE, "x", 12L, 1L);
+        assertThat(screens.conversationProject(inProject))
+            .isEqualTo("This conversation works in the project TESTTA \"test taskforce\": what the person asks is about it unless they name another.\n");
+
+        assertThat(screens.conversationProject(new AgentContext("acme", 1L, 7L))).isEmpty();
+        when(projectService.getProject("acme", 13L, 7L)).thenThrow(new ForbiddenException("no"));
+        assertThat(screens.conversationProject(new AgentContext("acme", 1L, 7L, Screen.NONE, "x", 13L, 1L))).isEmpty();
     }
 }

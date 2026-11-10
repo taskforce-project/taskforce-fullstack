@@ -28,6 +28,7 @@ import com.taskforce.tf_api.shared.exception.BusinessException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -36,7 +37,8 @@ import static org.mockito.Mockito.when;
 
 /**
  * Créer un projet, geste du MCP TaskForce (R115, séance n°17) : « crée un projet Next.js », l'exemple de la Présidence,
- * demande le nom, puis où vit son code, sa visibilité dans le même choix ; deux questions au plus, rien n'est créé avant.
+ * demande le nom et où vit son code dans la même carte, sa visibilité dans le même choix ; deux questions au plus, rien
+ * n'est créé avant.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Créer un projet depuis la conversation")
@@ -54,7 +56,7 @@ class ProjectGesturesTest {
         gestures = new ProjectGestures(projectService, repoService, repoHost);
         lenient().when(repoHost.createsRepos("acme")).thenReturn(true);
         lenient().when(repoHost.linksRepos("acme")).thenReturn(true);
-        lenient().when(repoHost.recentRepos("acme", 3)).thenReturn(List.of("acme/web"));
+        lenient().when(repoHost.recentRepos(eq("acme"), anyInt())).thenReturn(List.of("acme/web", "acme/api", "acme/site"));
         lenient().when(projectService.createProject(eq("acme"), eq(7L), any())).thenAnswer(inv -> {
             CreateProjectRequest request = inv.getArgument(2);
             return ProjectResponse.builder().id(31L).identifier(request.getIdentifier()).name(request.getName()).build();
@@ -66,14 +68,106 @@ class ProjectGesturesTest {
     }
 
     private Question asked(String body) {
+        return card(body).get(0);
+    }
+
+    /** La carte que le geste lève sur ces arguments : ses questions, dans l'ordre où la personne les lit. */
+    private List<Question> card(String body) {
         try {
             gestures.create("acme", 7L, args(body));
         } catch (QuestionNeeded needed) {
-            return needed.question();
+            return needed.questions();
         } catch (Exception e) {
             throw new AssertionError(e);
         }
         throw new AssertionError("no question for " + body);
+    }
+
+    /**
+     * Ce qui manque se demande dans une seule carte, deux questions au plus (décision du CEO, 05/11/2026) : « crée un
+     * projet Next.js » demande le nom et où vit son code d'un coup. Cortex lit les mêmes questions avant le geste, et rien
+     * n'est créé avant leurs réponses.
+     */
+    @ParameterizedTest(name = "{0} : {1}")
+    @CsvSource(delimiter = '|', value = {
+        "{}                                              | Name: What should the project be called?",
+        "{\"stack\": \"Next.js\"}                        | Name: What should the project be called?~Repository: Where does its code live?",
+        "{\"name\": \"Next.js\"}                         | Name: What should the project be called?~Repository: Where does its code live?",
+        "{\"stack\": \"Next.js\", \"repository\": \"new\"} | Name: What should the project be called?~Visibility: Who can see the new repository?",
+        "{\"name\": \"Atlas\", \"stack\": \"Next.js\"}   | Repository: Where does the code of Atlas live?",
+        "{\"name\": \"Atlas\", \"repository\": \"new\"}  | Visibility: Who can see the new repository of Atlas?",
+    })
+    void what_is_missing_is_asked_in_one_card(String body, String asked) throws Exception {
+        List<Question> card = card(body);
+
+        assertThat(card).extracting(question -> question.header() + ": " + question.text())
+            .containsExactly(asked.split("~"));
+        assertThat(gestures.questions("acme", args(body))).isEqualTo(card);
+        assertThat(card).noneMatch(Question::multiple); // un nom, un dépôt : une seule réponse chacun
+        verify(projectService, never()).createProject(any(), any(), any());
+        verify(repoService, never()).linkRepo(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("chaque choix se dit en une ligne, le dépôt privé recommandé en premier, quatre choix au plus")
+    void each_choice_says_what_it_means() {
+        List<Question> card = card("{\"stack\": \"Next.js\"}");
+
+        assertThat(card.get(0).choices()).singleElement().satisfies(choice -> {
+            assertThat(choice.value()).isEqualTo("Next.js app");
+            assertThat(choice.description()).isEqualTo("Suggested from your request");
+            assertThat(choice.recommended()).isFalse(); // un nom n'a pas de défaut sûr
+        });
+        Question repository = card.get(1);
+        assertThat(repository.choices()).hasSize(Question.MAX_CHOICES).allMatch(choice -> choice.description() != null);
+        assertThat(repository.choices()).extracting(Question.Choice::label)
+            .containsExactly("Create a new repository", "acme/web", "acme/api", "No repository for now");
+        assertThat(repository.choices()).filteredOn(Question.Choice::recommended).extracting(Question.Choice::value)
+            .containsExactly("new-private");
+        assertThat(repository.choices().get(0).description()).isEqualTo("Private, named after the project, and linked to this project");
+    }
+
+    /**
+     * Test du CEO du 09/11/2026 : « Crée un projet "Recette 113" », et qwen3:8b passe de lui-même un nouveau dépôt. La
+     * personne n'en a rien dit : la carte le propose, et son clic est l'accord ; rien ne se crée avant.
+     */
+    @Test
+    @DisplayName("un nouveau dépôt que seul le modèle demande se propose sur la carte, au nom du projet")
+    void a_new_repository_only_the_model_said_is_offered() throws Exception {
+        List<Question> card = gestures.questions("acme", args("{\"name\": \"Recette 113\", \"repository\": \"new\"}"),
+            "Crée un projet \"Recette 113\"");
+
+        assertThat(card).singleElement().satisfies(question -> {
+            assertThat(question.text()).isEqualTo("Where does the code of Recette 113 live?");
+            assertThat(question.choices().get(0).label()).isEqualTo("Create a new repository");
+            assertThat(question.choices().get(0).value()).isEqualTo("new-private");
+            assertThat(question.choices().get(0).description()).isEqualTo("Private, named recette-113, and linked to this project");
+            assertThat(question.choices().get(0).recommended()).isTrue();
+        });
+        verify(projectService, never()).createProject(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("quand la personne le dit, un nouveau dépôt ne repose pas la question du dépôt")
+    void a_new_repository_the_person_said_keeps_its_visibility_question() throws Exception {
+        List<Question> card = gestures.questions("acme", args("{\"name\": \"Atlas\", \"repository\": \"new\"}"),
+            "Crée un projet Atlas avec un nouveau repo");
+
+        assertThat(card).singleElement().satisfies(question -> assertThat(question.header()).isEqualTo("Visibility"));
+    }
+
+    /** Sur la carte, ce qui ne peut pas se faire ici n'est pas proposé (R15). */
+    @Test
+    @DisplayName("là où aucun dépôt ne se crée, la carte ne propose que ce qui existe, sans s'en excuser")
+    void the_option_is_absent_where_it_cannot_be_done() throws Exception {
+        when(repoHost.createsRepos("acme")).thenReturn(false);
+
+        List<Question> card = gestures.questions("acme", args("{\"name\": \"Recette 113\", \"repository\": \"new\"}"), "Crée un projet");
+
+        assertThat(card).singleElement().satisfies(question -> {
+            assertThat(question.text()).isEqualTo("Where does the code of Recette 113 live?");
+            assertThat(question.choices()).extracting(Question.Choice::value).doesNotContain("new-private", "new-public");
+        });
     }
 
     /** Le nom manque, ou ne dit que la pile : TaskForce le demande, avant de rien créer. */
@@ -104,7 +198,7 @@ class ProjectGesturesTest {
         assertThat(question.field()).isEqualTo("repository");
         assertThat(question.text()).isEqualTo("Where does the code of Atlas live?");
         assertThat(question.choices()).extracting(Question.Choice::value)
-            .containsExactly("new-private", "new-public", "acme/web", "none");
+            .containsExactly("new-private", "acme/web", "acme/api", "none");
         assertThat(question.choices().get(0).recommended()).isTrue();
         assertThat(question.choices()).filteredOn(Question.Choice::recommended).hasSize(1);
         verify(projectService, never()).createProject(any(), any(), any());
@@ -113,8 +207,8 @@ class ProjectGesturesTest {
     /** Ce que TaskForce peut faire ici décide des choix : sans GitHub dans l'app desktop, pas de nouveau dépôt. */
     @ParameterizedTest(name = "crée {0}, lie {1} : {2}")
     @CsvSource(delimiter = '|', value = {
-        "true  | false | new-private,new-public,none",
-        "false | true  | acme/web,none",
+        "true  | false | new-private,none",
+        "false | true  | acme/web,acme/api,acme/site,none",
     })
     void the_choices_are_what_taskforce_can_do_here(boolean creates, boolean links, String choices) {
         when(repoHost.createsRepos("acme")).thenReturn(creates);
@@ -220,13 +314,170 @@ class ProjectGesturesTest {
     }
 
     @Test
-    @DisplayName("une réponse qui n'est pas un dépôt se redemande, et une création impossible ici aussi")
-    void an_answer_that_is_not_a_repository_is_asked_again() {
-        assertThat(asked("{\"name\": \"Atlas\", \"stack\": \"Next.js\", \"repository\": \"the usual one\"}").text())
-            .isEqualTo("\"the usual one\" isn't a repository: write it as owner/name. Where does the code of Atlas live?");
+    @DisplayName("une réponse qui ne nomme aucun de ses dépôts propose les plus proches une fois, puis le projet se crée sans")
+    void an_answer_that_names_no_repository_offers_the_closest_once() throws Exception {
+        Question closest = asked("{\"name\": \"Atlas\", \"stack\": \"Next.js\", \"repository\": \"the usual one\", "
+            + "\"answered\": [\"repository\"]}");
+        assertThat(closest.text()).isEqualTo("None of your repositories is called \"the usual one\": is it one of these?");
+        assertThat(closest.choices()).extracting(Question.Choice::value)
+            .containsExactly("acme/web", "acme/api", "acme/site", "none");
+
+        // La carte des plus proches a déjà été montrée : elle ne revient pas, le projet se crée sans dépôt et le dit.
+        IssueGestures.Gesture done = gestures.create("acme", 7L, args("{\"name\": \"Atlas\", \"stack\": \"Next.js\", "
+            + "\"repository\": \"the usual one\", \"answered\": [\"name\", \"repository\", \"repository\"]}"));
+        assertThat(done.summary()).isEqualTo("Project created in TaskForce: ATLAS \"Atlas\" (id 31). No repository is "
+            + "linked: \"the usual one\" isn't one of your repositories. Link it from the page of Atlas.");
+        verify(repoService, never()).linkRepo(any(), any(), any(), any());
+
         when(repoHost.createsRepos("acme")).thenReturn(false);
         assertThat(asked("{\"name\": \"Atlas\", \"stack\": \"Next.js\", \"repository\": \"new\"}").text())
-            .isEqualTo("TaskForce can't create a repository here. Where does the code of Atlas live?");
+            .isEqualTo("A new repository can't be created from here. Where does the code of Atlas live?");
+    }
+
+    /**
+     * GitHub connecté mais qui ne liste rien (son jeton refusé, la pile de dev le 05/11/2026) : la réponse tapée ne se lit
+     * parmi rien. La carte le dit une fois, puis le projet se crée sans dépôt, et la réponse dit pourquoi.
+     */
+    @Test
+    @DisplayName("ses dépôts illisibles : une carte qui le dit, une fois, puis le projet sans dépôt")
+    void unreadable_repositories_are_said_once() throws Exception {
+        when(repoHost.recentRepos(eq("acme"), anyInt())).thenReturn(List.of());
+        String body = "{\"name\": \"Next.js app\", \"stack\": \"Next.js\", \"repository\": \"test-taskforce est un repo "
+            + "normalement nan ?\", \"answered\": [\"name\", \"repository\"";
+
+        Question card = asked(body + "]}");
+        assertThat(card.text()).isEqualTo("I can't see your repositories here: write it as owner/name, or go on "
+            + "without one.");
+        assertThat(card.choices()).extracting(Question.Choice::value).containsExactly("none");
+
+        IssueGestures.Gesture done = gestures.create("acme", 7L, args(body + ", \"repository\"]}"));
+        assertThat(done.summary()).isEqualTo("Project created in TaskForce: NEXTJSAPP \"Next.js app\" (id 31). No "
+            + "repository is linked: your repositories can't be read from here. Link it from the page of Next.js app.");
+        verify(repoService, never()).linkRepo(any(), any(), any(), any());
+    }
+
+    /**
+     * Test du CEO du 05/11/2026 sur l'app desktop : sa réponse tapée nommait son dépôt sans son propriétaire, dans une
+     * phrase, et la carte revenait. Une réponse tapée se lit parmi ses dépôts, sans la casse, les espaces, les tirets ni le
+     * propriétaire ; un seul, c'est lui.
+     */
+    @ParameterizedTest(name = "« {0} » : {1}")
+    @CsvSource(delimiter = '|', value = {
+        "test-taskforce est un repo normalement nan ?     | Miche1-Pierre/test-taskforce",
+        "test taskforce est un repo regarde bien          | Miche1-Pierre/test-taskforce",
+        "TEST_TASKFORCE                                   | Miche1-Pierre/test-taskforce",
+        "miche1-pierre/TEST-taskforce                     | Miche1-Pierre/test-taskforce",
+        "c'est Miche1-Pierre/test-taskforce               | Miche1-Pierre/test-taskforce",
+        "le repo test                                     | Miche1-Pierre/test",
+    })
+    void a_typed_answer_is_read_among_the_repositories(String answer, String linked) throws Exception {
+        when(repoHost.recentRepos(eq("acme"), anyInt()))
+            .thenReturn(List.of("Miche1-Pierre/site", "Miche1-Pierre/test-taskforce", "Miche1-Pierre/test"));
+        when(repoService.linkRepo(eq("acme"), eq(31L), eq(7L), any()))
+            .thenAnswer(inv -> new ProjectRepoResponse(31L, "github", ((ProjectRepoLinkRequest) inv.getArgument(3)).getRepoFullName()));
+
+        IssueGestures.Gesture done = gestures.create("acme", 7L, args("{\"name\": \"Atlas\", \"stack\": \"Next.js\", "
+            + "\"repository\": \"" + answer + "\", \"answered\": [\"repository\"]}"));
+
+        ArgumentCaptor<ProjectRepoLinkRequest> request = ArgumentCaptor.forClass(ProjectRepoLinkRequest.class);
+        verify(repoService).linkRepo(eq("acme"), eq(31L), eq(7L), request.capture());
+        assertThat(request.getValue().getMode()).isEqualTo("LINK");
+        assertThat(request.getValue().getRepoFullName()).isEqualTo(linked);
+        assertThat(done.summary()).endsWith("Its repository " + linked + " is linked.");
+    }
+
+    @Test
+    @DisplayName("une réponse qui nomme plusieurs dépôts les propose, eux seuls, avec une phrase")
+    void an_answer_that_names_several_repositories_offers_them() {
+        when(repoHost.recentRepos(eq("acme"), anyInt())).thenReturn(List.of("acme/site", "acme/api", "perso/site"));
+
+        Question question = asked("{\"name\": \"Atlas\", \"stack\": \"Next.js\", \"repository\": \"site\"}");
+
+        assertThat(question.text()).isEqualTo("Several of your repositories match \"site\": which one is it?");
+        assertThat(question.choices()).extracting(Question.Choice::value).containsExactly("acme/site", "perso/site", "none");
+    }
+
+    /**
+     * Test du CEO du 05/11/2026 : « Next.js app », que TaskForce proposait, se redemandait une fois choisi. Une réponse
+     * donnée ne se redemande jamais, même quand elle ne dit que la pile ; le modèle, lui, ne nomme pas un projet ainsi.
+     */
+    @ParameterizedTest(name = "nom « {0} », répondu {1} : demandé {2}")
+    @CsvSource(delimiter = '|', value = {
+        "Next.js app | true  | false",
+        "Next.js     | true  | false",
+        "Next.js app | false | true",
+    })
+    void an_answered_name_is_never_asked_again(String name, boolean answered, boolean asked) throws Exception {
+        String body = "{\"name\": \"" + name + "\", \"stack\": \"Next.js\", \"repository\": \"none\""
+            + (answered ? ", \"answered\": [\"name\", \"repository\"]" : "") + "}";
+
+        assertThat(gestures.questions("acme", args(body))).extracting(Question::field)
+            .containsExactlyElementsOf(asked ? List.of("name") : List.of());
+        if (!asked) {
+            assertThat(gestures.create("acme", 7L, args(body)).summary())
+                .startsWith("Project created in TaskForce: NEXTJS");
+        }
+    }
+
+    /**
+     * L'échange du CEO, rejoué : la carte de « crée un projet Next.js », puis ses réponses (le nom proposé, son dépôt dans
+     * une phrase) : le projet se crée avec son dépôt, sans que la carte revienne.
+     */
+    @Test
+    @DisplayName("l'échange du CEO : la carte une fois, puis le projet et son dépôt")
+    void the_ceo_exchange_creates_the_project_with_its_repository() throws Exception {
+        when(repoHost.createsRepos("acme")).thenReturn(false); // l'app desktop : la coque crée les dépôts
+        when(repoHost.recentRepos(eq("acme"), anyInt()))
+            .thenReturn(List.of("Miche1-Pierre/portfolio", "Miche1-Pierre/test-taskforce", "Miche1-Pierre/notes"));
+        when(repoService.linkRepo(eq("acme"), eq(31L), eq(7L), any()))
+            .thenAnswer(inv -> new ProjectRepoResponse(31L, "github", ((ProjectRepoLinkRequest) inv.getArgument(3)).getRepoFullName()));
+
+        List<Question> card = gestures.questions("acme", args("{\"stack\": \"Next.js\"}"), "crée un projet Next.js");
+        assertThat(card).extracting(Question::field).containsExactly("name", "repository");
+        assertThat(card.get(1).choices()).extracting(Question.Choice::value)
+            .containsExactly("Miche1-Pierre/portfolio", "Miche1-Pierre/test-taskforce", "Miche1-Pierre/notes", "none");
+
+        IssueGestures.Gesture done = gestures.create("acme", 7L, args("{\"stack\": \"Next.js\", \"name\": \"Next.js app\", "
+            + "\"repository\": \"test-taskforce est un repo normalement nan ?\", \"answered\": [\"name\", \"repository\"]}"));
+
+        assertThat(done.summary()).isEqualTo("Project created in TaskForce: NEXTJSAPP \"Next.js app\" (id 31). Its "
+            + "repository Miche1-Pierre/test-taskforce is linked.");
+    }
+
+    /**
+     * Les dépôts de la personne, les plus proches du nom du projet d'abord, puis les plus récemment actifs ; un dépôt qui
+     * porte déjà le nom du projet vient en tête, recommandé.
+     */
+    @ParameterizedTest(name = "« {0} », crée {1} : {2}")
+    @CsvSource(delimiter = '|', value = {
+        "Orion          | false | acme/orion-docs,acme/orion-web,acme/api,none",
+        "Orion Web      | false | acme/orion-web*,acme/orion-docs,acme/api,none",
+        "Orion Web      | true  | acme/orion-web*,new-private,acme/orion-docs,none",
+        "Atlas          | true  | new-private*,acme/api,acme/site,none",
+    })
+    void the_closest_repositories_come_first(String name, boolean creates, String choices) {
+        when(repoHost.createsRepos("acme")).thenReturn(creates);
+        when(repoHost.recentRepos(eq("acme"), anyInt()))
+            .thenReturn(List.of("acme/api", "acme/site", "acme/orion-docs", "acme/orion-web"));
+
+        Question question = asked("{\"name\": \"" + name + "\", \"stack\": \"Next.js\"}");
+
+        assertThat(question.choices()).extracting(c -> c.value() + (c.recommended() ? "*" : ""))
+            .containsExactly(choices.split(","));
+    }
+
+    @Test
+    @DisplayName("sans GitHub ici, un dépôt nommé ne se lie pas : le projet se crée, et la réponse dit comment en donner un")
+    void without_github_a_named_repository_is_not_asked_again() throws Exception {
+        when(repoHost.createsRepos("acme")).thenReturn(false);
+        when(repoHost.linksRepos("acme")).thenReturn(false);
+
+        IssueGestures.Gesture done = gestures.create("acme", 7L,
+            args("{\"name\": \"Atlas\", \"stack\": \"Next.js\", \"repository\": \"acme/web\"}"));
+
+        assertThat(done.summary()).isEqualTo("Project created in TaskForce: ATLAS \"Atlas\" (id 31). No repository can be linked from here: "
+            + "connect GitHub in Settings > Integrations, then link one from the project's page.");
+        verify(repoService, never()).linkRepo(any(), any(), any(), any());
     }
 
     @ParameterizedTest(name = "« {0} » : dépôt {1}, clé {2}")

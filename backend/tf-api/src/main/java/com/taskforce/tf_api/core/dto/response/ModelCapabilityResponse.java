@@ -41,17 +41,30 @@ public record ModelCapabilityResponse(
     public record CaseInfo(String key, String capability, String title) {
     }
 
-    /** Une ligne : un modèle servi, s'il répond à Cortex pour la personne, sa dernière mesure. */
-    public record ModelRow(String model, boolean current, LocalDateTime measuredAt, List<Score> scores) {
+    /**
+     * Une ligne : un modèle servi, s'il répond à Cortex pour la personne, sa dernière mesure, et ce que dit sa fiche chez
+     * le fournisseur ({@code card}, sur Ollama ; {@code null} ailleurs). Le volet « Progress » montre la fiche comme
+     * telle tant que le modèle n'est pas mesuré, jamais comme une note (R113, R125). {@code failedCases} : les clés des
+     * cas ratés à leur dernière note, dans l'ordre de la suite, pour le détail de la ligne (R130).
+     */
+    public record ModelRow(String model, boolean current, LocalDateTime measuredAt, List<Score> scores, Card card,
+                           List<String> failedCases) {
+    }
+
+    /**
+     * La fiche d'un modèle chez son fournisseur : sa taille ({@code parameters}, « 8.2B »), sa fenêtre de contexte en
+     * jetons, s'il prend des outils. Chaque valeur est {@code null} quand la fiche ne la dit pas.
+     */
+    public record Card(String parameters, Integer contextWindow, Boolean tools) {
     }
 
     /**
      * Une cellule : la dernière note de chaque cas de la capacité. {@code capable} quand tous ses cas sont mesurés et
      * réussis. {@code heldWords}, pour le contexte : le plus long document tenu, en mots (0 si aucun ; {@code null} sans
-     * mesure).
+     * mesure). {@code tooSlow} : les cas qui n'ont pas répondu dans leur budget, ni réussis ni comptés dans {@code measured}.
      */
     public record Score(String capability, int passed, int measured, int total, boolean capable, Integer heldWords,
-                        LocalDateTime measuredAt) {
+                        LocalDateTime measuredAt, int tooSlow) {
     }
 
     /** Le premier modèle capable d'une capacité, dans l'ordre de la table. */
@@ -62,8 +75,8 @@ public record ModelCapabilityResponse(
     public record RunStarted(Long runId, String model, LocalDateTime startedAt, List<String> cases) {
     }
 
-    /** La note d'un cas : chaque critère, ce que le modèle a appelé, un extrait de sa réponse, la taille du prompt. */
+    /** La note d'un cas : chaque critère, ce que le modèle a appelé, un extrait de sa réponse, la taille du prompt, s'il a été trop lent. */
     public record CaseResult(String caseKey, String capability, boolean passed, List<EvalGrader.Check> checks,
-                             List<ReplayOutcome.ReplayCall> calls, String answer, String model, long promptTokens) {
+                             List<ReplayOutcome.ReplayCall> calls, String answer, String model, long promptTokens, boolean tooSlow) {
     }
 }

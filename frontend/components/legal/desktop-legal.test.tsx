@@ -21,4 +21,10 @@ describe("DesktopLegal", () => {
     expect(screen.getByText(/sends no usage data/)).toBeInTheDocument()
     expect(screen.queryByText(/cookies/i)).not.toBeInTheDocument()
   })
+
+  it("confidentialité : le modèle de voix vient de Hugging Face après le premier démarrage, et la date du changement est dite", () => {
+    render(<DesktopLegal kind="privacy" />)
+    expect(screen.getByText(/After its\s+first start, the app downloads the speech model once from Hugging Face/)).toBeInTheDocument()
+    expect(screen.getByText("Last updated: 9 November 2026.")).toBeInTheDocument()
+  })
 })

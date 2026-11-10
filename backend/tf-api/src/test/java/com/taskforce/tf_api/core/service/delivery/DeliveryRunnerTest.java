@@ -13,11 +13,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.taskforce.tf_api.core.enums.DeliveryRunOutcome;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkType;
@@ -39,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -64,8 +67,45 @@ class DeliveryRunnerTest {
     @Mock private IssueGitHubLinkRepository linkRepository;
     @Mock private MissionEvidenceService evidenceService;
     @Mock private IssueService issueService;
+    @Mock private DeliveryActivityService activityService;
 
     @InjectMocks private DeliveryRunner runner;
+
+    /** (la fin de la mission, ses demandes ouvertes se closent ?) */
+    static Stream<Arguments> endsOfAMission() {
+        return Stream.of(
+            Arguments.of(new DeliveryPoll(DeliveryRunStatus.DONE, "Pull request opened", "https://example.com/pull/10", null), true),
+            Arguments.of(new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "Runner lost: no heartbeat for more than 10 min."), true),
+            Arguments.of(new DeliveryPoll(DeliveryRunStatus.RUNNING, null, null, null), false));
+    }
+
+    @ParameterizedTest(name = "{0} : demandes closes = {1}")
+    @MethodSource("endsOfAMission")
+    @DisplayName("R128 : quelle que soit sa fin, runner perdu compris, une mission clôt ses demandes ouvertes, avant son dossier")
+    void a_mission_that_ends_closes_its_open_requests(DeliveryPoll poll, boolean closed) {
+        Project project = mock(Project.class);
+        lenient().when(project.getId()).thenReturn(400L);
+        Issue issue = mock(Issue.class);
+        lenient().when(issue.getProject()).thenReturn(project);
+        DeliveryRun run = DeliveryRun.builder()
+            .id(41L).issue(issue).providerKey("claude-code").status(DeliveryRunStatus.RUNNING).externalRef("ref-41").build();
+        when(runRepository.findById(41L)).thenReturn(Optional.of(run));
+        DeliveryAgentProvider provider = mock(DeliveryAgentProvider.class);
+        when(provider.poll(eq("ref-41"), any())).thenReturn(poll);
+        when(registry.get("claude-code")).thenReturn(provider);
+        lenient().when(issueStatusRepository.findByProjectIdAndName(eq(400L), anyString())).thenReturn(Optional.empty());
+        lenient().when(issueStatusRepository.findByProjectIdOrderByPosition(400L)).thenReturn(List.of());
+        lenient().when(issueStatusRepository.save(any(IssueStatus.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        runner.refresh(41L);
+
+        verify(activityService, times(closed ? 1 : 0)).closeApprovals(run);
+        if (closed) {
+            InOrder order = inOrder(activityService, evidenceService);
+            order.verify(activityService).closeApprovals(run);
+            order.verify(evidenceService).end(run, poll);
+        }
+    }
 
     @Test
     @DisplayName("provider « push » : dispatch puis poll -> DONE (résumé + lien), issue déplacée vers « In review by AI »")
@@ -198,6 +238,25 @@ class DeliveryRunnerTest {
         runner.complete(31L, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "late failure"));
         assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.DONE);
         assertThat(run.getError()).isNull();
+        verifyNoMoreInteractions(notificationService);
+    }
+
+    @Test
+    @DisplayName("complete : une mission arrêtée par la personne reste où elle est, sans notification (R138)")
+    void stopped_run_does_not_move_the_issue() {
+        Issue issue = mock(Issue.class);
+        DeliveryRun run = DeliveryRun.builder().id(33L).issue(issue).providerKey("claude-code")
+            .status(DeliveryRunStatus.RUNNING).outcome(DeliveryRunOutcome.STOPPED).build();
+        when(runRepository.findById(33L)).thenReturn(Optional.of(run));
+        DeliveryPoll stopped = new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "Stopped by Ada.");
+
+        runner.complete(33L, stopped);
+
+        assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.FAILED);
+        assertThat(run.getError()).isEqualTo("Stopped by Ada.");
+        verify(activityService).closeApprovals(run);
+        verify(evidenceService).end(run, stopped);
+        verify(issue, never()).setStatus(any(IssueStatus.class));
         verifyNoMoreInteractions(notificationService);
     }
 

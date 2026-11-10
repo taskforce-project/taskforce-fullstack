@@ -26,11 +26,17 @@ import java.util.regex.Pattern;
  */
 public final class CortexPlans {
 
+    /** Résumer : une issue nommée s'y lit avant le modèle ({@link IssueMaterial}). */
+    public static final String SUMMARIZE = "summarize";
+
     /** Les plans, dans l'ordre qui départage deux plans nommés au même endroit du message. */
-    static final List<String> IDS = List.of("delete", "create-project", "move-assign", "what-changed", "summarize");
+    static final List<String> IDS = List.of("delete", "create-project", "move-assign", "what-changed", SUMMARIZE);
     /** Un plan tient sur un écran : la condition de Rus au vote de R117. */
     static final int MAX_LINES = 12;
     static final int MAX_CHARS = 1000;
+
+    /** Au-delà, un texte collé plutôt qu'une demande (l'ancien plafond des messages). */
+    static final int MAX_REQUEST = 4_000;
 
     private static final int FLAGS = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS;
     private static final String SEPARATOR = "---";
@@ -60,7 +66,8 @@ public final class CortexPlans {
 
     /** Le plan de cette demande : celui qu'elle nomme en premier, l'ordre des plans départageant ; aucun sinon. */
     public static Optional<Plan> forRequest(String message) {
-        if (message == null || message.isBlank()) return Optional.empty();
+        // Un long texte collé n'est pas une demande courante : ses mots (« delete », « résume ») n'appellent aucun plan.
+        if (message == null || message.isBlank() || message.length() > MAX_REQUEST) return Optional.empty();
         String said = message.replace('’', '\'');
         return PLANS.stream()
             .filter(plan -> plan.position(said) >= 0)

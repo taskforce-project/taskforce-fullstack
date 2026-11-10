@@ -3,14 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useParams } from "next/navigation"
-import { Sparkles, ExternalLink, ChevronDown, ChevronRight, RefreshCw } from "lucide-react"
+import { Sparkles, ExternalLink, ChevronRight, RefreshCw } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { contextGauge } from "@/lib/cortex/context-gauge"
+import { useAiStatusStore } from "@/lib/store/ai-status-store"
+import { useCortexStore } from "@/lib/store/cortex-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
-
-/** Fenêtre de contexte du modèle local (approx.) - sert la jauge « fenêtre de contexte ». */
-const CONTEXT_WINDOW = 32_768
 
 const fmt = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n)
@@ -52,11 +53,19 @@ function Ring({ pct }: { pct: number }) {
  * Modal « façon Claude » sous l'input du chat : **fenêtre de contexte** + **consommation du mois**
  * (vs le plafond de l'instance s'il y en a un, avec réinitialisation), modèle + refresh en pied.
  * Auto-porté (pas de portail) pour rester bien positionné dans le panneau flottant.
+ *
+ * La jauge de contexte compare ce que Cortex a envoyé au modèle pour sa dernière réponse à la fenêtre que la
+ * passerelle a donnée à cette requête, et le dit en une ligne (test du CEO de la 1.10.0 : le cumul de la conversation
+ * contre une fenêtre écrite en dur donnait « 45k / 33k (100%) », sans rien dire).
  */
-export function CortexUsage({ sessionTokens, className }: { sessionTokens: number; className?: string }) {
+export function CortexUsage({ className }: { className?: string }) {
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const openSettings = useSettingsStore((s) => s.openSettings)
+  const t = usePreferencesStore((s) => s.t.cortex)
+  const context = useCortexStore((s) => s.context)
+  // La plus grande fenêtre que la passerelle donne au modèle de Cortex (Ollama), que la ligne de la jauge dit.
+  const maximum = useAiStatusStore((s) => s.status?.fastContextWindow ?? s.status?.contextWindow ?? null)
 
   const [open, setOpen] = useState(false)
   const [usage, setUsage] = useState<AiUsage | null>(null)
@@ -114,7 +123,7 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
     }
   }, [open, place])
 
-  const ctxPct = pctOf(sessionTokens, CONTEXT_WINDOW)
+  const gauge = contextGauge(context, maximum, t)
   const unlimited = usage ? usage.limitTokens < 0 : false
   const usePct = usage && !unlimited ? pctOf(usage.usedTokens, usage.limitTokens) : 0
   const useTone = usePct >= 90 ? "rose" : usePct >= 70 ? "amber" : "blue"
@@ -122,15 +131,16 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
 
   return (
     <div ref={ref} className={cn("relative", className)}>
+      {/* Un petit anneau, à droite de la rangée sous la boîte (R134) : son nom et sa valeur au survol. */}
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        title="Context window & usage"
+        aria-expanded={open}
+        aria-label={gauge.value ? `${t.gaugeLabel}: ${gauge.value}` : t.gaugeLabel}
+        title={gauge.value ? `${t.gaugeLabel}: ${gauge.value}` : t.gaugeLabel}
+        className="flex size-6 items-center justify-center rounded text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground motion-reduce:transition-none"
       >
-        <Ring pct={ctxPct} />
-        <span className="font-medium">Cortex</span>
-        <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} />
+        <Ring pct={gauge.pct} />
       </button>
 
       {open && coords && typeof document !== "undefined" && createPortal(
@@ -148,11 +158,12 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
             >
               <span className="text-muted-foreground">Context window</span>
               <span className="flex items-center gap-1 tabular-nums font-medium">
-                {fmt(sessionTokens)} / {fmt(CONTEXT_WINDOW)} <span className="text-muted-foreground">({ctxPct}%)</span>
-                <ChevronRight className="size-3 text-muted-foreground" />
+                {gauge.value}
+                <ChevronRight className="size-4 text-muted-foreground" />
               </span>
             </button>
-            <div className="mt-1.5"><Bar pct={ctxPct} tone={ctxPct >= 90 ? "rose" : ctxPct >= 70 ? "amber" : "blue"} /></div>
+            {context?.window ? <div className="mt-1.5"><Bar pct={gauge.pct} tone={gauge.tone} /></div> : null}
+            <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{gauge.line}</p>
           </div>
 
           <div className="h-px bg-border" />
@@ -165,11 +176,11 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
               className="flex w-full items-center justify-between text-left text-xs font-semibold transition-colors hover:text-foreground"
             >
               <span>Monthly usage</span>
-              <ChevronRight className="size-3 text-muted-foreground" />
+              <ChevronRight className="size-4 text-muted-foreground" />
             </button>
 
             <div className="mt-2 space-y-1">
-              <div className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">This month</span>
                 <span className="tabular-nums">
                   {usage
@@ -181,7 +192,7 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
               </div>
               <Bar pct={unlimited ? 4 : usePct} tone={unlimited ? "blue" : useTone} />
               {usage && (
-                <div className="flex items-center justify-between text-[10px] text-muted-foreground/70">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span className="tabular-nums">
                     {fmt(usage.usedTokens)} {unlimited ? "" : `/ ${fmt(usage.limitTokens)} `}tokens
                   </span>
@@ -196,23 +207,24 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
           {/* Pied : modèle + refresh + actions (façon Claude « Opus 4.8 Max ») */}
           <div className="flex items-center justify-between gap-2 px-3 py-2">
             <span className="flex items-center gap-1.5 text-xs font-medium">
-              <Sparkles className="size-3.5 text-primary" /> Cortex
+              <Sparkles className="size-4 text-primary" /> Cortex
             </span>
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => void load(true)}
                 className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                title="Actualiser"
+                title={t.gaugeRefresh}
+                aria-label={t.gaugeRefresh}
               >
-                <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
+                <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
               </button>
               <button
                 type="button"
                 onClick={openDetails}
-                className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium transition-colors hover:bg-muted"
+                className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors duration-150 hover:bg-muted motion-reduce:transition-none"
               >
-                <ExternalLink className="size-3" /> Details
+                <ExternalLink className="size-4" /> Details
               </button>
             </div>
           </div>

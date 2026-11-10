@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.service.mcpserver;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -77,25 +78,60 @@ final class CortexMcpTool implements CortexGesture {
     }
 
     /**
-     * Ce que le geste exige toujours (R115) : l'issue, résolue parmi ce que la personne voit ou demandée avec les issues
-     * de l'écran en choix, puis un texte qui manque (le commentaire), demandé en réponse libre. Les besoins qu'un geste
-     * juge lui-même ({@code when}, créer un projet) se demandent dans son exécution.
+     * Ce qu'il manque au geste (R115), dans une seule carte de deux questions au plus (décision du CEO, 05/11/2026) :
+     * l'issue, résolue parmi ce que la personne voit ou demandée avec les issues de l'écran en choix ; un texte qui
+     * manque (le commentaire), en réponse libre ; puis ce que le geste demande lui-même avant d'écrire (créer un projet :
+     * son nom et où vit son code), sur les arguments sans les mots que le modèle a mis à la place de ceux de la personne.
      */
     @Override public Map<String, Object> ask(Map<String, Object> args, AgentContext ctx) {
-        JsonNode resolved = resolved(args, ctx);
+        Map<String, Object> given = fromTheModel(args, ctx);
+        List<Question> asked = new ArrayList<>();
+        JsonNode resolved;
+        try {
+            resolved = resolved(given, ctx);
+        } catch (QuestionNeeded needed) {
+            asked.addAll(needed.questions());
+            resolved = mapper.valueToTree(given);
+        }
+        ObjectNode own = resolved.deepCopy();
+        Map<String, Question.Choice> proposed = new LinkedHashMap<>();
         for (McpTool.Need need : tool.needs()) {
             JsonNode value = resolved.path(need.field());
             boolean missing = value.isMissingNode() || value.isNull() || (value.isTextual() && value.asText().isBlank());
             // Un nom que la demande ne dit pas, le modèle l'a inventé (« Web Application » pour « crée un projet Next.js »,
             // qwen3:8b, 04/11/2026) : TaskForce le demande, la proposition du modèle en suggestion.
             if (need.ownWords() && !missing && ctx.request() != null && !said(value.asText(), ctx.request())) {
-                throw new QuestionNeeded(new Question(need.field(), need.question(),
-                    List.of(Question.Choice.of(value.asText().strip(), value.asText().strip()))));
+                String word = value.asText().strip();
+                proposed.put(need.field(), Question.Choice.of(word, word, "Cortex's suggestion: your request gives none"));
+                own.remove(need.field());
+                continue;
             }
             if (!need.isAsked() || need.when() != null || ISSUE.equals(need.field())) continue;
-            if (missing) throw new QuestionNeeded(Question.free(need.field(), need.question()));
+            if (missing) asked.add(Question.free(need.field(), need.header(), need.question()));
         }
+        if (tool.asker() != null) {
+            for (Question question : tool.asker().ask(ctx.slug(), ctx.userId(), own, ctx.request())) {
+                Question.Choice suggestion = proposed.remove(question.field());
+                asked.add(suggestion == null ? question : question.suggesting(suggestion));
+            }
+        }
+        // Une proposition que le geste ne redemande pas : TaskForce la demande lui-même, la proposition en choix.
+        proposed.forEach((field, suggestion) -> tool.needs().stream().filter(need -> need.field().equals(field))
+            .findFirst().ifPresent(need -> asked.add(Question.of(field, need.header(), need.question(), List.of(suggestion)))));
+        if (!asked.isEmpty()) throw new QuestionNeeded(asked);
         return mapper.convertValue(resolved, MAP);
+    }
+
+    /**
+     * Les arguments d'un tour du modèle, sans ce que seul le serveur écrit : les réponses de la personne sur les cartes
+     * ({@link Question#ANSWERED}). Hors d'un tour du modèle (une réponse à une carte, un accord), ils restent tels quels.
+     */
+    private static Map<String, Object> fromTheModel(Map<String, Object> args, AgentContext ctx) {
+        Map<String, Object> given = args == null ? Map.of() : args;
+        if (ctx.request() == null || !given.containsKey(Question.ANSWERED)) return given;
+        Map<String, Object> kept = new LinkedHashMap<>(given);
+        kept.remove(Question.ANSWERED);
+        return kept;
     }
 
     /** La valeur se lit dans la demande, sans la casse, les accents, les espaces ni la ponctuation. */
@@ -123,12 +159,14 @@ final class CortexMcpTool implements CortexGesture {
     /**
      * Les arguments avec les ids de l'issue, pour un geste qui en touche une : nommée par sa clé, ou par ce que la
      * personne lit à l'écran ; sinon la question de TaskForce, avec les issues de l'écran. Les autres gestes les gardent.
+     * Pour supprimer, la colonne que la demande nomme désigne l'issue, plutôt que le titre que le modèle a choisi.
      */
     private JsonNode resolved(Map<String, Object> args, AgentContext ctx) {
         JsonNode named = mapper.valueToTree(args == null ? Map.of() : args);
         McpTool.Need issue = tool.needs().stream().filter(need -> ISSUE.equals(need.field())).findFirst().orElse(null);
         if (issue == null) return gestures.withIds(ctx.slug(), ctx.userId(), named);
-        return gestures.issueOf(ctx.slug(), ctx.userId(), ctx.screen(), named, issue.question());
+        String request = IssueGestures.NAMED_BY_COLUMN.contains(tool.name()) ? ctx.request() : null;
+        return gestures.issueOf(ctx.slug(), ctx.userId(), ctx.screen(), named, issue.question(), request);
     }
 
     private String write(Object value) {

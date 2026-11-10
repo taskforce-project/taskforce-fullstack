@@ -13,9 +13,12 @@ import {
   issueDraftInput, localDay, memberName, namedColumn, openCycles, readIssueDraft,
   type DraftPriority, type DraftProblem, type IssueDraft,
 } from "@/lib/cortex/issue-draft"
+import { useCortexStore } from "@/lib/store/cortex-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { cn } from "@/lib/utils"
+import { Markdown } from "@/components/ui/lightweight-markdown"
+import { LinkedText } from "./answer-links"
 import { UndoAction } from "./undo-action"
 
 type CardState = "draft" | "creating" | "created" | "failed"
@@ -48,6 +51,7 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
   const t = usePreferencesStore((s) => s.t.cortex)
   const projects = useProjectStore((s) => s.projects)
   const fetchProjects = useProjectStore((s) => s.fetchProjects)
+  const noteDone = useCortexStore((s) => s.noteDone)
   const [draft, setDraft] = useState<IssueDraft>(() => readIssueDraft(call.input))
   const [editing, setEditing] = useState(false)
   const [columns, setColumns] = useState<IssueStatus[]>([])
@@ -105,7 +109,10 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
       const result = await approveAction(slug, { ...call, input: issueDraftInput(sent) })
       setOutput(result.output)
       // L'outil dit ce qui l'arrête dans sa sortie : seule « Created … » est une issue créée.
-      setState(result.status === "success" && result.output.startsWith("Created ") ? "created" : "failed")
+      const created = result.status === "success" && result.output.startsWith("Created ")
+      setState(created ? "created" : "failed")
+      // La fenêtre la montre dans « Changes » (R122), avec le même « Undo » que la carte.
+      if (created) noteDone({ ...call, input: issueDraftInput(sent), status: "success", output: result.output })
     } catch (e) {
       setOutput(getErrorMessage(e))
       setState("failed")
@@ -113,9 +120,10 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
   }
 
   if (state === "created") {
+    // L'issue créée se nomme par sa clé : un clic l'ouvre dans le volet (R123).
     return (
       <div className="my-2 flex flex-col gap-1 border border-shape-green/30 bg-tint-green px-3 py-2 text-xs">
-        <p className="whitespace-pre-wrap break-words text-ink-green">{output}</p>
+        <p className="whitespace-pre-wrap break-words text-ink-green">{output && <LinkedText text={output} />}</p>
         <UndoAction slug={slug} call={{ ...call, status: "success", output }} />
       </div>
     )
@@ -183,7 +191,7 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
           {(editing || draft.description) && (
             <>
               <dt className="text-muted-foreground">{t.issueDescription}</dt>
-              <dd className="min-w-0 whitespace-pre-wrap break-words">
+              <dd className="min-w-0 break-words">
                 {editing ? (
                   <textarea
                     aria-label={t.issueDescription}
@@ -193,7 +201,8 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
                     className={cn(FIELD, "py-1")}
                   />
                 ) : (
-                  draft.description
+                  // Les mots de Cortex sont rendus, jamais en Markdown brut (R123, constat 14) ; le texte se modifie tel quel.
+                  <Markdown content={draft.description} compact className="space-y-1 text-sm leading-relaxed" />
                 )}
               </dd>
             </>

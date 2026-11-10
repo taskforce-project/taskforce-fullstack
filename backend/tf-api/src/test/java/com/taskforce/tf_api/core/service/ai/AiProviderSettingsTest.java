@@ -21,6 +21,28 @@ class AiProviderSettingsTest {
 
     private static final String HOST_OLLAMA = "http://host.docker.internal:11434/v1";
 
+    @ParameterizedTest(name = "{0} : plafond {1}, défaut {2}")
+    @MethodSource("contextWindows")
+    @DisplayName("les fenêtres chez les fournisseurs hébergés : le plafond (12 000 par défaut chez Groq) et la valeur supposée")
+    void hostedContext(Map<String, String> env, int ceiling, int defaultContext) {
+        AiProviderSettings s = settings(env);
+
+        assertThat(s.hostedMaxContext()).isEqualTo(ceiling);
+        assertThat(s.defaultContext()).isEqualTo(defaultContext);
+    }
+
+    static Stream<Arguments> contextWindows() {
+        return Stream.of(
+            Arguments.of(Map.of(), 0, 16_384),
+            Arguments.of(Map.of("AI_PROVIDER", "openai"), 0, 16_384),
+            Arguments.of(Map.of("AI_PROVIDER", "anthropic"), 0, 16_384),
+            Arguments.of(Map.of("AI_PROVIDER", "groq"), 12_000, 16_384),
+            Arguments.of(Map.of("GROQ_API_KEY", "k"), 12_000, 16_384),
+            Arguments.of(Map.of("AI_PROVIDER", "groq", "AI_HOSTED_MAX_CONTEXT", "131072"), 131_072, 16_384),
+            Arguments.of(Map.of("AI_PROVIDER", "openai", "AI_HOSTED_MAX_CONTEXT", "64000", "AI_DEFAULT_CONTEXT", "128000"), 64_000, 128_000),
+            Arguments.of(Map.of("AI_DEFAULT_CONTEXT", "abc", "AI_HOSTED_MAX_CONTEXT", "-1"), 0, 16_384));
+    }
+
     private static AiProviderSettings settings(Map<String, String> env) {
         return AiProviderSettings.from(env::get);
     }
@@ -102,27 +124,43 @@ class AiProviderSettingsTest {
 
     static Stream<Arguments> limits() {
         return Stream.of(
-            Arguments.of(Map.of(), true, Duration.ofSeconds(120), "bge-m3", 16_000),
-            Arguments.of(Map.of("AI_PROVIDER", "none"), false, Duration.ofSeconds(120), "bge-m3", 16_000),
-            Arguments.of(Map.of("AI_PROVIDER", "None", "OLLAMA_TIMEOUT", "300"), false, Duration.ofSeconds(300), "bge-m3", 16_000),
+            Arguments.of(Map.of(), true, Duration.ofSeconds(120), "bge-m3", 16_000, 16_384),
+            Arguments.of(Map.of("AI_PROVIDER", "none"), false, Duration.ofSeconds(120), "bge-m3", 16_000, 16_384),
+            Arguments.of(Map.of("AI_PROVIDER", "None", "OLLAMA_TIMEOUT", "300"), false, Duration.ofSeconds(300), "bge-m3",
+                16_000, 16_384),
             Arguments.of(Map.of("AI_TIMEOUT", "60", "OLLAMA_EMBED_MODEL", "mxbai-embed-large", "AI_MAX_TOKENS", "4096"),
-                true, Duration.ofSeconds(60), "mxbai-embed-large", 4096),
-            Arguments.of(Map.of("AI_TIMEOUT", "1.5", "AI_MAX_TOKENS", "zero"), true, Duration.ofMillis(1500), "bge-m3", 16_000),
+                true, Duration.ofSeconds(60), "mxbai-embed-large", 4096, 16_384),
+            Arguments.of(Map.of("AI_TIMEOUT", "1.5", "AI_MAX_TOKENS", "zero"), true, Duration.ofMillis(1500), "bge-m3",
+                16_000, 16_384),
             // AI_PROVIDER posé : le modèle des vecteurs est choisi parmi les installés.
-            Arguments.of(Map.of("AI_PROVIDER", "ollama"), true, Duration.ofSeconds(120), "", 16_000),
-            Arguments.of(Map.of("AI_TIMEOUT", "-3", "AI_EMBED_MODEL", "bge-m3"), true, Duration.ofSeconds(120), "bge-m3", 16_000));
+            Arguments.of(Map.of("AI_PROVIDER", "ollama"), true, Duration.ofSeconds(120), "", 16_000, 16_384),
+            Arguments.of(Map.of("AI_TIMEOUT", "-3", "AI_EMBED_MODEL", "bge-m3"), true, Duration.ofSeconds(120), "bge-m3",
+                16_000, 16_384),
+            // La fenêtre de contexte d'Ollama : un plafond posé, sinon le défaut mesuré sur une carte de 8 Go.
+            Arguments.of(Map.of("AI_OLLAMA_MAX_CONTEXT", "32768"), true, Duration.ofSeconds(120), "bge-m3", 16_000, 32_768),
+            Arguments.of(Map.of("AI_OLLAMA_MAX_CONTEXT", "8k"), true, Duration.ofSeconds(120), "bge-m3", 16_000, 16_384),
+            Arguments.of(Map.of("AI_OLLAMA_MAX_CONTEXT", "0"), true, Duration.ofSeconds(120), "bge-m3", 16_000, 16_384));
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("limits")
-    @DisplayName("coupure, délai, plafond de réponse et modèle des vecteurs")
-    void limits(Map<String, String> env, boolean enabled, Duration timeout, String embedModel, int maxTokens) {
+    @DisplayName("coupure, délai, plafond de réponse, fenêtre d'Ollama et modèle des vecteurs")
+    void limits(Map<String, String> env, boolean enabled, Duration timeout, String embedModel, int maxTokens,
+                int ollamaMaxContext) {
         AiProviderSettings s = settings(env);
 
         assertThat(s.enabled()).isEqualTo(enabled);
         assertThat(s.timeout()).isEqualTo(timeout);
         assertThat(s.embedModel()).isEqualTo(embedModel);
         assertThat(s.maxTokens()).isEqualTo(maxTokens);
+        assertThat(s.ollamaMaxContext()).isEqualTo(ollamaMaxContext);
+    }
+
+    @Test
+    @DisplayName("le journal dit le plafond de la fenêtre d'Ollama, et seulement pour Ollama")
+    void describesTheOllamaWindow() {
+        assertThat(settings(Map.of("AI_OLLAMA_MAX_CONTEXT", "32768")).describe()).contains("context up to 32768 tokens");
+        assertThat(settings(Map.of("GROQ_API_KEY", "gsk")).describe()).doesNotContain("context");
     }
 
     @Test

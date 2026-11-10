@@ -43,6 +43,7 @@ import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.dto.response.UserSummaryResponse;
 import com.taskforce.tf_api.core.enums.CycleStatus;
 import com.taskforce.tf_api.core.enums.IssuePriority;
+import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.Workspace;
@@ -200,6 +201,20 @@ public class IssueGestures {
     // ------------------------------------------------------------------ ce que TaskForce demande (R115)
 
     /**
+     * Les gestes dont l'issue se désigne par la colonne que la demande nomme : supprimer (« supprime l'issue qu'il y a
+     * dans In review by AI »). Pas déplacer : la colonne nommée y est celle où l'issue va, pas celle où elle est.
+     */
+    public static final Set<String> NAMED_BY_COLUMN = Set.of("delete_issue");
+
+    /** Une clé écrite dans une phrase, avec son tiret ou une espace : « OPS-35 », « testta 2 ». */
+    private static final Pattern KEY_IN_TEXT =
+        Pattern.compile("(?<![\\p{L}\\p{N}])(\\p{L}[\\p{L}\\p{N}]{0,9})[-\\s](\\d{1,9})(?![\\p{L}\\p{N}])");
+    /** Ce qui est entre guillemets est un titre cité, pas une colonne. L'apostrophe reste : « l'issue qu'il y a ». */
+    private static final Pattern QUOTED = Pattern.compile("\"[^\"]*\"|“[^”]*”|«[^»]*»");
+    /** Le plus long nom de colonne lu dans une demande, en mots. */
+    private static final int MAX_COLUMN_WORDS = 8;
+
+    /**
      * L'issue d'un geste de Cortex, telle que la demande la désigne : des ids, une clé qu'elle voit, ou ce qu'elle lit à
      * l'écran (une colonne, un bout de titre, « testta 2 ») quand cela ne désigne qu'une issue, comme un bout de nom ne
      * désigne qu'une personne ({@link IssueFields#assignee}). Sinon, rien ne se devine : TaskForce demande laquelle, avec
@@ -208,32 +223,204 @@ public class IssueGestures {
      */
     @Transactional(readOnly = true)
     public JsonNode issueOf(String slug, Long userId, Screen screen, JsonNode args, String question) {
+        return issueOf(slug, userId, screen, args, question, null);
+    }
+
+    /**
+     * La même, quand la demande de la personne peut nommer la colonne de l'issue ({@link #NAMED_BY_COLUMN}) : une colonne
+     * nommée désigne l'issue, et non le titre que le modèle a choisi (test du CEO du 05/11/2026 : « supprime l'issue qu'il
+     * y a dans In review by AI » donnait la carte de TESTTA-1, dans Done, au titre identique à celui de TESTTA-2). La
+     * colonne est celle du tableau à l'écran ; sans tableau, celle de tous les projets que la personne voit. Une issue
+     * dans cette colonne : c'est elle ; plusieurs : celles dont la demande écrit le titre, sinon TaskForce demande, avec
+     * elles en choix ; aucune : TaskForce demande, avec l'écran en choix. Une clé que la personne écrit elle-même
+     * l'emporte sur la colonne.
+     *
+     * @param request la demande telle que la personne l'a écrite ; null quand rien ne se lit dans ses mots (un agent
+     *                extérieur, une réponse à une carte, un geste qui ne se désigne pas par sa colonne)
+     */
+    @Transactional(readOnly = true)
+    public JsonNode issueOf(String slug, Long userId, Screen screen, JsonNode args, String question, String request) {
         if (args.hasNonNull("projectId") && args.hasNonNull("issueId")) return args;
         String asked = args.path("issue").isTextual() ? args.get("issue").asText().strip() : "";
+        boolean byColumn = request != null && !request.isBlank();
+        JsonNode found = null;
+        IssueResponse picked = null;
         if (KEY.matcher(asked).matches()) {
             try {
-                return withIds(slug, userId, args);
+                found = withIds(slug, userId, args);
+                if (!byColumn) return found;
+                picked = issueService.getIssue(slug, found.path("projectId").asLong(), found.path("issueId").asLong(), userId);
             } catch (McpArgs.InvalidArgumentException unknown) {
                 // Une clé qu'elle ne voit pas : la question la remplace, avec ce qu'elle voit.
+            } catch (RuntimeException unreadable) {
+                return found; // la clé se résout, l'issue ne se relit pas : celle du modèle, comme avant
             }
         }
+        boolean board = screen != null && !screen.isEmpty();
         List<IssueResponse> candidates = candidates(slug, userId, screen);
-        List<IssueResponse> named = asked.isEmpty() ? List.of() : designated(candidates, asked);
-        if (named.size() == 1) {
-            IssueResponse issue = named.get(0);
-            ObjectNode out = ((ObjectNode) args).deepCopy();
-            out.put("issue", issue.getIdentifier());
-            out.put("projectId", issue.getProjectId());
-            out.put("issueId", issue.getId());
-            return out;
+        if (byColumn) {
+            // Le tableau à l'écran ; sans tableau, chaque projet que la personne voit : « In review by AI » n'y est pas
+            // forcément celle de ses issues.
+            List<IssueResponse> pool = board ? candidates : visibleIssues(slug, userId);
+            if (!writesAKey(request, pool)) {
+                IssueStatusResponse column = namedColumn(request, columnsOf(slug, userId, screen, pool), picked);
+                if (column != null) return inColumn(args, column, pool, request, candidates, screen, question);
+            }
         }
-        List<IssueResponse> shown = named.isEmpty() ? candidates : named;
+        if (found != null) return found;
+        List<IssueResponse> named = asked.isEmpty() ? List.of() : designated(candidates, asked);
+        if (named.size() == 1) return resolvedTo(args, named.get(0));
+        throw new QuestionNeeded(whichIssue(question, named.isEmpty() ? candidates : named, screen));
+    }
+
+    /**
+     * L'issue de la colonne que la demande nomme : la seule qui s'y trouve ; plusieurs, celles dont la demande écrit le
+     * titre (« supprime Ajouter la version LTS, celle qui est dans In review by AI ») ; sinon la question de TaskForce,
+     * avec celles de la colonne en choix, ou l'écran quand la colonne est vide.
+     */
+    private JsonNode inColumn(JsonNode args, IssueStatusResponse column, List<IssueResponse> pool, String request,
+                              List<IssueResponse> screenIssues, Screen screen, String question) {
+        // Par son nom : sans tableau à l'écran, des projets différents ont des colonnes homonymes.
+        String name = IssueFields.key(column.getName());
+        List<IssueResponse> there = pool.stream()
+            .filter(issue -> issue.getStatus() != null && name.equals(IssueFields.key(issue.getStatus().getName())))
+            .toList();
+        String said = IssueFields.key(request);
+        List<IssueResponse> titled = there.stream()
+            .filter(issue -> IssueFields.key(issue.getTitle()).length() >= 3 && said.contains(IssueFields.key(issue.getTitle())))
+            .toList();
+        List<IssueResponse> chosen = titled.isEmpty() ? there : titled;
+        if (chosen.size() == 1) return resolvedTo(args, chosen.get(0));
+        String why = chosen.isEmpty() ? "No issue is in " + column.getName() + ". "
+            : chosen.size() + " issues are in " + column.getName() + ". ";
+        throw new QuestionNeeded(whichIssue(why + question, chosen.isEmpty() ? screenIssues : chosen, screen));
+    }
+
+    /**
+     * Les issues de tous les projets que la personne voit, les dernières changées d'abord, avec ses droits ; une lecture
+     * refusée n'en donne aucune de ce projet.
+     */
+    private List<IssueResponse> visibleIssues(String slug, Long userId) {
+        List<IssueResponse> all = new ArrayList<>();
+        List<ProjectResponse> seen;
+        try {
+            seen = projectService.listProjects(slug, userId);
+        } catch (RuntimeException e) {
+            return List.of();
+        }
+        for (ProjectResponse project : seen) {
+            try {
+                all.addAll(issueService.listIssues(slug, project.getId(), userId));
+            } catch (RuntimeException e) {
+                // Un projet qu'elle ne lit pas (ou plus) : ses issues ne comptent pas.
+            }
+        }
+        return all.stream()
+            .filter(issue -> !issue.isArchived())
+            .sorted(Comparator.comparing(IssueGestures::changedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+            .toList();
+    }
+
+    private static ObjectNode resolvedTo(JsonNode args, IssueResponse issue) {
+        ObjectNode out = ((ObjectNode) args).deepCopy();
+        out.put("issue", issue.getIdentifier());
+        out.put("projectId", issue.getProjectId());
+        out.put("issueId", issue.getId());
+        return out;
+    }
+
+    /** La question « laquelle ? », avec ces issues en choix : l'issue ouverte, quand elle en est, en défaut. */
+    private static Question whichIssue(String question, List<IssueResponse> shown, Screen screen) {
         Long open = screen == null ? null : screen.issueId();
-        throw new QuestionNeeded(new Question("issue", question, shown.stream()
+        return Question.of("issue", "Issue", question, shown.stream()
             .map(issue -> Objects.equals(open, issue.getId())
-                ? Question.Choice.recommended(issue.getIdentifier(), choiceLabel(issue))
-                : Question.Choice.of(issue.getIdentifier(), choiceLabel(issue)))
-            .toList()));
+                ? Question.Choice.recommended(issue.getIdentifier(), choiceLabel(issue), whereItIs(issue))
+                : Question.Choice.of(issue.getIdentifier(), choiceLabel(issue), whereItIs(issue)))
+            .toList());
+    }
+
+    /**
+     * Les colonnes où chercher celle que la demande nomme : celles du projet de l'écran (une colonne vide compte aussi),
+     * sinon celles des issues de la personne. Une lecture refusée n'en donne aucune.
+     */
+    private List<IssueStatusResponse> columnsOf(String slug, Long userId, Screen scope, List<IssueResponse> candidates) {
+        if (scope != null && !scope.isEmpty()) {
+            try {
+                return issueService.listStatuses(slug, scope.projectId(), userId);
+            } catch (RuntimeException e) {
+                return List.of();
+            }
+        }
+        Map<Long, IssueStatusResponse> seen = new LinkedHashMap<>();
+        candidates.stream().map(IssueResponse::getStatus).filter(Objects::nonNull)
+            .forEach(status -> seen.putIfAbsent(status.getId(), status));
+        return List.copyOf(seen.values());
+    }
+
+    /**
+     * La colonne que la demande nomme, en mots entiers (« to do » est « Todo », « in-review » est « In Review »), hors de
+     * ce qu'elle cite entre guillemets. La plus longue l'emporte (« In review by AI » plutôt que « In review ») ; deux
+     * colonnes différentes, ou aucune : null. Les mots d'une colonne qui sont dans le titre de l'issue que le modèle a
+     * choisie s'expliquent par ce titre (« Done page redesign ») : ils ne nomment pas de colonne.
+     */
+    static IssueStatusResponse namedColumn(String request, List<IssueStatusResponse> columns, IssueResponse picked) {
+        List<String> words = words(QUOTED.matcher(request).replaceAll(" "));
+        List<String> title = picked == null ? List.of() : words(picked.getTitle());
+        // Chaque colonne nommée, par son nom, et où la demande la dit (début et fin, en mots).
+        Map<String, IssueStatusResponse> named = new LinkedHashMap<>();
+        Map<String, List<int[]>> where = new LinkedHashMap<>();
+        for (IssueStatusResponse column : columns) {
+            String name = IssueFields.key(column.getName());
+            if (name.length() < 2 || named.containsKey(name) || !spans(title, name).isEmpty()) continue;
+            List<int[]> spans = spans(words, name);
+            if (spans.isEmpty()) continue;
+            named.put(name, column);
+            where.put(name, spans);
+        }
+        // Une colonne dite dans le nom d'une autre (« In review » dans « In review by AI ») n'est pas nommée à part.
+        List<String> kept = named.keySet().stream()
+            .filter(name -> where.get(name).stream().anyMatch(span -> where.entrySet().stream()
+                .noneMatch(other -> !other.getKey().equals(name) && other.getValue().stream()
+                    .anyMatch(outer -> outer[0] <= span[0] && span[1] <= outer[1] && outer[1] - outer[0] > span[1] - span[0]))))
+            .toList();
+        return kept.size() == 1 ? named.get(kept.get(0)) : null;
+    }
+
+    /** Où la phrase dit ce nom (lu par {@link IssueFields#key}), en mots entiers à la suite : début et fin de chaque fois. */
+    private static List<int[]> spans(List<String> words, String name) {
+        List<int[]> spans = new ArrayList<>();
+        for (int start = 0; start < words.size(); start++) {
+            StringBuilder joined = new StringBuilder();
+            for (int end = start; end < words.size() && end - start < MAX_COLUMN_WORDS; end++) {
+                joined.append(words.get(end));
+                if (joined.length() > name.length()) break;
+                if (joined.toString().equals(name)) {
+                    spans.add(new int[] {start, end + 1});
+                    break;
+                }
+            }
+        }
+        return spans;
+    }
+
+    /** Les mots d'un texte, lus par {@link IssueFields#key} : sans la casse, les accents ni la ponctuation. */
+    private static List<String> words(String text) {
+        if (text == null) return List.of();
+        List<String> out = new ArrayList<>();
+        for (String word : text.split("[^\\p{L}\\p{N}]+")) {
+            String key = IssueFields.key(word);
+            if (!key.isEmpty()) out.add(key);
+        }
+        return out;
+    }
+
+    /** La demande écrit la clé d'une de ces issues (« TESTTA-2 », « testta 2 ») : la personne l'a nommée elle-même. */
+    private static boolean writesAKey(String request, List<IssueResponse> candidates) {
+        Set<String> written = new HashSet<>();
+        Matcher key = KEY_IN_TEXT.matcher(request);
+        while (key.find()) written.add(IssueFields.key(key.group(1) + key.group(2)));
+        return !written.isEmpty() && candidates.stream()
+            .anyMatch(issue -> issue.getIdentifier() != null && written.contains(IssueFields.key(issue.getIdentifier())));
     }
 
     /**
@@ -278,8 +465,32 @@ public class IssueGestures {
 
     private static String choiceLabel(IssueResponse issue) {
         String title = issue.getTitle() == null ? "" : issue.getTitle().replaceAll("\\s+", " ").strip();
-        return issue.getIdentifier() + " " + clip(title, 50)
-            + (issue.getStatus() == null ? "" : " (" + issue.getStatus().getName() + ")");
+        return (issue.getIdentifier() + " " + clip(title, 50)).strip();
+    }
+
+    /** Ce qu'une colonne veut dire sur le tableau, en une ligne, pour un choix de colonne. */
+    private static String stage(IssueStatusCategory category) {
+        if (category == null) return null;
+        return switch (category) {
+            case BACKLOG -> "Not planned yet";
+            case UNSTARTED -> "Planned, not started";
+            case STARTED -> "Work in progress";
+            case COMPLETED -> "Done";
+            case CANCELLED -> "Dropped";
+        };
+    }
+
+    /** Deux noms lus par {@link IssueFields#key} se ressemblent quand l'un contient l'autre. */
+    private static boolean looksLike(String name, String wanted) {
+        return wanted.length() >= 3 && !name.isEmpty() && (name.contains(wanted) || wanted.contains(name));
+    }
+
+    /** Ce qu'un choix d'issue dit en une ligne : sa colonne, et qui la prend. */
+    private static String whereItIs(IssueResponse issue) {
+        String column = issue.getStatus() == null ? null : issue.getStatus().getName();
+        String who = issue.getAssignee() == null ? null : "assigned to " + name(issue.getAssignee());
+        if (column == null) return who;
+        return who == null ? column : column + ", " + who;
     }
 
     private static LocalDateTime changedAt(IssueResponse issue) {
@@ -306,11 +517,16 @@ public class IssueGestures {
         } else {
             why = "No member of " + project.getName() + " matches \"" + clip(asked, 40) + "\".";
         }
-        List<Question.Choice> choices = new ArrayList<>((several ? matching : members).stream()
-            .map(m -> Question.Choice.of(m.getEmail() != null ? m.getEmail() : IssueFields.name(m), IssueFields.name(m)))
+        // « Nobody » garde sa place sur la carte quand l'issue a un assigné.
+        int room = Question.MAX_CHOICES - (before.getAssignee() != null ? 1 : 0);
+        List<Question.Choice> choices = new ArrayList<>((several ? matching : members).stream().limit(room)
+            .map(m -> Question.Choice.of(m.getEmail() != null ? m.getEmail() : IssueFields.name(m), IssueFields.name(m),
+                m.getEmail() != null && !m.getEmail().equals(IssueFields.name(m)) ? m.getEmail() : "Member of " + project.getName()))
             .toList());
-        if (before.getAssignee() != null) choices.add(Question.Choice.of(NO_VALUE, "Nobody"));
-        return new Question("assignee", "Who should take " + before.getIdentifier() + "? " + why, choices);
+        if (before.getAssignee() != null) {
+            choices.add(Question.Choice.of(NO_VALUE, "Nobody", "Unassigns " + before.getIdentifier()));
+        }
+        return Question.of("assignee", "Assignee", "Who should take " + before.getIdentifier() + "? " + why, choices);
     }
 
     // ------------------------------------------------------------------ changer les champs, déplacer, assigner
@@ -392,11 +608,14 @@ public class IssueGestures {
                 + ". Its columns are: " + IssueFields.listed(columns, IssueStatusResponse::getName) + ".");
         }
         if (column == null) {
-            // R115 : une colonne nommée qui n'existe pas ne s'invente pas, TaskForce demande, avec celles du projet.
-            throw new QuestionNeeded(new Question("status", "Which column should " + before.getIdentifier() + " move to? \""
-                + clip(asked.strip(), 40) + "\" isn't a column of " + project.getName() + ".", columns.stream()
+            // R115 : une colonne nommée qui n'existe pas ne s'invente pas, TaskForce demande, avec celles du projet : celles
+            // dont le nom ressemble à ce qui est écrit d'abord (« review » : In Review, In review by AI), puis le tableau.
+            String wanted = IssueFields.key(asked);
+            throw new QuestionNeeded(Question.of("status", "Column", "Which column should " + before.getIdentifier()
+                + " move to? \"" + clip(asked.strip(), 40) + "\" isn't a column of " + project.getName() + ".", columns.stream()
                     .filter(c -> !c.getId().equals(current))
-                    .map(c -> Question.Choice.of(c.getName(), c.getName()))
+                    .sorted(Comparator.comparing((IssueStatusResponse c) -> !looksLike(IssueFields.key(c.getName()), wanted)))
+                    .map(c -> Question.Choice.of(c.getName(), c.getName(), stage(c.getCategory())))
                     .toList()));
         }
         if (column.getId().equals(current)) return;
@@ -444,7 +663,7 @@ public class IssueGestures {
         List<String> remove = names(args, "removeLabels");
         if (add.isEmpty() && remove.isEmpty()) return;
         Found<List<ProjectLabelResponse>> added = fields.labels(project, add, slug, userId);
-        if (!added.ok()) throw new McpArgs.InvalidArgumentException(added.problem());
+        if (!added.ok()) throw whichLabels(slug, userId, project, before, add, added.problem());
         Found<List<ProjectLabelResponse>> removed = fields.labels(project, remove, slug, userId);
         if (!removed.ok()) throw new McpArgs.InvalidArgumentException(removed.problem());
         List<ProjectLabelResponse> current = before.getLabels() == null ? List.of() : before.getLabels();
@@ -458,6 +677,36 @@ public class IssueGestures {
         request.setLabelIds(to);
         changes.add(new Change("labels", labelNames(current), labelNames(next.values().stream().toList())));
         undo.put("labels", pair(from, to));
+    }
+
+    /**
+     * Un label à ajouter qui n'existe pas (R115) : il ne s'invente pas, TaskForce demande lesquels, parmi ceux du projet
+     * que l'issue n'a pas encore, et plusieurs se cochent : les labels ne s'excluent pas. Ceux que la demande nomme et qui
+     * existent viennent d'abord, recommandés. Sans label à proposer, l'erreur reste, qui le dit.
+     */
+    private RuntimeException whichLabels(String slug, Long userId, ProjectResponse project, IssueResponse before,
+                                         List<String> asked, String problem) {
+        List<ProjectLabelResponse> existing = projectService.listLabels(slug, project.getId(), userId);
+        Set<Long> has = before.getLabels() == null ? Set.of()
+            : before.getLabels().stream().map(ProjectLabelResponse::getId).collect(Collectors.toSet());
+        Set<String> named = asked.stream().map(name -> name.toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
+        List<ProjectLabelResponse> offered = existing.stream().filter(label -> !has.contains(label.getId()))
+            .sorted(Comparator.comparing((ProjectLabelResponse label) -> !named.contains(label.getName().toLowerCase(Locale.ROOT))))
+            .toList();
+        String unknown = asked.stream()
+            .filter(name -> existing.stream().noneMatch(label -> name.equalsIgnoreCase(label.getName())))
+            .findFirst().orElse(null);
+        if (offered.isEmpty() || unknown == null) return new McpArgs.InvalidArgumentException(problem);
+        return new QuestionNeeded(Question.several("addLabels", "Labels", "Which labels should " + before.getIdentifier()
+            + " get? \"" + clip(unknown, 40) + "\" isn't a label of " + project.getName() + ".", offered.stream()
+                .map(label -> {
+                    String about = label.getDescription() == null || label.getDescription().isBlank() ? null
+                        : clip(label.getDescription().strip(), 80);
+                    return named.contains(label.getName().toLowerCase(Locale.ROOT))
+                        ? Question.Choice.recommended(label.getName(), label.getName(), about)
+                        : Question.Choice.of(label.getName(), label.getName(), about);
+                })
+                .toList()));
     }
 
     /** L'estimation, de 1 à 100 ; 0 ou « none » la retire. */
@@ -675,8 +924,10 @@ public class IssueGestures {
      */
     public Gesture deletion(String slug, Long userId, JsonNode args) {
         Doomed doomed = doomed(slug, userId, args);
-        // Le modèle redit la carte au lieu de demander « on supprime ? » : un « oui » écrit ne supprimerait rien (R1).
-        return new Gesture("Deleting " + named(doomed.issue()) + " removes it for good" + doomed.goesWith()
+        // Le modèle redit la carte au lieu de demander « on supprime ? » : un « oui » écrit ne supprimerait rien (R1). La
+        // colonne avec la clé : la personne voit tout de suite si ce n'est pas l'issue dont elle parle.
+        String column = doomed.issue().getStatus() == null ? "" : ", in " + doomed.issue().getStatus().getName() + ",";
+        return new Gesture("Deleting " + named(doomed.issue()) + column + " removes it for good" + doomed.goesWith()
             + ". Archiving hides it from the board and can be undone. The person chooses on the card below, Archive or "
             + "Delete: do not ask them to confirm in writing.", doomed.target(), List.of(), Map.of(), null);
     }
@@ -708,9 +959,10 @@ public class IssueGestures {
             return parts.isEmpty() ? "" : ", with " + joined(parts);
         }
 
-        /** L'issue telle que la carte la montre, avec ce qui partirait. */
+        /** L'issue telle que la carte la montre, avec sa colonne et ce qui partirait. */
         Map<String, Object> target() {
             Map<String, Object> target = ref(issue, projectId, run == null ? null : run.id());
+            if (issue.getStatus() != null) target.put("column", issue.getStatus().getName());
             target.put("comments", comments);
             target.put("checklist", checklist);
             if (run != null) target.put("mission", run.status());
@@ -789,7 +1041,8 @@ public class IssueGestures {
                 ? " is done: its result waits for review on the result card below (Apply, Discard, Try again, or Mark as "
                     + "done when it changed nothing)." + decides
                 : " is done, and its result was " + OUTCOMES.getOrDefault(run.outcome(), run.outcome().toLowerCase(Locale.ROOT)) + ".";
-            default -> run.refused() ? " did not start: " + text(run.error())
+            default -> "STOPPED".equals(run.outcome()) ? " was stopped by the person who delegated it."
+                : run.refused() ? " did not start: " + text(run.error())
                 : " failed" + (run.error() == null || run.error().isBlank() ? "." : ": " + run.error());
         };
     }

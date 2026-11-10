@@ -3,6 +3,8 @@ package com.taskforce.tf_api.core.dto.response;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 /**
  * Réponse structurée de l'assistant agentique. Pensée pour un rendu riche (kit chat) :
  * étapes du raisonnement, outils appelés, sources Brain OS citées, plus la réponse markdown.
@@ -12,6 +14,18 @@ import java.util.Map;
  *
  * <p>{@code record} : le dossier de la réponse, quand elle en a un : celui de ses appels d'outil, ou celui qui s'ouvre
  * quand TaskForce corrige une réponse sans outil (R116). Il fait d'elle un cas de la banque.
+ *
+ * <p>{@code model} : le modèle qui a répondu, tel que la passerelle l'a appelé ; null quand aucun modèle n'a répondu (un
+ * repli). Le pied de la réponse le montre (test du CEO du 05/11/2026 : « jsp avec quel model il a fait ca »).
+ *
+ * <p>{@code read} : ce que TaskForce a donné à lire à ce modèle, compté (R123, séance n°18 : la ligne grise, « qwen3:8b ·
+ * read OPS-35 and 3 comments ») ; null quand aucun modèle n'a répondu.
+ *
+ * <p>{@code offer} : ce que TaskForce propose quand une demande est trop grande pour ce modèle (TF-J1-13) : un modèle
+ * servi dont la fenêtre la tient ; le contrôleur le rend avec le tour, jamais dans la réponse elle-même.
+ *
+ * <p>{@link #NOT_SENT} : le {@code mode} d'une demande trop grande pour la fenêtre du modèle. Elle ne lui a jamais été
+ * envoyée, et les tours suivants ne la lui donnent pas non plus.
  */
 public record AssistantAnswer(
     String answer,
@@ -21,12 +35,107 @@ public record AssistantAnswer(
     List<AssistantStep> steps,
     List<AssistantToolCall> toolCalls,
     AssistantUsage usage,
-    String record
+    String record,
+    String model,
+    AssistantRead read,
+    @JsonIgnore ChatTurnResponse.Escalation offer
 ) {
+    public static final String NOT_SENT = "not_sent";
+
+    /** Une réponse sans proposition d'un autre modèle. */
+    public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
+                           List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage,
+                           String record, String model, AssistantRead read) {
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read, null);
+    }
+
+    /** Une réponse sans ce que le modèle a lu : un repli, ou une réponse d'avant la ligne grise. */
+    public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
+                           List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage,
+                           String record, String model) {
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, null, null);
+    }
+
     /** Une réponse sans dossier à elle. */
     public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
                            List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage) {
-        this(answer, reasoning, mode, sources, steps, toolCalls, usage, null);
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, null, null, null, null);
+    }
+
+    /** Une réponse dont le modèle n'est pas connu. */
+    public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
+                           List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage,
+                           String record) {
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, record, null, null, null);
+    }
+
+    /** La même réponse, avec ce que TaskForce a donné à lire au modèle. */
+    public AssistantAnswer withRead(AssistantRead read) {
+        return new AssistantAnswer(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read, offer);
+    }
+
+    /**
+     * Ce que TaskForce a donné à lire au modèle pour une réponse (R123) : compté au moment où il le lui donne, jamais
+     * deviné après coup. {@code issues} : les issues lues en entier (avant un résumé, ou jointes par la personne), avec le
+     * nombre de commentaires donnés ; {@code boards} : les tableaux montrés (celui de l'écran, ceux joints), avec le nombre
+     * d'issues montrées et l'issue ouverte ; {@code tools} : les outils qui lisent et ont abouti, avec leur nombre
+     * d'appels ; {@code notes} : les notes du Brain OS servies au modèle ; {@code context} : ce que TaskForce a fait pour
+     * que la requête tienne la fenêtre de ce modèle (TF-J1-13), null quand rien n'a été touché ; {@code files} : les
+     * fichiers joints à la demande (R134). Gardé avec la réponse, de quoi la relire pareil dans une conversation rouverte
+     * (R137) : {@code notesRead}, ces notes par leur nom ; {@code acts}, ce que Cortex a fait, geste par geste ;
+     * {@code workedMs}, le temps que la réponse a pris ; {@code record}, son dossier, qui fait d'elle un cas de la banque.
+     */
+    public record AssistantRead(List<IssueRead> issues, List<BoardRead> boards, List<ToolRead> tools, int notes,
+                                ContextRead context, List<FileRead> files, List<NoteRead> notesRead, List<ActRead> acts,
+                                Long workedMs, String record) {
+        public AssistantRead {
+            issues = issues == null ? List.of() : List.copyOf(issues);
+            boards = boards == null ? List.of() : List.copyOf(boards);
+            tools = tools == null ? List.of() : List.copyOf(tools);
+            files = files == null ? List.of() : List.copyOf(files);
+            notesRead = notesRead == null ? List.of() : List.copyOf(notesRead);
+            acts = acts == null ? List.of() : List.copyOf(acts);
+        }
+
+        /** Ce qui a été lu, sans fichier joint. */
+        public AssistantRead(List<IssueRead> issues, List<BoardRead> boards, List<ToolRead> tools, int notes, ContextRead context) {
+            this(issues, boards, tools, notes, context, null, null, null, null, null);
+        }
+
+        /** Ce qui a été lu, avec les fichiers joints. */
+        public AssistantRead(List<IssueRead> issues, List<BoardRead> boards, List<ToolRead> tools, int notes, ContextRead context,
+                             List<FileRead> files) {
+            this(issues, boards, tools, notes, context, files, null, null, null, null);
+        }
+
+        /** Ce qui a été lu, rien n'a dû être condensé ni coupé. */
+        public AssistantRead(List<IssueRead> issues, List<BoardRead> boards, List<ToolRead> tools, int notes) {
+            this(issues, boards, tools, notes, null, List.of());
+        }
+
+        /** Un fichier joint à la demande : son nom. */
+        public record FileRead(String name) {}
+
+        /**
+         * Ce qui a dû changer pour tenir la fenêtre du modèle : les messages condensés dans le résumé pour ce tour, ceux qui
+         * n'ont pas pu partir, les résultats d'outils raccourcis pendant la boucle. Jamais en silence (la ligne grise).
+         */
+        public record ContextRead(int summarized, int leftOut, int toolResults) {}
+
+        /** Une issue lue : sa clé, et les commentaires donnés avec elle. */
+        public record IssueRead(String key, int comments) {}
+
+        /** Un tableau montré : la clé du projet, les issues montrées, et l'issue ouverte à l'écran (null sans elle). */
+        public record BoardRead(String project, int issues, String open) {}
+
+        /** Un outil qui lit : son nom, et ses appels qui ont abouti. */
+        public record ToolRead(String name, int calls) {}
+
+        /** Une note servie au modèle : de quoi la nommer et l'ouvrir. */
+        public record NoteRead(Long id, String title) {}
+
+        /** Un geste de la réponse : l'outil, ce qu'il est devenu, et la clé de l'issue qu'il touche (null sans elle). */
+        public record ActRead(String name, String status, String key) {}
     }
 
     /** Une note Brain OS utilisée pour fonder la réponse (RAG). */
@@ -47,12 +156,12 @@ public record AssistantAnswer(
      * demande : rien n'est préparé). {@code record} : le dossier de la réponse, que l'accord prolonge. {@code ref} :
      * l'empreinte du résultat de cet appel au dossier, que « Undo » nomme pour défaire celui-là (R77). {@code target} :
      * l'issue que touche un geste du MCP TaskForce ({@code issueId}, {@code projectId}, {@code key}, {@code title}, et
-     * {@code runId} de sa mission), dont la conversation montre les cartes (ADR-024). {@code question} : ce que TaskForce
-     * demande à la personne avant le geste (R115), avec un statut question ; la carte montre ses choix, et
-     * {@code ref} nomme alors la question à laquelle la réponse se rattache.
+     * {@code runId} de sa mission), dont la conversation montre les cartes (ADR-024). {@code questions} : ce que
+     * TaskForce demande à la personne avant le geste (R115), deux questions au plus dans la même carte, avec un statut
+     * question ; la carte montre leurs choix, et {@code ref} nomme alors la carte à laquelle les réponses se rattachent.
      */
     public record AssistantToolCall(String name, String status, String input, String output, String record, String ref,
-                                    Map<String, Object> target, AssistantQuestion question) {
+                                    Map<String, Object> target, List<AssistantQuestion> questions) {
         /** Un appel sans question de TaskForce. */
         public AssistantToolCall(String name, String status, String input, String output, String record, String ref,
                                  Map<String, Object> target) {
@@ -66,16 +175,39 @@ public record AssistantAnswer(
     }
 
     /**
-     * Une question de TaskForce avant un geste (R115) : l'argument que la réponse remplit, la question, et ses choix, le
-     * défaut d'abord ({@code recommended}) quand il y en a un. Une réponse libre est toujours possible.
+     * Une question de TaskForce avant un geste (R115), dans la forme des questions de Claude : l'argument que la réponse
+     * remplit, son titre court, la question, si plusieurs choix se cochent ({@code multiple}), et ses choix, quatre au
+     * plus, le recommandé d'abord. Une réponse libre (« Other ») est toujours possible.
      */
-    public record AssistantQuestion(String field, String text, List<AssistantChoice> choices) {}
+    public record AssistantQuestion(String field, String header, String text, boolean multiple,
+                                    List<AssistantChoice> choices) {}
 
-    /** Un choix d'une question : la valeur que reçoit le geste, ce que la carte en montre, s'il est le défaut. */
-    public record AssistantChoice(String value, String label, boolean recommended) {}
+    /**
+     * Un choix d'une question : la valeur que reçoit le geste, ce que la carte en montre, ce qu'il veut dire en une ligne
+     * (null quand le libellé suffit), s'il est recommandé.
+     */
+    public record AssistantChoice(String value, String label, String description, boolean recommended) {}
 
-    /** Tokens réellement consommés par ce tour (cumulés sur les appels LLM). */
-    public record AssistantUsage(long promptTokens, long completionTokens, long totalTokens) {
+    /**
+     * Tokens réellement consommés par ce tour (cumulés sur les appels LLM), et ce que le modèle a lu au dernier appel :
+     * {@code lastPromptTokens}, la taille de ce prompt (0 sans appel), et {@code contextWindow}, sa fenêtre de contexte :
+     * celle que la passerelle a donnée (Ollama), celle que le fournisseur dit de ce modèle, ou la valeur prudente des
+     * réglages, dite comme telle par {@code contextEstimated}. La jauge de contexte de la conversation compare ces deux-là,
+     * pas le cumul.
+     */
+    public record AssistantUsage(long promptTokens, long completionTokens, long totalTokens, long lastPromptTokens,
+                                 Integer contextWindow, boolean contextEstimated) {
         public static final AssistantUsage NONE = new AssistantUsage(0, 0, 0);
+
+        /** Un usage sans ce qu'a lu le dernier appel. */
+        public AssistantUsage(long promptTokens, long completionTokens, long totalTokens) {
+            this(promptTokens, completionTokens, totalTokens, 0, null, false);
+        }
+
+        /** Un usage dont la fenêtre est connue. */
+        public AssistantUsage(long promptTokens, long completionTokens, long totalTokens, long lastPromptTokens,
+                              Integer contextWindow) {
+            this(promptTokens, completionTokens, totalTokens, lastPromptTokens, contextWindow, false);
+        }
     }
 }

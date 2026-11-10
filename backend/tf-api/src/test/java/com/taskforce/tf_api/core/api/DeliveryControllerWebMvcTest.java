@@ -15,9 +15,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.taskforce.tf_api.core.dto.response.DeliveryOpenApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryProviderResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunActivityResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
+import com.taskforce.tf_api.core.dto.response.MissionChangesResponse;
+import com.taskforce.tf_api.core.dto.response.MissionFileChangeResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
@@ -25,6 +28,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.delivery.DeliveryActivityService;
 import com.taskforce.tf_api.core.service.delivery.DeliveryRunner;
 import com.taskforce.tf_api.core.service.delivery.DeliveryService;
+import com.taskforce.tf_api.core.service.delivery.MissionChangesService;
 import com.taskforce.tf_api.core.service.delivery.MissionResultService;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
@@ -60,6 +64,7 @@ class DeliveryControllerWebMvcTest {
     @MockitoBean private DeliveryRunner deliveryRunner;
     @MockitoBean private DeliveryActivityService activityService;
     @MockitoBean private MissionResultService missionResults;
+    @MockitoBean private MissionChangesService missionChanges;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;             // WorkspaceAccessInterceptor
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository; // WorkspaceAccessInterceptor
@@ -167,6 +172,23 @@ class DeliveryControllerWebMvcTest {
 
         verify(deliveryRunner, never()).refresh(anyLong());
         verify(deliveryService, times(1)).listRuns(anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("GET /delivery/approvals/open : ce qui attend la personne, une ligne par mission (R128)")
+    void openApprovals_200() throws Exception {
+        var a = auth();
+        when(activityService.openApprovals("acme", 7L)).thenReturn(List.of(
+            new DeliveryOpenApprovalResponse(100L, 55L, "OPS-12", "Fix the footer", 12L, 3)));
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/approvals/open").with(a))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].runId").value(100))
+            .andExpect(jsonPath("$.data[0].issueId").value(55))
+            .andExpect(jsonPath("$.data[0].issueKey").value("OPS-12"))
+            .andExpect(jsonPath("$.data[0].issueTitle").value("Fix the footer"))
+            .andExpect(jsonPath("$.data[0].projectId").value(12))
+            .andExpect(jsonPath("$.data[0].requests").value(3));
     }
 
     @Test
@@ -299,6 +321,16 @@ class DeliveryControllerWebMvcTest {
     }
 
     @Test
+    @DisplayName("POST /runs/{id}/stop : la personne arrête la mission (R138)")
+    void stop_200() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/stop").with(auth()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("Stopped"));
+
+        verify(missionResults).stop("acme", 100L, 7L);
+    }
+
+    @Test
     @DisplayName("POST /runs/{id}/retry : une nouvelle mission part avec la remarque")
     void retry_200() throws Exception {
         var a = auth();
@@ -319,5 +351,103 @@ class DeliveryControllerWebMvcTest {
             .andExpect(status().isBadRequest());
 
         verify(missionResults, never()).retry(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("GET /runs/{id}/changes : les fichiers de la mission et ce que la personne peut en faire")
+    void changes_200() throws Exception {
+        var a = auth();
+        when(missionChanges.changes("acme", 100L, 7L)).thenReturn(new MissionChangesResponse("repo", true, 12, 1, 0, List.of(
+            new MissionChangesResponse.File("a.txt", "modified", 12, 1, false, false, false, "r1", false, null, null)),
+            false, false, true, null, null));
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/runs/100/changes").with(a))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.live").value(true))
+            .andExpect(jsonPath("$.data.added").value(12))
+            .andExpect(jsonPath("$.data.files[0].path").value("a.txt"))
+            .andExpect(jsonPath("$.data.files[0].removed").value(1));
+    }
+
+    @Test
+    @DisplayName("GET /runs/{id}/changes/file?path= : le diff d'un fichier")
+    void changedFile_200() throws Exception {
+        var a = auth();
+        when(missionChanges.file("acme", 100L, "src/a b.txt", 7L)).thenReturn(
+            new MissionFileChangeResponse("src/a b.txt", "diff", "@@ -1 +1 @@", false, false, false, "r1"));
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/runs/100/changes/file").param("path", "src/a b.txt").with(a))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.format").value("diff"))
+            .andExpect(jsonPath("$.data.body").value("@@ -1 +1 @@"));
+    }
+
+    @Test
+    @DisplayName("POST /runs/{id}/changes/revert : un fichier à remettre comme avant")
+    void revert_200() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/changes/revert").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"path\":\"a.txt\"}"))
+            .andExpect(status().isOk());
+
+        verify(missionChanges).revert("acme", 100L, "a.txt", 7L);
+    }
+
+    @Test
+    @DisplayName("POST /runs/{id}/changes/revert : sans fichier, refusé (400)")
+    void revert_needs_a_path() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/changes/revert").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"path\":\"  \"}"))
+            .andExpect(status().isBadRequest());
+
+        verify(missionChanges, never()).revert(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("POST /runs/{id}/follow-up : les commentaires relancent l'agent, et la réponse est la nouvelle mission")
+    void followUp_200() throws Exception {
+        var a = auth();
+        when(missionResults.askForChanges(anyString(), anyLong(), anyLong(), any())).thenReturn(run(101L, "QUEUED"));
+
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/follow-up").with(a)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"comments\":[{\"path\":\"a.txt\",\"line\":12,\"side\":\"new\",\"text\":\"Use the helper\"}]}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(101));
+
+        verify(deliveryRunner).execute(101L);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+        "aucun commentaire | {\"comments\":[]}",
+        "ligne zéro | {\"comments\":[{\"path\":\"a\",\"line\":0,\"side\":\"new\",\"text\":\"x\"}]}",
+        "côté inconnu | {\"comments\":[{\"path\":\"a\",\"line\":1,\"side\":\"left\",\"text\":\"x\"}]}",
+        "sans texte | {\"comments\":[{\"path\":\"a\",\"line\":1,\"side\":\"new\",\"text\":\" \"}]}",
+    })
+    @DisplayName("POST /runs/{id}/follow-up : des commentaires mal formés sont refusés (400)")
+    void followUp_validates(String label, String body) throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/follow-up").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isBadRequest());
+
+        verify(missionResults, never()).askForChanges(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("POST /runs/{id}/correction : une correction pour l'agent")
+    void correction_200() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/correction").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"Use tabs\"}"))
+            .andExpect(status().isOk());
+
+        verify(missionChanges).correct("acme", 100L, "Use tabs", 7L);
+    }
+
+    @Test
+    @DisplayName("POST /runs/{id}/correction : une correction trop longue est refusée (400)")
+    void correction_too_long() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/correction").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"" + "x".repeat(2001) + "\"}"))
+            .andExpect(status().isBadRequest());
     }
 }

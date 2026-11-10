@@ -74,7 +74,7 @@ class ModelCapabilityControllerWebMvcTest {
         when(capabilities.start("acme", 7L, "qwen3:14b")).thenReturn(
             new ModelCapabilityResponse.RunStarted(9L, "qwen3:14b", LocalDateTime.of(2026, 11, 4, 10, 0), List.of("tools-move")));
         when(capabilities.measure("acme", 7L, 9L, "tools-move")).thenReturn(
-            new ModelCapabilityResponse.CaseResult("tools-move", "tools", true, List.of(), List.of(), "Done.", "qwen3:14b", 5347));
+            new ModelCapabilityResponse.CaseResult("tools-move", "tools", true, List.of(), List.of(), "Done.", "qwen3:14b", 5347, false));
 
         mockMvc.perform(post(URL + "/runs").with(a).contentType(MediaType.APPLICATION_JSON).content("{\"model\":\"qwen3:14b\"}"))
             .andExpect(status().isOk())

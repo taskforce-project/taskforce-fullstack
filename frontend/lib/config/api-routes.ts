@@ -58,6 +58,8 @@ export const DELIVERY_ROUTES = {
   RUN: (slug: string, issueId: number) => `/api/workspaces/${slug}/delivery/issues/${issueId}/run`,
   /** Runs de délégation du workspace (GET) - vue « workflow » (agents en parallèle). */
   RUNS: (slug: string) => `/api/workspaces/${slug}/delivery/runs`,
+  /** Ce qui attend la personne connectée (GET, R128) : ses demandes encore ouvertes, une ligne par mission. */
+  OPEN_APPROVALS: (slug: string) => `/api/workspaces/${slug}/delivery/approvals/open`,
   /** Chronologie en direct d'un run après l'événement `after`, et ses demandes de validation (GET, lot 5). */
   ACTIVITY: (slug: string, runId: number, after: number) =>
     `/api/workspaces/${slug}/delivery/runs/${runId}/activity?after=${after}`,
@@ -70,8 +72,20 @@ export const DELIVERY_ROUTES = {
   APPLY: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/apply`,
   DISCARD: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/discard`,
   RETRY: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/retry`,
+  /** « Stop » pendant le travail (POST, R138). */
+  STOP: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/stop`,
   /** Une mission qui n'a rien changé : l'issue se termine (POST, rejeu de la 1.8.0). */
   DONE: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/done`,
+  /** Les fichiers qu'une mission a changés, avec leurs lignes (GET, R139). */
+  CHANGES: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/changes`,
+  /** Le diff d'un fichier de la mission, `?path=` (GET, R139). */
+  CHANGED_FILE: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/changes/file`,
+  /** Remet un fichier comme avant la mission (POST, R139). */
+  REVERT_FILE: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/changes/revert`,
+  /** Les commentaires sur les lignes, envoyés ensemble : l'agent repart sur la même branche (POST, R139). */
+  FOLLOW_UP: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/follow-up`,
+  /** Une correction tapée pendant le travail (POST, R140). */
+  CORRECTION: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/correction`,
   /** Serveur MCP de l'instance pour ce workspace (adresse à donner à Claude Code, pas appelée par le front). */
   MCP_SERVER: (slug: string) => `/api/workspaces/${slug}/mcp`,
   /**
@@ -242,6 +256,10 @@ export const ISSUE_ROUTES = {
   MY_ISSUES: (slug: string) => `/api/workspaces/${slug}/my-issues`,
   /** Vue My Work - cycles de tous les projets visibles, en un appel (évite un appel par projet) */
   MY_CYCLES: (slug: string) => `/api/workspaces/${slug}/my-cycles`,
+  /** La recherche de la fenêtre (Ctrl+K, le « @ » et le « + » du compositeur) : par clé ou par titre, tous projets vus. */
+  SEARCH: (slug: string) => `/api/workspaces/${slug}/issues/search`,
+  /** Ctrl+K (R141) : les issues trouvées par ce qu'on a écrit dessous, sur les projets que la personne voit. */
+  SEARCH_COMMENTS: (slug: string) => `/api/workspaces/${slug}/issues/search/comments`,
   LIST:    (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues`,
   /** Liste paginée pour l'infinite-scroll du backlog (QA2-33) */
   PAGED:   (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/paged`,
@@ -357,6 +375,8 @@ export const ASSISTANT_ROUTES = {
   ACTION_UNDO: (slug: string) => `/api/workspaces/${slug}/assistant/actions/undo`,
   /** La réponse de la personne à une question de TaskForce (R115) : le geste reprend sur son clic. */
   ACTION_ANSWER: (slug: string) => `/api/workspaces/${slug}/assistant/actions/answer`,
+  /** Arrête un tour de Cortex (R134) : le serveur coupe l'appel au modèle. */
+  STOP: (slug: string) => `/api/workspaces/${slug}/assistant/stop`,
 } as const;
 
 /**
@@ -373,6 +393,26 @@ export const EVAL_ROUTES = {
   RUN_CASE: (slug: string, runId: number, caseId: number) =>
     `/api/workspaces/${slug}/evals/runs/${runId}/cases/${caseId}`,
   SETTINGS: (slug: string) => `/api/workspaces/${slug}/evals/settings`,
+  /** L'histoire de la banque (R125) : ses rejeux par modèle et par date, l'origine de chaque cas et ses notes. */
+  HISTORY: (slug: string) => `/api/workspaces/${slug}/evals/history`,
+  /** « Bien » et « pas bien », sous une réponse (R137) ; les critères d'un cas qui les attend. */
+  CASE_GOOD: (slug: string) => `/api/workspaces/${slug}/evals/cases/good`,
+  CASE_BAD: (slug: string) => `/api/workspaces/${slug}/evals/cases/bad`,
+  CASE_CRITERIA: (slug: string, caseId: number) => `/api/workspaces/${slug}/evals/cases/${caseId}/criteria`,
+} as const;
+
+/**
+ * Ce que Cortex peut lire dans un espace (R125), compté et daté, pour le volet « Progress ».
+ * Backend: @RequestMapping("/api/workspaces/{slug}/assistant/sources").
+ */
+export const CORTEX_SOURCE_ROUTES = {
+  SOURCES: (slug: string) => `/api/workspaces/${slug}/assistant/sources`,
+} as const;
+
+/** Les notes de l'espace (Brain OS) : Ctrl+K les cherche, le volet les lit (R141). */
+export const NOTE_ROUTES = {
+  SEARCH: (slug: string) => `/api/workspaces/${slug}/brain/search`,
+  BY_ID: (slug: string, id: number) => `/api/workspaces/${slug}/brain/nodes/${id}`,
 } as const;
 
 /**
@@ -384,12 +424,35 @@ export const AI_ROUTES = {
   USAGE: (slug: string) => `/api/workspaces/${slug}/ai/usage`,
   CONVERSATIONS: (slug: string) => `/api/workspaces/${slug}/ai/conversations`,
   CONVERSATION: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}`,
+  CONVERSATION_COMPACT: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}/compact`,
+  /** Le projet où travaille une conversation (R135), « No project » compris. */
+  CONVERSATION_PROJECT: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}/project`,
 } as const;
 
 /**
  * Ce que sait faire chaque modèle (R113) : la table de l'instance, une mesure cas par cas, le modèle de Cortex choisi.
  * Backend: @RequestMapping("/api/workspaces/{slug}/ai/models").
  */
+/**
+ * Le banc des modèles (R131)
+ * Backend: /api/workspaces/{slug}/ai/benchmark
+ */
+export const AI_BENCHMARK_ROUTES = {
+  MATRIX: (slug: string) => `/api/workspaces/${slug}/ai/benchmark`,
+  DETAIL: (slug: string) => `/api/workspaces/${slug}/ai/benchmark/detail`,
+  RUNS: (slug: string) => `/api/workspaces/${slug}/ai/benchmark/runs`,
+  RUN_LOAD: (slug: string, runId: number) => `/api/workspaces/${slug}/ai/benchmark/runs/${runId}/load`,
+  STOP: (slug: string) => `/api/workspaces/${slug}/ai/benchmark/stop`,
+  HISTORY: (slug: string) => `/api/workspaces/${slug}/ai/benchmark/history`,
+  RUN_CASE: (slug: string, runId: number, caseKey: string) =>
+    `/api/workspaces/${slug}/ai/benchmark/runs/${runId}/cases/${encodeURIComponent(caseKey)}`,
+  VERDICT: (slug: string, resultId: number) => `/api/workspaces/${slug}/ai/benchmark/results/${resultId}/verdict`,
+  TRIALS: (slug: string) => `/api/workspaces/${slug}/ai/benchmark/trials`,
+  TRIAL_LETTER: (slug: string, trialId: number, letter: string) =>
+    `/api/workspaces/${slug}/ai/benchmark/trials/${trialId}/letters/${encodeURIComponent(letter)}`,
+  TRIAL_CHOICE: (slug: string, trialId: number) => `/api/workspaces/${slug}/ai/benchmark/trials/${trialId}/choice`,
+} as const;
+
 export const AI_MODEL_ROUTES = {
   TABLE: (slug: string) => `/api/workspaces/${slug}/ai/models`,
   RUNS: (slug: string) => `/api/workspaces/${slug}/ai/models/runs`,

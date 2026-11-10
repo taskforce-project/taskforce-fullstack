@@ -22,6 +22,7 @@ const { mockInstance, mockAxios } = vi.hoisted(() => {
     create: vi.fn(() => instance),
     post: vi.fn(),
     isAxiosError: vi.fn(),
+    isCancel: vi.fn(() => false),
   };
   return { mockInstance: instance, mockAxios: axiosMock };
 });
@@ -220,6 +221,14 @@ describe('API Client', () => {
   });
 
   describe('Intercepteur de réponse - erreurs systémiques', () => {
+    it('ne dit rien d’une requête que la personne a coupée (l’arrêt d’un tour)', async () => {
+      mockAxios.isCancel.mockReturnValueOnce(true);
+
+      await expect(onResponseError(axiosError())).rejects.toBeDefined();
+
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
     it('signale une panne réseau', async () => {
       await expect(onResponseError(axiosError())).rejects.toBeDefined();
 

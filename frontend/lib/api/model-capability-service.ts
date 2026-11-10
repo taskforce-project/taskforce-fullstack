@@ -3,7 +3,8 @@
  * La table de l'instance, une mesure qui rejoue les cas fixes un par un, et le modèle que la personne prend pour Cortex
  * dans la webapp. Aucune adresse ni clé n'est exposée, seulement les noms de modèles et leurs notes.
  */
-import { apiClient, AI_TIMEOUT_MS } from "./client"
+import { apiClient } from "./client"
+import { BENCHMARK_CASE_TIMEOUT_MS } from "./model-benchmark-service"
 import { AI_MODEL_ROUTES } from "../config/api-routes"
 
 /** Une capacité de la table : tools, context, code, french, english. */
@@ -33,6 +34,8 @@ export interface ModelCapabilityScore {
   capable: boolean
   heldWords: number | null
   measuredAt: string | null
+  /** Ses cas qui n'ont pas répondu dans leur budget (R142) : ni réussis, ni ratés, ni comptés dans `measured`. */
+  tooSlow: number
 }
 
 export interface ModelCapabilityRow {
@@ -41,6 +44,8 @@ export interface ModelCapabilityRow {
   current: boolean
   measuredAt: string | null
   scores: ModelCapabilityScore[]
+  /** Les clés des cas ratés à leur dernière note, dans l'ordre de la suite ; absente d'un serveur plus ancien. */
+  failedCases?: string[]
 }
 
 export interface ModelCapabilityProposal {
@@ -85,6 +90,7 @@ export interface ModelCapabilityResult {
   answer: string
   model: string | null
   promptTokens: number
+  tooSlow: boolean
 }
 
 /** La table, lue en arrière-plan : sans message d'erreur, l'écran dit lui-même ce qui manque. */
@@ -98,10 +104,10 @@ export async function startModelMeasure(slug: string, model: string): Promise<Mo
   return res.data.data
 }
 
-/** Rejoue un cas sur le modèle de la mesure : une réponse du modèle, donc le délai de l'IA. */
+/** Rejoue un cas sur le modèle de la mesure : une réponse du modèle, dans le budget d'un cas (R142). */
 export async function measureModelCase(slug: string, runId: number, caseKey: string): Promise<ModelCapabilityResult> {
   const res = await apiClient.post<{ data: ModelCapabilityResult }>(
-    AI_MODEL_ROUTES.RUN_CASE(slug, runId, caseKey), undefined, { timeout: AI_TIMEOUT_MS },
+    AI_MODEL_ROUTES.RUN_CASE(slug, runId, caseKey), undefined, { timeout: BENCHMARK_CASE_TIMEOUT_MS, silentError: true },
   )
   return res.data.data
 }

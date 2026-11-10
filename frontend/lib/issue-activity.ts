@@ -28,10 +28,21 @@ const PULL = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/(\
 const fill = (text: string, values: Record<string, string>): string =>
   text.replace(/\{(\w+)\}/g, (all, key: string) => values[key] ?? all);
 
+/**
+ * L'agent qui a agi, avec le modèle qui le faisait parler quand il le dit (R123) : « Cortex · qwen3:8b ». Null quand la
+ * personne a agi seule.
+ */
+export function agentName(via: string | null | undefined, model: string | null | undefined): string | null {
+  const agent = via?.trim();
+  if (!agent) return null;
+  const name = model?.trim();
+  return name && name !== agent ? `${agent} · ${name}` : agent;
+}
+
 /** La ligne d'activité, dans les mots de l'interface. */
 export function describeActivity(a: IssueActivity, t: ActivityTexts): ActivityLine {
   const actor = a.actor ? (a.actor.displayName ?? a.actor.email) : t.system;
-  const via = a.via?.trim() || null;
+  const via = agentName(a.via, a.model);
   const line: ActivityLine = { who: actor, what: "", change: null, link: null, forWhom: null };
   // Une issue créée depuis la carte de Cortex : la personne l'a créée, Cortex l'a préparée.
   if (a.action === "CREATED") {
@@ -67,6 +78,8 @@ export function describeActivity(a: IssueActivity, t: ActivityTexts): ActivityLi
     // La mission n'a rien changé : la personne a terminé l'issue (rejeu de la 1.8.0).
     case "MISSION_MARKED_DONE":
       return { ...line, what: t.markedDone };
+    case "MISSION_CHANGES_ASKED":
+      return { ...line, what: t.askedForChanges };
     default:
       return {
         ...line,

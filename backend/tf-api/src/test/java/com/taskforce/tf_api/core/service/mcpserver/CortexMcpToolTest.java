@@ -25,6 +25,7 @@ import com.taskforce.tf_api.core.service.agent.AgentService;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.core.service.agent.AgentToolRegistry;
 import com.taskforce.tf_api.core.service.agent.CortexGesture;
+import com.taskforce.tf_api.core.service.agent.Question;
 import com.taskforce.tf_api.core.service.agent.QuestionNeeded;
 import com.taskforce.tf_api.core.service.agent.Screen;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
@@ -33,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -56,7 +58,7 @@ class CortexMcpToolTest {
         mcp = new TaskforceMcpTools(mapper, mock(ProjectService.class), mock(IssueService.class), mock(SmartAssignService.class),
             mock(BrainSearchService.class), mock(AnalyticsService.class), mock(AgentService.class), gestures, projects);
         lenient().when(gestures.withIds(eq("acme"), eq(7L), any())).thenAnswer(inv -> inv.getArgument(2));
-        lenient().when(gestures.issueOf(eq("acme"), eq(7L), any(), any(), any())).thenAnswer(inv -> inv.getArgument(3));
+        lenient().when(gestures.issueOf(eq("acme"), eq(7L), any(), any(), any(), any())).thenAnswer(inv -> inv.getArgument(3));
     }
 
     @Mock private ProjectGestures projects;
@@ -118,12 +120,55 @@ class CortexMcpToolTest {
 
         assertThatThrownBy(() -> comment.ask(Map.of("issue", "TF-12"), ctx))
             .isInstanceOfSatisfying(QuestionNeeded.class, needed -> {
-                assertThat(needed.question().field()).isEqualTo("content");
-                assertThat(needed.question().text()).isEqualTo("What should the comment say?");
-                assertThat(needed.question().choices()).isEmpty();
+                assertThat(needed.questions()).singleElement().satisfies(question -> {
+                    assertThat(question.field()).isEqualTo("content");
+                    assertThat(question.header()).isEqualTo("Comment");
+                    assertThat(question.text()).isEqualTo("What should the comment say?");
+                    assertThat(question.choices()).isEmpty();
+                });
             });
         assertThat(comment.ask(Map.of("issue", "TF-12", "content", "Done in #12"), ctx))
             .containsEntry("content", "Done in #12");
+    }
+
+    @Test
+    @DisplayName("R115 : « commente ça » sans issue ni texte demande les deux dans la même carte, l'issue d'abord")
+    void the_issue_and_the_comment_are_asked_in_one_card() {
+        when(gestures.issueOf(eq("acme"), eq(7L), any(), any(), eq("Which issue should get the comment?"), isNull()))
+            .thenThrow(new QuestionNeeded(Question.of("issue", "Issue", "Which issue should get the comment?",
+                List.of(Question.Choice.recommended("TF-12", "TF-12 Fix login", "Todo")))));
+
+        assertThatThrownBy(() -> ((CortexGesture) tool("add_comment")).ask(Map.of(), ctx))
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> assertThat(needed.questions())
+                .extracting(question -> question.header() + ": " + question.text())
+                .containsExactly("Issue: Which issue should get the comment?", "Comment: What should the comment say?"));
+    }
+
+    @Test
+    @DisplayName("R115 : le nom inventé par le modèle et où vit le code, dans la même carte, sa proposition en premier")
+    void the_invented_name_and_the_repository_are_asked_in_one_card() {
+        when(projects.questions(eq("acme"), any(), any())).thenReturn(List.of(
+            Question.of("name", "Name", "What should the project be called?",
+                List.of(Question.Choice.of("Next.js app", "Next.js app", "Suggested from your request"))),
+            Question.of("repository", "Repository", "Where does its code live?",
+                List.of(Question.Choice.recommended("new-private", "A new private repository", "Only you see it")))));
+        AgentContext asking = new AgentContext("acme", 1L, 7L, Screen.NONE, "crée un projet Next.js");
+
+        assertThatThrownBy(() -> ((CortexGesture) tool("create_project"))
+                .ask(Map.of("name", "Web Application", "stack", "Next.js"), asking))
+            .isInstanceOfSatisfying(QuestionNeeded.class, needed -> {
+                assertThat(needed.questions()).extracting(Question::field).containsExactly("name", "repository");
+                assertThat(needed.question().choices()).extracting(Question.Choice::value)
+                    .containsExactly("Web Application", "Next.js app");
+                assertThat(needed.question().choices().get(0).description())
+                    .isEqualTo("Cortex's suggestion: your request gives none");
+                assertThat(needed.question().choices()).noneMatch(Question.Choice::recommended);
+            });
+        // Le geste lit la demande sans le nom que le modèle a inventé : il demande le nom, avec ce que la demande dit.
+        org.mockito.ArgumentCaptor<JsonNode> seen = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
+        org.mockito.Mockito.verify(projects).questions(eq("acme"), seen.capture(), eq("crée un projet Next.js"));
+        assertThat(seen.getValue().has("name")).isFalse();
+        assertThat(seen.getValue().path("stack").asText()).isEqualTo("Next.js");
     }
 
     /**
@@ -159,12 +204,49 @@ class CortexMcpToolTest {
     @DisplayName("R115 : l'issue se résout parmi celles de l'écran, qui va avec chaque appel")
     void the_issue_is_resolved_with_the_screen() {
         AgentContext seeing = new AgentContext("acme", 1L, 7L, new Screen(12L, 5L));
-        when(gestures.issueOf(eq("acme"), eq(7L), eq(new Screen(12L, 5L)), any(), eq("Which issue should be deleted?")))
+        when(gestures.issueOf(eq("acme"), eq(7L), eq(new Screen(12L, 5L)), any(), eq("Which issue should be deleted?"), isNull()))
             .thenReturn(mapper.createObjectNode().put("issue", "TF-12").put("projectId", 12).put("issueId", 5));
 
         Map<String, Object> resolved = ((CortexGesture) tool("delete_issue")).ask(Map.of("issue", "the open one"), seeing);
 
         assertThat(resolved).containsEntry("issue", "TF-12").containsEntry("issueId", 5);
+    }
+
+    /**
+     * Test du CEO du 05/11/2026 : pour supprimer, la demande de la personne part avec l'issue, pour que la colonne qu'elle
+     * nomme la désigne ; pour déplacer, la colonne nommée est celle où l'issue va : la demande ne part pas.
+     */
+    @ParameterizedTest(name = "{0} : la demande part {1}")
+    @CsvSource({"delete_issue, true", "update_issue, false", "add_comment, false", "delegate_issue, false"})
+    void the_request_names_the_column_only_for_a_deletion(String name, boolean withRequest) {
+        String request = "supprime l'issue qu'il y a dans In review by AI";
+        AgentContext asking = new AgentContext("acme", 1L, 7L, new Screen(12L, null), request);
+        org.mockito.ArgumentCaptor<String> sent = org.mockito.ArgumentCaptor.forClass(String.class);
+        when(gestures.issueOf(eq("acme"), eq(7L), any(), any(), any(), sent.capture()))
+            .thenReturn(mapper.createObjectNode().put("issue", "TESTTA-2").put("projectId", 12).put("issueId", 22)
+                .put("content", "x").put("status", "Done"));
+
+        ((CortexGesture) tool(name)).ask(Map.of("issue", "TESTTA-1"), asking);
+
+        assertThat(sent.getValue()).isEqualTo(withRequest ? request : null);
+    }
+
+    /**
+     * Ce que la personne a répondu sur les cartes, seul le serveur le note : celui que passerait le modèle est retiré, celui
+     * d'une réponse à une carte reste et parvient au geste.
+     */
+    @ParameterizedTest(name = "demande « {0} » : la note reste {1}")
+    @CsvSource(nullValues = "-", value = {"crée un projet Next.js appelé Orion, false", "-, true"})
+    void only_the_server_marks_what_was_answered(String request, boolean kept) {
+        AgentContext asking = new AgentContext("acme", 1L, 7L, Screen.NONE, request);
+        org.mockito.ArgumentCaptor<JsonNode> seen = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
+        when(projects.questions(eq("acme"), seen.capture(), any())).thenReturn(List.of());
+
+        Map<String, Object> resolved = ((CortexGesture) tool("create_project"))
+            .ask(Map.of("name", "Orion", "stack", "Next.js", Question.ANSWERED, List.of("name")), asking);
+
+        assertThat(resolved.containsKey(Question.ANSWERED)).isEqualTo(kept);
+        assertThat(seen.getValue().has(Question.ANSWERED)).isEqualTo(kept);
     }
 
     @Test

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { AI_TIMEOUT_MS, apiClient } from "./client"
+import { apiClient } from "./client"
+import { BENCHMARK_CASE_TIMEOUT_MS } from "./model-benchmark-service"
 import { chooseModel, getModelCapabilities, measureModelCase, startModelMeasure } from "./model-capability-service"
 
 vi.mock("./client", () => ({
-  AI_TIMEOUT_MS: 200_000,
   apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn() },
 }))
 
@@ -27,7 +27,7 @@ describe("model-capability-service", () => {
     expect(await startModelMeasure("acme", "qwen3:8b")).toEqual({ runId: 9 })
     expect(apiClient.post).toHaveBeenCalledWith(`${BASE}/runs`, { model: "qwen3:8b" })
     expect(await measureModelCase("acme", 9, "tools-move")).toEqual({ passed: true })
-    expect(apiClient.post).toHaveBeenLastCalledWith(`${BASE}/runs/9/cases/tools-move`, undefined, { timeout: AI_TIMEOUT_MS })
+    expect(apiClient.post).toHaveBeenLastCalledWith(`${BASE}/runs/9/cases/tools-move`, undefined, { timeout: BENCHMARK_CASE_TIMEOUT_MS, silentError: true })
   })
 
   it("chooses the model of Cortex, or goes back to the instance's", async () => {

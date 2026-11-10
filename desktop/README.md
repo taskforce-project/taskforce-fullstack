@@ -28,8 +28,25 @@ This folder holds the Electron shell. The app itself is the rest of the reposito
   it in memory only.
 - **Claude Code.** The shell starts the runner with a secret drawn at each start. Claude Code must be installed and
   signed in on the computer.
+- **Voice.** The microphone of the composer records in the window and the shell transcribes on the computer, in a
+  utility process (`src/voice.ts`, `src/voice-worker.ts`), with sherpa-onnx (npm, prebuilt N-API binaries, unpacked
+  from the app's archive) and Parakeet TDT 0.6b v3 by NVIDIA (CC BY 4.0, int8 export for sherpa-onnx, 671 MB). The model
+  is downloaded once from Hugging Face a few minutes after the app opens, in the background and at a limited rate, from
+  a pinned revision, checked against SHA-256 and kept in the app's folder (`voice/`). A click on the microphone during
+  the download shows its progress on the icon and lifts the limit; a failure retries at the next start. There is no
+  download in the Microsoft Store version, which has no microphone. Audio never leaves the computer; the log keeps
+  durations, never the text.
 - **Updates.** The app checks the `desktop-latest` release at start and every six hours, downloads in the background
-  and installs on quit. The Microsoft Store version leaves its updates to the Store.
+  and installs on quit. The installer never shows a system window for an update: on quit it installs silently. With
+  "Restart now", there is a TaskForce window on screen from the click to the new version: the app's own update screen
+  while the app stops, then a window with the same look drawn by the installer (`installer.nsh`, with the NSIS `System`
+  plugin and Windows' GDI: no extra executable, no script), which says so if the install fails and opens the app again.
+  The installer runs twice from the same file: the first process holds that window and starts the second, which is the
+  unchanged, silent electron-builder install. The two hand the screen over through a file in the app's folder
+  (`update-screen`, `src/update-pending.ts`): it exists while the installer's window is on screen. The app notes the
+  version it installs (`update-pending.json` in its folder): if the next start still runs the version before, the
+  update toast says it didn't install and offers to restart again. The Microsoft Store version leaves its updates to
+  the Store.
 
 The full design is in the docs repository: `v1/03-architecture/Specification_App_Desktop.md`.
 
@@ -63,8 +80,9 @@ the Store version. Variables read by a development build:
 
 ## Package and release
 
-`npm run dist:win` builds the Windows installer (per user, no administrator rights) and `npm run dist:linux` the .deb
-and AppImage, in `release/`. `npm run icon` draws the app icon from the brand mark first, with the logos of the
+`npm run dist:win` builds the Windows installer (per user, no administrator rights, one click: a small window with the
+app icon and a progress bar for the first install, none for an update) and `npm run dist:linux` the .deb and AppImage,
+in `release/`. `npm run icon` draws the app icon from the brand mark first, with the logos of the
 Microsoft Store package (`build/appx`).
 
 `npm run dist:store` builds the Microsoft Store package (`release/TaskForce-<version>-store.appx`), with the identity
@@ -75,6 +93,7 @@ SmartScreen nor Smart App Control stops it. In this version:
 - the data goes in the package's folder, `%LOCALAPPDATA%\Packages\<package family>\LocalState`, which Windows deletes
   when the app is uninstalled; it stays separate from the data of the version from the website;
 - the notifications keep the identity of the package;
+- there is no microphone: the package would have to declare the capability, which cannot be tried without installing it;
 - the database starts without `cmd.exe`. In a Store package, a program of the package may start another one only
   directly: through `cmd.exe`, a system program, Windows refuses ("Access is denied"). `initdb` and `pg_ctl start` go
   through `cmd.exe`, and so does the server when it checks its own version at start. So the build prepares an empty

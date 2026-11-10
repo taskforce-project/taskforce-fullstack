@@ -71,11 +71,11 @@ public final class CapabilitySuite {
 
     private static final List<CapabilityCase> CASES = List.of(
         new CapabilityCase("tools-move", Capability.TOOLS,
-            "Moves ATLAS-3 to Done with update_issue",
+            "Moves ATLAS-3 to Done",
             ask("Move ATLAS-3 to Done."),
             tool("update_issue", "issue", "ATLAS-3", "status", "Done"), List.of(), 0),
         new CapabilityCase("tools-list", Capability.TOOLS,
-            "Lists the issues of the Atlas project with list_issues",
+            "Lists the issues of the Atlas project",
             ask("Which issues of the Atlas project are blocked?"),
             tool("list_issues", "project", "Atlas|ATLAS"), List.of(), 0),
         new CapabilityCase("context-short", Capability.CONTEXT,

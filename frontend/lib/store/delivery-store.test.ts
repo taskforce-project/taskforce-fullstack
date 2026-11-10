@@ -1,4 +1,5 @@
 import { act } from '@testing-library/react';
+import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDeliveryStore } from './delivery-store';
 import type { DeliveryProvider, DeliveryRun } from '../api/delivery-service';
@@ -8,16 +9,24 @@ vi.mock('../api/delivery-service', () => ({
   getDeliveryProviders: vi.fn(),
   getIssueRun: vi.fn(),
   listWorkspaceRuns: vi.fn(),
+  listOpenApprovals: vi.fn(),
   delegateIssue: vi.fn(),
   getRunnerStatus: vi.fn(),
   provisionRunner: vi.fn(),
   getRunActivity: vi.fn(),
   decideApproval: vi.fn(),
   downloadEvidence: vi.fn(),
+  getEvidence: vi.fn(),
   applyRun: vi.fn(),
   discardRun: vi.fn(),
   markRunDone: vi.fn(),
   retryRun: vi.fn(),
+  getMissionChanges: vi.fn(),
+  getMissionFileDiff: vi.fn(),
+  revertMissionFile: vi.fn(),
+  askForChanges: vi.fn(),
+  sendCorrection: vi.fn(),
+  stopRun: vi.fn(),
 }));
 
 function makeRun(overrides: Partial<DeliveryRun> = {}): DeliveryRun {
@@ -36,7 +45,171 @@ const PROVIDERS: DeliveryProvider[] = [
 describe('delivery-store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    act(() => useDeliveryStore.setState({ providers: [], projectProviders: {}, providersLoading: false, runs: {}, workspaceRuns: [], runner: null, activity: {} }));
+    act(() => useDeliveryStore.setState({ providers: [], projectProviders: {}, providersLoading: false, runs: {}, workspaceRuns: [], openApprovals: [], runner: null, activity: {} }));
+    vi.mocked(svc.listOpenApprovals).mockResolvedValue([]);
+  });
+
+  // ---- les changements d'une mission (R139, R140) ----
+
+  const changes = { mode: 'repo', live: false, added: 1, removed: 0, more: 0, files: [], canRevert: true, canComment: true, canCorrect: false, blockedReason: null, correction: null } as const;
+  const refused = () => new AxiosError('Refused', 'ERR', undefined, undefined, {
+    status: 400, data: { message: 'Refused by the server' }, statusText: '', headers: {}, config: {} as InternalAxiosRequestConfig,
+  } as AxiosResponse);
+
+  describe('changes', () => {
+    beforeEach(() => act(() => useDeliveryStore.setState({ missionChanges: {}, fileDiffs: {}, changeComments: {}, changeErrors: {} })));
+
+    it('fetchMissionChanges keeps the list; a failure keeps the one before and returns null', async () => {
+      vi.mocked(svc.getMissionChanges).mockResolvedValue({ ...changes });
+      await expect(useDeliveryStore.getState().fetchMissionChanges('acme', 1)).resolves.toMatchObject({ mode: 'repo' });
+      vi.mocked(svc.getMissionChanges).mockRejectedValue(new Error('down'));
+      await expect(useDeliveryStore.getState().fetchMissionChanges('acme', 1)).resolves.toBeNull();
+      expect(useDeliveryStore.getState().missionChanges[1]?.mode).toBe('repo');
+    });
+
+    it('fetchFileDiff keeps the diff by file; a failure says so with null', async () => {
+      const diff = { path: 'a.txt', format: 'diff', body: '@@', binary: false, truncated: false, withheld: false, revision: 'r1' } as const;
+      vi.mocked(svc.getMissionFileDiff).mockResolvedValue({ ...diff });
+      await useDeliveryStore.getState().fetchFileDiff('acme', 1, 'a.txt');
+      expect(useDeliveryStore.getState().fileDiffs[1]?.['a.txt']?.body).toBe('@@');
+      vi.mocked(svc.getMissionFileDiff).mockRejectedValue(new Error('down'));
+      await expect(useDeliveryStore.getState().fetchFileDiff('acme', 1, 'b.txt')).resolves.toBeNull();
+      expect(useDeliveryStore.getState().fileDiffs[1]?.['b.txt']).toBeNull();
+      expect(useDeliveryStore.getState().fileDiffs[1]?.['a.txt']?.body).toBe('@@');
+    });
+
+    it('revertFile rereads the list; a refusal is kept on the file and returns false, and a later success clears it', async () => {
+      vi.mocked(svc.revertMissionFile).mockRejectedValueOnce(refused());
+      await expect(useDeliveryStore.getState().revertFile('acme', 1, 'a.txt')).resolves.toBe(false);
+      expect(useDeliveryStore.getState().changeErrors[1]?.['a.txt']).toBeTruthy();
+      vi.mocked(svc.revertMissionFile).mockResolvedValue(undefined);
+      vi.mocked(svc.getMissionChanges).mockResolvedValue({ ...changes });
+      await expect(useDeliveryStore.getState().revertFile('acme', 1, 'a.txt')).resolves.toBe(true);
+      expect(useDeliveryStore.getState().changeErrors[1]?.['a.txt']).toBeUndefined();
+      expect(svc.getMissionChanges).toHaveBeenCalled();
+    });
+
+    it('a failure without a reason from the server is kept empty: the screen says what to do in its own words (R133)', async () => {
+      vi.mocked(svc.revertMissionFile).mockRejectedValueOnce(new AxiosError('Network Error'));
+      await useDeliveryStore.getState().revertFile('acme', 1, 'a.txt');
+      expect(useDeliveryStore.getState().changeErrors[1]?.['a.txt']).toBe('');
+      const internal = new AxiosError('Failed', 'ERR', undefined, undefined, {
+        status: 500, data: { message: 'An unexpected error occurred' }, statusText: '', headers: {}, config: {} as InternalAxiosRequestConfig,
+      } as AxiosResponse);
+      vi.mocked(svc.sendCorrection).mockRejectedValueOnce(internal);
+      await useDeliveryStore.getState().sendCorrection('acme', 1, 'x');
+      expect(useDeliveryStore.getState().changeErrors[1]?.['']).toBe('');
+    });
+
+    it('comments are added and removed one by one, by mission', () => {
+      const { addChangeComment } = useDeliveryStore.getState();
+      act(() => addChangeComment(1, { path: 'a.txt', line: 2, side: 'new', text: 'one' }));
+      act(() => addChangeComment(1, { path: 'a.txt', line: 3, side: 'old', text: 'two' }));
+      act(() => addChangeComment(2, { path: 'b.txt', line: 1, side: 'new', text: 'other mission' }));
+      const [first] = useDeliveryStore.getState().changeComments[1] ?? [];
+      act(() => useDeliveryStore.getState().removeChangeComment(1, first?.id ?? ''));
+      expect(useDeliveryStore.getState().changeComments[1]?.map((c) => c.text)).toEqual(['two']);
+      expect(useDeliveryStore.getState().changeComments[2]).toHaveLength(1);
+    });
+
+    it('askForChanges sends the comments without their ids, forgets them, and keeps the new mission', async () => {
+      const next = makeRun({ id: 2, issueId: 5, status: 'QUEUED' });
+      vi.mocked(svc.askForChanges).mockResolvedValue(next);
+      act(() => useDeliveryStore.setState({ workspaceRuns: [makeRun({ id: 1 })] }));
+      act(() => useDeliveryStore.getState().addChangeComment(1, { path: 'a.txt', line: 2, side: 'new', text: 'one' }));
+
+      await expect(useDeliveryStore.getState().askForChanges('acme', 5, 1)).resolves.toEqual(next);
+
+      expect(svc.askForChanges).toHaveBeenCalledWith('acme', 1, [{ path: 'a.txt', line: 2, side: 'new', text: 'one' }]);
+      const state = useDeliveryStore.getState();
+      expect(state.changeComments[1]).toBeUndefined();
+      expect(state.runs[5]).toEqual(next);
+      expect(state.workspaceRuns.map((r) => [r.id, r.outcome])).toEqual([[2, undefined], [1, 'FOLLOWED_UP']]);
+    });
+
+    it('askForChanges with no comment does nothing', async () => {
+      await expect(useDeliveryStore.getState().askForChanges('acme', 5, 1)).resolves.toBeNull();
+      expect(svc.askForChanges).not.toHaveBeenCalled();
+    });
+
+    it('askForChanges refused: the comments stay, the reason is kept', async () => {
+      vi.mocked(svc.askForChanges).mockRejectedValue(refused());
+      act(() => useDeliveryStore.getState().addChangeComment(1, { path: 'a.txt', line: 2, side: 'new', text: 'one' }));
+      await expect(useDeliveryStore.getState().askForChanges('acme', 5, 1)).resolves.toBeNull();
+      const state = useDeliveryStore.getState();
+      expect(state.changeComments[1]).toHaveLength(1);
+      expect(state.changeErrors[1]?.['']).toBeTruthy();
+    });
+
+    it('sendCorrection rereads the list; a refusal is kept', async () => {
+      vi.mocked(svc.sendCorrection).mockResolvedValueOnce(undefined);
+      vi.mocked(svc.getMissionChanges).mockResolvedValue({ ...changes });
+      await expect(useDeliveryStore.getState().sendCorrection('acme', 1, 'use tabs')).resolves.toBe(true);
+      expect(svc.sendCorrection).toHaveBeenCalledWith('acme', 1, 'use tabs');
+      vi.mocked(svc.sendCorrection).mockRejectedValueOnce(refused());
+      await expect(useDeliveryStore.getState().sendCorrection('acme', 1, 'x')).resolves.toBe(false);
+      expect(useDeliveryStore.getState().changeErrors[1]?.['']).toBeTruthy();
+    });
+  });
+
+  // ---- ce qui attend la personne (R128) ----
+
+  const open = (runId: number, requests: number) => ({ runId, issueId: runId * 10, issueKey: `WEB-${runId}`, issueTitle: 'Fix', projectId: 12, requests });
+
+  it('fetchOpenApprovals reads what waits for the person; a failure keeps the list and returns null', async () => {
+    vi.mocked(svc.listOpenApprovals).mockResolvedValueOnce([open(1, 2)]);
+    await act(async () => { await useDeliveryStore.getState().fetchOpenApprovals('acme'); });
+    expect(svc.listOpenApprovals).toHaveBeenCalledWith('acme');
+    expect(useDeliveryStore.getState().openApprovals).toEqual([open(1, 2)]);
+
+    vi.mocked(svc.listOpenApprovals).mockRejectedValueOnce(new Error('down'));
+    let res: unknown = 'unset';
+    await act(async () => { res = await useDeliveryStore.getState().fetchOpenApprovals('acme'); });
+    expect(res).toBeNull();
+    expect(useDeliveryStore.getState().openApprovals).toEqual([open(1, 2)]);
+  });
+
+  it('answering a request lowers the number at once, before the server is read again', async () => {
+    act(() => useDeliveryStore.setState({ openApprovals: [open(100, 2), open(101, 1)] }));
+    vi.mocked(svc.decideApproval).mockResolvedValue(undefined);
+    vi.mocked(svc.getRunActivity).mockResolvedValue({ events: [], approvals: [] });
+    let during: number[] = [];
+    vi.mocked(svc.listOpenApprovals).mockImplementationOnce(async () => {
+      during = useDeliveryStore.getState().openApprovals.map((row) => row.requests);
+      return [open(100, 1), open(101, 1)];
+    });
+
+    await act(async () => { await useDeliveryStore.getState().decideApproval('acme', 100, 9, true); });
+
+    expect(during).toEqual([1, 1]);
+    expect(useDeliveryStore.getState().openApprovals).toEqual([open(100, 1), open(101, 1)]);
+  });
+
+  it('the last request of a mission takes its line away', async () => {
+    act(() => useDeliveryStore.setState({ openApprovals: [open(100, 1)] }));
+    vi.mocked(svc.decideApproval).mockResolvedValue(undefined);
+    vi.mocked(svc.getRunActivity).mockResolvedValue({ events: [], approvals: [] });
+    let during: unknown[] = [];
+    vi.mocked(svc.listOpenApprovals).mockImplementationOnce(async () => {
+      during = useDeliveryStore.getState().openApprovals;
+      return [];
+    });
+
+    await act(async () => { await useDeliveryStore.getState().decideApproval('acme', 100, 9, false); });
+
+    expect(during).toEqual([]);
+  });
+
+  it('a refused answer reads the truth again: the request had already closed', async () => {
+    act(() => useDeliveryStore.setState({ openApprovals: [open(100, 1)] }));
+    vi.mocked(svc.decideApproval).mockRejectedValue(new Error('expired'));
+    vi.mocked(svc.listOpenApprovals).mockResolvedValueOnce([]);
+
+    let ok = true;
+    await act(async () => { ok = await useDeliveryStore.getState().decideApproval('acme', 100, 9, true); });
+
+    expect(ok).toBe(false);
+    expect(useDeliveryStore.getState().openApprovals).toEqual([]);
   });
 
   it('fetchProviders loads the providers', async () => {
@@ -189,6 +362,25 @@ describe('delivery-store', () => {
     expect(svc.downloadEvidence).toHaveBeenCalledWith('acme', 100, 'md');
   });
 
+  // La vue du travail lit le dossier de preuve pendant qu'il se construit (R95, point 3).
+  it('fetchEvidence keeps the record of a run, null while it has none, the last read on another error', async () => {
+    const evidence = { format: 'taskforce-evidence/1', events: [], root: 'h1' };
+    const missing = new AxiosError('Not found', 'ERR_BAD_REQUEST', {} as InternalAxiosRequestConfig, undefined,
+      { status: 404, data: {}, headers: {}, statusText: '', config: {} } as AxiosResponse);
+    vi.mocked(svc.getEvidence).mockResolvedValueOnce(evidence).mockRejectedValueOnce(new Error('offline')).mockRejectedValueOnce(missing);
+    let read: unknown = undefined;
+
+    await act(async () => { read = await useDeliveryStore.getState().fetchEvidence('acme', 100); });
+    expect(read).toEqual(evidence);
+    expect(useDeliveryStore.getState().evidence[100]).toEqual(evidence);
+    await act(async () => { read = await useDeliveryStore.getState().fetchEvidence('acme', 100); });
+    expect(read).toBeNull();
+    expect(useDeliveryStore.getState().evidence[100]).toEqual(evidence);
+    await act(async () => { read = await useDeliveryStore.getState().fetchEvidence('acme', 100); });
+    expect(useDeliveryStore.getState().evidence[100]).toBeNull();
+    expect(svc.getEvidence).toHaveBeenCalledWith('acme', 100);
+  });
+
   it('decideApproval returns false when the server refuses', async () => {
     vi.mocked(svc.decideApproval).mockRejectedValue(new Error('expired'));
     let ok = true;
@@ -281,6 +473,32 @@ describe('delivery-store : les gestes de la carte de résultat (R78)', () => {
     await act(async () => { await useDeliveryStore.getState().discardRun('acme', 28, 100); });
 
     expect(useDeliveryStore.getState().resultErrors[100]).toBeUndefined();
+  });
+
+  it('stopRun : la mission se relit, sa chronologie et ce qui attend aussi', async () => {
+    vi.mocked(svc.stopRun).mockResolvedValue(undefined);
+    vi.mocked(svc.getIssueRun).mockResolvedValue({ id: 100, issueId: 28, status: 'FAILED', outcome: 'STOPPED' } as DeliveryRun);
+    vi.mocked(svc.getRunActivity).mockResolvedValue({ events: [], approvals: [] });
+    vi.mocked(svc.listOpenApprovals).mockResolvedValue([]);
+
+    let ok = false;
+    await act(async () => { ok = await useDeliveryStore.getState().stopRun('acme', 28, 100); });
+
+    expect(ok).toBe(true);
+    expect(svc.stopRun).toHaveBeenCalledWith('acme', 100);
+    expect(useDeliveryStore.getState().runs[28]?.outcome).toBe('STOPPED');
+    expect(svc.listOpenApprovals).toHaveBeenCalledWith('acme');
+  });
+
+  it('stopRun refusé : false, et la mission se relit pour dire où elle en est', async () => {
+    vi.mocked(svc.stopRun).mockRejectedValue(new Error('This mission has already ended.'));
+    vi.mocked(svc.getIssueRun).mockResolvedValue({ id: 100, issueId: 28, status: 'DONE' } as DeliveryRun);
+
+    let ok = true;
+    await act(async () => { ok = await useDeliveryStore.getState().stopRun('acme', 28, 100); });
+
+    expect(ok).toBe(false);
+    expect(useDeliveryStore.getState().runs[28]?.status).toBe('DONE');
   });
 
   it('retryRun : la nouvelle mission remplace l\'ancienne sur l\'issue', async () => {

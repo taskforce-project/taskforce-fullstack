@@ -14,7 +14,9 @@ import { Markdown } from "@/components/ui/lightweight-markdown"
 import { cn } from "@/lib/utils"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useWorkflowStore } from "@/lib/store/workflow-store"
-import { openWorkflowPanel, isActiveJob } from "@/components/workflows/workflow-dock"
+import { useWindowStore } from "@/lib/store/window-store"
+import { isActiveJob } from "@/lib/window/missions"
+import { AnalysisReply } from "@/components/layout/work-rows"
 import type { AnalysisDepth, StoredBrief, StoredPriority } from "@/lib/api/analysis-service"
 import type { DecisionSnapshot } from "@/lib/api/analytics-service"
 
@@ -205,8 +207,8 @@ function PriorityCard({
 /**
  * Decision board (boucle OODA) - aide à la décision par projet sur la page Analytics.
  *
- * L'analyse est un **workflow asynchrone** : « Analyser » le lance et ouvre le panneau « AI Workflows »,
- * où l'on suit son statut ; le brief produit est persisté, et chaque priorité reste actionnable
+ * L'analyse est un **workflow asynchrone** : « Analyser » le lance et ouvre « Missions », dans la zone de droite
+ * de la fenêtre (R122), où l'on suit son statut ; le brief produit est persisté, et chaque priorité reste actionnable
  * (accepter → issue, épingler, éditer, écarter) au rechargement de la page.
  */
 export function DecisionBoard({
@@ -218,6 +220,8 @@ export function DecisionBoard({
   const { fetchBrief, launch } = useWorkflowStore()
   const [depth, setDepth] = useState<AnalysisDepth>("QUICK")
   const [launching, setLaunching] = useState(false)
+  const showRow = useWindowStore((s) => s.showRow)
+  const followInMissions = () => showRow("missions")
 
   /** Le workflow en cours pour ce projet (le dock en montre le détail). */
   const runningJob = useMemo(
@@ -241,7 +245,7 @@ export function DecisionBoard({
       toast.error("Could not start the analysis")
       return
     }
-    openWorkflowPanel()
+    followInMissions()
   }
 
   const busy = launching || runningJob !== null
@@ -296,14 +300,20 @@ export function DecisionBoard({
         </div>
       </header>
 
-      {runningJob && (
+      {/* La question de l'analyse se répond ici, où l'analyse se lance ; sinon, elle se suit dans « Missions ». */}
+      {runningJob?.status === "WAITING_FOR_INPUT" ? (
+        <div className="mt-3 flex flex-col gap-1.5 rounded-lg border border-shape-yellow/35 bg-shape-yellow/[0.06] px-3 py-2">
+          <p className="text-xs font-medium text-foreground">{t.analysisNeedsAnswer}</p>
+          <AnalysisReply slug={slug} job={runningJob} className="px-0 pb-0 pl-0" />
+        </div>
+      ) : runningJob && (
         <button
           type="button"
-          onClick={openWorkflowPanel}
+          onClick={followInMissions}
           className="mt-3 flex w-full items-center gap-2 rounded-lg border border-primary/30 bg-primary/[0.06] px-3 py-2 text-left text-xs text-foreground transition-colors hover:bg-primary/[0.1]"
         >
           <Loader2 className="size-3.5 shrink-0 animate-spin text-ink-blue" />
-          {runningJob.status === "WAITING_FOR_INPUT" ? t.analysisNeedsAnswer : t.analysisFollow}
+          {t.analysisFollow}
         </button>
       )}
 

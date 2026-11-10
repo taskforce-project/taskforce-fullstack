@@ -1,6 +1,11 @@
 package com.taskforce.tf_api.core.model;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import com.taskforce.tf_api.core.enums.DeliveryRunOutcome;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
@@ -161,4 +166,43 @@ public class DeliveryRun extends AuditableEntity {
     /** Pourquoi la personne a appliqué malgré des tests en échec (R87) ; vide sinon. */
     @Column(name = "outcome_reason", length = 2000)
     private String outcomeReason;
+
+    // --- Les changements sous les yeux (R139, séance n°20).
+
+    /** La mission que celle-ci reprend, sur la même branche ; vide pour une mission neuve. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_run_id")
+    private DeliveryRun parentRun;
+
+    /** Le commit d'où part la mission : l'état « d'avant » d'un fichier. */
+    @Column(name = "base_sha", length = 64)
+    private String baseSha;
+
+    /** La session de l'agent, qu'une reprise continue. */
+    @Column(name = "agent_session", length = 64)
+    private String agentSession;
+
+    /** {@code repo} ou {@code scratch} ; vide tant que le runner n'a rien relevé (runner plus ancien, ou pas encore parti). */
+    @Column(name = "work_mode", length = 8)
+    private String workMode;
+
+    /** Les fichiers au-delà du plafond du runner, comptés dans ses totaux. */
+    @Column(name = "changes_more", nullable = false)
+    @Builder.Default
+    private int changesMore = 0;
+
+    /** La branche n'existe plus sur le poste ni sur GitHub : plus rien ne se remet. */
+    @Column(name = "branch_gone", nullable = false)
+    @Builder.Default
+    private boolean branchGone = false;
+
+    /** Un fichier a été remis après les tests : leur résultat porte sur une version d'avant. */
+    @Column(name = "tests_stale", nullable = false)
+    @Builder.Default
+    private boolean testsStale = false;
+
+    /** Les commentaires qui lancent cette reprise : {@code path}, {@code line}, {@code side}, {@code text}. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "follow_up", columnDefinition = "jsonb")
+    private List<Map<String, Object>> followUp;
 }

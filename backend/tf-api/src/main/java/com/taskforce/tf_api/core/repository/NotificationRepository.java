@@ -44,6 +44,19 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     """)
     int markAllAsRead(@Param("recipientId") Long recipientId, @Param("workspaceId") Long workspaceId);
 
+    /** Marque lues les notifications d'un type pour cette issue : ce qu'elles annonçaient n'attend plus la personne. */
+    @Modifying
+    @Query("""
+        UPDATE Notification n
+        SET n.read = true
+        WHERE n.recipient.id = :recipientId
+          AND n.issueIdentifier = :issueIdentifier
+          AND n.type = :type
+          AND n.read = false
+    """)
+    int markReadForIssue(@Param("recipientId") Long recipientId, @Param("issueIdentifier") String issueIdentifier,
+                         @Param("type") String type);
+
     /** Acquitte (dismiss) toutes les notifications d'un user/workspace */
     @Modifying
     @Query("""

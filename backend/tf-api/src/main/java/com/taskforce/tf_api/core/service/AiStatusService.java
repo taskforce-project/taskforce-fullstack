@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.service;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,10 +26,22 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class AiStatusService {
 
-    /** État de l'IA. Les noms de modèles sont {@code null} quand on ne sait pas lesquels serviraient. */
+    /**
+     * État de l'IA. Les noms de modèles sont {@code null} quand on ne sait pas lesquels serviraient.
+     * {@code contextWindow} et {@code fastContextWindow} : la plus grande fenêtre de contexte, en jetons, que la
+     * passerelle donne à chacun des deux modèles sur Ollama, qui la taille à chaque requête ; {@code null} ailleurs, où
+     * le fournisseur la tient.
+     */
     public record AiStatus(boolean configured, boolean chatAvailable, String chatModel, String fastModel,
-                           boolean embeddingsAvailable, String embeddingModel) {
+                           boolean embeddingsAvailable, String embeddingModel, Integer contextWindow,
+                           Integer fastContextWindow) {
         public static final AiStatus UNREACHABLE = new AiStatus(false, false, null, null, false, null);
+
+        /** Sans fenêtre connue : l'IA coupée ou injoignable, ou un autre fournisseur qu'Ollama. */
+        public AiStatus(boolean configured, boolean chatAvailable, String chatModel, String fastModel,
+                        boolean embeddingsAvailable, String embeddingModel) {
+            this(configured, chatAvailable, chatModel, fastModel, embeddingsAvailable, embeddingModel, null, null);
+        }
     }
 
     /**
@@ -81,6 +94,22 @@ public class AiStatusService {
         }
     }
 
+    /**
+     * Ce que la fiche d'un modèle dit de lui chez le fournisseur de maintenant, pour la table des capacités tant qu'il
+     * n'est pas mesuré (R125) : sur Ollama sa fiche, ailleurs la fenêtre que dit sa liste de modèles ; vide sans rien de lisible.
+     */
+    public Optional<ModelGateway.ModelCard> describe(String model) {
+        return gateway.describe(snapshot().settings(), model);
+    }
+
+    /**
+     * Charge un modèle avant qu'on ne chronomètre rien (R142) : ce qu'Ollama dit de sa place en mémoire ; vide chez un autre
+     * fournisseur, où il n'y a rien à charger.
+     */
+    public Optional<ModelGateway.LoadedModel> load(String model, Duration budget) {
+        return gateway.load(snapshot().settings(), model, budget);
+    }
+
     /** Oublie l'état en cache : le prochain appel relit le fournisseur (après un échec d'appel au modèle). */
     public void invalidate() {
         cached = null;
@@ -104,7 +133,12 @@ public class AiStatusService {
         if (chat.isEmpty()) {
             log.warn("AI provider unreachable ({})", settings.describe());
         }
-        AiStatus status = new AiStatus(true, chatAvailable, models.chat(), models.fast(), embedAvailable, models.embed());
+        // La fenêtre que reçoit chaque modèle (Ollama seulement) : le maximum du modèle est lu une fois par la passerelle.
+        Integer window = chatAvailable ? gateway.contextWindow(settings, models.chat()).orElse(null) : null;
+        Integer fastWindow = !chatAvailable ? null
+            : models.fast().equals(models.chat()) ? window : gateway.contextWindow(settings, models.fast()).orElse(null);
+        AiStatus status = new AiStatus(true, chatAvailable, models.chat(), models.fast(), embedAvailable, models.embed(),
+            window, fastWindow);
         return new Snapshot(settings, status, chat.isPresent(), chat.orElse(List.of()), embed.orElse(List.of()));
     }
 }

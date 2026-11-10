@@ -1,29 +1,32 @@
 import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 
-import { BrandLogo, NAME_ONLY } from "./brand-logo";
+import { BrandLogo } from "./brand-logo";
 import { BRAND_LOGOS } from "@/lib/brand-logos.generated";
 
 describe("BrandLogo", () => {
-  it.each([
-    // [slug, nom affiché, initiales attendues]
-    ["anthropic", "Claude Code", "CL"],
-    ["anthropic", "Claude Code", "CL"],
-    ["marque-inconnue", "Acme", "AC"],
-  ])("« %s » (%s) : repli neutre en initiales, aucun fichier de logo chargé", (slug, name, expected) => {
-    const { container } = render(<BrandLogo slug={slug} name={name} />);
+  it("« marque-inconnue » : repli neutre en initiales, aucun fichier de logo chargé", () => {
+    const { container } = render(<BrandLogo slug="marque-inconnue" name="Acme" />);
 
     expect(container.querySelector("img")).toBeNull();
-    expect(container.textContent).toBe(expected);
+    expect(container.textContent).toBe("AC");
   });
 
-  it("le logo d'Anthropic n'est ni vendorisé ni affiché (conditions d'Anthropic, ADR-013)", () => {
-    // Plus aucun fichier servi (OSS-1.9) ; NAME_ONLY reste en garde si la marque revenait au manifeste.
-    expect(BRAND_LOGOS["anthropic"]).toBeUndefined();
-    expect(NAME_ONLY.has("anthropic")).toBe(true);
+  it.each([
+    // [clé, nom affiché]
+    ["anthropic", "Claude Code"],
+    ["anthropic", "Claude"],
+  ])("« %s » (%s) montre la marque de Claude (R144, décision du CEO)", (slug, name) => {
+    render(<BrandLogo slug={slug} name={name} />);
+
+    expect(screen.getByRole("img", { name })).toHaveAttribute("src", "/logos/anthropic.svg");
   });
 
-  it("une marque vendorisée hors NAME_ONLY garde son logo", () => {
+  it("le fichier de la marque de Claude est au manifeste", () => {
+    expect(BRAND_LOGOS["anthropic"]).toBe("single");
+  });
+
+  it("une marque vendorisée garde son logo", () => {
     const { container } = render(<BrandLogo slug="cursor" name="Cursor" />);
 
     expect(BRAND_LOGOS["cursor"]).toBeDefined();

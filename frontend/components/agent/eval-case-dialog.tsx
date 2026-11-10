@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { NO_TOOL, type EvalCriteria, type EvalDraft, type EvalDraftCall } from "@/lib/api/eval-service"
 import { useEvalStore } from "@/lib/store/eval-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { cn } from "@/lib/utils"
 
@@ -50,34 +51,28 @@ function CallLine({ call }: { call: EvalDraftCall }) {
   )
 }
 
-/** Le geste sous une réponse qui a un dossier ; le dialogue ne se monte qu'ouvert. */
-export function EvalCaseButton({ slug, record }: { slug: string; record: string }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex h-6 items-center gap-1 rounded px-1.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-      >
-        <FlaskConical className="size-3" /> Add to test bank
-      </button>
-      {open && <EvalCaseDialog slug={slug} record={record} open={open} onOpenChange={setOpen} />}
-    </>
-  )
-}
-
 /**
- * Le geste « en faire un cas » : le brouillon vient du dossier de la réponse, la personne confirme
- * ou corrige les critères proposés, puis le serveur fige le cas.
+ * Le formulaire d'un cas, sous « Advanced » (R137) : le brouillon vient du dossier de la réponse, la personne confirme ou
+ * corrige les critères proposés, puis le serveur fige le cas. Avec `caseId`, il écrit les critères d'un cas qui les
+ * attend ; `expected`, c'est la phrase déjà écrite sous la réponse : elle reste avec le cas.
  */
 export function EvalCaseDialog({
-  slug, record, open, onOpenChange,
-}: { slug: string; record: string; open: boolean; onOpenChange: (open: boolean) => void }) {
+  slug, record, open, onOpenChange, caseId, expected, onSaved,
+}: {
+  slug: string
+  record: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  caseId?: number
+  expected?: string
+  onSaved?: () => void
+}) {
   const draftCase = useEvalStore((s) => s.draftCase)
   const addCase = useEvalStore((s) => s.addCase)
+  const giveCriteria = useEvalStore((s) => s.giveCriteria)
   const error = useEvalStore((s) => s.error)
   const openSettings = useSettingsStore((s) => s.openSettings)
+  const thread = usePreferencesStore((s) => s.t.thread)
 
   // Le dialogue se monte ouvert (EvalCaseButton) : le brouillon se lit dès le montage.
   const [draft, setDraft] = useState<EvalDraft | null>(null)
@@ -122,15 +117,19 @@ export function EvalCaseDialog({
     forbid: forbid.filter((t) => t !== tool),
     contains: split(contains, ","),
     notContains: split(notContains, ","),
+    ...(expected ? { expected } : {}),
   })
 
   const save = async () => {
     setSaving(true)
-    const added = await addCase(slug, record, title, criteria())
+    const added = caseId === undefined
+      ? await addCase(slug, record, title, criteria())
+      : await giveCriteria(slug, caseId, title, criteria())
     setSaving(false)
     if (!added) return
     onOpenChange(false)
-    toast.success("Added to the test bank", { action: { label: "Open", onClick: () => openSettings("evals") } })
+    onSaved?.()
+    toast.success(caseId === undefined ? thread.keptToast : thread.criteriaSaved, { action: { label: thread.keptOpen, onClick: () => openSettings("evals") } })
   }
 
   const setArg = (index: number, patch: Partial<ArgRow>) =>
@@ -140,7 +139,7 @@ export function EvalCaseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[560px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FlaskConical className="h-4 w-4 text-muted-foreground" />
@@ -179,7 +178,7 @@ export function EvalCaseDialog({
 
             <div className="flex flex-col gap-3 border-t border-border/60 pt-3">
               <p className={label}>A good answer</p>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1.5">
                   <span className="text-xs text-foreground">Calls the tool</span>
                   <Select value={tool} onValueChange={setTool}>
@@ -247,7 +246,7 @@ export function EvalCaseDialog({
                 </div>
               )}
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="eval-case-contains" className="text-xs text-foreground">Says the words</label>
                   <Input id="eval-case-contains" value={contains} placeholder="Separated by commas"

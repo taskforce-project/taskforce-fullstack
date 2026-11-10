@@ -209,7 +209,7 @@ public class TaskforceMcpTools {
                     .build(),
                 false, UPDATE, "PATCH", args -> issuePath(args),
                 (slug, userId, args) -> gestures.update(slug, userId, args))
-                .needing(Need.asked(ISSUE, "Which issue should change?")),
+                .needing(Need.asked(ISSUE, "Issue", "Which issue should change?")),
 
             new McpTool("check_checklist_item", "Check a checklist item",
                 "Check or uncheck one item of the issue's checklist, by its id from get_issue. Check an item when you have "
@@ -235,8 +235,8 @@ public class TaskforceMcpTools {
                     .build(),
                 false, "comment.create", "POST", args -> issuePath(args) + "/comments",
                 (slug, userId, args) -> gestures.comment(slug, userId, args))
-                .needing(Need.asked(ISSUE, "Which issue should get the comment?"),
-                    Need.asked("content", "What should the comment say?")),
+                .needing(Need.asked(ISSUE, "Issue", "Which issue should get the comment?"),
+                    Need.asked("content", "Comment", "What should the comment say?")),
 
             new McpTool("delegate_issue", "Delegate an issue to an agent",
                 "Hand an issue to a coding agent (Claude Code unless you name another): a mission starts on the person's "
@@ -246,7 +246,7 @@ public class TaskforceMcpTools {
                     .build(),
                 false, "mission.start", "POST", args -> "delivery/issues/" + requiredLong(args, "issueId") + "/delegate",
                 (slug, userId, args) -> gestures.delegate(slug, userId, args))
-                .needing(Need.asked(ISSUE, "Which issue should Claude Code work on?"),
+                .needing(Need.asked(ISSUE, "Issue", "Which issue should Claude Code work on?"),
                     Need.byDefault("agent", "Claude Code")),
 
             new McpTool("delete_issue", "Delete an issue",
@@ -255,7 +255,7 @@ public class TaskforceMcpTools {
                 issue(schema()).build(),
                 false, "issue.delete", "DELETE", args -> issuePath(args),
                 (slug, userId, args) -> gestures.delete(slug, userId, args))
-                .needing(Need.asked(ISSUE, "Which issue should be deleted?")),
+                .needing(Need.asked(ISSUE, "Issue", "Which issue should be deleted?")),
 
             new McpTool("get_mission", "Get the mission of an issue",
                 "Where the mission of an issue stands: waiting for the runner, at work, asking the person something, or done "
@@ -263,7 +263,7 @@ public class TaskforceMcpTools {
                 issue(schema()).build(),
                 true, READ, "GET", args -> "delivery/issues/" + requiredLong(args, "issueId") + "/run",
                 (slug, userId, args) -> gestures.mission(slug, userId, args))
-                .needing(Need.asked(ISSUE, "Which issue's mission do you mean?")),
+                .needing(Need.asked(ISSUE, "Issue", "Which issue's mission do you mean?")),
 
             new McpTool("create_project", "Create a project",
                 "Create a TaskForce project. Pass name only if the person gave one, and stack if they say what it is built "
@@ -279,14 +279,16 @@ public class TaskforceMcpTools {
                 false, "project.create", "POST", args -> "projects",
                 (slug, userId, args) -> projectGestures.create(slug, userId, args))
                 .needing(
-                    Need.inOwnWords("name", "What should the project be called?",
+                    Need.inOwnWords("name", "Name", "What should the project be called?",
                         "the request gives no name, or only what it is built with"),
-                    Need.askedWhen("repository", "Where does its code live?", null,
+                    Need.askedWhen("repository", "Repository", "Where does its code live?", null,
                         "a code project (a stack is named), where TaskForce can create or link a repository"),
-                    Need.askedWhen("repositoryVisibility", "Who can see the new repository?", "private",
+                    Need.askedWhen("repositoryVisibility", "Visibility", "Who can see the new repository?", "private",
                         "a new repository: it can't be undone from TaskForce, so its visibility is asked with it"),
                     Need.byDefault("identifier", "from the name"),
-                    Need.byDefault("visibility", "the project's members only")),
+                    Need.byDefault("visibility", "the project's members only"))
+                // Le nom et le dépôt dans la même carte (R115, décision du CEO du 05/11/2026), avant que rien ne s'écrive.
+                .asking((slug, userId, args, request) -> projectGestures.questions(slug, args, request)),
 
             new McpTool("smart_assign", "Recommend an assignee",
                 "Recommend the best assignee for an issue (workload, skills, history), with the reasons. It does not assign: "

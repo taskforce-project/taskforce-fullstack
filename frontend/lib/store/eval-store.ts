@@ -6,7 +6,11 @@ import {
   createEvalCase,
   draftEvalCase,
   getEvalBank,
+  getEvalHistory,
   getEvalRun,
+  giveEvalCriteria,
+  keepBadCase,
+  keepGoodCase,
   runEvalCase,
   setEvalBankEnabled,
   startEvalRun,
@@ -14,6 +18,7 @@ import {
   type EvalCaseSummary,
   type EvalCriteria,
   type EvalDraft,
+  type EvalHistory,
   type EvalRunDetail,
 } from "../api/eval-service";
 import { parseServerDate } from "../utils/server-date";
@@ -44,10 +49,22 @@ interface EvalState {
   /** Le rejeu en cours, null sinon : un seul à la fois. */
   progress: EvalProgress | null;
   error: string | null;
+  /** L'histoire de la banque (R125), pour le volet « Progress ». `null` = pas encore lue. */
+  history: EvalHistory | null;
+  /** La dernière lecture de l'histoire a échoué : le volet le dit au lieu d'attendre. */
+  historyFailed: boolean;
 
   fetchBank: (slug: string) => Promise<EvalBank | null>;
+  /** Relit l'histoire de la banque ; null si elle n'a pas pu l'être (la dernière lue reste). */
+  fetchHistory: (slug: string) => Promise<EvalHistory | null>;
   draftCase: (slug: string, record: string) => Promise<EvalDraft | null>;
   addCase: (slug: string, record: string, title: string, criteria: EvalCriteria) => Promise<EvalCaseSummary | null>;
+  /** « Bien » (R137) : garde ce qui a été observé, d'un clic ; null en cas d'échec, la raison dans `error`. */
+  keepGood: (slug: string, record: string) => Promise<EvalCaseSummary | null>;
+  /** « Pas bien » (R137) : garde une phrase, le cas attend ses critères ; null en cas d'échec, la raison dans `error`. */
+  keepBad: (slug: string, record: string, expected: string) => Promise<EvalCaseSummary | null>;
+  /** Écrit les critères d'un cas qui les attend ; null en cas d'échec, la raison dans `error`. */
+  giveCriteria: (slug: string, caseId: number, title: string, criteria: EvalCriteria) => Promise<EvalCaseSummary | null>;
   archiveCase: (slug: string, caseId: number) => Promise<boolean>;
   setEnabled: (slug: string, enabled: boolean) => Promise<boolean>;
   /** Rejoue les cas de la banque sur un modèle, un par un, puis rend le rejeu noté (partiel s'il s'est arrêté). */
@@ -61,6 +78,18 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 export const useEvalStore = create<EvalState>((set, get) => {
   const progress = (patch: Partial<EvalProgress>) =>
     set((state) => (state.progress ? { progress: { ...state.progress, ...patch } } : {}));
+
+  /** Un cas gardé : la banque le prend tout de suite, et le volet « Progress » le montre (R137). */
+  const kept = (slug: string, added: EvalCaseSummary): EvalCaseSummary => {
+    set((state) => ({
+      error: null,
+      bank: state.bank && !state.bank.cases.some((c) => c.id === added.id)
+        ? { ...state.bank, cases: [added, ...state.bank.cases] }
+        : state.bank,
+    }));
+    void get().fetchHistory(slug);
+    return added;
+  };
 
   /** Note un cas ; un 429 du frein de débit se patiente, toute autre erreur arrête le rejeu. */
   const grade = async (slug: string, runId: number, caseId: number) => {
@@ -82,6 +111,8 @@ export const useEvalStore = create<EvalState>((set, get) => {
     run: null,
     progress: null,
     error: null,
+    history: null,
+    historyFailed: false,
 
     fetchBank: async (slug) => {
       try {
@@ -89,6 +120,17 @@ export const useEvalStore = create<EvalState>((set, get) => {
         set({ bank });
         return bank;
       } catch {
+        return null;
+      }
+    },
+
+    fetchHistory: async (slug) => {
+      try {
+        const history = await getEvalHistory(slug);
+        set({ history, historyFailed: false });
+        return history;
+      } catch {
+        set({ historyFailed: true });
         return null;
       }
     },
@@ -106,12 +148,42 @@ export const useEvalStore = create<EvalState>((set, get) => {
 
     addCase: async (slug, record, title, criteria) => {
       try {
-        const added = await createEvalCase(slug, record, title, criteria);
+        return kept(slug, await createEvalCase(slug, record, title, criteria));
+      } catch (err) {
+        set({ error: getErrorMessage(err) });
+        return null;
+      }
+    },
+
+    keepGood: async (slug, record) => {
+      try {
+        return kept(slug, await keepGoodCase(slug, record));
+      } catch (err) {
+        set({ error: getErrorMessage(err) });
+        return null;
+      }
+    },
+
+    keepBad: async (slug, record, expected) => {
+      try {
+        return kept(slug, await keepBadCase(slug, record, expected));
+      } catch (err) {
+        set({ error: getErrorMessage(err) });
+        return null;
+      }
+    },
+
+    giveCriteria: async (slug, caseId, title, criteria) => {
+      try {
+        const done = await giveEvalCriteria(slug, caseId, title, criteria);
         set((state) => ({
           error: null,
-          bank: state.bank ? { ...state.bank, cases: [added, ...state.bank.cases] } : state.bank,
+          bank: state.bank
+            ? { ...state.bank, cases: state.bank.cases.map((c) => (c.id === done.id ? done : c)) }
+            : state.bank,
         }));
-        return added;
+        void get().fetchHistory(slug);
+        return done;
       } catch (err) {
         set({ error: getErrorMessage(err) });
         return null;
@@ -163,7 +235,8 @@ export const useEvalStore = create<EvalState>((set, get) => {
           progress({ done: (get().progress?.done ?? 0) + 1 });
         }
       } catch (err) {
-        set({ error: getErrorMessage(err) });
+        // Arrêté par la personne : ce n'est pas une panne à afficher.
+        if (!get().progress?.stopping) set({ error: getErrorMessage(err) });
       }
       try {
         if (runId === null) return null;
@@ -175,6 +248,8 @@ export const useEvalStore = create<EvalState>((set, get) => {
       } finally {
         set({ progress: null });
         void get().fetchBank(slug);
+        // Le volet « Progress » montre ce rejeu dès qu'il est noté : sa courbe et la note de chaque cas.
+        void get().fetchHistory(slug);
       }
     },
 

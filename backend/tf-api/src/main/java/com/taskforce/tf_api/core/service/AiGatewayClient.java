@@ -1,15 +1,25 @@
 package com.taskforce.tf_api.core.service;
 
+import java.time.Duration;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.taskforce.tf_api.core.service.AiStatusService.AiStatus;
+import com.taskforce.tf_api.core.service.ai.AiProviderSettings;
 import com.taskforce.tf_api.core.service.ai.ChosenModel;
+import com.taskforce.tf_api.core.service.ai.ContextBudget;
+import com.taskforce.tf_api.core.service.ai.ModelChoice;
+import com.taskforce.tf_api.core.service.ai.ModelDeadline;
 import com.taskforce.tf_api.core.service.ai.ModelGateway;
 import com.taskforce.tf_api.core.service.ai.ModelProviderException;
+import com.taskforce.tf_api.core.service.ai.ModelWindow;
+import com.taskforce.tf_api.core.service.ai.TurnStop;
+import com.taskforce.tf_api.core.service.ai.TurnStoppedException;
 import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +42,8 @@ public class AiGatewayClient implements LlmClient {
     /** Accumulateur d'usage par thread : [prompt, completion, total]. {@code null} = capture inactive. */
     private final ThreadLocal<long[]> usageAccumulator = new ThreadLocal<>();
     private final ThreadLocal<String> lastModel = new ThreadLocal<>();
+    /** Le prompt du dernier appel et sa fenêtre, pendant une capture : la jauge de contexte, pas une somme. */
+    private final ThreadLocal<LlmContext> lastContext = new ThreadLocal<>();
 
     public AiGatewayClient(ModelGateway gateway, AiStatusService status) {
         this.gateway = gateway;
@@ -49,6 +61,7 @@ public class AiGatewayClient implements LlmClient {
     public void beginUsageCapture() {
         usageAccumulator.set(new long[3]);
         lastModel.remove();
+        lastContext.remove();
     }
 
     @Override
@@ -61,6 +74,7 @@ public class AiGatewayClient implements LlmClient {
     public void endUsageCapture() {
         usageAccumulator.remove();
         lastModel.remove();
+        lastContext.remove();
     }
 
     @Override
@@ -68,11 +82,20 @@ public class AiGatewayClient implements LlmClient {
         return lastModel.get();
     }
 
-    /** Garde le modèle qui a répondu, pendant une capture seulement : hors capture, rien ne le lira. */
-    private void rememberModel(String model) {
-        if (usageAccumulator.get() != null && model != null && !model.isBlank()) {
-            lastModel.set(model);
-        }
+    @Override
+    public LlmContext currentContext() {
+        return lastContext.get();
+    }
+
+    /**
+     * Garde le modèle qui a répondu, son prompt et sa fenêtre, pendant une capture seulement : hors capture, rien ne les
+     * lira.
+     */
+    private void remember(ModelGateway.ChatReply reply) {
+        if (usageAccumulator.get() == null) return;
+        if (reply.model() != null && !reply.model().isBlank()) lastModel.set(reply.model());
+        long prompt = reply.usage() == null ? 0 : reply.usage().promptTokens();
+        lastContext.set(new LlmContext(prompt, reply.contextWindow(), reply.windowEstimated()));
     }
 
     @Override
@@ -94,8 +117,35 @@ public class AiGatewayClient implements LlmClient {
         return callChat(messages, tools, false, null, model);
     }
 
+    @Override
+    public ModelWindow contextWindow(String tier) {
+        AiStatusService.Snapshot snapshot = status.snapshot();
+        return gateway.window(snapshot.settings(), modelOf(tier, snapshot.status()), "deep".equals(tier));
+    }
+
+    @Override
+    public Optional<ModelWindow> largerWindow(String tier, int tokens) {
+        AiStatusService.Snapshot snapshot = status.snapshot();
+        String current = modelOf(tier, snapshot.status());
+        boolean think = "deep".equals(tier);
+        return ModelChoice.chatModels(snapshot.settings().provider(), snapshot.models()).stream()
+            .filter(model -> !model.equals(current))
+            .map(model -> gateway.window(snapshot.settings(), model, think))
+            .filter(window -> !window.estimated() && new ContextBudget(window, tokens, 0, 0, 0).fits())
+            .filter(window -> gateway.describe(snapshot.settings(), window.model())
+                .map(card -> !Boolean.FALSE.equals(card.tools())).orElse(true))
+            .min(Comparator.comparingInt(ModelWindow::tokens));
+    }
+
+    /** Le modèle de ce palier : celui que la personne a choisi pour cette action (R113, R118), sinon celui du palier. */
+    private static String modelOf(String tier, AiStatus current) {
+        return ChosenModel.current().orElseGet(() -> "fast".equals(tier) ? current.fastModel() : current.chatModel());
+    }
+
     private JsonNode callChat(List<?> messages, List<Map<String, Object>> tools, boolean jsonMode, String tier,
                               String model) {
+        // La personne a arrêté ce tour (R134) : rien ne part.
+        TurnStop.check();
         AiStatusService.Snapshot snapshot = status.snapshot();
         AiStatus current = snapshot.status();
         if (!current.chatAvailable()) {
@@ -103,23 +153,40 @@ public class AiGatewayClient implements LlmClient {
         }
         // Le modèle nommé d'abord (rejeu de la banque, R61), puis celui que la personne a choisi pour cette action
         // (R113, R118), sinon celui du palier.
-        String chosen = model != null && !model.isBlank() ? model
-            : ChosenModel.current().orElseGet(() -> "fast".equals(tier) ? current.fastModel() : current.chatModel());
+        String chosen = model != null && !model.isBlank() ? model : modelOf(tier, current);
         boolean think = "deep".equals(tier);
         try {
-            ModelGateway.ChatReply reply = gateway.chat(snapshot.settings(),
+            ModelGateway.ChatReply reply = gateway.chat(settingsOf(snapshot),
                 new ModelGateway.ChatCall(messages, tools, jsonMode, chosen, think));
             accumulateUsage(reply.usage());
-            rememberModel(reply.model());
+            remember(reply);
             return reply.message();
+        } catch (TurnStoppedException stopped) {
+            // L'appel coupé n'a pas dit son usage : le prompt que le modèle a commencé à lire compte quand même, estimé
+            // comme le budget de la requête. Ce n'est pas une panne : l'état de l'IA reste valable.
+            long read = ContextBudget.tokens(String.valueOf(messages));
+            accumulateUsage(new LlmUsage(read, 0, read));
+            throw stopped;
         } catch (ModelProviderException.ToolsRefused refused) { // le fournisseur répond : son état reste valable
             log.error("AI provider refused the tools: {}", LogSafe.of(refused.getMessage()));
             throw new LlmToolsRefusedException("The AI provider refused the tools", refused);
+        } catch (ModelProviderException.TimedOut late) { // le fournisseur est là, le modèle est lent : son état reste valable
+            log.warn("AI provider call timed out: {}", LogSafe.of(late.getMessage()));
+            throw new LlmTimedOutException("The model did not answer in time", late);
         } catch (RuntimeException ex) {
+            if (Thread.currentThread().isInterrupted()) throw new LlmException("Stopped", ex); // « Stop » du banc, pas une panne
             log.error("AI provider call failed: {}", LogSafe.of(ex.getMessage()));
             status.invalidate(); // le fournisseur est peut-être tombé : on relira son état au prochain appel
             throw new LlmException("AI service unavailable: " + ex.getMessage(), ex);
         }
+    }
+
+    /** Les réglages de cet appel : le temps qu'il reste au cas du banc en cours (R142), sinon le délai général de l'IA. */
+    private static AiProviderSettings settingsOf(AiStatusService.Snapshot snapshot) {
+        Optional<Duration> left = ModelDeadline.remaining();
+        if (left.isEmpty()) return snapshot.settings();
+        if (!left.get().isPositive()) throw new ModelProviderException.TimedOut("The time given to this request is over", null);
+        return snapshot.settings().withTimeout(left.get());
     }
 
     /** Additionne l'usage d'une réponse à l'accumulateur du thread (si la capture est active). */

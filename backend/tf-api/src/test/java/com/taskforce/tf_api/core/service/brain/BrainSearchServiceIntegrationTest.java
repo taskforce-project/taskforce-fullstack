@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import com.taskforce.tf_api.core.dto.response.KnowledgeSearchHit;
 import com.taskforce.tf_api.core.enums.NodeDomain;
 import com.taskforce.tf_api.core.enums.NodeStatus;
 import com.taskforce.tf_api.core.enums.NodeType;
@@ -27,6 +28,8 @@ import com.taskforce.tf_api.util.AbstractIntegrationTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -149,6 +152,34 @@ class BrainSearchServiceIntegrationTest extends AbstractIntegrationTest {
             "SELECT embedding IS NULL AND embedding_model IS NULL FROM knowledge_nodes WHERE id = ?",
             Boolean.class, postgres.getId());
         assertThat(cleared).isTrue();
+    }
+
+    @Test
+    @DisplayName("Ctrl+K : plein texte seul, sans le modèle, le passage à la place du contenu, sans les notes du noyau")
+    void text_only_for_the_window_search() {
+        when(access.resolveAndAuthorize("ws-brain-it", 1L)).thenReturn(ws);
+        when(access.viewer(ws.getId(), 1L)).thenReturn(reader());
+        when(embeddingClient.currentModel()).thenReturn("bge-m3");
+        nodeRepository.save(KnowledgeNode.builder()
+            .workspace(ws).type(NodeType.NOTE).domain(NodeDomain.ENGINEERING).title("Kernel").content("Rolling rules of the kernel.")
+            .status(NodeStatus.ACTIVE).metadata(new java.util.HashMap<>(java.util.Map.of("system", true))).build());
+
+        List<KnowledgeSearchHit> hits = service.searchText("ws-brain-it", 1L, "rolling", 5);
+
+        assertThat(hits).hasSize(1);
+        assertThat(hits.get(0).getNode().getTitle()).isEqualTo("Deployment runbook");
+        assertThat(hits.get(0).getNode().getContent()).isNull();
+        assertThat(hits.get(0).getExcerpt()).isEqualTo("Rolling deploy of the backend on two virtual machines.");
+        verify(embeddingClient, never()).embed(anyString());
+    }
+
+    @Test
+    @DisplayName("Ctrl+K : rien ne répond à une recherche sans mot")
+    void text_only_without_a_word() {
+        when(access.resolveAndAuthorize("ws-brain-it", 1L)).thenReturn(ws);
+        when(access.viewer(ws.getId(), 1L)).thenReturn(reader());
+
+        assertThat(service.searchText("ws-brain-it", 1L, "!!", 5)).isEmpty();
     }
 
     @Test

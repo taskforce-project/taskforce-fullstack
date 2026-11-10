@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -29,8 +30,13 @@ import lombok.extern.slf4j.Slf4j;
  * <p>Elle remplace l'ai-service Python et le relais d'IA de la coque de l'app desktop, et reprend leur comportement :</p>
  * <ul>
  *   <li>{@code /no_think} au dernier message d'un modèle Qwen3 qui ne doit pas raisonner, et sur Ollama le réglage natif
- *       {@code reasoning_effort: "none"}, qu'Ollama 0.40 suit quand il ignore la directive (même appel d'outil : 2,9 s
- *       puis 0,5 s, mesuré le 29/10/2026) ;</li>
+ *       ({@code think: false}), qu'Ollama 0.40 suit quand il ignore la directive (même appel d'outil : 2,9 s puis 0,5 s,
+ *       mesuré le 29/10/2026) ;</li>
+ *   <li>avec Ollama, la conversation passe par son API ({@code /api/chat}), la seule où une requête choisit sa fenêtre
+ *       de contexte : elle est taillée à chaque requête ({@link OllamaProtocol}), au lieu des 4 096 jetons par défaut
+ *       où le prompt de Cortex perdait son début (J1-4, 04/11/2026) ;</li>
+ *   <li>la fenêtre des autres fournisseurs vient de leur liste de modèles, quand ils la disent ; sinon la valeur prudente
+ *       des réglages, marquée comme une estimation ({@link #window}) ;</li>
  *   <li>un bloc {@code <think>} resté dans une réponse est retiré ;</li>
  *   <li>un refus 400 ou 413 avec des outils : on redemande avec moitié moins d'outils (un serveur MCP riche dépasse la
  *       taille admise, ou expose un schéma refusé ; le backend les envoie triés par pertinence, on garde le début). Jamais
@@ -53,10 +59,18 @@ public class ModelGateway {
     static final String USER_AGENT = "TaskForce-AI/1.0";
     /** Délai d'une liste de modèles : la sonde de l'état de l'IA ne doit pas faire attendre. */
     static final Duration PROBE_TIMEOUT = Duration.ofSeconds(3);
+    /** Délai de la liste des modèles chargés par Ollama, lue avant chaque conversation : elle répond en une milliseconde. */
+    static final Duration LOADED_TIMEOUT = Duration.ofSeconds(1);
     private static final double TEMPERATURE = 0.4;
 
     private final ObjectMapper mapper;
     private final ModelHttp http;
+    /** La fiche de chaque modèle d'Ollama ({@code /api/show}), par adresse : elle ne change qu'avec le modèle. */
+    private final Map<String, ModelCard> modelCards = new ConcurrentHashMap<>();
+    /** La place de chaque modèle d'Ollama sur le disque ({@code /api/tags}), par adresse : elle ne change qu'avec le modèle. */
+    private final Map<String, Long> diskSizes = new ConcurrentHashMap<>();
+    /** La fenêtre que chaque fournisseur hébergé dit de ses modèles, par adresse, relue avec sa liste (état de l'IA, 30 s). */
+    private final Map<String, Integer> reportedWindows = new ConcurrentHashMap<>();
 
     @Autowired
     public ModelGateway(ObjectMapper mapper) {
@@ -81,8 +95,54 @@ public class ModelGateway {
                            boolean think) {
     }
 
-    /** La réponse : le modèle qui a répondu, le message assistant (qui peut porter des {@code tool_calls}), l'usage. */
-    public record ChatReply(String model, ObjectNode message, LlmUsage usage) {
+    /**
+     * La réponse : le modèle qui a répondu, le message assistant (qui peut porter des {@code tool_calls}), l'usage, et la
+     * fenêtre de contexte de cette requête : celle que la passerelle a donnée à Ollama ({@code num_ctx}), celle qu'un
+     * autre fournisseur dit de ce modèle, ou la valeur prudente des réglages ({@code windowEstimated}).
+     */
+    public record ChatReply(String model, ObjectNode message, LlmUsage usage, Integer contextWindow, boolean windowEstimated) {
+
+        /** Une réponse dont personne ne dit la fenêtre. */
+        public ChatReply(String model, ObjectNode message, LlmUsage usage) {
+            this(model, message, usage, null, false);
+        }
+
+        /** Une réponse dont on connaît la fenêtre. */
+        public ChatReply(String model, ObjectNode message, LlmUsage usage, Integer contextWindow) {
+            this(model, message, usage, contextWindow, false);
+        }
+    }
+
+    /**
+     * Ce que la fiche d'un modèle dit de lui chez son fournisseur, telle qu'Ollama la donne : sa taille (« 8.2B »), sa
+     * fenêtre de contexte en jetons, s'il prend des outils, sa famille (« qwen3 »), s'il sait converser ({@code chat},
+     * {@link OllamaProtocol#chats}), et sa place sur le disque en octets ; chaque valeur est {@code null} quand la fiche ne
+     * la dit pas. Ce n'est pas une mesure : la table des capacités la montre comme telle tant que le modèle n'est pas mesuré
+     * ici (R113, R125, R142).
+     */
+    public record ModelCard(String parameters, Integer contextLength, Boolean tools, String family, Boolean chat, Long diskBytes) {
+
+        static final ModelCard NONE = new ModelCard(null, null, null);
+
+        /** Une fiche réduite à ce que disent la liste des modèles ou un fournisseur hébergé. */
+        public ModelCard(String parameters, Integer contextLength, Boolean tools) {
+            this(parameters, contextLength, tools, null, null, null);
+        }
+
+        boolean empty() {
+            return parameters == null && contextLength == null && tools == null && family == null && chat == null;
+        }
+
+        ModelCard onDisk(Long bytes) {
+            return new ModelCard(parameters, contextLength, tools, family, chat, bytes);
+        }
+    }
+
+    /**
+     * Un modèle d'Ollama une fois chargé (R142) : la mémoire qu'il occupe avec sa fenêtre de contexte, ce qui en tient sur
+     * la carte graphique (le reste tourne sur le processeur). Mesuré, pas estimé : {@code /api/ps}.
+     */
+    public record LoadedModel(long memoryBytes, long gpuBytes) {
     }
 
     /** Une conversation, chez le fournisseur des réglages. */
@@ -97,7 +157,132 @@ public class ModelGateway {
         if (call.tools() != null) {
             call.tools().forEach(tool -> tools.add(mapper.valueToTree(tool)));
         }
-        return settings.provider() == AiProvider.ANTHROPIC ? anthropic(settings, call, tools) : openAi(settings, call, tools);
+        try {
+            return switch (settings.provider()) {
+                case ANTHROPIC -> anthropic(settings, call, tools);
+                case OLLAMA -> ollama(settings, call, tools);
+                case OPENAI -> openAi(settings, call, tools);
+            };
+        } catch (ModelProviderException failed) {
+            throw failed.about(call.model()); // la conversation nomme le modèle qui n'a pas répondu
+        }
+    }
+
+    /**
+     * La fenêtre sur laquelle TaskForce compte pour une requête de ce modèle (TF-J1-13). Sur Ollama, ce que la passerelle
+     * lui donne au plus. Ailleurs, ce que le fournisseur dit dans sa liste de modèles, sous {@code AI_HOSTED_MAX_CONTEXT} ;
+     * s'il ne dit rien, {@code AI_DEFAULT_CONTEXT}, marquée comme une estimation. Chez Anthropic, la réponse a la place que
+     * lui donne {@code AI_MAX_TOKENS} : au-delà de la fenêtre, elle s'arrêterait en route (ses modèles récents), ou l'API
+     * refuserait la requête (les plus anciens).
+     */
+    public ModelWindow window(AiProviderSettings settings, String model, boolean think) {
+        if (settings.provider() == AiProvider.OLLAMA) {
+            String base = OllamaProtocol.nativeBase(settings.baseUrl());
+            int maximum = model == null || model.isBlank() ? 0 : modelMaximum(base, openAiHeaders(settings.apiKey()), model);
+            int ceiling = OllamaProtocol.ceiling(settings.ollamaMaxContext(), maximum);
+            return new ModelWindow(model, ceiling, false, ContextBudget.answerRoom(ceiling, think));
+        }
+        Integer reported = reportedWindow(settings, model);
+        int known = reported == null ? settings.defaultContext() : reported;
+        int tokens = settings.hostedMaxContext() > 0 ? Math.min(known, settings.hostedMaxContext()) : known;
+        int room = settings.provider() == AiProvider.ANTHROPIC
+            ? Math.min(settings.maxTokens(), tokens / 2) : ContextBudget.answerRoom(tokens, think);
+        return new ModelWindow(model, tokens, reported == null, room);
+    }
+
+    /** Ce que le fournisseur dit de la fenêtre de ce modèle, relu à chaque liste de ses modèles ; null s'il ne dit rien. */
+    private Integer reportedWindow(AiProviderSettings settings, String model) {
+        return model == null ? null : reportedWindows.get(settings.baseUrl() + " " + model);
+    }
+
+    /**
+     * La plus grande fenêtre de contexte que la passerelle donne à ce modèle, en jetons, pour l'état de l'IA : sur
+     * Ollama, {@code AI_OLLAMA_MAX_CONTEXT}, ou le maximum du modèle s'il est plus petit. Ailleurs, le fournisseur la
+     * tient : vide (la conversation lit {@link #window}).
+     */
+    public Optional<Integer> contextWindow(AiProviderSettings settings, String model) {
+        if (!settings.enabled() || settings.provider() != AiProvider.OLLAMA || model == null || model.isBlank()) {
+            return Optional.empty();
+        }
+        String base = OllamaProtocol.nativeBase(settings.baseUrl());
+        int maximum = modelMaximum(base, openAiHeaders(settings.apiKey()), model);
+        return Optional.of(OllamaProtocol.ceiling(settings.ollamaMaxContext(), maximum));
+    }
+
+    /**
+     * Ce que la fiche d'un modèle dit de lui (sa taille, sa fenêtre, ses outils), pour la table des capacités tant qu'il
+     * n'est pas mesuré (R125) : sur Ollama, lue une fois dans {@code /api/show} ; chez un autre fournisseur, la fenêtre
+     * qu'il dit dans sa liste de modèles. Sans rien de lisible : vide.
+     */
+    public Optional<ModelCard> describe(AiProviderSettings settings, String model) {
+        if (!settings.enabled() || model == null || model.isBlank()) {
+            return Optional.empty();
+        }
+        if (settings.provider() != AiProvider.OLLAMA) {
+            Integer reported = reportedWindow(settings, model);
+            return reported == null ? Optional.empty() : Optional.of(new ModelCard(null, reported, null));
+        }
+        String base = OllamaProtocol.nativeBase(settings.baseUrl());
+        Map<String, String> headers = openAiHeaders(settings.apiKey());
+        ModelCard card = card(base, headers, model);
+        return card.empty() ? Optional.empty() : Optional.of(card.onDisk(diskBytes(base, headers, model)));
+    }
+
+    /**
+     * Charge un modèle d'Ollama, avant qu'on ne chronomètre rien (R142) : une conversation sans message le monte en mémoire,
+     * à la plus grande fenêtre qu'il recevra, pour qu'aucun cas ne paie un rechargement ({@link OllamaProtocol#window} garde
+     * la fenêtre déjà chargée). Rend ce qu'Ollama dit de sa place ; vide chez un autre fournisseur, où rien ne se charge.
+     *
+     * @throws ModelProviderException.TimedOut    le chargement dépasse {@code budget}
+     * @throws ModelProviderException.Unreachable Ollama ne répond pas
+     * @throws ModelProviderException             Ollama refuse de le charger (plus de mémoire, par exemple)
+     */
+    public Optional<LoadedModel> load(AiProviderSettings settings, String model, Duration budget) {
+        if (!settings.enabled() || settings.provider() != AiProvider.OLLAMA || model == null || model.isBlank()) {
+            return Optional.empty();
+        }
+        String base = OllamaProtocol.nativeBase(settings.baseUrl());
+        Map<String, String> headers = openAiHeaders(settings.apiKey());
+        int window = OllamaProtocol.ceiling(settings.ollamaMaxContext(), modelMaximum(base, headers, model));
+        ModelHttp.Reply reply = send(base + "/api/chat", headers, OllamaProtocol.loadRequest(mapper, model, window), budget);
+        if (!reply.ok()) {
+            log.warn("AI provider refused to load {} (HTTP {})", LogSafe.of(model), reply.status());
+            throw new ModelProviderException("AI provider refused to load the model (HTTP " + reply.status() + ")");
+        }
+        return Optional.of(placement(base, headers, model));
+    }
+
+    /** Où tient un modèle chargé, selon {@code /api/ps} ; 0 octet s'il n'est pas dit. */
+    private LoadedModel placement(String base, Map<String, String> headers, String model) {
+        try {
+            ModelHttp.Reply reply = http.send("GET", base + "/api/ps", headers, null, LOADED_TIMEOUT);
+            return reply.ok() ? OllamaProtocol.loaded(read(reply.body()), model) : new LoadedModel(0, 0);
+        } catch (IOException | RuntimeException unknown) {
+            return new LoadedModel(0, 0);
+        }
+    }
+
+    /**
+     * La place d'un modèle sur le disque, lue dans {@code /api/tags} (toute la liste d'un coup) ; null si elle n'y est pas.
+     * Une liste lue qui ne le nomme pas compte aussi (0) : la matrice se relit à chaque cas, sans relire la liste pour autant.
+     */
+    private Long diskBytes(String base, Map<String, String> headers, String model) {
+        String key = base + " " + model;
+        Long known = diskSizes.get(key);
+        if (known != null) {
+            return known > 0 ? known : null;
+        }
+        try {
+            ModelHttp.Reply reply = http.send("GET", base + "/api/tags", headers, null, PROBE_TIMEOUT);
+            if (reply.ok()) {
+                OllamaProtocol.diskSizes(read(reply.body())).forEach((name, bytes) -> diskSizes.put(base + " " + name, bytes));
+                diskSizes.putIfAbsent(key, 0L);
+            }
+        } catch (IOException | RuntimeException unreadable) {
+            return null;
+        }
+        Long read = diskSizes.get(key);
+        return read != null && read > 0 ? read : null;
     }
 
     /** Vecteurs des textes, dans l'ordre, chez le fournisseur des vecteurs. */
@@ -129,18 +314,20 @@ public class ModelGateway {
     public Optional<List<String>> chatModels(AiProviderSettings settings) {
         if (settings.provider() == AiProvider.ANTHROPIC) {
             // Toute la liste d'un coup : sans limite, Anthropic n'en rend que vingt.
-            return models(settings.baseUrl() + "/models?limit=1000", anthropicHeaders(settings.apiKey()));
+            return models(settings.baseUrl() + "/models?limit=1000", anthropicHeaders(settings.apiKey()), settings.baseUrl());
         }
-        return models(settings.baseUrl() + "/models", openAiHeaders(settings.apiKey()));
+        // La liste d'Ollama (/v1/models) ne dit pas de fenêtre : la sienne vient de sa fiche.
+        return models(settings.baseUrl() + "/models", openAiHeaders(settings.apiKey()),
+            settings.provider() == AiProvider.OLLAMA ? null : settings.baseUrl());
     }
 
     /** Les modèles que le fournisseur des vecteurs annonce ; vide s'il ne répond pas. */
     public Optional<List<String>> embedModels(AiProviderSettings settings) {
-        return models(settings.embedBaseUrl() + "/models", openAiHeaders(settings.embedApiKey()));
+        return models(settings.embedBaseUrl() + "/models", openAiHeaders(settings.embedApiKey()), null);
     }
 
     // -------------------------------------------------------------------------
-    // API compatible OpenAI (Ollama compris)
+    // API compatible OpenAI
     // -------------------------------------------------------------------------
 
     private ChatReply openAi(AiProviderSettings settings, ChatCall call, List<JsonNode> tools) {
@@ -153,16 +340,12 @@ public class ModelGateway {
         if (call.jsonMode()) {
             body.putObject("response_format").put("type", "json_object");
         }
-        if (!call.think() && settings.provider() == AiProvider.OLLAMA && OpenAiProtocol.isQwen3(model)) {
-            // Ollama ignore /no_think : son réglage natif coupe le raisonnement. Ailleurs, il n'est pas garanti.
-            body.put("reasoning_effort", "none");
-        }
         String url = settings.baseUrl() + "/chat/completions";
         Map<String, String> headers = openAiHeaders(settings.apiKey());
         List<JsonNode> attempt = tools;
         boolean retriedGeneration = false;
         while (true) {
-            withTools(body, attempt, false);
+            withTools(body, attempt, AiProvider.OPENAI);
             ModelHttp.Reply reply = send(url, headers, body, settings.timeout());
             if (reply.ok()) {
                 JsonNode payload = read(reply.body());
@@ -170,7 +353,9 @@ public class ModelGateway {
                 if (!choices.isArray() || choices.isEmpty() || !(choices.get(0).path("message") instanceof ObjectNode message)) {
                     throw new ModelProviderException("AI provider answered without choices");
                 }
-                return new ChatReply(model, OpenAiProtocol.stripThinking(message), usage(payload.path("usage")));
+                ModelWindow window = window(settings, model, call.think());
+                return new ChatReply(model, OpenAiProtocol.stripThinking(message), usage(payload.path("usage")),
+                    window.tokens(), window.estimated());
             }
             if (reply.status() == 400 && !attempt.isEmpty() && !retriedGeneration && reply.body().contains("tool_use_failed")) {
                 // Groq refuse une réponse où le modèle a mal formé un appel d'outil : on redemande une fois, mêmes outils.
@@ -182,7 +367,100 @@ public class ModelGateway {
                 attempt = fewerTools(reply.status(), attempt);
                 continue;
             }
-            throw new ModelProviderException("AI provider refused the request (HTTP " + reply.status() + ")");
+            throw ModelProviderException.refused(reply.status(), reply.body());
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // API d'Ollama
+    // -------------------------------------------------------------------------
+
+    /**
+     * Une conversation par l'API d'Ollama, avec la fenêtre de contexte que demande la requête : ses messages et ses
+     * outils estimés, plus la place de la réponse, au plus le plafond des réglages et le maximum du modèle. Elle se
+     * taille sur le premier essai : avec moins d'outils, les suivants y tiennent, sans recharger le modèle.
+     */
+    private ChatReply ollama(AiProviderSettings settings, ChatCall call, List<JsonNode> tools) {
+        String model = call.model();
+        String base = OllamaProtocol.nativeBase(settings.baseUrl());
+        Map<String, String> headers = openAiHeaders(settings.apiKey());
+        ObjectNode body = OllamaProtocol.request(mapper, call.messages(), model, call.think(), call.jsonMode(), TEMPERATURE);
+        List<JsonNode> attempt = tools;
+        withTools(body, attempt, AiProvider.OLLAMA);
+        int window = sizeWindow(settings, base, headers, call, body);
+        ((ObjectNode) body.path("options")).put("num_ctx", window);
+        while (true) {
+            ModelHttp.Reply reply = send(base + "/api/chat", headers, body, settings.timeout());
+            if (reply.ok()) {
+                JsonNode payload = read(reply.body());
+                ObjectNode message = OllamaProtocol.message(mapper, payload);
+                return new ChatReply(model, OpenAiProtocol.stripThinking(message), OllamaProtocol.usage(payload), window);
+            }
+            if ((reply.status() == 400 || reply.status() == 413) && !attempt.isEmpty()) {
+                attempt = fewerTools(reply.status(), attempt);
+                withTools(body, attempt, AiProvider.OLLAMA);
+                continue;
+            }
+            throw ModelProviderException.refused(reply.status(), reply.body());
+        }
+    }
+
+    /** La fenêtre de la requête (cf. {@link OllamaProtocol#window}) ; une requête qui la dépasse est signalée au journal. */
+    private int sizeWindow(AiProviderSettings settings, String base, Map<String, String> headers, ChatCall call,
+                           ObjectNode body) {
+        String model = call.model();
+        int ceiling = OllamaProtocol.ceiling(settings.ollamaMaxContext(), modelMaximum(base, headers, model));
+        int loaded = loadedWindow(base, headers, model);
+        int tokens = ContextBudget.tokens(write(body.path("messages")))
+            + (body.has("tools") ? ContextBudget.tokens(write(body.path("tools"))) : 0);
+        int needed = OllamaProtocol.needed(tokens, call.think(), ceiling);
+        int window = OllamaProtocol.window(needed, ceiling, loaded);
+        if (needed > window) {
+            log.warn("A request to {} needs about {} tokens, more than its context window of {}: Ollama drops the "
+                + "oldest messages, then the start (AI_OLLAMA_MAX_CONTEXT raises the window)", LogSafe.of(model), needed, window);
+        } else {
+            log.debug("Ollama {}: about {} tokens, context window {} (ceiling {}, loaded {})", LogSafe.of(model), tokens,
+                window, ceiling, loaded);
+        }
+        return window;
+    }
+
+    /** Le maximum d'un modèle d'Ollama, lu une fois ; 0 s'il n'est pas lisible (le plafond des réglages vaut seul). */
+    private int modelMaximum(String base, Map<String, String> headers, String model) {
+        Integer maximum = card(base, headers, model).contextLength();
+        return maximum == null ? 0 : maximum;
+    }
+
+    /**
+     * La fiche d'un modèle d'Ollama ({@code /api/show}), lue une fois et gardée quand elle dit quelque chose ; vide si
+     * elle n'est pas lisible, et relue la fois suivante.
+     */
+    private ModelCard card(String base, Map<String, String> headers, String model) {
+        String key = base + " " + model;
+        ModelCard known = modelCards.get(key);
+        if (known != null) {
+            return known;
+        }
+        try {
+            ModelHttp.Reply reply = http.send("POST", base + "/api/show", headers,
+                write(mapper.createObjectNode().put("model", model)), PROBE_TIMEOUT);
+            ModelCard card = reply.ok() ? OllamaProtocol.card(read(reply.body())) : ModelCard.NONE;
+            if (!card.empty()) {
+                modelCards.put(key, card);
+            }
+            return card;
+        } catch (IOException | RuntimeException unreadable) {
+            return ModelCard.NONE;
+        }
+    }
+
+    /** La fenêtre avec laquelle Ollama garde ce modèle chargé ; 0 s'il ne l'est pas, ou si Ollama ne le dit pas. */
+    private int loadedWindow(String base, Map<String, String> headers, String model) {
+        try {
+            ModelHttp.Reply reply = http.send("GET", base + "/api/ps", headers, null, LOADED_TIMEOUT);
+            return reply.ok() ? OllamaProtocol.loadedWindow(read(reply.body()), model) : 0;
+        } catch (IOException | RuntimeException unknown) {
+            return 0;
         }
     }
 
@@ -198,12 +476,13 @@ public class ModelGateway {
         List<JsonNode> attempt = tools;
         boolean thinkingDropped = false;
         while (true) {
-            withTools(body, attempt, true);
+            withTools(body, attempt, AiProvider.ANTHROPIC);
             ModelHttp.Reply reply = send(url, headers, body, settings.timeout());
             if (reply.ok()) {
                 JsonNode payload = read(reply.body());
+                ModelWindow window = window(settings, call.model(), call.think());
                 return new ChatReply(call.model(), AnthropicProtocol.message(mapper, payload, call.jsonMode()),
-                    usage(AnthropicProtocol.usage(mapper, payload)));
+                    usage(AnthropicProtocol.usage(mapper, payload)), window.tokens(), window.estimated());
             }
             String error = errorMessage(reply.body());
             if (reply.status() == 400 && !thinkingDropped && error.contains("signature")
@@ -220,7 +499,7 @@ public class ModelGateway {
                 continue;
             }
             log.warn("AI provider refused the request (HTTP {}): {}", reply.status(), LogSafe.of(error));
-            throw new ModelProviderException("AI provider refused the request (HTTP " + reply.status() + ")");
+            throw ModelProviderException.refused(reply.status(), reply.body());
         }
     }
 
@@ -236,7 +515,7 @@ public class ModelGateway {
         if (keep == 0) {
             log.error("AI provider answered {} even with a single tool", status);
             if (status == 413) {
-                throw new ModelProviderException("AI provider: the request is too large (HTTP 413)");
+                throw ModelProviderException.tooLarge("AI provider: the request is too large (HTTP 413)");
             }
             throw new ModelProviderException.ToolsRefused("AI provider refused the tools (HTTP " + status + ")");
         }
@@ -244,31 +523,40 @@ public class ModelGateway {
         return tools.subList(0, keep);
     }
 
-    private void withTools(ObjectNode body, List<JsonNode> tools, boolean anthropic) {
+    /** Les outils au format du fournisseur ; l'API d'Ollama n'a pas de {@code tool_choice}, le modèle choisit toujours. */
+    private void withTools(ObjectNode body, List<JsonNode> tools, AiProvider format) {
         if (tools.isEmpty()) {
             body.remove("tools");
             body.remove("tool_choice");
             return;
         }
         ArrayNode array = body.putArray("tools");
-        if (anthropic) {
-            tools.forEach(tool -> array.add(AnthropicProtocol.tool(mapper, tool)));
-            body.putObject("tool_choice").put("type", "auto");
-        } else {
-            tools.forEach(array::add);
-            body.put("tool_choice", "auto");
+        switch (format) {
+            case ANTHROPIC -> {
+                tools.forEach(tool -> array.add(AnthropicProtocol.tool(mapper, tool)));
+                body.putObject("tool_choice").put("type", "auto");
+            }
+            case OPENAI -> {
+                tools.forEach(array::add);
+                body.put("tool_choice", "auto");
+            }
+            case OLLAMA -> tools.forEach(array::add);
         }
     }
 
     private ModelHttp.Reply send(String url, Map<String, String> headers, ObjectNode body, Duration timeout) {
         try {
             return http.send("POST", url, headers, write(body), timeout);
-        } catch (IOException unreachable) {
-            throw new ModelProviderException("AI provider unreachable: " + reason(unreachable), unreachable);
+        } catch (IOException failed) {
+            throw ModelProviderException.transport(reason(failed), failed, timeout);
         }
     }
 
-    private Optional<List<String>> models(String url, Map<String, String> headers) {
+    /**
+     * Les modèles d'une liste, en gardant la fenêtre de ceux qui la disent, quand {@code windowsOf} nomme l'adresse où
+     * les retrouver (les vecteurs n'en ont pas besoin).
+     */
+    private Optional<List<String>> models(String url, Map<String, String> headers, String windowsOf) {
         try {
             ModelHttp.Reply reply = http.send("GET", url, headers, null, PROBE_TIMEOUT);
             if (!reply.ok()) {
@@ -280,6 +568,10 @@ public class ModelGateway {
                 String id = row.path("id").asText("");
                 if (!id.isEmpty()) {
                     ids.add(id);
+                    int reported = OpenAiProtocol.reportedWindow(row);
+                    if (windowsOf != null && reported > 0) {
+                        reportedWindows.put(windowsOf + " " + id, reported);
+                    }
                 }
             });
             return Optional.of(List.copyOf(ids));

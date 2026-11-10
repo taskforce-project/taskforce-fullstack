@@ -127,6 +127,7 @@ public class LocalRunnerService {
             LocalDateTime now = LocalDateTime.now();
             // Tout est lu AVANT la mise à jour : elle vide le contexte de persistance (entités détachées).
             RulesBundle rules = rulesService.bundleFor(project.getWorkspace());
+            RunnerClaimResponse.FollowUp followUp = followUpOf(candidate);
             RunnerClaimResponse claim = new RunnerClaimResponse(
                 runId,
                 issue.getId(),
@@ -140,7 +141,8 @@ public class LocalRunnerService {
                 candidate.getModel(),
                 now.plus(settings.sessionTtl()),
                 rules,
-                project.getTestCommand());
+                project.getTestCommand(),
+                followUp);
 
             String externalRef = "runner:" + runner.clientId() + ":" + UUID.randomUUID();
             int won = runRepository.claim(runId, runner.clientId(), externalRef, now,
@@ -156,6 +158,11 @@ public class LocalRunnerService {
                 started.put("agent", agent);
                 started.put("rules", Map.of("version", rules.version(), "digest", rules.digest()));
                 started.put("runner", runner.clientId());
+                // Une reprise se raccroche à la mission qu'elle continue : son dossier et les commentaires qui la lancent.
+                if (followUp != null) {
+                    started.put("followUpOf", followUp.parentRunId());
+                    started.put("comments", followUp.comments().size());
+                }
                 runRepository.findById(runId).ifPresent(run ->
                     evidenceService.append(run, "mission.started", MissionEvidenceService.Actor.SERVER, started));
                 log.info("Run {} réclamé par le runner {} (issue {}, pour {})",
@@ -165,6 +172,23 @@ public class LocalRunnerService {
             // Perdu : un autre runner du même propriétaire a été plus rapide. On passe au suivant.
         }
         return Optional.empty();
+    }
+
+    /**
+     * Ce qu'une reprise emporte de la mission qu'elle continue, ou null pour une mission neuve. Le dossier de travail est
+     * celui du premier run de la chaîne : Claude Code range ses sessions par dossier.
+     */
+    private static RunnerClaimResponse.FollowUp followUpOf(DeliveryRun run) {
+        DeliveryRun parent = run.getParentRun();
+        if (parent == null) return null;
+        DeliveryRun root = parent;
+        while (root.getParentRun() != null) root = root.getParentRun();
+        List<RunnerClaimResponse.Comment> comments = run.getFollowUp() == null ? List.of() : run.getFollowUp().stream()
+            .map(c -> new RunnerClaimResponse.Comment(String.valueOf(c.get("path")), ((Number) c.get("line")).intValue(),
+                String.valueOf(c.get("side")), String.valueOf(c.get("text"))))
+            .toList();
+        return new RunnerClaimResponse.FollowUp(parent.getId(), root.getId(), run.getBranch(), run.getBaseSha(),
+            parent.getAgentSession(), parent.getResultUrl(), comments);
     }
 
     /** Signe de vie du runner sur son run. Refusé si le run ne lui appartient plus ou est terminé. */
@@ -200,14 +224,14 @@ public class LocalRunnerService {
         // Les faits de la carte de résultat (R78) : la fin, et pour un travail rendu la branche, les commits, les tests.
         run.setEndedAt(LocalDateTime.now());
         if (done) recordFacts(run, result);
-        // Les demandes sans réponse vont au dossier de preuve avant sa clôture, faite par DeliveryRunner.
-        activityService.closeApprovals(run);
+        // DeliveryRunner clôt le dossier de preuve et les demandes sans réponse, quelle que soit la fin de la mission.
         deliveryRunner.complete(runId, poll);
     }
 
     /** Ce que le runner rapporte d'un travail rendu : la branche, les commits, les tests tels qu'il les a lancés. */
     private static void recordFacts(DeliveryRun run, RunnerResultRequest result) {
         if (result.branch() != null && !result.branch().isBlank()) run.setBranch(result.branch().strip());
+        if (result.agentSession() != null) run.setAgentSession(result.agentSession());
         run.setCommits(result.commits());
         RunnerResultRequest.Tests tests = result.tests();
         if (tests == null) return;
@@ -280,10 +304,21 @@ public class LocalRunnerService {
     // ---------------------------------------------------------------------
 
     /** Le run est du bon provider, en cours, réclamé par CE runner, et délégué par SON propriétaire actif. */
-    private void assertHeldBy(DeliveryRun run, RunnerIdentity runner) {
+    static void assertHeldBy(DeliveryRun run, RunnerIdentity runner) {
+        if (run.getStatus() != DeliveryRunStatus.RUNNING) {
+            log.warn("Accès runner refusé : run {} (statut {}) demandé par {}", run.getId(), run.getStatus(), runner.clientId());
+            throw new ForbiddenException(REFUSED);
+        }
+        assertCarriedBy(run, runner);
+    }
+
+    /**
+     * Le run a été porté par CE runner et délégué par SON propriétaire actif, fini ou non : un fichier se remet comme
+     * avant une fois la mission finie (R139).
+     */
+    static void assertCarriedBy(DeliveryRun run, RunnerIdentity runner) {
         User owner = run.getStartedBy();
         boolean held = ClaudeCodeProvider.KEY.equals(run.getProviderKey())
-            && run.getStatus() == DeliveryRunStatus.RUNNING
             && runner.clientId().equals(run.getClaimedBy())
             && owner != null
             && owner.getEmail() != null

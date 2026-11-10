@@ -3,6 +3,7 @@ import {
   listIssues,
   listMyIssues,
   getScheduledIssues,
+  searchIssues,
   getIssue,
   createIssue,
   updateIssue,
@@ -87,6 +88,25 @@ describe('issue-service', () => {
 
       expect(apiClient.get).toHaveBeenCalledWith(ISSUE_ROUTES.MY_ISSUES(SLUG));
       expect(result).toEqual(issues);
+    });
+  });
+
+  describe('searchIssues', () => {
+    it('GET la recherche de la fenêtre : le texte et la limite en paramètres (R123, R124)', async () => {
+      const hits = [{ id: 35, projectId: 3, key: 'OPS-35', title: 'Iteration #35', status: 'Done', statusCategory: 'COMPLETED' }];
+      vi.mocked(apiClient.get).mockResolvedValue(envelope(hits));
+
+      const result = await searchIssues(SLUG, 'ops 35', 5);
+
+      expect(apiClient.get).toHaveBeenCalledWith(ISSUE_ROUTES.SEARCH(SLUG), { params: { q: 'ops 35', limit: 5 } });
+      expect(result).toEqual(hits);
+    });
+
+    it('rend une liste vide quand le serveur ne dit rien ; 8 par défaut', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue(envelope(null));
+
+      await expect(searchIssues(SLUG, '')).resolves.toEqual([]);
+      expect(apiClient.get).toHaveBeenCalledWith(ISSUE_ROUTES.SEARCH(SLUG), { params: { q: '', limit: 8 } });
     });
   });
 

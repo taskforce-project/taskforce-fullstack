@@ -46,13 +46,28 @@ function DialogOverlay({
   )
 }
 
+/**
+ * Les trois largeurs d'un dialogue (R133, « Le dessin », séance n°20) : `sm` 420 px pour une confirmation ou deux champs,
+ * `md` 560 px pour un formulaire, `lg` 720 px pour ce qui montre beaucoup. Une colonne, les libellés au-dessus des champs,
+ * une action principale en bas à droite.
+ */
+const DIALOG_WIDTH = {
+  sm: "sm:max-w-[420px]",
+  md: "sm:max-w-[560px]",
+  lg: "sm:max-w-[720px]",
+} as const
+
+export type DialogSize = keyof typeof DIALOG_WIDTH
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  size = "md",
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  size?: DialogSize
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -64,7 +79,8 @@ function DialogContent({
           // max-content d'un enfant (ex. un titre long non-secable dans le bulk Auto-assign) et DEPASSE
           // le max-w-lg -> le contenu sort du modal a droite. minmax(0,1fr) borne la colonne a la largeur
           // du modal et laisse les `truncate` internes tronquer. Ne fait que clamper un debordement.
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid [grid-template-columns:minmax(0,1fr)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 outline-none sm:max-w-lg",
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 motion-reduce:animate-none fixed top-[50%] left-[50%] z-50 grid [grid-template-columns:minmax(0,1fr)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-150 outline-none",
+          DIALOG_WIDTH[size],
           className
         )}
         {...props}

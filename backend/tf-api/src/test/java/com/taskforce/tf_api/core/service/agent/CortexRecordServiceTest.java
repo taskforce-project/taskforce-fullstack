@@ -154,47 +154,58 @@ class CortexRecordServiceTest {
         assertThat(service.approve(id, "create_note", 7L, "{}")).isEqualTo(approvable);
     }
 
-    /** Une réponse où TaskForce a demandé quelle issue supprimer (R115) : rend l'empreinte de la question. */
+    /** Une réponse où TaskForce a demandé le nom d'un projet et où vit son code (R115) : rend l'empreinte de la carte. */
     private String asked(UUID id) {
-        Map<String, Object> question = new LinkedHashMap<>();
-        question.put("tool", "delete_issue");
-        question.put("status", "question");
-        question.put("output", "Nothing was done: TaskForce asks the person first. Which issue should be deleted?");
-        question.put("arguments", "{}");
-        question.put("question", Map.of("field", "issue", "text", "Which issue should be deleted?", "choices", List.of()));
-        question.put("screen", Map.of("projectId", 12));
-        return service.append(id, "action.result", Actor.SERVER, question).orElseThrow();
+        Map<String, Object> card = new LinkedHashMap<>();
+        card.put("tool", "create_project");
+        card.put("status", "question");
+        card.put("output", "Nothing was done: TaskForce asks the person first. What should the project be called?");
+        card.put("arguments", "{\"stack\":\"Next.js\"}");
+        card.put("questions", List.of(
+            Map.of("field", "name", "header", "Name", "text", "What should the project be called?", "choices", List.of()),
+            Map.of("field", "repository", "header", "Repository", "text", "Where does its code live?", "choices", List.of())));
+        card.put("screen", Map.of("projectId", 12));
+        return service.append(id, "action.result", Actor.SERVER, card).orElseThrow();
     }
 
     @Test
-    @DisplayName("R115 : la réponse à une question de TaskForce entre au dossier une fois, et rend ce que le geste reprend")
-    void a_question_is_answered_once() {
-        UUID id = service.open(ctx, "supprime ça", Map.of());
+    @DisplayName("R115 : les réponses à une carte de TaskForce entrent au dossier une fois, ensemble, et rendent ce que le geste reprend")
+    void a_card_is_answered_once() {
+        UUID id = service.open(ctx, "crée un projet Next.js", Map.of());
         String ref = asked(id);
+        Map<String, String> answers = new LinkedHashMap<>();
+        answers.put("name", "Atlas");
+        answers.put("repository", "new-private");
 
-        Optional<com.fasterxml.jackson.databind.JsonNode> answered = service.answer(id, "delete_issue", ref, 7L, "TESTTA-2");
+        assertThat(service.question(id, "create_project", ref)).isPresent(); // une lecture : rien n'entre au dossier
+        int before = stored.size();
+        Optional<com.fasterxml.jackson.databind.JsonNode> answered = service.answer(id, "create_project", ref, 7L, answers);
 
         assertThat(answered).isPresent();
-        assertThat(answered.get().path("question").path("field").asText()).isEqualTo("issue");
+        assertThat(answered.get().path("questions").get(1).path("field").asText()).isEqualTo("repository");
         assertThat(answered.get().path("screen").path("projectId").asLong()).isEqualTo(12L);
+        assertThat(stored).hasSize(before + 1);
         assertThat(stored.getLast().getType()).isEqualTo("human.decision");
         assertThat(stored.getLast().getActorId()).isEqualTo("user-7");
-        assertThat(stored.getLast().getData()).contains("\"decision\":\"answered\"", "\"answer\":\"TESTTA-2\"", "\"field\":\"issue\"");
-        // Un deuxième clic ne répond plus : la question a sa réponse.
-        assertThat(service.answer(id, "delete_issue", ref, 7L, "TESTTA-3")).isEmpty();
+        assertThat(stored.getLast().getData()).contains("\"decision\":\"answered\"",
+            "\"answers\":{\"name\":\"Atlas\",\"repository\":\"new-private\"}");
+        // Un deuxième envoi ne répond plus : la carte a ses réponses.
+        assertThat(service.answer(id, "create_project", ref, 7L, Map.of("name", "Orion"))).isEmpty();
+        assertThat(service.question(id, "create_project", ref)).isEmpty();
     }
 
     @ParameterizedTest(name = "réponse à {0} avec {1} : rien")
     @CsvSource(nullValues = "-", value = {
-        "update_issue, real",   // la question d'un autre geste
-        "delete_issue, other",  // une empreinte qui n'est pas celle d'une question
-        "delete_issue, -",
+        "update_issue, real",    // la carte d'un autre geste
+        "create_project, other", // une empreinte qui n'est pas celle d'une carte
+        "create_project, -",
     })
-    void only_an_open_question_takes_an_answer(String tool, String ref) {
-        UUID id = service.open(ctx, "supprime ça", Map.of());
+    void only_an_open_card_takes_answers(String tool, String ref) {
+        UUID id = service.open(ctx, "crée un projet Next.js", Map.of());
         String real = asked(id);
 
-        assertThat(service.answer(id, tool, "real".equals(ref) ? real : ref, 7L, "TESTTA-2")).isEmpty();
+        assertThat(service.question(id, tool, "real".equals(ref) ? real : ref)).isEmpty();
+        assertThat(service.answer(id, tool, "real".equals(ref) ? real : ref, 7L, Map.of("name", "Atlas"))).isEmpty();
     }
 
     @Test
@@ -243,6 +254,20 @@ class CortexRecordServiceTest {
 
         assertThat(stored.getFirst().getData()).isEqualTo("{\"agent\":\"internal\",\"model\":\"qwen3:8b\","
             + "\"notes\":[{\"id\":12,\"title\":\"Release plan\"}],\"question\":\"Write the release notes\",\"tier\":\"fast\"}");
+    }
+
+    @Test
+    @DisplayName("R123 : le modèle qui a répondu se relit à l'ouverture du dossier ; rien quand elle ne le dit pas")
+    void the_model_of_the_record_is_read_back() {
+        UUID answered = service.open(ctx, "Summarize OPS-35", Map.of("model", " qwen3:8b ", "tier", "fast"));
+        service.append(answered, "action.result", Actor.SERVER, Map.of("tool", "add_comment", "status", "pending"));
+
+        assertThat(service.model(answered)).contains("qwen3:8b");
+
+        stored.clear();
+        UUID silent = service.open(ctx, "Write the release notes", Map.of());
+        assertThat(service.model(silent)).isEmpty();
+        assertThat(service.model(null)).isEmpty();
     }
 
     // -------------------------------------------------------------------------
@@ -345,5 +370,25 @@ class CortexRecordServiceTest {
         assertThat(records).containsKey(id);
         assertThat(stored).extracting(CortexRecordEvent::getType).containsExactly("mission.started", "note");
         assertThat(stored.getFirst().getData()).contains("\"question\":\"suprime testta 2\"").contains("qwen3:8b");
+    }
+
+    @Test
+    @DisplayName("l'incident de chaque dossier se relit d'un coup, pour l'histoire de la banque ; un autre ne compte pas")
+    void incidents_are_read_from_the_server_notes() {
+        UUID corrected = service.incident(ctx, null, "suprime testta 2", Map.of(),
+            Map.of("incident", "trust", "said", List.of("I deleted TESTTA-2."), "shown", "Nothing was deleted."));
+        UUID other = UUID.randomUUID();
+        when(eventRepository.findByRecordIdInAndTypeAndActorKindOrderBySeqAsc(List.of(corrected, other), "note", "server"))
+            .thenReturn(List.of(
+                stored.getLast(),
+                CortexRecordEvent.builder().recordId(other).seq(2).type("note").actorKind("server")
+                    .data("{\"about\":\"something else\"}").build()));
+
+        Map<UUID, com.fasterxml.jackson.databind.JsonNode> found = service.incidents(List.of(corrected, other));
+
+        assertThat(found).containsOnlyKeys(corrected);
+        assertThat(found.get(corrected).path("shown").asText()).isEqualTo("Nothing was deleted.");
+        assertThat(found.get(corrected).path("said").get(0).asText()).isEqualTo("I deleted TESTTA-2.");
+        assertThat(service.incidents(List.of())).isEmpty();
     }
 }

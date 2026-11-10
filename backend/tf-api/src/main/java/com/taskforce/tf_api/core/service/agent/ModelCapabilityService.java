@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.dto.response.ChatTurnResponse;
 import com.taskforce.tf_api.core.dto.response.ModelCapabilityResponse;
 import com.taskforce.tf_api.core.dto.response.ModelCapabilityResponse.CapabilityInfo;
+import com.taskforce.tf_api.core.dto.response.ModelCapabilityResponse.Card;
 import com.taskforce.tf_api.core.dto.response.ModelCapabilityResponse.CaseInfo;
 import com.taskforce.tf_api.core.dto.response.ModelCapabilityResponse.CaseResult;
 import com.taskforce.tf_api.core.dto.response.ModelCapabilityResponse.ModelRow;
@@ -32,12 +33,16 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.AiModelChoiceRepository;
 import com.taskforce.tf_api.core.repository.ModelCapabilityResultRepository;
 import com.taskforce.tf_api.core.repository.ModelCapabilityRunRepository;
+import com.taskforce.tf_api.core.service.AiGatewayClient;
 import com.taskforce.tf_api.core.service.AiStatusService;
 import com.taskforce.tf_api.core.service.AiUsageService;
+import com.taskforce.tf_api.core.service.LlmTimedOutException;
 import com.taskforce.tf_api.core.service.LlmToolsRefusedException;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.agent.CapabilitySuite.CapabilityCase;
 import com.taskforce.tf_api.core.service.ai.ModelChoice;
+import com.taskforce.tf_api.core.service.ai.ModelDeadline;
+import com.taskforce.tf_api.core.service.ai.ModelGateway;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -79,11 +84,15 @@ public class ModelCapabilityService {
     static final String TAKES_TOOLS = "takes Cortex's tools";
     static final String TOOLS_REFUSED = "The AI provider refused Cortex's tools for this model, even a single one: it can't "
         + "answer as Cortex.";
+    static final String ANSWERS_IN_TIME = "answers in time";
+    static final String TOO_SLOW_DETAIL = "No answer in the " + BenchmarkSuite.CASE_BUDGET.toMinutes()
+        + " minutes a test case gets: too slow here.";
 
     private final BrainAccessGuard access;
     private final AiStatusService aiStatus;
     private final AgentService agent;
     private final AiUsageService aiUsage;
+    private final ModelCallStops stops;
     private final ModelCapabilityRunRepository runs;
     private final ModelCapabilityResultRepository results;
     private final AiModelChoiceRepository choices;
@@ -98,10 +107,11 @@ public class ModelCapabilityService {
         return build(userId);
     }
 
-    /** Ouvre une mesure d'un modèle servi : ses cas sont ceux de la suite, dans leur ordre. */
+    /** Ouvre une mesure d'un modèle servi qui sait converser : ses cas sont ceux de la suite, dans leur ordre. */
     public RunStarted start(String slug, Long userId, String model) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         String name = served(model);
+        requireChat(aiStatus.describe(name), name);
         ModelCapabilityRun run = runs.save(ModelCapabilityRun.builder()
             .workspaceId(ws.getId()).startedBy(userId).startedAt(LocalDateTime.now()).model(name)
             .suiteVersion(CapabilitySuite.VERSION).total(CapabilitySuite.cases().size()).passed(0).build());
@@ -111,7 +121,8 @@ public class ModelCapabilityService {
 
     /**
      * Rejoue et note un cas d'une mesure, une seule fois. Le quota et le frein de débit de l'IA valent comme pour une
-     * réponse ; une panne du modèle remonte telle quelle, sans note, pour qu'on rejoue le cas.
+     * réponse. Un cas qui dépasse son budget se note « trop lent », à part (R142) ; une panne du modèle se dit, sans note, pour
+     * qu'on rejoue le cas.
      */
     public CaseResult measure(String slug, Long userId, Long runId, String caseKey) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
@@ -127,14 +138,22 @@ public class ModelCapabilityService {
         aiUsage.assertWithinQuota(ws.getId());
         ReplayOutcome outcome;
         EvalGrader.Grade grade;
+        boolean tooSlow = false;
         try {
-            outcome = agent.replay(new AgentContext(slug, ws.getId(), userId), capabilityCase.replay(), run.getModel());
+            outcome = stops.during(ws.getId(), userId, () -> ModelDeadline.within(BenchmarkSuite.CASE_BUDGET,
+                () -> agent.replay(new AgentContext(slug, ws.getId(), userId), capabilityCase.replay(), run.getModel())));
             grade = CapabilitySuite.grade(capabilityCase, outcome);
         } catch (LlmToolsRefusedException refused) {
             // Le fournisseur refuse les outils de Cortex pour ce modèle, même un seul (un modèle de base, sans gabarit
             // d'outils) : ce n'est pas une panne à rejouer, c'est une mesure, et le modèle ne peut pas répondre en Cortex.
             outcome = new ReplayOutcome("", List.of(), run.getModel(), LlmUsage.ZERO);
             grade = new EvalGrader.Grade(false, List.of(new EvalGrader.Check(TAKES_TOOLS, false, TOOLS_REFUSED)));
+        } catch (LlmTimedOutException late) {
+            tooSlow = true;
+            outcome = new ReplayOutcome("", List.of(), run.getModel(), LlmUsage.ZERO);
+            grade = new EvalGrader.Grade(false, List.of(new EvalGrader.Check(ANSWERS_IN_TIME, false, TOO_SLOW_DETAIL)));
+        } catch (AiGatewayClient.LlmException down) {
+            throw new BusinessException("MODEL_FAILED", run.getModel() + " stopped answering on this machine. Run it again, or leave it out of the run.");
         }
         recordUsage(ws.getId(), outcome.usage());
         long prompt = outcome.usage() == null ? 0 : outcome.usage().promptTokens();
@@ -143,7 +162,7 @@ public class ModelCapabilityService {
         ModelCapabilityResult saved;
         try {
             saved = results.save(ModelCapabilityResult.builder().runId(runId).caseKey(caseKey)
-                .capability(capabilityCase.capability().key()).passed(grade.passed()).details(json(details))
+                .capability(capabilityCase.capability().key()).passed(grade.passed()).details(json(details)).tooSlow(tooSlow)
                 .createdAt(LocalDateTime.now()).build());
         } catch (DataIntegrityViolationException twice) { // le même cas deux fois en même temps : le premier compte
             return results.findByRunIdAndCaseKey(runId, caseKey).map(this::result).orElseThrow(() -> twice);
@@ -274,16 +293,16 @@ public class ModelCapabilityService {
 
     /** La dernière note de chaque cas, pour les modèles servis, dans l'ordre de la table. */
     private record Measures(List<String> order, Map<String, Map<Capability, Score>> scores,
-                            Map<String, LocalDateTime> measuredAt) {
+                            Map<String, LocalDateTime> measuredAt, Map<String, List<String>> failedCases) {
     }
 
-    private record Latest(boolean passed, LocalDateTime at) {
+    private record Latest(boolean passed, boolean tooSlow, LocalDateTime at) {
     }
 
     private Measures measures(AiStatusService.Snapshot snapshot) {
         List<String> order = ModelChoice.chatModels(snapshot.settings().provider(), snapshot.models());
         Map<Long, String> modelOfRun = new HashMap<>();
-        runs.findTop500BySuiteVersionOrderByStartedAtDesc(CapabilitySuite.VERSION).stream()
+        runs.findTop500BySuiteAndSuiteVersionOrderByStartedAtDesc(ModelCapabilityRun.CAPABILITY, CapabilitySuite.VERSION).stream()
             .filter(run -> order.contains(run.getModel()))
             .forEach(run -> modelOfRun.put(run.getId(), run.getModel()));
         Map<String, Map<String, Latest>> latest = new HashMap<>();
@@ -292,12 +311,14 @@ public class ModelCapabilityService {
                 Map<String, Latest> byCase = latest.computeIfAbsent(modelOfRun.get(row.getRunId()), m -> new HashMap<>());
                 Latest seen = byCase.get(row.getCaseKey());
                 if (seen == null || row.getCreatedAt().isAfter(seen.at())) {
-                    byCase.put(row.getCaseKey(), new Latest(Boolean.TRUE.equals(row.getPassed()), row.getCreatedAt()));
+                    byCase.put(row.getCaseKey(), new Latest(Boolean.TRUE.equals(row.getPassed()), Boolean.TRUE.equals(row.getTooSlow()),
+                        row.getCreatedAt()));
                 }
             }
         }
         Map<String, Map<Capability, Score>> scores = new LinkedHashMap<>();
         Map<String, LocalDateTime> measuredAt = new HashMap<>();
+        Map<String, List<String>> failedCases = new HashMap<>();
         for (String model : order) {
             Map<String, Latest> byCase = latest.getOrDefault(model, Map.of());
             Map<Capability, Score> cells = new LinkedHashMap<>();
@@ -307,28 +328,37 @@ public class ModelCapabilityService {
             scores.put(model, cells);
             byCase.values().stream().map(Latest::at).max(LocalDateTime::compareTo)
                 .ifPresent(at -> measuredAt.put(model, at));
+            failedCases.put(model, CapabilitySuite.cases().stream().map(CapabilityCase::key)
+                .filter(key -> byCase.containsKey(key) && !byCase.get(key).passed() && !byCase.get(key).tooSlow())
+                .toList());
         }
-        return new Measures(order, scores, measuredAt);
+        return new Measures(order, scores, measuredAt, failedCases);
     }
 
     private static Score score(Capability capability, Map<String, Latest> byCase) {
         int passed = 0;
         int measured = 0;
+        int tooSlow = 0;
         Integer held = null;
         LocalDateTime at = null;
         for (CapabilityCase c : CapabilitySuite.cases()) {
             if (c.capability() != capability || !byCase.containsKey(c.key())) continue;
             Latest note = byCase.get(c.key());
+            at = at == null || note.at().isAfter(at) ? note.at() : at;
+            // Un cas trop lent n'est ni réussi ni raté : il ne compte pas comme une mesure, et l'escalade ne s'y fie pas (R142).
+            if (note.tooSlow()) {
+                tooSlow++;
+                continue;
+            }
             measured++;
             if (capability == Capability.CONTEXT) held = held == null ? 0 : held;
             if (note.passed()) {
                 passed++;
                 if (capability == Capability.CONTEXT) held = Math.max(held, c.documentWords());
             }
-            at = at == null || note.at().isAfter(at) ? note.at() : at;
         }
         int total = CapabilitySuite.count(capability);
-        return new Score(capability.key(), passed, measured, total, measured == total && passed == total, held, at);
+        return new Score(capability.key(), passed, measured, total, measured == total && passed == total, held, at, tooSlow);
     }
 
     private ModelCapabilityResponse build(Long userId) {
@@ -340,7 +370,7 @@ public class ModelCapabilityService {
 
         List<ModelRow> rows = measures.order().stream()
             .map(model -> new ModelRow(model, model.equals(current), measures.measuredAt().get(model),
-                List.copyOf(measures.scores().get(model).values())))
+                List.copyOf(measures.scores().get(model).values()), card(model), measures.failedCases().get(model)))
             .toList();
         List<Proposal> proposals = new ArrayList<>();
         for (Capability capability : Capability.values()) {
@@ -371,6 +401,23 @@ public class ModelCapabilityService {
     /** Le détail gardé avec une note. */
     record Details(List<EvalGrader.Check> checks, List<ReplayOutcome.ReplayCall> calls, String answer, String model,
                    long promptTokens) {
+    }
+
+    /** Ce que dit la fiche du modèle chez son fournisseur, ou {@code null} : une description, jamais une note (R113). */
+    private Card card(String model) {
+        return aiStatus.describe(model)
+            .map(card -> new Card(card.parameters(), card.contextLength(), card.tools()))
+            .orElse(null);
+    }
+
+    /**
+     * Un modèle de base complète du texte, il ne converse pas (R142) : le dire ici, au lieu de le faire échouer cas après cas. Sans
+     * fiche, on ne sait pas : on essaie.
+     */
+    static void requireChat(Optional<ModelGateway.ModelCard> card, String model) {
+        if (card.map(known -> Boolean.FALSE.equals(known.chat())).orElse(false)) {
+            throw new BusinessException("MODEL_CANNOT_CHAT", model + " completes text and can't hold a conversation: TaskForce doesn't run it.");
+        }
     }
 
     /** Un modèle de conversation que la passerelle sert maintenant ; sinon la personne apprend lesquels le sont. */
@@ -405,7 +452,7 @@ public class ModelCapabilityService {
     private CaseResult result(ModelCapabilityResult result) {
         Details details = read(result.getDetails());
         return new CaseResult(result.getCaseKey(), result.getCapability(), result.isPassed(), details.checks(),
-            details.calls(), details.answer(), details.model(), details.promptTokens());
+            details.calls(), details.answer(), details.model(), details.promptTokens(), result.isTooSlow());
     }
 
     private static String json(Object value) {

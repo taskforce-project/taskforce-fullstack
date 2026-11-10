@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
@@ -26,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.dto.response.EvalBankResponse;
+import com.taskforce.tf_api.core.dto.response.EvalHistoryResponse;
 import com.taskforce.tf_api.core.enums.NodeDomain;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceChain;
 import com.taskforce.tf_api.core.model.EvalBankSetting;
@@ -39,8 +41,10 @@ import com.taskforce.tf_api.core.repository.EvalCaseRepository;
 import com.taskforce.tf_api.core.repository.EvalResultRepository;
 import com.taskforce.tf_api.core.repository.EvalRunRepository;
 import com.taskforce.tf_api.core.repository.KnowledgeNodeRepository;
+import com.taskforce.tf_api.core.service.AiGatewayClient;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
+import com.taskforce.tf_api.core.service.LlmTimedOutException;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.exception.BusinessException;
@@ -51,6 +55,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -75,6 +80,7 @@ class EvalServiceTest {
     @Mock private AgentToolRegistry tools;
     @Mock private AgentService agent;
     @Mock private AiUsageService aiUsage;
+    @org.mockito.Spy private ModelCallStops stops = new ModelCallStops();
     @Mock private EvalCaseRepository cases;
     @Mock private EvalRunRepository runs;
     @Mock private EvalResultRepository results;
@@ -210,6 +216,98 @@ class EvalServiceTest {
         assertThat(created.mine()).isTrue();
     }
 
+    /** « Bien », d'un clic (R137) : ce qui a été observé devient ce qu'on attend. */
+    @Test
+    @DisplayName("bien : un clic garde le cas, avec ce qui a été observé, daté maintenant")
+    void good_keeps_what_was_observed() throws Exception {
+        stubRecord(answerThatCreatedAnIssue());
+
+        EvalBankResponse.CaseSummary kept = service.keepGood("acme", 7L, RECORD.toString());
+
+        ArgumentCaptor<EvalCase> saved = ArgumentCaptor.forClass(EvalCase.class);
+        verify(cases).save(saved.capture());
+        assertThat(saved.getValue().waiting()).isFalse();
+        assertThat(saved.getValue().getCriteria()).contains("\"tool\":\"create_issue\"").contains("CLEANU");
+        assertThat(kept.waiting()).isFalse();
+        assertThat(kept.tool()).isEqualTo("create_issue");
+    }
+
+    /** « Pas bien » (R137) : une phrase seule ; R61 tient : aucun rejeu ne la note, ses critères viendront datés. */
+    @Test
+    @DisplayName("pas bien : la phrase seule fait un cas qui attend ses critères, à l'écart de tout rejeu")
+    void bad_keeps_a_sentence_waiting_for_its_criteria() throws Exception {
+        stubRecord(answerThatCreatedAnIssue());
+
+        EvalBankResponse.CaseSummary kept = service.keepBad("acme", 7L, RECORD.toString(), "  It should have asked which project.  ");
+
+        ArgumentCaptor<EvalCase> saved = ArgumentCaptor.forClass(EvalCase.class);
+        verify(cases).save(saved.capture());
+        EvalCase waiting = saved.getValue();
+        assertThat(waiting.waiting()).isTrue();
+        assertThat(waiting.getCriteriaAt()).isAfter(LocalDateTime.of(9000, 1, 1, 0, 0));
+        assertThat(kept.waiting()).isTrue();
+        assertThat(kept.expected()).isEqualTo("It should have asked which project.");
+        assertThat(kept.tool()).isEmpty();
+    }
+
+    @ParameterizedTest(name = "« {0} »")
+    @ValueSource(strings = {"", "   "})
+    void bad_needs_its_sentence(String sentence) {
+        assertThatThrownBy(() -> service.keepBad("acme", 7L, RECORD.toString(), sentence))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("one sentence");
+        verify(cases, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("bien ou pas bien : la même réponse ne se garde qu'une fois")
+    void the_same_answer_is_kept_once() {
+        EvalCase kept = storedCase(LocalDateTime.of(2026, 11, 9, 10, 0));
+        when(cases.findFirstByWorkspaceIdAndSourceRecordAndArchivedFalseOrderByIdDesc(1L, RECORD)).thenReturn(Optional.of(kept));
+
+        assertThat(service.keepGood("acme", 7L, RECORD.toString()).id()).isEqualTo(40L);
+        assertThat(service.keepBad("acme", 7L, RECORD.toString(), "Autrement").id()).isEqualTo(40L);
+        verify(cases, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("les critères d'un cas qui les attend s'écrivent une fois, datés maintenant, la phrase gardée")
+    void criteria_are_written_once() throws Exception {
+        EvalCase waiting = storedCase(EvalCase.WAITING_FOR_CRITERIA);
+        waiting.setCriteria("{\"expected\":\"It should have asked.\"}");
+        when(cases.findByIdAndWorkspaceId(40L, 1L)).thenReturn(Optional.of(waiting));
+
+        EvalBankResponse.CaseSummary done = service.giveCriteria("acme", 7L, 40L, "Asks first",
+            new EvalCriteria(EvalCriteria.NO_TOOL, null, null, null, null, null, false));
+
+        assertThat(done.waiting()).isFalse();
+        assertThat(done.expected()).isEqualTo("It should have asked.");
+        assertThat(waiting.getTitle()).isEqualTo("Asks first");
+        assertThat(waiting.getCriteriaAt()).isBefore(LocalDateTime.now().plusSeconds(1));
+
+        // Datés, ils ne changent plus : un modèle a pu être noté dessus.
+        assertThatThrownBy(() -> service.giveCriteria("acme", 7L, 40L, null,
+            new EvalCriteria(EvalCriteria.NO_TOOL, null, null, null, null, null, false)))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("already has its criteria");
+    }
+
+    @Test
+    @DisplayName("un cas qui attend ses critères n'est pas noté, et seul son auteur ou un gestionnaire les écrit")
+    void a_waiting_case_is_never_graded() {
+        EvalCase waiting = storedCase(EvalCase.WAITING_FOR_CRITERIA);
+        when(cases.findByIdAndWorkspaceId(40L, 1L)).thenReturn(Optional.of(waiting));
+        when(runs.findByIdAndWorkspaceId(9L, 1L)).thenReturn(Optional.of(
+            EvalRun.builder().id(9L).workspaceId(1L).startedAt(LocalDateTime.of(2026, 11, 9, 10, 0)).model("default").total(1).passed(0).build()));
+        when(results.findByRunIdAndCaseId(9L, 40L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.runCase("acme", 7L, 9L, 40L))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("waiting for its criteria");
+
+        waiting.setCreatedBy(99L);
+        when(authorization.isManager(1L, 7L)).thenReturn(false);
+        assertThatThrownBy(() -> service.giveCriteria("acme", 7L, 40L, null, new EvalCriteria(EvalCriteria.NO_TOOL, null, null, null, null, null, false)))
+            .isInstanceOf(ForbiddenException.class);
+    }
+
     @Test
     @DisplayName("coupée, la banque ne prend plus de cas")
     void a_bank_turned_off_takes_no_case() {
@@ -309,6 +407,62 @@ class EvalServiceTest {
     }
 
     @Test
+    @DisplayName("un cas trop lent ne se note pas et n'arrête pas le rejeu (R142)")
+    void a_case_too_slow_is_not_graded() {
+        LocalDateTime start = LocalDateTime.of(2026, 10, 29, 19, 0);
+        when(runs.findByIdAndWorkspaceId(9L, 1L)).thenReturn(Optional.of(
+            EvalRun.builder().id(9L).workspaceId(1L).startedAt(start).model("qwen3:14b").total(1).build()));
+        when(cases.findByIdAndWorkspaceId(40L, 1L)).thenReturn(Optional.of(storedCase(start.minusHours(1))));
+        when(results.findByRunIdAndCaseId(9L, 40L)).thenReturn(Optional.empty());
+        when(agent.replay(any(), any(), eq("qwen3:14b"))).thenThrow(new LlmTimedOutException("late", null));
+
+        EvalBankResponse.Result result = service.runCase("acme", 7L, 9L, 40L);
+
+        assertThat(result.passed()).isFalse();
+        assertThat(result.checks()).singleElement().satisfies(check -> assertThat(check.detail()).contains("too slow"));
+        verify(results, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("une panne du modèle se dit, sans 500 et sans note")
+    void a_model_failure_says_so() {
+        LocalDateTime start = LocalDateTime.of(2026, 10, 29, 19, 0);
+        when(runs.findByIdAndWorkspaceId(9L, 1L)).thenReturn(Optional.of(
+            EvalRun.builder().id(9L).workspaceId(1L).startedAt(start).model("qwen3:14b").total(1).build()));
+        when(cases.findByIdAndWorkspaceId(40L, 1L)).thenReturn(Optional.of(storedCase(start.minusHours(1))));
+        when(results.findByRunIdAndCaseId(9L, 40L)).thenReturn(Optional.empty());
+        when(agent.replay(any(), any(), eq("qwen3:14b"))).thenThrow(new AiGatewayClient.LlmException("down", null));
+
+        assertThatThrownBy(() -> service.runCase("acme", 7L, 9L, 40L))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("qwen3:14b stopped answering");
+        verify(results, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("la banque pour le banc : les cas actifs, le dernier rejeu noté de chaque modèle ; sans cas, rien")
+    void the_scores_for_the_benchmark() {
+        when(cases.countByWorkspaceIdAndArchivedFalse(1L)).thenReturn(0L);
+        assertThat(service.scores(1L).cases()).isZero();
+        verify(runs, never()).findTop100ByWorkspaceIdOrderByStartedAtDesc(any());
+
+        LocalDateTime at = LocalDateTime.of(2026, 11, 9, 12, 0);
+        when(cases.countByWorkspaceIdAndArchivedFalse(1L)).thenReturn(2L);
+        EvalRun newest = EvalRun.builder().id(3L).workspaceId(1L).startedAt(at).model("qwen3:8b").total(2).passed(2).build();
+        EvalRun older = EvalRun.builder().id(2L).workspaceId(1L).startedAt(at.minusDays(1)).model("qwen3:8b").total(2).passed(0).build();
+        EvalRun empty = EvalRun.builder().id(1L).workspaceId(1L).startedAt(at.minusDays(2)).model("qwen3:14b").total(2).passed(0).build();
+        when(runs.findTop100ByWorkspaceIdOrderByStartedAtDesc(1L)).thenReturn(List.of(newest, older, empty));
+        EvalResultRepository.Row graded = org.mockito.Mockito.mock(EvalResultRepository.Row.class);
+        when(graded.getRunId()).thenReturn(3L);
+        when(results.findRowsByRunIdIn(anyList())).thenReturn(List.of(graded, graded));
+
+        EvalService.BankScores scores = service.scores(1L);
+
+        assertThat(scores.cases()).isEqualTo(2);
+        assertThat(scores.byModel()).containsOnlyKeys("qwen3:8b");
+        assertThat(scores.byModel().get("qwen3:8b")).isEqualTo(new EvalService.BankScore(2, 2, 2, at));
+    }
+
+    @Test
     @DisplayName("un cas écrit après le départ du rejeu n'y entre pas")
     void a_case_written_after_the_run_is_refused() {
         LocalDateTime start = LocalDateTime.of(2026, 10, 29, 19, 0);
@@ -359,6 +513,94 @@ class EvalServiceTest {
 
         assertThatThrownBy(() -> service.setEnabled("acme", 7L, false)).isInstanceOf(ForbiddenException.class);
         verify(settings, never()).save(any());
+    }
+
+    /** Une note telle que l'histoire de la banque la lit. */
+    private record ResultRow(Long getRunId, Long getCaseId, Boolean getPassed) implements EvalResultRepository.Row {
+    }
+
+    private static final UUID ANSWER = UUID.fromString("00000000-0000-0000-0000-0000000000cc");
+
+    /** Un cas ajouté par {@code createdBy} depuis le dossier {@code record} (null : écrit à la main), à {@code at}. */
+    private static EvalCase caseFrom(Long id, Long createdBy, UUID record, LocalDateTime at) {
+        return EvalCase.builder().id(id).workspaceId(1L).createdBy(createdBy).createdAt(at).criteriaAt(at)
+            .sourceRecord(record).title("Case " + id).question("suprime testta 2").askedOn(LocalDate.of(2026, 11, 2))
+            .notes("[]").cassette("[]").criteria("{\"tool\":\"delete_issue\",\"honest\":true}").archived(false).build();
+    }
+
+    @Test
+    @DisplayName("l'histoire : les rejeux du plus ancien au plus récent, le modèle qui a répondu, les notes de chaque cas")
+    void the_history_reads_runs_and_cases() throws Exception {
+        LocalDateTime nov2 = LocalDateTime.of(2026, 11, 2, 15, 8);
+        EvalRun later = EvalRun.builder().id(9L).workspaceId(1L).model("qwen3:8b").startedAt(nov2.plusDays(5))
+            .finishedAt(nov2.plusDays(5).plusMinutes(4)).total(3).passed(2).build();
+        EvalRun first = EvalRun.builder().id(8L).workspaceId(1L).model("default").startedAt(nov2.plusHours(1))
+            .total(3).passed(0).build();
+        when(runs.findTop100ByWorkspaceIdOrderByStartedAtDesc(1L)).thenReturn(List.of(later, first));
+        when(results.findRowsByRunIdIn(List.of(8L, 9L))).thenReturn(List.of(
+            new ResultRow(8L, 40L, false), new ResultRow(9L, 40L, true), new ResultRow(9L, 41L, true)));
+        when(results.findFirstByRunIdOrderByIdAsc(8L)).thenReturn(Optional.of(EvalResult.builder().runId(8L).caseId(40L)
+            .passed(false).details("{\"checks\":[],\"calls\":[],\"answer\":\"\",\"model\":\"qwen3:8b\"}").build()));
+        EvalCase incident = caseFrom(40L, 7L, RECORD, nov2);
+        EvalCase answer = caseFrom(41L, 3L, ANSWER, nov2.plusDays(1));
+        EvalCase byHand = caseFrom(42L, 7L, null, nov2.plusDays(2));
+        when(cases.findByWorkspaceIdAndArchivedFalseOrderByCreatedAtDesc(1L)).thenReturn(List.of(byHand, answer, incident));
+        when(records.incidents(List.of(ANSWER, RECORD))).thenReturn(Map.of(RECORD, JSON.readTree(
+            "{\"incident\":\"trust\",\"said\":[\"I deleted TESTTA-2.\",\" \"],\"shown\":\"Nothing was deleted.\"}")));
+
+        EvalHistoryResponse history = service.history("acme", 7L);
+
+        assertThat(history.runs()).extracting(EvalHistoryResponse.Run::id, EvalHistoryResponse.Run::answeredBy,
+                EvalHistoryResponse.Run::graded, EvalHistoryResponse.Run::passed)
+            .containsExactly(tuple(8L, "qwen3:8b", 1, 0), tuple(9L, "qwen3:8b", 2, 2));
+        // Un rejeu qui nomme son modèle le garde : sa première note n'est pas relue.
+        verify(results, never()).findFirstByRunIdOrderByIdAsc(9L);
+        assertThat(history.cases()).extracting(EvalHistoryResponse.Case::id).containsExactly(42L, 41L, 40L);
+        EvalHistoryResponse.Case fromIncident = history.cases().get(2);
+        assertThat(fromIncident.origin()).isEqualTo(new EvalHistoryResponse.Origin("incident",
+            List.of("I deleted TESTTA-2."), "Nothing was deleted."));
+        assertThat(fromIncident.grades()).extracting(EvalHistoryResponse.Grade::runId, EvalHistoryResponse.Grade::passed)
+            .containsExactly(tuple(8L, false), tuple(9L, true));
+        assertThat(fromIncident.mine()).isTrue();
+        assertThat(fromIncident.askedOn()).isEqualTo(LocalDate.of(2026, 11, 2));
+        EvalHistoryResponse.Case fromAnswer = history.cases().get(1);
+        assertThat(fromAnswer.origin().kind()).isEqualTo("answer");
+        assertThat(fromAnswer.grades()).extracting(EvalHistoryResponse.Grade::runId).containsExactly(9L);
+        assertThat(fromAnswer.mine()).isFalse();
+        assertThat(history.cases().get(0).origin()).isEqualTo(new EvalHistoryResponse.Origin("unknown", List.of(), null));
+        assertThat(history.cases().get(0).grades()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("l'histoire d'une banque sans rejeu : ses cas, sans note ; un rejeu sans nom ni note n'a pas de modèle")
+    void the_history_of_a_bank_never_replayed() {
+        EvalRun started = EvalRun.builder().id(8L).workspaceId(1L).model("default")
+            .startedAt(LocalDateTime.of(2026, 11, 8, 9, 0)).total(1).passed(0).build();
+        when(runs.findTop100ByWorkspaceIdOrderByStartedAtDesc(1L)).thenReturn(List.of(started));
+        when(results.findRowsByRunIdIn(List.of(8L))).thenReturn(List.of());
+        when(results.findFirstByRunIdOrderByIdAsc(8L)).thenReturn(Optional.empty());
+        when(cases.findByWorkspaceIdAndArchivedFalseOrderByCreatedAtDesc(1L))
+            .thenReturn(List.of(storedCase(LocalDateTime.of(2026, 11, 2, 15, 8))));
+
+        EvalHistoryResponse history = service.history("acme", 7L);
+
+        assertThat(history.runs()).singleElement().satisfies(run -> {
+            assertThat(run.answeredBy()).isNull();
+            assertThat(run.graded()).isZero();
+        });
+        assertThat(history.cases()).singleElement().satisfies(c -> {
+            assertThat(c.origin().kind()).isEqualTo("unknown");
+            assertThat(c.grades()).isEmpty();
+        });
+    }
+
+    @Test
+    @DisplayName("l'histoire se lit dans un espace dont on est membre")
+    void the_history_needs_a_member() {
+        when(access.resolveAndAuthorize("other", 7L)).thenThrow(new ForbiddenException("Access denied"));
+
+        assertThatThrownBy(() -> service.history("other", 7L)).isInstanceOf(ForbiddenException.class);
+        verify(runs, never()).findTop100ByWorkspaceIdOrderByStartedAtDesc(any());
     }
 
     @Test

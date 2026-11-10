@@ -47,4 +47,23 @@ public class ModelCapabilityResult {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    /** Le temps de la réponse, en millisecondes, au banc des modèles (R131) ; null pour une mesure de capacité. */
+    @Column(name = "duration_ms")
+    private Long durationMs;
+
+    /** La note retournée par une personne (R131) ; null : celle du code compte. */
+    @Column(name = "person_passed")
+    private Boolean personPassed;
+
+    @Column(name = "person_id")
+    private Long personId;
+
+    @Column(name = "person_at")
+    private LocalDateTime personAt;
+
+    /** Le cas n'a pas répondu dans son budget (R142) : « Too slow here », pas un raté. */
+    @Builder.Default
+    @Column(name = "too_slow", nullable = false, updatable = false)
+    private boolean tooSlow = false;
 }
