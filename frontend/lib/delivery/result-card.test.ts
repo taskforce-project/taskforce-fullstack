@@ -84,6 +84,11 @@ describe("resultCard", () => {
     expect(resultCard(run({ tests }), undefined, "TF-28", t).checks[0]).toEqual(check);
   });
 
+  it("says the tests are about an earlier version once a file was put back (R139), without a verdict", () => {
+    const stale = run({ tests: { command: "npm test", ran: true, passed: true, passedCount: 12, total: 12, stale: true } });
+    expect(resultCard(stale, activity([]), "TF-28", t).checks[0]).toEqual({ label: t.testsStale, value: "", ok: null });
+  });
+
   it("counts an unanswered request as not answered", () => {
     expect(resultCard(run(), activity([approval("ALLOWED"), approval("EXPIRED")]), "TF-28", t).checks[1])
       .toEqual({ label: "Requests answered", value: "1 of 2", ok: false });

@@ -80,8 +80,8 @@ describe("WorkView", () => {
     fetchWorkspaceRuns.mockResolvedValue([])
     useUserStore.setState({ user: { id: "7", email: "pierre@acme.dev", firstName: "Pierre", lastName: "M", displayName: "Pierre" } })
     useDeliveryStore.setState({
-      workspaceRuns: [RUN], runs: { 28: RUN }, activity: { 100: WORKING }, evidence: { 100: EVIDENCE },
-      fetchWorkspaceRuns, fetchRun, fetchActivity, fetchEvidence, downloadEvidence, stopRun,
+      workspaceRuns: [RUN], runs: { 28: RUN }, activity: { 100: WORKING }, evidence: { 100: EVIDENCE }, missionChanges: {},
+      fetchWorkspaceRuns, fetchRun, fetchActivity, fetchEvidence, downloadEvidence, stopRun, fetchMissionChanges: vi.fn().mockResolvedValue(null),
     })
   })
   afterEach(() => vi.useRealTimers())
@@ -126,6 +126,22 @@ describe("WorkView", () => {
     expect(region.getByText("Edited footer.tsx")).toBeInTheDocument()
     expect(region.getByText("Commented on the issue")).toBeInTheDocument()
     expect(document.body.textContent).not.toMatch(/taskforce:|add_comment|npm test|Claude Code 2\.1/)
+  })
+
+  it("shows what the runner read instead of the timeline's list, once the runner reports the changes (R139)", () => {
+    useDeliveryStore.setState({
+      missionChanges: { 100: {
+        mode: "repo", live: true, added: 12, removed: 1, more: 0, canRevert: false, canComment: false, canCorrect: false, blockedReason: null, correction: null,
+        files: [{ path: "src/footer.tsx", status: "modified", added: 12, removed: 1, binary: false, truncated: false, withheld: false, revision: "r1", reverting: false, error: null, updatedAt: null }],
+      } },
+    })
+    render(<WorkView runId={100} />)
+
+    const changes = screen.getByRole("region", { name: "Changes" })
+    expect(within(changes).getAllByRole("img", { name: "12 added, 1 removed" })).toHaveLength(2)
+    // Le commentaire de l'agent reste ; les fichiers d'après la chronologie, non.
+    const documents = screen.getByRole("region", { name: "Files and documents" })
+    expect(within(documents).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Commented"])
   })
 
   it("a switch brings the commands back, with their times, and the branch", () => {

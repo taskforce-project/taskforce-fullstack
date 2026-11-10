@@ -19,9 +19,11 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { runAgent, type AgentOutcome } from "./agent.js";
 import { ApiError, TaskforceApi, type Claim, type RunResult } from "./api.js";
 import { askInTaskForce } from "./approvals.js";
+import { ChangeTracker, liveIndexPath, removeLiveIndex, repoChanges, scratchChanges } from "./changes.js";
+import { LiveMissions, pollCommands } from "./commands.js";
 import { loadConfig, type RepoConfig, type RunnerConfig } from "./config.js";
 import { exitFacts, judgeExit, type ExitVerdict } from "./exits.js";
-import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWorktree, repoVisibility, resolveRepo, runSetup, type Worktree } from "./git.js";
+import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWorktree, reopenWorktree, repoVisibility, resolveRepo, runSetup, type Worktree } from "./git.js";
 import { verifiedBundle } from "./harness/verify.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { log } from "./log.js";
@@ -96,7 +98,7 @@ function logOutcome(outcome: AgentOutcome): void {
 }
 
 /** Traite un run réclamé, jusqu'au résultat posté. Ne lève jamais : tout échec devient un résultat FAILED. */
-async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim, shutdown?: AbortSignal): Promise<void> {
+async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim, live: LiveMissions, shutdown?: AbortSignal): Promise<void> {
   log.info(`Run #${claim.runId} claimed: ${claim.issueKey} - ${claim.title}`);
   const heartbeat = startHeartbeat(api, claim.runId, HEARTBEAT_MS);
   // L'agent s'arrête si le runner s'arrête, ou si la personne a arrêté la mission dans TaskForce (R138).
@@ -106,6 +108,11 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
   let worktree: Worktree | null = null;
   let repo: RepoConfig | null = null;
   let scratch: string | null = null;
+  const liveIndex = liveIndexPath(config.home, claim.runId);
+  const onConversation = (tell: ((text: string) => boolean) | null): void => {
+    if (tell) live.attach(claim.runId, tell);
+    else live.detach(claim.runId);
+  };
   try {
     // Pas de mission sans règles : paquet absent ou empreinte qui ne tient pas, le run finit en échec ici.
     const rules = verifiedBundle(claim.rules);
@@ -121,17 +128,33 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
     if (!start.go) throw new MissionNotStarted(start.reason ? `${start.reason}.` : `This mission does not start: ${start.why}.`);
     if (claim.repoFullName) {
       repo = await resolveRepo(config.repos, config.autoClone, config.home, claim.repoFullName);
-      worktree = await prepareWorktree(repo, claim, config.home);
+      const followUp = claim.followUp ?? null;
+      worktree = followUp
+        ? await reopenWorktree(repo, followUp.worktreeRun, followUp.branch, followUp.base, config.home)
+        : await prepareWorktree(repo, claim, config.home);
       log.info(`Worktree ready: ${worktree.path} (branch ${worktree.branch}, base ${worktree.base})`);
       await runSetup(worktree, repo.setup);
 
+      // Les changements sous les yeux (R139) : ce que porte le dossier de travail contre le commit d'où part la mission.
+      const open = worktree;
+      const changes = new ChangeTracker(api, claim.runId, () => repoChanges(open.path, open.baseSha, liveIndex));
+      // Un premier relevé tout de suite : ce que la branche porte déjà sur une reprise, et TaskForce sait qu'il peut suivre.
+      await changes.publish();
       const { agentConfig, token } = await startAgentSession(config, api);
       log.info("Claude Code at work (follow it live in TaskForce)...");
-      const outcome = await runAgent(agentConfig, claim, worktree.path, token, { mode: "repo", branch: worktree.branch, signal, rules }, api);
+      const outcome = await runAgent(agentConfig, claim, worktree.path, token, {
+        mode: "repo", branch: worktree.branch, signal, rules, onWrite: () => changes.touch(), onConversation,
+      }, api);
       logOutcome(outcome);
-      if (!outcome.ok) throw new Error(outcome.text);
+      // Même en échec, ce que l'agent a écrit se voit : le dossier de travail est gardé.
+      if (!outcome.ok) {
+        await changes.finish();
+        throw new Error(outcome.text);
+      }
 
       const commits = await finalizeCommits(worktree, claim);
+      // L'état final, relu dans les commits : ce que les tests écriront ensuite ne compte pas.
+      await changes.finish(() => repoChanges(open.path, open.baseSha));
       // S1 (R32) : les tests du projet, lancés par le runner sur le travail de l'agent, jamais par l'agent. Après les
       // commits : ce que les tests écrivent (couverture, rapports) ne part pas avec la branche.
       let report = outcome.text;
@@ -177,9 +200,10 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
         } else {
           await pushBranch(worktree, repo);
           const pushed = `Pushed the branch \`${worktree.branch}\` (${commits} commit${commits > 1 ? "s" : ""}): ${push.why}.`;
-          let url: string | undefined;
+          // Une reprise pousse sur la branche de la pull request déjà ouverte : elle se met à jour, il n'y en a pas d'autre.
+          let url: string | undefined = followUp?.pullRequestUrl ?? undefined;
           let note = "";
-          if (config.openPullRequest) {
+          if (config.openPullRequest && !url) {
             const pr = await judgeExit(rules, exitFacts("pr.open", worktree.branch, visibility), "gh pr create",
               `Open a pull request from ${worktree.branch} on ${where}`, ask);
             log.info(`Pull request: ${pr.why}`);
@@ -196,6 +220,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       }
       // La carte de résultat (R78) lit les faits, pas le résumé : la branche, les commits, les tests du runner.
       if (commits > 0) result = { ...result, branch: worktree.branch, commits, ...(testFacts ? { tests: testFacts } : {}) };
+      if (outcome.sessionId) result = { ...result, agentSession: outcome.sessionId };
     } else {
       // Projet sans dépôt (tâche non-code) : l'agent travaille dans un dossier jetable et rend son travail
       // dans TaskForce (commentaire), jamais de pull request, jamais un fichier hors de ce dossier.
@@ -205,10 +230,17 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       scratch = prepareScratch(config.home, claim.runId);
       log.info(`Repo-less workspace: ${scratch}`);
 
+      // Un dossier jetable n'a pas d'avant : les fichiers s'y montrent écrits, avec leur contenu (R139).
+      const folder = scratch;
+      const changes = new ChangeTracker(api, claim.runId, () => scratchChanges(folder));
+      await changes.publish();
       const { agentConfig, token } = await startAgentSession(config, api);
       log.info("Claude Code at work on a repo-less task (follow it live in TaskForce)...");
-      const outcome = await runAgent(agentConfig, claim, scratch, token, { mode: "repoless", signal, rules }, api);
+      const outcome = await runAgent(agentConfig, claim, scratch, token, {
+        mode: "repoless", signal, rules, onWrite: () => changes.touch(), onConversation,
+      }, api);
       logOutcome(outcome);
+      await changes.finish();
       if (!outcome.ok) throw new Error(outcome.text);
       result = { status: "DONE", summary: outcome.text.slice(0, 7900) };
     }
@@ -223,6 +255,8 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
     }
   } finally {
     heartbeat.stop();
+    live.detach(claim.runId);
+    removeLiveIndex(liveIndex);
   }
 
   // Close dans TaskForce : le serveur a déjà sa fin, et son dossier est scellé.
@@ -334,6 +368,9 @@ async function main(): Promise<void> {
   }
 
   log.info(`Runner ${config.clientId} listening to ${config.apiUrl} (every ${config.pollSeconds} s)`);
+  // Les ordres de TaskForce (remettre un fichier, une correction) ont leur boucle : une mission en cours ne les retarde pas.
+  const live = new LiveMissions();
+  const orders = args.has("--once") ? Promise.resolve() : pollCommands(config, api, live, shutdown.signal);
   let lastError = "";
   // Un problème connu (Claude Code déconnecté…) : le runner ne prend rien et le dit à TaskForce à chaque passage.
   const readiness = new Readiness(() => agentProblem(config));
@@ -349,7 +386,7 @@ async function main(): Promise<void> {
       const claim = await api.claim(problem);
       lastError = "";
       if (claim) {
-        await processRun(config, api, claim, shutdown.signal);
+        await processRun(config, api, claim, live, shutdown.signal);
         readiness.invalidate();
         if (args.has("--once")) break;
         continue;
@@ -367,6 +404,8 @@ async function main(): Promise<void> {
     }
     await sleep(config.pollSeconds * 1000, undefined, { signal: shutdown.signal }).catch(() => undefined);
   }
+  shutdown.abort();
+  await orders;
   // Le canal IPC garderait le processus en vie.
   if (process.connected) process.disconnect();
 }

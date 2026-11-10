@@ -22,7 +22,9 @@ export type IssueActivityType =
   | "CHECKLIST_CHECKED" | "CHECKLIST_UNCHECKED" | "PULL_REQUEST_OPENED"
   | "MISSION_APPLIED" | "MISSION_DISCARDED" | "MISSION_RETRIED"
   // L'issue terminée par la personne, la mission n'ayant rien changé (V114, rejeu de la 1.8.0).
-  | "MISSION_MARKED_DONE";
+  | "MISSION_MARKED_DONE"
+  // La personne a commenté des lignes du diff : la mission repart sur la même branche (V122, R139).
+  | "MISSION_CHANGES_ASKED";
 
 export interface UserSummary {
   id: number;

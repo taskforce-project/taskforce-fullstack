@@ -15,6 +15,11 @@ import {
   discardRun,
   markRunDone,
   retryRun,
+  getMissionChanges,
+  getMissionFileDiff,
+  revertMissionFile,
+  askForChanges,
+  sendCorrection,
   stopRun,
 } from './delivery-service';
 import { apiClient } from './client';
@@ -57,6 +62,38 @@ describe('delivery-service', () => {
   it('propage l’erreur du client', async () => {
     vi.mocked(apiClient.get).mockRejectedValue(new Error('boom'));
     await expect(getDeliveryProviders(SLUG)).rejects.toThrow('boom');
+  });
+
+  // Les changements d'une mission (R139) : lus en boucle, sans toast ; les refus se lisent sur place.
+  it('getMissionChanges lit la liste sans toast', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope({ mode: 'repo', files: [] }));
+    await expect(getMissionChanges(SLUG, 100)).resolves.toEqual({ mode: 'repo', files: [] });
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.CHANGES(SLUG, 100), { silentError: true });
+  });
+
+  it('getMissionFileDiff lit le diff d’un fichier, le chemin en paramètre', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope({ path: 'a b.txt', body: '@@' }));
+    await getMissionFileDiff(SLUG, 100, 'a b.txt');
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.CHANGED_FILE(SLUG, 100), { params: { path: 'a b.txt' }, silentError: true });
+  });
+
+  it('revertMissionFile envoie le fichier', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
+    await revertMissionFile(SLUG, 100, 'a.txt');
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.REVERT_FILE(SLUG, 100), { path: 'a.txt' }, { silentError: true });
+  });
+
+  it('askForChanges envoie les commentaires et rend la nouvelle mission', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope({ id: 101 }));
+    const comments = [{ path: 'a.txt', line: 2, side: 'new' as const, text: 'x' }];
+    await expect(askForChanges(SLUG, 100, comments)).resolves.toEqual({ id: 101 });
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.FOLLOW_UP(SLUG, 100), { comments }, { silentError: true });
+  });
+
+  it('sendCorrection envoie le texte', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
+    await sendCorrection(SLUG, 100, 'use tabs');
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.CORRECTION(SLUG, 100), { text: 'use tabs' }, { silentError: true });
   });
 
   it('delegateIssue POST le provider et retourne le run', async () => {

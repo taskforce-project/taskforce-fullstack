@@ -40,6 +40,19 @@ public class RunnerPresenceService {
         reports.computeIfAbsent(userId, id -> new ConcurrentHashMap<>()).put(clientId, new Report(problem, clock.instant()));
     }
 
+    /** Le runner est passé, sans rien dire de son poste : un signe de vie, pendant qu'il porte une mission. */
+    public void seen(Long userId, String clientId) {
+        reports.computeIfAbsent(userId, id -> new ConcurrentHashMap<>())
+            .compute(clientId, (key, known) -> new Report(known == null ? null : known.problem(), clock.instant()));
+    }
+
+    /** Ce runner vient-il de passer ? Sinon, un ordre pour lui attendrait qu'il revienne, sans que personne ne le sache. */
+    public boolean online(Long userId, String clientId) {
+        Map<String, Report> byRunner = reports.get(userId);
+        Report report = byRunner == null || clientId == null ? null : byRunner.get(clientId);
+        return report != null && report.at().isAfter(clock.instant().minus(FRESH));
+    }
+
     /** Le problème signalé par ses runners récents quand aucun n'est prêt ; vide sinon, ou sans nouvelles récentes. */
     public Optional<String> problem(Long userId) {
         Map<String, Report> byRunner = reports.get(userId);

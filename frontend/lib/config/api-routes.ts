@@ -76,6 +76,16 @@ export const DELIVERY_ROUTES = {
   STOP: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/stop`,
   /** Une mission qui n'a rien changé : l'issue se termine (POST, rejeu de la 1.8.0). */
   DONE: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/done`,
+  /** Les fichiers qu'une mission a changés, avec leurs lignes (GET, R139). */
+  CHANGES: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/changes`,
+  /** Le diff d'un fichier de la mission, `?path=` (GET, R139). */
+  CHANGED_FILE: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/changes/file`,
+  /** Remet un fichier comme avant la mission (POST, R139). */
+  REVERT_FILE: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/changes/revert`,
+  /** Les commentaires sur les lignes, envoyés ensemble : l'agent repart sur la même branche (POST, R139). */
+  FOLLOW_UP: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/follow-up`,
+  /** Une correction tapée pendant le travail (POST, R140). */
+  CORRECTION: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/correction`,
   /** Serveur MCP de l'instance pour ce workspace (adresse à donner à Claude Code, pas appelée par le front). */
   MCP_SERVER: (slug: string) => `/api/workspaces/${slug}/mcp`,
   /**

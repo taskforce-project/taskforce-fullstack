@@ -41,12 +41,22 @@ public record RunnerResultRequest(
 
     /** Les tests du projet tels que le runner les a lancés (R32) ; absents quand aucun n'a tourné. */
     @Valid
-    Tests tests
+    Tests tests,
+
+    /** La session de l'agent, pour qu'une reprise la continue (R139) ; un runner plus ancien ne l'envoie pas. */
+    @Pattern(regexp = "[0-9a-fA-F-]{8,64}", message = "agentSession must be a session id")
+    String agentSession
 ) {
 
     /** Un résultat sans les faits de la carte, comme les envoie un runner plus ancien. */
     public RunnerResultRequest(String status, String summary, String resultUrl, String error, Boolean refused) {
-        this(status, summary, resultUrl, error, refused, null, null, null);
+        this(status, summary, resultUrl, error, refused, null, null, null, null);
+    }
+
+    /** Un résultat avec les faits de la carte, sans session d'agent. */
+    public RunnerResultRequest(String status, String summary, String resultUrl, String error, Boolean refused,
+                               String branch, Integer commits, Tests tests) {
+        this(status, summary, resultUrl, error, refused, branch, commits, tests, null);
     }
 
     /**

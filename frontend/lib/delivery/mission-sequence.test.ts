@@ -462,6 +462,7 @@ describe("Hand over: the end of the mission", () => {
     ["DISCARDED", "Discarded"],
     ["MARKED_DONE", "Marked as done"],
     ["RETRIED", "Replaced by a new try"],
+    ["FOLLOWED_UP", "Changes asked: the agent went back to it"],
   ] as const)("once decided, says what became of it: %s", (outcome, sentence) => {
     const seq = sequence({ ...DONE, outcome }, S08)
     expect(seq.status).toBe(sentence)

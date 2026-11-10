@@ -40,8 +40,14 @@ function finish(ok, result) {
   process.exit(ok ? 0 : 1);
 }
 
+// Le brief arrive en première ligne de l'entrée `stream-json` ; l'entrée reste ouverte jusqu'au résultat (R140).
 let prompt = "";
-for await (const chunk of process.stdin) prompt += chunk;
+let firstLine = "";
+for await (const chunk of process.stdin) {
+  firstLine += chunk;
+  if (firstLine.includes("\n")) break;
+}
+prompt = JSON.parse(firstLine.split("\n")[0]).message.content;
 const ids = /projectId (\d+), issueId (\d+)/.exec(prompt);
 if (!ids) finish(false, "stub-agent: projectId/issueId not found in the prompt");
 const projectId = Number(ids[1]);
