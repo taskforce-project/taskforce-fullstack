@@ -1,16 +1,34 @@
 import { app, BrowserWindow, Notification } from "electron";
 import { autoUpdater, BaseUpdater } from "electron-updater";
 
+import { installerArgs, launchInstaller, waitUntil } from "./installer-launch";
 import { log } from "./log";
 import { fromStore } from "./paths";
-import { pendingOutcome, savePending, takePending } from "./update-pending";
+import { pendingOutcome, releaseUpdateScreen, savePending, takePending, updateScreenIsUp } from "./update-pending";
 import { IDLE, reduceUpdate, restartBy, type UpdateEvent, type UpdateState } from "./update-state";
 
 /** Fréquence des vérifications pendant que l'app reste ouverte. */
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 
+/** L'installeur met quelques secondes à montrer sa fenêtre ; passé ce délai, l'app part quand même. */
+const HANDOVER_MS = 20_000;
+
+/** Le temps que la fenêtre qui s'ouvre finisse d'apparaître (l'animation de Windows) avant que l'écran d'avant parte. */
+export const SETTLE_MS = 300;
+
+/**
+ * Ce que la coque fait à l'écran pour redémarrer (cf. main.ts) : l'écran de la mise à jour avant l'installeur, qui rend
+ * la poignée de sa fenêtre ; un redémarrage sans mise à jour, derrière le même écran.
+ */
+export interface RestartScreen {
+  prepare(version: string): Promise<string | null>;
+  relaunch(): Promise<void>;
+}
+
 let started = false;
 let state: UpdateState = IDLE;
+/** L'installeur téléchargé, connu à la fin du téléchargement. */
+let installerFile: string | null = null;
 /** Une installation est partie (« Restart now ») : un second clic ne la relance pas. */
 let installing = false;
 /** La version qui n'a pas pris au dernier arrêt (cf. update-pending.ts) : son toast le dit. */
@@ -18,7 +36,29 @@ let notInstalled: string | null = null;
 
 /** L'état de la mise à jour, que l'interface lit à son ouverture puis reçoit à chaque changement. */
 export function updateState(): UpdateState {
-  return state;
+  if (state.status !== "installed") return state;
+  // Une nouvelle version ne se dit qu'une fois, même si la fenêtre se recharge.
+  const installed = state;
+  state = IDLE;
+  return installed;
+}
+
+/** Premier lancement d'une nouvelle version : la fenêtre le dira à son ouverture. */
+export function announceInstalled(notice: { version: string; from: string }): void {
+  state = { status: "installed", version: notice.version, from: notice.from };
+}
+
+/**
+ * La fenêtre de l'installeur ne part qu'une fois celle de l'app à l'écran (cf. update-pending.ts, installer.nsh), et
+ * entièrement apparue : la nouvelle s'ouvre par-dessus, à la même place et à l'identique.
+ */
+export function releaseUpdateScreenOnFirstWindow(): void {
+  if (process.platform !== "win32" || fromStore()) return;
+  const release = () => setTimeout(() => releaseUpdateScreen(app.getPath("userData")), SETTLE_MS);
+  app.once("browser-window-created", (_event, window) => {
+    if (window.isVisible()) release();
+    else window.once("show", release);
+  });
 }
 
 /** Note la mise à jour qui s'installe en quittant ; une note impossible n'empêche pas l'installation. */
@@ -31,46 +71,72 @@ function notePending(version: string): void {
 }
 
 /**
- * « Restart now » : installe la version téléchargée sans la fenêtre de l'installeur Windows, puis rouvre l'app. Le CEO,
- * le 05/11/2026, devant « TaskForce Setup, Installing, please wait... » : « c'est une fenêtre système Windows, c'est
- * naze ». `prepare` montre l'écran de la mise à jour, aux couleurs de l'app, et arrête la pile proprement : l'installeur,
- * lui, ferme de force tout ce qui tourne encore depuis le dossier de l'app. Puis l'installeur part sans fenêtre (`/S`)
- * avec `--force-run`, qui rouvre l'app à la fin, et l'app quitte. Pendant l'installation (environ une minute chez le
- * CEO), aucune fenêtre de l'app ne peut rester, puisque l'installeur remplace TaskForce.exe : une notification le dit.
- * Un échec ne se voit plus dans l'installeur : la note du lancement suivant le dit (cf. update-pending.ts).
+ * Windows : l'installeur part d'un fil à part, sans fenêtre système, et l'écran de la mise à jour reste jusqu'à ce que la
+ * fenêtre de l'installeur l'ait remplacé, au même endroit et aux mêmes couleurs (cf. installer.nsh). electron-updater ne
+ * le lance pas lui-même : il le ferait du fil principal (cf. installer-launch.ts). Il ne faut donc plus qu'il en lance un
+ * autre à la fermeture.
  */
-export async function installNow(prepare: (version: string) => Promise<void>): Promise<void> {
+async function installWithScreen(version: string, screen: string | null, restart: RestartScreen): Promise<void> {
+  const userData = app.getPath("userData");
+  try {
+    if (!installerFile) throw new Error("no installer downloaded");
+    releaseUpdateScreen(userData);
+    autoUpdater.autoInstallOnAppQuit = false;
+    await launchInstaller(installerFile, installerArgs(screen));
+  } catch (error) {
+    log.warn(`Update ${version} did not start (${(error as Error).message}): TaskForce opens again on ${app.getVersion()}`);
+    await restart.relaunch();
+    return;
+  }
+  if (!(await waitUntil(() => updateScreenIsUp(userData), HANDOVER_MS))) {
+    log.warn(`The installer of ${version} did not show its window in time`);
+  }
+}
+
+/** Linux : l'installeur remplace le paquet sans rien montrer, une notification le dit. */
+async function installWithNotice(version: string, restart: RestartScreen): Promise<void> {
+  if (Notification.isSupported()) {
+    new Notification({ title: `Installing TaskForce ${version}`, body: "TaskForce opens again by itself when it's done." }).show();
+  }
+  // `install(isSilent, isForceRunAfter)` lance l'installeur et rend la main sans quitter. Il marque d'abord l'installation
+  // comme partie (`quitAndInstallCalled`), même si l'installeur ne part pas : à la fermeture, electron-updater n'en lance
+  // pas une autre, qui fermerait l'app relancée ci-dessous ; sans installeur téléchargé, il n'aurait rien à lancer.
+  if (!(autoUpdater instanceof BaseUpdater && autoUpdater.install(true, true))) {
+    log.warn(`Update ${version} did not start: TaskForce opens again on ${app.getVersion()}`);
+    await restart.relaunch();
+  }
+}
+
+/**
+ * « Restart now » : installe la version téléchargée sans fenêtre système, puis rouvre l'app. Le CEO, le 05/11/2026, devant
+ * « TaskForce Setup, Installing, please wait... » : « c'est une fenêtre système Windows, c'est naze ». `prepare` montre
+ * l'écran de la mise à jour, celui de la coque, et arrête la pile proprement : l'installeur, lui, ferme de force tout ce
+ * qui tourne encore depuis le dossier de l'app. Puis l'installeur part avec `--force-run`, qui rouvre l'app à la fin, et
+ * l'app quitte. Un échec se dit à l'écran quand il y en a un, sinon la note du lancement suivant le dit (cf.
+ * update-pending.ts).
+ */
+export async function installNow(restart: RestartScreen): Promise<void> {
   if (state.status !== "ready" || installing) return;
   installing = true;
   const { version } = state;
   log.info(`Installing ${version}`);
-  await prepare(version).catch((error: Error) => log.warn(`Update screen or stop failed: ${error.message}`));
+  const screen = await restart.prepare(version).catch((error: Error) => {
+    log.warn(`Update screen or stop failed: ${error.message}`);
+    return null;
+  });
   notePending(version);
-  if (Notification.isSupported()) {
-    new Notification({ title: `Installing TaskForce ${version}`, body: "TaskForce opens again by itself when it's done." }).show();
-  }
-  // Plus de fenêtre pendant que l'installeur part : Windows peut retenir l'app le temps de le vérifier (9 s dans le
-  // journal du CEO), et une fenêtre qui ne répond plus deviendrait « Not Responding ».
-  for (const window of BrowserWindow.getAllWindows()) window.hide();
-  // `install(isSilent, isForceRunAfter)` (installeurs de Windows et de Linux, les cibles de l'app) lance l'installeur avec
-  // `--updated /S --force-run` et rend la main sans quitter. Il marque d'abord l'installation comme partie
-  // (`quitAndInstallCalled`), même si l'installeur ne part pas : à la fermeture, electron-updater n'en lance pas une
-  // autre, qui fermerait l'app relancée ci-dessous ; sans installeur téléchargé, il n'aurait rien à lancer.
-  if (!(autoUpdater instanceof BaseUpdater && autoUpdater.install(true, true))) {
-    log.warn(`Update ${version} did not start: TaskForce opens again on ${app.getVersion()}`);
-    app.relaunch();
-  }
+  if (process.platform === "win32") await installWithScreen(version, screen, restart);
+  else await installWithNotice(version, restart);
   app.quit();
 }
 
 /**
  * Redémarre l'app (déconnexion, session fermée en ligne) : par la mise à jour quand une version est prête, l'installeur
- * rouvrant l'app à la fin, sinon par une simple relance (cf. `restartBy`).
+ * rouvrant l'app à la fin, sinon par une simple relance derrière l'écran de la coque (cf. `restartBy`).
  */
-export async function restartApp(prepare: (version: string) => Promise<void>): Promise<void> {
-  if (restartBy(state) === "update") return installNow(prepare);
-  app.relaunch();
-  app.quit();
+export async function restartApp(restart: RestartScreen): Promise<void> {
+  if (restartBy(state) === "update") return installNow(restart);
+  await restart.relaunch();
 }
 
 /** Applique un événement d'`electron-updater` et, s'il change ce qu'il y a à montrer, l'envoie à chaque fenêtre. */
@@ -88,9 +154,9 @@ function apply(event: UpdateEvent): void {
  * releases du dépôt (backend, site...) ne s'y mélangent pas. Les migrations de la base s'appliquent au redémarrage.
  *
  * L'interface montre l'avancement dans un toast qui reste, puis « Restart now » (cf. update-state.ts) : plus de boîte
- * de dialogue du système. La notification du système ne sert que si la fenêtre n'est pas au premier plan. Dans les deux
- * cas, l'installeur tourne sans fenêtre : à la fermeture, c'est ce que fait `autoInstallOnAppQuit` (sans rouvrir l'app) ;
- * au redémarrage, cf. `installNow`.
+ * de dialogue du système. La notification du système ne sert que si la fenêtre n'est pas au premier plan. À la fermeture,
+ * l'installeur tourne sans fenêtre, c'est ce que fait `autoInstallOnAppQuit` (sans rouvrir l'app) ; au redémarrage, cf.
+ * `installNow`.
  */
 export function startUpdater(): void {
   // Version du Microsoft Store : le Store installe ses mises à jour, l'app ne les cherche pas elle-même (ses règles
@@ -138,6 +204,7 @@ export function startUpdater(): void {
 
   autoUpdater.on("update-downloaded", (info) => {
     log.info(`Update ${info.version} downloaded`);
+    installerFile = info.downloadedFile;
     apply({ kind: "downloaded", version: info.version, retry: info.version === notInstalled });
     if (Notification.isSupported() && !BrowserWindow.getFocusedWindow()) {
       new Notification({

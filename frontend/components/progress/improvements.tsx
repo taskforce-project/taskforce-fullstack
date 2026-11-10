@@ -1,8 +1,9 @@
 "use client"
 
 import { useId, useState } from "react"
-import { Check, Minus, X } from "lucide-react"
+import { Check, CircleDashed, Minus, X } from "lucide-react"
 
+import { EvalCaseDialog } from "@/components/agent/eval-case-dialog"
 import { Named } from "@/components/progress/named"
 import { ProgressSection } from "@/components/progress/progress-section"
 import type { EvalHistoryCase, EvalHistoryRun } from "@/lib/api/eval-service"
@@ -14,8 +15,10 @@ import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { cn } from "@/lib/utils"
 
 /** Le détail d'un cas, dans sa ligne (R129) : d'où il vient, quand il est entré, et sa note à chaque rejeu, par modèle. */
-function CaseDetail({ id, item, lines }: Readonly<{ id: string; item: EvalHistoryCase; lines: readonly CaseLine[] }>) {
+function CaseDetail({ id, slug, item, lines }: Readonly<{ id: string; slug: string; item: EvalHistoryCase; lines: readonly CaseLine[] }>) {
   const tp = usePreferencesStore((s) => s.t.progress)
+  const thread = usePreferencesStore((s) => s.t.thread)
+  const [writing, setWriting] = useState(false)
   const origin = caseOrigin(item, tp)
   const added = fillText(item.mine ? tp.addedByYou : tp.added, { date: dayOf(item.addedAt) })
   return (
@@ -29,9 +32,23 @@ function CaseDetail({ id, item, lines }: Readonly<{ id: string; item: EvalHistor
             {origin.shown && <span>{origin.shown}</span>}
           </div>
         )}
+        {item.expected && !item.waiting && <span>{fillText(thread.expectedLine, { sentence: item.expected })}</span>}
         <span>{added}</span>
       </div>
-      {lines.length === 0 ? (
+      {item.waiting ? (
+        // Une phrase ne se note pas : aucun rejeu ne le prend avant ses critères (R61), et son auteur peut les écrire ici.
+        <div className="flex flex-wrap items-center gap-2">
+          <p>{thread.waitingCriteria}</p>
+          {item.mine && item.record && (
+            <button type="button" onClick={() => setWriting(true)} className="text-foreground underline underline-offset-2">
+              {thread.writeCriteria}
+            </button>
+          )}
+          {writing && item.record && (
+            <EvalCaseDialog slug={slug} record={item.record} caseId={item.id} expected={item.expected} open={writing} onOpenChange={setWriting} />
+          )}
+        </div>
+      ) : lines.length === 0 ? (
         <p>{tp.notReplayed}</p>
       ) : (
         <ul className="flex flex-col gap-1">
@@ -62,20 +79,22 @@ function CaseDetail({ id, item, lines }: Readonly<{ id: string; item: EvalHistor
 }
 
 /** Une ligne, un cas : son titre et sa dernière note ; un clic ouvre tout ce qu'on sait de lui. */
-function CaseItem({ item, runs, open, onToggle }: Readonly<{
+function CaseItem({ slug, item, runs, open, onToggle }: Readonly<{
+  slug: string
   item: EvalHistoryCase
   runs: readonly EvalHistoryRun[]
   open: boolean
   onToggle: () => void
 }>) {
   const tp = usePreferencesStore((s) => s.t.progress)
+  const waitingName = usePreferencesStore((s) => s.t.thread.waitingCriteria)
   const detailId = useId()
   const lines = caseLines(item, runs, tp.defaultModel)
   const last = lastMark(lines)
-  const name = last
+  const name = item.waiting ? waitingName : last
     ? fillText(last.passed ? tp.gradePassed : tp.gradeFailed, { model: last.model, date: last.day })
     : tp.notReplayed
-  const Icon = last === null ? Minus : last.passed ? Check : X
+  const Icon = item.waiting ? CircleDashed : last === null ? Minus : last.passed ? Check : X
   return (
     <li>
       <button
@@ -88,7 +107,9 @@ function CaseItem({ item, runs, open, onToggle }: Readonly<{
           open && "bg-muted",
         )}
       >
-        <span className="min-w-0 flex-1 truncate text-xs text-foreground">{item.title}</span>
+        {/* Un cas qui n'est qu'une phrase se lit par elle (R137), et dit ce qu'il attend. */}
+        <span className="min-w-0 flex-1 truncate text-xs text-foreground">{item.waiting && item.expected ? item.expected : item.title}</span>
+        {item.waiting && <span className="shrink-0 text-xs text-muted-foreground">{waitingName}</span>}
         <Named name={name}>
           <span role="img" aria-label={name} className="shrink-0">
             <Icon
@@ -98,7 +119,7 @@ function CaseItem({ item, runs, open, onToggle }: Readonly<{
           </span>
         </Named>
       </button>
-      {open && <CaseDetail id={detailId} item={item} lines={lines} />}
+      {open && <CaseDetail id={detailId} slug={slug} item={item} lines={lines} />}
     </li>
   )
 }
@@ -108,7 +129,7 @@ function CaseItem({ item, runs, open, onToggle }: Readonly<{
  * dernière note ; un clic dit d'où il vient (l'incident de confiance, la réponse, ou seulement sa question) et sa note
  * depuis. Il lit l'histoire que charge {@link BankHistory}.
  */
-export function Improvements() {
+export function Improvements({ slug }: Readonly<{ slug: string }>) {
   const tp = usePreferencesStore((s) => s.t.progress)
   const history = useEvalStore((s) => s.history)
   const [opened, setOpened] = useState<number | null>(null)
@@ -121,6 +142,7 @@ export function Improvements() {
         {history.cases.map((item) => (
           <CaseItem
             key={item.id}
+            slug={slug}
             item={item}
             runs={history.runs}
             open={opened === item.id}

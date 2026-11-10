@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.taskforce.tf_api.core.enums.DeliveryRunOutcome;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkStatus;
 import com.taskforce.tf_api.core.enums.GitHubLinkType;
@@ -237,6 +238,25 @@ class DeliveryRunnerTest {
         runner.complete(31L, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "late failure"));
         assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.DONE);
         assertThat(run.getError()).isNull();
+        verifyNoMoreInteractions(notificationService);
+    }
+
+    @Test
+    @DisplayName("complete : une mission arrêtée par la personne reste où elle est, sans notification (R138)")
+    void stopped_run_does_not_move_the_issue() {
+        Issue issue = mock(Issue.class);
+        DeliveryRun run = DeliveryRun.builder().id(33L).issue(issue).providerKey("claude-code")
+            .status(DeliveryRunStatus.RUNNING).outcome(DeliveryRunOutcome.STOPPED).build();
+        when(runRepository.findById(33L)).thenReturn(Optional.of(run));
+        DeliveryPoll stopped = new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "Stopped by Ada.");
+
+        runner.complete(33L, stopped);
+
+        assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.FAILED);
+        assertThat(run.getError()).isEqualTo("Stopped by Ada.");
+        verify(activityService).closeApprovals(run);
+        verify(evidenceService).end(run, stopped);
+        verify(issue, never()).setStatus(any(IssueStatus.class));
         verifyNoMoreInteractions(notificationService);
     }
 

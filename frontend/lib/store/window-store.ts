@@ -8,8 +8,8 @@ import { createJSONStorage, persist } from "zustand/middleware"
 // étroits et la recherche fermés. La route, elle, dit quel volet est ouvert.
 // ---------------------------------------------------------------------------
 
-/** Les six lignes de la zone de droite (R122), dans leur ordre. */
-export const WINDOW_ROWS = ["environment", "context", "connectors", "results", "changes", "missions"] as const
+/** Les cartes de la zone de droite (R122, R141), dans leur ordre : « missions » porte aussi les résultats à juger. */
+export const WINDOW_ROWS = ["environment", "context", "connectors", "missions", "changes"] as const
 export type WindowRow = (typeof WINDOW_ROWS)[number]
 
 interface WindowState {

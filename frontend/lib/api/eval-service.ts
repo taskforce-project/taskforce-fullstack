@@ -3,7 +3,8 @@
  * question, sa date, les notes servies et ce que les outils de lecture ont rendu, figés par le serveur. Un rejeu le
  * rejoue à blanc sur un modèle nommé, et du code le note, critère par critère.
  */
-import { apiClient, AI_TIMEOUT_MS } from "./client"
+import { apiClient } from "./client"
+import { BENCHMARK_CASE_TIMEOUT_MS } from "./model-benchmark-service"
 import { EVAL_ROUTES } from "../config/api-routes"
 
 /** Valeur de `EvalCriteria.tool` quand Cortex ne devait appeler aucun outil. */
@@ -11,6 +12,8 @@ export const NO_TOOL = "none"
 
 /** Ce qu'un cas vérifie. Un champ vide n'est pas vérifié ; il faut au moins un critère. */
 export interface EvalCriteria {
+  /** Ce qu'il aurait fallu faire, dans les mots de la personne : une phrase ne se vérifie pas, elle reste avec le cas. */
+  expected?: string
   /** L'outil attendu, `NO_TOOL` pour aucun, vide pour ne pas le vérifier. */
   tool: string
   /** Pour chaque argument de l'outil attendu, les valeurs acceptées (la casse ne compte pas). */
@@ -34,6 +37,10 @@ export interface EvalCaseSummary {
   /** Quand les critères ont été figés : un rejeu ne compte que les cas figés avant son départ. */
   criteriaAt: string
   mine: boolean
+  /** Ce qu'il aurait fallu faire, dans les mots de la personne ; vide sinon. */
+  expected?: string
+  /** Le cas n'est encore qu'une phrase : aucun rejeu ne le note avant ses critères (R61). */
+  waiting?: boolean
 }
 
 export interface EvalRunSummary {
@@ -149,6 +156,12 @@ export interface EvalHistoryCase {
   origin: EvalCaseOrigin
   /** Dans l'ordre des rejeux. */
   grades: EvalGrade[]
+  /** Ce qu'il aurait fallu faire, dans les mots de la personne ; vide sinon. */
+  expected?: string
+  /** Le cas attend ses critères (R137). */
+  waiting?: boolean
+  /** Le dossier d'un cas qui attend ses critères : leur formulaire s'en tire. */
+  record?: string | null
 }
 
 export interface EvalHistory {
@@ -184,6 +197,26 @@ export async function createEvalCase(
   return res.data.data
 }
 
+/** « Bien » (R137) : ce qui a été observé devient ce qu'on attend, d'un clic. */
+export async function keepGoodCase(slug: string, record: string): Promise<EvalCaseSummary> {
+  const res = await apiClient.post<{ data: EvalCaseSummary }>(EVAL_ROUTES.CASE_GOOD(slug), { record })
+  return res.data.data
+}
+
+/** « Pas bien » (R137) : une phrase, ce qu'il aurait fallu faire ; le cas attend ses critères. */
+export async function keepBadCase(slug: string, record: string, expected: string): Promise<EvalCaseSummary> {
+  const res = await apiClient.post<{ data: EvalCaseSummary }>(EVAL_ROUTES.CASE_BAD(slug), { record, expected })
+  return res.data.data
+}
+
+/** Écrit les critères d'un cas qui les attend, une fois : le serveur les date maintenant. */
+export async function giveEvalCriteria(
+  slug: string, caseId: number, title: string, criteria: EvalCriteria,
+): Promise<EvalCaseSummary> {
+  const res = await apiClient.put<{ data: EvalCaseSummary }>(EVAL_ROUTES.CASE_CRITERIA(slug, caseId), { title, criteria })
+  return res.data.data
+}
+
 export async function archiveEvalCase(slug: string, caseId: number): Promise<void> {
   await apiClient.delete(EVAL_ROUTES.CASE(slug, caseId))
 }
@@ -195,12 +228,12 @@ export async function startEvalRun(slug: string, model: string): Promise<EvalRun
 }
 
 /**
- * Rejoue et note un cas : un appel au modèle, d'où le délai de l'IA. Sans toast : le store attend lui-même le frein de
- * débit de l'IA (429) et dit pourquoi un rejeu s'arrête.
+ * Rejoue et note un cas : un appel au modèle, dans le budget d'un cas (R142). Sans toast : le store attend lui-même le frein
+ * de débit de l'IA (429) et dit pourquoi un rejeu s'arrête.
  */
 export async function runEvalCase(slug: string, runId: number, caseId: number): Promise<EvalResult> {
   const res = await apiClient.post<{ data: EvalResult }>(
-    EVAL_ROUTES.RUN_CASE(slug, runId, caseId), {}, { timeout: AI_TIMEOUT_MS, silentError: true },
+    EVAL_ROUTES.RUN_CASE(slug, runId, caseId), {}, { timeout: BENCHMARK_CASE_TIMEOUT_MS, silentError: true },
   )
   return res.data.data
 }

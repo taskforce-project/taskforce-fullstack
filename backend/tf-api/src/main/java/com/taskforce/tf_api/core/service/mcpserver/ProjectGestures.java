@@ -39,10 +39,10 @@ import com.taskforce.tf_api.shared.exception.BusinessException;
  * <ol>
  *   <li><b>le nom</b>, quand la demande n'en donne pas, ou ne dit que ce sur quoi le projet est construit (« Next.js »
  *       est une pile, pas un nom) ;</li>
- *   <li><b>où vit son code</b>, pour un projet de code (une pile nommée) : un nouveau dépôt, privé d'abord, ou public (sa
- *       visibilité dans le même choix, puisque le créer ne se défait pas d'ici), un dépôt qui existe, ou aucun pour
- *       l'instant. Un nouveau dépôt n'est proposé que là où TaskForce le crée (GitHub connecté) ; sans GitHub,
- *       aucune question, et la réponse dit comment en donner un.</li>
+ *   <li><b>où vit son code</b>, pour un projet de code (une pile nommée) : un nouveau dépôt, privé, au nom du projet, puis
+ *       lié (TF-J1-15 : le clic sur la carte est l'accord), un dépôt qui existe, ou aucun pour l'instant. Un nouveau dépôt
+ *       n'est proposé que là où il peut vraiment se créer : le GitHub connecté à l'espace, le {@code gh} de la personne
+ *       dans l'app desktop (R15) ; sans GitHub, aucune question, et la réponse dit comment en donner un.</li>
  * </ol>
  * <p>Cortex lit ces questions avant le geste ({@link #questions}), avec ce que le modèle a mis à la place des mots de la
  * personne ; un agent extérieur les reçoit du geste lui-même.</p>
@@ -64,6 +64,7 @@ public class ProjectGestures {
     static final String NEW_PUBLIC = "new-public";
     static final String NONE = "none";
     private static final String LINK = "LINK";
+    private static final String CREATE_NEW = "Create a new repository";
     private static final String REPOSITORY = "repository";
 
     /** Les dépôts lus pour la question : GitHub en rend cent au plus, les plus récemment actifs d'abord. */
@@ -270,12 +271,15 @@ public class ProjectGestures {
         // Un projet qui n'est pas de code, sans dépôt nommé : rien à demander, ni à l'hôte des dépôts (R102).
         if (asked.isEmpty() && wanted.stack().isEmpty()) return Repository.NONE_YET;
         if (NO_REPOSITORY.contains(said)) return Repository.NONE_YET;
-        if (NEW.equals(said) || IssueFields.key(NEW_PRIVATE).equals(said) || IssueFields.key(NEW_PUBLIC).equals(said)) {
+        boolean brandNew = NEW.equals(said) || IssueFields.key(NEW_PRIVATE).equals(said) || IssueFields.key(NEW_PUBLIC).equals(said);
+        // Un nouveau dépôt ne se crée que si la personne le dit. Quand seul le modèle le dit (qwen3:8b le 09/11/2026, pour
+        // « Crée un projet "Recette 113" »), la carte le propose, et son clic est l'accord.
+        if (brandNew && (request == null || RepoMatch.namesRepository(request))) {
             return created(slug, wanted, said, code);
         }
         boolean creates = repoHost.createsRepos(slug);
         boolean links = repoHost.linksRepos(slug);
-        if (asked.isEmpty()) {
+        if (asked.isEmpty() || brandNew) {
             if (!creates && !links) return Repository.NONE_YET;
             List<String> mine = links ? repositories(slug) : List.of();
             throw new QuestionNeeded(whereItLives(creates, mine, wanted, request, "Where does " + code + " live?"));
@@ -283,7 +287,7 @@ public class ProjectGestures {
         if (!links) {
             // Rien ne se lie ici : le projet se crée, et la réponse dit comment lui en donner un (jamais la même carte).
             return creates && RepoMatch.wantsNew(asked) ? created(slug, wanted, said, code)
-                : Repository.none("TaskForce can't link a repository here: connect GitHub in Settings > Integrations, "
+                : Repository.none("No repository can be linked from here: connect GitHub in Settings > Integrations, "
                     + "then link one from the project's page.");
         }
         List<String> mine = repositories(slug);
@@ -296,7 +300,7 @@ public class ProjectGestures {
         String project = wanted.name().isEmpty() ? "the project" : wanted.name();
         if (wanted.answers(REPOSITORY) > 1) {
             // Les plus proches ont déjà été proposés : la carte ne revient pas, le projet se crée sans dépôt.
-            String why = mine.isEmpty() ? "TaskForce can't see your repositories here"
+            String why = mine.isEmpty() ? "your repositories can't be read from here"
                 : "\"" + clip(asked) + "\"" + (matching.isEmpty() ? " isn't one of your repositories"
                     : " matches several of your repositories");
             return Repository.none("No repository is linked: " + why + ". Link it from the page of " + project + ".");
@@ -312,10 +316,10 @@ public class ProjectGestures {
         if (!repoHost.createsRepos(slug)) {
             List<String> mine = repoHost.linksRepos(slug) ? repositories(slug) : List.of();
             if (wanted.answers(REPOSITORY) > 1) {
-                return Repository.none("TaskForce can't create a repository here: create one from the project's page.");
+                return Repository.none("A repository can't be created from here: create one from the project's page.");
             }
             throw new QuestionNeeded(whereItLives(false, mine, wanted, null,
-                "TaskForce can't create a repository here. Where does " + code + " live?"));
+                "A new repository can't be created from here. Where does " + code + " live?"));
         }
         if (IssueFields.key(NEW_PRIVATE).equals(said)) return Repository.created(true);
         if (IssueFields.key(NEW_PUBLIC).equals(said)) return Repository.created(false);
@@ -333,7 +337,7 @@ public class ProjectGestures {
     }
 
     /**
-     * La question du dépôt : ce que TaskForce peut faire ici, le nouveau dépôt privé recommandé ; les dépôts de la
+     * La question du dépôt : ce qui peut se faire ici, le nouveau dépôt recommandé (privé, au nom du projet) ; les dépôts de la
      * personne prennent la place qui reste sur la carte, à côté d'aucun, ceux qui ressemblent au nom, à la pile ou à la
      * demande d'abord, puis les plus récemment actifs. Un dépôt qui porte déjà le nom du projet vient en tête, recommandé :
      * un nouveau dépôt de ce nom ne pourrait pas se créer.
@@ -345,11 +349,9 @@ public class ProjectGestures {
             choices.add(Question.Choice.recommended(same, same, "Your repository with this project's name, linked as it is"));
         }
         if (creates) {
-            Question.Choice fresh = Question.Choice.of(NEW_PRIVATE, "A new private repository",
-                "TaskForce creates it on GitHub; only the people you add see the code");
+            String named = wanted.name().isEmpty() ? "named after the project" : "named " + repoName(wanted.name());
+            Question.Choice fresh = Question.Choice.of(NEW_PRIVATE, CREATE_NEW, "Private, " + named + ", and linked to this project");
             choices.add(same == null ? Question.Choice.recommended(fresh.value(), fresh.label(), fresh.description()) : fresh);
-            choices.add(Question.Choice.of(NEW_PUBLIC, "A new public repository",
-                "TaskForce creates it on GitHub; anyone on the internet sees the code"));
         }
         int room = Question.MAX_CHOICES - choices.size() - 1;
         RepoMatch.ranked(mine, Arrays.asList(wanted.name(), wanted.stack(), request)).stream()
@@ -372,7 +374,7 @@ public class ProjectGestures {
             text = "Several of your repositories match \"" + clip(asked) + "\": which one is it?";
             offered = matching.stream().limit(room).toList();
         } else if (mine.isEmpty()) {
-            text = "TaskForce can't see your repositories here: write it as owner/name, or go on without one.";
+            text = "I can't see your repositories here: write it as owner/name, or go on without one.";
             offered = List.of();
         } else {
             text = "None of your repositories is called \"" + clip(asked) + "\": is it one of these?";

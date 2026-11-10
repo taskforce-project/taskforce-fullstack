@@ -2,21 +2,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 
 import { deletionKey, messagesToTurns, undoKey, useCortexStore } from "./cortex-store";
+import { CONSTANTS_EN } from "@/lib/constants_en";
 import { useIssueStore } from "./issue-store";
 import { useScreenStore } from "./screen-store";
 import {
-  answerQuestion, approveAction, sendAgentMessage, undoAction, type AssistantAnswer, type AssistantToolCall,
+  answerQuestion, approveAction, sendAgentMessage, stopTurn, undoAction, type AssistantAnswer, type AssistantToolCall,
+  type ChatTurnResponse,
 } from "@/lib/api/assistant-service";
 import {
-  compactConversation, deleteConversation, getConversation, listConversations, type ConversationSummary,
+  compactConversation, deleteConversation, getConversation, listConversations, setConversationProject, type ConversationSummary,
 } from "@/lib/api/ai-conversation-service";
 
 // Aucun réseau : la réponse de Cortex et les conversations sont simulées ; les erreurs passent par le vrai client.
 vi.mock("@/lib/api/assistant-service", () => ({
-  sendAgentMessage: vi.fn(), answerQuestion: vi.fn(), undoAction: vi.fn(), approveAction: vi.fn(),
+  sendAgentMessage: vi.fn(), answerQuestion: vi.fn(), undoAction: vi.fn(), approveAction: vi.fn(), stopTurn: vi.fn(),
 }));
 vi.mock("@/lib/api/ai-conversation-service", () => ({
   listConversations: vi.fn(), getConversation: vi.fn(), deleteConversation: vi.fn(), compactConversation: vi.fn(),
+  setConversationProject: vi.fn(),
 }));
 
 const answer = (text: string, totalTokens = 120): AssistantAnswer => ({
@@ -77,12 +80,13 @@ describe("useCortexStore : /compact (TF-J1-13)", () => {
     expect(useCortexStore.getState().context).toEqual({ tokens: 3400, window: 8192 });
   });
 
-  it("a refused summary says what the server says, nothing changed", async () => {
-    vi.mocked(compactConversation).mockRejectedValue(httpError(400, { message: "The conversation could not be compacted: nothing changed. Try again." }));
+  it("a refused summary says what the server says, on the line: nothing changed", async () => {
+    vi.mocked(compactConversation).mockRejectedValue(httpError(400, { message: "The model returned no summary, so nothing changed in this conversation. Try again." }));
 
     await expect(useCortexStore.getState().compact("acme")).resolves.toBe(false);
 
-    expect(useCortexStore.getState().turns.at(-1)?.answer?.answer).toContain("could not be compacted");
+    expect(useCortexStore.getState().turns.at(-1)).toMatchObject({ kind: "compact", compacting: false });
+    expect(useCortexStore.getState().turns.at(-1)?.problem).toContain("nothing changed");
     expect(useCortexStore.getState().sentAt).toBeNull();
   });
 
@@ -92,6 +96,47 @@ describe("useCortexStore : /compact (TF-J1-13)", () => {
     await expect(useCortexStore.getState().compact("acme")).resolves.toBe(false);
 
     expect(useCortexStore.getState().turns.at(-1)?.kind).toBe("quota");
+    expect(useCortexStore.getState().turns.at(-1)?.compacting).toBeUndefined();
+  });
+
+  it("a pending line waits where the result will come, and the thread stays whole", async () => {
+    const before = [{ id: "u1", role: "user" as const, text: "Hello" }, { id: "a1", role: "assistant" as const, answer: answer("Hi.") }];
+    useCortexStore.setState({ turns: before, conversationId: 7 });
+    let finish: (done: { summarized: number }) => void = () => {};
+    vi.mocked(compactConversation).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+
+    const compacting = useCortexStore.getState().compact("acme");
+
+    const waiting = useCortexStore.getState().turns;
+    expect(waiting.slice(0, 2)).toEqual(before);
+    expect(waiting[2]).toMatchObject({ kind: "compact", compacting: true });
+
+    finish({ summarized: 4 });
+    await compacting;
+
+    const after = useCortexStore.getState().turns;
+    expect(after).toHaveLength(3);
+    expect(after[2].id).toBe(waiting[2].id);
+    expect(after[2]).toMatchObject({ kind: "compact", compacted: 4, compacting: false });
+  });
+
+  it("the line opens the summary, and the gauge takes its new value at once", async () => {
+    useCortexStore.setState({ conversationId: 7, context: { tokens: 6000, window: 8192 } });
+    vi.mocked(compactConversation).mockResolvedValue({ summarized: 8, summary: "What was said.", contextTokens: 2400, contextWindow: 8192, contextEstimated: true });
+
+    await useCortexStore.getState().compact("acme");
+
+    expect(useCortexStore.getState().turns.at(-1)?.summary).toBe("What was said.");
+    expect(useCortexStore.getState().context).toEqual({ tokens: 2400, window: 8192, estimated: true });
+  });
+
+  it("nothing compacted keeps the gauge", async () => {
+    useCortexStore.setState({ conversationId: 7, context: { tokens: 6000, window: 8192 } });
+    vi.mocked(compactConversation).mockResolvedValue({ summarized: 0 });
+
+    await useCortexStore.getState().compact("acme");
+
+    expect(useCortexStore.getState().context).toEqual({ tokens: 6000, window: 8192 });
   });
 
   it("does nothing while an answer is awaited, or without a workspace", async () => {
@@ -114,11 +159,59 @@ describe("useCortexStore : /compact (TF-J1-13)", () => {
     expect(turns[2].compacted).toBe(0);
   });
 
+  it("a reopened conversation still opens the summary of its compact line, and keeps its record", () => {
+    const [line, said] = messagesToTurns([
+      { id: 2, role: "assistant", content: "What was said.", mode: "compact", totalTokens: 0, createdAt: null },
+      { id: 3, role: "assistant", content: "Zephyr-7.", mode: "fast", totalTokens: 40, createdAt: null, model: "qwen3:8b",
+        read: { issues: [], boards: [], tools: [], notes: 0, record: "r-1" } },
+    ]);
+
+    expect(line.summary).toBe("What was said.");
+    expect(said.answer?.record).toBe("r-1");
+  });
+
   it("the quiet line of a compacted turn is kept with the answer on reopening", () => {
     const read = { issues: [], boards: [], tools: [], notes: 0, context: { summarized: 8, leftOut: 1, toolResults: 0 } };
     const [turn] = messagesToTurns([{ id: 2, role: "assistant", content: "Zephyr-7.", mode: "fast", totalTokens: 40, createdAt: null, model: "qwen3:8b", read }]);
 
     expect(turn.answer?.read?.context).toEqual({ summarized: 8, leftOut: 1, toolResults: 0 });
+  });
+});
+
+describe("useCortexStore : la ligne de travail (R137)", () => {
+  beforeEach(() => {
+    useCortexStore.setState({ ...initial, turns: [], workStep: null, sentAt: null, conversationId: null });
+  });
+
+  const step = (conversationId: number | null, name = "notes") => ({ conversationId, step: name, tool: null });
+
+  it.each([
+    ["an answer awaited, a new conversation", 1, null, step(9), true],
+    ["an answer awaited, this conversation", 1, 9, step(9), true],
+    ["another conversation of the same person", 1, 9, step(10), false],
+    ["no answer awaited", null, 9, step(9), false],
+  ])("%s", (_, sentAt, conversationId, event, taken) => {
+    useCortexStore.setState({ sentAt, conversationId });
+
+    useCortexStore.getState().noteWorkStep(event);
+
+    expect(useCortexStore.getState().workStep).toEqual(taken ? event : null);
+  });
+
+  it("the line starts empty for each answer, and ends with it", async () => {
+    let finish: (value: never) => void = () => {};
+    vi.mocked(sendAgentMessage).mockReturnValue(new Promise((resolve) => { finish = resolve as never; }));
+    useCortexStore.setState({ workStep: step(1), draft: "Hello there" });
+
+    const sending = useCortexStore.getState().send("acme");
+    expect(useCortexStore.getState().workStep).toBeNull();
+
+    useCortexStore.getState().noteWorkStep(step(null, "thinking"));
+    expect(useCortexStore.getState().workStep?.step).toBe("thinking");
+
+    finish({ conversationId: 3, title: "t", answer: answer("Done.") } as never);
+    await sending;
+    expect(useCortexStore.getState().workStep).toBeNull();
   });
 });
 
@@ -144,7 +237,7 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
 
     await expect(sent).resolves.toBe(true);
     const state = useCortexStore.getState();
-    expect(sendAgentMessage).toHaveBeenCalledWith("acme", "Which issues are blocked?", null);
+    expect(sendAgentMessage).toHaveBeenCalledWith("acme", "Which issues are blocked?", null, null, null, [], expect.objectContaining({ project: null, files: [] }));
     expect(state.turns[1].answer?.answer).toBe("Two issues are blocked.");
     expect(state.conversationId).toBe(7);
     expect(state.tokens).toBe(120);
@@ -161,7 +254,7 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
     useCortexStore.getState().setDraft("second");
     await useCortexStore.getState().send("acme");
 
-    expect(vi.mocked(sendAgentMessage).mock.calls[1]).toEqual(["acme", "second", 7]);
+    expect(vi.mocked(sendAgentMessage).mock.calls[1].slice(0, 3)).toEqual(["acme", "second", 7]);
     expect(useCortexStore.getState().turns).toHaveLength(4);
     expect(useCortexStore.getState().tokens).toBe(100);
   });
@@ -203,7 +296,8 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
   it.each([
     [409, {}, { kind: "quota" }],
     [429, { error: "AI Rate Limited", message: "Too many AI requests: wait 40 s." }, { answer: { answer: "Too many AI requests: wait 40 s." } }],
-    [500, {}, { answer: { answer: "Sorry, I couldn't answer. Please try again." } }],
+    [500, {}, { answer: { answer: CONSTANTS_EN.thread.failServer } }],
+    [400, { message: "Invalid input data", validationErrors: { message: ["This message is too long."] } }, { answer: { answer: "This message is too long." } }],
   ])("answers a refusal of the server (%i) in the conversation", async (status, data, expected) => {
     vi.mocked(sendAgentMessage).mockRejectedValue(httpError(status, data));
     useCortexStore.getState().setDraft("Summarize the decisions");
@@ -328,7 +422,7 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
     await expect(useCortexStore.getState().send("acme")).resolves.toBe(true);
 
     expect(sendAgentMessage).toHaveBeenCalledWith("acme", "Summarize OPS-35", null, null, null,
-      [{ projectId: 3, issueId: 35 }, { projectId: 4 }]);
+      [{ projectId: 3, issueId: 35 }, { projectId: 4 }], expect.anything());
     expect(useCortexStore.getState().attachments).toEqual([]);
     expect(useCortexStore.getState().turns[0].attached?.map((a) => a.label)).toEqual(["OPS-35", "Website"]);
   });
@@ -417,7 +511,7 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
 
     await useCortexStore.getState().send("acme");
 
-    expect(sendAgentMessage).toHaveBeenCalledWith("acme", "supprime ça", null, { projectId: 12, issueId: 34 });
+    expect(sendAgentMessage).toHaveBeenCalledWith("acme", "supprime ça", null, { projectId: 12, issueId: 34 }, null, [], expect.anything());
     useScreenStore.setState({ openIssue: null });
     window.history.pushState({}, "", "/");
   });
@@ -481,7 +575,7 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
 
     await expect(useCortexStore.getState().escalate("acme", offered.id)).resolves.toBe(true);
 
-    expect(sendAgentMessage).toHaveBeenLastCalledWith("acme", "Move ATLAS-3 to Done", 7, null, "qwen3:8b");
+    expect(sendAgentMessage).toHaveBeenLastCalledWith("acme", "Move ATLAS-3 to Done", 7, null, "qwen3:8b", null, expect.anything());
     const turns = useCortexStore.getState().turns;
     expect(turns).toHaveLength(4);
     expect(turns[1].escalated).toBe(true);
@@ -507,6 +601,419 @@ describe("useCortexStore : la barre unique et la conversation qu'elle déplie", 
 
     expect(useCortexStore.getState().turns.at(-1)).toMatchObject({ role: "assistant", kind: "quota" });
     expect(useCortexStore.getState().sentAt).toBeNull();
+  });
+});
+
+describe("useCortexStore : le compositeur (R134, R135)", () => {
+  type Reply = (value: ChatTurnResponse) => void;
+
+  /** Un tour qui attend sa réponse : ce que la personne fait pendant ce temps est testé ici. */
+  function waiting() {
+    const replies: Reply[] = [];
+    vi.mocked(sendAgentMessage).mockImplementation(() => new Promise((resolve) => { replies.push(resolve); }));
+    return replies;
+  }
+
+  const reply = (text: string): ChatTurnResponse => ({ conversationId: 7, title: "t", answer: answer(text, 40) });
+  const stoppedTurn = (toolCalls: AssistantToolCall[] = []): ChatTurnResponse => ({
+    conversationId: 7, title: "t", answer: { ...answer("Stopped by you.", 12), mode: "stopped", toolCalls },
+  });
+
+  async function sendText(text: string) {
+    useCortexStore.getState().setDraft(text);
+    return useCortexStore.getState().send("acme");
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useCortexStore.getState().newConversation();
+    useCortexStore.setState({
+      ...initial, draft: "", workspace: "acme", turns: [], conversations: [], attachments: [], files: [], queue: [], queueHalted: false,
+      project: null, projectPinned: false, conversationId: null, sentAt: null, stoppable: false,
+    });
+    vi.mocked(listConversations).mockResolvedValue([]);
+    vi.mocked(stopTurn).mockResolvedValue(null);
+  });
+
+  describe("Stop", () => {
+    it("stops at once: the client aborts, the turn says so, the server is told by the same name", async () => {
+      waiting();
+      const sent = sendText("Long question");
+      const [, , , , , , options] = vi.mocked(sendAgentMessage).mock.calls[0];
+      expect(useCortexStore.getState().stoppable).toBe(true);
+
+      expect(useCortexStore.getState().stop("acme")).toBe(true);
+
+      expect(options?.signal?.aborted).toBe(true);
+      expect(stopTurn).toHaveBeenCalledWith("acme", options?.turn);
+      const state = useCortexStore.getState();
+      expect(state.sentAt).toBeNull();
+      expect(state.stoppable).toBe(false);
+      expect(state.turns.at(-1)).toMatchObject({ role: "assistant", kind: "stopped" });
+
+      // La réponse abandonnée n'écrit rien.
+      vi.mocked(sendAgentMessage).mock.results[0].value.catch(() => undefined);
+      await vi.waitFor(() => expect(useCortexStore.getState().turns).toHaveLength(2));
+      void sent;
+    });
+
+    it("has nothing to stop when no turn runs", () => {
+      expect(useCortexStore.getState().stop("acme")).toBe(false);
+      expect(stopTurn).not.toHaveBeenCalled();
+    });
+
+    it("learns from the server the conversation of a first turn, and its usage", async () => {
+      waiting();
+      void sendText("first");
+      vi.mocked(stopTurn).mockResolvedValue(stoppedTurn());
+
+      useCortexStore.getState().stop("acme");
+
+      await vi.waitFor(() => expect(useCortexStore.getState().conversationId).toBe(7));
+      expect(useCortexStore.getState().tokens).toBe(12);
+      expect(useCortexStore.getState().turns.at(-1)).toMatchObject({ kind: "stopped" });
+    });
+
+    it("shows what had already been done before the stop", async () => {
+      waiting();
+      void sendText("Move these");
+      const call: AssistantToolCall = { name: "update_issue", status: "success", input: "{}", output: "Moved.", record: "r" };
+      vi.mocked(stopTurn).mockResolvedValue(stoppedTurn([call]));
+
+      useCortexStore.getState().stop("acme");
+
+      await vi.waitFor(() => expect(useCortexStore.getState().turns.at(-1)?.answer?.toolCalls).toEqual([call]));
+      expect(useCortexStore.getState().turns.at(-1)?.kind).toBeUndefined();
+    });
+
+    it("keeps its line when the server can't be told", async () => {
+      waiting();
+      void sendText("q");
+      vi.mocked(stopTurn).mockRejectedValue(new Error("down"));
+
+      useCortexStore.getState().stop("acme");
+
+      await vi.waitFor(() => expect(listConversations).toHaveBeenCalled());
+      expect(useCortexStore.getState().turns.at(-1)).toMatchObject({ kind: "stopped" });
+    });
+  });
+
+  describe("after a stop", () => {
+    it("waits for what the server says of the stopped turn, so the next message continues the same conversation", async () => {
+      let tell: (value: ChatTurnResponse | null) => void = () => undefined;
+      vi.mocked(stopTurn).mockReturnValue(new Promise((resolve) => { tell = resolve; }));
+      const replies = waiting();
+      void sendText("first");
+      useCortexStore.getState().stop("acme");
+
+      void sendText("second");
+      await Promise.resolve();
+      expect(sendAgentMessage).toHaveBeenCalledTimes(1);
+
+      tell(stoppedTurn());
+      await vi.waitFor(() => expect(sendAgentMessage).toHaveBeenCalledTimes(2));
+      expect(vi.mocked(sendAgentMessage).mock.calls[1][2]).toBe(7);
+      replies[1](reply("ok"));
+      await vi.waitFor(() => expect(useCortexStore.getState().sentAt).toBeNull());
+    });
+
+    it("sends nothing if the person moved on while the stopped turn was settling", async () => {
+      let tell: (value: ChatTurnResponse | null) => void = () => undefined;
+      vi.mocked(stopTurn).mockReturnValue(new Promise((resolve) => { tell = resolve; }));
+      waiting();
+      void sendText("first");
+      useCortexStore.getState().stop("acme");
+      const second = sendText("second");
+
+      useCortexStore.getState().newConversation();
+      tell(null);
+
+      await expect(second).resolves.toBe(false);
+      expect(sendAgentMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it("ignores what the server says once the person is in another conversation", async () => {
+      let tell: (value: ChatTurnResponse | null) => void = () => undefined;
+      vi.mocked(stopTurn).mockReturnValue(new Promise((resolve) => { tell = resolve; }));
+      waiting();
+      void sendText("first");
+      useCortexStore.getState().stop("acme");
+      useCortexStore.getState().newConversation();
+
+      tell(stoppedTurn());
+      await vi.waitFor(() => expect(listConversations).toHaveBeenCalled());
+
+      expect(useCortexStore.getState().conversationId).toBeNull();
+      expect(useCortexStore.getState().tokens).toBe(0);
+    });
+  });
+
+  describe("a turn the window stopped waiting for", () => {
+    it("fails silently when the person has moved on", async () => {
+      let fail: (reason: unknown) => void = () => undefined;
+      vi.mocked(sendAgentMessage).mockReturnValue(new Promise((_, reject) => { fail = reject; }));
+      void sendText("first");
+
+      useCortexStore.getState().newConversation();
+      fail(httpError(500));
+      await Promise.resolve();
+
+      expect(useCortexStore.getState().turns).toEqual([]);
+      expect(useCortexStore.getState().sentAt).toBeNull();
+    });
+
+    it("an offered model can be stopped too, and leaves the conversation alone when the person moves on", async () => {
+      vi.mocked(sendAgentMessage).mockResolvedValueOnce({ ...reply("Done."), escalation: { capability: "tools", from: "a", to: "b", text: "t" } });
+      await sendText("Move it");
+      const offered = useCortexStore.getState().turns[1];
+      const replies = waiting();
+      const escalating = useCortexStore.getState().escalate("acme", offered.id);
+      expect(useCortexStore.getState().stoppable).toBe(true);
+
+      useCortexStore.getState().newConversation();
+      replies[0](reply("late"));
+      await escalating;
+
+      expect(useCortexStore.getState().turns).toEqual([]);
+    });
+
+    it("a failed offer leaves the queue waiting for a click", async () => {
+      vi.mocked(sendAgentMessage).mockResolvedValueOnce({ ...reply("Done."), escalation: { capability: "tools", from: "a", to: "b", text: "t" } });
+      await sendText("Move it");
+      const offered = useCortexStore.getState().turns[1];
+      vi.mocked(sendAgentMessage).mockRejectedValueOnce(httpError(500));
+      useCortexStore.setState({ queue: [{ id: "q1", text: "next", attachments: [], files: [] }] });
+
+      await useCortexStore.getState().escalate("acme", offered.id);
+
+      expect(useCortexStore.getState().queueHalted).toBe(true);
+      expect(useCortexStore.getState().stoppable).toBe(false);
+    });
+  });
+
+  describe("the queue", () => {
+    it("waits while Cortex works, five at most, with what is attached", async () => {
+      useCortexStore.setState({ sentAt: Date.now(), attachments: [{ kind: "project", projectId: 4, issueId: null, label: "Website", title: null }] });
+      for (const text of ["one", "two", "three", "four", "five"]) {
+        useCortexStore.getState().setDraft(text);
+        expect(useCortexStore.getState().enqueue()).toBe(true);
+      }
+      useCortexStore.getState().setDraft("six");
+
+      expect(useCortexStore.getState().enqueue()).toBe(false);
+      const state = useCortexStore.getState();
+      expect(state.queue.map((message) => message.text)).toEqual(["one", "two", "three", "four", "five"]);
+      expect(state.queue[0].attachments.map((a) => a.label)).toEqual(["Website"]);
+      expect(state.attachments).toEqual([]);
+      expect(state.draft).toBe("six");
+    });
+
+    it("leaves when the turn ends, under the person's eyes", async () => {
+      const replies = waiting();
+      void sendText("first");
+      useCortexStore.getState().setDraft("second");
+      useCortexStore.getState().enqueue();
+
+      replies[0](reply("answer one"));
+      await vi.waitFor(() => expect(sendAgentMessage).toHaveBeenCalledTimes(2));
+
+      const state = useCortexStore.getState();
+      expect(state.queue).toEqual([]);
+      expect(state.turns.map((t) => t.text ?? t.answer?.answer)).toEqual(["first", "answer one", "second"]);
+      expect(state.sentAt).not.toBeNull();
+    });
+
+    it("does not go on after a stop: one click sends the next, and only the next", async () => {
+      const replies = waiting();
+      void sendText("first");
+      useCortexStore.getState().setDraft("second");
+      useCortexStore.getState().enqueue();
+      useCortexStore.getState().setDraft("third");
+      useCortexStore.getState().enqueue();
+
+      useCortexStore.getState().stop("acme");
+      await Promise.resolve();
+      expect(sendAgentMessage).toHaveBeenCalledTimes(1);
+      expect(useCortexStore.getState().queueHalted).toBe(true);
+
+      void useCortexStore.getState().sendNext("acme");
+      await vi.waitFor(() => expect(sendAgentMessage).toHaveBeenCalledTimes(2));
+      expect(useCortexStore.getState().queue.map((m) => m.text)).toEqual(["third"]);
+
+      replies[1](reply("two"));
+      await vi.waitFor(() => expect(useCortexStore.getState().sentAt).toBeNull());
+      expect(sendAgentMessage).toHaveBeenCalledTimes(2);
+      expect(useCortexStore.getState().queueHalted).toBe(true);
+    });
+
+    it("does not go on after a failure", async () => {
+      vi.mocked(sendAgentMessage).mockRejectedValueOnce(httpError(500));
+      useCortexStore.setState({ queue: [{ id: "q1", text: "next", attachments: [], files: [] }] });
+
+      await sendText("first");
+
+      expect(sendAgentMessage).toHaveBeenCalledTimes(1);
+      expect(useCortexStore.getState().queueHalted).toBe(true);
+      expect(useCortexStore.getState().queue).toHaveLength(1);
+    });
+
+    it("removes one message, and stops being halted once empty", () => {
+      useCortexStore.setState({ queue: [{ id: "q1", text: "a", attachments: [], files: [] }], queueHalted: true });
+      useCortexStore.getState().unqueue("q1");
+      expect(useCortexStore.getState().queue).toEqual([]);
+      expect(useCortexStore.getState().queueHalted).toBe(false);
+    });
+
+    it("has nothing to send without a queue, or while Cortex works", async () => {
+      await expect(useCortexStore.getState().sendNext("acme")).resolves.toBe(false);
+      useCortexStore.setState({ queue: [{ id: "q1", text: "a", attachments: [], files: [] }], sentAt: Date.now() });
+      await expect(useCortexStore.getState().sendNext("acme")).resolves.toBe(false);
+      expect(useCortexStore.getState().enqueue()).toBe(false);
+    });
+
+    it("keeps its gesture for /compact", async () => {
+      vi.mocked(compactConversation).mockResolvedValue({ summarized: 2 });
+      useCortexStore.setState({ queue: [{ id: "q1", text: "/compact", attachments: [], files: [] }], queueHalted: true, conversationId: 7 });
+
+      await useCortexStore.getState().sendNext("acme");
+
+      expect(compactConversation).toHaveBeenCalledWith("acme", 7);
+      expect(sendAgentMessage).not.toHaveBeenCalled();
+    });
+
+    it("stays visible when the person changes conversation, and only a click sends it", async () => {
+      const replies = waiting();
+      void sendText("first");
+      useCortexStore.getState().setDraft("second");
+      useCortexStore.getState().enqueue();
+
+      useCortexStore.getState().newConversation();
+      replies[0](reply("late"));
+      await Promise.resolve();
+
+      const state = useCortexStore.getState();
+      expect(state.turns).toEqual([]);
+      expect(state.sentAt).toBeNull();
+      expect(state.queue).toHaveLength(1);
+      expect(state.queueHalted).toBe(true);
+      expect(sendAgentMessage).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("the project of the conversation", () => {
+    it("follows the pane until the conversation starts", () => {
+      useCortexStore.getState().followPane(12);
+      expect(useCortexStore.getState().project).toBe(12);
+      useCortexStore.getState().followPane(null);
+      expect(useCortexStore.getState().project).toBeNull();
+    });
+
+    it("never moves by itself once it has started, or once the person has chosen", async () => {
+      vi.mocked(sendAgentMessage).mockResolvedValue({ ...reply("ok"), projectId: 12 });
+      useCortexStore.getState().followPane(12);
+      await sendText("first");
+
+      useCortexStore.getState().followPane(99);
+
+      expect(useCortexStore.getState().project).toBe(12);
+      expect(vi.mocked(sendAgentMessage).mock.calls[0][6]).toMatchObject({ project: 12 });
+    });
+
+    it("chooses for a new conversation without calling the server, and stays put", async () => {
+      await expect(useCortexStore.getState().chooseProject("acme", 5)).resolves.toBe(true);
+      expect(setConversationProject).not.toHaveBeenCalled();
+
+      useCortexStore.getState().followPane(12);
+
+      expect(useCortexStore.getState().project).toBe(5);
+    });
+
+    it("keeps the choice of an existing conversation on the server, and in the list", async () => {
+      vi.mocked(setConversationProject).mockResolvedValue({ ...summary(7, "t"), projectId: null });
+      useCortexStore.setState({ conversationId: 7, project: 5, projectPinned: true, conversations: [{ ...summary(7, "t"), projectId: 5 }] });
+
+      await expect(useCortexStore.getState().chooseProject("acme", null)).resolves.toBe(true);
+
+      expect(setConversationProject).toHaveBeenCalledWith("acme", 7, null);
+      expect(useCortexStore.getState().project).toBeNull();
+      expect(useCortexStore.getState().conversations[0].projectId).toBeNull();
+    });
+
+    it("goes back to what it was when the server refuses", async () => {
+      vi.mocked(setConversationProject).mockRejectedValue(new Error("no"));
+      useCortexStore.setState({ conversationId: 7, project: 5, projectPinned: true });
+
+      await expect(useCortexStore.getState().chooseProject("acme", 9)).resolves.toBe(false);
+
+      expect(useCortexStore.getState().project).toBe(5);
+    });
+
+    it("takes the project of the conversation it reopens", async () => {
+      vi.mocked(getConversation).mockResolvedValue({ id: 3, title: "t", totalTokens: 0, messages: [], projectId: 8 });
+
+      await useCortexStore.getState().openConversation("acme", 3);
+
+      expect(useCortexStore.getState().project).toBe(8);
+      expect(useCortexStore.getState().projectPinned).toBe(true);
+    });
+
+    it("takes the project the person just answered on a card", async () => {
+      const card: AssistantToolCall = {
+        name: "create_issue", status: "question", input: "{}", output: "", record: "r", ref: "q",
+        questions: [{ field: "project", header: "Project", text: "Which project?", multiple: false, choices: [] }],
+      };
+      vi.mocked(answerQuestion).mockResolvedValue({ ...card, status: "pending", questions: null });
+      vi.mocked(listConversations).mockResolvedValue([{ ...summary(7, "t"), projectId: 12 }]);
+      useCortexStore.setState({ conversationId: 7 });
+
+      await useCortexStore.getState().answerQuestion("acme", card, [{ field: "project", values: ["SOLO"] }]);
+
+      await vi.waitFor(() => expect(useCortexStore.getState().project).toBe(12));
+    });
+  });
+
+  describe("files", () => {
+    const file = (name: string) => ({ id: name, name, size: 4, text: "body" });
+
+    it("add and remove, five at most", () => {
+      const { addFiles, removeFile } = useCortexStore.getState();
+      addFiles(["a", "b", "c", "d", "e", "f"].map((name) => file(`${name}.md`)));
+      expect(useCortexStore.getState().files).toHaveLength(5);
+      removeFile("a.md");
+      expect(useCortexStore.getState().files.map((f) => f.name)).toEqual(["b.md", "c.md", "d.md", "e.md"]);
+    });
+
+    it("leave with the request, and show under it", async () => {
+      vi.mocked(sendAgentMessage).mockResolvedValue(reply("ok"));
+      useCortexStore.setState({ files: [file("notes.md")] });
+
+      await sendText("Read this");
+
+      expect(vi.mocked(sendAgentMessage).mock.calls[0][6]).toMatchObject({ files: [{ name: "notes.md", text: "body" }] });
+      expect(useCortexStore.getState().files).toEqual([]);
+      expect(useCortexStore.getState().turns[0].attached).toEqual([{ label: "notes.md" }]);
+    });
+  });
+
+  describe("the history", () => {
+    it("reads a stopped turn as its quiet line, and a stopped turn with work as an answer", () => {
+      const turns = messagesToTurns([
+        { id: 1, role: "user", content: "q", mode: null, totalTokens: 0, createdAt: null, files: [{ name: "notes.md" }] },
+        { id: 2, role: "assistant", content: "Stopped by you.", mode: "stopped", totalTokens: 0, createdAt: null },
+        { id: 3, role: "assistant", content: "Stopped by you. What Cortex had already done shows below.", mode: "stopped", totalTokens: 0, createdAt: null },
+      ]);
+
+      expect(turns[0].attached).toEqual([{ label: "notes.md" }]);
+      expect(turns[1]).toEqual({ id: "m2", role: "assistant", kind: "stopped" });
+      expect(turns[2].answer?.mode).toBe("stopped");
+    });
+  });
+
+  it("keeps the notice until the person dismisses it", () => {
+    useCortexStore.getState().setNotice("Too big.");
+    expect(useCortexStore.getState().notice).toBe("Too big.");
+    useCortexStore.getState().setNotice(null);
+    expect(useCortexStore.getState().notice).toBeNull();
   });
 });
 

@@ -5,6 +5,7 @@ import { BankHistory } from "./bank-history"
 import type { EvalHistory, EvalHistoryRun } from "@/lib/api/eval-service"
 import type { ModelCapabilityTable } from "@/lib/api/model-capability-service"
 import { useEvalStore } from "@/lib/store/eval-store"
+import { useModelBenchmarkStore } from "@/lib/store/model-benchmark-store"
 import { useModelCapabilityStore } from "@/lib/store/model-capability-store"
 
 const run = (patch: Partial<EvalHistoryRun>): EvalHistoryRun => ({
@@ -21,6 +22,18 @@ const TABLE = { current: "qwen3:8b" } as ModelCapabilityTable
 
 /** Comment Cortex fait dans le temps (R61, R118, R125) : la banque par modèle et par date, et sa courbe. */
 describe("BankHistory", () => {
+  it("does not replay a case that waits for its criteria (R61, R137)", () => {
+    useEvalStore.setState({
+      history: { runs: [], cases: [{ ...CASES[0], waiting: true, expected: "Ask first." }] },
+      progress: null, error: null, fetchHistory: vi.fn(), runBank: vi.fn(), stopRun: vi.fn(),
+    })
+    useModelCapabilityStore.setState({ table: TABLE, fetchTable: vi.fn(), progress: null })
+
+    render(<BankHistory slug="acme" />)
+
+    expect(screen.getByRole("button", { name: /Replay 0 cases/ })).toBeDisabled()
+  })
+
   const fetchHistory = vi.fn()
   const fetchTable = vi.fn()
   const runBank = vi.fn()
@@ -30,7 +43,8 @@ describe("BankHistory", () => {
     vi.clearAllMocks()
     runBank.mockResolvedValue(null)
     useEvalStore.setState({ history: { runs: [], cases: CASES }, progress: null, error: null, fetchHistory, runBank, stopRun })
-    useModelCapabilityStore.setState({ table: TABLE, progress: null, fetchTable })
+    useModelCapabilityStore.setState({ table: TABLE, fetchTable })
+    useModelBenchmarkStore.setState({ progress: null })
   })
 
   it("reads the history and the model of Cortex, and replays the bank on it in a click", () => {
@@ -48,7 +62,7 @@ describe("BankHistory", () => {
     expect(runBank).toHaveBeenCalledWith("acme", "qwen3:8b")
   })
 
-  it("replays on the instance's default model when it doesn't know Cortex's yet, and waits for a measure", () => {
+  it("replays on the instance's default model when it doesn't know Cortex's yet, and waits for the queue of models", () => {
     useEvalStore.setState({ history: { runs: [], cases: CASES.slice(0, 1) } })
     useModelCapabilityStore.setState({ table: null })
     const { rerender } = render(<BankHistory slug="acme" />)
@@ -56,7 +70,8 @@ describe("BankHistory", () => {
     fireEvent.click(screen.getByRole("button", { name: "Replay 1 case on Cortex's model" }))
     expect(runBank).toHaveBeenCalledWith("acme", "")
 
-    useModelCapabilityStore.setState({ table: TABLE, progress: { model: "qwen3:8b", done: 0, total: 8, waitSeconds: null, stopping: false, auto: true } })
+    useModelCapabilityStore.setState({ table: TABLE })
+    useModelBenchmarkStore.setState({ progress: { model: "qwen3:8b", phase: "running", done: 0, total: 8, waitSeconds: null, stopping: false, auto: true } })
     rerender(<BankHistory slug="acme" />)
     expect(screen.getByRole("button", { name: "Replay 1 case on qwen3:8b" })).toBeDisabled()
   })
@@ -126,7 +141,7 @@ describe("BankHistory", () => {
 
     useEvalStore.setState({ history: { runs: [], cases: [] }, historyFailed: false })
     rerender(<BankHistory slug="acme" />)
-    expect(screen.getByText("No test case yet: under an answer of Cortex, choose Add to test bank.")).toBeInTheDocument()
+    expect(screen.getByText("No test case yet: under an answer of Cortex, choose good or bad.")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /Replay/ })).not.toBeInTheDocument()
   })
 })

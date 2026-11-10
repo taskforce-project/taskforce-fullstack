@@ -1,7 +1,7 @@
 {
   "name": "taskforce-desktop",
   "productName": "TaskForce",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "TaskForce on your computer: projects, Brain OS and coding agents, with your data on your disk.",
   "license": "AGPL-3.0-only",
   "author": "TaskForce",
@@ -14,6 +14,7 @@
     "test": "tsx --test test/*.test.ts",
     "resources": "node scripts/prepare-resources.mjs",
     "icon": "node scripts/make-icon.mjs",
+    "screen-panel": "node scripts/make-screen-panel.mjs",
     "dist:win": "npm run build && npm run icon && electron-builder --win nsis --publish never",
     "dist:store": "npm run build && npm run icon && electron-builder --win appx --publish never",
     "dist:linux": "npm run build && npm run icon && electron-builder --linux deb AppImage --publish never"

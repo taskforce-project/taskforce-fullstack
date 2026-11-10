@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import com.taskforce.tf_api.core.service.AiStatusService.AiStatus;
 import com.taskforce.tf_api.core.service.ai.ModelGateway;
+import com.taskforce.tf_api.core.service.ai.TurnStoppedException;
 import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +59,8 @@ public class EmbeddingClient {
         try {
             List<float[]> vectors = gateway.embed(snapshot.settings(), snapshot.status().embeddingModel(), texts);
             return vectors.size() == texts.size() ? vectors : null;
+        } catch (TurnStoppedException stopped) {
+            return null; // la personne a arrêté le tour (R134) : ce n'est pas une panne, l'état de l'IA reste valable
         } catch (RuntimeException ex) {
             log.warn("Embeddings unavailable: {}", LogSafe.of(ex.getMessage()));
             status.invalidate();

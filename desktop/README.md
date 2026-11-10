@@ -31,15 +31,31 @@ This folder holds the Electron shell. The app itself is the rest of the reposito
 - **Voice.** The microphone of the composer records in the window and the shell transcribes on the computer, in a
   utility process (`src/voice.ts`, `src/voice-worker.ts`), with sherpa-onnx (npm, prebuilt N-API binaries, unpacked
   from the app's archive) and Parakeet TDT 0.6b v3 by NVIDIA (CC BY 4.0, int8 export for sherpa-onnx, 671 MB). The model
-  is downloaded once from Hugging Face at the person's first click, from a pinned revision, checked against SHA-256 and
-  kept in the app's folder (`voice/`). Audio never leaves the computer; the log keeps durations, never the text.
+  is downloaded once from Hugging Face a few minutes after the app opens, in the background and at a limited rate, from
+  a pinned revision, checked against SHA-256 and kept in the app's folder (`voice/`). A click on the microphone during
+  the download shows its progress on the icon and lifts the limit; a failure retries at the next start. There is no
+  download in the Microsoft Store version, which has no microphone. Audio never leaves the computer; the log keeps
+  durations, never the text.
+- **Screens.** Every window outside the main one is the same screen: the sign-in's window (1000 x 640), with the
+  painted panel on the left, and only the right side changes. The sign-in (`static/signin.html`), then the start, an
+  update, signing out and their failures (`static/splash.html`: a step, a bar, a note, and for a failure what to do,
+  with its buttons) share one stylesheet (`static/shell.css`) and one left panel (`static/panel.js`). A screen opens
+  where the one before it was, so that only its right side seems to change.
 - **Updates.** The app checks the `desktop-latest` release at start and every six hours, downloads in the background
-  and installs on quit. The installer never shows a window for an update: on quit it installs silently; with
-  "Restart now", the app shows its own update screen while it stops, then the installer installs silently (`/S`) and
-  opens the app again (`--force-run`). `installer.nsh` makes every update (`--updated`) silent, also when an older
-  version of the app starts it. The app notes the version it installs (`update-pending.json` in its folder): if the
-  next start still runs the version before, the update toast says it didn't install and offers to restart again. The
-  Microsoft Store version leaves its updates to the Store.
+  and installs on quit. The installer never shows a system window for an update: on quit it installs silently. With
+  "Restart now", there is a TaskForce window on screen from the click to the new version: the app's update screen
+  while the app stops, then the same screen drawn by the installer at the same place (`installer.nsh`, with the NSIS
+  `System` plugin, Windows' GDI and GDI+: no extra executable, no script), which says so if the install fails and opens
+  the app again. The app names its screen to the installer (`--screen`, the window's handle); the installer draws the
+  left panel from images of the real one (`installer/panel-*.jpg`, one per display scale, made by
+  `npm run screen-panel`: a test fails when the panel changes without them), and the right side at the measures and in
+  the colors of `static/shell.css`. The installer runs twice from the same file: the first process holds that window
+  and starts the second, which is the unchanged, silent electron-builder install. The two hand the screen over through
+  a file in the app's folder (`update-screen`, `src/update-pending.ts`): it exists while the installer's window is on
+  screen, and says where it is, so that the new version opens its first window over it. The app notes the version it
+  installs (`update-pending.json` in its folder): if the next start still runs the version before, its first screen
+  and the update toast say it didn't install, and the toast offers to restart again. The Microsoft Store version
+  leaves its updates to the Store.
 
 The full design is in the docs repository: `v1/03-architecture/Specification_App_Desktop.md`.
 
@@ -76,7 +92,8 @@ the Store version. Variables read by a development build:
 `npm run dist:win` builds the Windows installer (per user, no administrator rights, one click: a small window with the
 app icon and a progress bar for the first install, none for an update) and `npm run dist:linux` the .deb and AppImage,
 in `release/`. `npm run icon` draws the app icon from the brand mark first, with the logos of the
-Microsoft Store package (`build/appx`).
+Microsoft Store package (`build/appx`). `npm run screen-panel` renders the left panel of the screens for the installer,
+on Windows 11, and is run again whenever that panel changes.
 
 `npm run dist:store` builds the Microsoft Store package (`release/TaskForce-<version>-store.appx`), with the identity
 that Partner Center reserved for TaskForce. It is not signed: Microsoft signs it when it publishes it, so neither

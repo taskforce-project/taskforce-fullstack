@@ -10,8 +10,9 @@ import { VoiceStartError, type VoiceCallbacks, type VoiceNotice, type VoiceOutco
 // ---------------------------------------------------------------------------
 // Le micro du compositeur (R132, R76, R80) : un clic démarre, un clic arrête, Échap annule ; le texte s'écrit dans le
 // compositeur et rien ne part sans Entrée ou le bouton d'envoi. Dans l'app desktop, la transcription tourne sur la machine
-// (`desktop/src/voice.ts`), le modèle se téléchargeant une fois ; dans la webapp, le service du navigateur, après la phrase
-// de R80, retenue par personne. Erreurs avalées : une ligne courte le dit (`notice`), le compositeur continue.
+// (`desktop/src/voice.ts`), le modèle s'y préparant seul : un clic pendant sa préparation montre son avancement sur l'icône
+// (R143) ; dans la webapp, le service du navigateur, après la phrase de R80, retenue par personne. Erreurs avalées : une
+// ligne courte le dit (`notice`), le compositeur continue.
 // ---------------------------------------------------------------------------
 
 /** Où passe la voix : sur la machine, par le navigateur, ou nulle part (aucun micro n'apparaît). */
@@ -27,8 +28,7 @@ export type VoicePhase =
   | "idle"
   /** Webapp, premier usage : la phrase de R80 attend une réponse. */
   | "consent"
-  /** App desktop : le modèle manque, sa taille est dite. */
-  | "offer"
+  /** App desktop : le modèle se prépare, l'icône montre où il en est. */
   | "downloading"
   | "starting"
   | "listening"
@@ -55,10 +55,9 @@ interface VoiceState {
   press: (person: string | null, onText: (text: string) => void) => Promise<void>
   /** Webapp : la personne active la voix ; l'écoute démarre, le choix est retenu pour elle. */
   acceptConsent: (person: string | null) => Promise<void>
-  /** Télécharge le modèle, ou rejoint le téléchargement en cours. Rend vrai s'il est là. */
+  /** Rejoint la préparation du modèle, ou la lance : l'icône montre l'avancement. Rend vrai s'il est là. */
   startDownload: () => Promise<boolean>
-  cancelDownload: () => void
-  /** Referme la question posée (« Keep typing », « Not now »). */
+  /** Referme la question posée (« Keep typing »). */
   dismiss: () => void
   dismissNotice: () => void
   /** Échap : arrête d'écouter et jette ce qui a été dit. */
@@ -181,7 +180,7 @@ export const useVoiceStore = create<VoiceState>()(
           const { phase } = get()
           if (phase === "listening") return finish()
           if (phase === "starting" || phase === "transcribing" || phase === "downloading") return
-          if (phase === "consent" || phase === "offer") return get().dismiss()
+          if (phase === "consent") return get().dismiss()
           sink = onText
           say(null)
           const kind = voiceKind()
@@ -198,12 +197,13 @@ export const useVoiceStore = create<VoiceState>()(
             const status = await desktopBridge()?.voice?.status()
             if (mine !== generation) return
             if (status?.state === "ready") return listen()
-            set({ phase: "idle" })
-            if (status?.state === "downloading") {
-              await get().startDownload()
+            if (!status) {
+              set({ phase: "idle" })
               return
             }
-            if (status) set({ phase: "offer", model: { bytes: status.bytes, received: status.received } })
+            // Le modèle se prépare, ou manque encore : le clic montre où il en est, sur l'icône.
+            set({ model: { bytes: status.bytes, received: status.received } })
+            await get().startDownload()
           } catch {
             if (mine !== generation) return
             set({ phase: "idle" })
@@ -231,24 +231,16 @@ export const useVoiceStore = create<VoiceState>()(
               say("ready")
               return true
             }
-            if (result.error === "cancelled") {
-              set({ phase: "idle", model: null })
-              return false
-            }
-            set({ phase: "offer" })
-            say(downloadNotice(result.error))
+            set({ phase: "idle", model: null })
+            if (result.error !== "cancelled") say(downloadNotice(result.error))
             return false
           } catch {
-            set({ phase: "offer" })
+            set({ phase: "idle", model: null })
             say("network")
             return false
           } finally {
             stop()
           }
-        },
-
-        cancelDownload: () => {
-          void desktopBridge()?.voice?.cancelDownload()
         },
 
         dismiss: () => {

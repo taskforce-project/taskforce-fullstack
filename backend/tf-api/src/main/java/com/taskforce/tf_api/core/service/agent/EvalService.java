@@ -41,11 +41,14 @@ import com.taskforce.tf_api.core.repository.EvalCaseRepository;
 import com.taskforce.tf_api.core.repository.EvalResultRepository;
 import com.taskforce.tf_api.core.repository.EvalRunRepository;
 import com.taskforce.tf_api.core.repository.KnowledgeNodeRepository;
+import com.taskforce.tf_api.core.service.AiGatewayClient;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
+import com.taskforce.tf_api.core.service.LlmTimedOutException;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.agent.ReplayCase.CassetteEntry;
 import com.taskforce.tf_api.core.service.agent.ReplayCase.FrozenNote;
+import com.taskforce.tf_api.core.service.ai.ModelDeadline;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
@@ -61,7 +64,9 @@ import lombok.extern.slf4j.Slf4j;
  * <ul>
  *   <li>Un cas naît d'un geste de la personne sur une de ses réponses : le serveur fige, depuis le dossier de cette
  *       réponse, la question, sa date, les notes servies et ce que les outils de lecture ont rendu.</li>
- *   <li>Les critères viennent de l'acte qu'elle a validé, et sont datés avant tout rejeu.</li>
+ *   <li>Les critères viennent de l'acte qu'elle a validé, et sont datés avant tout rejeu. Sous une réponse, un clic sur
+ *       « bien » garde ce qui a été observé ; « pas bien » garde une phrase, ce qu'il aurait fallu faire, et le cas attend
+ *       ses critères : aucun rejeu ne le note tant qu'ils ne sont pas écrits (R137).</li>
  *   <li>Un rejeu fait répondre un modèle nommé à chaque cas, sans toucher l'espace, et le note par du code.</li>
  *   <li>Coupée, la banque ne prend plus de cas ; les siens restent, rejouables.</li>
  * </ul>
@@ -78,6 +83,8 @@ public class EvalService {
     static final int MAX_ITEMS = 10;
     static final int MAX_VALUE = 200;
     static final int MAX_TITLE = 200;
+    /** La phrase de la personne : ce qu'il aurait fallu faire. */
+    public static final int MAX_EXPECTED = 500;
     /** Le modèle par défaut de l'instance (le tier rapide), quand le rejeu n'en nomme pas. */
     static final String DEFAULT_MODEL = "default";
     /** D'où vient un cas, pour l'histoire de la banque (R125). */
@@ -98,6 +105,7 @@ public class EvalService {
     private final AgentToolRegistry tools;
     private final AgentService agent;
     private final AiUsageService aiUsage;
+    private final ModelCallStops stops;
     private final EvalCaseRepository cases;
     private final EvalRunRepository runs;
     private final EvalResultRepository results;
@@ -145,9 +153,39 @@ public class EvalService {
         List<EvalHistoryResponse.Case> history = active.stream()
             .map(evalCase -> new EvalHistoryResponse.Case(evalCase.getId(), evalCase.getTitle(), evalCase.getQuestion(),
                 evalCase.getAskedOn(), evalCase.getCreatedAt(), userId.equals(evalCase.getCreatedBy()),
-                origin(evalCase, incidents), grades(recent, byCase.getOrDefault(evalCase.getId(), Map.of()))))
+                origin(evalCase, incidents), grades(recent, byCase.getOrDefault(evalCase.getId(), Map.of())),
+                read(evalCase.getCriteria(), EvalCriteria.class).expected(), evalCase.waiting(),
+                evalCase.waiting() && evalCase.getSourceRecord() != null ? evalCase.getSourceRecord().toString() : null))
             .toList();
         return new EvalHistoryResponse(points, history);
+    }
+
+    /** Le dernier rejeu de la banque sur un modèle : réussis, notés, cas du rejeu, sa date. */
+    public record BankScore(int passed, int graded, int total, LocalDateTime at) {
+    }
+
+    /** Pour la colonne « Your tests » du banc (R142) : les cas actifs de la banque, et le dernier rejeu de chaque modèle. */
+    public record BankScores(int cases, Map<String, BankScore> byModel) {
+    }
+
+    /** Ce que le banc montre de la banque d'un espace ; sans cas actif, pas de colonne. Un rejeu sans aucune note ne compte pas. */
+    @Transactional(readOnly = true)
+    public BankScores scores(Long workspaceId) {
+        int active = (int) cases.countByWorkspaceIdAndArchivedFalse(workspaceId);
+        if (active == 0) return new BankScores(0, Map.of());
+        List<EvalRun> recent = runs.findTop100ByWorkspaceIdOrderByStartedAtDesc(workspaceId);
+        Map<Long, Integer> graded = new HashMap<>();
+        if (!recent.isEmpty()) {
+            results.findRowsByRunIdIn(recent.stream().map(EvalRun::getId).toList())
+                .forEach(row -> graded.merge(row.getRunId(), 1, Integer::sum));
+        }
+        Map<String, BankScore> byModel = new HashMap<>();
+        for (EvalRun run : recent) { // du plus récent au plus ancien : le premier vu est le dernier rejeu de ce modèle
+            int notes = graded.getOrDefault(run.getId(), 0);
+            String model = notes == 0 ? null : answeredBy(run);
+            if (model != null) byModel.putIfAbsent(model, new BankScore(run.getPassed(), notes, run.getTotal(), run.getStartedAt()));
+        }
+        return new BankScores(active, byModel);
     }
 
     /** Le brouillon d'un cas, tiré du dossier d'une réponse de la personne ; elle le confirme ou le corrige. */
@@ -170,19 +208,91 @@ public class EvalService {
     public CaseSummary create(String slug, Long userId, String recordRef, String title, EvalCriteria criteria) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         requireEnabled(ws.getId());
-        if (cases.countByWorkspaceIdAndArchivedFalse(ws.getId()) >= MAX_CASES) {
-            throw new BusinessException("The test bank holds " + MAX_CASES + " cases: archive one before adding another.");
-        }
+        requireRoom(ws.getId());
         validate(criteria);
         UUID record = recordId(recordRef);
         Frozen frozen = freeze(new AgentContext(slug, ws.getId(), userId), record);
         LocalDateTime now = LocalDateTime.now();
-        EvalCase saved = cases.save(EvalCase.builder()
-            .workspaceId(ws.getId()).createdBy(userId).createdAt(now).criteriaAt(now).sourceRecord(record)
+        return summary(cases.save(frozenCase(ws.getId(), userId, record, title, frozen, now, now, criteria)), userId);
+    }
+
+    /**
+     * « Bien », d'un clic (R137) : ce qui a été observé devient ce qu'on attend (les critères que le brouillon proposait),
+     * datés maintenant. La même réponse ne se garde qu'une fois.
+     */
+    @Transactional
+    public CaseSummary keepGood(String slug, Long userId, String recordRef) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        requireEnabled(ws.getId());
+        UUID record = recordId(recordRef);
+        Optional<EvalCase> kept = cases.findFirstByWorkspaceIdAndSourceRecordAndArchivedFalseOrderByIdDesc(ws.getId(), record);
+        if (kept.isPresent()) return summary(kept.get(), userId);
+        requireRoom(ws.getId());
+        Frozen frozen = freeze(new AgentContext(slug, ws.getId(), userId), record);
+        LocalDateTime now = LocalDateTime.now();
+        return summary(cases.save(frozenCase(ws.getId(), userId, record, null, frozen, now, now, propose(frozen.calls()))), userId);
+    }
+
+    /**
+     * « Pas bien » (R137) : une phrase, ce qu'il aurait fallu faire. Une phrase ne se vérifie pas par du code : le cas se
+     * garde, il se lit dans l'histoire avec elle, et il attend ses critères. Aucun rejeu ne le note avant ({@link
+     * EvalCase#WAITING_FOR_CRITERIA}, R61).
+     */
+    @Transactional
+    public CaseSummary keepBad(String slug, Long userId, String recordRef, String expected) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        requireEnabled(ws.getId());
+        String sentence = expected == null ? "" : expected.strip();
+        if (sentence.isEmpty() || sentence.length() > MAX_EXPECTED) {
+            throw new BusinessException("Say in one sentence what Cortex should have done (" + MAX_EXPECTED + " characters at most).");
+        }
+        UUID record = recordId(recordRef);
+        Optional<EvalCase> kept = cases.findFirstByWorkspaceIdAndSourceRecordAndArchivedFalseOrderByIdDesc(ws.getId(), record);
+        if (kept.isPresent()) return summary(kept.get(), userId);
+        requireRoom(ws.getId());
+        Frozen frozen = freeze(new AgentContext(slug, ws.getId(), userId), record);
+        EvalCase waiting = frozenCase(ws.getId(), userId, record, null, frozen, LocalDateTime.now(), EvalCase.WAITING_FOR_CRITERIA,
+            EvalCriteria.sentence(sentence));
+        return summary(cases.save(waiting), userId);
+    }
+
+    /**
+     * Écrit les critères d'un cas qui les attend, une seule fois, datés maintenant : avant tout rejeu qui le notera (R61).
+     * Un cas qui a déjà les siens ne les change pas.
+     */
+    @Transactional
+    public CaseSummary giveCriteria(String slug, Long userId, Long caseId, String title, EvalCriteria criteria) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        EvalCase evalCase = cases.findByIdAndWorkspaceId(caseId, ws.getId())
+            .orElseThrow(() -> new ResourceNotFoundException("This case was not found."));
+        if (!userId.equals(evalCase.getCreatedBy()) && !authorization.isManager(ws.getId(), userId)) {
+            throw new ForbiddenException("Only the person who added this case, or an owner or admin, can write its criteria.");
+        }
+        if (!evalCase.waiting()) {
+            throw new BusinessException("This case already has its criteria: they can't change once a model may be graded on them.");
+        }
+        validate(criteria);
+        String sentence = read(evalCase.getCriteria(), EvalCriteria.class).expected();
+        evalCase.setCriteria(json(criteria.keeping(sentence)));
+        evalCase.setCriteriaAt(LocalDateTime.now());
+        if (title != null && !title.isBlank()) evalCase.setTitle(title(title, evalCase.getQuestion(), MAX_TITLE));
+        return summary(cases.save(evalCase), userId);
+    }
+
+    private void requireRoom(Long workspaceId) {
+        if (cases.countByWorkspaceIdAndArchivedFalse(workspaceId) >= MAX_CASES) {
+            throw new BusinessException("The test bank holds " + MAX_CASES + " cases: archive one before adding another.");
+        }
+    }
+
+    /** Un cas tel que le serveur le fige : sa question, sa date, ses notes et sa cassette viennent du dossier. */
+    private static EvalCase frozenCase(Long workspaceId, Long userId, UUID record, String title, Frozen frozen,
+                                       LocalDateTime createdAt, LocalDateTime criteriaAt, EvalCriteria criteria) {
+        return EvalCase.builder()
+            .workspaceId(workspaceId).createdBy(userId).createdAt(createdAt).criteriaAt(criteriaAt).sourceRecord(record)
             .title(title(title, frozen.question(), MAX_TITLE)).question(frozen.question()).askedOn(frozen.askedOn())
             .notes(json(frozen.notes())).cassette(json(frozen.cassette())).criteria(json(criteria)).archived(false)
-            .build());
-        return summary(saved, userId);
+            .build();
     }
 
     /** Archive un cas : la personne qui l'a ajouté, ou un gestionnaire de l'espace. Ses notes passées restent. */
@@ -213,8 +323,9 @@ public class EvalService {
     }
 
     /**
-     * Rejoue un cas dans un rejeu, une seule fois. Le quota et le frein de débit de l'IA valent comme pour une réponse ;
-     * une panne du modèle remonte telle quelle, sans note, pour qu'on rejoue le cas.
+     * Rejoue un cas dans un rejeu, une seule fois. Le quota et le frein de débit de l'IA valent comme pour une réponse. Un
+     * cas trop lent (le budget d'un cas du banc, R142) ne se note pas et n'arrête pas le rejeu ; une panne du modèle se dit,
+     * sans note, pour qu'on rejoue le cas.
      */
     public Result runCase(String slug, Long userId, Long runId, Long caseId) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
@@ -225,12 +336,24 @@ public class EvalService {
         Optional<EvalResult> done = results.findByRunIdAndCaseId(runId, caseId);
         if (done.isPresent()) return result(done.get(), evalCase);
         if (evalCase.isArchived()) throw new BusinessException("This case is archived.");
+        if (evalCase.waiting()) throw new BusinessException("This case is still waiting for its criteria.");
         if (evalCase.getCriteriaAt().isAfter(run.getStartedAt())) {
             throw new BusinessException("This case was written after the run started: its criteria must come first.");
         }
         aiUsage.assertWithinQuota(ws.getId());
         String model = DEFAULT_MODEL.equals(run.getModel()) ? null : run.getModel();
-        ReplayOutcome outcome = agent.replay(new AgentContext(slug, ws.getId(), userId), replayCase(evalCase), model);
+        ReplayOutcome outcome;
+        try {
+            outcome = stops.during(ws.getId(), userId, () -> ModelDeadline.within(BenchmarkSuite.CASE_BUDGET,
+                () -> agent.replay(new AgentContext(slug, ws.getId(), userId), replayCase(evalCase), model)));
+        } catch (LlmTimedOutException late) {
+            return new Result(caseId, evalCase.getTitle(), false,
+                List.of(new EvalGrader.Check(ModelCapabilityService.ANSWERS_IN_TIME, false, ModelCapabilityService.TOO_SLOW_DETAIL)),
+                List.of(), "", model);
+        } catch (AiGatewayClient.LlmException down) {
+            throw new BusinessException("MODEL_FAILED", (model == null ? "This model" : model)
+                + " stopped answering on this machine. Replay it again, or replay another model.");
+        }
         recordUsage(ws.getId(), outcome.usage());
         EvalGrader.Grade grade = EvalGrader.grade(read(evalCase.getCriteria(), EvalCriteria.class), outcome);
         Details details = new Details(grade.checks(), outcome.calls(), shorten(outcome.answer(), MAX_ANSWER), outcome.model());
@@ -399,6 +522,9 @@ public class EvalService {
         if (!criteria.effect().isEmpty() && !EFFECTS.contains(criteria.effect())) {
             throw new BusinessException("A rule effect is allow, ask or deny.");
         }
+        if (criteria.expected().length() > MAX_EXPECTED) {
+            throw new BusinessException("What it should have done takes " + MAX_EXPECTED + " characters at most.");
+        }
         if (criteria.args().size() > MAX_ITEMS) throw new BusinessException("A case checks " + MAX_ITEMS + " arguments at most.");
         criteria.args().forEach((key, values) -> {
             if (key.isBlank() || key.length() > 64) throw new BusinessException("An argument needs a short name.");
@@ -471,7 +597,8 @@ public class EvalService {
     private static CaseSummary summary(EvalCase evalCase, Long userId) {
         EvalCriteria criteria = read(evalCase.getCriteria(), EvalCriteria.class);
         return new CaseSummary(evalCase.getId(), evalCase.getTitle(), evalCase.getQuestion(), criteria.tool(),
-            evalCase.getCreatedAt(), evalCase.getCriteriaAt(), userId.equals(evalCase.getCreatedBy()));
+            evalCase.getCreatedAt(), evalCase.getCriteriaAt(), userId.equals(evalCase.getCreatedBy()), criteria.expected(),
+            evalCase.waiting());
     }
 
     private static RunSummary summary(EvalRun run) {

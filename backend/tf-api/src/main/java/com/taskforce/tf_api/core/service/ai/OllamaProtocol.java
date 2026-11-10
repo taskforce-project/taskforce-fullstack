@@ -180,12 +180,15 @@ final class OllamaProtocol {
     }
 
     /**
-     * Ce que la fiche d'un modèle dit de lui, dans la réponse de {@code /api/show} (R113, R125) : sa taille
-     * ({@code details.parameter_size}, « 8.2B »), sa fenêtre de contexte, et s'il prend des outils ({@code capabilities},
-     * qu'Ollama donne depuis 0.6 ; {@code null} quand la fiche ne le dit pas). Une description, jamais une mesure.
+     * Ce que la fiche d'un modèle dit de lui, dans la réponse de {@code /api/show} (R113, R125, R142) : sa taille
+     * ({@code details.parameter_size}, « 8.2B »), sa fenêtre de contexte, s'il prend des outils ({@code capabilities},
+     * qu'Ollama donne depuis 0.6 ; {@code null} quand la fiche ne le dit pas), sa famille, et s'il sait converser. Une
+     * description, jamais une mesure.
      */
     static ModelGateway.ModelCard card(JsonNode show) {
-        String size = show.path("details").path("parameter_size").asText("").strip();
+        JsonNode details = show.path("details");
+        String size = details.path("parameter_size").asText("").strip();
+        String family = details.path("family").asText("").strip();
         int window = contextLength(show);
         JsonNode capabilities = show.path("capabilities");
         Boolean tools = null;
@@ -195,19 +198,67 @@ final class OllamaProtocol {
                 if ("tools".equals(capability.asText())) tools = true;
             }
         }
-        return new ModelGateway.ModelCard(size.isEmpty() ? null : size, window > 0 ? window : null, tools);
+        return new ModelGateway.ModelCard(size.isEmpty() ? null : size, window > 0 ? window : null, tools,
+            family.isEmpty() ? null : family, chats(show, tools), null);
+    }
+
+    /**
+     * Le modèle sait-il converser ? Un modèle de base (qwen2.5-coder:7b-base : {@code ["completion","insert"]}, un gabarit
+     * qui ne parle que de {@code .Prompt} et {@code .Suffix}) complète du texte : il répond à côté, sans outil (vérifié le
+     * 09/11/2026 sur les sept modèles de la Présidence). Un modèle qui prend des outils converse, même quand son gabarit ne
+     * nomme pas les messages (qwen3.5:9b, rendu par Ollama lui-même) ; sinon, c'est son gabarit qui le dit. {@code null}
+     * quand la fiche ne donne pas ses capacités (Ollama avant 0.6) : on ne sait pas, on essaie.
+     */
+    static Boolean chats(JsonNode show, Boolean tools) {
+        if (tools == null) return null;
+        if (tools) return true;
+        String template = show.path("template").asText("");
+        return template.contains(".Messages") || template.contains(".System");
+    }
+
+    /** La requête qui charge un modèle sans lui rien demander : une conversation sans message, à cette fenêtre. */
+    static ObjectNode loadRequest(ObjectMapper mapper, String model, int window) {
+        ObjectNode body = mapper.createObjectNode();
+        body.put("model", model);
+        body.putArray("messages");
+        body.put("stream", false);
+        body.putObject("options").put("num_ctx", window);
+        return body;
     }
 
     /** La fenêtre du modèle chargé, dans la réponse de {@code /api/ps} ; 0 s'il n'est pas chargé. */
     static int loadedWindow(JsonNode ps, String model) {
+        JsonNode row = loadedRow(ps, model);
+        return row == null ? 0 : Math.max(0, row.path("context_length").asInt(0));
+    }
+
+    /** Où tient le modèle chargé, dans la réponse de {@code /api/ps} : sa mémoire et ce qui en tient sur la carte graphique. */
+    static ModelGateway.LoadedModel loaded(JsonNode ps, String model) {
+        JsonNode row = loadedRow(ps, model);
+        if (row == null) return new ModelGateway.LoadedModel(0, 0);
+        return new ModelGateway.LoadedModel(Math.max(0, row.path("size").asLong(0)), Math.max(0, row.path("size_vram").asLong(0)));
+    }
+
+    private static JsonNode loadedRow(JsonNode ps, String model) {
         for (JsonNode row : ps.path("models")) {
             String name = row.path("name").asText("");
             String id = row.path("model").asText("");
             if (name.equals(model) || id.equals(model) || name.equals(model + ":latest") || id.equals(model + ":latest")) {
-                return Math.max(0, row.path("context_length").asInt(0));
+                return row;
             }
         }
-        return 0;
+        return null;
+    }
+
+    /** La place sur le disque de chaque modèle installé, dans la réponse de {@code /api/tags}, en octets. */
+    static Map<String, Long> diskSizes(JsonNode tags) {
+        Map<String, Long> sizes = new HashMap<>();
+        for (JsonNode row : tags.path("models")) {
+            String name = row.path("name").asText("");
+            long size = row.path("size").asLong(0);
+            if (!name.isEmpty() && size > 0) sizes.put(name, size);
+        }
+        return sizes;
     }
 
     /** Les arguments d'un appel d'outil, en objet ; illisibles ou d'une autre forme, un objet vide. */

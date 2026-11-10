@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest"
 
 import { CONSTANTS_EN } from "@/lib/constants_en"
 import type { ModelCapabilityRow, ModelCapabilityScore, ModelCapabilityTable } from "@/lib/api/model-capability-service"
-import { failedCaseTitles, fillModelText, proposalLines, proposedFor, scoreLine, scoreSign, scoreText } from "./model-table"
+import { failedCaseTitles, fillModelText, proposalLines, proposedFor, scoreSign, scoreText } from "./model-table"
 
 const t = CONSTANTS_EN.models
 
 const score = (over: Partial<ModelCapabilityScore> = {}): ModelCapabilityScore => ({
-  capability: "tools", passed: 2, measured: 2, total: 2, capable: true, heldWords: null, measuredAt: "2026-11-04T10:00:00",
+  capability: "tools", passed: 2, measured: 2, total: 2, capable: true, heldWords: null, measuredAt: "2026-11-04T10:00:00", tooSlow: 0,
   ...over,
 })
 
@@ -23,6 +23,8 @@ describe("scoreText and scoreSign : une capacité d'un modèle (R113, R130)", ()
       "1/2 · holds 500 words", "partly"],
     ["no document", score({ capability: "context", passed: 0, capable: false, heldWords: 0 }),
       "0/2 · lost the shortest document", "failed"],
+    ["too slow on every case", score({ passed: 0, measured: 0, capable: false, tooSlow: 2 }), "2 too slow here", "slow"],
+    ["too slow on one case", score({ passed: 1, measured: 1, capable: false, tooSlow: 1 }), "1 of 1 measured · 1 too slow here", "slow"],
   ])("%s", (_label, s, text, sign) => {
     expect(scoreText(s, t)).toBe(text)
     expect(scoreSign(s)).toBe(sign)
@@ -59,10 +61,6 @@ describe("proposalLines : ce que TaskForce propose", () => {
     scores: [score(), score({ capability: "context", passed: 1, capable: false }), score({ capability: "new" })],
     failedCases: ["tools-move", "gone"],
   }
-
-  it("says the scores of a model in words, for its detail", () => {
-    expect(scoreLine(table, row, t)).toBe("Tools 2/2 · Long context 1/2 · new 2/2")
-  })
 
   it("names the failed cases of a model; a case it does not know keeps its key; none without the field", () => {
     const withCases = { ...table, cases: [{ key: "tools-move", capability: "tools", title: "Move an issue" }] }

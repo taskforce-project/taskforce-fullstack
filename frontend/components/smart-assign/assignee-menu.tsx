@@ -66,7 +66,7 @@ interface AssigneeMenuProps {
    * L'agent qui travaille sur l'issue au nom de la personne qui l'a déléguée (« Claude Code, for Pierre »), tant que la
    * mission court ou attend sa relecture : le bouton le montre à la place de l'assigné, qui ne change pas.
    */
-  working?: { label: string; hint: string } | null
+  working?: { label: string; hint: string; logoKey?: string } | null
 }
 
 /** Résumé court "pourquoi" pour une personne quand le LLM n'a pas rendu de phrase. */
@@ -154,9 +154,12 @@ export function AssigneeMenu({
           className="flex min-h-8 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-1 text-left text-sm shadow-xs outline-none transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-input/30 dark:hover:bg-input/50"
         >
           {working ? (
-            // Le nom de l'agent seul, jamais son logo (conditions d'Anthropic, ADR-013).
             <span className="flex min-w-0 items-center gap-1.5" title={working.hint}>
-              <Bot className="size-4 shrink-0 text-primary" />
+              {working.logoKey ? (
+                <BrandLogo slug={working.logoKey} name={working.label} className="size-4 shrink-0" />
+              ) : (
+                <Bot className="size-4 shrink-0 text-primary" />
+              )}
               <span className="truncate">{working.label}</span>
             </span>
           ) : assignee ? (
@@ -303,15 +306,10 @@ export function AssigneeMenu({
                         <span className="min-w-0">
                           <span className="flex items-center gap-1.5">
                             <span className="truncate">{a.displayName}</span>
-                            {/* L'agent à l'essai de R51 se dit à l'essai, et dit ce qu'il rend. */}
-                            {a.trial && (
-                              <span className="shrink-0 border border-border px-1 text-[10px] uppercase text-muted-foreground">
-                                {models.trial}
-                              </span>
-                            )}
                           </span>
+                          {/* Cortex (R144) dit ce qu'il rend. */}
                           {a.ready && a.trial && (
-                            <span className="block whitespace-normal text-xs text-muted-foreground">{models.trialHint}</span>
+                            <span className="block whitespace-normal text-xs text-muted-foreground">{models.cortexHint}</span>
                           )}
                           {!a.ready && a.reason && (
                             <span className="block whitespace-normal text-xs text-muted-foreground">{a.reason}</span>

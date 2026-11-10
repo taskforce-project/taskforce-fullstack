@@ -69,14 +69,15 @@ export function DesktopLegal({ kind }: Readonly<{ kind: "legal" | "privacy" }>) 
                 go through your GitHub command-line tool.
               </p>
               <p>
-                If you use the microphone, what you say is transcribed on this computer and the audio goes nowhere. The
-                first time, the app downloads the speech model once from Hugging Face, which receives that request: it
+                What you say into the microphone is transcribed on this computer and the audio goes nowhere. After its
+                first start, the app downloads the speech model once from Hugging Face, which receives that request: it
                 is Parakeet TDT 0.6b v3 by NVIDIA, under the CC BY 4.0 license.
               </p>
               <p>
                 The app checks GitHub for new versions. It sends no usage data. You can export your data in Settings,
                 Privacy &amp; Data, and delete your account from your online account page (Settings, Account).
               </p>
+              <p>Last updated: 9 November 2026.</p>
             </>
           )}
         </div>

@@ -186,4 +186,16 @@ class ScreenContextTest {
         assertThat(attached.open()).isNull();
         assertThat(screens.attached(new AgentContext("acme", 1L, 7L), null).isEmpty()).isTrue();
     }
+
+    @Test
+    @DisplayName("la conversation dit où elle travaille (R135) ; sans projet, ou un projet que la personne ne voit plus : rien")
+    void the_project_of_the_conversation() {
+        AgentContext inProject = new AgentContext("acme", 1L, 7L, Screen.NONE, "x", 12L, 1L);
+        assertThat(screens.conversationProject(inProject))
+            .isEqualTo("This conversation works in the project TESTTA \"test taskforce\": what the person asks is about it unless they name another.\n");
+
+        assertThat(screens.conversationProject(new AgentContext("acme", 1L, 7L))).isEmpty();
+        when(projectService.getProject("acme", 13L, 7L)).thenThrow(new ForbiddenException("no"));
+        assertThat(screens.conversationProject(new AgentContext("acme", 1L, 7L, Screen.NONE, "x", 13L, 1L))).isEmpty();
+    }
 }

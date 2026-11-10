@@ -22,17 +22,16 @@ describe("AnswerText : ce que TaskForce dit se voit comme sa parole (R116)", () 
     expect(screen.queryByText(/\[!taskforce\]/i)).not.toBeInTheDocument()
   })
 
-  /** R115 : les questions de TaskForce se lisent sur leur carte ; sans elle (une conversation rouverte), dans le bloc. */
+  /** R115, R136 : les questions d'un geste se lisent sur leur carte ; sans elle (une conversation rouverte), comme les mots de Cortex. */
   const ASKS = "> [!taskforce] TaskForce · asks\n> What should the project be called?\n> Where does its code live?\n"
 
-  it("shows TaskForce's questions under its name when their card is not there", () => {
+  it("reads the questions as Cortex's words when their card is not there: one voice", () => {
     render(<AnswerText text={ASKS} />)
 
-    const note = screen.getByRole("note", { name: t.taskforceAsksLabel })
-    expect(note).toHaveAttribute("title", t.taskforceAsksHint)
-    expect(note).toHaveTextContent(t.taskforceAsksWhat)
-    expect(note).not.toHaveTextContent(t.taskforceSaysWhat)
-    expect(note).toHaveTextContent("Where does its code live?")
+    expect(screen.queryByRole("note")).not.toBeInTheDocument()
+    expect(screen.queryByText(t.taskforceSays)).not.toBeInTheDocument()
+    expect(screen.getByText("What should the project be called?")).toBeInTheDocument()
+    expect(screen.getByText("Where does its code live?")).toBeInTheDocument()
   })
 
   it("leaves the questions to their card, and keeps the rest of the answer", () => {

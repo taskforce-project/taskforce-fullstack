@@ -9,35 +9,31 @@ import type { ModelCapabilityRow, ModelCapabilityScore, ModelCapabilityTable } f
 
 type ModelTexts = (typeof CONSTANTS_EN)["models"];
 
-/** Le signe d'une capacité (« Le dessin », séance n°19) : point plein, demi-point, cercle, tiret. */
-export type CapabilitySign = "passed" | "partly" | "failed" | "none";
+/** Le signe d'une capacité (« Le dessin », séance n°19) : point plein, demi-point, cercle, tiret, et un cadran pour « trop lent » (R142). */
+export type CapabilitySign = "passed" | "partly" | "failed" | "slow" | "none";
 
 const fill = (text: string, values: Record<string, string | number>): string =>
   text.replace(/\{(\w+)\}/g, (all, key: string) => (key in values ? String(values[key]) : all));
 
-/** Réussie : tous ses cas mesurés et réussis ; ratée : aucun de ses cas mesurés n'a réussi ; en partie, le reste. */
+/** Réussie : tous ses cas mesurés et réussis ; ratée : aucun de ses cas mesurés n'a réussi ; en partie, le reste. Un cas trop lent n'est ni l'un ni l'autre. */
 export function scoreSign(score: ModelCapabilityScore): CapabilitySign {
+  if (score.tooSlow > 0) return "slow";
   if (score.measured === 0) return "none";
   if (score.capable) return "passed";
   return score.passed === 0 ? "failed" : "partly";
 }
 
-/** « 2/2 », « 1 of 2 measured », « Not measured » ; le contexte dit en plus la taille tenue. */
+/** « 2/2 », « 1 of 2 measured », « Not measured » ; le contexte dit en plus la taille tenue, un cas trop lent le dit aussi. */
 export function scoreText(score: ModelCapabilityScore, t: ModelTexts): string {
-  if (score.measured === 0) return t.notMeasured;
+  const slow = score.tooSlow > 0 ? fill(t.tooSlow, { count: score.tooSlow }) : null;
+  if (score.measured === 0) return slow ?? t.notMeasured;
   const base = score.measured === score.total
     ? `${score.passed}/${score.total}`
     : fill(t.partial, { passed: score.passed, measured: score.measured });
-  if (score.capability !== "context" || score.heldWords === null) return base;
-  const held = score.heldWords === 0 ? t.heldNone : fill(t.heldWords, { words: score.heldWords.toLocaleString("en-US") });
-  return `${base} · ${held}`;
-}
-
-/** Les capacités d'un modèle en mots, pour son détail (R130) : « Tools 2/2 · Long context 1/2 · holds 500 words ». */
-export function scoreLine(table: ModelCapabilityTable, row: ModelCapabilityRow, t: ModelTexts): string {
-  return row.scores
-    .map((score) => `${table.capabilities.find((c) => c.key === score.capability)?.label ?? score.capability} ${scoreText(score, t)}`)
-    .join(" · ");
+  const held = score.capability !== "context" || score.heldWords === null
+    ? null
+    : score.heldWords === 0 ? t.heldNone : fill(t.heldWords, { words: score.heldWords.toLocaleString("en-US") });
+  return [base, held, slow].filter(Boolean).join(" · ");
 }
 
 /** Les titres des cas ratés d'un modèle à leur dernière note, dans l'ordre de la suite ; un cas inconnu garde sa clé. */

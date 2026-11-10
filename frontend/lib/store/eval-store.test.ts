@@ -11,6 +11,9 @@ vi.mock("../api/eval-service", () => ({
   getEvalBank: vi.fn(),
   getEvalHistory: vi.fn(),
   getEvalRun: vi.fn(),
+  giveEvalCriteria: vi.fn(),
+  keepBadCase: vi.fn(),
+  keepGoodCase: vi.fn(),
   runEvalCase: vi.fn(),
   setEvalBankEnabled: vi.fn(),
   startEvalRun: vi.fn(),
@@ -36,6 +39,70 @@ describe("useEvalStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useEvalStore.setState({ bank: null, run: null, progress: null, error: null, history: null, historyFailed: false });
+    vi.mocked(service.getEvalHistory).mockResolvedValue({ runs: [], cases: [] });
+  });
+
+  /** « Bien », « pas bien » et les critères d'un cas qui les attend (R137) : la banque et l'histoire les montrent aussitôt. */
+  describe("sous une réponse", () => {
+    const WAITING = { ...CASE, id: 50, waiting: true, expected: "Ask first." };
+
+    it("bien : garde le cas, dans la banque et l'histoire", async () => {
+      useEvalStore.setState({ bank: BANK });
+      vi.mocked(service.keepGoodCase).mockResolvedValue({ ...CASE, id: 60 });
+
+      expect(await useEvalStore.getState().keepGood("acme", "r-1")).toMatchObject({ id: 60 });
+
+      expect(service.keepGoodCase).toHaveBeenCalledWith("acme", "r-1");
+      expect(useEvalStore.getState().bank?.cases.map((c) => c.id)).toEqual([60, 40]);
+      expect(service.getEvalHistory).toHaveBeenCalledWith("acme");
+    });
+
+    it("pas bien : la phrase part, le cas attend ses critères", async () => {
+      vi.mocked(service.keepBadCase).mockResolvedValue(WAITING);
+
+      expect(await useEvalStore.getState().keepBad("acme", "r-1", "Ask first.")).toEqual(WAITING);
+
+      expect(service.keepBadCase).toHaveBeenCalledWith("acme", "r-1", "Ask first.");
+    });
+
+    it("la même réponse gardée deux fois ne se double pas", async () => {
+      useEvalStore.setState({ bank: BANK });
+      vi.mocked(service.keepGoodCase).mockResolvedValue(CASE);
+
+      await useEvalStore.getState().keepGood("acme", "r-1");
+
+      expect(useEvalStore.getState().bank?.cases).toHaveLength(1);
+    });
+
+    it("les critères écrits remplacent le cas qui les attendait", async () => {
+      useEvalStore.setState({ bank: { ...BANK, cases: [WAITING] } });
+      const done = { ...WAITING, waiting: false };
+      vi.mocked(service.giveEvalCriteria).mockResolvedValue(done);
+
+      expect(await useEvalStore.getState().giveCriteria("acme", 50, "T", CRITERIA)).toEqual(done);
+
+      expect(useEvalStore.getState().bank?.cases).toEqual([done]);
+      expect(service.getEvalHistory).toHaveBeenCalled();
+    });
+
+    it("sans banque lue, rien ne casse", async () => {
+      vi.mocked(service.giveEvalCriteria).mockResolvedValue(CASE);
+
+      expect(await useEvalStore.getState().giveCriteria("acme", 40, "T", CRITERIA)).toEqual(CASE);
+      expect(useEvalStore.getState().bank).toBeNull();
+    });
+
+    it.each([
+      ["keepGood", () => useEvalStore.getState().keepGood("acme", "r-1"), service.keepGoodCase],
+      ["keepBad", () => useEvalStore.getState().keepBad("acme", "r-1", "x"), service.keepBadCase],
+      ["giveCriteria", () => useEvalStore.getState().giveCriteria("acme", 1, "T", CRITERIA), service.giveEvalCriteria],
+    ])("%s qui échoue rend null, la raison dans error", async (_, call, mocked) => {
+      vi.mocked(mocked as typeof service.keepGoodCase).mockRejectedValue(new Error("The test bank is off"));
+
+      await expect(call()).resolves.toBeNull();
+
+      expect(useEvalStore.getState().error).toBe("The test bank is off");
+    });
   });
 
   afterEach(() => vi.useRealTimers());

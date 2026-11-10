@@ -120,6 +120,9 @@ async function refreshAccessToken(): Promise<string | null> {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
+    // Une requête que la personne a coupée (l'arrêt d'un tour, R134) n'est pas une panne : rien à dire, rien à rejouer.
+    if (axios.isCancel(error)) return Promise.reject(error);
+
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     const requestUrl = error.config?.url ?? ""
@@ -278,6 +281,11 @@ export function getErrorMessage(error: unknown): string {
  */
 export function getErrorStatus(error: unknown): number | undefined {
   return axios.isAxiosError(error) ? error.response?.status : undefined;
+}
+
+/** La réponse n'est pas arrivée à temps (le délai du navigateur, ou un 504 d'un relais devant l'API). */
+export function isRequestTimeout(error: unknown): boolean {
+  return axios.isAxiosError(error) && (error.code === "ECONNABORTED" || error.response?.status === 504);
 }
 
 /**
