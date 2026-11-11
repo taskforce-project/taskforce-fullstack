@@ -126,7 +126,8 @@ public class LocalRunnerService {
 
             LocalDateTime now = LocalDateTime.now();
             // Tout est lu AVANT la mise à jour : elle vide le contexte de persistance (entités détachées).
-            RulesBundle rules = rulesService.bundleFor(project.getWorkspace());
+            RulesBundle rules = rulesService.bundleFor(project.getWorkspace(),
+                new HarnessRulesService.Work(project.getId(), null, owner.getId()));
             RunnerClaimResponse.FollowUp followUp = followUpOf(candidate);
             RunnerClaimResponse claim = new RunnerClaimResponse(
                 runId,

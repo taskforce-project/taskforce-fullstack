@@ -103,7 +103,7 @@ class MissionChangesServiceTest {
         lenient().when(project.getRepoFullName()).thenReturn("acme/website");
         lenient().when(visibilityGuard.canWrite(any(), anyLong())).thenReturn(true);
         lenient().when(presence.online(USER_ID, RUNNER_ID)).thenReturn(true);
-        lenient().when(rulesService.bundleFor(any())).thenReturn(RULES);
+        lenient().when(rulesService.bundleFor(any(), any())).thenReturn(RULES);
         lenient().when(userRepository.getReferenceById(USER_ID)).thenReturn(ada);
         lenient().when(userRepository.findByEmail("ada@taskforce.dev")).thenReturn(Optional.of(ada));
         lenient().when(commandRepository.save(any())).thenAnswer(i -> {
