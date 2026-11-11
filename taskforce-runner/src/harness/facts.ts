@@ -1,7 +1,7 @@
 import { lstatSync, realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-import type { Facts } from "./engine/rules-engine.js";
+import { secretIn, type Facts } from "./engine/rules-engine.js";
 
 /**
  * Ce qu'on sait d'une action de Claude Code avant qu'elle parte, pour la juger (contracts/README.md). Une action qu'on
@@ -251,13 +251,56 @@ function escapes(pattern: string): boolean {
   return isAbsolute(pattern) || pattern.startsWith("~") || pattern.split(/[\\/]/).includes("..");
 }
 
+/** Les outils qui ne font que lire dans la copie : ce qu'ils portent ne part nulle part. */
+const LOCAL_READS: ReadonlySet<string> = new Set(["Read", "Glob", "Grep"]);
+
+/**
+ * Le fait `secret` du socle (R157 : aucun secret ne sort) : ce que l'appel enverrait ou écrirait (une commande, une
+ * adresse, une requête, le contenu d'un fichier, les arguments d'un outil) porte un secret d'un format reconnu. Le moteur
+ * compilé le reconnaît, comme le serveur.
+ */
+export function carriesSecret(toolName: string, toolInput: unknown): boolean {
+  if (LOCAL_READS.has(toolName) || toolInput === undefined || toolInput === null) return false;
+  const text = outgoing(toolName, toolInput);
+  return text.length > 0 && secretIn(text);
+}
+
+/**
+ * Ce qu'un appel écrit ou envoie : le texte nouveau d'une modification (pas celui qu'elle remplace, déjà dans le dépôt),
+ * le contenu d'un fichier écrit ; pour tout autre outil, son entrée entière.
+ */
+function outgoing(toolName: string, toolInput: unknown): string {
+  if (typeof toolInput !== "object") return String(toolInput);
+  const input = toolInput as Record<string, unknown>;
+  const text = (value: unknown): string => (typeof value === "string" ? value : "");
+  switch (toolName) {
+    case "Edit":
+      return text(input.new_string);
+    case "MultiEdit":
+      return (Array.isArray(input.edits) ? input.edits : [])
+        .map((edit: unknown) => text((edit as Record<string, unknown> | null)?.new_string)).join("\n");
+    case "Write":
+      return text(input.content);
+    case "NotebookEdit":
+      return text(input.new_source);
+    default:
+      return JSON.stringify(toolInput);
+  }
+}
+
 /**
  * Les faits d'un appel d'outil : plusieurs pour une commande composée (un par morceau) ou une action qu'on ne sait pas
- * borner, aucun pour un outil interne. Le plus strict l'emporte (`decideAll`).
+ * borner, aucun pour un outil interne. Le plus strict l'emporte (`decideAll`). Un appel qui porte un secret le dit dans
+ * chacun de ses faits : le socle le refuse.
  * `tool_input` vient de Claude Code : on n'en lit que ce qui sert à juger.
  */
 export function toolFacts(toolName: string, toolInput: unknown, workDir: string): Facts[] {
   if (INTERNAL_TOOLS.has(toolName)) return [];
+  const facts = describedFacts(toolName, toolInput, workDir);
+  return carriesSecret(toolName, toolInput) ? facts.map((f) => ({ ...f, secret: "true" })) : facts;
+}
+
+function describedFacts(toolName: string, toolInput: unknown, workDir: string): Facts[] {
   const input = (toolInput && typeof toolInput === "object" ? toolInput : {}) as Record<string, unknown>;
 
   const fileAction = FILE_TOOLS[toolName];
