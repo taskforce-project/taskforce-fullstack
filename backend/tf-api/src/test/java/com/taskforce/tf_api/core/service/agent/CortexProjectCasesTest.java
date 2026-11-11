@@ -92,6 +92,10 @@ class CortexProjectCasesTest {
     @Mock private CycleService cycleService;
     @Mock private HarnessRuleSetRepository ruleSets;
     @Mock private WorkspaceRepository workspaces;
+    @Mock private com.taskforce.tf_api.core.repository.WorkspaceMemberRepository members;
+    @Mock private com.taskforce.tf_api.core.repository.ProjectMemberRepository projectMembers;
+    @Mock private com.taskforce.tf_api.core.repository.ProjectRepository projectRepository;
+    @Mock private com.taskforce.tf_api.core.repository.IssueRepository issueRepository;
 
     private final ObjectMapper json = new ObjectMapper();
     private AgentService service;
@@ -117,7 +121,9 @@ class CortexProjectCasesTest {
         when(tools.get("create_issue")).thenReturn(createIssue);
 
         service = new AgentService(access, search, tools, llm, json, aiUsage, workspaceMcp, authorization,
-            new CortexGate(new HarnessRulesService(ruleSets), workspaces), records, undo, screens, material, resolver, conversations);
+            new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projectRepository, issueRepository, json),
+            new com.taskforce.tf_api.core.service.rules.RuleApprovers(members, projectMembers), records, undo, screens, material,
+            resolver, conversations);
     }
 
     private static ProjectResponse project(Long id, String key, String name) {
