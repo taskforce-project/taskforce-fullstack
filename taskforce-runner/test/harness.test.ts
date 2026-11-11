@@ -91,10 +91,10 @@ describe("contrat des règles : empreinte du paquet", () => {
   });
 
   it("un paquet tel que le serveur l'envoie, conditions vides à null, juge comme le contrat", () => {
-    const empty = { action: null, tool: null, command: null, path: null, branch: null, repoVisibility: null, server: null, sensitivity: null };
+    const empty = { action: null, tool: null, command: null, path: null, branch: null, repoVisibility: null, server: null, sensitivity: null, actor: null, over: null };
     const fromServer = {
       ...defaults, project: null, issuedAt: null,
-      rules: defaults.rules.map((r) => ({ ...r, inverse: null, when: { ...empty, ...r.when } })),
+      rules: defaults.rules.map((r) => ({ ...r, inverse: r.inverse ?? null, when: { ...empty, ...r.when } })),
     } as unknown as RulesBundle;
     const received = verifiedBundle({ ...fromServer, digest: bundleDigest(fromServer) });
     for (const c of ruleCases.decisions) {
@@ -106,7 +106,7 @@ describe("contrat des règles : empreinte du paquet", () => {
 
   it("refuse un paquet modifié après son empreinte, ou sans règles", () => {
     const signed = { ...defaults, digest: bundleDigest(defaults) };
-    const loosened = { ...signed, rules: signed.rules.map((r) => (r.id === "pay" ? { ...r, effect: "allow" as const } : r)) };
+    const loosened = { ...signed, rules: signed.rules.map((r) => (r.id === "delete-issue" ? { ...r, effect: "allow" as const } : r)) };
     assert.throws(() => verifiedBundle(loosened), /do not match their digest/);
     assert.throws(() => verifiedBundle(undefined), /without rules/);
   });
@@ -284,7 +284,7 @@ describe("faits d'une action de Claude Code, jugés par la table par défaut", (
 });
 
 describe("plusieurs faits pour un appel : le plus strict l'emporte", () => {
-  it("aucun fait : autorisé, sans règle", () => assert.deepEqual(decideAll(defaults, []), { effect: "allow", rule: null }));
+  it("aucun fait : autorisé, sans règle", () => assert.deepEqual(decideAll(defaults, []), { effect: "allow", rule: null, require: null }));
 
   it("autorisé puis refusé : refusé, par la règle qui refuse", () => {
     const d = decideAll(defaults, [{ action: "file.read" }, { action: "shell", command: "git push" }, { action: "file.write" }]);
