@@ -18,7 +18,8 @@ import com.taskforce.tf_api.core.harness.rules.RulesBundle.Rule;
  *   effet égal, la première règle du paquet ; aucune règle : l'action est inconnue, donc demandée.</li>
  *   <li>Les couches de l'entreprise (R157) ne font que durcir : une de leurs règles qui demande ou refuse l'emporte si
  *   elle est plus stricte, et à effet égal, la première du paquet (le serveur y range les couches de la plus précise à
- *   la plus large, avant la table) ; une de leurs règles qui autorise ne compte jamais.</li>
+ *   la plus large, avant la table) ; une de leurs règles qui autorise ne compte jamais. Elles ne décident jamais de
+ *   {@code harness.change}, l'action que TaskForce garde : seule sa table en décide.</li>
  *   <li>Quand la décision est de demander, les obligations de toutes les règles qui demandent s'ajoutent : chaque liste
  *   de personnes désignées, le plus grand nombre de signatures, la séparation de qui prépare et de qui signe (R98).</li>
  *   <li>Le socle ({@link RulesFloor}) passe en dernier, après toutes les couches, et aucune ne le relâche.</li>
@@ -29,6 +30,9 @@ public final class RulesEngine {
     public static final String ALLOW = "allow";
     public static final String ASK = "ask";
     public static final String DENY = "deny";
+
+    /** L'action que TaskForce garde, changer les règles : seule sa table en décide, jamais une couche de l'entreprise. */
+    public static final String HARNESS_CHANGE = "harness.change";
 
     /**
      * La règle qui l'emporte ; {@code rule} est nul quand aucune règle ne s'applique. {@code require} n'existe que pour
@@ -73,10 +77,11 @@ public final class RulesEngine {
 
     /** @param facts ce qu'on sait de l'action, par nom de condition ; un fait absent ne satisfait jamais une condition. */
     public static Decision decide(RulesBundle bundle, Map<String, String> facts) {
+        boolean ours = HARNESS_CHANGE.equals(facts.get("action"));
         Rule winner = null;
         for (Rule rule : bundle.rules()) {
-            if (!matches(rule.when(), facts)) {
-                continue;
+            if ((ours && rule.layer() != null) || !matches(rule.when(), facts)) {
+                continue; // changer les règles : seule la table de TaskForce en décide, jamais une couche de l'entreprise
             }
             int rank = rank(rule.effect());
             if (rule.layer() != null && rank == rank(ALLOW)) {
@@ -120,8 +125,12 @@ public final class RulesEngine {
 
     /** Les obligations des règles qui demandent et couvrent ces faits, réunies ; nulles s'il n'y en a aucune. */
     private static Obligations obligations(RulesBundle bundle, Map<String, String> facts) {
+        boolean ours = HARNESS_CHANGE.equals(facts.get("action"));
         List<Obligations> asked = new ArrayList<>();
         for (Rule rule : bundle.rules()) {
+            if (ours && rule.layer() != null) {
+                continue;
+            }
             if (rule.require() != null && ASK.equals(rule.effect()) && matches(rule.when(), facts)) {
                 RulesBundle.Require r = rule.require();
                 List<List<String>> approvers = r.approvers() == null || r.approvers().isEmpty()

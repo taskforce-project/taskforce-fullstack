@@ -102,6 +102,15 @@
       "expect": { "effect": "deny", "rule": "floor-no-agent-rules", "require": null }
     },
     {
+      "name": "a company layer never decides harness.change, the action TaskForce owns: its own table does",
+      "rules": [
+        { "id": "ws-ask-people", "layer": "workspace", "when": { "actor": "person" }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "Every gesture of a person waits for an admin.", "review": "2027-05-11", "require": { "approvers": ["role:admin"] } },
+        { "id": "prj-no-rule-changes", "layer": "project", "when": { "action": "harness.change" }, "class": "irreversible", "effect": "deny", "inverse": null, "owner": "lead@example.com", "reason": "Nobody changes the rules here.", "review": "2027-05-11" }
+      ],
+      "facts": { "action": "harness.change", "actor": "person" },
+      "expect": { "effect": "allow", "rule": "change-rules", "require": null }
+    },
+    {
       "name": "no secret leaves: a comment that carries one is refused",
       "rules": [],
       "facts": { "action": "comment.create", "secret": "true" },

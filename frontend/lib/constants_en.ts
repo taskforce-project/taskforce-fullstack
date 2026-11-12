@@ -578,6 +578,7 @@ export const CONSTANTS_EN = {
       loosens: "A rule you add can only make TaskForce stricter, and this one would let something happen without asking. Say what should be asked first, or refused.",
       noEffect: "TaskForce couldn't tell whether this rule asks first or refuses. Say it in other words.",
       noCondition: "TaskForce couldn't tell which actions this rule is about. Name them: changing files, deleting issues, writing in a connected tool…",
+      noAction: "TaskForce couldn't tell which kind of action this rule is about. Name it: changing files, running a command, writing in a connected tool…",
       unknownCondition: "Part of this rule is about something TaskForce doesn't know of an action. Say it in other words.",
       rulesAreTaskForce: "Changing the rules is TaskForce's own rule: only the people who may change them do. A rule can't be about it.",
       unknownAction: "TaskForce doesn't see this kind of action, so a rule about it would never apply.",
