@@ -4,8 +4,8 @@ import { useEffect } from "react"
 import { toast } from "sonner"
 
 import { CreateProjectDialog } from "@/components/dialogs/create-project-dialog"
-import { finishMcpReturn } from "@/lib/api/integration-service"
 import { useCreateProjectStore } from "@/lib/store/create-project-store"
+import { useIntegrationStore } from "@/lib/store/integration-store"
 
 /**
  * Modal GLOBAL de création de projet - monté une seule fois dans l'`AppShell`, piloté par
@@ -22,6 +22,7 @@ export function CreateProjectModal() {
   const open = useCreateProjectStore((s) => s.open)
   const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
   const closeCreateProject = useCreateProjectStore((s) => s.closeCreateProject)
+  const finishConnection = useIntegrationStore((s) => s.finishConnection)
 
   // Même retour fluide pour GitHub connecté depuis la section « dépôt de code » : le callback renvoie sur
   // `…?newProject=repo&github=connected`, on rouvre la création là où elle en était (brouillon restauré).
@@ -58,13 +59,13 @@ export function CreateProjectModal() {
       }
     }
     // Le retour du navigateur a gardé le code : l'app, connectée, finit la connexion de la personne qui l'a lancée.
-    const finishing = finishMcpReturn(params)
+    const finishing = finishConnection(params)
     if (finishing) void finishing.then(({ outcome }) => said(outcome))
     else said(mcp)
     for (const key of ["import", "mcp", "connector", "state", "finish"]) params.delete(key)
     const q = params.toString()
     window.history.replaceState({}, "", window.location.pathname + (q ? `?${q}` : ""))
-  }, [openCreateProject])
+  }, [openCreateProject, finishConnection])
 
   return <CreateProjectDialog open={open} onOpenChange={(o) => { if (!o) closeCreateProject() }} />
 }

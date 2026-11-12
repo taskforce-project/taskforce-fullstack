@@ -26,7 +26,7 @@ import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
-import { finishMcpReturn, getGitHubRepos, getGitHubRepoIssues, syncGitHub, syncSlack, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
+import { getGitHubRepos, getGitHubRepoIssues, syncGitHub, syncSlack, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { IntegrationsCatalog } from "@/components/integrations/integrations-catalog"
 import { DisconnectConfirmDialog, DISCONNECT_CONSEQUENCES } from "@/components/integrations/disconnect-confirm-dialog"
 import { WebhooksPanel } from "@/components/settings/webhooks-panel"
@@ -1964,6 +1964,7 @@ export default function SettingsPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const openSettings = useSettingsStore((s) => s.openSettings)
+  const finishConnection = useIntegrationStore((s) => s.finishConnection)
   const workspace = typeof params.workspace === "string" ? params.workspace : ""
 
   useEffect(() => {
@@ -1983,8 +1984,9 @@ export default function SettingsPage() {
       if (outcome === "admin") toast.warning(CONSTANTS_EN.connect.returnedAdmin.replace("{name}", tool), { id: "oauth-mcp" })
       if (outcome === "error") toast.error(CONSTANTS_EN.connect.returnedError.replace("{name}", tool), { id: "oauth-mcp" })
     }
-    // Le retour du navigateur a gardé le code : l'app, connectée, finit la connexion de la personne qui l'a lancée.
-    const finishing = finishMcpReturn(new URLSearchParams(searchParams.toString()))
+    // Le retour du navigateur a gardé le code : l'app, connectée, finit la connexion de la personne qui l'a lancée, et
+    // le catalogue, déjà ouvert, se relit quand elle aboutit.
+    const finishing = finishConnection(new URLSearchParams(searchParams.toString()))
     if (finishing) void finishing.then(({ outcome }) => said(outcome))
     else said(mcp)
     const target = github || slack || mcp
@@ -1994,7 +1996,7 @@ export default function SettingsPage() {
         : undefined
     openSettings(target)
     router.replace(workspace ? `/${workspace}/dashboard` : "/")
-  }, [searchParams, openSettings, router, workspace])
+  }, [searchParams, openSettings, finishConnection, router, workspace])
 
   return null
 }

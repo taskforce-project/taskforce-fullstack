@@ -22,7 +22,9 @@ import {
   getWebhookDeliveries,
   getIntegrationCatalog,
   getMcpServers,
+  finishMcpReturn,
   type IntegrationCatalog,
+  type McpOAuthCompletion,
   type McpServerStatus,
   type IntegrationStatus,
   type GitHubRepo,
@@ -47,7 +49,10 @@ interface IntegrationState {
   githubLinks:   Record<number, GitHubLink[]>;
   /** Dépôts visibles par la connexion GitHub du workspace (liaison d'un projet). */
   githubRepos:   GitHubRepo[];
-  /** Incrémenté à chaque déconnexion : le catalogue, qui garde son propre état, se relit. */
+  /**
+   * Incrémenté à chaque déconnexion, et quand une connexion revenue du navigateur aboutit : le catalogue, qui garde son
+   * propre état, se relit.
+   */
   changes:       number;
   /**
    * Les connecteurs que « Connectors » montre (R122) : le catalogue de l'espace, et l'état des serveurs MCP connectés
@@ -57,6 +62,13 @@ interface IntegrationState {
 
   /** Relit le catalogue et les serveurs MCP ; false si le catalogue ne se lit pas (les serveurs, eux, peuvent manquer). */
   fetchConnectors: (slug: string) => Promise<boolean>;
+
+  /**
+   * Finit le retour d'une connexion à un outil lu dans l'adresse (`?mcp=finish…`), sur le web comme dans l'app de
+   * bureau ; `null` quand l'adresse n'en porte pas. Une connexion faite, ou qui attend l'administrateur, change le
+   * catalogue : il se relit (`changes`). Un échec se dit `error`, sans lever.
+   */
+  finishConnection: (params: URLSearchParams) => Promise<McpOAuthCompletion> | null;
 
   // GitHub
   fetchGitHubStatus:  (slug: string) => Promise<void>;
@@ -113,6 +125,15 @@ export const useIntegrationStore = create<IntegrationState>((set) => ({
     } catch {
       return false;
     }
+  },
+
+  finishConnection: (params) => {
+    const finishing = finishMcpReturn(params);
+    if (!finishing) return null;
+    return finishing.then((completion) => {
+      if (completion.outcome !== "error") set((s) => ({ changes: s.changes + 1 }));
+      return completion;
+    });
   },
 
   // ---------------------------------------------------------------------------

@@ -32,6 +32,7 @@ vi.mock('../api/integration-service', () => ({
   getWebhookDeliveries: vi.fn(),
   getIntegrationCatalog: vi.fn(),
   getMcpServers: vi.fn(),
+  finishMcpReturn: vi.fn(),
 }));
 
 function makeStatus(overrides: Partial<IntegrationStatus> = {}): IntegrationStatus {
@@ -427,5 +428,38 @@ describe('integration-store - connectors of the window', () => {
     await expect(useIntegrationStore.getState().fetchConnectors('acme')).resolves.toBe(false);
     await expect(useIntegrationStore.getState().fetchConnectors('')).resolves.toBe(false);
     expect(useIntegrationStore.getState().connectors).toBeNull();
+  });
+});
+
+// Le retour d'une connexion, fini dans l'app (web et bureau) : le catalogue déjà ouvert se relit quand elle aboutit.
+describe('integration-store - a connection finished in the app', () => {
+  const back = new URLSearchParams('mcp=finish&connector=glean&state=st-1&finish=fin-1');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    act(() => useIntegrationStore.setState({ changes: 0 }));
+  });
+
+  it('tells the catalog to reload when the connection is made, or waits for the admin', async () => {
+    vi.mocked(svc.finishMcpReturn).mockReturnValue(Promise.resolve({ outcome: 'connected', connectorKey: 'glean' }));
+    await act(async () => {
+      await expect(useIntegrationStore.getState().finishConnection(back)).resolves.toEqual({ outcome: 'connected', connectorKey: 'glean' });
+    });
+    expect(svc.finishMcpReturn).toHaveBeenCalledWith(back);
+    expect(useIntegrationStore.getState().changes).toBe(1);
+
+    vi.mocked(svc.finishMcpReturn).mockReturnValue(Promise.resolve({ outcome: 'admin', connectorKey: 'glean' }));
+    await act(async () => { await useIntegrationStore.getState().finishConnection(back); });
+    expect(useIntegrationStore.getState().changes).toBe(2);
+  });
+
+  it('leaves the catalog as it is when the connection fails, or when the address carries no return', async () => {
+    vi.mocked(svc.finishMcpReturn).mockReturnValue(Promise.resolve({ outcome: 'error', connectorKey: 'glean' }));
+    await act(async () => { await useIntegrationStore.getState().finishConnection(back); });
+    expect(useIntegrationStore.getState().changes).toBe(0);
+
+    vi.mocked(svc.finishMcpReturn).mockReturnValue(null);
+    expect(useIntegrationStore.getState().finishConnection(new URLSearchParams('section=integrations'))).toBeNull();
+    expect(useIntegrationStore.getState().changes).toBe(0);
   });
 });
