@@ -71,11 +71,12 @@ class McpOAuthServiceTest {
     private final ObjectMapper om = new ObjectMapper();
     private final Workspace ws = Workspace.builder().id(WS_ID).slug("acme").build();
     private final User person = User.builder().id(USER_ID).email("a@acme.test").build();
+    private ConnectorCatalog catalog;
     private McpOAuthService service;
 
     @BeforeEach
     void setUp() {
-        ConnectorCatalog catalog = new ConnectorCatalog();
+        catalog = new ConnectorCatalog();
         catalog.build();
         McpOAuthSettings settings = new McpOAuthSettings("http://localhost:8080", "", "http://localhost:3000",
             "TaskForce", "web", "");
@@ -409,6 +410,39 @@ class McpOAuthServiceTest {
             .isEqualTo("http://localhost:3000/acme/settings?section=integrations&mcp=error&connector=linear");
         verify(client, never()).postForm(anyString(), any());
         verify(stateRepository, never()).deleteById(anyString());
+    }
+
+    @Test
+    @DisplayName("callback : la personne refuse elle-même un outil qui exige l'administrateur -> erreur, jamais l'attente de l'administrateur")
+    void aDeclineOnAnAdminRequiredToolIsNotAnAdminWait() {
+        assertThat(catalog.preset("asana")).hasValueSatisfying(p -> assertThat(p.admin().required()).isTrue());
+        McpOAuthState row = openState("st-d");
+        row.setConnectorKey("asana");
+        when(stateRepository.findById("st-d")).thenReturn(Optional.of(row));
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+
+        assertThat(service.callback("st-d", null, "access_denied", null, "The user denied the request"))
+            .contains("mcp=error").contains("connector=asana").doesNotContain("mcp=admin");
+        verify(workspaceMcp, never()).ownConnection(any(), any(), any(), anyBoolean());
+        verify(connections, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("callback : une erreur qui arrive après un retour déjà reçu -> erreur, la connexion n'attend pas l'administrateur")
+    void anErrorAfterTheReturnChangesNothing() {
+        McpOAuthState row = openState("st-1");
+        when(stateRepository.findById("st-1")).thenReturn(Optional.of(row));
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+        service.callback("st-1", "code-xyz", null, "https://as.ex");
+        String firstFinish = row.getFinishHash();
+
+        assertThat(service.callback("st-1", null, "admin_approval_required")).contains("mcp=error")
+            .doesNotContain("mcp=admin");
+
+        assertThat(row.getCode()).isEqualTo("code-xyz");
+        assertThat(row.getFinishHash()).isEqualTo(firstFinish);
+        verify(workspaceMcp, never()).ownConnection(any(), any(), any(), anyBoolean());
+        verify(connections, never()).save(any());
     }
 
     @Test

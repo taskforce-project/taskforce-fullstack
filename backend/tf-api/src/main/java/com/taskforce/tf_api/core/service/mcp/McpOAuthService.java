@@ -330,9 +330,12 @@ public class McpOAuthService {
             : stateRepository.findById(state).orElse(null);
         if (row == null) return settings.appBase() + "/?mcp=error"; // state inconnu/expire : retour generique
         try {
+            // Un state ne revient qu'une fois : un second retour, même une erreur, ne change plus rien.
+            if (row.getCode() != null || row.getFinishHash() != null) throw new BusinessException("retour deja recu");
             if (error != null && !error.isBlank()) {
-                if (ADMIN_ERRORS.contains(error) || adminRequired(row.getConnectorKey())
-                        || microsoftAdminFirst(row.getConnectorKey(), errorDescription)) {
+                // L'administrateur n'est attendu que si l'éditeur le dit (ses erreurs d'administrateur, les codes de
+                // Microsoft) ; jamais sur le refus de la personne elle-même (access_denied, son « Cancel »).
+                if (ADMIN_ERRORS.contains(error) || microsoftAdminFirst(row.getConnectorKey(), errorDescription)) {
                     markWaitingForAdmin(row);
                     return appRedirect(row, "admin");
                 }
@@ -340,8 +343,6 @@ public class McpOAuthService {
             }
             if (row.getExpiresAt().isBefore(LocalDateTime.now())) throw new BusinessException("state expire");
             if (code == null || code.isBlank()) throw new BusinessException("code manquant");
-            // Un state ne revient qu'une fois.
-            if (row.getCode() != null || row.getFinishHash() != null) throw new BusinessException("retour deja recu");
             // RFC 9207 : le retour doit venir de l'émetteur attendu (attaque par mélange de serveurs).
             if (iss != null && !iss.isBlank() && !sameIssuer(iss, row.getIssuer())) {
                 throw new BusinessException("emetteur inattendu");
@@ -478,10 +479,6 @@ public class McpOAuthService {
 
     private static final java.util.regex.Pattern MICROSOFT_ADMIN =
         java.util.regex.Pattern.compile("AADSTS(65001|90094|90095|900941)\\b");
-
-    private boolean adminRequired(String connectorKey) {
-        return catalog.preset(connectorKey).map(p -> p.admin() != null && p.admin().required()).orElse(false);
-    }
 
     /**
      * Le compte chez l'éditeur, pour « Connected as ... » : ce que la réponse du jeton en dit (le jeton d'identité
