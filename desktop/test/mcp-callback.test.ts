@@ -123,7 +123,7 @@ describe("connectorEnvironment", () => {
     });
   });
 
-  it("passes the person's own pre-registered clients and the tryout switch, nothing else", () => {
+  it("passes the person's own pre-registered clients, nothing else", () => {
     const env = connectorEnvironment("http://127.0.0.1:47816/mcp/callback", "https://api.example.test", {
       TF_CATALOG_SHOW_UNTRIED: "true",
       TF_MCP_ASANA_CLIENT_ID: "id-1",
@@ -131,7 +131,7 @@ describe("connectorEnvironment", () => {
       TF_MCP_ASANA_OTHER: "no",
       AWS_SECRET_ACCESS_KEY: "no",
     });
-    assert.equal(env.TF_CATALOG_SHOW_UNTRIED, "true");
+    assert.equal(env.TF_CATALOG_SHOW_UNTRIED, undefined);
     assert.equal(env.TF_MCP_ASANA_CLIENT_ID, "id-1");
     assert.equal(env.TF_MCP_ASANA_CLIENT_SECRET, "secret-1");
     assert.equal(env.TF_MCP_ASANA_OTHER, undefined);

@@ -242,8 +242,6 @@ services:
       TF_MCP_ASANA_CLIENT_SECRET: ${TF_MCP_ASANA_CLIENT_SECRET:-}
       TF_MCP_GITHUB_MCP_CLIENT_ID: ${TF_MCP_GITHUB_MCP_CLIENT_ID:-}
       TF_MCP_GITHUB_MCP_CLIENT_SECRET: ${TF_MCP_GITHUB_MCP_CLIENT_SECRET:-}
-      # true = le catalogue montre aussi les préréglages pas encore essayés (instance d'essai seulement, R15).
-      TF_CATALOG_SHOW_UNTRIED: ${TF_CATALOG_SHOW_UNTRIED:-false}
 
       # Chiffrement au repos des données personnelles (RGPD).
       # Le nom DOIT être TF_ENCRYPTION_KEY : c'est celui que lit `security.encryption-key`.

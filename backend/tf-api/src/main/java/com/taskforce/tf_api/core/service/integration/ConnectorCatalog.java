@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -36,10 +35,8 @@ import jakarta.annotation.PostConstruct;
  *       l'étape de l'administrateur et la classe de chaque outil connu.</li>
  * </ul>
  *
- * <p>Le catalogue ne montre que les préréglages essayés de bout en bout (TF-J1-3, R15, R153) : ceux qui portent
- * {@code tried} dans le fichier. Les autres se connectent toujours par l'API et par leur adresse, et l'espace qui en
- * a connecté un le voit encore ({@link #isShown}). Une instance d'essai les montre tous avec
- * {@code integrations.catalog.show-untried} (variable {@code TF_CATALOG_SHOW_UNTRIED}), le temps de les essayer.</p>
+ * <p>Le catalogue montre chaque préréglage, à tous (décision de la Présidence, 12/11/2026) : {@code tried} dit
+ * seulement lequel a été essayé de bout en bout, avec sa preuve.</p>
  */
 @Component
 public class ConnectorCatalog {
@@ -50,10 +47,6 @@ public class ConnectorCatalog {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final Map<String, ConnectorDescriptor> byKey = new LinkedHashMap<>();
-
-    /** Une instance d'essai montre aussi les préréglages pas encore essayés. Faux hors de Spring (tests). */
-    @Value("${integrations.catalog.show-untried:false}")
-    private boolean showUntried;
 
     @PostConstruct
     public void build() {
@@ -109,16 +102,6 @@ public class ConnectorCatalog {
     /** Préréglage essayé de bout en bout ? (faux pour une native, une clé inconnue et un préréglage jamais essayé) */
     public boolean isTriedPreset(String key) {
         return preset(key).map(ConnectorPreset::isTried).orElse(false);
-    }
-
-    /**
-     * Le catalogue montre-t-il cet outil à un espace ? Une native et un préréglage essayé, toujours. Un préréglage
-     * jamais essayé, seulement à l'espace qui l'a déjà connecté : sa connexion continue de marcher, et il garde de
-     * quoi la voir et la déconnecter ; et sur une instance d'essai. Une clé inconnue, jamais.
-     */
-    public boolean isShown(String key, boolean connectedHere) {
-        return byKey(key).map(d -> d.preset() == null || d.preset().isTried() || connectedHere || showUntried)
-            .orElse(false);
     }
 
     /**
