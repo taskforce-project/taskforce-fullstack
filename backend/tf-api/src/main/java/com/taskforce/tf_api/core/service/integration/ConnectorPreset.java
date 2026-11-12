@@ -18,7 +18,8 @@ import com.taskforce.tf_api.core.enums.ToolClass;
  *                   avant elle
  * @param apiKey     la clé guidée, quand l'éditeur en propose une
  * @param readTools  les outils qui ne font que lire ; tout autre outil est une écriture
- * @param tried      la date et la preuve de l'essai de bout en bout ; nul tant que l'outil n'est pas montré (R15)
+ * @param tried      la date et la preuve de l'essai de bout en bout ; nul tant que l'outil n'a pas été essayé (il se
+ *                   montre quand même : décision de la Présidence, 12/11/2026)
  * @param blocked    pourquoi l'éditeur ferme la porte aujourd'hui (liste d'attente, revue) ; nul sinon
  * @param api        l'API de l'éditeur que TaskForce sert lui-même, sans serveur MCP (Google Drive, Microsoft Graph) ;
  *                   nul pour un serveur MCP

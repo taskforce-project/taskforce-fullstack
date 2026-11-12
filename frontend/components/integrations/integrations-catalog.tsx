@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { Info, Loader2, ExternalLink, Check, Plug, Search, ChevronLeft, Globe, BookOpen, Server, Wrench, AlertTriangle, Terminal, Plus } from "lucide-react"
+import { Info, Loader2, ExternalLink, Check, Plug, Search, ChevronLeft, ChevronRight, Globe, BookOpen, Server, Wrench, AlertTriangle, Terminal, Plus } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -17,6 +17,7 @@ import { DesktopGitHubConnect } from "@/components/desktop/desktop-github-connec
 import { cn } from "@/lib/utils"
 import { IS_DESKTOP, type DesktopToolsStatus } from "@/lib/desktop"
 import { getErrorMessage } from "@/lib/api/client"
+import { fillText } from "@/lib/delivery/result-card"
 import type { CONSTANTS_EN } from "@/lib/constants_en"
 import { useDesktopToolsStore } from "@/lib/store/desktop-tools-store"
 import { useIntegrationStore } from "@/lib/store/integration-store"
@@ -127,10 +128,53 @@ export function connectionOf(
   return { label: AUTH_LABEL[tool.authType], help: AUTH_HELP[tool.authType], canConnect: true }
 }
 
+/** Les filtres de la grille : la recherche, la catégorie choisie, et ce que la personne a connecté ou pas. */
+export interface CatalogFilters {
+  query: string
+  category: string
+  status: "all" | "connected" | "disconnected"
+}
+
+/** Le nombre d'outils qu'une catégorie montre d'abord, quand toutes les catégories s'affichent sans recherche. */
+export const FOLDED_COUNT = 6
+
+/**
+ * Les catégories que la grille montre : filtrées par catégorie et par état, et par la recherche, qui lit le nom,
+ * la description et l'intitulé de la catégorie (« finance » trouve tous les outils de la finance). Une catégorie vide
+ * disparaît.
+ */
+export function filterCatalog(catalog: IntegrationCatalog, filters: CatalogFilters): IntegrationCatalog["categories"] {
+  const q = filters.query.trim().toLowerCase()
+  return catalog.categories
+    .filter((g) => filters.category === "all" || g.category === filters.category)
+    .map((g) => ({
+      ...g,
+      tools: g.tools
+        .filter((tool) => filters.status === "all" || (filters.status === "connected" ? tool.connected : !tool.connected))
+        .filter((tool) => !q || g.label.toLowerCase().includes(q) || tool.name.toLowerCase().includes(q)
+          || (tool.description ?? "").toLowerCase().includes(q))
+        // Ce qui se connecte d'abord ; un outil que l'éditeur ferme encore vient en dernier (tri stable).
+        .sort((a, b) => Number(Boolean(a.blocked)) - Number(Boolean(b.blocked))),
+    }))
+    .filter((g) => g.tools.length > 0)
+}
+
+/**
+ * Plus de cent outils (R153) : toutes catégories affichées, sans recherche ni filtre, chaque catégorie montre ses
+ * premiers outils et un bouton pour le reste ; une recherche, une catégorie ou un filtre montre tout.
+ */
+export function folds(filters: CatalogFilters, count: number): boolean {
+  return filters.category === "all" && !filters.query.trim() && filters.status === "all" && count > FOLDED_COUNT
+}
+
 /** L'état de la connexion que la personne utilise, sur la carte : branché, à reconnecter, en attente, ou le chemin. */
 function CardState({ tool }: Readonly<{ tool: ConnectorView }>) {
   const t = usePreferencesStore((s) => s.t.integrations)
   const c = usePreferencesStore((s) => s.t.connect)
+  // Un outil que l'éditeur ferme encore ne promet pas un chemin qu'il ne tient pas (R15).
+  if (tool.blocked && !tool.connected) {
+    return <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">{c.notAvailable}</span>
+  }
   const shared = tool.scope === "WORKSPACE" ? <span className="text-[10px] text-muted-foreground">{c.shared}</span> : null
   if (tool.connected) {
     return (
@@ -159,6 +203,7 @@ function CardState({ tool }: Readonly<{ tool: ConnectorView }>) {
  */
 export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   const t = usePreferencesStore((s) => s.t.integrations)
+  const catalogText = usePreferencesStore((s) => s.t.catalog)
   const [loaded, setLoaded] = useState<IntegrationCatalog | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -241,19 +286,11 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   }
 
   // Filtrage recherche + catégorie (marketplace) - catégories vides masquées.
-  const groups = useMemo(() => {
-    if (!catalog) return []
-    const q = query.trim().toLowerCase()
-    return catalog.categories
-      .filter((g) => activeCat === "all" || g.category === activeCat)
-      .map((g) => ({
-        ...g,
-        tools: g.tools
-          .filter((t) => statusFilter === "all" || (statusFilter === "connected" ? t.connected : !t.connected))
-          .filter((t) => !q || t.name.toLowerCase().includes(q) || (t.description ?? "").toLowerCase().includes(q)),
-      }))
-      .filter((g) => g.tools.length > 0)
-  }, [catalog, query, activeCat, statusFilter])
+  const filters: CatalogFilters = useMemo(
+    () => ({ query, category: activeCat, status: statusFilter }),
+    [query, activeCat, statusFilter],
+  )
+  const groups = useMemo(() => (catalog ? filterCatalog(catalog, filters) : []), [catalog, filters])
 
   if (loading && !catalog) {
     return (
@@ -316,8 +353,8 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
           />
         </div>
 
-        {/* Filtres par catégorie */}
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-hide">
+        {/* Filtres par catégorie : treize catégories, sur plusieurs lignes plutôt qu'un défilement caché */}
+        <div className="flex flex-wrap gap-1.5">
           <CatPill active={activeCat === "all"} onClick={() => setActiveCat("all")}>
             All <span className="tabular-nums opacity-60">{catalog.total}</span>
           </CatPill>
@@ -336,16 +373,26 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
               : "No integration matches your search. If the tool has an MCP server, connect it with Connect an MCP server."}
           </p>
         ) : (
-          groups.map((group) => (
-            <section key={group.category} className="flex flex-col gap-3">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{group.label}</h4>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {group.tools.map((tool) => (
-                  <ConnectorCard key={tool.key} tool={tool} onOpenDetail={() => setDetailKey(tool.key)} />
-                ))}
-              </div>
-            </section>
-          ))
+          groups.map((group) => {
+            const folded = folds(filters, group.tools.length)
+            return (
+              <section key={group.category} className="flex flex-col gap-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{group.label}</h4>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {(folded ? group.tools.slice(0, FOLDED_COUNT) : group.tools).map((tool) => (
+                    <ConnectorCard key={tool.key} tool={tool} onOpenDetail={() => setDetailKey(tool.key)} />
+                  ))}
+                </div>
+                {folded && (
+                  <Button variant="ghost" size="sm" className="w-fit gap-1 px-2 text-xs text-muted-foreground"
+                          onClick={() => setActiveCat(group.category)}>
+                    {fillText(catalogText.showAll, { count: String(group.tools.length), category: group.label })}
+                    <ChevronRight className="size-3.5" />
+                  </Button>
+                )}
+              </section>
+            )
+          })
         )}
         </>
         )}
@@ -412,8 +459,8 @@ function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; o
 function ConnectorDetailView({
   tool, categoryLabel, onBack, onConnect,
 }: Readonly<{ tool: ConnectorView; categoryLabel: string; onBack: () => void; onConnect: () => void }>) {
-  const connection = connectionOf(tool, usePreferencesStore((s) => s.t.integrations), IS_DESKTOP,
-    usePreferencesStore((s) => s.t.connect))
+  const connectTexts = usePreferencesStore((s) => s.t.connect)
+  const connection = connectionOf(tool, usePreferencesStore((s) => s.t.integrations), IS_DESKTOP, connectTexts)
   return (
     <div className="flex flex-col gap-6">
       {/* Retour */}
@@ -460,12 +507,12 @@ function ConnectorDetailView({
         </ul>
       </section>
 
-      {/* Connexion */}
+      {/* Connexion : un outil que l'éditeur ferme encore dit pourquoi, au lieu d'un chemin qu'il ne tient pas (R15) */}
       <section className="flex flex-col gap-2">
         <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Connection</h4>
         <p className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{connection.label}</span>
-          {`: ${connection.help}`}
+          <span className="font-medium text-foreground">{tool.blocked && !tool.connected ? connectTexts.notAvailable : connection.label}</span>
+          {`: ${tool.blocked && !tool.connected ? tool.blocked : connection.help}`}
         </p>
         {tool.setupHint && (
           <div className="flex gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">

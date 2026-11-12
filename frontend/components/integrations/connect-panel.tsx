@@ -40,8 +40,10 @@ export function pathLabel(tool: ConnectorView, t: ConnectTexts): string | null {
     case "company-app":
       return t.pathAdminFirst
     case "api-key":
-    case "server-url":
       return t.pathKey
+    // L'adresse du serveur que l'entreprise crée (Zoho) ou tient (Glean, Metabase) : la personne la colle.
+    case "server-url":
+      return t.pathAddress
     case "open":
       return t.pathOpen
     default:

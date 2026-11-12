@@ -68,6 +68,21 @@ class FindIntegrationToolTest {
     }
 
     @Test
+    @DisplayName("un outil que l'éditeur ferme encore se dit pas encore connectable, avec la raison")
+    void a_blocked_tool_is_not_offered() {
+        ConnectorView square = new ConnectorView("square", "Square", "FINANCE_HR", "MCP", false, List.of(), List.of("mcp"),
+            null, null, null, null, "https://mcp.squareup.com/mcp", "NOT_CONNECTED", null, null, "self-registration",
+            null, null, false, false, "Square admits only the MCP clients on its allowlist.", false);
+        when(catalogService.getCatalog(eq("acme"), eq(7L))).thenReturn(new IntegrationCatalogResponse(1, 0,
+            List.of(new CategoryGroup("FINANCE_HR", "Finance and HR", List.of(square)))));
+
+        String out = tool().execute(Map.<String, Object>of("query", "square"), new AgentContext("acme", 1L, 7L));
+
+        assertThat(out).contains("Square").contains("NOT available to connect yet").contains("allowlist")
+            .doesNotContain("available, NOT connected");
+    }
+
+    @Test
     @DisplayName("aucune correspondance → réponse franche, et la piste du serveur MCP")
     void no_match_is_honest() {
         when(catalogService.getCatalog(eq("acme"), eq(7L))).thenReturn(catalog());
