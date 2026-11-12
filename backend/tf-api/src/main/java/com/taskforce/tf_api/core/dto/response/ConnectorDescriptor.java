@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.taskforce.tf_api.core.enums.ConnectorAuthType;
 import com.taskforce.tf_api.core.enums.ConnectorCategory;
+import com.taskforce.tf_api.core.service.integration.ConnectorPreset;
 
 /**
  * Fiche d'un outil du catalogue d'intégrations : intégration native ou préréglage de serveur MCP.
@@ -22,5 +23,7 @@ public record ConnectorDescriptor(
     /** Site officiel du service, affiché dans la fiche détaillée. */
     String websiteUrl,
     /** URL du serveur MCP hébergé officiel, préremplie (modifiable) dans le dialogue de connexion. */
-    String mcpSuggestedUrl
+    String mcpSuggestedUrl,
+    /** Le préréglage lu dans le fichier des préréglages ; nul pour une intégration native. */
+    ConnectorPreset preset
 ) {}
