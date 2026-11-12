@@ -89,6 +89,31 @@ public class McpClientRegistrar {
         throw new NoClient("This tool doesn't let TaskForce register on its own: its admin has to set up an app.");
     }
 
+    /**
+     * Le client d'un outil servi par l'API de son éditeur (Google, Microsoft), qui n'offre ni CIMD ni inscription
+     * dynamique : celui de l'entreprise, sinon le nôtre, lu dans {@code <préfixe>_CLIENT_ID} et
+     * {@code <préfixe>_CLIENT_SECRET} ({@code TF_GOOGLE}, {@code TF_MICROSOFT} ; jamais dans le dépôt) ; sinon
+     * {@link NoClient}.
+     */
+    @Transactional(readOnly = true)
+    public RegisteredClient clientForApi(Long workspaceId, String connectorKey, String envPrefix) {
+        ConnectorApp company = connectorKey == null ? null
+            : apps.findByWorkspaceIdAndConnectorKey(workspaceId, connectorKey).orElse(null);
+        if (company != null) {
+            return new RegisteredClient(company.getClientId(), blankToNull(company.getClientSecret()), COMPANY);
+        }
+        String id = envPrefix == null ? null : blankToNull(environment.getProperty(envPrefix + "_CLIENT_ID"));
+        if (id == null) {
+            throw new NoClient("TaskForce's app for this tool isn't set up on this instance: its admin has to set it up.");
+        }
+        return new RegisteredClient(id, blankToNull(environment.getProperty(envPrefix + "_CLIENT_SECRET")), OURS);
+    }
+
+    /** L'identifiant de notre client chez un éditeur servi par son API, quand l'instance l'a ; nul sinon. */
+    public String ourClientId(String envPrefix) {
+        return envPrefix == null ? null : blankToNull(environment.getProperty(envPrefix + "_CLIENT_ID"));
+    }
+
     /** Notre client enregistré chez l'éditeur, s'il est configuré pour cette clé. */
     RegisteredClient ours(String connectorKey) {
         if (connectorKey == null || connectorKey.isBlank()) return null;

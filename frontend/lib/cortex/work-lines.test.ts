@@ -167,4 +167,22 @@ describe("proposalLine : la carte d'une action demandée, sans nom d'outil", () 
   ])("%s", (tool, expected) => {
     expect(proposalLine(tool, t)).toBe(expected)
   })
+
+  // Ranger un document (R156) : quoi et où, avant l'accord.
+  it.each([
+    [{ title: "Weekly report", storage: "google-drive", folder: "Reports" },
+      "Cortex proposes to save \"Weekly report\" to Google Drive, in Reports. Nothing is saved until you approve it."],
+    [{ title: "Minutes", storage: "server" }, "Cortex proposes to save \"Minutes\" in TaskForce. Nothing is saved until you approve it."],
+    [{ title: "Plan", storage: "machine", folder: "C:\\Docs" },
+      "Cortex proposes to save \"Plan\" on this computer, in C:\\Docs. Nothing is saved until you approve it."],
+  ])("save_document %o", (args, expected) => {
+    expect(proposalLine("save_document", t, JSON.stringify(args))).toBe(expected)
+  })
+
+  it("save_document without readable arguments says the general sentence", () => {
+    const general = "Cortex proposes to save this document. Nothing changes until you approve it."
+    expect(proposalLine("save_document", t, "{not json")).toBe(general)
+    expect(proposalLine("save_document", t, JSON.stringify({ title: "x", storage: "box" }))).toBe(general)
+    expect(proposalLine("save_document", t, null)).toBe(general)
+  })
 })

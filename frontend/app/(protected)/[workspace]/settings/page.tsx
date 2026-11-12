@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, useParams } from "next/navigation"
 import {
   User, Bell, Mail, Zap, Globe, Key, Palette, Webhook,
   Upload, Camera, Trash2, Shield, Loader2, RotateCcw,
-  Activity, Gauge, Search, Bot, Sparkles, FlaskConical, Scale,
+  Activity, Gauge, Search, Bot, Sparkles, FlaskConical, Scale, HardDrive,
 } from "lucide-react"
 import { toast } from "sonner"
 import { CONSTANTS_EN } from "@/lib/constants_en"
@@ -33,6 +33,7 @@ import { WebhooksPanel } from "@/components/settings/webhooks-panel"
 import { EventPicker } from "@/components/settings/event-picker"
 import { AgentsPanel } from "@/components/settings/agents-panel"
 import { RulesPanel } from "@/components/rules/rules-panel"
+import { StoragePanel } from "@/components/storage/storage-panel"
 import { DesktopAiPanel } from "@/components/settings/desktop-ai-panel"
 import { EvalBankPanel } from "@/components/settings/eval-bank-panel"
 import { InstanceAiPanel } from "@/components/settings/instance-ai-panel"
@@ -77,6 +78,7 @@ export type SettingsSection =
   | "integrations"
   | "agents"
   | "rules"
+  | "storage"
   | "privacy"
 
 interface SectionConfig {
@@ -100,6 +102,8 @@ const ALL_SECTIONS: SectionConfig[] = [
   { key: "agents",        label: "Agents",         icon: <Bot className="h-4 w-4" />,        group: "Workspace" },
   // Les règles de l'entreprise par couches (R157) : le libellé vient des textes de l'interface.
   { key: "rules",         label: CONSTANTS_EN.rules.settingsLabel, icon: <Scale className="h-4 w-4" />, group: "Workspace" },
+  // Où TaskForce range ce qu'il écrit (R156).
+  { key: "storage",       label: CONSTANTS_EN.storage.settingsLabel, icon: <HardDrive className="h-4 w-4" />, group: "Workspace" },
   { key: "audit",         label: "Audit log",      icon: <Activity className="h-4 w-4" />,    group: "Workspace" },
   { key: "privacy",       label: "Privacy & Data", icon: <Shield className="h-4 w-4" />,     group: "Personal" },
 ]
@@ -115,7 +119,7 @@ export const SECTIONS: SectionConfig[] = ALL_SECTIONS.filter((s) => !IS_DESKTOP 
 
 export const SECTION_GROUPS = [
   { label: "Personal",  keys: ["profile", "account", "appearance", "notifications", "security", "privacy"] as const },
-  { label: "Workspace", keys: ["workspace", "ai", "usage", "evals", "integrations", "agents", "rules", "audit"] as const },
+  { label: "Workspace", keys: ["workspace", "ai", "usage", "evals", "integrations", "agents", "rules", "storage", "audit"] as const },
 ]
 
 // SKILL_OPTIONS + SkillsTagInput retirés avec le faux champ « Skills » du Profil (TF-SETTINGS-FAKE) :
@@ -1930,6 +1934,7 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
       {active === "integrations"  && <IntegrationsPanel />}
       {active === "agents"        && <AgentsPanel />}
       {active === "rules"         && <RulesPanel />}
+      {active === "storage"       && <StoragePanel />}
       {active === "audit"         && <AuditLogPanel />}
       {active === "privacy"       && <PrivacyPanel />}
     </>

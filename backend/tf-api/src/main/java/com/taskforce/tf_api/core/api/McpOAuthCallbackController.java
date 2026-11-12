@@ -43,9 +43,16 @@ public class McpOAuthCallbackController {
         @RequestParam(required = false) String code,
         @RequestParam(required = false) String state,
         @RequestParam(required = false) String error,
-        @RequestParam(required = false) String iss
+        @RequestParam(required = false) String iss,
+        @RequestParam(name = "error_description", required = false) String errorDescription,
+        @RequestParam(name = "admin_consent", required = false) String adminConsent
     ) {
-        String redirect = mcpOAuthService.callback(state, code, error, iss);
+        // L'administrateur d'une entreprise vient d'accorder notre application chez Microsoft (TF-J2-14) : pas de flux de
+        // connexion à finir, l'app tout court.
+        if (adminConsent != null && (state == null || state.isBlank())) {
+            return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(settings.appBase() + "/")).build();
+        }
+        String redirect = mcpOAuthService.callback(state, code, error, iss, errorDescription);
         return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(redirect)).build();
     }
 

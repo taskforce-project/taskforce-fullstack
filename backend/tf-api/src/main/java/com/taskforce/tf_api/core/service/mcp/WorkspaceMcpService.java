@@ -147,6 +147,17 @@ public class WorkspaceMcpService {
     @Value("${integrations.mcp.tools-cache-ttl-ms:60000}")
     private long cacheTtlMs;
 
+    /**
+     * Les outils des éditeurs que TaskForce sert par leur API (Google Drive, Microsoft 365), sans serveur MCP : la même
+     * connexion, les mêmes règles. Absents, ces connexions ne servent aucun outil.
+     */
+    private CompanyApiTools apiTools;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setApiTools(CompanyApiTools apiTools) {
+        this.apiTools = apiTools;
+    }
+
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
 
     private record Cached(long expiresAt, List<AgentTool> tools) {}
@@ -416,6 +427,11 @@ public class WorkspaceMcpService {
         List<AgentTool> tools = new ArrayList<>();
         for (ConnectorConnection conn : usable(workspaceId, userId)) {
             if (conn.getState() != ConnectionState.CONNECTED) continue;
+            String api = McpTokenService.apiKind(readConfig(conn.getConfig()));
+            if (api != null) {
+                if (apiTools != null) tools.addAll(apiTools.toolsFor(conn, api));
+                continue;
+            }
             McpClient.ServerRef ref = toServerRef(conn);
             if (ref == null) continue;
             Set<String> allow = allowList(conn);
@@ -497,6 +513,15 @@ public class WorkspaceMcpService {
                     conn.getAccountLabel(), false, List.of(), List.of(), null));
                 continue;
             }
+            // L'API d'un éditeur : ses outils sont ceux de TaskForce, connus d'avance, sans sonde.
+            String api = McpTokenService.apiKind(config);
+            if (api != null) {
+                List<String> names = apiTools == null ? List.of()
+                    : apiTools.infos(conn.getConnectorKey(), api).stream().map(McpToolInfo::name).toList();
+                out.add(new McpServerStatus(conn.getConnectorKey(), name, host(url), conn.getScope(), conn.getState(),
+                    conn.getAccountLabel(), true, names, List.of(), null));
+                continue;
+            }
             McpClient.ServerRef ref = toServerRef(conn);
             if (ref == null) continue;
             Set<String> allow = allowList(conn);
@@ -525,6 +550,8 @@ public class WorkspaceMcpService {
     public List<McpToolInfo> serverTools(Long workspaceId, Long userId, String connectorKey) {
         ConnectorConnection conn = connectionFor(workspaceId, userId, connectorKey)
             .orElseThrow(() -> new ResourceNotFoundException("MCP connector not connected: " + connectorKey));
+        String api = McpTokenService.apiKind(readConfig(conn.getConfig()));
+        if (api != null) return apiTools == null ? List.of() : apiTools.infos(connectorKey, api);
         McpClient.ServerRef ref = toServerRef(conn);
         if (ref == null) throw new BusinessException("The connector " + connectorKey + " is not an MCP server (mcpUrl missing)");
         Set<String> allow = allowList(conn);
@@ -661,7 +688,8 @@ public class WorkspaceMcpService {
     private McpClient.ServerRef toServerRef(ConnectorConnection conn) {
         Map<String, String> config = readConfig(conn.getConfig());
         String url = config.getOrDefault(CONFIG_URL, "").trim();
-        if (url.isEmpty()) return null;
+        // L'API d'un éditeur n'est pas un serveur MCP : ni initialize, ni tools/list, ni liste figée à sonder.
+        if (url.isEmpty() || McpTokenService.apiKind(config) != null) return null;
         // OAuth (TF-MCP-02) : access token géré (refresh auto), en Bearer ; sinon jeton collé, en Bearer ou dans
         // l'en-tête choisi.
         String token;

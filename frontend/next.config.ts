@@ -66,14 +66,20 @@ const CF_BEACON_CONNECT = "https://cloudflareinsights.com";
 // varie (lh3, lh4…) d'où le joker de sous-domaine ; GitHub sert ses avatars depuis un hôte unique.
 const OAUTH_AVATAR_ORIGINS = "https://avatars.githubusercontent.com https://*.googleusercontent.com";
 
+// Le sélecteur de Google Drive (Google Picker, TF-J2-14) : le script de Google, puis le sélecteur dans une iframe de
+// Google. Avec la portée drive.file, il est la seule porte vers les fichiers de la personne : TaskForce ne voit que ce
+// qu'elle y choisit.
+const GOOGLE_PICKER_SCRIPT = "https://apis.google.com";
+const GOOGLE_PICKER_FRAMES = "https://docs.google.com https://drive.google.com";
+
 const cspHeader = [
   "default-src 'self'",
   // `unsafe-eval` n'est requis QUE par le rechargement à chaud du serveur de développement.
   // L'embarquer en production élargissait la surface XSS sans aucune contrepartie.
-  `script-src 'self' 'unsafe-inline' ${TURNSTILE_ORIGIN} ${CF_BEACON_SCRIPT}${IS_PROD ? "" : " 'unsafe-eval'"}`,
+  `script-src 'self' 'unsafe-inline' ${TURNSTILE_ORIGIN} ${CF_BEACON_SCRIPT} ${GOOGLE_PICKER_SCRIPT}${IS_PROD ? "" : " 'unsafe-eval'"}`,
   // Sans `frame-src`, `default-src 'self'` s'applique aux iframes et le défi Turnstile ne s'affiche
-  // pas. La directive n'existait pas : elle est ajoutée ici, restreinte à cette seule origine.
-  `frame-src 'self' ${TURNSTILE_ORIGIN}`,
+  // pas. La directive n'existait pas : elle est ajoutée ici, restreinte à ses origines.
+  `frame-src 'self' ${TURNSTILE_ORIGIN} ${GOOGLE_PICKER_FRAMES}`,
   // `unsafe-inline` sur les styles reste nécessaire : Tailwind et l'hydratation de Next.js
   // injectent des styles en ligne. Le lever suppose de passer aux nonces.
   "style-src 'self' 'unsafe-inline'",
@@ -99,8 +105,8 @@ const IS_DESKTOP = process.env.NEXT_PUBLIC_DESKTOP === "true";
 
 const desktopCspHeader = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${IS_PROD ? "" : " 'unsafe-eval'"}`,
-  "frame-src 'self'",
+  `script-src 'self' 'unsafe-inline' ${GOOGLE_PICKER_SCRIPT}${IS_PROD ? "" : " 'unsafe-eval'"}`,
+  `frame-src 'self' ${GOOGLE_PICKER_FRAMES}`,
   "style-src 'self' 'unsafe-inline'",
   // Temps réel : `'self'` couvre aussi le WebSocket de la même origine en CSP 3 ; la boucle locale est écrite en plus,
   // son port n'étant connu qu'au lancement.

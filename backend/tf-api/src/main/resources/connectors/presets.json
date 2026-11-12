@@ -3,6 +3,63 @@
   "version": 1,
   "presets": [
     {
+      "key": "google-drive",
+      "name": "Google Drive",
+      "category": "FILES_STORAGE",
+      "description": "Docs, Sheets and the files you choose",
+      "website": "https://drive.google.com",
+      "connection": "our-app",
+      "api": {
+        "kind": "google-drive",
+        "issuer": "https://accounts.google.com",
+        "base": "https://www.googleapis.com",
+        "app": "TF_GOOGLE",
+        "authorize": { "access_type": "offline", "prompt": "consent", "include_granted_scopes": "true" }
+      },
+      "scopes": {
+        "read": ["openid", "email", "https://www.googleapis.com/auth/drive.file"],
+        "write": ["openid", "email", "https://www.googleapis.com/auth/drive.file"]
+      },
+      "admin": {
+        "required": false,
+        "text": "If your Google Workspace limits third-party apps, an admin allows TaskForce once in the Google Admin console: Security, Access and data control, API controls, Manage third-party app access.",
+        "link": "https://admin.google.com/ac/owl/list?tab=configuredApps"
+      },
+      "tools": { "read": ["search_files", "read_file"], "write": [] },
+      "sources": ["https://developers.google.com/workspace/drive/api/guides/api-specific-auth", "https://developers.google.com/workspace/drive/picker/guides/overview", "https://developers.google.com/identity/protocols/oauth2/native-app", "https://accounts.google.com/.well-known/openid-configuration"],
+      "unverified": ["the picker inside the desktop app's window", "a loopback return address with a path for a Desktop app client"]
+    },
+    {
+      "key": "microsoft-365",
+      "name": "Microsoft 365",
+      "category": "FILES_STORAGE",
+      "description": "OneDrive, SharePoint and Teams",
+      "website": "https://www.microsoft.com/microsoft-365",
+      "connection": "our-app",
+      "api": {
+        "kind": "microsoft-graph",
+        "issuer": "https://login.microsoftonline.com/{tenant}/v2.0",
+        "base": "https://graph.microsoft.com/v1.0",
+        "app": "TF_MICROSOFT",
+        "authorize": { "prompt": "select_account" }
+      },
+      "scopes": {
+        "read": ["openid", "profile", "email", "offline_access", "User.Read", "Files.Read.All", "Sites.Read.All", "Team.ReadBasic.All", "Channel.ReadBasic.All", "ChannelMessage.Read.All", "Chat.Read"],
+        "write": ["openid", "profile", "email", "offline_access", "User.Read", "Files.Read.All", "Sites.Read.All", "Team.ReadBasic.All", "Channel.ReadBasic.All", "ChannelMessage.Read.All", "Chat.Read", "Files.ReadWrite.All", "ChannelMessage.Send", "ChatMessage.Send"]
+      },
+      "admin": {
+        "required": false,
+        "text": "An admin of your Microsoft 365 organization approves TaskForce once, for everyone: open the admin page, sign in with an admin account and accept. Or in the Microsoft Entra admin center: Enterprise applications, TaskForce, Permissions, Grant admin consent.",
+        "link": "https://login.microsoftonline.com/organizations/adminconsent?client_id={clientId}"
+      },
+      "tools": {
+        "read": ["search_files", "read_file", "list_teams", "read_channel", "list_chats", "read_chat"],
+        "write": ["post_channel_message", "post_chat_message"]
+      },
+      "sources": ["https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow", "https://learn.microsoft.com/en-us/graph/api/channel-list-messages", "https://learn.microsoft.com/en-us/graph/api/chatmessage-post", "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-app-consent-policies", "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent", "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration"],
+      "unverified": ["a personal Microsoft account asked for SharePoint permissions", "the admin consent page with the organizations authority", "loopback return addresses registered through the manifest"]
+    },
+    {
       "key": "linear",
       "name": "Linear",
       "category": "TICKETS_PROJECTS",

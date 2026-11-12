@@ -123,8 +123,11 @@ class ConnectorCatalogTest {
             assertThat(d.fields()).isEmpty();
             assertThat(d.capabilities()).containsExactly("mcp");
             assertThat(d.docsUrl()).isNull();
-            // Sauf le serveur que l'entreprise crée chez l'éditeur (Zoho) : son adresse vient de la personne.
-            if (d.preset().connection() != ConnectionPath.SERVER_URL) assertThat(d.mcpSuggestedUrl()).startsWith("https://");
+            // Sauf le serveur que l'entreprise crée chez l'éditeur (Zoho) : son adresse vient de la personne ; et l'API
+            // d'un éditeur que TaskForce sert lui-même (Google Drive), sans serveur MCP.
+            if (d.preset().connection() != ConnectionPath.SERVER_URL && d.preset().api() == null) {
+                assertThat(d.mcpSuggestedUrl()).startsWith("https://");
+            }
         });
     }
 

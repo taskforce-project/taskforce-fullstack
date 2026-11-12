@@ -21,6 +21,8 @@ import com.taskforce.tf_api.core.enums.ToolClass;
  * @param tried      la date et la preuve de l'essai de bout en bout ; nul tant que l'outil n'a pas été essayé (il se
  *                   montre quand même : décision de la Présidence, 12/11/2026)
  * @param blocked    pourquoi l'éditeur ferme la porte aujourd'hui (liste d'attente, revue) ; nul sinon
+ * @param api        l'API de l'éditeur que TaskForce sert lui-même, sans serveur MCP (Google Drive, Microsoft Graph) ;
+ *                   nul pour un serveur MCP
  */
 public record ConnectorPreset(
     String key,
@@ -39,8 +41,17 @@ public record ConnectorPreset(
     Tried tried,
     String blocked,
     List<String> sources,
-    List<String> unverified
+    List<String> unverified,
+    Api api
 ) {
+
+    /**
+     * Un outil servi par l'API de son éditeur, par la même connexion qu'un serveur MCP (une par personne, le même geste,
+     * le même retour) : l'émetteur OAuth ({@code {tenant}} y est remplacé par le locataire de l'instance), l'adresse de
+     * l'API, le préfixe des variables de notre application ({@code TF_GOOGLE} : {@code TF_GOOGLE_CLIENT_ID}...), et les
+     * paramètres que l'éditeur attend en plus à l'autorisation (le jeton de renouvellement de Google).
+     */
+    public record Api(String kind, String issuer, String base, String app, java.util.Map<String, String> authorize) {}
 
     /** Les portées demandées : la lecture par défaut, l'écriture quand la personne l'accorde. */
     public record Scopes(List<String> read, List<String> write) {

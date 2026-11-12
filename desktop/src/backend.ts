@@ -29,8 +29,12 @@ export interface BackendOptions {
   mcpRedirectUri: string;
 }
 
-/** Les clients enregistrés d'avance chez un éditeur, que la personne a mis dans son environnement (chemin B). */
-const PRE_REGISTERED = /^TF_MCP_[A-Z0-9_]+_CLIENT_(ID|SECRET)$/;
+/**
+ * Les clients enregistrés d'avance chez un éditeur, que la personne a mis dans son environnement (chemin B) : ceux des
+ * serveurs MCP, et ceux de Google et de Microsoft pour les fichiers de l'entreprise (TF-J2-14).
+ */
+const PRE_REGISTERED =
+  /^(TF_MCP_[A-Z0-9_]+_CLIENT_(ID|SECRET)|TF_GOOGLE_(CLIENT_ID|CLIENT_SECRET|API_KEY|APP_ID)|TF_MICROSOFT_(CLIENT_ID|TENANT))$/;
 
 /**
  * Ce que le backend local sait des connexions aux outils (séance n°22, R154) : l'adresse de retour fixe de la coque, et

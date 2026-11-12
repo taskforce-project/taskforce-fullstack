@@ -107,6 +107,94 @@ public class McpOAuthDiscovery {
             as.path("authorization_response_iss_parameter_supported").asBoolean(false));
     }
 
+    /**
+     * Le serveur d'autorisation d'un outil servi par l'API de son éditeur (Google Drive, Microsoft Graph), sans serveur
+     * MCP devant : sa metadata (RFC 8414, sinon OpenID Connect), avec les mêmes exigences qu'un serveur MCP (l'émetteur qui
+     * se nomme comme on l'a trouvé, PKCE S256). Sans {@code resource} : ces éditeurs n'en veulent pas.
+     */
+    public DiscoveredAuth discoverIssuer(String issuerUrl) {
+        JsonNode as = null;
+        for (String candidate : asMetadataUrls(issuerUrl)) {
+            as = client.getJsonOrNull(candidate);
+            if (as != null && as.isObject()) break;
+            as = null;
+        }
+        if (as == null) throw new NoOAuth(issuerUrl);
+        String issuer = text(as, "issuer");
+        boolean entra = entra(issuerUrl) && issuer != null && entraIssuerMatches(issuer, issuerUrl);
+        if (issuer == null || !(sameIssuer(issuer, issuerUrl) || entra)) {
+            throw new BusinessException("The sign-in server " + issuerUrl + " does not identify itself as such: "
+                + "TaskForce does not connect to it.");
+        }
+        String authEp = text(as, "authorization_endpoint");
+        String tokenEp = text(as, "token_endpoint");
+        if (authEp == null || tokenEp == null) {
+            throw new BusinessException("Incomplete OAuth endpoints for " + issuerUrl);
+        }
+        // Entra accepte S256 sans l'annoncer dans sa metadata : admis pour ses seuls émetteurs, et seulement quand la
+        // metadata se tait (une metadata qui annonce d'autres méthodes sans S256 reste refusée).
+        boolean entraSilentOnPkce = entra && !as.has("code_challenge_methods_supported") && sameHost(authEp, issuerUrl)
+            && sameHost(tokenEp, issuerUrl);
+        if (!supportsS256(as) && !entraSilentOnPkce) {
+            throw new BusinessException("The sign-in server " + issuerUrl + " does not announce PKCE (S256): "
+                + "TaskForce can't sign in to it safely.");
+        }
+        return new DiscoveredAuth(issuer, authEp, tokenEp, null, null, null, null, text(as, "revocation_endpoint"),
+            false, as.path("authorization_response_iss_parameter_supported").asBoolean(false));
+    }
+
+    // --- Microsoft Entra -----------------------------------------------------
+
+    /** L'hôte d'Entra (le nuage public de Microsoft) ; aucun autre n'a ses exceptions. */
+    static final String ENTRA_HOST = "login.microsoftonline.com";
+    /** L'émetteur que nomme la metadata d'Entra pour {@code common} et {@code organizations}. */
+    private static final String ENTRA_TEMPLATE = "{tenantid}";
+    /** Le locataire des comptes Microsoft personnels, celui que nomme la metadata de {@code consumers}. */
+    private static final String ENTRA_CONSUMERS = "9188040d-6c67-4c5b-b112-36a304b66dad";
+    private static final Pattern ENTRA_PATH = Pattern.compile("/([^/]{1,100})/v2\\.0");
+    private static final Pattern GUID = Pattern.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+
+    /**
+     * Un émetteur d'Entra : {@code https://login.microsoftonline.com/<locataire>/v2.0}, sans port. Lu comme un texte : le
+     * modèle {@code {tenantid}} de sa metadata n'est pas une adresse valable pour {@link URI}.
+     */
+    static boolean entra(String url) {
+        String v = url == null ? "" : strip(url.trim());
+        String origin = "https://" + ENTRA_HOST;
+        return v.length() > origin.length() && v.regionMatches(true, 0, origin, 0, origin.length())
+            && ENTRA_PATH.matcher(v.substring(origin.length())).matches();
+    }
+
+    /**
+     * L'émetteur que la metadata d'Entra déclare pour l'émetteur demandé : le même ; pour {@code common} et
+     * {@code organizations}, le modèle {@code {tenantid}} que Microsoft publie ; pour {@code consumers}, le locataire
+     * des comptes personnels ; pour un domaine, l'identifiant de son locataire. Rien d'autre.
+     */
+    static boolean entraIssuerMatches(String declared, String asked) {
+        if (!entra(declared) || !entra(asked)) return false;
+        String want = tenant(asked);
+        String said = tenant(declared);
+        if (want.equalsIgnoreCase(said)) return true;
+        if ("common".equalsIgnoreCase(want) || "organizations".equalsIgnoreCase(want)) return ENTRA_TEMPLATE.equals(said);
+        if ("consumers".equalsIgnoreCase(want)) return ENTRA_CONSUMERS.equalsIgnoreCase(said);
+        return want.contains(".") && GUID.matcher(said).matches();
+    }
+
+    private static String tenant(String entraUrl) {
+        Matcher m = ENTRA_PATH.matcher(strip(entraUrl.trim()).substring(("https://" + ENTRA_HOST).length()));
+        return m.matches() ? m.group(1) : "";
+    }
+
+    private static boolean sameHost(String a, String b) {
+        try {
+            URI x = URI.create(a.trim());
+            URI y = URI.create(b.trim());
+            return "https".equals(x.getScheme()) && x.getHost() != null && x.getHost().equalsIgnoreCase(y.getHost());
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
     // -------------------------------------------------------------------------
 
     private JsonNode fetchPrm(String mcpUrl, String header) {
