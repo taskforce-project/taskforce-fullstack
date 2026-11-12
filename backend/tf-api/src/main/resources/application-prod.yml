@@ -171,6 +171,12 @@ integrations:
     oauth:
       redirect-base: ${APP_API_URL:${APP_URL}}   # base publique du BACKEND (recoit le callback OAuth)
       app-base: ${FRONTEND_URL}                   # base du FRONT (retour utilisateur apres callback)
+      # Notre document de metadonnees client (CIMD, TF-J2-12) : <redirect-base>/api/mcp/oauth/client.json par defaut,
+      # en HTTPS. Les clients enregistres d'avance chez un editeur viennent des variables TF_MCP_<CLE>_CLIENT_ID et
+      # TF_MCP_<CLE>_CLIENT_SECRET (ex. TF_MCP_ASANA_CLIENT_ID), jamais du depot.
+  # Une instance d'essai montre aussi les prereglages pas encore essayes de bout en bout (R15, R153).
+  catalog:
+    show-untried: ${TF_CATALOG_SHOW_UNTRIED:false}
 
 # Webhooks sortants (OSS-6.2) : envois signés HMAC-SHA256, tentés jusqu'à 6 fois sur 9 h environ.
 taskforce:

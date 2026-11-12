@@ -69,7 +69,14 @@ public class CortexGate {
 
     /** Juge un outil : ses faits, puis la règle la plus stricte qui les couvre. */
     public Verdict judge(RulesBundle bundle, AgentTool tool) {
-        Map<String, String> facts = facts(tool);
+        return judge(bundle, facts(tool));
+    }
+
+    /**
+     * Juge un geste par ses faits, quand il n'est pas un outil de Cortex : l'import d'un projet crée un projet et ses
+     * issues (R158 : la console et l'import passent par le moteur comme tout autre geste).
+     */
+    public Verdict judge(RulesBundle bundle, Map<String, String> facts) {
         RulesEngine.Decision decision = RulesEngine.decide(bundle, facts);
         RulesBundle.Rule rule = decision.rule();
         return new Verdict(decision.effect(), rule == null ? null : rule.id(), rule == null ? NO_RULE : rule.reason(), facts);
@@ -78,8 +85,11 @@ public class CortexGate {
     /**
      * Les faits d'un outil : son action, son nom et, pour un outil externe, le serveur qui le porte. Un geste du MCP
      * TaskForce porte son action lui-même (ADR-024) : la même que la table juge quand un agent extérieur le fait.
+     *
+     * <p>La classe d'un outil externe est celle que TaskForce lui donne (séance n°22, R158) : celle du préréglage de son
+     * serveur, une écriture pour un outil inconnu, quoi que le serveur déclare de lui-même ({@code readOnlyHint}).</p>
      */
-    static Map<String, String> facts(AgentTool tool) {
+    public static Map<String, String> facts(AgentTool tool) {
         String name = tool.name() == null ? "" : tool.name();
         Map<String, String> facts = new LinkedHashMap<>();
         if (tool instanceof ExternalMcpTool external) {

@@ -533,7 +533,7 @@ class AgentServiceTest {
     /** Une règle de l'espace qui refuse tout. */
     private void denyEverything(String reason) {
         CortexGate deny = Mockito.mock(CortexGate.class);
-        when(deny.judge(any(), any())).thenReturn(new CortexGate.Verdict("deny", "frozen", reason, Map.of()));
+        when(deny.judge(any(), any(AgentTool.class))).thenReturn(new CortexGate.Verdict("deny", "frozen", reason, Map.of()));
         ReflectionTestUtils.setField(service, "gate", deny);
     }
 

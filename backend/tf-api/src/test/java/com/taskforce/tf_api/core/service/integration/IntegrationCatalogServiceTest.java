@@ -9,16 +9,22 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.taskforce.tf_api.core.dto.response.IntegrationCatalogResponse;
 import com.taskforce.tf_api.core.dto.response.IntegrationCatalogResponse.CategoryGroup;
 import com.taskforce.tf_api.core.dto.response.IntegrationCatalogResponse.ConnectorView;
+import com.taskforce.tf_api.core.enums.ConnectionScope;
+import com.taskforce.tf_api.core.enums.ConnectionState;
 import com.taskforce.tf_api.core.enums.IntegrationProvider;
+import com.taskforce.tf_api.core.model.ConnectorApp;
 import com.taskforce.tf_api.core.model.Integration;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.repository.ConnectorAppRepository;
 import com.taskforce.tf_api.core.repository.IntegrationRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.mcp.McpOAuthSettings;
 import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
 import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService.ConnectedServer;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
@@ -26,11 +32,13 @@ import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests unitaires de {@link IntegrationCatalogService} : état de connexion réel des natives et des préréglages, et
- * préréglages jamais essayés retirés du catalogue sauf pour l'espace qui les a connectés (TF-J1-3).
+ * Tests unitaires de {@link IntegrationCatalogService} : l'état réel de la connexion que la personne utilise (la sienne,
+ * sinon celle de l'espace), les catégories du registre dans leur ordre, et les préréglages jamais essayés retirés du
+ * catalogue sauf pour qui les a connectés (TF-J1-3, R15, R153).
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("IntegrationCatalogService")
@@ -40,20 +48,33 @@ class IntegrationCatalogServiceTest {
     @Mock private WorkspaceMemberRepository workspaceMemberRepository;
     @Mock private IntegrationRepository integrationRepository;
     @Mock private WorkspaceMcpService workspaceMcp;
+    @Mock private ConnectorAppRepository connectorApps;
 
+    private ConnectorCatalog catalog;
     private IntegrationCatalogService service;
 
     @BeforeEach
     void setUp() {
-        ConnectorCatalog catalog = new ConnectorCatalog();
+        catalog = new ConnectorCatalog();
         catalog.build();
+        McpOAuthSettings settings = new McpOAuthSettings("https://api.example.test", "", "https://app.example.test",
+            "TaskForce", "web", "");
         service = new IntegrationCatalogService(catalog, workspaceRepository, workspaceMemberRepository,
-            integrationRepository, workspaceMcp);
+            integrationRepository, workspaceMcp, connectorApps, settings);
         when(workspaceRepository.findBySlug("acme")).thenReturn(Optional.of(Workspace.builder().id(1L).slug("acme").build()));
+        lenient().when(connectorApps.findByWorkspaceId(1L)).thenReturn(List.of());
+    }
+
+    private static ConnectedServer server(String key, ConnectionScope scope, ConnectionState state, String account) {
+        return new ConnectedServer(key, null, "https://example.test/mcp", scope, state, account);
+    }
+
+    private static List<ConnectorView> tools(IntegrationCatalogResponse catalog) {
+        return catalog.categories().stream().flatMap(g -> g.tools().stream()).toList();
     }
 
     @Test
-    @DisplayName("hors du workspace → 403")
+    @DisplayName("hors du workspace -> 403")
     void refuses_a_non_member() {
         when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(1L, 7L)).thenReturn(false);
 
@@ -61,71 +82,120 @@ class IntegrationCatalogServiceTest {
     }
 
     @Test
-    @DisplayName("native connectée par son flux, préréglage connecté par son serveur MCP ; une clé hors préréglage ne compte pas")
+    @DisplayName("native connectée par son flux, préréglage par la connexion de la personne ; une clé hors préréglage ne compte pas")
     void reports_the_real_connection_state() {
         when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(1L, 7L)).thenReturn(true);
         when(integrationRepository.findByWorkspaceId(1L))
             .thenReturn(List.of(Integration.builder().provider(IntegrationProvider.GITHUB).build()));
-        // « github » enregistré comme serveur MCP ne doit pas se faire passer pour la native.
-        when(workspaceMcp.connectedServers(1L)).thenReturn(List.of(
-            new ConnectedServer("linear", null, "https://mcp.linear.app/mcp"),
+        // « slack » enregistré comme serveur MCP ne doit pas se faire passer pour la native.
+        when(workspaceMcp.connectedServers(1L, 7L)).thenReturn(List.of(
+            server("linear", ConnectionScope.PERSONAL, ConnectionState.CONNECTED, "ada@acme.test"),
             new ConnectedServer("slack", null, "https://example.com/mcp")));
 
         IntegrationCatalogResponse catalog = service.getCatalog("acme", 7L);
 
-        List<ConnectorView> tools = catalog.categories().stream().flatMap(g -> g.tools().stream()).toList();
-        assertThat(tools).filteredOn(ConnectorView::connected).extracting(ConnectorView::key)
+        assertThat(tools(catalog)).filteredOn(ConnectorView::connected).extracting(ConnectorView::key)
             .containsExactlyInAnyOrder("github", "linear");
+        ConnectorView linear = tools(catalog).stream().filter(t -> t.key().equals("linear")).findFirst().orElseThrow();
+        assertThat(linear.state()).isEqualTo("CONNECTED");
+        assertThat(linear.accountLabel()).isEqualTo("ada@acme.test");
+        assertThat(linear.scope()).isEqualTo("PERSONAL");
+        assertThat(linear.connection()).isEqualTo("self-registration");
+        assertThat(linear.writeChoice()).isTrue();
         assertThat(catalog.connected()).isEqualTo(2);
-        assertThat(catalog.total()).isEqualTo(4).isEqualTo(tools.size());
+        assertThat(catalog.total()).isEqualTo(4).isEqualTo(tools(catalog).size());
     }
 
     @Test
-    @DisplayName("rien de connecté : les trois natives et Linear, le seul préréglage essayé ; aucun des 24 autres")
+    @DisplayName("sa connexion passe avant celle de l'espace ; à reconnecter se dit, sans compter comme branché")
+    void her_own_connection_and_its_state() {
+        when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(1L, 7L)).thenReturn(true);
+        when(integrationRepository.findByWorkspaceId(1L)).thenReturn(List.of());
+        when(workspaceMcp.connectedServers(1L, 7L)).thenReturn(List.of(
+            server("linear", ConnectionScope.WORKSPACE, ConnectionState.CONNECTED, "team@acme.test"),
+            server("linear", ConnectionScope.PERSONAL, ConnectionState.NEEDS_RECONNECT, "ada@acme.test")));
+
+        ConnectorView linear = tools(service.getCatalog("acme", 7L)).stream()
+            .filter(t -> t.key().equals("linear")).findFirst().orElseThrow();
+
+        assertThat(linear.scope()).isEqualTo("PERSONAL");
+        assertThat(linear.state()).isEqualTo("NEEDS_RECONNECT");
+        assertThat(linear.connected()).isFalse();
+    }
+
+    @Test
+    @DisplayName("rien de connecté : les trois natives et Linear, le seul préréglage essayé, dans l'ordre du registre")
     void shows_only_the_tried_presets() {
         when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(1L, 7L)).thenReturn(true);
         when(integrationRepository.findByWorkspaceId(1L)).thenReturn(List.of());
-        when(workspaceMcp.connectedServers(1L)).thenReturn(List.of());
+        when(workspaceMcp.connectedServers(1L, 7L)).thenReturn(List.of());
 
         IntegrationCatalogResponse catalog = service.getCatalog("acme", 7L);
 
-        List<ConnectorView> tools = catalog.categories().stream().flatMap(g -> g.tools().stream()).toList();
-        assertThat(tools).extracting(ConnectorView::key).containsExactly("plane", "linear", "github", "slack");
-        assertThat(catalog.categories()).extracting(CategoryGroup::category)
-            .containsExactly("PROJECT_MANAGEMENT", "DEV_CICD", "COMMUNICATION");
+        assertThat(tools(catalog)).extracting(ConnectorView::key).containsExactly("plane", "linear", "slack", "github");
+        assertThat(catalog.categories()).extracting(CategoryGroup::category, CategoryGroup::label)
+            .containsExactly(tuple("TICKETS_PROJECTS", "Tickets and projects"), tuple("CHAT_MAIL", "Chat and mail"),
+                tuple("CODE", "Code"));
         assertThat(catalog.total()).isEqualTo(4);
         assertThat(catalog.connected()).isZero();
     }
 
     @Test
-    @DisplayName("un préréglage jamais essayé reste visible, connecté et déconnectable pour l'espace qui l'a connecté")
-    void keeps_an_untried_preset_this_workspace_connected() {
+    @DisplayName("un préréglage jamais essayé reste visible, connecté et déconnectable pour qui l'a connecté")
+    void keeps_an_untried_preset_she_connected() {
         when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(1L, 7L)).thenReturn(true);
         when(integrationRepository.findByWorkspaceId(1L)).thenReturn(List.of());
-        when(workspaceMcp.connectedServers(1L)).thenReturn(List.of(
+        when(workspaceMcp.connectedServers(1L, 7L)).thenReturn(List.of(
             new ConnectedServer("cloudflare", null, "https://mcp.cloudflare.com/mcp")));
 
         IntegrationCatalogResponse catalog = service.getCatalog("acme", 7L);
 
-        List<ConnectorView> tools = catalog.categories().stream().flatMap(g -> g.tools().stream()).toList();
-        assertThat(tools).extracting(ConnectorView::key)
-            .containsExactly("plane", "linear", "github", "cloudflare", "slack")
+        assertThat(tools(catalog)).extracting(ConnectorView::key)
+            .containsExactly("plane", "linear", "slack", "github", "cloudflare")
             .doesNotContain("jira", "vercel");
-        ConnectorView cloudflare = tools.stream().filter(t -> t.key().equals("cloudflare")).findFirst().orElseThrow();
+        ConnectorView cloudflare = tools(catalog).stream().filter(t -> t.key().equals("cloudflare")).findFirst().orElseThrow();
         assertThat(cloudflare.connected()).isTrue();
-        assertThat(cloudflare.category()).isEqualTo("HOSTING_INFRA");
-        assertThat(cloudflare.mcpSuggestedUrl()).isEqualTo("https://mcp.cloudflare.com/mcp");
+        assertThat(cloudflare.category()).isEqualTo("CODE");
+        assertThat(cloudflare.scope()).isEqualTo("WORKSPACE");
+        assertThat(cloudflare.tried()).isFalse();
         assertThat(catalog.total()).isEqualTo(5);
         assertThat(catalog.connected()).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("serveurs hors catalogue listés en dernier, connectés, avec leur nom et l'hôte de leur URL")
+    @DisplayName("instance d'essai : les préréglages pas encore essayés se montrent, et le chemin qu'ils demandent")
+    void a_tryout_instance_shows_the_untried_presets() {
+        ReflectionTestUtils.setField(catalog, "showUntried", true);
+        when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(1L, 7L)).thenReturn(true);
+        when(integrationRepository.findByWorkspaceId(1L)).thenReturn(List.of());
+        when(workspaceMcp.connectedServers(1L, 7L)).thenReturn(List.of());
+        when(connectorApps.findByWorkspaceId(1L)).thenReturn(List.of(ConnectorApp.builder().connectorKey("asana").build()));
+
+        List<ConnectorView> tools = tools(service.getCatalog("acme", 7L));
+
+        ConnectorView slack = tools.stream().filter(t -> t.key().equals("slack-mcp")).findFirst().orElseThrow();
+        assertThat(slack.state()).isEqualTo("WAITING_FOR_ADMIN");
+        assertThat(slack.admin().required()).isTrue();
+        assertThat(slack.admin().text()).contains("https://api.example.test/api/mcp/oauth/callback");
+        ConnectorView asana = tools.stream().filter(t -> t.key().equals("asana")).findFirst().orElseThrow();
+        assertThat(asana.companyApp()).isTrue();
+        assertThat(asana.state()).isEqualTo("NOT_CONNECTED");
+        ConnectorView jira = tools.stream().filter(t -> t.key().equals("jira")).findFirst().orElseThrow();
+        assertThat(jira.admin().text()).contains("https://api.example.test/**").doesNotContain("{redirectHost}");
+        ConnectorView figma = tools.stream().filter(t -> t.key().equals("figma")).findFirst().orElseThrow();
+        assertThat(figma.blocked()).contains("waitlist");
+        ConnectorView stripe = tools.stream().filter(t -> t.key().equals("stripe")).findFirst().orElseThrow();
+        assertThat(stripe.apiKey().link()).startsWith("https://");
+        assertThat(stripe.category()).isEqualTo("FINANCE_HR");
+    }
+
+    @Test
+    @DisplayName("serveurs hors catalogue listés en dernier, avec leur nom et l'hôte de leur URL")
     void lists_custom_servers_last() {
         when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(1L, 7L)).thenReturn(true);
         when(integrationRepository.findByWorkspaceId(1L)).thenReturn(List.of());
         // « trello » : connexion MCP héritée d'une tuile retirée au lot 6, sans nom enregistré.
-        when(workspaceMcp.connectedServers(1L)).thenReturn(List.of(
+        when(workspaceMcp.connectedServers(1L, 7L)).thenReturn(List.of(
             new ConnectedServer("custom-team-docs", "Team docs", "https://docs.example.com/mcp"),
             new ConnectedServer("trello", null, "https://mcp.trello.example/sse")));
 
@@ -145,20 +215,5 @@ class IntegrationCatalogServiceTest {
         });
         assertThat(catalog.total()).isEqualTo(6);
         assertThat(catalog.connected()).isEqualTo(2);
-    }
-
-    @Test
-    @DisplayName("groupes dans l'ordre du catalogue, Plane en tête")
-    void groups_in_declaration_order() {
-        when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(1L, 7L)).thenReturn(true);
-        when(integrationRepository.findByWorkspaceId(1L)).thenReturn(List.of());
-        when(workspaceMcp.connectedServers(1L)).thenReturn(List.of());
-
-        IntegrationCatalogResponse catalog = service.getCatalog("acme", 7L);
-
-        assertThat(catalog.categories().get(0).category()).isEqualTo("PROJECT_MANAGEMENT");
-        assertThat(catalog.categories().get(0).label()).isEqualTo("Project management");
-        assertThat(catalog.categories().get(0).tools().get(0).key()).isEqualTo("plane");
-        assertThat(catalog.connected()).isZero();
     }
 }

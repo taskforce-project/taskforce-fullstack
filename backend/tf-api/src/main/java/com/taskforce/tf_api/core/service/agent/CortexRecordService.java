@@ -282,8 +282,8 @@ public class CortexRecordService {
         }).toList();
     }
 
-    /** Un texte gardé au dossier, coupé à {@link #MAX_TEXT} caractères. */
-    static String shorten(String text) {
+    /** Un texte gardé au dossier, coupé à {@link #MAX_TEXT} caractères (aussi pour la console et l'import, R158). */
+    public static String shorten(String text) {
         if (text == null) return "";
         return text.length() <= MAX_TEXT ? text : text.substring(0, MAX_TEXT) + "...";
     }

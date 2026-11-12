@@ -153,8 +153,12 @@ public class AgentService {
         if (tool == null) {
             throw new BusinessException("This action is no longer available.");
         }
-        if (tool instanceof ExternalMcpTool && !authorization.isManager(ws.getId(), userId)) {
-            throw new BusinessException("Only workspace owners and admins can approve a change in an external tool.");
+        // Une écriture par la connexion de la personne, elle l'accorde ; par une connexion partagée avec l'espace, un
+        // propriétaire ou un administrateur (séance n°22, R154 ; OSS-1.5). Ses outils sont ceux de sa connexion.
+        if (tool instanceof ExternalMcpTool external && !external.isReadOnly() && external.shared()
+                && !authorization.isManager(ws.getId(), userId)) {
+            throw new BusinessException("Only workspace owners and admins can approve a change through a connection "
+                + "shared with the workspace.");
         }
         if (!records.approve(record, toolName, userId, argsJson)) {
             throw new BusinessException("This action is no longer waiting for your approval.");
@@ -1357,11 +1361,14 @@ public class AgentService {
                     result = refusedText(verdict);
                     status = "refused";
                 } else if (!verdict.allowed()) {
-                    // Demandé : jamais exécuté par le modèle. Une écriture externe ne se propose qu'à qui peut la valider
-                    // (propriétaire ou administrateur, OSS-1.5) ; les autres l'apprennent d'emblée.
-                    if (tool instanceof ExternalMcpTool && !authorization.isManager(ctx.workspaceId(), ctx.userId())) {
-                        result = "Not run: only workspace owners and admins can approve a change in an external "
-                            + "tool. Tell the user that an owner or admin has to make this change.";
+                    // Demandé : jamais exécuté par le modèle. Une écriture externe ne se propose qu'à qui peut la valider :
+                    // la personne pour sa connexion ; un propriétaire ou un administrateur pour une connexion partagée
+                    // (OSS-1.5) ; les autres l'apprennent d'emblée.
+                    if (tool instanceof ExternalMcpTool external && external.shared()
+                            && !authorization.isManager(ctx.workspaceId(), ctx.userId())) {
+                        result = "Not run: only workspace owners and admins can approve a change through a connection "
+                            + "shared with the workspace. Tell the user that an owner or admin has to make this "
+                            + "change, or that she can connect the tool with her own account.";
                         status = "error";
                     } else {
                         // La carte dit ce que la personne accorde : l'issue qu'on supprimerait, ce qui partirait avec elle.

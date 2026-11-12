@@ -64,11 +64,19 @@ public class McpClient {
     }
 
     /**
-     * Définition d'un outil distant ({@code tools/list}). {@code readOnly} est dérivé de
-     * {@code annotations.readOnlyHint} — <b>par défaut faux</b> (traité comme écriture → confirmation
-     * requise) si l'indice est absent, choix conservateur pour la sûreté.
+     * Définition d'un outil distant ({@code tools/list}). {@code readOnly} est ce que le serveur déclare de lui-même
+     * ({@code annotations.readOnlyHint}) : TaskForce ne s'en sert plus pour décider (séance n°22, R158), la classe vient
+     * du préréglage ({@code ConnectorCatalog#classOf}). {@code title} entre dans l'empreinte de l'outil figée à la
+     * connexion, avec sa description et son schéma.
      */
-    public record ToolDef(String name, String description, JsonNode inputSchema, boolean readOnly) {}
+    public record ToolDef(String name, String title, String description, JsonNode inputSchema, boolean readOnly) {
+        public ToolDef(String name, String description, JsonNode inputSchema, boolean readOnly) {
+            this(name, null, description, inputSchema, readOnly);
+        }
+    }
+
+    /** La version du protocole que TaskForce annonce : celle du transport Streamable HTTP qu'il parle. */
+    public static final String PROTOCOL_VERSION = "2025-06-18";
 
     /**
      * Session MCP ouverte : URL + token de pass-through + {@code mcp-session-id} <b>optionnel</b>
@@ -88,7 +96,7 @@ public class McpClient {
      */
     public Session initialize(ServerRef ref) {
         ObjectNode params = objectMapper.createObjectNode();
-        params.put("protocolVersion", "2025-06-18");
+        params.put("protocolVersion", PROTOCOL_VERSION);
         params.set("capabilities", objectMapper.createObjectNode());
         ObjectNode clientInfo = objectMapper.createObjectNode();
         clientInfo.put("name", "taskforce-mcp-client");
@@ -99,6 +107,7 @@ public class McpClient {
             rpcBody("initialize", params, 1));
         // Un statut d'erreur (ex. 401 token invalide) doit remonter clairement, plutôt que de se
         // déguiser en « serveur sans session ».
+        if (res.statusCode() == 401) throw new Unauthorized(ref.connectorKey());
         if (res.statusCode() / 100 != 2) {
             throw new BusinessException("MCP handshake refused (" + ref.connectorKey()
                 + ", HTTP " + res.statusCode() + ")");
@@ -133,7 +142,8 @@ public class McpClient {
             String name = t.path("name").asText(null);
             if (name == null || name.isBlank()) continue;
             boolean readOnly = t.path("annotations").path("readOnlyHint").asBoolean(false);
-            out.add(new ToolDef(name, t.path("description").asText(""), t.get("inputSchema"), readOnly));
+            String title = t.path("title").asText(t.path("annotations").path("title").asText(null));
+            out.add(new ToolDef(name, title, t.path("description").asText(""), t.get("inputSchema"), readOnly));
         }
         return out;
     }
@@ -187,6 +197,52 @@ public class McpClient {
         root.put("method", method);
         if (params != null) root.set("params", params);
         return root.toString();
+    }
+
+    /** Le serveur refuse le jeton (401) : la connexion est à refaire, rien d'autre ne marchera. */
+    public static class Unauthorized extends BusinessException {
+        public Unauthorized(String connectorKey) {
+            super("MCP handshake refused (" + connectorKey + ", HTTP 401)");
+        }
+    }
+
+    /** Cette instance admet-elle les serveurs du réseau local (app desktop, installation sur site) ? */
+    public boolean allowsPrivateNetwork() {
+        return allowPrivateNetwork;
+    }
+
+    /**
+     * L'adresse vise-t-elle la machine ou le réseau local (bouclage, adresses privées, noms internes) ? Un tel serveur
+     * ne se connecte que sur une instance qui l'admet, et après l'accord explicite de la personne (bonnes pratiques
+     * de sécurité MCP : montrer le serveur local et demander).
+     */
+    public static boolean isLocal(String url) {
+        if (url == null || !url.trim().matches("(?i)https?://.+")) return false;
+        String host;
+        try {
+            host = URI.create(url.trim()).getHost();
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+        if (host == null) return false;
+        String h = host.toLowerCase(java.util.Locale.ROOT).replaceAll("^\\[|]$", "");
+        if (h.equals("localhost") || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal")
+                || !h.contains(".") && !h.contains(":")) {
+            return true;
+        }
+        try {
+            for (java.net.InetAddress a : java.net.InetAddress.getAllByName(h)) {
+                byte[] b = a.getAddress();
+                boolean cgnat = b.length == 4 && (b[0] & 0xff) == 100 && (b[1] & 0xc0) == 64; // 100.64.0.0/10
+                if (a.isLoopbackAddress() || a.isSiteLocalAddress() || a.isLinkLocalAddress() || a.isAnyLocalAddress()
+                        || cgnat || a instanceof java.net.Inet6Address && (b[0] & 0xfe) == 0xfc) {
+                    return true;
+                }
+            }
+        } catch (java.net.UnknownHostException e) {
+            return false; // un nom qui ne se résout pas n'est pas local : la connexion échouera d'elle-même
+        }
+        return false;
     }
 
     /**
