@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.enums.ConnectionState;
 import com.taskforce.tf_api.core.model.ConnectorConnection;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -128,15 +129,16 @@ public class McpTokenService {
                 return config.get(K_ACCESS);
             } catch (McpOAuthClient.OAuthError e) {
                 if (!e.needsReconnect()) {
-                    log.warn("Refresh token MCP '{}' echoue : {}", conn.getConnectorKey(), e.getMessage());
+                    log.warn("Refresh token MCP '{}' echoue : {}", LogSafe.of(conn.getConnectorKey()), LogSafe.of(e.getMessage()));
                     return config.get(K_ACCESS);
                 }
-                log.warn("Refresh token MCP '{}' refuse : connexion a refaire ({})", conn.getConnectorKey(), e.error());
+                log.warn("Refresh token MCP '{}' refuse : connexion a refaire ({})", LogSafe.of(conn.getConnectorKey()),
+                    LogSafe.of(e.error()));
                 conn.setState(ConnectionState.NEEDS_RECONNECT);
                 repository.save(conn);
                 return null;
             } catch (Exception e) {
-                log.warn("Refresh token MCP '{}' echoue : {}", conn.getConnectorKey(), e.getMessage());
+                log.warn("Refresh token MCP '{}' echoue : {}", LogSafe.of(conn.getConnectorKey()), LogSafe.of(e.getMessage()));
                 return config.get(K_ACCESS);
             }
         }

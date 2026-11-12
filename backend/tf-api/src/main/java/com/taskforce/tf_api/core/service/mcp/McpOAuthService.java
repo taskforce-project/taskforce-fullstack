@@ -32,6 +32,7 @@ import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 import com.taskforce.tf_api.core.service.integration.ConnectorPreset;
 import com.taskforce.tf_api.core.service.mcp.McpOAuthDiscovery.DiscoveredAuth;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 import com.taskforce.tf_api.shared.security.SsrfGuard;
 
 import lombok.RequiredArgsConstructor;
@@ -272,7 +273,7 @@ public class McpOAuthService {
             workspaceMcp.invalidate(row.getWorkspaceId());
             return appRedirect(row, "connected");
         } catch (Exception e) {
-            log.warn("Callback OAuth MCP echoue (connector={}) : {}", row.getConnectorKey(), e.getMessage());
+            log.warn("Callback OAuth MCP echoue (connector={}) : {}", LogSafe.of(row.getConnectorKey()), LogSafe.of(e.getMessage()));
             return appRedirect(row, "error");
         } finally {
             stateRepository.deleteById(row.getState()); // usage unique
@@ -412,7 +413,15 @@ public class McpOAuthService {
 
     private static boolean sameIssuer(String a, String b) {
         if (b == null) return false;
-        return a.trim().replaceAll("/+$", "").equals(b.trim().replaceAll("/+$", ""));
+        return withoutTrailingSlashes(a).equals(withoutTrailingSlashes(b));
+    }
+
+    /** Une adresse sans ses barres finales, sans expression régulière sur une valeur venue du dehors. */
+    private static String withoutTrailingSlashes(String url) {
+        String v = url.trim();
+        int end = v.length();
+        while (end > 0 && v.charAt(end - 1) == '/') end--;
+        return v.substring(0, end);
     }
 
     private String urlSafe(int bytes) {

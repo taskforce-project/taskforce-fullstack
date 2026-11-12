@@ -26,6 +26,7 @@ import com.taskforce.tf_api.core.service.agent.CortexGate;
 import com.taskforce.tf_api.core.service.agent.CortexRecordService;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -96,10 +97,11 @@ public class McpImportService {
                 issueService.createIssue(ws.getSlug(), project.getId(), issueRequest(ni), userId);
                 imported++;
             } catch (Exception e) {
-                log.warn("Import : issue « {} » ignorée : {}", ni.title(), e.getMessage());
+                log.warn("Import : issue « {} » ignorée : {}", LogSafe.of(ni.title()), LogSafe.of(e.getMessage()));
             }
         }
-        log.info("Import MCP {} → projet {} : {}/{} issues", connectorKey, project.getIdentifier(), imported, issues.size());
+        log.info("Import MCP {} → projet {} : {}/{} issues", LogSafe.of(connectorKey), LogSafe.of(project.getIdentifier()),
+            imported, issues.size());
         result(record, "create_issue", "success", "Project " + project.getIdentifier() + ": " + imported + " of "
             + issues.size() + " issues imported.");
         return new ImportResult(project.getId(), project.getIdentifier(), project.getName(), imported, issues.size());
@@ -138,7 +140,7 @@ public class McpImportService {
             data.put("output", CortexRecordService.shorten(output));
             records.append(record, "action.result", CortexRecordService.Actor.SERVER, data);
         } catch (RuntimeException e) {
-            log.warn("Import : resultat de {} non garde au dossier : {}", tool, e.getMessage());
+            log.warn("Import : resultat de {} non garde au dossier : {}", LogSafe.of(tool), LogSafe.of(e.getMessage()));
         }
     }
 

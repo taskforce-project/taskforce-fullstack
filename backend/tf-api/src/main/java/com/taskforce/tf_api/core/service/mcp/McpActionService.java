@@ -16,6 +16,7 @@ import com.taskforce.tf_api.core.service.agent.CortexRecordService;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -104,7 +105,7 @@ public class McpActionService {
             data.put("output", CortexRecordService.shorten(output));
             records.append(record, "action.result", CortexRecordService.Actor.SERVER, data);
         } catch (RuntimeException e) {
-            log.warn("Console : resultat de {} non garde au dossier : {}", tool, e.getMessage());
+            log.warn("Console : resultat de {} non garde au dossier : {}", LogSafe.of(tool), LogSafe.of(e.getMessage()));
         }
     }
 

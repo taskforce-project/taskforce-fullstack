@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 import com.taskforce.tf_api.shared.security.SsrfGuard;
 
 import lombok.extern.slf4j.Slf4j;
@@ -126,7 +127,7 @@ public class McpClient {
             send(session.baseUrl(), session.token(), session.authHeader(), session.sessionId(),
                 "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
         } catch (Exception e) {
-            log.debug("notifications/initialized ignorée ({}) : {}", ref.connectorKey(), e.getMessage());
+            log.debug("notifications/initialized ignorée ({}) : {}", LogSafe.of(ref.connectorKey()), LogSafe.of(e.getMessage()));
         }
         return session;
     }
@@ -184,7 +185,7 @@ public class McpClient {
             authorize(b, session.token(), session.authHeader());
             http.send(b.build(), HttpResponse.BodyHandlers.discarding());
         } catch (Exception e) {
-            log.debug("Fermeture session MCP ignorée : {}", e.getMessage());
+            log.debug("Fermeture session MCP ignorée : {}", LogSafe.of(e.getMessage()));
         }
     }
 

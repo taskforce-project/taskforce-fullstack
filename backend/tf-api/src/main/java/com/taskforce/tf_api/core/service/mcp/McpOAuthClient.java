@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 import com.taskforce.tf_api.shared.security.SsrfGuard;
 
 import lombok.extern.slf4j.Slf4j;
@@ -101,7 +102,7 @@ public class McpOAuthClient {
             if (r.statusCode() / 100 != 2) return null;
             return objectMapper.readTree(r.body());
         } catch (Exception e) {
-            log.debug("GET metadata {} echoue : {}", url, e.getMessage());
+            log.debug("GET metadata {} echoue : {}", LogSafe.of(url), LogSafe.of(e.getMessage()));
             return null;
         }
     }
@@ -146,7 +147,7 @@ public class McpOAuthClient {
         try {
             return sendForm(url, form).statusCode();
         } catch (Exception e) {
-            log.debug("POST {} echoue : {}", url, e.getMessage());
+            log.debug("POST {} echoue : {}", LogSafe.of(url), LogSafe.of(e.getMessage()));
             return -1;
         }
     }
@@ -167,7 +168,7 @@ public class McpOAuthClient {
                 mcpUrl, "application/json, text/event-stream");
             return new Probe(r.statusCode(), r.headers().firstValue("WWW-Authenticate").orElse(""));
         } catch (Exception e) {
-            log.debug("Probe MCP {} echoue : {}", mcpUrl, e.getMessage());
+            log.debug("Probe MCP {} echoue : {}", LogSafe.of(mcpUrl), LogSafe.of(e.getMessage()));
             return new Probe(-1, "");
         }
     }

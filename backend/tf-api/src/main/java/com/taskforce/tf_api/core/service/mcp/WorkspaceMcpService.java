@@ -38,6 +38,7 @@ import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -430,7 +431,7 @@ public class WorkspaceMcpService {
                         catalog.classOf(conn.getConnectorKey(), def.name()), conn.getScope()));
                 }
             } catch (Exception e) {
-                log.warn("Serveur MCP '{}' (ws={}) ignoré : {}", ref.connectorKey(), workspaceId, e.getMessage());
+                log.warn("Serveur MCP '{}' (ws={}) ignoré : {}", LogSafe.of(ref.connectorKey()), workspaceId, LogSafe.of(e.getMessage()));
             }
         }
         if (!tools.isEmpty()) {
@@ -476,7 +477,7 @@ public class WorkspaceMcpService {
             conn.setState(ConnectionState.NEEDS_RECONNECT);
             repository.save(conn);
         } catch (RuntimeException e) {
-            log.debug("Etat de la connexion '{}' non garde : {}", conn.getConnectorKey(), e.getMessage());
+            log.debug("Etat de la connexion '{}' non garde : {}", LogSafe.of(conn.getConnectorKey()), LogSafe.of(e.getMessage()));
         }
     }
 
@@ -608,7 +609,8 @@ public class WorkspaceMcpService {
                 client.close(session);
             }
         } catch (Exception e) {
-            log.debug("Liste des outils de '{}' non figee a la connexion : {}", conn.getConnectorKey(), e.getMessage());
+            log.debug("Liste des outils de '{}' non figee a la connexion : {}", LogSafe.of(conn.getConnectorKey()),
+                LogSafe.of(e.getMessage()));
         }
     }
 
@@ -616,7 +618,7 @@ public class WorkspaceMcpService {
         try {
             pin(conn, defs);
         } catch (RuntimeException e) {
-            log.debug("Liste des outils de '{}' non figee : {}", conn.getConnectorKey(), e.getMessage());
+            log.debug("Liste des outils de '{}' non figee : {}", LogSafe.of(conn.getConnectorKey()), LogSafe.of(e.getMessage()));
         }
     }
 

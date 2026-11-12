@@ -17,6 +17,7 @@ import com.taskforce.tf_api.core.repository.ConnectorAppRepository;
 import com.taskforce.tf_api.core.repository.McpOAuthRegistrationRepository;
 import com.taskforce.tf_api.core.service.mcp.McpOAuthDiscovery.DiscoveredAuth;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -145,7 +146,8 @@ public class McpClientRegistrar {
             ok = listed;
         }
         if (ok) cimdChecked.put(key, System.currentTimeMillis());
-        else log.info("Document CIMD {} indisponible pour {} : inscription dynamique a la place", cimdUrl, redirectUri);
+        else log.info("Document CIMD {} indisponible pour {} : inscription dynamique a la place", LogSafe.of(cimdUrl),
+            LogSafe.of(redirectUri));
         return ok;
     }
 
