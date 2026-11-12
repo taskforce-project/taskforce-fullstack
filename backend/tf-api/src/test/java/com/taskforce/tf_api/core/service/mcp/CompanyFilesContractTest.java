@@ -357,6 +357,43 @@ class CompanyFilesContractTest {
         assertThat(CortexGate.facts(read)).containsEntry("action", "mcp.read").containsEntry("server", "microsoft-365");
     }
 
+    // ── Teams, sur la même connexion ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("Teams : Cortex lit les canaux et les conversations, cités ; poster est une écriture qui attend une personne")
+    void teams() {
+        connectMicrosoft(ada, true);
+        AgentContext ctx = new AgentContext("acme", WS, ada.getId());
+
+        assertThat(tool(ada, "microsoft-365__list_teams").execute(Map.of(), ctx))
+            .contains("Product (teamId team-1): General (channelId 19:general@thread.tacv2)");
+        AgentTool channel = tool(ada, "microsoft-365__read_channel");
+        String messages = channel.execute(Map.of("teamId", "team-1", "channelId", "19:general@thread.tacv2"), ctx);
+        assertThat(messages).startsWith("Source: \"Channel messages\" in Microsoft Teams, last changed 2026-11-10 09:15 UTC.")
+            .contains("[2026-11-10 09:15 UTC] Grace Hopper: Ship the Q4 plan & tell finance (https://teams.example/m1)")
+            .contains(CompanyApiTools.OUTSIDE).doesNotContain("<p>").doesNotContain("systemEventMessage");
+        assertThat(tool(ada, "microsoft-365__list_chats").execute(Map.of(), ctx))
+            .contains("Ada, Grace Hopper (chatId 19:chat@unq.gbl.spaces)");
+        assertThat(tool(ada, "microsoft-365__read_chat").execute(Map.of("chatId", "19:chat@unq.gbl.spaces"), ctx))
+            .contains("Grace Hopper: Budget is due Friday");
+
+        AgentTool post = tool(ada, "microsoft-365__post_channel_message");
+        assertThat(CortexGate.facts(post)).containsEntry("action", "mcp.write").containsEntry("server", "microsoft-365");
+        assertThat(CortexGate.facts(channel)).containsEntry("action", "mcp.read");
+        Proof proof = new Proof();
+        CortexGate.Verdict verdict = proof.gate.judge(proof.gate.rulesFor(ctx), post,
+            "{\"teamId\":\"team-1\",\"channelId\":\"19:general@thread.tacv2\",\"text\":\"Shipped\"}", CortexGate.Exposure.none());
+        assertThat(verdict.allowed()).isFalse();
+        assertThat(verdict.denied()).isFalse();
+
+        // Accordé par la personne : le message part, et le résultat dit où le retrouver.
+        assertThat(post.execute(Map.of("teamId", "team-1", "channelId", "19:general@thread.tacv2", "text", "Shipped"), ctx))
+            .isEqualTo("Posted in Microsoft Teams. Link: https://teams.example/m9.");
+        assertThat(tool(ada, "microsoft-365__post_chat_message").execute(Map.of("chatId", "19:chat@unq.gbl.spaces",
+            "text", "On it"), ctx)).isEqualTo("Posted in Microsoft Teams.");
+        assertThat(microsoft.posted).containsExactly("channel General: Shipped", "chat: On it");
+    }
+
     // ── Microsoft 365 : ranger dans OneDrive ou SharePoint (R156) ────────────
 
     @Test

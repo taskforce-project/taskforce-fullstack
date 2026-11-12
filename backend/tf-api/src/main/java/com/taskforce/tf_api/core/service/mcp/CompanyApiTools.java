@@ -127,7 +127,7 @@ public class CompanyApiTools {
                 }));
     }
 
-    // --- Microsoft 365 : OneDrive et SharePoint ----------------------------
+    // --- Microsoft 365 : OneDrive, SharePoint et Teams ---------------------
 
     private List<Spec> microsoft() {
         List<Spec> specs = new ArrayList<>();
@@ -159,7 +159,82 @@ public class CompanyApiTools {
                         f.modifiedBy(), f.webUrl(), graph.text(u.base(), t, f, MAX_CHARS));
                 });
             }));
+        // Teams, sur la même connexion : lire les canaux et les conversations de la personne, poster après son accord.
+        specs.add(new Spec("list_teams", "List the Microsoft Teams teams and channels this person is in, with their ids.",
+            schema(Map.of(), List.of()),
+            (u, args) -> {
+                List<MicrosoftGraphApi.Team> teams = connections.call(u, t -> graph.teams(u.base(), t));
+                if (teams.isEmpty()) return "This person is in no team in Microsoft Teams.";
+                StringBuilder out = new StringBuilder(teams.size() + " team(s) in Microsoft Teams:\n");
+                for (MicrosoftGraphApi.Team team : teams) {
+                    out.append("- ").append(team.name()).append(" (teamId ").append(team.id()).append("): ")
+                        .append(team.channels().stream().map(c -> c.name() + " (channelId " + c.id() + ")")
+                            .collect(java.util.stream.Collectors.joining(", ")))
+                        .append('\n');
+                }
+                return out.toString().strip();
+            }));
+        specs.add(new Spec("read_channel", "Read the latest messages of a Microsoft Teams channel live, by its team id and "
+            + "channel id (from list_teams). Cite each message with its author and date.",
+            schema(Map.of("teamId", "The team's id", "channelId", "The channel's id"), List.of("teamId", "channelId")),
+            (u, args) -> {
+                String teamId = required(args, "teamId");
+                String channelId = required(args, "channelId");
+                return citeMessages("Channel messages",
+                    connections.call(u, t -> graph.channelMessages(u.base(), t, teamId, channelId)));
+            }));
+        specs.add(new Spec("list_chats", "List this person's Microsoft Teams chats, with their ids.", schema(Map.of(), List.of()),
+            (u, args) -> {
+                List<MicrosoftGraphApi.Chat> chats = connections.call(u, t -> graph.chats(u.base(), t));
+                if (chats.isEmpty()) return "This person has no chat in Microsoft Teams.";
+                StringBuilder out = new StringBuilder(chats.size() + " chat(s) in Microsoft Teams:\n");
+                for (MicrosoftGraphApi.Chat chat : chats) {
+                    out.append("- ").append(chat.name()).append(" (chatId ").append(chat.id()).append(")\n");
+                }
+                return out.toString().strip();
+            }));
+        specs.add(new Spec("read_chat", "Read the latest messages of a Microsoft Teams chat live, by its chat id (from "
+            + "list_chats). Cite each message with its author and date.",
+            schema(Map.of("chatId", "The chat's id"), List.of("chatId")),
+            (u, args) -> {
+                String chatId = required(args, "chatId");
+                return citeMessages("Chat messages", connections.call(u, t -> graph.chatMessages(u.base(), t, chatId)));
+            }));
+        specs.add(new Spec("post_channel_message", "Post a message in a Microsoft Teams channel, by its team id and channel "
+            + "id. The person approves it before it is sent.",
+            schema(Map.of("teamId", "The team's id", "channelId", "The channel's id", "text", "The message, as plain text"),
+                List.of("teamId", "channelId", "text")),
+            (u, args) -> posted(connections.call(u, t -> graph.postToChannel(u.base(), t, required(args, "teamId"),
+                required(args, "channelId"), required(args, "text"))))));
+        specs.add(new Spec("post_chat_message", "Post a message in a Microsoft Teams chat, by its chat id. The person "
+            + "approves it before it is sent.",
+            schema(Map.of("chatId", "The chat's id", "text", "The message, as plain text"), List.of("chatId", "text")),
+            (u, args) -> posted(connections.call(u, t -> graph.postToChat(u.base(), t, required(args, "chatId"),
+                required(args, "text"))))));
         return specs;
+    }
+
+    /**
+     * Des messages de Teams, lus à l'instant, avec leur auteur et leur date (Graph les rend du plus récent au plus ancien) :
+     * la fiche dit la date du dernier, et la marque d'un contenu du dehors (R158).
+     */
+    String citeMessages(String where, List<MicrosoftGraphApi.Message> messages) {
+        StringBuilder text = new StringBuilder();
+        String latest = null;
+        for (MicrosoftGraphApi.Message m : messages) {
+            text.append('[').append(m.at() == null ? "" : shown(m.at())).append("] ").append(m.from()).append(": ")
+                .append(m.text());
+            if (m.webUrl() != null) text.append(" (").append(m.webUrl()).append(')');
+            text.append('\n');
+            if (latest == null && m.at() != null) latest = m.at();
+        }
+        if (messages.isEmpty()) text.append("No message yet.");
+        return cite("Microsoft Teams", where, null, null, latest, null, null, text.toString().strip());
+    }
+
+    /** Ce qu'un message posté a donné : où le retrouver. */
+    private static String posted(MicrosoftGraphApi.Message m) {
+        return "Posted in Microsoft Teams." + (m.webUrl() == null ? "" : " Link: " + m.webUrl() + ".");
     }
 
     // -------------------------------------------------------------------------
