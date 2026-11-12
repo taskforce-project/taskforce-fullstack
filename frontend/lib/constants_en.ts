@@ -1846,6 +1846,7 @@ export const CONSTANTS_EN = {
     allowOnce: "Allow",
     allowForMission: "Allow for this mission",
     forMissionHint: "Requests of the same kind won't be asked again until the mission ends.",
+    onceHint: "Your workspace's rules ask each time: this approval counts for this request only.",
     noAnswerMeansNo: "No answer in {minutes} min means no. You will see that it was refused.",
     noAnswerSoon: "No answer in less than a minute means no. You will see that it was refused.",
     showCommand: "Show the command",

@@ -109,6 +109,14 @@ public class DeliveryRunApproval extends AuditableEntity {
     @Builder.Default
     private boolean separateRoles = false;
 
+    /**
+     * La décision lie (V129) : une couche de l'entreprise, une règle qui porte des obligations (qui accorde, combien de
+     * signatures, un seuil) ou le socle. Un accord y vaut pour cet appel seulement, jamais pour le reste de la mission.
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean binding = false;
+
     /** Les obligations de l'accord, telles que le moteur les a rendues ; nulles pour un accord ordinaire. */
     public RulesEngine.Obligations obligations() {
         if ((approvers == null || approvers.isEmpty()) && signatures <= 1 && !separateRoles) {

@@ -199,6 +199,36 @@ describe("la porte du poste devant les règles de l'entreprise", () => {
     assert.equal(binding({ effect: "ask", rule: defaults.rules.find((r) => r.id === "fetch-web") ?? null }), false);
   });
 
+  it("un accord « pour cette mission » ne couvre jamais une décision qui lie : chaque appel se redemande", async () => {
+    const asked: Ruling[] = [];
+    const forMission: ApprovalApi = {
+      requestApproval: async (_runId, _tool, _summary, _askedBy, ruling) => {
+        asked.push(ruling ?? {});
+        return { approvalId: asked.length, status: "PENDING", expiresAt: "" } satisfies Approval;
+      },
+      approvalStatus: async (_runId, id) => ({ approvalId: id, status: "ALLOWED", expiresAt: "", scope: "MISSION" }),
+    };
+    const threshold: Rule = { id: "big-quotes", when: { action: "mcp.write", over: { fact: "arg.amount", value: 10 } },
+      class: "irreversible", effect: "ask", inverse: null, owner: "TaskForce", reason: "Big quotes.", review: "" };
+    const server = new ApprovalServer(forMission, 42, WORK, { waitMs: 200, pollMs: 5, rules: { ...rules, rules: [threshold, ...rules.rules] } });
+    await server.start();
+    const call = (input: Record<string, unknown>) => fetch(server.preToolUseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${server.token}` },
+      body: JSON.stringify({ hook_event_name: "PreToolUse", ...input }),
+    }).then((res) => res.json() as Promise<{ hookSpecificOutput?: { permissionDecision?: string } }>);
+    try {
+      // Une règle de l'entreprise, avec la personne qui accorde : accordée « pour la mission », elle redemande.
+      assert.equal((await call(edit("src/accounting/ledger.ts"))).hookSpecificOutput?.permissionDecision, "allow");
+      assert.equal((await call(edit("src/accounting/ledger.ts"))).hookSpecificOutput?.permissionDecision, "allow");
+      assert.equal(asked.length, 2);
+      // Une règle à seuil lie aussi, même hors des couches.
+      assert.equal(binding({ effect: "ask", rule: threshold }), true);
+    } finally {
+      await server.stop();
+    }
+  });
+
   it("après une page du web lue avec l'accord de la personne, un commentaire de l'agent demande à son tour", async () => {
     const { api: fake } = api();
     const exposure = Exposure.forMission("acme/app", "private");

@@ -91,6 +91,8 @@ public class DeliveryActivityService {
     /** La portée d'un accord : une fois, ou pour le reste de la mission (R46). */
     static final String SCOPE_ONCE = "ONCE";
     static final String SCOPE_MISSION = "MISSION";
+    /** Les règles du socle, que le moteur nomme {@code floor-…}. */
+    private static final String FLOOR = "floor-";
 
     // --------------------------------------------------------------------- runner (autorité déjà vérifiée)
 
@@ -164,8 +166,10 @@ public class DeliveryActivityService {
                                                RunnerApprovalRequest ruling) {
         // Le serveur rejuge l'action avec les mêmes règles (R157) : ce qu'une règle de l'entreprise demande à l'accord
         // (R98), et un refus que le runner n'aurait pas vu, qui clôt la demande aussitôt.
-        RulesEngine.Decision judged = judged(run, ruling);
-        RulesEngine.Obligations require = judged == null ? ruleObligations(run, ruling) : judged.require();
+        RulesBundle bundle = bundleOf(run);
+        List<Map<String, String>> facts = factsOf(ruling);
+        RulesEngine.Decision judged = facts == null ? null : RulesEngine.decideAll(bundle, facts);
+        RulesEngine.Obligations require = judged == null ? ruleObligations(bundle, ruling) : judged.require();
         boolean refused = judged != null && RulesEngine.DENY.equals(judged.effect());
         DeliveryRunApproval approval = approvalRepository.save(DeliveryRunApproval.builder()
             .run(run)
@@ -180,6 +184,7 @@ public class DeliveryActivityService {
             .approvers(require == null || require.approvers().isEmpty() ? null : require.approvers())
             .signatures(require == null ? 1 : require.signatures())
             .separateRoles(require != null && require.separate())
+            .binding(binds(bundle, facts, judged, require, ruling))
             .expiresAt(LocalDateTime.now().plus(settings.approvalTimeout()))
             .build());
         Map<String, Object> asked = approvalData(approval);
@@ -201,8 +206,8 @@ public class DeliveryActivityService {
         return toRunnerResponse(approval);
     }
 
-    /** L'action rejugée sur les faits que le runner a jugés ; null quand il ne les a pas envoyés (runner plus ancien). */
-    private RulesEngine.Decision judged(DeliveryRun run, RunnerApprovalRequest ruling) {
+    /** Les faits que le runner a jugés, nettoyés, pour les rejuger ; null quand il ne les a pas envoyés (runner plus ancien). */
+    private static List<Map<String, String>> factsOf(RunnerApprovalRequest ruling) {
         if (ruling == null || ruling.facts() == null || ruling.facts().isEmpty()) {
             return null;
         }
@@ -216,16 +221,53 @@ public class DeliveryActivityService {
             }
             facts.add(clean);
         }
-        return RulesEngine.decideAll(bundleOf(run), facts);
+        return facts;
+    }
+
+    /**
+     * La décision lie-t-elle ? Une couche de l'entreprise, une règle qui porte des obligations (qui accorde, combien de
+     * signatures, un seuil) ou le socle, pour l'appel ou l'un de ses morceaux qui demandent : un accord n'y vaudra qu'une
+     * fois. Sans les faits (runner plus ancien), la règle qu'il a nommée, d'après les règles en vigueur.
+     */
+    private static boolean binds(RulesBundle bundle, List<Map<String, String>> facts, RulesEngine.Decision judged,
+                                 RulesEngine.Obligations require, RunnerApprovalRequest ruling) {
+        if (!RuleApprovers.ordinary(require)) {
+            return true;
+        }
+        if (judged != null) {
+            if (binding(judged)) {
+                return true;
+            }
+            for (Map<String, String> part : facts) {
+                RulesEngine.Decision decision = RulesEngine.decide(bundle, part);
+                if (RulesEngine.ASK.equals(decision.effect()) && binding(decision)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        String ruleId = ruling == null ? null : blankToNull(ruling.rule());
+        if (ruleId == null) {
+            return false;
+        }
+        return ruleId.startsWith(FLOOR) || bundle.rules().stream()
+            .anyMatch(r -> ruleId.equals(r.id()) && (r.layer() != null || (r.when() != null && r.when().over() != null)));
+    }
+
+    /** Une décision qui lie : sa règle vient d'une couche de l'entreprise ou du socle, porte un seuil ou des obligations. */
+    private static boolean binding(RulesEngine.Decision decision) {
+        RulesBundle.Rule rule = decision.rule();
+        return !RuleApprovers.ordinary(decision.require()) || (rule != null && (rule.layer() != null
+            || rule.id().startsWith(FLOOR) || (rule.when() != null && rule.when().over() != null)));
     }
 
     /** Ce que demande la règle que le runner a nommée, d'après les règles en vigueur, quand il n'a pas envoyé ses faits. */
-    private RulesEngine.Obligations ruleObligations(DeliveryRun run, RunnerApprovalRequest ruling) {
+    private RulesEngine.Obligations ruleObligations(RulesBundle bundle, RunnerApprovalRequest ruling) {
         String ruleId = ruling == null ? null : blankToNull(ruling.rule());
         if (ruleId == null) {
             return null;
         }
-        return bundleOf(run).rules().stream()
+        return bundle.rules().stream()
             .filter(r -> ruleId.equals(r.id()) && RulesEngine.ASK.equals(r.effect()) && r.require() != null)
             .findFirst()
             .map(r -> new RulesEngine.Obligations(
@@ -349,7 +391,7 @@ public class DeliveryActivityService {
                     a.getCreatedAt(), a.getExpiresAt(), a.getDecidedAt(), displayName(a.getDecidedBy()),
                     canSign(run, a, userId), a.getAskedBy(), a.getAction(), a.getRuleId(), a.getRuleReason(), a.getScope(),
                     approvers.labels(require, workspaceId), require == null ? 1 : require.signatures(),
-                    require != null && require.separate(), signedBy);
+                    require != null && require.separate(), signedBy, a.isBinding());
             })
             .toList();
         return new DeliveryRunActivityResponse(events, approvals);
@@ -372,6 +414,7 @@ public class DeliveryActivityService {
     /**
      * Autorise ou refuse une action de l'agent. Réservé à la personne qui a délégué, tant que la demande attend. Un accord
      * {@code forMission} vaut pour le reste de la mission (R46) : le runner ne redemande plus ce que la même règle demande.
+     * Une décision qui lie (une couche de l'entreprise, des obligations, le socle) ne s'accorde qu'une fois.
      */
     @Transactional
     public void decide(String slug, Long runId, Long approvalId, boolean allow, boolean forMission, Long userId) {
@@ -419,7 +462,7 @@ public class DeliveryActivityService {
             }
         }
         approval.setStatus(allow ? DeliveryApprovalStatus.ALLOWED : DeliveryApprovalStatus.DENIED);
-        approval.setScope(allow && forMission ? SCOPE_MISSION : SCOPE_ONCE);
+        approval.setScope(allow && forMission && !approval.isBinding() ? SCOPE_MISSION : SCOPE_ONCE);
         approval.setDecidedAt(now);
         approval.setDecidedBy(person);
         approvalRepository.save(approval);

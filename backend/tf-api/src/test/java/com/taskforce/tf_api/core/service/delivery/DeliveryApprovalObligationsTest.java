@@ -220,6 +220,24 @@ class DeliveryApprovalObligationsTest {
     }
 
     @Test
+    @DisplayName("une règle de l'entreprise lie : accordée « pour la mission », elle ne vaut qu'une fois, et l'écran le sait")
+    void aCompanyRuleIsAllowedOnceOnly() {
+        companyRule(Map.of("action", "file.write", "path", "**/accounting/**"), Map.of());
+        service.openApproval(run, "Edit", "src/accounting/ledger.ts", false, editInAccounting());
+        DeliveryRunApproval approval = opened();
+        when(userRepository.getReferenceById(7L)).thenReturn(delegator);
+
+        assertThat(approval.isBinding()).isTrue();
+        assertThat(approval.obligations()).isNull(); // la personne qui a délégué répond seule
+        assertThat(service.activity("acme", 100L, 0, 7L).approvals().get(0).binding()).isTrue();
+
+        service.decide("acme", 100L, 9L, true, true, 7L);
+
+        assertThat(approval.getStatus()).isEqualTo(DeliveryApprovalStatus.ALLOWED);
+        assertThat(approval.getScope()).isEqualTo("ONCE");
+    }
+
+    @Test
     @DisplayName("un refus d'une personne qui peut signer suffit")
     void oneRefusalIsEnough() {
         companyRule(Map.of("action", "file.write"), Map.of("signatures", 2));

@@ -113,6 +113,17 @@ describe("PendingApproval : ce que l'agent demande, en mots (R78, R133)", () => 
     await waitFor(() => expect(svc.decideApproval).toHaveBeenCalledWith("acme", 100, 9, true, false));
   });
 
+  it("une décision qui lie (une règle de l'entreprise, des obligations, le socle) ne s'accorde qu'une fois", async () => {
+    vi.mocked(svc.decideApproval).mockResolvedValue(undefined);
+    show(approval({ action: "file.write", rule: "ws-accounting", binding: true }));
+
+    expect(screen.queryByRole("button", { name: "Allow for this mission" })).not.toBeInTheDocument();
+    expect(screen.getByText(/this approval counts for this request only/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Allow" }));
+
+    await waitFor(() => expect(svc.decideApproval).toHaveBeenCalledWith("acme", 100, 9, true, false));
+  });
+
   it("une décision refusée par le serveur ne dit pas qu'elle a réussi", async () => {
     vi.mocked(svc.decideApproval).mockRejectedValue(new Error("expired"));
     show(approval());
