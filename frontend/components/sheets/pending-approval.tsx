@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import type { DeliveryRunApproval } from "@/lib/api/delivery-service"
 import { approvalWords, deadlineText } from "@/lib/delivery/approval-words"
+import { obligationWords } from "@/lib/rules/rule-words"
 import { requestWant, requestWords, type SequencedRun } from "@/lib/delivery/mission-sequence"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
@@ -46,11 +47,15 @@ export function PendingApproval({ slug, runId, approval, goal, run, compact = fa
 }>) {
   const t = usePreferencesStore((s) => s.t.missions)
   const sequence = usePreferencesStore((s) => s.t.missionSequence)
+  const rulesText = usePreferencesStore((s) => s.t.rules)
   const decide = useDeliveryStore((s) => s.decideApproval)
   const [busy, setBusy] = useState<"allow" | "deny" | null>(null)
   const words = approvalWords(approval, t, requestWant(approval, run, sequence))
   const forMission = approval.askedBy !== "runner"
   const deadline = deadlineText(minutesLeft(approval.expiresAt), t)
+  // Une règle de l'entreprise désigne qui accorde (R98) : la carte dit qui, et combien de personnes.
+  const obligations = obligationWords(approval, rulesText)
+  const waiting = obligations.length > 0 ? obligations.join(" ") : t.waitingFor
 
   async function onDecide(allow: boolean) {
     setBusy(allow ? "allow" : "deny")
@@ -77,7 +82,8 @@ export function PendingApproval({ slug, runId, approval, goal, run, compact = fa
           <ShieldQuestion className="size-3.5 shrink-0 text-ink-yellow" aria-hidden="true" />
           <span className="min-w-0 break-words">{words.title}</span>
         </span>
-        {approval.canDecide ? buttons : <span className="text-[11px] text-muted-foreground">{t.waitingFor}</span>}
+        {approval.canDecide ? buttons : <span className="text-[11px] text-muted-foreground">{waiting}</span>}
+        {approval.canDecide && obligations.length > 0 && <span className="text-[11px] text-muted-foreground">{obligations.join(" ")}</span>}
         <span className="text-[11px] text-muted-foreground">{deadline}</span>
       </div>
     )
@@ -103,11 +109,12 @@ export function PendingApproval({ slug, runId, approval, goal, run, compact = fa
         {approval.canDecide ? (
           <>
             {buttons}
+            {obligations.length > 0 && <span className="text-[11px] text-muted-foreground">{obligations.join(" ")}</span>}
             <span className="text-[11px] text-muted-foreground">{deadline}</span>
             {forMission && <span className="text-[11px] text-muted-foreground">{t.forMissionHint}</span>}
           </>
         ) : (
-          <span className="text-[11px] text-muted-foreground">{t.waitingFor} {deadline}</span>
+          <span className="text-[11px] text-muted-foreground">{waiting} {deadline}</span>
         )}
         {showCommand ? (
           <code className="block overflow-x-auto whitespace-pre-wrap break-all bg-muted px-1.5 py-1 font-mono text-[11px]">{command}</code>

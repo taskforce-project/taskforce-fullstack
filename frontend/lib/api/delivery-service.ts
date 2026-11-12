@@ -292,6 +292,17 @@ export interface DeliveryRunApproval {
   reason?: string | null;
   /** Portée d'un accord : `ONCE`, ou `MISSION` pour le reste de la mission (R46). */
   scope?: "ONCE" | "MISSION" | null;
+  /**
+   * Les personnes qu'une règle de l'entreprise désigne pour accorder (R98), une liste par règle : un nom, ou la référence
+   * d'un rôle (`role:admin`, `role:owner`, `project-lead`) ; vide pour un accord ordinaire.
+   */
+  waitingFor?: string[][];
+  /** Le nombre de personnes distinctes qui accordent. */
+  signatures?: number;
+  /** La personne qui a délégué ne signe pas. */
+  separate?: boolean;
+  /** Qui a déjà accordé, quand il en faut plusieurs. */
+  signedBy?: string[];
 }
 
 export interface DeliveryRunActivity {

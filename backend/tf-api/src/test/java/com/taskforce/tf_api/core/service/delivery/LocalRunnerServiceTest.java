@@ -141,7 +141,7 @@ class LocalRunnerServiceTest {
         when(visibilityGuard.canWrite(any(Project.class), eq(7L))).thenReturn(true);
         when(runRepository.claim(eq(100L), eq("tf-runner-pierre"), anyString(), any(),
             eq(DeliveryRunStatus.QUEUED), eq(DeliveryRunStatus.RUNNING))).thenReturn(1);
-        when(rulesService.bundleFor(any())).thenReturn(RULES);
+        when(rulesService.bundleFor(any(), any())).thenReturn(RULES);
 
         RunnerClaimResponse claim = service.claim(RUNNER).orElseThrow();
 
@@ -169,7 +169,7 @@ class LocalRunnerServiceTest {
         when(runRepository.findClaimable(eq("claude-code"), eq(DeliveryRunStatus.QUEUED), eq(7L), any())).thenReturn(List.of(queued));
         when(visibilityGuard.canWrite(any(Project.class), eq(7L))).thenReturn(true);
         when(runRepository.claim(eq(100L), eq("tf-runner-pierre"), anyString(), any(), any(), any())).thenReturn(1);
-        when(rulesService.bundleFor(any())).thenReturn(RULES);
+        when(rulesService.bundleFor(any(), any())).thenReturn(RULES);
         when(runRepository.findById(100L)).thenReturn(Optional.of(queued));
 
         service.claim(RUNNER);
@@ -198,7 +198,7 @@ class LocalRunnerServiceTest {
         when(runRepository.findClaimable(eq("claude-code"), eq(DeliveryRunStatus.QUEUED), eq(7L), any())).thenReturn(List.of(queued));
         when(visibilityGuard.canWrite(any(Project.class), eq(7L))).thenReturn(true);
         when(runRepository.claim(eq(100L), eq("tf-runner-pierre"), anyString(), any(), any(), any())).thenReturn(1);
-        when(rulesService.bundleFor(any())).thenReturn(RULES);
+        when(rulesService.bundleFor(any(), any())).thenReturn(RULES);
         when(runRepository.findById(100L)).thenReturn(Optional.of(queued));
 
         RunnerClaimResponse.FollowUp followUp = service.claim(RUNNER).orElseThrow().followUp();
@@ -223,7 +223,7 @@ class LocalRunnerServiceTest {
         when(runRepository.findClaimable(eq("claude-code"), eq(DeliveryRunStatus.QUEUED), eq(7L), any())).thenReturn(List.of(queued));
         when(visibilityGuard.canWrite(any(Project.class), eq(7L))).thenReturn(true);
         when(runRepository.claim(eq(100L), eq("tf-runner-pierre"), anyString(), any(), any(), any())).thenReturn(1);
-        when(rulesService.bundleFor(any())).thenReturn(RULES);
+        when(rulesService.bundleFor(any(), any())).thenReturn(RULES);
 
         assertThat(service.claim(RUNNER).orElseThrow().followUp()).isNull();
     }

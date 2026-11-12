@@ -158,4 +158,18 @@ describe("PendingApproval : ce que l'agent demande, en mots (R78, R133)", () => 
       expect(screen.queryByRole("button")).toBeNull();
     });
   });
+  // Une règle de l'entreprise désigne qui accorde (R98) : la carte le dit, à qui attend comme à qui signe.
+  it("la règle du CEO : la personne qui a délégué voit qui accorde, la responsable voit ses boutons", () => {
+    const waiting = { waitingFor: [["Marie Martin"]], signatures: 1, separate: false, signedBy: [] };
+    show(approval({ ...waiting, canDecide: false }));
+    expect(screen.getByText(/Waits for Marie Martin\./)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Allow/ })).not.toBeInTheDocument();
+  });
+
+  it("deux signatures sans celle de qui a délégué : la carte compte les signatures, et garde les boutons", () => {
+    show(approval({ waitingFor: [], signatures: 2, separate: true, signedBy: ["Ada"] }), { compact: true });
+    expect(screen.getByText(/2 different people approve: 1 so far\./)).toBeInTheDocument();
+    expect(screen.getByText(/The person who delegated this task can't approve it\./)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Allow/ })).toBeInTheDocument();
+  });
 });

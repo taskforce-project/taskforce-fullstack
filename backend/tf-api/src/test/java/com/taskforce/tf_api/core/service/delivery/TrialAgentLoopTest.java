@@ -125,8 +125,8 @@ class TrialAgentLoopTest {
     private void rules(String effect) {
         RulesBundle.Rule comment = new RulesBundle.Rule("comment",
             new RulesBundle.Condition("comment.create", null, null, null, null, null, null, null), "reversible-exit",
-            effect, null, "workspace-owner", "A comment is deleted in one gesture.", null);
-        when(rulesService.bundleFor(any())).thenReturn(new RulesBundle(RulesBundle.FORMAT, "acme", null, 3,
+            effect, "delete-comment", "workspace-owner", "A comment is deleted in one gesture.", null);
+        when(rulesService.bundleFor(any(), any())).thenReturn(new RulesBundle(RulesBundle.FORMAT, "acme", null, 3,
             "sha256:" + "a".repeat(64), null, List.of(comment)));
     }
 

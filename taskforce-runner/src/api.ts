@@ -1,4 +1,5 @@
 import type { RunnerConfig } from "./config.js";
+import type { Facts } from "./harness/engine/rules-engine.js";
 
 /** Tâche remise par `POST /delivery/runner/claim` (miroir de `RunnerClaimResponse` côté backend). */
 export interface Claim {
@@ -165,6 +166,11 @@ export interface Ruling {
   /** La règle qui demande, et sa raison telle qu'elle s'écrit pour la personne. */
   rule?: string;
   reason?: string;
+  /**
+   * Les faits jugés, un jeu par morceau de l'appel : TaskForce rejuge l'action avec les mêmes règles, pour savoir qui
+   * peut accorder ce qu'une règle de l'entreprise demande (R98), et refuser ce que le socle refuse.
+   */
+  facts?: Facts[];
 }
 
 export class ApiError extends Error {

@@ -1,6 +1,8 @@
 package com.taskforce.tf_api.core.service.mcpserver;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.security.access.AccessDeniedException;
@@ -12,8 +14,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
+import com.taskforce.tf_api.core.harness.rules.RulesBundle;
+import com.taskforce.tf_api.core.harness.rules.RulesEngine;
+import com.taskforce.tf_api.core.harness.rules.SecretScan;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.AuditService;
 import com.taskforce.tf_api.core.security.DeliverySessionFilter;
 import com.taskforce.tf_api.core.security.PersonalTokenAuthenticator;
 import com.taskforce.tf_api.core.service.delivery.DeliverySessionScope;
@@ -49,10 +58,16 @@ public class McpServerService {
     static final int METHOD_NOT_FOUND = -32601;
     static final int INVALID_PARAMS = -32602;
 
+    /** Le geste d'un agent par le MCP de TaskForce, au journal de l'espace (R157 : chaque geste est jugé et gardé). */
+    static final String AGENT_GESTURE = "AGENT_GESTURE";
+
     private final TaskforceMcpTools tools;
     private final ObjectMapper mapper;
     private final UserRepository userRepository;
     private final JwtIdentityResolver identityResolver;
+    private final HarnessRulesService rulesService;
+    private final WorkspaceRepository workspaces;
+    private final AuditService audit;
 
     /**
      * Réponse HTTP d'un message : statut et corps JSON déjà sérialisé ({@code null} = pas de corps, 202).
@@ -157,6 +172,13 @@ public class McpServerService {
                 log.warn("MCP tool {} refused outside the delegated session (run {})", name, delegated.get().runId());
                 return result(id, toolError(delegated.get().refusal()));
             }
+            // Le socle (R157) : le geste d'un agent passe par le moteur, avec les règles de l'espace, du projet touché et
+            // de la personne. Un agent lancé par le runner a été jugé sur le poste (une demande y attend la personne) :
+            // ici, seul un refus l'arrête. Un autre agent n'a pas de carte où demander : ce qui demande ne part pas.
+            String refused = judged(slug, userId, tool, args, delegated.isPresent());
+            if (refused != null) {
+                return result(id, toolError(refused));
+            }
             Object value = tool.handler().call(slug, userId, args);
             log.info("MCP tool {} called in {} by user {}{}", LogSafe.of(name), LogSafe.of(slug), userId, via(principal));
             return result(id, toolResult(value));
@@ -172,6 +194,39 @@ public class McpServerService {
             log.warn("MCP tool {} failed in {}: {}", LogSafe.of(name), LogSafe.of(slug), LogSafe.of(e.toString()));
             return result(id, toolError("The tool failed on the server. Try again later."));
         }
+    }
+
+    /**
+     * Juge un geste du MCP de TaskForce comme le runner juge ceux de Claude Code : mêmes faits ({@code action},
+     * {@code tool} sous son nom {@code mcp__taskforce__…}, un agent, un secret dans les arguments), même moteur. Rend la
+     * raison d'un refus, ou null quand le geste part. Un geste qui change quelque chose entre au journal de l'espace.
+     */
+    private String judged(String slug, Long userId, McpTool tool, JsonNode args, boolean delegated) {
+        Workspace workspace = workspaces.findBySlug(slug).orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
+        Long projectId = args.path("projectId").canConvertToLong() ? args.path("projectId").asLong() : null;
+        Map<String, String> facts = new LinkedHashMap<>();
+        if (tool.action() != null) facts.put("action", tool.action());
+        facts.put("tool", "mcp__taskforce__" + tool.name());
+        facts.put("actor", "agent");
+        if (SecretScan.in(args.toString())) facts.put("secret", "true");
+        RulesBundle bundle = rulesService.bundleFor(workspace, new HarnessRulesService.Work(projectId, null, userId));
+        RulesEngine.Decision decision = RulesEngine.decide(bundle, facts);
+        String reason = decision.rule() == null ? "No rule of this workspace covers this action."
+            : decision.rule().text() != null ? decision.rule().text() : decision.rule().reason();
+        boolean stops = RulesEngine.DENY.equals(decision.effect()) || (!delegated && RulesEngine.ASK.equals(decision.effect()));
+        if (!tool.readOnly() || stops) {
+            audit.record(workspace.getId(), userId, AGENT_GESTURE, "mcp_tool", tool.name(), Map.of(
+                "effect", decision.effect(), "rule", decision.rule() == null ? "" : decision.rule().id(),
+                "delegated", delegated, "rules", Map.of("version", bundle.version(), "digest", bundle.digest())));
+        }
+        if (RulesEngine.DENY.equals(decision.effect())) {
+            return "Not run: the rules of this workspace refuse it. " + reason;
+        }
+        if (stops) {
+            return "Not run: this needs a person's approval, and an agent connected from outside can't ask for it. " + reason
+                + " Ask the person to do it in TaskForce.";
+        }
+        return null;
     }
 
     private ObjectNode toolResult(Object value) {

@@ -43,6 +43,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mockingDetails;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -67,6 +68,10 @@ class McpServerServiceTest {
     @Mock private JwtIdentityResolver identityResolver;
     @Mock private IssueGestures gestures;
     @Mock private ProjectGestures projectGestures;
+    @Mock private com.taskforce.tf_api.core.repository.HarnessRuleSetRepository ruleSets;
+    @Mock private com.taskforce.tf_api.core.repository.WorkspaceMemberRepository members;
+    @Mock private com.taskforce.tf_api.core.repository.WorkspaceRepository workspaces;
+    @Mock private com.taskforce.tf_api.core.service.AuditService audit;
 
     private McpServerService service;
 
@@ -74,7 +79,10 @@ class McpServerServiceTest {
     void setUp() {
         TaskforceMcpTools tools = new TaskforceMcpTools(mapper, projectService, issueService, smartAssignService,
             brainSearchService, analyticsService, agentService, gestures, projectGestures);
-        service = new McpServerService(tools, mapper, userRepository, identityResolver);
+        service = new McpServerService(tools, mapper, userRepository, identityResolver,
+            new com.taskforce.tf_api.core.harness.rules.HarnessRulesService(ruleSets, members), workspaces, audit);
+        lenient().when(workspaces.findBySlug("acme")).thenReturn(Optional.of(com.taskforce.tf_api.core.model.Workspace.builder()
+            .id(3L).slug("acme").owner(User.builder().id(1L).email("owner@taskforce.dev").build()).build()));
         // Sans clé d'issue, les arguments passent tels quels ; les gestes répondent par leur phrase.
         lenient().when(gestures.withIds(any(), any(), any())).thenAnswer(inv -> inv.getArgument(2));
         lenient().when(gestures.update(any(), any(), any())).thenReturn(gesture("Updated"));
@@ -464,5 +472,71 @@ class McpServerServiceTest {
             .claim(DeliverySessionFilter.PROJECT_CLAIM, 12L)
             .claim(DeliverySessionFilter.ISSUE_CLAIM, 5L)
             .build();
+    }
+    // ------------------------------------------------------------------ le socle (R157) : chaque geste par le moteur
+
+    @Test
+    @DisplayName("un agent connecté de dehors ne supprime pas une issue : ce qui demande une personne ne part pas")
+    void an_outside_agent_cannot_do_what_asks_a_person() {
+        JsonNode result = callTool(personalToken(), "delete_issue", Map.of("projectId", 12, "issueId", 5), "acme");
+
+        assertThat(result.path("isError").asBoolean()).isTrue();
+        assertThat(result.path("content").get(0).path("text").asText()).contains("needs a person's approval");
+        verify(audit).record(eq(3L), eq(7L), eq(McpServerService.AGENT_GESTURE), eq("mcp_tool"), eq("delete_issue"), any());
+        verify(gestures, never()).delete(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("un secret dans les arguments ne sort pas, même pour un commentaire")
+    void a_secret_in_a_gesture_is_refused() {
+        JsonNode result = callTool(user(), "add_comment",
+            Map.of("projectId", 12, "issueId", 5, "content", "token ghp_" + "x".repeat(36)), "acme");
+
+        assertThat(result.path("isError").asBoolean()).isTrue();
+        assertThat(result.path("content").get(0).path("text").asText()).contains("refuse it");
+        verify(gestures, never()).comment(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("une règle de l'entreprise qui refuse vaut aussi pour un agent connecté de dehors")
+    void a_company_rule_holds_for_an_outside_agent() {
+        Map<String, Object> rule = new java.util.LinkedHashMap<>();
+        rule.put("id", "ws-no-comments");
+        rule.put("when", Map.of("action", "comment.create"));
+        rule.put("class", "reversible-exit");
+        rule.put("effect", "deny");
+        rule.put("owner", "owner@taskforce.dev");
+        rule.put("reason", "No comment from agents here.");
+        rule.put("review", "2027-05-11");
+        rule.put("text", "No comment from agents here.");
+        when(ruleSets.findByWorkspaceIdOrderByVersionDesc(3L)).thenReturn(List.of(com.taskforce.tf_api.core.model.HarnessRuleSet
+            .builder().version(2).rules(List.of(rule)).digest("sha256:" + "d".repeat(64)).build()));
+
+        JsonNode result = callTool(delegated(), "add_comment", Map.of("projectId", 12, "issueId", 5, "content", "Done"), "acme");
+
+        assertThat(result.path("content").get(0).path("text").asText()).contains("No comment from agents here.");
+        verify(gestures, never()).comment(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("un agent du runner a été jugé sur le poste : ce qu'une règle demande lui a été demandé, il passe ici")
+    void a_runner_agent_was_judged_on_the_machine() {
+        Map<String, Object> rule = new java.util.LinkedHashMap<>();
+        rule.put("id", "ws-ask-comments");
+        rule.put("when", Map.of("action", "comment.create"));
+        rule.put("class", "reversible-exit");
+        rule.put("effect", "ask");
+        rule.put("owner", "owner@taskforce.dev");
+        rule.put("reason", "Comments wait for a person.");
+        rule.put("review", "2027-05-11");
+        when(ruleSets.findByWorkspaceIdOrderByVersionDesc(3L)).thenReturn(List.of(com.taskforce.tf_api.core.model.HarnessRuleSet
+            .builder().version(2).rules(List.of(rule)).digest("sha256:" + "e".repeat(64)).build()));
+
+        JsonNode fromRunner = callTool(delegated(), "add_comment", Map.of("projectId", 12, "issueId", 5, "content", "Done"), "acme");
+        JsonNode fromOutside = callTool(personalToken(), "add_comment", Map.of("projectId", 12, "issueId", 5, "content", "Done"), "acme");
+
+        assertThat(fromRunner.path("isError").asBoolean()).isFalse();
+        assertThat(fromOutside.path("isError").asBoolean()).isTrue();
+        assertThat(fromOutside.path("content").get(0).path("text").asText()).contains("Comments wait for a person.");
     }
 }

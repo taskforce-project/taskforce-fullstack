@@ -5,6 +5,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import type { Approval, AskedBy, Ruling } from "./api.js";
 import { decide, decideAll, type Decision, type Facts, type Rule, type RulesBundle } from "./harness/engine/rules-engine.js";
+import type { Exposure } from "./harness/exposure.js";
 import { changesTaskForce, toolFacts } from "./harness/facts.js";
 import { log } from "./log.js";
 import { describeToolInput, toolLabel } from "./stream.js";
@@ -54,6 +55,11 @@ export interface ApprovalServerOptions {
    * la mission lève le plafond pour le reste de la mission. Absent : pas de plafond.
    */
   maxTaskForceChanges?: number;
+  /**
+   * Ce que la mission a en main pour le socle (R158) : ses faits s'ajoutent à ceux de chaque action, et une action qui
+   * rapporte un contenu de dehors, une fois partie, s'y ajoute. Absent : aucun de ces faits.
+   */
+  exposure?: Exposure;
   /** Attente maximale d'une décision ; au-delà, refus. */
   waitMs: number;
   /** Intervalle de lecture de la décision. */
@@ -110,6 +116,14 @@ export function preToolUseAnswer(allow: boolean): Record<string, unknown> {
       permissionDecisionReason: allow ? "Allowed in TaskForce by the person who delegated this task." : DENIED_BY_PERSON,
     },
   };
+}
+
+/**
+ * Une demande que les préférences du poste ne lèvent pas (`allowedInAdvance`) : celle d'une règle de l'entreprise (R157),
+ * qui peut désigner qui accorde, ou du socle. Elle va toujours à TaskForce, où les bonnes personnes répondent.
+ */
+export function binding(decision: Decision): boolean {
+  return Boolean(decision.require) || Boolean(decision.rule?.layer) || Boolean(decision.rule?.id.startsWith("floor-"));
 }
 
 /** Le programme d'une commande simple, sans son chemin. */
@@ -267,19 +281,36 @@ export class ApprovalServer {
     if (route === "/pre-tool-use") {
       const decision = this.judge(input);
       if (decision.effect !== "ask") {
+        if (decision.effect === "allow") this.took(tool, input.tool_input);
         this.reply(res, 200, preToolUseDecision({ effect: decision.effect, rule: decision.rule }));
-      } else if (this.inAdvance(tool)) {
+      } else if (this.inAdvance(tool) && !binding(decision)) {
         this.passed(decision);
+        this.took(tool, input.tool_input);
         this.reply(res, 200, {}); // aux permissions de Claude Code : autorisé d'avance, ou le hook PermissionRequest
       } else {
         const allow = await this.askPerson(tool, input.tool_input, decision);
-        if (allow) this.passed(decision);
+        if (allow) {
+          this.passed(decision);
+          this.took(tool, input.tool_input);
+        }
         this.reply(res, 200, preToolUseAnswer(allow));
       }
       return;
     }
     const allow = await this.askPerson(tool, input.tool_input);
+    if (allow) this.took(tool, input.tool_input);
     this.reply(res, 200, allow ? hookDecision(true) : hookDecision(false, DENIED_BY_PERSON));
+  }
+
+  /** Une action part : ce qu'elle rapporte de dehors entre dans ce que la mission a en main (R158). */
+  private took(tool: string, toolInput: unknown): void {
+    this.options.exposure?.took(toolFacts(tool, toolInput, this.workDir));
+  }
+
+  /** Les faits d'un appel, avec ceux du socle que la mission porte (l'acteur, les données sensibles, le contenu de dehors). */
+  private factsOf(tool: string, toolInput: unknown): Facts[] {
+    const facts = toolFacts(tool, toolInput, this.workDir);
+    return this.options.exposure ? this.options.exposure.with(facts) : facts;
   }
 
   /** Un outil que la personne autorise d'avance sur son poste, en tout ou en partie (`Bash`, `Bash(mvn test *)`). */
@@ -318,7 +349,7 @@ export class ApprovalServer {
     const tool = typeof input.tool_name === "string" ? input.tool_name : "unknown tool";
     const rules = this.options.rules;
     const ruled: Decision = rules
-      ? decideAll(rules, toolFacts(tool, input.tool_input, this.workDir))
+      ? decideAll(rules, this.factsOf(tool, input.tool_input))
       : { effect: "ask", rule: null };
     const decision = this.capped(tool, ruled);
     this.options.onDecision?.(tool, decision, input.tool_input);
@@ -352,7 +383,7 @@ export class ApprovalServer {
    * plafond, c'est lui qui demande, et un accord pour la mission le lève ({@link CHANGES_CAP}).
    */
   ruling(tool: string, toolInput: unknown, judged?: Decision): Ruling & { scopes: string[] } {
-    const facts = toolFacts(tool, toolInput, this.workDir);
+    const facts = this.factsOf(tool, toolInput);
     const action = facts.find((f) => f.action)?.action;
     if (judged?.rule?.id === CHANGES_CAP) {
       return { ...(action ? { action } : {}), rule: CHANGES_CAP, reason: judged.rule.reason, scopes: [CHANGES_CAP] };
@@ -361,7 +392,9 @@ export class ApprovalServer {
     const decision: Decision = rules ? decideAll(rules, facts) : { effect: "ask", rule: null };
     return {
       ...(action ? { action } : {}),
-      ...(decision.rule ? { rule: decision.rule.id, reason: decision.rule.reason } : {}),
+      ...(decision.rule ? { rule: decision.rule.id, reason: decision.rule.text ?? decision.rule.reason } : {}),
+      // Les faits jugés, pour que TaskForce rejuge l'action avec les mêmes règles et sache qui peut accorder (R98).
+      ...(facts.length > 0 ? { facts } : {}),
       scopes: missionScopes(rules, facts, tool),
     };
   }

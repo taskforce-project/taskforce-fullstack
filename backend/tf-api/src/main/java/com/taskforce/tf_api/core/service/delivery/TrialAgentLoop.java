@@ -179,7 +179,8 @@ public class TrialAgentLoop {
         Project project = issue.getProject();
         String person = run.getStartedBy().getDisplayName() == null || run.getStartedBy().getDisplayName().isBlank()
             ? run.getStartedBy().getEmail() : run.getStartedBy().getDisplayName();
-        RulesBundle rules = rulesService.bundleFor(project.getWorkspace());
+        RulesBundle rules = rulesService.bundleFor(project.getWorkspace(),
+            new HarnessRulesService.Work(project.getId(), null, run.getStartedBy().getId()));
         Mission mission = new Mission(runId, issue.getId(), project.getId(), project.getWorkspace().getId(),
             project.getWorkspace().getSlug(), run.getStartedBy().getId(), person, run.getStartedBy().getEmail(),
             run.getModel(), project.getIdentifier() + "-" + issue.getSequenceNumber(), rules);
