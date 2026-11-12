@@ -421,7 +421,8 @@ public class DeliveryActivityService {
         DeliveryRun run = scopedRun(slug, runId);
         Project project = run.getIssue().getProject();
         visibilityGuard.assertCanView(project, userId);
-        DeliveryRunApproval approval = approvalRepository.findByIdAndRunId(approvalId, runId)
+        // La ligne de la demande, verrouillée : deux signatures qui arrivent ensemble se comptent l'une après l'autre.
+        DeliveryRunApproval approval = approvalRepository.findByIdAndRunIdForUpdate(approvalId, runId)
             .orElseThrow(() -> new ResourceNotFoundException("Approval request not found"));
         RulesEngine.Obligations require = approval.obligations();
         Long delegator = run.getStartedBy() == null ? null : run.getStartedBy().getId();

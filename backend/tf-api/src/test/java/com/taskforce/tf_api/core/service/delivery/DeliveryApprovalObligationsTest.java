@@ -159,6 +159,7 @@ class DeliveryApprovalObligationsTest {
         approval.setId(9L);
         approval.setCreatedAt(LocalDateTime.now());
         lenient().when(approvalRepository.findByIdAndRunId(9L, 100L)).thenReturn(Optional.of(approval));
+        lenient().when(approvalRepository.findByIdAndRunIdForUpdate(9L, 100L)).thenReturn(Optional.of(approval));
         lenient().when(approvalRepository.findByRunIdOrderByCreatedAtAsc(100L)).thenReturn(List.of(approval));
         return approval;
     }

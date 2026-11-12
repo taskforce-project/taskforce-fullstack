@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,12 +16,22 @@ import com.taskforce.tf_api.core.enums.DeliveryApprovalStatus;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.DeliveryRunApproval;
 
+import jakarta.persistence.LockModeType;
+
 @Repository
 public interface DeliveryRunApprovalRepository extends JpaRepository<DeliveryRunApproval, Long> {
 
     List<DeliveryRunApproval> findByRunIdOrderByCreatedAtAsc(Long runId);
 
     Optional<DeliveryRunApproval> findByIdAndRunId(Long id, Long runId);
+
+    /**
+     * Charge une demande en la verrouillant jusqu'à la fin de la transaction : deux signatures qui arrivent ensemble sur
+     * la même demande s'ajoutent et se comptent l'une après l'autre.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM DeliveryRunApproval a WHERE a.id = :id AND a.run.id = :runId")
+    Optional<DeliveryRunApproval> findByIdAndRunIdForUpdate(@Param("id") Long id, @Param("runId") Long runId);
 
     long countByRunIdAndStatus(Long runId, DeliveryApprovalStatus status);
 
