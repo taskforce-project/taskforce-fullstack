@@ -59,8 +59,9 @@ public interface DocumentWriter {
         /**
          * Un nom de fichier sûr partout (Windows, Google Drive, SharePoint) : sans séparateur ni caractère réservé, sans
          * point ni espace au bout, borné ; « Document » quand le titre n'en laisse rien. Un nom que Windows réserve à un
-         * périphérique ({@code CON}, {@code PRN}, {@code AUX}, {@code NUL}, {@code COM1} à {@code COM9}, {@code LPT1} à
-         * {@code LPT9}, avec ou sans extension) est renommé.
+         * périphérique ({@code CON}, {@code PRN}, {@code AUX}, {@code NUL}, {@code COM0} à {@code COM9} et
+         * {@code COM¹} à {@code COM³}, {@code LPT0} à {@code LPT9} et {@code LPT¹} à {@code LPT³}, {@code CONIN$},
+         * {@code CONOUT$}, avec ou sans extension) est renommé.
          */
         static String fileName(String title, String extension) {
             String base = Normalizer.normalize(title == null ? "" : title, Normalizer.Form.NFC)
@@ -77,7 +78,7 @@ public interface DocumentWriter {
 
         /** Les noms que Windows réserve à un périphérique, quelle que soit la casse. */
         private static final java.util.regex.Pattern DEVICE =
-            java.util.regex.Pattern.compile("(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])");
+            java.util.regex.Pattern.compile("(?i)(CON|PRN|AUX|NUL|COM[0-9¹²³]|LPT[0-9¹²³]|CONIN\\$|CONOUT\\$)");
 
         static String sha256(byte[] bytes) {
             try {

@@ -173,6 +173,20 @@ class SaveDocumentToolTest {
     }
 
     @Test
+    @DisplayName("les autres noms que Windows réserve : COM0, LPT0, les chiffres en exposant, CONIN$ et CONOUT$")
+    void everyWindowsDeviceNameIsRenamed() {
+        assertThat(DocumentWriter.DocumentFile.fileName("COM0", ".md")).isEqualTo("Document COM0.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("lpt0.notes", ".md")).isEqualTo("Document lpt0.notes.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("COM¹", ".md")).isEqualTo("Document COM¹.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("COM²", ".md")).isEqualTo("Document COM².md");
+        assertThat(DocumentWriter.DocumentFile.fileName("LPT³", ".md")).isEqualTo("Document LPT³.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("conin$", ".md")).isEqualTo("Document conin$.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("CONOUT$.log", ".md")).isEqualTo("Document CONOUT$.log.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("CONOUT", ".md")).isEqualTo("CONOUT.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("COM⁴", ".md")).isEqualTo("COM⁴.md");
+    }
+
+    @Test
     @DisplayName("un document vide ou sans titre ne se range pas")
     void emptyRefused() {
         assertThatThrownBy(() -> tool.perform(Map.of("title", "r", "content", " "), ctx))
