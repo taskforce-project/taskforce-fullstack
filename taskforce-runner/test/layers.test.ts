@@ -199,6 +199,35 @@ describe("la porte du poste devant les règles de l'entreprise", () => {
     assert.equal(binding({ effect: "ask", rule: defaults.rules.find((r) => r.id === "fetch-web") ?? null }), false);
   });
 
+  it("une commande composée dont un morceau relève d'une règle de l'entreprise va à TaskForce, même autorisée d'avance", async () => {
+    const docker: Rule = {
+      id: "ws-ask-docker", layer: "workspace", text: "Docker commands wait for a person",
+      when: { action: "shell", command: "docker **" }, class: "irreversible", effect: "ask", inverse: null,
+      owner: "admin@example.com", reason: "Docker commands wait for a person", review: "2027-05-11",
+    };
+    const { api: fake, asked } = api();
+    const server = new ApprovalServer(fake, 42, WORK, { waitMs: 200, pollMs: 5,
+      rules: { ...defaults, rules: [docker, ...defaults.rules] }, allowedInAdvance: ["Bash"] });
+    await server.start();
+    const bash = (command: string) => fetch(server.preToolUseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${server.token}` },
+      body: JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command } }),
+    });
+    try {
+      // Rien qui lie : l'autorisation d'avance du poste vaut.
+      await bash("make build");
+      assert.equal(asked.length, 0);
+      // La décision de l'appel entier ne lie pas, celle de son second morceau, si : la demande part à TaskForce.
+      const combined = { tool_name: "Bash", tool_input: { command: "make build && docker ps" } };
+      assert.equal(binding(server.judge(combined)), false);
+      await bash(combined.tool_input.command);
+      assert.equal(asked.length, 1);
+    } finally {
+      await server.stop();
+    }
+  });
+
   it("un accord « pour cette mission » ne couvre jamais une décision qui lie : chaque appel se redemande", async () => {
     const asked: Ruling[] = [];
     const forMission: ApprovalApi = {

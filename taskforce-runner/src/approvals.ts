@@ -298,7 +298,9 @@ export class ApprovalServer {
       if (decision.effect !== "ask") {
         if (decision.effect === "allow") this.took(tool, input.tool_input);
         this.reply(res, 200, preToolUseDecision({ effect: decision.effect, rule: decision.rule }));
-      } else if (this.inAdvance(tool) && !binding(decision)) {
+      } else if (this.inAdvance(tool)
+        && !bindingCall(this.options.rules, this.factsOf(tool, input.tool_input), decision)) {
+        // Autorisé d'avance sur le poste, et aucun morceau de l'appel ne relève d'une décision qui lie.
         this.passed(decision);
         this.took(tool, input.tool_input);
         this.reply(res, 200, {}); // aux permissions de Claude Code : autorisé d'avance, ou le hook PermissionRequest
