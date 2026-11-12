@@ -24,42 +24,42 @@ public final class RulesResponse {
      * @param projects  les projets que la personne voit, pour la couche d'un projet
      * @param canEdit   la personne peut écrire les couches de l'organisation, des rôles et des personnes
      */
-    public record Overview(
+    public record RulesOverview(
         int version,
         String digest,
         List<String> floor,
-        List<DefaultRule> defaults,
-        List<Layer> layers,
-        List<Version> versions,
-        List<Person> members,
-        List<ProjectRef> projects,
+        List<DefaultRuleView> defaults,
+        List<RuleLayerView> layers,
+        List<RuleVersion> versions,
+        List<RulePerson> members,
+        List<RuleProject> projects,
         boolean canEdit
     ) {}
 
     /** Une règle de la table de TaskForce. */
-    public record DefaultRule(String id, String action, Map<String, Object> when, String effect, String reason) {}
+    public record DefaultRuleView(String id, String action, Map<String, Object> when, String effect, String reason) {}
 
     /**
      * Une couche de l'entreprise : sa portée, ce qu'elle vise, et sa version en vigueur.
      *
      * @param name le nom de ce qu'elle vise (le projet, la personne), quand il y en a un
      */
-    public record Layer(String scope, String ref, String name, int version, String author, LocalDateTime at,
-                        String digest, boolean canEdit, List<Statement> rules) {}
+    public record RuleLayerView(String scope, String ref, String name, int version, String author, LocalDateTime at,
+                        String digest, boolean canEdit, List<RuleStatement> rules) {}
 
     /**
      * Une règle de l'entreprise telle que la personne l'a écrite : sa phrase, et ce que TaskForce en a fait (une à
      * quelques règles du contrat), avec qui accorde, qui l'a écrite et quand, et ses cas.
      */
-    public record Statement(String group, String text, String effect, List<Part> parts, List<Approver> approvers,
+    public record RuleStatement(String group, String text, String effect, List<RulePart> parts, List<RuleApprover> approvers,
                             int signatures, boolean separate, String addedBy, LocalDateTime addedAt,
-                            List<CaseView> cases) {}
+                            List<RuleCaseView> cases) {}
 
     /** Une règle du contrat, telle que le moteur la juge. */
-    public record Part(String id, String action, Map<String, Object> when, String effect, Map<String, Object> raw) {}
+    public record RulePart(String id, String action, Map<String, Object> when, String effect, Map<String, Object> raw) {}
 
     /** Une personne désignée : sa référence, son nom quand c'est une personne, son métier. */
-    public record Approver(String ref, String name, String detail) {}
+    public record RuleApprover(String ref, String name, String detail) {}
 
     /**
      * Un cas, rejoué par le moteur : ses faits, ce qu'il attend, ce que le moteur en a décidé, et si c'est pareil.
@@ -67,8 +67,8 @@ public final class RulesResponse {
      * @param text   la phrase du modèle qui le décrit ; null pour un cas que TaskForce a écrit d'après la règle
      * @param source {@code taskforce} ou {@code model}
      */
-    public record CaseView(String text, Map<String, String> facts, String expect, List<Approver> expectApprovers,
-                           Decision decision, boolean passed, String source) {}
+    public record RuleCaseView(String text, Map<String, String> facts, String expect, List<RuleApprover> expectApprovers,
+                           RuleDecision decision, boolean passed, String source) {}
 
     /**
      * Une décision du moteur, dite en données : l'effet, la règle qui l'a prise (sa phrase quand elle en a une, sinon
@@ -76,19 +76,19 @@ public final class RulesResponse {
      *
      * @param layer la couche de la règle ; {@code taskforce} pour la table, {@code floor} pour le socle, null sans règle
      */
-    public record Decision(String effect, String rule, String ruleText, String layer, String layerName,
-                           List<List<Approver>> approvers, int signatures, boolean separate) {}
+    public record RuleDecision(String effect, String rule, String ruleText, String layer, String layerName,
+                           List<List<RuleApprover>> approvers, int signatures, boolean separate) {}
 
     /** Une version écrite d'une couche. */
-    public record Version(int version, String scope, String ref, String name, String author, LocalDateTime at,
+    public record RuleVersion(int version, String scope, String ref, String name, String author, LocalDateTime at,
                           String digest, int rules) {}
 
-    public record Person(Long id, String name, String jobTitle, String role) {}
+    public record RulePerson(Long id, String name, String jobTitle, String role) {}
 
-    public record ProjectRef(Long id, String name, boolean canEdit) {}
+    public record RuleProject(Long id, String name, boolean canEdit) {}
 
     /** Un refus de la validation : son code, que l'écran dit en mots, et ce qu'il nomme. */
-    public record Problem(String code, String detail) {}
+    public record RuleProblem(String code, String detail) {}
 
     /**
      * Une règle en mots, traduite et vérifiée : la traduction, ses cas rejoués, ce qui l'empêche d'entrer. Elle entre
@@ -99,10 +99,10 @@ public final class RulesResponse {
      * @param unclear        ce que la règle demande et que les conditions ne savent pas dire
      * @param broken         les cas d'autres règles de l'espace qu'elle changerait (R98 : rejoués à chaque changement)
      */
-    public record Draft(String text, String scope, String ref, List<Map<String, Object>> rules,
-                        List<Map<String, Object>> modelCases, List<CaseView> cases, List<CaseView> broken,
-                        List<Problem> problems, String approverNeeded, String unclear, boolean passed) {}
+    public record RuleDraft(String text, String scope, String ref, List<Map<String, Object>> rules,
+                        List<Map<String, Object>> modelCases, List<RuleCaseView> cases, List<RuleCaseView> broken,
+                        List<RuleProblem> problems, String approverNeeded, String unclear, boolean passed) {}
 
     /** « What would happen? » : l'action telle que TaskForce l'a lue, et ce que ses règles en décideraient. */
-    public record Check(Map<String, String> facts, Decision decision, String unclear) {}
+    public record RuleCheck(Map<String, String> facts, RuleDecision decision, String unclear) {}
 }

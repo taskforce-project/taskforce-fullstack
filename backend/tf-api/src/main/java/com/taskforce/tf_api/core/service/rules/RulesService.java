@@ -92,13 +92,13 @@ public class RulesService {
     private final AuditService audit;
 
     /** Ce qui empêche une règle d'entrer, ou ce qu'elle devient : la réponse de {@link #add} dit lequel. */
-    public record Saved(RulesResponse.Draft draft, boolean saved) {
+    public record Saved(RulesResponse.RuleDraft draft, boolean saved) {
     }
 
     // ------------------------------------------------------------------------------------------------- lire
 
     @Transactional(readOnly = true)
-    public RulesResponse.Overview overview(String slug, Long userId) {
+    public RulesResponse.RulesOverview overview(String slug, Long userId) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         Context context = context(ws, userId);
         List<HarnessRuleSet> rows = repository.findByWorkspaceIdOrderByVersionDesc(ws.getId());
@@ -106,24 +106,24 @@ public class RulesService {
         rows.forEach(row -> current.putIfAbsent(LayerKey.of(row), row));
         Map<LayerKey, LayerVersion> state = rulesService.currentLayers(ws.getId());
 
-        List<RulesResponse.Layer> layers = new ArrayList<>();
+        List<RulesResponse.RuleLayerView> layers = new ArrayList<>();
         for (Map.Entry<LayerKey, HarnessRuleSet> e : current.entrySet()) {
             if (!context.sees(e.getKey())) {
                 continue;
             }
             HarnessRuleSet row = e.getValue();
-            layers.add(new RulesResponse.Layer(e.getKey().scope().layer(), e.getKey().ref(), context.nameOf(e.getKey()),
+            layers.add(new RulesResponse.RuleLayerView(e.getKey().scope().layer(), e.getKey().ref(), context.nameOf(e.getKey()),
                 row.getVersion(), context.nameOf(row.getCreatedBy()), row.getCreatedAt(), row.getDigest(),
                 context.canEdit(e.getKey()), statements(ws, context, e.getKey(), row.getRules(), state)));
         }
-        List<RulesResponse.Version> versions = rows.stream()
+        List<RulesResponse.RuleVersion> versions = rows.stream()
             .filter(row -> context.sees(LayerKey.of(row)))
-            .map(row -> new RulesResponse.Version(row.getVersion(), row.getScope().layer(), LayerKey.of(row).ref(),
+            .map(row -> new RulesResponse.RuleVersion(row.getVersion(), row.getScope().layer(), LayerKey.of(row).ref(),
                 context.nameOf(LayerKey.of(row)), context.nameOf(row.getCreatedBy()), row.getCreatedAt(), row.getDigest(),
                 row.getRules().size()))
             .toList();
         RulesBundle workspaceBundle = rulesService.build(ws, Work.NONE, null, state);
-        return new RulesResponse.Overview(workspaceBundle.version(), workspaceBundle.digest(),
+        return new RulesResponse.RulesOverview(workspaceBundle.version(), workspaceBundle.digest(),
             RulesFloor.RULES.stream().map(RulesBundle.Rule::id).toList(), defaults(ws), layers, versions,
             context.people(), context.projectRefs(), context.manager());
     }
@@ -132,7 +132,7 @@ public class RulesService {
 
     /** Traduit une règle en mots (sans traduction donnée), puis la vérifie ; rien n'est écrit. */
     @Transactional(readOnly = true)
-    public RulesResponse.Draft draft(String slug, Long userId, RuleDraftRequest request) {
+    public RulesResponse.RuleDraft draft(String slug, Long userId, RuleDraftRequest request) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         Context context = context(ws, userId);
         LayerKey key = target(ws, context, request.scope(), request.ref());
@@ -196,7 +196,7 @@ public class RulesService {
         }
         Map<LayerKey, LayerVersion> state = new LinkedHashMap<>(rulesService.currentLayers(ws.getId()));
         state.put(key, new LayerVersion(key, Integer.MAX_VALUE, null, after));
-        List<RulesResponse.CaseView> broken = replay(ws, context, state, null);
+        List<RulesResponse.RuleCaseView> broken = replay(ws, context, state, null);
         if (!broken.isEmpty()) {
             throw new BusinessException("Removing this rule would change what other rules of your workspace do. "
                 + "Remove those first, or write them again.");
@@ -212,7 +212,7 @@ public class RulesService {
 
     /** « What would happen? » : l'action lue par le modèle en faits, puis jugée par le moteur, sans le modèle. */
     @Transactional(readOnly = true)
-    public RulesResponse.Check check(String slug, Long userId, RuleCheckRequest request) {
+    public RulesResponse.RuleCheck check(String slug, Long userId, RuleCheckRequest request) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         Context context = context(ws, userId);
         Long projectId = request.projectId();
@@ -223,16 +223,16 @@ public class RulesService {
         }
         RuleDraftService.Reading reading = drafts.read(ws.getId(), request.text().strip(), tools(ws));
         if (reading.facts() == null) {
-            return new RulesResponse.Check(null, null, reading.unclear());
+            return new RulesResponse.RuleCheck(null, null, reading.unclear());
         }
         RulesBundle bundle = rulesService.bundleFor(ws, new Work(projectId, null, userId));
         RulesEngine.Decision decision = RulesEngine.decide(bundle, reading.facts());
-        return new RulesResponse.Check(reading.facts(), decisionView(decision, context, bundle), reading.unclear());
+        return new RulesResponse.RuleCheck(reading.facts(), decisionView(decision, context, bundle), reading.unclear());
     }
 
     // ------------------------------------------------------------------------------------------------- vérifier
 
-    private record Verified(RulesResponse.Draft draft, List<Map<String, Object>> stored) {
+    private record Verified(RulesResponse.RuleDraft draft, List<Map<String, Object>> stored) {
     }
 
     /**
@@ -242,7 +242,7 @@ public class RulesService {
      */
     private Verified verify(Workspace ws, Context context, LayerKey key, String text, List<Map<String, Object>> candidate,
                             List<RuleCases.Case> modelCases, String approverNeeded, String unclear) {
-        List<RulesResponse.Problem> problems = new ArrayList<>();
+        List<RulesResponse.RuleProblem> problems = new ArrayList<>();
         List<Map<String, Object>> clean = new ArrayList<>();
         for (Map<String, Object> raw : candidate) {
             Map<String, Object> rule = new LinkedHashMap<>();
@@ -251,14 +251,14 @@ public class RulesService {
             if (raw.get("require") != null) {
                 rule.put("require", raw.get("require"));
             }
-            RuleValidator.check(rule, context.memberIds()).forEach(p -> problems.add(new RulesResponse.Problem(p.code(), p.detail())));
+            RuleValidator.check(rule, context.memberIds()).forEach(p -> problems.add(new RulesResponse.RuleProblem(p.code(), p.detail())));
             clean.add(rule);
         }
         if (candidate.isEmpty()) {
-            problems.add(new RulesResponse.Problem("nothing", unclear));
+            problems.add(new RulesResponse.RuleProblem("nothing", unclear));
         }
         if (!problems.isEmpty()) {
-            return new Verified(new RulesResponse.Draft(text, key.scope().layer(), key.ref(), clean, casesOut(modelCases),
+            return new Verified(new RulesResponse.RuleDraft(text, key.scope().layer(), key.ref(), clean, casesOut(modelCases),
                 List.of(), List.of(), problems, approverNeeded, unclear, false), List.of());
         }
         String group = ruleId(key, text, 0, clean.size());
@@ -283,8 +283,8 @@ public class RulesService {
         }
         for (Map<String, Object> rule : stored) {
             if (existing(ws, key).stream().anyMatch(r -> rule.get("id").equals(r.get("id")))) {
-                problems.add(new RulesResponse.Problem("alreadyThere", null));
-                return new Verified(new RulesResponse.Draft(text, key.scope().layer(), key.ref(), clean,
+                problems.add(new RulesResponse.RuleProblem("alreadyThere", null));
+                return new Verified(new RulesResponse.RuleDraft(text, key.scope().layer(), key.ref(), clean,
                     casesOut(modelCases), List.of(), List.of(), problems, approverNeeded, unclear, false), List.of());
             }
         }
@@ -310,7 +310,7 @@ public class RulesService {
             first.put("cases", withModel);
             cases.addAll(modelCases);
         }
-        List<RulesResponse.CaseView> views = new ArrayList<>();
+        List<RulesResponse.RuleCaseView> views = new ArrayList<>();
         boolean passed = !cases.isEmpty();
         for (RuleCases.Case c : cases) {
             RuleCases.Outcome outcome = RuleCases.run(c, with);
@@ -318,12 +318,12 @@ public class RulesService {
             views.add(caseView(outcome, context, with));
         }
         if (cases.isEmpty()) {
-            problems.add(new RulesResponse.Problem("noCase", null));
+            problems.add(new RulesResponse.RuleProblem("noCase", null));
         }
-        List<RulesResponse.CaseView> broken = replay(ws, context, after, Set.copyOf(stored.stream()
+        List<RulesResponse.RuleCaseView> broken = replay(ws, context, after, Set.copyOf(stored.stream()
             .map(r -> (String) r.get("id")).toList()));
         passed &= broken.isEmpty();
-        return new Verified(new RulesResponse.Draft(text, key.scope().layer(), key.ref(), clean, casesOut(modelCases),
+        return new Verified(new RulesResponse.RuleDraft(text, key.scope().layer(), key.ref(), clean, casesOut(modelCases),
             views, broken, problems, approverNeeded, unclear, passed && problems.isEmpty()), stored);
     }
 
@@ -331,9 +331,9 @@ public class RulesService {
      * Rejoue les cas de toutes les règles écrites de l'espace (sauf {@code skip}) contre cet état ; rend ceux qui ne
      * tiennent plus.
      */
-    private List<RulesResponse.CaseView> replay(Workspace ws, Context context, Map<LayerKey, LayerVersion> state,
+    private List<RulesResponse.RuleCaseView> replay(Workspace ws, Context context, Map<LayerKey, LayerVersion> state,
                                                 Set<String> skip) {
-        List<RulesResponse.CaseView> broken = new ArrayList<>();
+        List<RulesResponse.RuleCaseView> broken = new ArrayList<>();
         for (LayerVersion layer : state.values()) {
             RulesBundle bundle = bundleIn(ws, context, layer.key(), state);
             for (Map<String, Object> rule : layer.rules()) {
@@ -453,19 +453,19 @@ public class RulesService {
 
     // ------------------------------------------------------------------------------------------------- vues
 
-    private List<RulesResponse.Statement> statements(Workspace ws, Context context, LayerKey key,
+    private List<RulesResponse.RuleStatement> statements(Workspace ws, Context context, LayerKey key,
                                                      List<Map<String, Object>> rules, Map<LayerKey, LayerVersion> state) {
         RulesBundle bundle = bundleIn(ws, context, key, state);
         Map<String, List<Map<String, Object>>> groups = new LinkedHashMap<>();
         rules.forEach(r -> groups.computeIfAbsent(groupOf(r), g -> new ArrayList<>()).add(r));
-        List<RulesResponse.Statement> out = new ArrayList<>();
+        List<RulesResponse.RuleStatement> out = new ArrayList<>();
         for (Map.Entry<String, List<Map<String, Object>>> g : groups.entrySet()) {
             List<Map<String, Object>> parts = g.getValue();
             Map<String, Object> first = parts.get(0);
             List<String> approvers = new ArrayList<>();
             int signatures = 1;
             boolean separate = false;
-            List<RulesResponse.CaseView> cases = new ArrayList<>();
+            List<RulesResponse.RuleCaseView> cases = new ArrayList<>();
             for (Map<String, Object> part : parts) {
                 Map<String, Object> require = RuleValidator.map(part.get("require"));
                 if (require != null) {
@@ -481,7 +481,7 @@ public class RulesService {
                     cases.add(caseView(RuleCases.run(c, bundle), context, bundle));
                 }
             }
-            out.add(new RulesResponse.Statement(g.getKey(), Objects.toString(first.get("text"), Objects.toString(first.get("reason"), "")),
+            out.add(new RulesResponse.RuleStatement(g.getKey(), Objects.toString(first.get("text"), Objects.toString(first.get("reason"), "")),
                 Objects.toString(first.get("effect"), ""),
                 parts.stream().map(RulesService::part).toList(),
                 approvers.stream().map(context::approver).toList(), signatures, separate,
@@ -490,36 +490,36 @@ public class RulesService {
         return out;
     }
 
-    private static RulesResponse.Part part(Map<String, Object> rule) {
+    private static RulesResponse.RulePart part(Map<String, Object> rule) {
         Map<String, Object> when = RuleValidator.map(rule.get("when"));
         Map<String, Object> raw = new LinkedHashMap<>(rule);
         raw.remove("cases");
         raw.remove("addedBy");
         raw.remove("addedAt");
         raw.remove("group");
-        return new RulesResponse.Part(Objects.toString(rule.get("id"), ""), when == null ? null : (String) when.get("action"),
+        return new RulesResponse.RulePart(Objects.toString(rule.get("id"), ""), when == null ? null : (String) when.get("action"),
             when, Objects.toString(rule.get("effect"), ""), raw);
     }
 
-    private List<RulesResponse.DefaultRule> defaults(Workspace ws) {
-        List<RulesResponse.DefaultRule> out = new ArrayList<>();
+    private List<RulesResponse.DefaultRuleView> defaults(Workspace ws) {
+        List<RulesResponse.DefaultRuleView> out = new ArrayList<>();
         for (JsonNode rule : rulesService.ownedBy(null)) {
             Map<String, Object> when = JSON.convertValue(rule.path("when"), MAP);
-            out.add(new RulesResponse.DefaultRule(rule.path("id").asText(), (String) when.get("action"), when,
+            out.add(new RulesResponse.DefaultRuleView(rule.path("id").asText(), (String) when.get("action"), when,
                 rule.path("effect").asText(), rule.path("reason").asText()));
         }
         return out;
     }
 
-    private RulesResponse.CaseView caseView(RuleCases.Outcome outcome, Context context, RulesBundle bundle) {
+    private RulesResponse.RuleCaseView caseView(RuleCases.Outcome outcome, Context context, RulesBundle bundle) {
         RuleCases.Case c = outcome.c();
-        List<RulesResponse.Approver> expected = c.expect().approvers() == null ? null
+        List<RulesResponse.RuleApprover> expected = c.expect().approvers() == null ? null
             : c.expect().approvers().stream().map(context::approver).toList();
-        return new RulesResponse.CaseView(c.text(), c.facts(), c.expect().effect(), expected,
+        return new RulesResponse.RuleCaseView(c.text(), c.facts(), c.expect().effect(), expected,
             decisionView(outcome.decision(), context, bundle), outcome.passed(), c.source());
     }
 
-    private RulesResponse.Decision decisionView(RulesEngine.Decision decision, Context context, RulesBundle bundle) {
+    private RulesResponse.RuleDecision decisionView(RulesEngine.Decision decision, Context context, RulesBundle bundle) {
         RulesBundle.Rule rule = decision.rule();
         String layer = rule == null ? null : rule.layer() != null ? rule.layer()
             : RulesFloor.RULES.contains(rule) ? "floor" : "taskforce";
@@ -529,9 +529,9 @@ public class RulesService {
                 .map(l -> context.nameOf(new LayerKey(RuleScope.valueOf(l.scope().toUpperCase(Locale.ROOT)), l.ref())))
                 .orElse(null);
         }
-        List<List<RulesResponse.Approver>> approvers = decision.require() == null ? List.of()
+        List<List<RulesResponse.RuleApprover>> approvers = decision.require() == null ? List.of()
             : decision.require().approvers().stream().map(set -> set.stream().map(context::approver).toList()).toList();
-        return new RulesResponse.Decision(decision.effect(), rule == null ? null : rule.id(),
+        return new RulesResponse.RuleDecision(decision.effect(), rule == null ? null : rule.id(),
             rule == null ? null : rule.text() != null ? rule.text() : rule.reason(), layer, layerName, approvers,
             decision.require() == null ? 1 : decision.require().signatures(),
             decision.require() != null && decision.require().separate());
@@ -740,16 +740,16 @@ public class RulesService {
             };
         }
 
-        RulesResponse.Approver approver(String ref) {
+        RulesResponse.RuleApprover approver(String ref) {
             if (ref.startsWith("person:")) {
                 User u = user(longOf(ref.substring(7)));
-                return new RulesResponse.Approver(ref, u == null ? null : nameOf(u), u == null ? null : u.getJobTitle());
+                return new RulesResponse.RuleApprover(ref, u == null ? null : nameOf(u), u == null ? null : u.getJobTitle());
             }
-            return new RulesResponse.Approver(ref, null, null);
+            return new RulesResponse.RuleApprover(ref, null, null);
         }
 
-        List<RulesResponse.Person> people() {
-            return members.values().stream().map(m -> new RulesResponse.Person(m.getUser().getId(), nameOf(m.getUser()),
+        List<RulesResponse.RulePerson> people() {
+            return members.values().stream().map(m -> new RulesResponse.RulePerson(m.getUser().getId(), nameOf(m.getUser()),
                 m.getUser().getJobTitle(), m.getRole().name())).toList();
         }
 
@@ -758,8 +758,8 @@ public class RulesService {
                 m.getUser().getJobTitle(), m.getRole().name())).toList();
         }
 
-        List<RulesResponse.ProjectRef> projectRefs() {
-            return projects.values().stream().map(p -> new RulesResponse.ProjectRef(p.getId(), p.getName(),
+        List<RulesResponse.RuleProject> projectRefs() {
+            return projects.values().stream().map(p -> new RulesResponse.RuleProject(p.getId(), p.getName(),
                 canEdit(new LayerKey(RuleScope.PROJECT, String.valueOf(p.getId()))))).toList();
         }
     }

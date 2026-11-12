@@ -135,12 +135,12 @@ class RulesServiceTest {
                 new RuleCases.Expect("allow", null), RuleCases.BY_MODEL)), null, null);
     }
 
-    private RulesResponse.Draft draftCeoRule(String scope, String ref) {
+    private RulesResponse.RuleDraft draftCeoRule(String scope, String ref) {
         when(drafts.translate(eq(1L), eq(CEO_RULE), anyString(), any(), any())).thenReturn(ceoTranslation());
         return service.draft("acme", ADMIN, new RuleDraftRequest(CEO_RULE, scope, ref, null, null));
     }
 
-    private RulesService.Saved save(RulesResponse.Draft draft, long userId) {
+    private RulesService.Saved save(RulesResponse.RuleDraft draft, long userId) {
         return service.add("acme", userId, new RuleDraftRequest(draft.text(), draft.scope(), draft.ref(), draft.rules(),
             draft.modelCases()));
     }
@@ -148,7 +148,7 @@ class RulesServiceTest {
     @Test
     @DisplayName("la règle du CEO, de bout en bout : en mots, ses cas passent, elle entre, et la mission demande à la responsable")
     void theCeoRuleEndToEnd() {
-        RulesResponse.Draft draft = draftCeoRule("workspace", null);
+        RulesResponse.RuleDraft draft = draftCeoRule("workspace", null);
 
         assertThat(draft.passed()).isTrue();
         assertThat(draft.problems()).isEmpty();
@@ -188,7 +188,7 @@ class RulesServiceTest {
             .isEqualTo("allow");
 
         // L'écran : la phrase, qui l'a écrite, qui accorde, et ses cas qui passent.
-        RulesResponse.Overview overview = service.overview("acme", MEMBER);
+        RulesResponse.RulesOverview overview = service.overview("acme", MEMBER);
         assertThat(overview.canEdit()).isFalse();
         assertThat(overview.layers()).singleElement().satisfies(layer -> {
             assertThat(layer.scope()).isEqualTo("workspace");
@@ -209,13 +209,13 @@ class RulesServiceTest {
         // « What would happen? » : l'action en mots, lue en faits, jugée par le moteur.
         when(drafts.read(eq(1L), anyString(), any())).thenReturn(new RuleDraftService.Reading(
             Map.of("action", "file.write", "path", "src/accounting/ledger.ts", "actor", "agent"), null));
-        RulesResponse.Check check = service.check("acme", MEMBER,
+        RulesResponse.RuleCheck check = service.check("acme", MEMBER,
             new RuleCheckRequest("Claude Code changes the ledger in the accounting module", PROJECT));
         assertThat(check.decision().effect()).isEqualTo("ask");
         assertThat(check.decision().ruleText()).isEqualTo(CEO_RULE);
         assertThat(check.decision().layer()).isEqualTo("workspace");
         assertThat(check.decision().approvers()).singleElement().satisfies(set ->
-            assertThat(set).extracting(RulesResponse.Approver::name).containsExactly("Marie Martin"));
+            assertThat(set).extracting(RulesResponse.RuleApprover::name).containsExactly("Marie Martin"));
     }
 
     @Test
@@ -227,11 +227,11 @@ class RulesServiceTest {
         RuleDraftRequest request = new RuleDraftRequest("Agents may delete issues without asking", "workspace", null,
             List.of(loosening), null);
 
-        RulesResponse.Draft draft = service.draft("acme", ADMIN, request);
+        RulesResponse.RuleDraft draft = service.draft("acme", ADMIN, request);
         RulesService.Saved saved = service.add("acme", ADMIN, request);
 
         assertThat(draft.passed()).isFalse();
-        assertThat(draft.problems()).extracting(RulesResponse.Problem::code).containsExactly("loosens");
+        assertThat(draft.problems()).extracting(RulesResponse.RuleProblem::code).containsExactly("loosens");
         assertThat(saved.saved()).isFalse();
         assertThat(rows).isEmpty();
         verify(audit, never()).record(any(), any(), any(), any(), any(), any());
@@ -248,7 +248,7 @@ class RulesServiceTest {
             new RuleDraftRequest("Nobody changes the rules", "workspace", null, List.of(rule), null));
 
         assertThat(saved.saved()).isFalse();
-        assertThat(saved.draft().problems()).extracting(RulesResponse.Problem::code).contains("rulesAreTaskForce");
+        assertThat(saved.draft().problems()).extracting(RulesResponse.RuleProblem::code).contains("rulesAreTaskForce");
     }
 
     @Test
@@ -294,7 +294,7 @@ class RulesServiceTest {
         freeze.put("when", Map.of("action", "file.write", "path", "src/**"));
         freeze.put("effect", "deny");
 
-        RulesResponse.Draft draft = service.draft("acme", ADMIN,
+        RulesResponse.RuleDraft draft = service.draft("acme", ADMIN,
             new RuleDraftRequest("No change at all in src", "workspace", null, List.of(freeze), null));
 
         assertThat(draft.passed()).isFalse();
@@ -306,10 +306,10 @@ class RulesServiceTest {
     void twiceTheSameRule() {
         assertThat(save(draftCeoRule("workspace", null), ADMIN).saved()).isTrue();
 
-        RulesResponse.Draft again = draftCeoRule("workspace", null);
+        RulesResponse.RuleDraft again = draftCeoRule("workspace", null);
 
         assertThat(again.passed()).isFalse();
-        assertThat(again.problems()).extracting(RulesResponse.Problem::code).containsExactly("alreadyThere");
+        assertThat(again.problems()).extracting(RulesResponse.RuleProblem::code).containsExactly("alreadyThere");
     }
 
     @Test
@@ -369,7 +369,7 @@ class RulesServiceTest {
     void checkWithoutFacts() {
         when(drafts.read(eq(1L), anyString(), any())).thenReturn(new RuleDraftService.Reading(null, "TaskForce doesn't see emails."));
 
-        RulesResponse.Check check = service.check("acme", ADMIN, new RuleCheckRequest("Send an email to the client", null));
+        RulesResponse.RuleCheck check = service.check("acme", ADMIN, new RuleCheckRequest("Send an email to the client", null));
 
         assertThat(check.decision()).isNull();
         assertThat(check.unclear()).isEqualTo("TaskForce doesn't see emails.");

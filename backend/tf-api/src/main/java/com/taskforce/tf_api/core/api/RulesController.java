@@ -45,7 +45,7 @@ public class RulesController {
     private final JwtIdentityResolver identityResolver;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<RulesResponse.Overview>> listRules(
+    public ResponseEntity<ApiResponse<RulesResponse.RulesOverview>> listRules(
         @PathVariable String slug, @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(ApiResponse.success(rules.overview(slug, resolveUserId(jwt))));
     }
@@ -55,7 +55,7 @@ public class RulesController {
      * faite, la vérifie seulement. Rien n'est écrit.
      */
     @PostMapping("/drafts")
-    public ResponseEntity<ApiResponse<RulesResponse.Draft>> draftRule(
+    public ResponseEntity<ApiResponse<RulesResponse.RuleDraft>> draftRule(
         @PathVariable String slug, @Valid @RequestBody RuleDraftRequest body, @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(ApiResponse.success(rules.draft(slug, resolveUserId(jwt), body)));
     }
@@ -65,7 +65,7 @@ public class RulesController {
      * relâcherait le socle, n'entre pas : la réponse le dit, avec la vérification (422).
      */
     @PostMapping
-    public ResponseEntity<ApiResponse<RulesResponse.Draft>> addRule(
+    public ResponseEntity<ApiResponse<RulesResponse.RuleDraft>> addRule(
         @PathVariable String slug, @Valid @RequestBody RuleDraftRequest body, @AuthenticationPrincipal Jwt jwt) {
         RulesService.Saved saved = rules.add(slug, resolveUserId(jwt), body);
         if (!saved.saved()) {
@@ -89,7 +89,7 @@ public class RulesController {
 
     /** « What would happen? » : l'action décrite, telle que TaskForce la lit, et ce que les règles en décideraient. */
     @PostMapping("/check")
-    public ResponseEntity<ApiResponse<RulesResponse.Check>> checkAction(
+    public ResponseEntity<ApiResponse<RulesResponse.RuleCheck>> checkAction(
         @PathVariable String slug, @Valid @RequestBody RuleCheckRequest body, @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(ApiResponse.success(rules.check(slug, resolveUserId(jwt), body)));
     }
