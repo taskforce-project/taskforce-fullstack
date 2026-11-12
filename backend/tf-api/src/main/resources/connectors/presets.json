@@ -522,7 +522,7 @@
       "connection": "self-registration",
       "admin": {
         "required": false,
-        "text": "On Airtable Enterprise, an admin may allow MCP clients by their client ID: if Airtable refuses the connection, your admin allows TaskForce.",
+        "text": "On Airtable Enterprise, an admin may allow MCP clients by their client ID: your admin allows TaskForce.",
         "link": "https://support.airtable.com/docs/using-the-airtable-mcp-server"
       },
       "tried": null,
@@ -604,7 +604,7 @@
       "connection": "server-url",
       "admin": {
         "required": false,
-        "text": "MCP is on by default for eligible Glean tenants. If Glean refuses the connection, a Glean admin checks that an MCP server is enabled, or registers TaskForce as a static OAuth client.",
+        "text": "A Glean admin checks that an MCP server is enabled (it is by default for eligible tenants), or registers TaskForce as a static OAuth client.",
         "link": "https://developers.glean.com/guides/mcp"
       },
       "apiKey": {
@@ -940,7 +940,7 @@
       "connection": "self-registration",
       "admin": {
         "required": false,
-        "text": "If Datadog refuses the connection, an admin of your Datadog organization adds the redirect address {redirectUri}: Organization Settings, MCP OAuth Redirect URLs.",
+        "text": "An admin of your Datadog organization adds the redirect address {redirectUri}: Organization Settings, MCP OAuth Redirect URLs.",
         "link": "https://docs.datadoghq.com/mcp_server/setup/"
       },
       "tried": null,
@@ -961,7 +961,7 @@
       },
       "admin": {
         "required": false,
-        "text": "If New Relic refuses the connection, an administrator of your New Relic organization allows MCP access in the feature control manager.",
+        "text": "An administrator of your New Relic organization allows MCP access in the feature control manager.",
         "link": "https://docs.newrelic.com/docs/agentic-ai/mcp/setup/"
       },
       "tried": null,
@@ -1133,7 +1133,7 @@
       "connection": "self-registration",
       "admin": {
         "required": false,
-        "text": "MCP access is on by default. If ChartMogul refuses the connection, an admin or owner allows it: Settings, Admin, Security, Allow MCP server access.",
+        "text": "An admin or owner allows MCP server access: Settings, Admin, Security. It is on by default.",
         "link": "https://help.chartmogul.com/article/348-chartmogul-mcp-server"
       },
       "tried": null,
