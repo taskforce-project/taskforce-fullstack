@@ -120,10 +120,10 @@ public class McpOAuthService {
     @Transactional
     public ConnectOutcome connect(Workspace ws, User person, boolean manager, ConnectRequest req) {
         Optional<ConnectorPreset> preset = catalog.preset(req.connectorKey());
+        // Un préréglage joint toujours son serveur officiel ; une autre adresse demandée pour sa clé est refusée.
+        String url = catalog.serverFor(req.connectorKey(), req.mcpUrl(), req.allowWrites());
         if (preset.isPresent() && preset.get().api() != null) return connectApi(ws, person, manager, req, preset.get());
         ConnectionPath path = preset.map(ConnectorPreset::connection).orElse(ConnectionPath.SELF_REGISTRATION);
-        String url = preset.filter(p -> p.mcpUrl() != null).map(p -> p.urlFor(req.allowWrites()))
-            .orElse(req.mcpUrl() == null ? null : req.mcpUrl().trim());
         if (url == null || url.isBlank()) {
             if (path == ConnectionPath.SERVER_URL) return ConnectOutcome.of("key", null);
             throw new BusinessException("Required field: mcpUrl");
@@ -247,7 +247,10 @@ public class McpOAuthService {
     }
 
     @Transactional
-    public String start(Workspace ws, Long userId, ConnectRequest req, String mcpUrl) {
+    public String start(Workspace ws, Long userId, ConnectRequest req, String requestedUrl) {
+        // La clé d'un préréglage mène toujours à son serveur officiel : une autre adresse est refusée avant tout appel.
+        String mcpUrl = catalog.serverFor(req.connectorKey(), requestedUrl, req.allowWrites());
+        if (mcpUrl == null) throw new BusinessException("Required field: mcpUrl");
         urlGuard.accept(mcpUrl);
         WorkspaceMcpService.ServerIdentity server = workspaceMcp.resolveServer(ws.getId(), req.connectorKey(), req.name());
         DiscoveredAuth auth = discovery.discover(mcpUrl);
@@ -256,8 +259,10 @@ public class McpOAuthService {
         // exotique type javascript:). Les autres endpoints sont deja gardes au moment du fetch serveur.
         urlGuard.accept(auth.authorizationEndpoint());
         String redirectUri = settings.redirectUri();
+        // L'émetteur épinglé : celui que désigne le serveur officiel du préréglage. Lui seul reçoit un client enregistré.
+        boolean pinned = catalog.preset(server.connectorKey()).map(p -> p.serves(mcpUrl)).orElse(false);
         McpClientRegistrar.RegisteredClient registered =
-            registrar.clientFor(ws.getId(), server.connectorKey(), auth, redirectUri);
+            registrar.clientFor(ws.getId(), server.connectorKey(), auth, redirectUri, pinned);
 
         String verifier = urlSafe(48);
         String state = urlSafe(24);

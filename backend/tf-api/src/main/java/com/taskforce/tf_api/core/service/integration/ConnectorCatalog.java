@@ -21,6 +21,7 @@ import com.taskforce.tf_api.core.enums.ConnectionPath;
 import com.taskforce.tf_api.core.enums.ConnectorAuthType;
 import com.taskforce.tf_api.core.enums.ConnectorCategory;
 import com.taskforce.tf_api.core.enums.ToolClass;
+import com.taskforce.tf_api.shared.exception.BusinessException;
 
 import jakarta.annotation.PostConstruct;
 
@@ -110,6 +111,46 @@ public class ConnectorCatalog {
      */
     public ToolClass classOf(String connectorKey, String tool) {
         return preset(connectorKey).map(p -> p.classOf(tool)).orElse(ToolClass.WRITE);
+    }
+
+    /**
+     * La classe d'un outil servi par ce serveur : celle du préréglage seulement quand le serveur est le sien (son serveur
+     * officiel) ; tout autre serveur, même enregistré sous la clé d'un préréglage, n'a que des écritures.
+     */
+    public ToolClass classOn(String connectorKey, String serverUrl, String tool) {
+        return preset(connectorKey).filter(p -> p.serves(serverUrl)).map(p -> p.classOf(tool)).orElse(ToolClass.WRITE);
+    }
+
+    /**
+     * L'adresse que joint une connexion de cette clé : pour un préréglage qui a un serveur officiel, toujours celui-ci (sa
+     * lecture seule quand l'écriture n'est pas accordée), et une demande qui nomme une autre adresse est refusée ; pour un
+     * serveur ajouté à la main, ou celui que l'entreprise crée chez l'éditeur, l'adresse demandée (nulle si elle manque).
+     */
+    public String serverFor(String connectorKey, String requested, boolean writes) {
+        String asked = requested == null || requested.isBlank() ? null : requested.strip();
+        Optional<ConnectorPreset> preset = preset(connectorKey);
+        if (preset.isEmpty()) return asked;
+        assertAddress(preset.get(), asked);
+        return preset.get().hasOfficialServer() ? preset.get().urlFor(writes) : asked;
+    }
+
+    /**
+     * Refuse une adresse que la clé d'un préréglage ne peut pas joindre : autre chose que son serveur officiel, ou une
+     * adresse pour un outil que TaskForce sert par l'API de son éditeur. Sans effet pour une autre clé.
+     */
+    public void assertAddress(String connectorKey, String url) {
+        preset(connectorKey).ifPresent(p -> assertAddress(p, url == null || url.isBlank() ? null : url.strip()));
+    }
+
+    private static void assertAddress(ConnectorPreset preset, String url) {
+        if (url == null) return;
+        if (preset.api() != null) {
+            throw new BusinessException(preset.name() + " connects through its own sign-in, not by an address.");
+        }
+        if (preset.hasOfficialServer() && !preset.serves(url)) {
+            throw new BusinessException(preset.name() + " connects only to its official server ("
+                + java.net.URI.create(preset.mcpUrl()).getHost() + ").");
+        }
     }
 
     // -------------------------------------------------------------------------

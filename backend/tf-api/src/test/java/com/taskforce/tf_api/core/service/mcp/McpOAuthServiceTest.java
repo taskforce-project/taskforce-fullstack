@@ -103,12 +103,16 @@ class McpOAuthServiceTest {
     @Test
     @DisplayName("start : client du registrar, les seules portées de lecture du préréglage, PKCE et resource")
     void startBuildsAuthorizeUrl() {
+        service.allowLocalServersForContractTests(); // aucun nom résolu dans l'essai
         when(workspaceMcp.resolveServer(WS_ID, "linear", null)).thenReturn(new ServerIdentity("linear", null));
-        when(discovery.discover("https://203.0.113.10/mcp")).thenReturn(auth(true));
-        when(registrar.clientFor(eq(WS_ID), eq("linear"), any(), eq("http://localhost:8080/api/mcp/oauth/callback")))
+        // La lecture seule du serveur officiel : l'écriture n'est pas accordée.
+        when(discovery.discover("https://mcp.linear.app/mcp/readonly")).thenReturn(auth(true));
+        // Le serveur officiel du préréglage : son émetteur est épinglé.
+        when(registrar.clientFor(eq(WS_ID), eq("linear"), any(), eq("http://localhost:8080/api/mcp/oauth/callback"),
+                eq(true)))
             .thenReturn(new McpClientRegistrar.RegisteredClient("cid-123", null, McpClientRegistrar.DCR));
 
-        String url = service.start(ws, USER_ID, "linear", null, "https://203.0.113.10/mcp", "/acme?import=linear");
+        String url = service.start(ws, USER_ID, "linear", null, "https://mcp.linear.app/mcp", "/acme?import=linear");
 
         ArgumentCaptor<McpOAuthState> captor = ArgumentCaptor.forClass(McpOAuthState.class);
         verify(stateRepository).save(captor.capture());
@@ -131,13 +135,38 @@ class McpOAuthServiceTest {
     @Test
     @DisplayName("start : aucun chemin d'inscription -> l'erreur du registrar remonte, aucun state")
     void startWithoutAnyClientFails() {
-        when(workspaceMcp.resolveServer(WS_ID, "linear", null)).thenReturn(new ServerIdentity("linear", null));
+        when(workspaceMcp.resolveServer(WS_ID, "custom-docs", "Docs")).thenReturn(new ServerIdentity("custom-docs", "Docs"));
         when(discovery.discover(anyString())).thenReturn(auth(false));
-        when(registrar.clientFor(any(), any(), any(), any())).thenThrow(new McpClientRegistrar.NoClient("none"));
+        // Un serveur sans préréglage : aucun émetteur épinglé, donc aucun client enregistré d'avance.
+        when(registrar.clientFor(any(), any(), any(), any(), eq(false))).thenThrow(new McpClientRegistrar.NoClient("none"));
 
-        assertThatThrownBy(() -> service.start(ws, USER_ID, "linear", null, "https://203.0.113.10/mcp", null))
+        assertThatThrownBy(() -> service.start(ws, USER_ID, "custom-docs", "Docs", "https://203.0.113.10/mcp", null))
             .isInstanceOf(McpClientRegistrar.NoClient.class);
         verify(stateRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("start : la clé d'un préréglage avec une autre adresse que son serveur officiel -> refus, aucun appel")
+    void startRefusesAnotherServerForAPreset() {
+        assertThatThrownBy(() -> service.start(ws, USER_ID, "linear", null, "https://203.0.113.10/mcp", null))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("official server");
+        assertThatThrownBy(() -> service.start(ws, USER_ID, "google-drive", null, "https://203.0.113.10/mcp", null))
+            .isInstanceOf(BusinessException.class);
+        verifyNoInteractions(discovery, client, registrar);
+        verify(stateRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("connect : la clé d'un préréglage avec une autre adresse, jeton ou pas -> refus, rien d'enregistré")
+    void connectRefusesAnotherServerForAPreset() {
+        assertThatThrownBy(() -> service.connect(ws, person, false, new McpOAuthService.ConnectRequest("linear", null,
+            "https://203.0.113.10/mcp", "tok", null, false, false, false, null))).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.connect(ws, person, false, new McpOAuthService.ConnectRequest("linear", null,
+            "https://203.0.113.10/mcp", null, null, false, false, false, null))).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.connect(ws, person, true, new McpOAuthService.ConnectRequest("microsoft-365",
+            null, "https://203.0.113.10/", null, null, false, false, false, null))).isInstanceOf(BusinessException.class);
+        verify(workspaceMcp, never()).connectServer(any(), any(), any());
+        verifyNoInteractions(discovery, client, registrar);
     }
 
     @Test

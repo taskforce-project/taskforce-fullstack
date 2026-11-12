@@ -27,9 +27,10 @@ import lombok.extern.slf4j.Slf4j;
  * (inscription du client) et de la séance n°22 (R154) :
  *
  * <ol>
- *   <li><b>un client enregistré d'avance</b> : celui de l'entreprise, quand son administrateur l'a saisi pour cet
- *       espace (chemin C, le plus précis), sinon le nôtre, lu dans les variables d'environnement
- *       {@code TF_MCP_<CLÉ>_CLIENT_ID} et {@code TF_MCP_<CLÉ>_CLIENT_SECRET} (chemin B ; jamais dans le dépôt) ;</li>
+ *   <li><b>un client enregistré d'avance</b>, chez l'émetteur que le préréglage épingle seulement : celui de
+ *       l'entreprise, quand son administrateur l'a saisi pour cet espace (chemin C, le plus précis), sinon le nôtre, lu
+ *       dans les variables d'environnement {@code TF_MCP_<CLÉ>_CLIENT_ID} et {@code TF_MCP_<CLÉ>_CLIENT_SECRET}
+ *       (chemin B ; jamais dans le dépôt) ;</li>
  *   <li><b>notre document de métadonnées</b> (CIMD) : son adresse HTTPS sert d'identifiant, quand le serveur
  *       l'annonce et que le document répond ;</li>
  *   <li><b>l'inscription dynamique</b> (DCR), dépréciée par la norme mais encore la plus répandue : une seule par
@@ -69,16 +70,25 @@ public class McpClientRegistrar {
 
     private final Map<String, Long> cimdChecked = new ConcurrentHashMap<>();
 
+    /**
+     * Le client à présenter. {@code pinnedIssuer} : le serveur d'autorisation est celui que le préréglage épingle, celui
+     * que désigne son serveur officiel ; seul celui-là reçoit un client enregistré d'avance (l'application de
+     * l'entreprise, ou la nôtre) et son secret. Tout autre émetteur passe par CIMD ou l'inscription dynamique, sans secret
+     * de l'entreprise ni de TaskForce.
+     */
     @Transactional
-    public RegisteredClient clientFor(Long workspaceId, String connectorKey, DiscoveredAuth auth, String redirectUri) {
-        // 1. Un client enregistré d'avance : celui de l'entreprise, puis le nôtre.
-        ConnectorApp company = connectorKey == null ? null
-            : apps.findByWorkspaceIdAndConnectorKey(workspaceId, connectorKey).orElse(null);
-        if (company != null) {
-            return new RegisteredClient(company.getClientId(), blankToNull(company.getClientSecret()), COMPANY);
+    public RegisteredClient clientFor(Long workspaceId, String connectorKey, DiscoveredAuth auth, String redirectUri,
+                                      boolean pinnedIssuer) {
+        // 1. Un client enregistré d'avance, chez l'émetteur épinglé seulement : celui de l'entreprise, puis le nôtre.
+        if (pinnedIssuer) {
+            ConnectorApp company = connectorKey == null ? null
+                : apps.findByWorkspaceIdAndConnectorKey(workspaceId, connectorKey).orElse(null);
+            if (company != null) {
+                return new RegisteredClient(company.getClientId(), blankToNull(company.getClientSecret()), COMPANY);
+            }
+            RegisteredClient ours = ours(connectorKey);
+            if (ours != null) return ours;
         }
-        RegisteredClient ours = ours(connectorKey);
-        if (ours != null) return ours;
         // 2. Notre document de métadonnées, quand le serveur l'accepte et qu'il répond comme il faut.
         String cimd = settings.cimdUrl();
         if (auth.cimdSupported() && cimd != null && cimdServes(cimd, redirectUri)) {

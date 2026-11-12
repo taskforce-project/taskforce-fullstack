@@ -106,13 +106,41 @@ class WorkspaceMcpServiceTest {
     @Test
     @DisplayName("la classe vient du préréglage : lecture nommée, écriture nommée, et un outil inconnu est une écriture")
     void the_class_comes_from_the_preset() throws Exception {
-        when(repository.findUsable(1L, 7L)).thenReturn(List.of(mcpConnector()));
+        ConnectorConnection official = ConnectorConnection.builder()
+            .connectorKey("linear").config("{\"mcpUrl\":\"https://mcp.linear.app/mcp/readonly\"}").build();
+        when(repository.findUsable(1L, 7L)).thenReturn(List.of(official));
         when(client.initialize(any())).thenReturn(session);
         when(client.listTools(session)).thenReturn(List.of(def("list_issues"), def("save_issue"), lying("wipe_workspace")));
 
         List<AgentTool> tools = service.toolsFor(ctx);
 
         assertThat(tools).extracting(t -> ((ExternalMcpTool) t).isReadOnly()).containsExactly(true, false, false);
+    }
+
+    @Test
+    @DisplayName("les classes d'un préréglage ne valent que sur son serveur officiel : ailleurs, chaque outil est une écriture")
+    void the_preset_classes_apply_to_its_own_server_only() throws Exception {
+        // Une connexion gardée sous la clé du préréglage, mais vers un autre serveur.
+        ConnectorConnection elsewhere = ConnectorConnection.builder()
+            .connectorKey("linear").config("{\"mcpUrl\":\"https://203.0.113.10/mcp\"}").build();
+        when(repository.findUsable(1L, 7L)).thenReturn(List.of(elsewhere));
+        when(client.initialize(any())).thenReturn(session);
+        when(client.listTools(session)).thenReturn(List.of(def("list_issues"), def("get_issue")));
+
+        assertThat(service.toolsFor(ctx)).extracting(t -> ((ExternalMcpTool) t).isReadOnly()).containsExactly(false, false);
+    }
+
+    @Test
+    @DisplayName("connectServer : la clé d'un préréglage vers un autre serveur que l'officiel, ou d'une API -> refus")
+    void connect_server_refuses_another_server_for_a_preset() {
+        assertThatThrownBy(() -> service.connectServer(ws, ada,
+            new WorkspaceMcpService.ServerRequest("linear", null, "https://203.0.113.10/mcp", "tok", null, null, false, false)))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("official server");
+        assertThatThrownBy(() -> service.connectServer(ws, ada,
+            new WorkspaceMcpService.ServerRequest("google-drive", null, "https://203.0.113.10/mcp", "tok", null, null,
+                false, false)))
+            .isInstanceOf(BusinessException.class);
+        verify(repository, never()).save(any());
     }
 
     @Test
@@ -363,7 +391,7 @@ class WorkspaceMcpServiceTest {
     void server_tools_returns_rich_defs() throws Exception {
         ConnectorConnection conn = ConnectorConnection.builder()
             .connectorKey("linear")
-            .config("{\"mcpUrl\":\"http://x/mcp\",\"mcpAllow\":\"list_issues\"}").build();
+            .config("{\"mcpUrl\":\"https://mcp.linear.app/mcp\",\"mcpAllow\":\"list_issues\"}").build();
         when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(1L, "linear")).thenReturn(Optional.of(conn));
         when(client.initialize(any())).thenReturn(session);
         when(client.listTools(session)).thenReturn(List.of(def("list_issues"), def("delete_comment")));
@@ -398,7 +426,7 @@ class WorkspaceMcpServiceTest {
     void connect_server_persists_config() {
         when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerId(1L, "linear", 7L)).thenReturn(Optional.empty());
 
-        service.connectServer(ws, ada, request("linear", null, "https://203.0.113.10/mcp", null, null, "list_issues", false, false));
+        service.connectServer(ws, ada, request("linear", null, "https://mcp.linear.app/mcp", null, null, "list_issues", false, false));
 
         ArgumentCaptor<ConnectorConnection> captor = ArgumentCaptor.forClass(ConnectorConnection.class);
         verify(repository, atLeastOnce()).save(captor.capture());
@@ -406,7 +434,7 @@ class WorkspaceMcpServiceTest {
         assertThat(saved.getScope()).isEqualTo(ConnectionScope.PERSONAL);
         assertThat(saved.getOwner()).isEqualTo(ada);
         assertThat(saved.getConnectedBy()).isEqualTo(ada);
-        assertThat(saved.getConfig()).contains("mcpUrl").contains("https://203.0.113.10/mcp")
+        assertThat(saved.getConfig()).contains("mcpUrl").contains("https://mcp.linear.app/mcp")
             .contains("mcpAllow").contains("list_issues").doesNotContain("mcpToken");
     }
 
@@ -415,7 +443,7 @@ class WorkspaceMcpServiceTest {
     void connect_a_shared_server() {
         when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(1L, "linear")).thenReturn(Optional.empty());
 
-        service.connectServer(ws, ada, request("linear", null, "https://203.0.113.10/mcp", null, null, null, true, false));
+        service.connectServer(ws, ada, request("linear", null, "https://mcp.linear.app/mcp", null, null, null, true, false));
 
         ArgumentCaptor<ConnectorConnection> captor = ArgumentCaptor.forClass(ConnectorConnection.class);
         verify(repository, atLeastOnce()).save(captor.capture());
@@ -430,7 +458,7 @@ class WorkspaceMcpServiceTest {
             .when(client).assertAllowed("http://169.254.169.254/latest");
 
         assertThatThrownBy(() -> service.connectServer(ws, ada,
-            request("linear", null, " http://169.254.169.254/latest ", null, null, null, false, false)))
+            request("custom", "Docs", " http://169.254.169.254/latest ", null, null, null, false, false)))
             .isInstanceOf(BusinessException.class);
         verify(repository, never()).save(any());
     }

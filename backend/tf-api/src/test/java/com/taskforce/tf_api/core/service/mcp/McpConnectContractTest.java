@@ -37,6 +37,7 @@ import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.core.service.agent.CortexGate;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
+import com.taskforce.tf_api.core.service.integration.ConnectorPreset;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -84,8 +85,8 @@ class McpConnectContractTest {
     @BeforeEach
     void start() throws Exception {
         vendor = new FakeVendor();
-        catalog = new ConnectorCatalog();
-        catalog.build();
+        // Le préréglage essayé a pour serveur officiel le faux éditeur : ses classes et ses clients y valent.
+        catalog = servedBy(KEY, vendor.mcpUrl());
         HarnessRuleSetRepository ruleSets = Mockito.mock(HarnessRuleSetRepository.class);
         WorkspaceRepository workspaces = workspaceRepository();
         gate = new CortexGate(
@@ -99,13 +100,28 @@ class McpConnectContractTest {
         vendor.close();
     }
 
+    /** Le catalogue, où le préréglage {@code key} a pour serveur officiel {@code officialUrl} (le faux éditeur). */
+    static ConnectorCatalog servedBy(String key, String officialUrl) {
+        ConnectorCatalog served = new ConnectorCatalog() {
+            @Override
+            public Optional<ConnectorPreset> preset(String asked) {
+                return super.preset(asked).map(p -> key.equals(asked) ? new ConnectorPreset(p.key(), p.name(),
+                    p.category(), p.description(), p.website(), officialUrl, null, p.connection(), p.scopes(), p.admin(),
+                    p.apiKey(), p.readTools(), p.writeTools(), p.tried(), p.blocked(), p.sources(), p.unverified(),
+                    p.api()) : p);
+            }
+        };
+        served.build();
+        return served;
+    }
+
     // ── Le montage des vrais services ────────────────────────────────────────
 
     private McpOAuthService services(McpOAuthSettings settings) {
         McpOAuthClient http = new McpOAuthClient(om, 5000, true);
         McpClient mcp = new McpClient(om, 2000, 5000, true);
         ConnectorConnectionRepository connections = connections();
-        tokens = new McpTokenService(http, connections, om);
+        tokens = new McpTokenService(http, connections, om, catalog);
         workspaceMcp = new WorkspaceMcpService(connections, mcp, om, tokens, catalog);
         ReflectionTestUtils.setField(workspaceMcp, "cacheTtlMs", 60_000L);
         McpClientRegistrar registrar = new McpClientRegistrar(apps(), registrationRepository(), http, settings, env);

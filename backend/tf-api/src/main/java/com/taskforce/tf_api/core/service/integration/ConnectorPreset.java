@@ -84,6 +84,29 @@ public record ConnectorPreset(
         return !writes && readUrl != null && !readUrl.isBlank() ? readUrl : mcpUrl;
     }
 
+    /** Le préréglage a-t-il un serveur officiel ? Faux pour un serveur que l'entreprise crée, et pour l'API d'un éditeur. */
+    public boolean hasOfficialServer() {
+        return mcpUrl != null && !mcpUrl.isBlank();
+    }
+
+    /**
+     * Cette adresse est-elle le serveur officiel du préréglage, en écriture ou en lecture seule ? Ses classes d'outils et
+     * les clients enregistrés pour lui ne valent que là.
+     */
+    public boolean serves(String url) {
+        if (url == null || !hasOfficialServer()) return false;
+        String asked = bare(url);
+        return asked.equals(bare(mcpUrl)) || (readUrl != null && !readUrl.isBlank() && asked.equals(bare(readUrl)));
+    }
+
+    /** Une adresse sans espaces autour ni barres finales. */
+    private static String bare(String url) {
+        String v = url.strip();
+        int end = v.length();
+        while (end > 0 && v.charAt(end - 1) == '/') end--;
+        return v.substring(0, end);
+    }
+
     /** L'outil a-t-il été essayé de bout en bout ? */
     public boolean isTried() {
         return tried != null;

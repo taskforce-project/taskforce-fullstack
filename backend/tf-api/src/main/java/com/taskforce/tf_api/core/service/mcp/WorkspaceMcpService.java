@@ -279,6 +279,8 @@ public class WorkspaceMcpService {
     public ServerIdentity connectServer(Workspace ws, User person, ServerRequest req) {
         String mcpUrl = req.mcpUrl() == null ? "" : req.mcpUrl().trim();
         if (mcpUrl.isEmpty()) throw new BusinessException("Required field: mcpUrl");
+        // La clé d'un préréglage ne mène qu'à son serveur officiel : ses classes d'outils ne valent que là (R158).
+        catalog.assertAddress(req.connectorKey(), mcpUrl);
         boolean local = McpClient.isLocal(mcpUrl);
         // Refus immédiat d'une URL vers le réseau interne (OSS-1.2) ; le client revérifie avant chaque appel.
         client.assertAllowed(mcpUrl);
@@ -444,7 +446,7 @@ public class WorkspaceMcpService {
                     // Un outil changé ou apparu depuis la connexion attend un nouvel accord (R158).
                     if (held.contains(def.name())) continue;
                     tools.add(new ExternalMcpTool(client, refFor(conn, ref), def, objectMapper,
-                        catalog.classOf(conn.getConnectorKey(), def.name()), conn.getScope()));
+                        catalog.classOn(conn.getConnectorKey(), ref.serverUrl(), def.name()), conn.getScope()));
                 }
             } catch (Exception e) {
                 log.warn("Serveur MCP '{}' (ws={}) ignoré : {}", LogSafe.of(ref.connectorKey()), workspaceId, LogSafe.of(e.getMessage()));
@@ -561,7 +563,7 @@ public class WorkspaceMcpService {
         for (McpClient.ToolDef def : defs) {
             if (!allow.isEmpty() && !allow.contains(def.name())) continue;
             out.add(new McpToolInfo(def.name(), def.description(), def.inputSchema(),
-                catalog.classOf(connectorKey, def.name()).reads(), held.contains(def.name())));
+                catalog.classOn(connectorKey, ref.serverUrl(), def.name()).reads(), held.contains(def.name())));
         }
         return out;
     }
