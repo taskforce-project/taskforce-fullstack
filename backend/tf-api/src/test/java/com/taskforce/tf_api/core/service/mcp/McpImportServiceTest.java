@@ -134,17 +134,21 @@ class McpImportServiceTest {
     }
 
     @Test
-    @DisplayName("import : un outil de liste dont TaskForce ne sait pas la classe -> demandé, accordé par le clic, au dossier")
-    void an_unknown_list_tool_is_approved_by_the_click() throws Exception {
-        connectorWithTools("list_issues");
-        readReturns(listTool(ToolClass.WRITE), "[]");
-        when(llm.isConfigured()).thenReturn(false);
-        when(projectService.createProject(eq("acme"), eq(7L), any()))
-            .thenReturn(ProjectResponse.builder().id(99L).identifier("X").name("X").build());
+    @DisplayName("import : seul un outil classé en lecture est choisi ; une écriture qui parle d'issues ne l'est jamais")
+    void only_a_tool_classed_as_read_is_picked() throws Exception {
+        connectorWithTools("delete_issue", "list_issues", "search_issues");
+        ExternalMcpTool delete = new ExternalMcpTool(mcp, new McpClient.ServerRef("linear", "http://x/mcp", "AT"),
+            new McpClient.ToolDef("delete_issue", "Deletes an issue", json.readTree("{\"type\":\"object\"}"), true),
+            json, ToolClass.WRITE, ConnectionScope.PERSONAL);
+        when(workspaceMcp.toolFor(10L, 7L, "linear__list_issues")).thenReturn(Optional.of(listTool(ToolClass.WRITE)));
+        when(workspaceMcp.toolFor(10L, 7L, "linear__delete_issue")).thenReturn(Optional.of(delete));
+        when(workspaceMcp.toolFor(10L, 7L, "linear__search_issues")).thenReturn(Optional.empty());
 
-        service.importProject(ws, 7L, "linear", "X");
-
-        verify(records).append(eq(RECORD), eq("human.decision"), eq(CortexRecordService.Actor.person(7L)), any());
+        assertThatThrownBy(() -> service.importProject(ws, 7L, "linear", "X"))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("only reads");
+        verify(mcp, never()).callTool(any(), any(), any());
+        verify(mcp, never()).initialize(any());
+        verify(projectService, never()).createProject(anyString(), anyLong(), any());
     }
 
     @Test

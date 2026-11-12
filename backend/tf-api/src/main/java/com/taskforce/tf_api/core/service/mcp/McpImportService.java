@@ -2,9 +2,12 @@ package com.taskforce.tf_api.core.service.mcp;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -75,9 +78,7 @@ public class McpImportService {
         if (targetName == null || targetName.isBlank()) throw new BusinessException("The target project name is required");
 
         AgentContext ctx = new AgentContext(ws.getSlug(), ws.getId(), userId);
-        String issuesTool = findIssuesTool(ws.getId(), userId, connectorKey);
-        ExternalMcpTool read = workspaceMcp.toolFor(ws.getId(), userId, connectorKey + "__" + issuesTool)
-            .orElseThrow(() -> new BusinessException("\"" + connectorKey + "\" has no tool to list issues"));
+        ExternalMcpTool read = findIssuesTool(ws.getId(), userId, connectorKey);
         UUID record = records.open(ctx, "Import " + connectorKey + " into a new project: " + targetName,
             Map.of("via", "import"));
         RulesBundle bundle = gate.rulesFor(ctx);
@@ -148,17 +149,26 @@ public class McpImportService {
         }
     }
 
-    /** Cherche l'outil « lister les issues » du connecteur, par nom (générique), parmi ceux que la personne utilise. */
-    private String findIssuesTool(Long workspaceId, Long userId, String connectorKey) {
+    /**
+     * L'outil « lister les issues » du connecteur, parmi ceux que la personne utilise et que TaskForce classe en lecture :
+     * par son nom (générique), le plus proche d'abord. Un outil classé en écriture n'est jamais choisi, quel que soit son
+     * nom : l'import le lance sans arguments.
+     */
+    private ExternalMcpTool findIssuesTool(Long workspaceId, Long userId, String connectorKey) {
         List<String> tools = workspaceMcp.serverStatuses(workspaceId, userId).stream()
             .filter(s -> connectorKey.equals(s.connectorKey()) && s.reachable())
             .findFirst()
             .map(WorkspaceMcpService.McpServerStatus::tools)
             .orElseThrow(() -> new BusinessException("The MCP server \"" + connectorKey + "\" is not connected or not reachable"));
-        return tools.stream().filter(t -> t.equalsIgnoreCase("list_issues")).findFirst()
-            .or(() -> tools.stream().filter(t -> containsAll(t, "issue", "list")).findFirst())
-            .or(() -> tools.stream().filter(t -> t.toLowerCase(Locale.ROOT).contains("issue")).findFirst())
-            .orElseThrow(() -> new BusinessException("\"" + connectorKey + "\" has no tool to list issues"));
+        Set<String> candidates = new LinkedHashSet<>();
+        tools.stream().filter(t -> t.equalsIgnoreCase("list_issues")).forEach(candidates::add);
+        tools.stream().filter(t -> containsAll(t, "issue", "list")).forEach(candidates::add);
+        tools.stream().filter(t -> t.toLowerCase(Locale.ROOT).contains("issue")).forEach(candidates::add);
+        for (String name : candidates) {
+            Optional<ExternalMcpTool> tool = workspaceMcp.toolFor(workspaceId, userId, connectorKey + "__" + name);
+            if (tool.isPresent() && tool.get().isReadOnly()) return tool.get();
+        }
+        throw new BusinessException("\"" + connectorKey + "\" has no tool that only reads to list issues");
     }
 
     private List<NormalizedIssue> normalize(Long workspaceId, String raw) {
