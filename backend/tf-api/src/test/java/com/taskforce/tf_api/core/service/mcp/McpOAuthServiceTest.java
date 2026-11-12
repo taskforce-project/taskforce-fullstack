@@ -14,21 +14,25 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.enums.ConnectionScope;
 import com.taskforce.tf_api.core.enums.ConnectionState;
+import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.ConnectorApp;
 import com.taskforce.tf_api.core.model.ConnectorConnection;
 import com.taskforce.tf_api.core.model.McpOAuthState;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.ConnectorAppRepository;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
 import com.taskforce.tf_api.core.repository.McpOAuthStateRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 import com.taskforce.tf_api.core.service.mcp.McpOAuthDiscovery.DiscoveredAuth;
 import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService.ServerIdentity;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -72,14 +76,14 @@ class McpOAuthServiceTest {
     private final Workspace ws = Workspace.builder().id(WS_ID).slug("acme").build();
     private final User person = User.builder().id(USER_ID).email("a@acme.test").build();
     private ConnectorCatalog catalog;
+    private McpOAuthSettings settings;
     private McpOAuthService service;
 
     @BeforeEach
     void setUp() {
         catalog = new ConnectorCatalog();
         catalog.build();
-        McpOAuthSettings settings = new McpOAuthSettings("http://localhost:8080", "", "http://localhost:3000",
-            "TaskForce", "web", "");
+        settings = new McpOAuthSettings("http://localhost:8080", "", "http://localhost:3000", "TaskForce", "web", "");
         service = new McpOAuthService(discovery, client, stateRepository, workspaceRepository, userRepository,
             tokenService, workspaceMcp, registrar, settings, catalog, apps, connections, om, authorization);
     }
@@ -170,11 +174,11 @@ class McpOAuthServiceTest {
     @Test
     @DisplayName("connect : la clé d'un préréglage avec une autre adresse, jeton ou pas -> refus, rien d'enregistré")
     void connectRefusesAnotherServerForAPreset() {
-        assertThatThrownBy(() -> service.connect(ws, person, false, new McpOAuthService.ConnectRequest("linear", null,
+        assertThatThrownBy(() -> service.connect(ws, person, new McpOAuthService.ConnectRequest("linear", null,
             "https://203.0.113.10/mcp", "tok", null, false, false, false, null))).isInstanceOf(BusinessException.class);
-        assertThatThrownBy(() -> service.connect(ws, person, false, new McpOAuthService.ConnectRequest("linear", null,
+        assertThatThrownBy(() -> service.connect(ws, person, new McpOAuthService.ConnectRequest("linear", null,
             "https://203.0.113.10/mcp", null, null, false, false, false, null))).isInstanceOf(BusinessException.class);
-        assertThatThrownBy(() -> service.connect(ws, person, true, new McpOAuthService.ConnectRequest("microsoft-365",
+        assertThatThrownBy(() -> service.connect(ws, person, new McpOAuthService.ConnectRequest("microsoft-365",
             null, "https://203.0.113.10/", null, null, false, false, false, null))).isInstanceOf(BusinessException.class);
         verify(workspaceMcp, never()).connectServer(any(), any(), any());
         verifyNoInteractions(discovery, client, registrar);
@@ -512,13 +516,34 @@ class McpOAuthServiceTest {
         McpOAuthService.ConnectRequest req = new McpOAuthService.ConnectRequest("slack-mcp", null, null, null, null,
             false, false, false, null);
 
-        McpOAuthService.ConnectOutcome member = service.connect(ws, person, false, req);
-        McpOAuthService.ConnectOutcome admin = service.connect(ws, person, true, req);
+        McpOAuthService.ConnectOutcome member = service.connect(ws, person, req);
+        // Le rôle vient du service lui-même, plus de l'appelant.
+        when(authorization.isManager(WS_ID, USER_ID)).thenReturn(true);
+        McpOAuthService.ConnectOutcome admin = service.connect(ws, person, req);
 
         assertThat(member.next()).isEqualTo("admin");
         assertThat(member.message()).contains("http://localhost:8080/api/mcp/oauth/callback").doesNotContain("{redirectUri}");
         assertThat(admin.next()).isEqualTo("company-app");
         verifyNoInteractions(discovery, client);
+    }
+
+    @Test
+    @DisplayName("connect et start : une connexion partagée demandée par un membre -> refus par le service, rien ne part")
+    void aMemberCannotShareAConnection() {
+        WorkspaceMemberRepository members = org.mockito.Mockito.mock(WorkspaceMemberRepository.class);
+        when(members.findByWorkspaceIdAndUserId(WS_ID, USER_ID))
+            .thenReturn(Optional.of(WorkspaceMember.builder().role(WorkspaceRole.MEMBER).build()));
+        McpOAuthService guarded = new McpOAuthService(discovery, client, stateRepository, workspaceRepository,
+            userRepository, tokenService, workspaceMcp, registrar, settings, catalog, apps, connections, om,
+            new AuthorizationService(members));
+        McpOAuthService.ConnectRequest shared = new McpOAuthService.ConnectRequest("linear", null, null, null, null,
+            true, false, false, null);
+
+        assertThatThrownBy(() -> guarded.connect(ws, person, shared)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> guarded.start(ws, USER_ID, shared, "https://mcp.linear.app/mcp"))
+            .isInstanceOf(ForbiddenException.class);
+        verifyNoInteractions(discovery, client, registrar, workspaceMcp);
+        verify(stateRepository, never()).save(any());
     }
 
     @Test
@@ -531,7 +556,7 @@ class McpOAuthServiceTest {
         when(discovery.discover("https://mcp.slack.com/mcp")).thenThrow(new McpOAuthDiscovery.NoOAuth("x"));
         service.allowLocalServersForContractTests(); // aucun nom résolu dans l'essai
 
-        McpOAuthService.ConnectOutcome out = service.connect(ws, person, true,
+        McpOAuthService.ConnectOutcome out = service.connect(ws, person,
             new McpOAuthService.ConnectRequest("slack-mcp", null, null, null, null, false, false, false, null));
 
         // Sans métadonnées OAuth, le serveur attend une clé : la suite le dit.
@@ -541,11 +566,11 @@ class McpOAuthServiceTest {
     @Test
     @DisplayName("connect : un préréglage par clé demande la clé ; la clé donnée se garde pour la personne")
     void connectByKey() {
-        McpOAuthService.ConnectOutcome asked = service.connect(ws, person, false,
+        McpOAuthService.ConnectOutcome asked = service.connect(ws, person,
             new McpOAuthService.ConnectRequest("excalidraw-plus", null, null, null, null, false, false, false, null));
         assertThat(asked.next()).isEqualTo("key");
 
-        McpOAuthService.ConnectOutcome saved = service.connect(ws, person, false,
+        McpOAuthService.ConnectOutcome saved = service.connect(ws, person,
             new McpOAuthService.ConnectRequest("excalidraw-plus", null, null, "k-1", null, false, false, false, null));
         assertThat(saved.next()).isEqualTo("connected");
         ArgumentCaptor<WorkspaceMcpService.ServerRequest> req = ArgumentCaptor.forClass(WorkspaceMcpService.ServerRequest.class);
@@ -558,14 +583,14 @@ class McpOAuthServiceTest {
     @Test
     @DisplayName("connect : l'adresse du serveur que l'entreprise crée (Zoho) est demandée, puis vaut la connexion")
     void connectByServerUrl() {
-        assertThat(service.connect(ws, person, false, new McpOAuthService.ConnectRequest("zoho", null, null, null, null,
+        assertThat(service.connect(ws, person, new McpOAuthService.ConnectRequest("zoho", null, null, null, null,
             false, false, false, null)).next()).isEqualTo("key");
     }
 
     @Test
     @DisplayName("connect : un serveur public se connecte tel quel, sans navigateur")
     void connectAnOpenServer() {
-        assertThat(service.connect(ws, person, false, new McpOAuthService.ConnectRequest("excalidraw", null, null, null,
+        assertThat(service.connect(ws, person, new McpOAuthService.ConnectRequest("excalidraw", null, null, null,
             null, false, false, false, null)).next()).isEqualTo("connected");
         verify(workspaceMcp).connectServer(eq(ws), eq(person), any());
         verifyNoInteractions(discovery);
@@ -577,7 +602,7 @@ class McpOAuthServiceTest {
         when(workspaceMcp.connectServer(eq(ws), eq(person), any()))
             .thenThrow(new WorkspaceMcpService.LocalServerNeedsApproval("127.0.0.1:8811"));
 
-        McpOAuthService.ConnectOutcome out = service.connect(ws, person, false, new McpOAuthService.ConnectRequest(
+        McpOAuthService.ConnectOutcome out = service.connect(ws, person, new McpOAuthService.ConnectRequest(
             "custom", "Docker", "http://127.0.0.1:8811/mcp", null, null, false, false, false, null));
 
         assertThat(out.next()).isEqualTo("local");

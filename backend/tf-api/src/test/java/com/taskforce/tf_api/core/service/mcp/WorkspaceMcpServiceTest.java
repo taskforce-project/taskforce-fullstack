@@ -20,14 +20,19 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.enums.ConnectionScope;
 import com.taskforce.tf_api.core.enums.ConnectionState;
+import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.ConnectorConnection;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,6 +58,7 @@ class WorkspaceMcpServiceTest {
     @Mock private ConnectorConnectionRepository repository;
     @Mock private McpClient client;
     @Mock private McpTokenService tokenService; // OAuth (TF-MCP-02) : non-OAuth par défaut en test (isOAuth=false)
+    @Mock private WorkspaceMemberRepository members;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private WorkspaceMcpService service;
@@ -66,7 +72,13 @@ class WorkspaceMcpServiceTest {
     void setup() {
         ConnectorCatalog catalog = new ConnectorCatalog();
         catalog.build();
-        service = new WorkspaceMcpService(repository, client, objectMapper, tokenService, catalog);
+        // Les vrais droits : Ada (7) est propriétaire de l'espace, Bob (8) y est membre.
+        lenient().when(members.findByWorkspaceIdAndUserId(1L, 7L))
+            .thenReturn(Optional.of(WorkspaceMember.builder().role(WorkspaceRole.OWNER).build()));
+        lenient().when(members.findByWorkspaceIdAndUserId(1L, 8L))
+            .thenReturn(Optional.of(WorkspaceMember.builder().role(WorkspaceRole.MEMBER).build()));
+        service = new WorkspaceMcpService(repository, client, objectMapper, tokenService, catalog,
+            new AuthorizationService(members));
         ReflectionTestUtils.setField(service, "cacheTtlMs", 60_000L);
     }
 
@@ -628,6 +640,24 @@ class WorkspaceMcpServiceTest {
         assertThat(result.revoked()).isTrue();
         assertThat(result.revocable()).isTrue();
         verify(repository).delete(conn);
+    }
+
+    @Test
+    @DisplayName("la connexion de l'espace : un membre ne la crée, ne la déconnecte ni ne la réaccorde, rien ne change")
+    void a_member_cannot_touch_the_shared_connection() {
+        User bob = User.builder().id(8L).email("bob@acme.test").build();
+
+        assertThatThrownBy(() -> service.connectServer(ws, bob,
+            request("linear", null, "https://mcp.linear.app/mcp", "tok", null, null, true, false)))
+            .isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> service.disconnectServer(1L, 8L, "linear", true)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> service.approveTools(1L, 8L, "linear", true)).isInstanceOf(ForbiddenException.class);
+
+        verify(repository, never()).findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(any(), any());
+        verify(repository, never()).save(any());
+        verify(repository, never()).delete(any());
+        verify(tokenService, never()).revoke(any());
+        org.mockito.Mockito.verifyNoInteractions(client);
     }
 
     @Test

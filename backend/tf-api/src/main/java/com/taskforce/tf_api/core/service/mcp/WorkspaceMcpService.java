@@ -32,6 +32,7 @@ import com.taskforce.tf_api.core.model.ConnectorConnection;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
@@ -143,6 +144,8 @@ public class WorkspaceMcpService {
     private final ObjectMapper objectMapper;
     private final McpTokenService tokenService; // OAuth (TF-MCP-02) : access token géré + refresh auto
     private final ConnectorCatalog catalog;
+    /** Sa propre connexion : un membre ; une connexion partagée : un propriétaire ou un administrateur (règle 3). */
+    private final AuthorizationService authorization;
 
     @Value("${integrations.mcp.tools-cache-ttl-ms:60000}")
     private long cacheTtlMs;
@@ -269,14 +272,16 @@ public class WorkspaceMcpService {
                                 String allow, boolean shared, boolean localApproved) {}
 
     /**
-     * Connecte (ou reconfigure) un serveur MCP : pour la personne (par défaut), ou partagé avec l'espace (contrôle du
-     * rôle fait en amont par le contrôleur). Persiste {@code mcpUrl}, le nom d'un serveur personnalisé et, au choix, un
-     * jeton relayé en {@code Authorization: Bearer} ou dans l'en-tête nommé, en JSON <b>chiffré</b>, puis fige la liste
-     * de ses outils et invalide le cache. Un serveur local (la machine, le réseau local) ne se connecte que sur une
-     * instance qui l'admet (l'app desktop) et avec l'accord explicite de la personne. Renvoie la clé et le nom retenus.
+     * Connecte (ou reconfigure) un serveur MCP : pour la personne (par défaut, un membre), ou partagé avec l'espace (un
+     * propriétaire ou un administrateur, vérifié ici). Persiste {@code mcpUrl}, le nom d'un serveur personnalisé et, au
+     * choix, un jeton relayé en {@code Authorization: Bearer} ou dans l'en-tête nommé, en JSON <b>chiffré</b>, puis fige
+     * la liste de ses outils et invalide le cache. Un serveur local (la machine, le réseau local) ne se connecte que sur
+     * une instance qui l'admet (l'app desktop) et avec l'accord explicite de la personne. Renvoie la clé et le nom
+     * retenus.
      */
     @Transactional
     public ServerIdentity connectServer(Workspace ws, User person, ServerRequest req) {
+        authorization.requireForConnection(ws.getId(), person == null ? null : person.getId(), req.shared());
         String mcpUrl = req.mcpUrl() == null ? "" : req.mcpUrl().trim();
         if (mcpUrl.isEmpty()) throw new BusinessException("Required field: mcpUrl");
         // La clé d'un préréglage ne mène qu'à son serveur officiel : ses classes d'outils ne valent que là (R158).
@@ -362,12 +367,13 @@ public class WorkspaceMcpService {
     }
 
     /**
-     * Déconnecte un serveur MCP : la connexion de la personne, ou celle de l'espace ({@code shared}, rôle vérifié en
-     * amont). Révoque d'abord le jeton chez l'éditeur quand il offre la révocation (RFC 7009), puis supprime la ligne
-     * et invalide le cache. Dit ce qui a été révoqué.
+     * Déconnecte un serveur MCP : la connexion de la personne, ou celle de l'espace ({@code shared}, par un propriétaire
+     * ou un administrateur, vérifié ici). Révoque d'abord le jeton chez l'éditeur quand il offre la révocation
+     * (RFC 7009), puis supprime la ligne et invalide le cache. Dit ce qui a été révoqué.
      */
     @Transactional
     public DisconnectResult disconnectServer(Long workspaceId, Long userId, String connectorKey, boolean shared) {
+        authorization.requireForConnection(workspaceId, userId, shared);
         ConnectorConnection conn = (shared
             ? repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(workspaceId, connectorKey)
             : repository.findByWorkspaceIdAndConnectorKeyAndOwnerId(workspaceId, connectorKey, userId))
@@ -383,10 +389,11 @@ public class WorkspaceMcpService {
     /**
      * Redonne l'accord à la liste actuelle des outils d'une connexion (R158) : les outils qui avaient changé, ou qui
      * sont apparus, sont de nouveau servis. La personne pour sa connexion ; un propriétaire ou un administrateur pour
-     * celle de l'espace (vérifié en amont).
+     * celle de l'espace (vérifié ici).
      */
     @Transactional
     public void approveTools(Long workspaceId, Long userId, String connectorKey, boolean shared) {
+        authorization.requireForConnection(workspaceId, userId, shared);
         ConnectorConnection conn = (shared
             ? repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(workspaceId, connectorKey)
             : repository.findByWorkspaceIdAndConnectorKeyAndOwnerId(workspaceId, connectorKey, userId))

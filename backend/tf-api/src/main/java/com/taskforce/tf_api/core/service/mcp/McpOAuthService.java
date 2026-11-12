@@ -118,10 +118,15 @@ public class McpOAuthService {
     /**
      * Le geste « Connect » : TaskForce choisit le chemin. Une clé donnée se garde (D) ; un préréglage par clé seule
      * demande la clé ; un outil qui exige l'application de l'entreprise l'attend ; un serveur public se connecte tel
-     * quel ; sinon l'OAuth, avec le premier client possible. Rôle vérifié en amont pour une connexion partagée.
+     * quel ; sinon l'OAuth, avec le premier client possible. Le rôle est vérifié ici : un membre pour sa connexion, un
+     * propriétaire ou un administrateur pour celle de l'espace ; et c'est lui qui dit, à l'étape de l'administrateur,
+     * si la personne saisit l'application de l'entreprise ou l'attend.
      */
     @Transactional
-    public ConnectOutcome connect(Workspace ws, User person, boolean manager, ConnectRequest req) {
+    public ConnectOutcome connect(Workspace ws, User person, ConnectRequest req) {
+        Long personId = person == null ? null : person.getId();
+        authorization.requireForConnection(ws.getId(), personId, req.shared());
+        boolean manager = authorization.isManager(ws.getId(), personId);
         Optional<ConnectorPreset> preset = catalog.preset(req.connectorKey());
         // Un préréglage joint toujours son serveur officiel ; une autre adresse demandée pour sa clé est refusée.
         String url = catalog.serverFor(req.connectorKey(), req.mcpUrl(), req.allowWrites());
@@ -186,6 +191,7 @@ public class McpOAuthService {
      */
     @Transactional
     public String startApi(Workspace ws, Long userId, ConnectRequest req, ConnectorPreset preset) {
+        authorization.requireForConnection(ws.getId(), userId, req.shared());
         ConnectorPreset.Api api = preset.api();
         String[] fake = apiForContractTests.get(preset.key());
         String issuer = fake != null ? fake[0] : settings.apiIssuer(api.issuer());
@@ -238,8 +244,8 @@ public class McpOAuthService {
     }
 
     /**
-     * Demarre le flux et renvoie l'URL d'autorisation (le front y envoie le navigateur). Autorisation (membre, et
-     * gestionnaire pour une connexion partagée) faite en amont par le controleur. La cle est celle d'un prereglage du
+     * Demarre le flux et renvoie l'URL d'autorisation (le front y envoie le navigateur). Autorisation vérifiée ici (un
+     * membre, et un propriétaire ou un administrateur pour une connexion partagée). La cle est celle d'un prereglage du
      * catalogue ou d'un serveur personnalise, dont le nom est garde jusqu'au callback (cf.
      * {@link WorkspaceMcpService#resolveServer}).
      */
@@ -251,6 +257,7 @@ public class McpOAuthService {
 
     @Transactional
     public String start(Workspace ws, Long userId, ConnectRequest req, String requestedUrl) {
+        authorization.requireForConnection(ws.getId(), userId, req.shared());
         // La clé d'un préréglage mène toujours à son serveur officiel : une autre adresse est refusée avant tout appel.
         String mcpUrl = catalog.serverFor(req.connectorKey(), requestedUrl, req.allowWrites());
         if (mcpUrl == null) throw new BusinessException("Required field: mcpUrl");

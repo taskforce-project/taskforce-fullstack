@@ -9,6 +9,7 @@ import com.taskforce.tf_api.core.model.ConnectorApp;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.ConnectorAppRepository;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -17,8 +18,9 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * L'application de l'entreprise chez un éditeur (chemin C, séance n°22 R154) : son administrateur la crée dans son
- * tenant, puis saisit une fois ici son identifiant et son secret (chiffré au repos, jamais rendu par l'API). Le rôle
- * (propriétaire ou administrateur de l'espace) est vérifié par le contrôleur.
+ * tenant, puis saisit une fois ici son identifiant et son secret (chiffré au repos, jamais rendu par l'API). Elle vaut
+ * pour tout l'espace : seuls ses propriétaires et administrateurs la voient, la saisissent et la retirent, et le service
+ * le vérifie lui-même (règle 3).
  */
 @Service
 @RequiredArgsConstructor
@@ -32,9 +34,12 @@ public class ConnectorAppService {
 
     private final ConnectorAppRepository apps;
     private final ConnectorCatalog catalog;
+    private final AuthorizationService authorization;
 
+    /** Les applications d'entreprise de l'espace, pour un propriétaire ou un administrateur. */
     @Transactional(readOnly = true)
-    public List<CompanyApp> list(Long workspaceId) {
+    public List<CompanyApp> list(Long workspaceId, Long userId) {
+        authorization.requireForConnection(workspaceId, userId, true);
         return apps.findByWorkspaceId(workspaceId).stream()
             .map(a -> new CompanyApp(a.getConnectorKey(), a.getClientId(),
                 a.getClientSecret() != null && !a.getClientSecret().isBlank()))
@@ -42,11 +47,13 @@ public class ConnectorAppService {
     }
 
     /**
-     * Enregistre (ou remplace) l'application de l'entreprise pour un outil du catalogue. Un secret vide garde celui déjà
-     * saisi : l'écran ne le montre jamais, la personne n'a pas à le retaper pour changer l'identifiant.
+     * Enregistre (ou remplace) l'application de l'entreprise pour un outil du catalogue, par un propriétaire ou un
+     * administrateur. Un secret vide garde celui déjà saisi : l'écran ne le montre jamais, la personne n'a pas à le
+     * retaper pour changer l'identifiant.
      */
     @Transactional
     public CompanyApp save(Workspace ws, User admin, String connectorKey, String clientId, String clientSecret) {
+        authorization.requireForConnection(ws.getId(), admin == null ? null : admin.getId(), true);
         if (!catalog.isMcpPreset(connectorKey)) throw new BusinessException("Unknown tool: " + connectorKey);
         String id = clientId == null ? "" : clientId.strip();
         if (id.isEmpty() || id.length() > MAX_ID) throw new BusinessException("Enter the client ID of your company's app");
@@ -61,8 +68,10 @@ public class ConnectorAppService {
         return new CompanyApp(connectorKey, id, app.getClientSecret() != null && !app.getClientSecret().isBlank());
     }
 
+    /** Retire l'application de l'entreprise d'un outil, par un propriétaire ou un administrateur. */
     @Transactional
-    public void remove(Long workspaceId, String connectorKey) {
+    public void remove(Long workspaceId, Long userId, String connectorKey) {
+        authorization.requireForConnection(workspaceId, userId, true);
         ConnectorApp app = apps.findByWorkspaceIdAndConnectorKey(workspaceId, connectorKey)
             .orElseThrow(() -> new ResourceNotFoundException("No company app for " + connectorKey));
         apps.delete(app);
