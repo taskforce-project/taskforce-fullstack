@@ -16,7 +16,7 @@ const t = CONSTANTS_EN.storage
 function overview(overrides: Partial<StorageOverview> = {}): StorageOverview {
   return {
     scope: "workspace", canEdit: true, inherited: null,
-    target: { storage: "server", folderName: null, folderUrl: null, path: null, from: "default", chosenBy: null },
+    target: { storage: "server", folderId: null, driveId: null, folderName: null, folderUrl: null, path: null, from: "default", chosenBy: null },
     choices: [{ storage: "server", state: "ready" }, { storage: "machine", state: "ready" }],
     documents: [{
       id: 1, title: "Weekly report", fileName: "Weekly report.md", storage: "google-drive", folderName: "Reports",
@@ -79,8 +79,22 @@ describe("StoragePanel", () => {
     expect(toast.success).toHaveBeenCalledWith(t.saved)
   })
 
+  it("the folder already chosen stays when the dialog opens again", async () => {
+    given(overview({ target: { storage: "onedrive", folderId: "f1", driveId: "d1", folderName: "Reports", folderUrl: null,
+      path: null, from: "workspace", chosenBy: null }, choices: [{ storage: "onedrive", state: "ready" }] }))
+    chooseStorage.mockResolvedValue(overview())
+    render(<StoragePanel slug="acme" />)
+
+    fireEvent.click(screen.getByRole("button", { name: t.change }))
+    expect(screen.getByRole("button", { name: t.changeFolder })).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: t.save }))
+
+    await waitFor(() => expect(chooseStorage).toHaveBeenCalledWith("acme", null,
+      { storage: "onedrive", folderId: "f1", driveId: "d1" }))
+  })
+
   it("a project shows the workspace's choice, and a member only reads it", () => {
-    given(overview({ scope: "project", canEdit: false, target: { storage: "onedrive", folderName: "Team", folderUrl: null,
+    given(overview({ scope: "project", canEdit: false, target: { storage: "onedrive", folderId: "f", driveId: "d", folderName: "Team", folderUrl: null,
       path: null, from: "workspace", chosenBy: null } }))
     useStorageStore.setState({ key: "acme:30" })
     render(<StoragePanel slug="acme" projectId={30} />)

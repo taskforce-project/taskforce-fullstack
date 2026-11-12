@@ -165,6 +165,9 @@ function ChoiceRow({ choice, selected, onSelect, t }: Readonly<{
 /** Le dossier déjà choisi, quand la cible ne change pas. */
 function initialFolder(current: StorageOverview["target"]): ChosenFolder | null {
   if (current.storage === "machine" && current.path) return { path: current.path, label: current.path }
+  if (current.storage !== "server" && current.folderId) {
+    return { folderId: current.folderId, ...(current.driveId ? { driveId: current.driveId } : {}), label: current.folderName ?? "" }
+  }
   return null
 }
 

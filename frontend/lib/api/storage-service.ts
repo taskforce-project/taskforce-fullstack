@@ -17,6 +17,9 @@ export type StorageOrigin = "project" | "workspace" | "default"
 
 export interface StorageTargetView {
   storage: StorageKind
+  /** Le dossier chez l'éditeur, et le lecteur chez Microsoft : jamais montrés, gardés pour un nouveau choix. */
+  folderId: string | null
+  driveId: string | null
   folderName: string | null
   folderUrl: string | null
   path: string | null

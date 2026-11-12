@@ -65,9 +65,12 @@ public class StorageTargetService {
     /** Ce que la personne choisit. */
     public record TargetRequest(String storage, String folderId, String driveId, String path) {}
 
-    /** Une cible, telle que l'écran la montre. */
-    public record TargetView(String storage, String folderName, String folderUrl, String path, String from,
-                             String chosenBy) {}
+    /**
+     * Une cible, telle que l'écran la montre ; le dossier et le lecteur chez l'éditeur ne s'y lisent pas, ils servent à
+     * garder le dossier quand la personne rouvre le choix.
+     */
+    public record TargetView(String storage, String folderId, String driveId, String folderName, String folderUrl,
+                             String path, String from, String chosenBy) {}
 
     /** Une cible que la personne peut choisir, et ce qu'elle doit faire avant d'y ranger. */
     public record Choice(String storage, String state) {}
@@ -201,7 +204,8 @@ public class StorageTargetService {
     }
 
     private TargetView view(StorageTarget t, String from) {
-        return new TargetView(t.getKind().wire(), t.getFolderName(), t.getFolderUrl(), t.getLocalPath(), from,
+        return new TargetView(t.getKind().wire(), t.getFolderId(), t.getDriveId(), t.getFolderName(), t.getFolderUrl(),
+            t.getLocalPath(), from,
             t.getChosenBy() == null ? null : name(t.getChosenBy(), new HashMap<>()));
     }
 

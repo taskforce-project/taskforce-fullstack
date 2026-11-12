@@ -20,7 +20,7 @@ vi.mock("../api/client", () => ({
 
 const overview = (storage: StorageOverview["target"]["storage"]): StorageOverview => ({
   scope: "workspace", canEdit: true, inherited: null, documents: [],
-  target: { storage, folderName: null, folderUrl: null, path: null, from: "workspace", chosenBy: null },
+  target: { storage, folderId: null, driveId: null, folderName: null, folderUrl: null, path: null, from: "workspace", chosenBy: null },
   choices: [{ storage: "server", state: "ready" }],
 })
 
