@@ -191,6 +191,7 @@ public class ConnectorCatalog {
         Set<String> both = new LinkedHashSet<>(read);
         both.retainAll(write);
         if (!both.isEmpty()) throw new IllegalStateException("Preset " + key + " classes a tool twice: " + both);
+        toolListSource(key, n.path("tools"));
         JsonNode scopes = n.path("scopes");
         JsonNode admin = n.path("admin");
         JsonNode apiKey = n.path("apiKey");
@@ -206,6 +207,30 @@ public class ConnectorCatalog {
             Collections.unmodifiableSet(read), Collections.unmodifiableSet(write),
             tried.isObject() ? new ConnectorPreset.Tried(required(tried, "date"), required(tried, "proof")) : null,
             text(n, "blocked"), list(n.path("sources")), list(n.path("unverified")), api);
+    }
+
+    /**
+     * D'où vient la liste des outils d'un préréglage (séance n°23, R160) : la page publique de l'éditeur
+     * ({@code tools.source}, en HTTPS) et la date de sa lecture ({@code tools.checked}, AAAA-MM-JJ), l'une avec l'autre.
+     * Un outil n'y est en lecture que si l'éditeur le documente ainsi ; le reste demande.
+     */
+    private static void toolListSource(String key, JsonNode tools) {
+        String source = text(tools, "source");
+        String checked = text(tools, "checked");
+        if ((source == null) != (checked == null)) {
+            throw new IllegalStateException("Preset " + key + " gives the page of its tool list and the date it was read "
+                + "together, or neither");
+        }
+        if (source != null && !source.startsWith("https://")) {
+            throw new IllegalStateException("Preset " + key + " must read its tool list on an HTTPS page");
+        }
+        if (checked != null) {
+            try {
+                java.time.LocalDate.parse(checked);
+            } catch (java.time.format.DateTimeParseException e) {
+                throw new IllegalStateException("Preset " + key + " dates its tool list as YYYY-MM-DD: " + checked, e);
+            }
+        }
     }
 
     /** L'API d'un éditeur que TaskForce sert lui-même : son émetteur et son adresse, en HTTPS. */

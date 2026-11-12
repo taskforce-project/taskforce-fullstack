@@ -228,6 +228,44 @@ class ConnectorCatalogTest {
         assertThat(catalogue.classOf(cle, outil)).isEqualTo(classe);
     }
 
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"github-mcp", "gitlab", "notion", "confluence", "jira", "slack-mcp", "linear", "excalidraw",
+        "stripe", "zoho", "asana"})
+    @DisplayName("chaque liste d'outils de la première vague dit sa page publique et la date de sa lecture (séance n°23, R160)")
+    void lesListesDeLaPremiereVagueDisentLeurSource(String cle) throws IOException {
+        JsonNode tools = null;
+        for (JsonNode p : fichier()) if (cle.equals(p.path("key").asText())) tools = p.path("tools");
+        assertThat(tools).as(cle).isNotNull();
+        assertThat(tools.path("source").asText()).as(cle).startsWith("https://");
+        assertThat(java.time.LocalDate.parse(tools.path("checked").asText())).as(cle)
+            .isAfterOrEqualTo(java.time.LocalDate.of(2026, 11, 12));
+    }
+
+    @ParameterizedTest(name = "{0} / {1} -> {2}")
+    @CsvSource({
+        // Asana publie ses outils par groupe : la lecture sert, l'écriture et l'interactif demandent.
+        "asana,      get_task,                READ",
+        "asana,      search_objects,          READ",
+        "asana,      create_tasks,            WRITE",
+        "asana,      search_tasks_preview,    WRITE",
+        // Atlassian : la lecture de Teamwork Graph et du code ; executeRead lance n'importe quel outil différé.
+        "jira,       getTeamworkGraphContext, READ",
+        "confluence, searchCode,              READ",
+        "jira,       executeRead,             WRITE",
+        "confluence, executeRead,             WRITE",
+        // Linear ne publie pas de liste : seul ce que son journal des changements dit en lecture sert sans demander.
+        "linear,     list_customer_needs,     READ",
+        "linear,     get_issue,               WRITE",
+        "gitlab,     list_pipeline_schedules, READ",
+        "stripe,     stripe_analytics,        WRITE",
+        "notion,     notion-wait-session,     WRITE",
+        "slack-mcp,  slack_search_public,     WRITE",
+    })
+    @DisplayName("la première vague, relue le 12/11/2026 : lecture seulement si l'éditeur le dit, le doute demande (R160)")
+    void laPremiereVagueRelue(String cle, String outil, ToolClass classe) {
+        assertThat(catalogue.classOf(cle, outil)).isEqualTo(classe);
+    }
+
     @Test
     @DisplayName("la lecture par défaut : portées et adresse de lecture seule, l'écriture seulement accordée")
     void laLectureParDefaut() {

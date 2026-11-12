@@ -1,5 +1,5 @@
 {
-  "$comment": "Les préréglages MCP du catalogue (R99, séance n°22 R153, R154, R158) : des données, pas du code. Chaque outil : sa catégorie, son serveur MCP officiel, son chemin de connexion, les portées strictement utiles (lecture par défaut), l'étape de l'administrateur, et la classe de chaque outil connu (read ou write). Un outil absent des listes est une écriture : TaskForce demande, quoi qu'en dise le serveur. Chaque préréglage se montre (décision de la Présidence, 12/11/2026) ; `tried` note seulement la date et la preuve de l'essai de bout en bout. Faits vérifiés le 11/11/2026 pour la première vague, le 12/11/2026 pour les outils d'entreprise du répertoire des connecteurs de Claude (pages des éditeurs et métadonnées OAuth publiques, `sources`) ; ce qui n'a pas pu l'être est dans `unverified`. {redirectUri} et {redirectHost} sont remplacés par l'adresse de retour de l'instance.",
+  "$comment": "Les préréglages MCP du catalogue (R99, séance n°22 R153, R154, R158) : des données, pas du code. Chaque outil : sa catégorie, son serveur MCP officiel, son chemin de connexion, les portées strictement utiles (lecture par défaut), l'étape de l'administrateur, et la classe de chaque outil connu (read ou write). Un outil absent des listes est une écriture : TaskForce demande, quoi qu'en dise le serveur. Chaque préréglage se montre (décision de la Présidence, 12/11/2026) ; `tried` note seulement la date et la preuve de l'essai de bout en bout. Faits vérifiés le 11/11/2026 pour la première vague, le 12/11/2026 pour les outils d'entreprise du répertoire des connecteurs de Claude (pages des éditeurs et métadonnées OAuth publiques, `sources`) ; ce qui n'a pas pu l'être est dans `unverified`. Chaque liste d'outils de la première vague dit la page publique de l'éditeur d'où elle vient (`tools.source`) et la date de sa lecture (`tools.checked`) : un outil n'est en lecture que si l'éditeur le documente ainsi, et un outil incertain n'est pas classé, il demande (séance n°23, R160). {redirectUri} et {redirectHost} sont remplacés par l'adresse de retour de l'instance.",
   "version": 1,
   "presets": [
     {
@@ -79,12 +79,14 @@
         "link": "https://linear.app/settings/account/security"
       },
       "tools": {
-        "read": ["whoami", "get_workspace", "get_user", "list_users", "get_team", "list_teams", "get_issue", "list_issues", "get_issue_status", "list_issue_statuses", "list_issue_labels", "get_project", "list_projects", "list_project_labels", "get_milestone", "list_milestones", "list_cycles", "get_document", "list_documents", "list_comments", "list_custom_views", "get_template", "list_templates", "get_status_updates", "get_notifications", "get_triage_responsibility", "get_attachment", "extract_images", "get_diff", "list_diffs", "get_diff_threads", "get_release", "list_releases", "get_release_note", "list_release_notes", "list_release_pipelines", "list_agent_skills", "get_agent_skill", "search_documentation"],
-        "write": ["save_issue", "save_comment", "save_document", "save_project", "save_milestone", "save_status_update", "save_issue_label", "save_project_label", "save_release", "save_release_note", "create_issue_label", "create_attachment", "create_attachment_from_upload", "prepare_attachment_upload", "prepare_file_upload", "delete_attachment", "delete_comment", "delete_status_update", "retire_issue_label", "restore_issue_label", "retire_project_label", "restore_project_label", "share_issue", "unshare_issue", "mark_notification", "save_diff_comment", "delete_diff_comment", "resolve_diff_thread", "submit_diff_review", "update_diff", "merge_diff"]
+        "source": "https://linear.app/changelog",
+        "checked": "2026-11-12",
+        "read": ["list_issues", "list_issue_labels", "list_comments", "list_cycles", "list_projects", "get_project", "list_teams", "get_team", "list_users", "get_user", "list_customer_needs"],
+        "write": ["save_issue", "save_comment", "save_document", "save_customer_need", "save_project", "save_milestone", "save_status_update", "save_issue_label", "save_project_label", "save_release", "save_release_note", "create_issue_label", "create_attachment", "create_attachment_from_upload", "prepare_attachment_upload", "prepare_file_upload", "delete_attachment", "delete_comment", "delete_status_update", "retire_issue_label", "restore_issue_label", "retire_project_label", "restore_project_label", "share_issue", "unshare_issue", "mark_notification", "save_diff_comment", "delete_diff_comment", "resolve_diff_thread", "submit_diff_review", "update_diff", "merge_diff"]
       },
       "tried": { "date": "2026-09-03", "proof": "OAuth en un clic contre le vrai serveur (TF-MCP-02, 02/09/2026), connecté en prod avec serverInfo « Linear MCP » (TF-MCP-02b, 03/09/2026), outils servis à Cortex (05/09/2026), rejoué au lot 6 (18-19/10/2026)." },
       "sources": ["https://linear.app/docs/mcp", "https://mcp.linear.app/.well-known/oauth-authorization-server"],
-      "unverified": ["loopback redirects on any port", "the official tool list (taken from a live connection, not a vendor page)"]
+      "unverified": ["loopback redirects on any port", "the other tool names: Linear publishes no tool list and names only these in its changelog, so every other tool asks until Linear documents it"]
     },
     {
       "key": "jira",
@@ -104,12 +106,14 @@
         "link": "https://support.atlassian.com/security-and-access-policies/docs/control-atlassian-rovo-mcp-server-settings/"
       },
       "tools": {
-        "read": ["atlassianUserInfo", "getAccessibleAtlassianResources", "discover", "executeRead", "getContentFormatGuide", "search", "getJiraIssue", "listJiraProjects", "listJiraProjectIssueTypesMetadata", "getJiraIssueTypeMetaWithFields", "listJiraIssueTransitions", "listJiraIssueLinkTypes", "listJiraIssueRemoteIssueLinks", "listJiraIssueWorklogs", "lookupJiraAccountId", "listJiraIssueAssignableUsers", "listJiraIssueComments", "listJiraIssueChangelogs", "getJiraCurrentUser", "getJiraUser", "listJiraStatuses", "listJiraProjectComponents", "getJiraProjectVersions", "getJiraProjectVersionRelatedWork", "listJiraBoards", "getJiraBoardConfig", "getJiraBoardIssueData", "getJiraBoardSprintData", "listJiraBoardSprints", "listJiraFilters", "listJiraDashboards", "getJiraEntityProperty", "downloadJiraIssueAttachment", "searchJiraIssuesUsingJql", "getJiraWorkflows", "getJiraWorkflowEditorLink", "getJiraScreen"],
+        "source": "https://support.atlassian.com/atlassian-rovo-mcp-server/docs/supported-tools/",
+        "checked": "2026-11-12",
+        "read": ["atlassianUserInfo", "getAccessibleAtlassianResources", "discover", "getContentFormatGuide", "search", "getJiraIssue", "listJiraProjects", "listJiraProjectIssueTypesMetadata", "getJiraIssueTypeMetaWithFields", "listJiraIssueTransitions", "listJiraIssueLinkTypes", "listJiraIssueRemoteIssueLinks", "listJiraIssueWorklogs", "lookupJiraAccountId", "listJiraIssueAssignableUsers", "listJiraIssueComments", "listJiraIssueChangelogs", "getJiraCurrentUser", "getJiraUser", "listJiraStatuses", "listJiraProjectComponents", "getJiraProjectVersions", "getJiraProjectVersionRelatedWork", "listJiraBoards", "getJiraBoardConfig", "getJiraBoardIssueData", "getJiraBoardSprintData", "listJiraBoardSprints", "listJiraFilters", "listJiraDashboards", "getJiraEntityProperty", "downloadJiraIssueAttachment", "searchJiraIssuesUsingJql", "getJiraWorkflows", "getJiraWorkflowEditorLink", "getJiraScreen", "getTeamworkGraphContext", "getTeamworkGraphObject", "getPeopleInfo", "getWorkPortfolio", "getWorkActivity", "getPullRequests", "getCollaborators", "searchCode", "getCodeFile", "listCodeDirectory", "scanCodeRepo", "getCodeSymbol", "diffCodeSymbols"],
         "write": ["executeWrite", "executeDestructive", "createJiraIssue", "editJiraIssue", "transitionJiraIssue", "addOrEditJiraIssueComment", "addOrEditJiraIssueWorklog", "createJiraIssueLink", "manageJiraProjectVersion", "manageJiraProjectVersionRelatedWork", "manageJiraSprint", "createJiraBoard", "watchJiraIssue", "uploadAttachmentToJiraIssue", "editJiraEntityProperty", "createJiraIssueRemoteIssueLink", "convertJiraIssueHierarchy", "deleteJiraIssue", "deleteJiraComment", "deleteJiraIssueAttachment", "createJiraProject", "updateJiraProject", "updateJiraScreen"]
       },
       "tried": null,
       "sources": ["https://support.atlassian.com/atlassian-rovo-mcp-server/docs/supported-tools/", "https://auth.atlassian.com/.well-known/oauth-authorization-server/VCeDsk8ZHncYF1g234fKtc4lNipbBhu3", "https://support.atlassian.com/security-and-access-policies/docs/available-atlassian-mcp-server-domains/"],
-      "unverified": ["whether the default 127.0.0.1 entry covers every port", "a first consent by a site admin, reported only by the community"]
+      "unverified": ["whether the default 127.0.0.1 entry covers every port", "a first consent by a site admin, reported only by the community", "whether executeRead runs only read tools (the page does not say so: it asks)"]
     },
     {
       "key": "confluence",
@@ -129,12 +133,14 @@
         "link": "https://support.atlassian.com/security-and-access-policies/docs/control-atlassian-rovo-mcp-server-settings/"
       },
       "tools": {
-        "read": ["atlassianUserInfo", "getAccessibleAtlassianResources", "discover", "executeRead", "getContentFormatGuide", "search", "getConfluenceContent", "listConfluenceContent", "listConfluenceSpaces", "getConfluenceSpace", "getConfluenceSpaceInstructions", "getConfluencePersonalSpace", "listConfluenceComments", "getConfluenceComment", "getConfluenceContentSuggestions", "listConfluenceContentVersions", "getConfluenceContentVersion", "diffConfluenceContentVersions", "listConfluenceAttachments", "getConfluenceAttachment", "downloadConfluenceAttachment", "exportConfluenceContent", "getConfluenceContentPermissions", "getConfluenceContentRestrictionState", "getConfluencePublicLinkStatus", "getConfluenceReactions", "getConfluenceTask", "listConfluenceTasks", "listConfluenceTemplates", "getConfluenceTemplate", "resolveConfluenceContentMacros", "getConfluenceMauiApp", "searchConfluence"],
+        "source": "https://support.atlassian.com/atlassian-rovo-mcp-server/docs/supported-tools/",
+        "checked": "2026-11-12",
+        "read": ["atlassianUserInfo", "getAccessibleAtlassianResources", "discover", "getContentFormatGuide", "search", "getConfluenceContent", "listConfluenceContent", "listConfluenceSpaces", "getConfluenceSpace", "getConfluenceSpaceInstructions", "getConfluencePersonalSpace", "listConfluenceComments", "getConfluenceComment", "getConfluenceContentSuggestions", "listConfluenceContentVersions", "getConfluenceContentVersion", "diffConfluenceContentVersions", "listConfluenceAttachments", "getConfluenceAttachment", "downloadConfluenceAttachment", "exportConfluenceContent", "getConfluenceContentPermissions", "getConfluenceContentRestrictionState", "getConfluencePublicLinkStatus", "getConfluenceReactions", "getConfluenceTask", "listConfluenceTasks", "listConfluenceTemplates", "getConfluenceTemplate", "resolveConfluenceContentMacros", "getConfluenceMauiApp", "searchConfluence", "getTeamworkGraphContext", "getTeamworkGraphObject", "getPeopleInfo", "getWorkPortfolio", "getWorkActivity", "getPullRequests", "getCollaborators", "searchCode", "getCodeFile", "listCodeDirectory", "scanCodeRepo", "getCodeSymbol", "diffCodeSymbols"],
         "write": ["executeWrite", "executeDestructive", "createConfluenceContent", "updateConfluenceContent", "createConfluenceSpace", "setConfluenceSpaceInstructions", "copyConfluenceContent", "moveConfluenceContent", "archiveConfluenceContent", "unarchiveConfluenceContent", "restoreConfluenceContentVersion", "convertConfluenceContentMode", "setConfluenceContentStatus", "createConfluenceComment", "updateConfluenceComment", "updateConfluenceCommentResolution", "addConfluenceContentSuggestions", "createConfluenceAttachment", "addLabelsToConfluenceContent", "addConfluenceReaction", "addConfluenceContentPermissions", "removeConfluenceContentPermissions", "replaceConfluenceContentPermissions", "setConfluenceContentRestrictionState", "enableConfluencePublicLink", "disableConfluencePublicLink", "completeConfluenceTask", "reopenConfluenceTask", "starConfluenceContent", "unstarConfluenceContent", "starConfluenceSpace", "unstarConfluenceSpace", "watchConfluenceContent", "unwatchConfluenceContent", "watchConfluenceSpace", "unwatchConfluenceSpace", "watchConfluenceLabel", "unwatchConfluenceLabel", "createConfluenceInfographicForPage", "editConfluenceInfographicForPage", "createConfluenceMauiApp", "editConfluenceMauiApp"]
       },
       "tried": null,
       "sources": ["https://support.atlassian.com/atlassian-rovo-mcp-server/docs/supported-tools/", "https://auth.atlassian.com/.well-known/oauth-authorization-server/VCeDsk8ZHncYF1g234fKtc4lNipbBhu3"],
-      "unverified": ["whether the default 127.0.0.1 entry covers every port"]
+      "unverified": ["whether the default 127.0.0.1 entry covers every port", "whether executeRead runs only read tools (the page does not say so: it asks)"]
     },
     {
       "key": "asana",
@@ -150,10 +156,15 @@
         "text": "Register an MCP app in the Asana developer console (distributed to any workspace) with the redirect address {redirectUri}, then enter its client ID and client secret in TaskForce: Settings, Integrations, Asana. On Enterprise, an Asana admin also allows the app.",
         "link": "https://developers.asana.com/docs/integrating-with-asanas-mcp-server"
       },
-      "tools": { "read": [], "write": [] },
+      "tools": {
+        "source": "https://developers.asana.com/docs/mcp-tools-reference",
+        "checked": "2026-11-12",
+        "read": ["search_objects", "get_task", "get_task_stories", "get_tasks", "get_my_tasks", "get_notifications", "search_tasks", "get_project", "get_projects", "get_portfolio", "get_portfolios", "get_items_for_portfolio", "get_status_overview", "get_attachments", "get_user", "get_me", "get_users", "get_teams", "get_agent", "get_workspace_agents", "get_table", "get_tables", "get_record", "get_records", "search_records"],
+        "write": ["create_tasks", "create_project", "create_task_from_template", "create_project_from_template", "update_project", "update_tasks", "update_notifications", "delete_task", "add_comment", "create_project_status_update", "create_table", "update_table", "create_records", "update_records", "delete_record", "add_record_comment"]
+      },
       "tried": null,
       "sources": ["https://developers.asana.com/docs/integrating-with-asanas-mcp-server", "https://developers.asana.com/docs/oauth", "https://mcp.asana.com/.well-known/oauth-protected-resource/v2"],
-      "unverified": ["the tool names (Asana does not publish them: every tool asks until they are classified)", "whether PKCE spares the client secret"]
+      "unverified": ["the three interactive tools, a preview in Asana's own interface: unclassified, they ask", "whether PKCE spares the client secret"]
     },
     {
       "key": "clickup",
@@ -199,7 +210,9 @@
         "link": "https://docs.gitlab.com/user/gitlab_duo/model_context_protocol/mcp_server/"
       },
       "tools": {
-        "read": ["get_mcp_server_version", "get_project", "get_user", "list_groups", "list_projects", "list_project_members", "list_todos", "list_user_events", "search", "search_labels", "semantic_search", "semantic_code_search", "get_pages_content", "get_merge_request", "list_merge_requests", "get_work_item", "get_work_item_types", "get_saved_view_work_items", "list_work_item_saved_views", "list_work_items", "list_branches", "get_repository_file", "list_repository_tree", "get_commit", "list_commits", "list_releases", "list_tags", "get_pipeline", "get_job", "get_artifact_file", "list_pipelines", "list_duo_agents_and_flows", "list_duo_sessions", "get_duo_session", "list_wiki_pages", "list_vulnerabilities", "get_vulnerability", "get_merge_request_commits", "get_merge_request_diffs", "get_merge_request_pipelines", "get_merge_request_conflicts", "get_merge_request_notes", "get_workitem_notes", "get_issue", "get_pipeline_jobs"],
+        "source": "https://docs.gitlab.com/user/gitlab_duo/model_context_protocol/mcp_server_tools/",
+        "checked": "2026-11-12",
+        "read": ["get_mcp_server_version", "get_project", "get_user", "list_groups", "list_projects", "list_project_members", "list_todos", "list_user_events", "search", "search_labels", "semantic_search", "semantic_code_search", "get_pages_content", "get_merge_request", "list_merge_requests", "get_work_item", "get_work_item_types", "get_saved_view_work_items", "list_work_item_saved_views", "list_work_items", "list_branches", "get_repository_file", "list_repository_tree", "get_commit", "list_commits", "list_releases", "list_tags", "get_pipeline", "get_job", "get_artifact_file", "list_pipelines", "list_pipeline_schedules", "list_duo_agents_and_flows", "list_duo_sessions", "get_duo_session", "list_wiki_pages", "list_vulnerabilities", "get_vulnerability", "get_merge_request_commits", "get_merge_request_diffs", "get_merge_request_pipelines", "get_merge_request_conflicts", "get_merge_request_notes", "get_workitem_notes", "get_issue", "get_pipeline_jobs"],
         "write": ["save_project", "save_note", "save_merge_request", "save_merge_request_review", "accept_merge_request", "link_work_items", "save_work_item", "create_work_item", "update_work_item", "add_branch", "fork_repository", "add_commit", "save_pipeline", "start_duo_session", "send_duo_session_input", "save_vulnerability", "attach_scan_profile", "create_issue", "manage_pipeline"]
       },
       "tried": null,
@@ -226,6 +239,8 @@
         "link": "https://github.com/settings/personal-access-tokens/new"
       },
       "tools": {
+        "source": "https://github.com/github/github-mcp-server",
+        "checked": "2026-11-12",
         "read": ["actions_get", "actions_list", "get_job_logs", "get_code_quality_finding", "get_code_scanning_alert", "list_code_scanning_alerts", "get_me", "get_team_members", "get_teams", "ui_get", "get_dependabot_alert", "list_dependabot_alerts", "get_discussion", "get_discussion_comments", "list_discussion_categories", "list_discussions", "get_gist", "list_gists", "get_repository_tree", "custom_properties_read", "repository_ruleset_read", "get_label", "issue_read", "list_issue_fields", "list_issue_types", "list_issues", "search_issues", "list_label", "get_notification_details", "list_notifications", "search_orgs", "projects_get", "projects_list", "list_pull_requests", "pull_request_read", "search_pull_requests", "get_commit", "get_file_contents", "get_latest_release", "get_release_by_tag", "get_tag", "list_branches", "list_commits", "list_releases", "list_repository_collaborators", "list_tags", "search_code", "search_commits", "search_repositories", "get_secret_scanning_alert", "list_secret_scanning_alerts", "get_global_security_advisory", "list_global_security_advisories", "list_org_repository_security_advisories", "list_repository_security_advisories", "list_starred_repositories", "search_users", "get_copilot_space", "list_copilot_spaces", "github_support_docs_search"],
         "write": ["actions_run_trigger", "assign_copilot_to_issue", "assign_copilot_to_issue_with_intent", "request_copilot_review", "create_pull_request_with_copilot", "discussion_comment_write", "create_gist", "update_gist", "create_repository_ruleset", "custom_properties_write", "add_issue_comment", "issue_write", "sub_issue_write", "update_issue_comment", "label_write", "dismiss_notification", "manage_notification_subscription", "manage_repository_notification_subscription", "mark_all_notifications_read", "projects_write", "add_comment_to_pending_review", "add_reply_to_pull_request_comment", "create_pull_request", "merge_pull_request", "pull_request_review_write", "update_pull_request", "update_pull_request_branch", "create_branch", "create_or_update_file", "create_repository", "delete_file", "delete_repository", "fork_repository", "push_files", "star_repository", "unstar_repository"]
       },
@@ -335,7 +350,12 @@
         "text": "Create an internal Slack app for TaskForce at api.slack.com/apps: turn on its MCP access (is_mcp_enabled), add the redirect address {redirectUri} and the read user scopes, install it in your workspace, then enter its client ID and client secret in TaskForce: Settings, Integrations, Slack.",
         "link": "https://docs.slack.dev/ai/slack-mcp-server/"
       },
-      "tools": { "read": [], "write": ["slack_get_file_upload_url", "slack_complete_file_upload"] },
+      "tools": {
+        "source": "https://docs.slack.dev/ai/slack-mcp-server/",
+        "checked": "2026-11-12",
+        "read": [],
+        "write": ["slack_get_file_upload_url", "slack_complete_file_upload"]
+      },
       "tried": null,
       "sources": ["https://docs.slack.dev/ai/slack-mcp-server/", "https://mcp.slack.com/.well-known/oauth-authorization-server"],
       "unverified": ["the tool names (Slack does not publish them: every tool asks until they are classified)", "whether a 127.0.0.1 redirect is accepted (Slack documents localhost)"]
@@ -355,12 +375,14 @@
         "link": "https://www.notion.com/help/notion-mcp"
       },
       "tools": {
-        "read": ["notion-ai-search", "notion-connector-search", "notion-search", "notion-fetch", "notion-get-async-task", "notion-get-comments", "notion-get-suggested-edit", "notion-get-version-changes", "notion-view-version", "notion-get-self", "notion-get-users", "notion-get-groups", "notion-get-teams", "notion-get-tool-access", "notion-list-favorite-pages", "notion-list-private-pages", "notion-list-recent-pages", "notion-list-shared-pages", "notion-list-page-backlinks", "notion-query-data-sources", "notion-query-multiple-data-sources", "notion-query-meeting-notes", "notion-download-attachment", "notion-get-file-download-urls", "notion-download-skill", "notion-get-enabled-skills", "notion-memory-search", "notion-search-agents", "notion-search-sessions", "notion-query-sessions", "notion-get-session-status", "notion-list-session-events", "notion-read-session-event", "notion-wait-session", "notion-calendar-list-calendars", "notion-calendar-list-events", "notion-calendar-list-coworkers-events", "notion-calendar-list-contacts", "notion-calendar-list-calendar-resources", "notion-page-view"],
+        "source": "https://developers.notion.com/guides/mcp/tools-faqs",
+        "checked": "2026-11-12",
+        "read": ["notion-ai-search", "notion-connector-search", "notion-search", "notion-fetch", "notion-get-async-task", "notion-get-comments", "notion-get-suggested-edit", "notion-get-version-changes", "notion-view-version", "notion-get-self", "notion-get-users", "notion-get-groups", "notion-get-teams", "notion-get-tool-access", "notion-list-favorite-pages", "notion-list-private-pages", "notion-list-recent-pages", "notion-list-shared-pages", "notion-list-page-backlinks", "notion-query-data-sources", "notion-query-multiple-data-sources", "notion-query-meeting-notes", "notion-download-attachment", "notion-get-file-download-urls", "notion-download-skill", "notion-get-enabled-skills", "notion-memory-search", "notion-search-agents", "notion-search-sessions", "notion-query-sessions", "notion-get-session-status", "notion-list-session-events", "notion-read-session-event", "notion-calendar-list-calendars", "notion-calendar-list-events", "notion-calendar-list-coworkers-events", "notion-calendar-list-contacts", "notion-calendar-list-calendar-resources"],
         "write": ["notion-create-pages", "notion-update-page", "notion-move-pages", "notion-duplicate-page", "notion-delete-pages", "notion-restore-pages", "notion-restore-version", "notion-create-database", "notion-delete-databases", "notion-update-data-source", "notion-create-view", "notion-update-view", "notion-create-comment", "notion-update-comment", "notion-delete-comment", "notion-set-comment-reaction", "notion-set-discussion-resolved", "notion-create-suggested-edit", "notion-resolve-suggested-edit", "notion-create-attachment", "notion-create-file-upload", "notion-create-folder", "notion-update-folder", "notion-convert-page-to-skill", "notion-upload-skill", "notion-update-enabled-skills", "notion-spawn-session", "notion-send-message-to-session", "notion-stop-session", "notion-calendar-create-events", "notion-calendar-update-events", "notion-calendar-cancel-events", "notion-create-meeting-note", "notion-update-sidebar-tabs"]
       },
       "tried": null,
       "sources": ["https://developers.notion.com/guides/mcp/build-mcp-client", "https://developers.notion.com/guides/mcp/tools-faqs", "https://mcp.notion.com/.well-known/oauth-authorization-server"],
-      "unverified": ["loopback redirects (Notion asks for HTTPS in production)", "general availability (the metadata says Beta)"]
+      "unverified": ["loopback redirects (Notion asks for HTTPS in production)", "general availability (the metadata says Beta)", "notion-wait-session (it only waits for a session) and tools named on no public page: they ask"]
     },
     {
       "key": "stripe",
@@ -381,12 +403,14 @@
         "link": "https://docs.stripe.com/mcp"
       },
       "tools": {
-        "read": ["stripe_api_search", "stripe_api_details", "stripe_api_read", "get_stripe_account_info", "stripe_analytics", "get_balance_summary", "search_stripe_documentation", "stripe_implementation_planner"],
+        "source": "https://docs.stripe.com/mcp",
+        "checked": "2026-11-12",
+        "read": ["stripe_api_search", "stripe_api_details", "stripe_api_read", "get_stripe_account_info", "get_balance_summary", "search_stripe_documentation"],
         "write": ["stripe_api_write", "atlas_company_formation", "convert_currency", "send_money", "transfer_money", "setup_recipient", "send_stripe_feedback"]
       },
       "tried": null,
       "sources": ["https://docs.stripe.com/mcp", "https://access.stripe.com/.well-known/oauth-authorization-server/mcp"],
-      "unverified": ["an allowlist of client redirect addresses mentioned on a Stripe marketplace listing, absent from docs.stripe.com/mcp", "a read-only choice on Stripe's consent screen"]
+      "unverified": ["an allowlist of client redirect addresses mentioned on a Stripe marketplace listing, absent from docs.stripe.com/mcp", "a read-only choice on Stripe's consent screen", "stripe_analytics and stripe_implementation_planner, not described as only reading: they ask"]
     },
     {
       "key": "paypal",
@@ -425,10 +449,15 @@
         "hint": "Create your server in the Zoho MCP console, choose its tools, and paste its address here. The address works like a password: TaskForce keeps it encrypted and never shows it again.",
         "link": "https://help.zoho.com/portal/en/kb/mcp/implementation-guide/articles/zoho-mcp-implementation-guide"
       },
-      "tools": { "read": [], "write": [] },
+      "tools": {
+        "source": "https://help.zoho.com/portal/en/kb/mcp/implementation-guide/articles/zoho-mcp-implementation-guide",
+        "checked": "2026-11-12",
+        "read": [],
+        "write": []
+      },
       "tried": null,
       "sources": ["https://help.zoho.com/portal/en/kb/mcp/implementation-guide/articles/zoho-mcp-implementation-guide", "https://www.zoho.com/crm/developer/docs/mcp/overview.html"],
-      "unverified": ["the tool names (each company chooses them: every tool asks until classified)", "servers outside Zoho's IN data center"]
+      "unverified": ["the tool names (each company chooses them: every tool asks until classified)", "servers outside Zoho's IN data center", "a preset's tool classes count only on its official server, and each company's Zoho server is its own"]
     },
     {
       "key": "hubspot",
@@ -496,6 +525,8 @@
       "mcpUrl": "https://mcp.excalidraw.com/mcp",
       "connection": "open",
       "tools": {
+        "source": "https://github.com/excalidraw/excalidraw-mcp",
+        "checked": "2026-11-12",
         "read": ["read_me", "create_view", "read_checkpoint"],
         "write": ["export_to_excalidraw", "save_checkpoint"]
       },
