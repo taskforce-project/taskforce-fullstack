@@ -19292,6 +19292,54 @@
           "code"
         ]
       },
+      "CompleteRequest": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "finish": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "finish",
+          "state"
+        ]
+      },
+      "ApiResponseCompletion": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Completion"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Completion": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string"
+          },
+          "connectorKey": {
+            "type": "string"
+          }
+        }
+      },
       "ClientLogRequest": {
         "type": "object",
         "properties": {
@@ -22816,6 +22864,9 @@
           },
           "tried": {
             "type": "boolean"
+          },
+          "live": {
+            "$ref": "#/components/schemas/ConnectorView"
           }
         }
       },
@@ -23298,6 +23349,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "binding": {
+            "type": "boolean"
           }
         }
       },
