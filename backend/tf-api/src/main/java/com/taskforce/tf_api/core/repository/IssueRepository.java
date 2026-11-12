@@ -22,6 +22,15 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     @Query("SELECT COUNT(i) FROM Issue i WHERE i.project.workspace.id = :workspaceId")
     long countByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
+    /** Si l'une de ces issues de l'espace a été importée d'un outil de l'entreprise (séance n°22, R158). */
+    boolean existsByIdInAndProjectWorkspaceIdAndImportedFromIsNotNull(java.util.Collection<Long> ids, Long workspaceId);
+
+    /** Si le projet tient une issue importée d'un outil de l'entreprise (R158). */
+    boolean existsByProjectIdAndImportedFromIsNotNull(Long projectId);
+
+    /** Si l'espace tient une issue importée d'un outil de l'entreprise (R158). */
+    boolean existsByProjectWorkspaceIdAndImportedFromIsNotNull(Long workspaceId);
+
     /** Ce que porte un projet, compté, et quand le plus récent a changé : une ligne par projet. */
     interface ProjectCount {
         Long getProjectId();

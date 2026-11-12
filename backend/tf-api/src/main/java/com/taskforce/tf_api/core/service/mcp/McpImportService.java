@@ -97,7 +97,8 @@ public class McpImportService {
         for (NormalizedIssue ni : issues) {
             if (imported >= MAX_IMPORT) break;
             try {
-                issueService.createIssue(ws.getSlug(), project.getId(), issueRequest(ni), userId);
+                // Marquée de son outil : Cortex la lira comme un contenu du dehors (R158).
+                issueService.createIssue(ws.getSlug(), project.getId(), issueRequest(ni), userId, null, connectorKey);
                 imported++;
             } catch (Exception e) {
                 log.warn("Import : issue « {} » ignorée : {}", LogSafe.of(ni.title()), LogSafe.of(e.getMessage()));

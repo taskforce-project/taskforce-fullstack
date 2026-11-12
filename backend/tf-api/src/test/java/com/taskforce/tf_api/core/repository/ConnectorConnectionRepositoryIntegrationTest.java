@@ -34,6 +34,7 @@ class ConnectorConnectionRepositoryIntegrationTest extends AbstractIntegrationTe
     @Autowired private ConnectorAppRepository apps;
     @Autowired private McpOAuthRegistrationRepository registrations;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private IssueRepository issues;
 
     private User ada;
     private User bob;
@@ -131,5 +132,16 @@ class ConnectorConnectionRepositoryIntegrationTest extends AbstractIntegrationTe
         assertThatThrownBy(() -> registrations.saveAndFlush(McpOAuthRegistration.builder().issuer("https://as.ex")
             .redirectUri("http://127.0.0.1:47816/mcp/callback").clientId("dcr-2").build()))
             .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("les issues importées : la colonne de V124 et les requêtes que le socle lit (R158)")
+    void importedIssuesColumnAndQueries() {
+        Integer column = jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.columns "
+            + "WHERE table_name = 'issues' AND column_name = 'imported_from'", Integer.class);
+        assertThat(column).isEqualTo(1);
+        assertThat(issues.existsByProjectWorkspaceIdAndImportedFromIsNotNull(ws.getId())).isFalse();
+        assertThat(issues.existsByProjectIdAndImportedFromIsNotNull(-1L)).isFalse();
+        assertThat(issues.existsByIdInAndProjectWorkspaceIdAndImportedFromIsNotNull(List.of(-1L), ws.getId())).isFalse();
     }
 }

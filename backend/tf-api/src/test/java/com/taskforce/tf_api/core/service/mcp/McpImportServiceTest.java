@@ -40,6 +40,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -113,7 +114,7 @@ class McpImportServiceTest {
             "{\"issues\":[{\"title\":\"Bug login\",\"description\":\"casse\",\"priority\":\"HIGH\"},{\"title\":\"Feature X\"}]}");
         when(projectService.createProject(eq("acme"), eq(7L), any()))
             .thenReturn(ProjectResponse.builder().id(99L).identifier("IMPORT").name("Import Linear").build());
-        when(issueService.createIssue(eq("acme"), eq(99L), any(), eq(7L)))
+        when(issueService.createIssue(eq("acme"), eq(99L), any(), eq(7L), isNull(), eq("linear")))
             .thenReturn(IssueResponse.builder().id(1L).identifier("IMPORT-1").title("x").build());
 
         McpImportService.ImportResult r = service.importProject(ws, 7L, "linear", "Import Linear");
@@ -122,7 +123,8 @@ class McpImportServiceTest {
         assertThat(r.found()).isEqualTo(2);
         assertThat(r.imported()).isEqualTo(2);
         ArgumentCaptor<CreateIssueRequest> cap = ArgumentCaptor.forClass(CreateIssueRequest.class);
-        verify(issueService, times(2)).createIssue(eq("acme"), eq(99L), cap.capture(), eq(7L));
+        // Chaque issue garde l'outil d'où elle vient : Cortex la lira comme un contenu du dehors (R158).
+        verify(issueService, times(2)).createIssue(eq("acme"), eq(99L), cap.capture(), eq(7L), isNull(), eq("linear"));
         assertThat(cap.getAllValues().get(0).getTitle()).isEqualTo("Bug login");
         assertThat(cap.getAllValues().get(0).getPriority()).isEqualTo(IssuePriority.HIGH);
         // Trois gestes demandés puis décidés au dossier : la lecture, le projet, les issues.
@@ -186,6 +188,6 @@ class McpImportServiceTest {
 
         assertThat(r.found()).isZero();
         assertThat(r.imported()).isZero();
-        verify(issueService, never()).createIssue(anyString(), anyLong(), any(), anyLong());
+        verify(issueService, never()).createIssue(anyString(), anyLong(), any(), anyLong(), any(), any());
     }
 }

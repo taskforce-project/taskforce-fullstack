@@ -2,7 +2,7 @@
 -- V124 -- une connexion par personne, l'application de l'entreprise, les inscriptions par emetteur
 -- (TF-J2-12, TF-J2-13 ; seance n°22 du Conseil, R154 et R158)
 -- ============================================================
--- Depend de : V61 (connector_connection), V82 (mcp_oauth_states), V13 (workspaces), V1 (users).
+-- Depend de : V61 (connector_connection), V82 (mcp_oauth_states), V16 (issues), V13 (workspaces), V1 (users).
 --
 -- 1. connector_connection : jusqu'ici une connexion valait pour tout l'espace, avec les droits de qui l'avait
 --    faite. Desormais une connexion appartient a une personne (scope PERSONAL, owner_id) ; une connexion d'espace
@@ -18,6 +18,9 @@
 -- 3. mcp_oauth_client : les inscriptions dynamiques (DCR), gardees par emetteur et par adresse de retour (norme MCP
 --    du 28/07/2026) : une seule inscription par serveur d'autorisation, au lieu d'une par connexion.
 -- 4. mcp_oauth_states : ce que le retour du navigateur doit savoir de plus.
+-- 5. issues.imported_from : l'outil de l'entreprise d'ou l'import a tire l'issue (la cle de son connecteur), nul pour
+--    une issue ecrite dans TaskForce. Son texte a ete ecrit par n'importe qui dans cet outil : Cortex le lit comme un
+--    contenu du dehors, et le socle demande une personne avant une ecriture ou une sortie (R158).
 
 -- 1. Une connexion par personne
 ALTER TABLE connector_connection ADD COLUMN owner_id BIGINT REFERENCES users(id) ON DELETE CASCADE;
@@ -72,3 +75,6 @@ ALTER TABLE mcp_oauth_states ADD COLUMN resource TEXT;
 ALTER TABLE mcp_oauth_states ADD COLUMN revocation_endpoint TEXT;
 ALTER TABLE mcp_oauth_states ADD COLUMN client_source VARCHAR(16);
 ALTER TABLE mcp_oauth_states ADD COLUMN iss_required BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- 5. Les issues importees d'un outil de l'entreprise
+ALTER TABLE issues ADD COLUMN imported_from VARCHAR(64);

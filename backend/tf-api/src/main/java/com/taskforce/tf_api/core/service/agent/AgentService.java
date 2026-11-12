@@ -959,6 +959,9 @@ public class AgentService {
         if (!issue.isEmpty()) origin.put("issue", CortexRecordService.shorten(issue));
         if (!files.isEmpty()) origin.put("files", files.stream().map(AttachedFile::name).toList());
         if (plan != null) origin.put("plan", plan.id());
+        // Une issue importée d'un outil de l'entreprise sous les yeux de la réponse (séance n°22, R158) : un contenu du
+        // dehors, que le socle compte avant une écriture ou une sortie, et que le dossier garde.
+        if (gate.importedInView(ctx, joined, read == null ? List.of() : read.ids())) origin.put(CortexGate.IMPORTED, true);
         Kernel kernel = new Kernel(ctx, message, origin);
         String answer = toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel,
             reading, loopFit);
@@ -1492,6 +1495,7 @@ public class AgentService {
             }
             // Ce que l'outil a lu entre dans la réponse (R158) : les gestes suivants le portent dans leurs faits.
             exposure.after(tool, judgedFacts, status);
+            if ("success".equals(status) && gate.readImported(ctx, judgedFacts, argsJson)) exposure.outside();
             if (asked != null) {
                 return new ToolOutcome(status, result, null, asked(name, argsJson, result, asked), null, asked);
             }

@@ -87,10 +87,16 @@ public class IssueMaterial {
 
     /**
      * Ce que le modèle a lu des issues (R123, la ligne grise) : le bloc, et chaque issue lue avec les commentaires donnés
-     * sous le plafond. Vide quand aucune n'a été lue.
+     * sous le plafond, et leurs ids, où le socle cherche une issue importée d'un outil de l'entreprise (R158). Vide quand
+     * aucune n'a été lue.
      */
-    public record Read(String text, List<AssistantRead.IssueRead> issues) {
-        public static final Read NOTHING = new Read("", List.of());
+    public record Read(String text, List<AssistantRead.IssueRead> issues, List<Long> ids) {
+        public static final Read NOTHING = new Read("", List.of(), List.of());
+
+        /** Ce qui a été lu, sans les ids des issues. */
+        public Read(String text, List<AssistantRead.IssueRead> issues) {
+            this(text, issues, List.of());
+        }
 
         public boolean isEmpty() {
             return text == null || text.isEmpty();
@@ -115,17 +121,19 @@ public class IssueMaterial {
         if (summarize) named(ctx, request).forEach(wanted::putIfAbsent);
         StringBuilder text = new StringBuilder();
         List<AssistantRead.IssueRead> read = new ArrayList<>();
+        List<Long> ids = new ArrayList<>();
         for (Map.Entry<Long, Long> issue : wanted.entrySet()) {
             try {
                 Block block = material(ctx, issue.getValue(), issue.getKey());
                 text.append(block.text());
                 read.add(new AssistantRead.IssueRead(block.key(), block.comments()));
+                ids.add(issue.getKey());
             } catch (RuntimeException e) {
                 // Une issue qu'elle ne voit pas (ou plus) : rien n'en est dit, la réponse se fait sans elle.
                 log.debug("Cortex : issue {} non lue : {}", issue.getKey(), LogSafe.of(e.getMessage()));
             }
         }
-        return text.isEmpty() ? Read.NOTHING : new Read((summarize ? HEADER : ATTACHED) + text, read);
+        return text.isEmpty() ? Read.NOTHING : new Read((summarize ? HEADER : ATTACHED) + text, read, ids);
     }
 
     /**
