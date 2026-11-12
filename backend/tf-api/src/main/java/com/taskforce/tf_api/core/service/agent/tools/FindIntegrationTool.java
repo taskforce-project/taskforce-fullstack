@@ -58,8 +58,12 @@ public class FindIntegrationTool implements AgentTool {
         for (CategoryGroup group : catalog.categories()) {
             for (ConnectorView c : group.tools()) {
                 if (matches(c, group, query)) {
+                    // Un outil que l'éditeur ferme encore (liste d'attente, liste de clients) se dit tel quel : Cortex
+                    // n'invite pas à le connecter (R15).
                     hits.add("- " + c.name() + " (" + group.label() + ") : "
-                        + (c.connected() ? "already connected" : "available, NOT connected"));
+                        + (c.connected() ? "already connected"
+                            : c.blocked() != null ? "listed, NOT available to connect yet: " + c.blocked()
+                            : "available, NOT connected"));
                     if (hits.size() >= MAX_HITS) break;
                 }
             }
