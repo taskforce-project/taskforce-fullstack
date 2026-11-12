@@ -9,6 +9,7 @@ import { Backend } from "./backend";
 import { Frontend } from "./frontend";
 import { GitHubRelay } from "./github-relay";
 import { log } from "./log";
+import { McpCallback } from "./mcp-callback";
 import { randomToken } from "./net";
 import { accountDataDir } from "./paths";
 import { EmbeddedPostgres } from "./postgres";
@@ -52,7 +53,8 @@ function accountSecret(subject: string, name: "databasePassword" | "encryptionKe
  * Démarre l'app du compte. La base d'abord ; puis le backend et l'interface en parallèle (le backend prend le plus
  * de temps) ; le relais enfin, qui ouvre l'origine de la fenêtre, et le runner de Claude Code.
  */
-export async function startStack(account: Account, onStep: (step: string) => void): Promise<Stack> {
+export async function startStack(account: Account, onStep: (step: string) => void,
+                                 onConnected: () => void = () => undefined): Promise<Stack> {
   const dataDir = accountDataDir(account.subject);
   const launchToken = randomToken("tfd_");
   const database = new EmbeddedPostgres(dataDir, accountSecret(account.subject, "databasePassword"));
@@ -65,11 +67,13 @@ export async function startStack(account: Account, onStep: (step: string) => voi
   const ai = new BackendAi(() => backend.port, launchToken, shellSecret);
   const aiChoice = settings.aiSettings(account.subject);
   const github = new GitHubRelay();
+  const mcpCallback = new McpCallback(onConnected);
 
   // Le runner d'abord : il rend au backend le résultat d'un run interrompu avant que celui-ci s'arrête. Chaque étape a un
   // délai : une étape bloquée ne doit jamais empêcher l'arrêt propre de la base.
   const stop = async () => {
     await within(runner.stop(), 20_000);
+    await within(mcpCallback.stop(), 5_000);
     await within(proxy.stop(), 5_000);
     await within(frontend.stop(), 10_000);
     await within(backend.stop(), 15_000);
@@ -97,6 +101,8 @@ export async function startStack(account: Account, onStep: (step: string) => voi
 
     const origin = await proxy.reserve(settings.windowPort(account.subject));
     settings.setWindowPort(account.subject, proxy.port);
+    // Le retour des connexions aux outils, sur un port fixe : le backend doit connaître son adresse avant de démarrer.
+    const mcpRedirectUri = await mcpCallback.start();
     await github.start();
     await avatar;
     onStep("Opening your workspace");
@@ -114,10 +120,12 @@ export async function startStack(account: Account, onStep: (step: string) => voi
         shellSecret,
         github: { url: github.url(), token: github.token },
         runnerSecret,
+        mcpRedirectUri,
       }),
       frontend.start(join(dataDir, "logs")),
     ]);
     await proxy.start(backend.port, frontend.port);
+    mcpCallback.connect(backend.port);
     runner.start({ apiPort: backend.port, secret: runnerSecret, dataDir });
     log.info(`TaskForce ready at ${origin}`);
     return { account, dataDir, launchToken, origin, ai, github, updateNotice: updateNotice(previous, app.getVersion(), fresh), stop };

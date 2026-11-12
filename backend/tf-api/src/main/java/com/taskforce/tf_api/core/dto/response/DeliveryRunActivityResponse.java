@@ -17,6 +17,11 @@ public record DeliveryRunActivityResponse(List<Event> events, List<Approval> app
      * @param action    l'action que les règles ont jugée, pour la dire en mots (R78) ; vide pour un runner plus ancien
      * @param rule      la règle qui demande, et {@code reason} sa raison ; vides quand aucune ne couvre l'action
      * @param scope     la portée d'un accord : {@code ONCE}, ou {@code MISSION} pour le reste de la mission (R46)
+     * @param waitingFor les personnes qu'une règle de l'entreprise désigne (R98), une liste par règle : le nom d'une
+     *                   personne, ou la référence d'un rôle ({@code role:admin}...) ; vide pour un accord ordinaire
+     * @param signatures le nombre de personnes distinctes qui accordent
+     * @param separate   la personne qui a délégué ne signe pas
+     * @param signedBy   qui a déjà accordé, quand l'accord en demande plusieurs
      */
     public record Approval(
         Long id,
@@ -32,6 +37,19 @@ public record DeliveryRunActivityResponse(List<Event> events, List<Approval> app
         String action,
         String rule,
         String reason,
-        String scope
-    ) {}
+        String scope,
+        List<List<String>> waitingFor,
+        int signatures,
+        boolean separate,
+        List<String> signedBy
+    ) {
+
+        /** Un accord ordinaire, que la personne qui a délégué donne seule. */
+        public Approval(Long id, String tool, String summary, String status, LocalDateTime createdAt,
+                        LocalDateTime expiresAt, LocalDateTime decidedAt, String decidedBy, boolean canDecide,
+                        String askedBy, String action, String rule, String reason, String scope) {
+            this(id, tool, summary, status, createdAt, expiresAt, decidedAt, decidedBy, canDecide, askedBy, action, rule,
+                reason, scope, List.of(), 1, false, List.of());
+        }
+    }
 }

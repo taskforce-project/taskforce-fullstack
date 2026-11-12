@@ -236,6 +236,13 @@ services:
       MCP_ALLOW_PRIVATE_NETWORK: ${MCP_ALLOW_PRIVATE_NETWORK:-false}
       WEBHOOKS_ALLOW_PRIVATE_NETWORK: ${WEBHOOKS_ALLOW_PRIVATE_NETWORK:-false}
 
+      # Nos applications enregistrées chez les éditeurs qui l'exigent (TF-J2-12, chemin B) : TF_MCP_<CLÉ>_CLIENT_ID et
+      # _CLIENT_SECRET, par préréglage. Vides = le chemin passe à l'application de l'entreprise (Settings).
+      TF_MCP_ASANA_CLIENT_ID: ${TF_MCP_ASANA_CLIENT_ID:-}
+      TF_MCP_ASANA_CLIENT_SECRET: ${TF_MCP_ASANA_CLIENT_SECRET:-}
+      TF_MCP_GITHUB_MCP_CLIENT_ID: ${TF_MCP_GITHUB_MCP_CLIENT_ID:-}
+      TF_MCP_GITHUB_MCP_CLIENT_SECRET: ${TF_MCP_GITHUB_MCP_CLIENT_SECRET:-}
+
       # Chiffrement au repos des données personnelles (RGPD).
       # Le nom DOIT être TF_ENCRYPTION_KEY : c'est celui que lit `security.encryption-key`.
       # Il s'appelait ENCRYPTION_KEY jusqu'au 24/07/2026 — une variable que rien ne lisait.

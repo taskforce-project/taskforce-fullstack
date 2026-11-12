@@ -5,9 +5,10 @@ import { useSearchParams, useRouter, useParams } from "next/navigation"
 import {
   User, Bell, Mail, Zap, Globe, Key, Palette, Webhook,
   Upload, Camera, Trash2, Shield, Loader2, RotateCcw,
-  Activity, Gauge, Search, Bot, Sparkles, FlaskConical,
+  Activity, Gauge, Search, Bot, Sparkles, FlaskConical, Scale,
 } from "lucide-react"
 import { toast } from "sonner"
+import { CONSTANTS_EN } from "@/lib/constants_en"
 import { useTheme } from "next-themes"
 
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -31,6 +32,7 @@ import { DisconnectConfirmDialog, DISCONNECT_CONSEQUENCES } from "@/components/i
 import { WebhooksPanel } from "@/components/settings/webhooks-panel"
 import { EventPicker } from "@/components/settings/event-picker"
 import { AgentsPanel } from "@/components/settings/agents-panel"
+import { RulesPanel } from "@/components/rules/rules-panel"
 import { DesktopAiPanel } from "@/components/settings/desktop-ai-panel"
 import { EvalBankPanel } from "@/components/settings/eval-bank-panel"
 import { InstanceAiPanel } from "@/components/settings/instance-ai-panel"
@@ -74,6 +76,7 @@ export type SettingsSection =
   | "audit"
   | "integrations"
   | "agents"
+  | "rules"
   | "privacy"
 
 interface SectionConfig {
@@ -95,6 +98,8 @@ const ALL_SECTIONS: SectionConfig[] = [
   { key: "ai",            label: "AI",             icon: <Sparkles className="h-4 w-4" />,    group: "Workspace" },
   { key: "integrations",  label: "Integrations",   icon: <Webhook className="h-4 w-4" />,    group: "Workspace" },
   { key: "agents",        label: "Agents",         icon: <Bot className="h-4 w-4" />,        group: "Workspace" },
+  // Les règles de l'entreprise par couches (R157) : le libellé vient des textes de l'interface.
+  { key: "rules",         label: CONSTANTS_EN.rules.settingsLabel, icon: <Scale className="h-4 w-4" />, group: "Workspace" },
   { key: "audit",         label: "Audit log",      icon: <Activity className="h-4 w-4" />,    group: "Workspace" },
   { key: "privacy",       label: "Privacy & Data", icon: <Shield className="h-4 w-4" />,     group: "Personal" },
 ]
@@ -110,7 +115,7 @@ export const SECTIONS: SectionConfig[] = ALL_SECTIONS.filter((s) => !IS_DESKTOP 
 
 export const SECTION_GROUPS = [
   { label: "Personal",  keys: ["profile", "account", "appearance", "notifications", "security", "privacy"] as const },
-  { label: "Workspace", keys: ["workspace", "ai", "usage", "evals", "integrations", "agents", "audit"] as const },
+  { label: "Workspace", keys: ["workspace", "ai", "usage", "evals", "integrations", "agents", "rules", "audit"] as const },
 ]
 
 // SKILL_OPTIONS + SkillsTagInput retirés avec le faux champ « Skills » du Profil (TF-SETTINGS-FAKE) :
@@ -1924,6 +1929,7 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
       {active === "ai"            && (IS_DESKTOP ? <DesktopAiPanel /> : <InstanceAiPanel />)}
       {active === "integrations"  && <IntegrationsPanel />}
       {active === "agents"        && <AgentsPanel />}
+      {active === "rules"         && <RulesPanel />}
       {active === "audit"         && <AuditLogPanel />}
       {active === "privacy"       && <PrivacyPanel />}
     </>
@@ -1939,6 +1945,15 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
  * Les briques (`SECTIONS`, `SettingsNav`, `SettingsPanels`, panneaux) restent exportées ci-dessus
  * et sont réutilisées par le modal.
  */
+/** Le nom d'un outil revenu du navigateur : sa clé de connecteur, lisible (`slack-mcp` devient « Slack mcp »). */
+function connectorName(key: string | null): string {
+  if (!key) return "The tool"
+  const words = key.replace(/^custom-/, "").replace(/-mcp$/, "").split("-").filter(Boolean)
+  if (words.length === 0) return "The tool"
+  const name = words.join(" ")
+  return name.charAt(0).toUpperCase() + name.slice(1)
+}
+
 export default function SettingsPage() {
   const router = useRouter()
   const params = useParams()
@@ -1951,13 +1966,16 @@ export default function SettingsPage() {
     const github = searchParams.get("github")
     const slack = searchParams.get("slack")
     const mcp = searchParams.get("mcp")
+    // L'outil revient avec sa clé, jamais avec le compte : son nom se lit dans le catalogue, sinon « The tool ».
+    const tool = connectorName(searchParams.get("connector"))
     // Un id par service : l'effet peut repasser avant que router.replace n'ait retiré les paramètres, un seul toast.
     if (github === "connected") toast.success("GitHub connected successfully!", { id: "oauth-github" })
     if (github === "error") toast.error("GitHub wasn't connected. Try again, and accept the access on GitHub.", { id: "oauth-github" })
     if (slack === "connected") toast.success("Slack connected successfully!", { id: "oauth-slack" })
     if (slack === "error") toast.error("Slack wasn't connected. Try again, and allow the access on Slack.", { id: "oauth-slack" })
-    if (mcp === "connected") toast.success("MCP server connected", { id: "oauth-mcp" })
-    if (mcp === "error") toast.error("The MCP server connection failed. Try again, or connect it with a token.", { id: "oauth-mcp" })
+    if (mcp === "connected") toast.success(CONSTANTS_EN.connect.returnedConnected.replace("{name}", tool), { id: "oauth-mcp" })
+    if (mcp === "admin") toast.warning(CONSTANTS_EN.connect.returnedAdmin.replace("{name}", tool), { id: "oauth-mcp" })
+    if (mcp === "error") toast.error(CONSTANTS_EN.connect.returnedError.replace("{name}", tool), { id: "oauth-mcp" })
     const target = github || slack || mcp
       ? "integrations"
       : section && SECTIONS.some((s) => s.key === section)

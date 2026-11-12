@@ -350,7 +350,13 @@ public class MissionChangesService {
         boolean revert = command.getKind() == DeliveryCommandKind.REVERT_FILE;
         return new RunnerCommandResponse(command.getId(), run.getId(), command.getKind().name(), command.getPath(),
             revert ? run.getBranch() : null, revert ? run.getBaseSha() : null, revert ? root.getId() : null,
-            revert ? project.getRepoFullName() : null, revert ? rulesService.bundleFor(project.getWorkspace()) : null, command.getText());
+            revert ? project.getRepoFullName() : null, revert ? rulesService.bundleFor(project.getWorkspace(), workOf(run)) : null, command.getText());
+    }
+
+    /** Le travail que les règles jugent : le projet de la mission et la personne qui l'a déléguée (R157). */
+    private static HarnessRulesService.Work workOf(DeliveryRun run) {
+        return new HarnessRulesService.Work(run.getIssue().getProject().getId(), null,
+            run.getStartedBy() == null ? null : run.getStartedBy().getId());
     }
 
     /** Ce que la personne peut faire du résultat maintenant ; sans raison quand il n'y a rien à lui expliquer. */

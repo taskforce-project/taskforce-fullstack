@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.service.delivery;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,12 +20,22 @@ import com.taskforce.tf_api.core.dto.response.DeliveryRunActivityResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
 import com.taskforce.tf_api.core.enums.DeliveryApprovalStatus;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
+import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
+import com.taskforce.tf_api.core.harness.rules.RulesBundle;
+import com.taskforce.tf_api.core.harness.rules.RulesEngine;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.DeliveryRunApproval;
+import com.taskforce.tf_api.core.model.DeliveryRunApprovalSignature;
 import com.taskforce.tf_api.core.model.DeliveryRunEvent;
+import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.DeliveryRunApprovalRepository;
+import com.taskforce.tf_api.core.repository.DeliveryRunApprovalSignatureRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
+import com.taskforce.tf_api.core.service.rules.RuleApprovers;
 import com.taskforce.tf_api.core.repository.DeliveryRunEventRepository;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -65,6 +76,10 @@ public class DeliveryActivityService {
     private final NotificationService notificationService;
     private final LocalRunnerSettings settings;
     private final MissionEvidenceService evidenceService;
+    private final HarnessRulesService rulesService;
+    private final RuleApprovers approvers;
+    private final DeliveryRunApprovalSignatureRepository signatureRepository;
+    private final WorkspaceMemberRepository workspaceMembers;
 
     /** Type de l'événement du dossier de preuve pour chaque sorte d'événement du runner. */
     private static final Map<String, String> EVIDENCE_TYPE = Map.of(
@@ -147,24 +162,101 @@ public class DeliveryActivityService {
     @Transactional
     public RunnerApprovalResponse openApproval(DeliveryRun run, String tool, String summary, boolean byRunner,
                                                RunnerApprovalRequest ruling) {
+        // Le serveur rejuge l'action avec les mêmes règles (R157) : ce qu'une règle de l'entreprise demande à l'accord
+        // (R98), et un refus que le runner n'aurait pas vu, qui clôt la demande aussitôt.
+        RulesEngine.Decision judged = judged(run, ruling);
+        RulesEngine.Obligations require = judged == null ? ruleObligations(run, ruling) : judged.require();
+        boolean refused = judged != null && RulesEngine.DENY.equals(judged.effect());
         DeliveryRunApproval approval = approvalRepository.save(DeliveryRunApproval.builder()
             .run(run)
             .tool(tool.strip())
             .summary(clip(summary))
             .askedBy(byRunner ? "runner" : "agent")
             .action(ruling == null ? null : blankToNull(ruling.action()))
-            .ruleId(ruling == null ? null : blankToNull(ruling.rule()))
-            .ruleReason(ruling == null ? null : blankToNull(ruling.reason()))
+            .ruleId(refused ? judged.rule().id() : ruling == null ? null : blankToNull(ruling.rule()))
+            .ruleReason(refused ? clip(judged.rule().reason()) : ruling == null ? null : blankToNull(ruling.reason()))
+            .status(refused ? DeliveryApprovalStatus.DENIED : DeliveryApprovalStatus.PENDING)
+            .decidedAt(refused ? LocalDateTime.now() : null)
+            .approvers(require == null || require.approvers().isEmpty() ? null : require.approvers())
+            .signatures(require == null ? 1 : require.signatures())
+            .separateRoles(require != null && require.separate())
             .expiresAt(LocalDateTime.now().plus(settings.approvalTimeout()))
             .build());
-        notificationService.notifyAgentApproval(run.getIssue(), run.getStartedBy(), approval.getTool(), approval.getSummary(), byRunner);
         Map<String, Object> asked = approvalData(approval);
         asked.put("askedBy", approval.getAskedBy());
-        asked.put("effect", "ask");
+        asked.put("effect", refused ? "deny" : "ask");
         asked.put("asked", run.getStartedBy() != null ? run.getStartedBy().getEmail() : null);
+        if (require != null) {
+            asked.put("require", Map.of("approvers", require.approvers(), "signatures", require.signatures(),
+                "separate", require.separate()));
+        }
         evidenceService.append(run, "action.decided", MissionEvidenceService.Actor.SERVER, asked);
-        log.info("Run {} : validation {} demandée ({})", run.getId(), approval.getId(), approval.getTool());
+        if (!refused) {
+            for (User signer : signers(run, approval.obligations())) {
+                notificationService.notifyAgentApproval(run.getIssue(), signer, approval.getTool(), approval.getSummary(), byRunner);
+            }
+        }
+        log.info("Run {} : validation {} demandée ({}){}", run.getId(), approval.getId(), approval.getTool(),
+            refused ? ", refusée par les règles du serveur" : "");
         return toRunnerResponse(approval);
+    }
+
+    /** L'action rejugée sur les faits que le runner a jugés ; null quand il ne les a pas envoyés (runner plus ancien). */
+    private RulesEngine.Decision judged(DeliveryRun run, RunnerApprovalRequest ruling) {
+        if (ruling == null || ruling.facts() == null || ruling.facts().isEmpty()) {
+            return null;
+        }
+        List<Map<String, String>> facts = new ArrayList<>();
+        for (Map<String, String> part : ruling.facts()) {
+            Map<String, String> clean = new LinkedHashMap<>();
+            if (part != null) {
+                part.forEach((k, v) -> {
+                    if (k != null && v != null) clean.put(k, v);
+                });
+            }
+            facts.add(clean);
+        }
+        return RulesEngine.decideAll(bundleOf(run), facts);
+    }
+
+    /** Ce que demande la règle que le runner a nommée, d'après les règles en vigueur, quand il n'a pas envoyé ses faits. */
+    private RulesEngine.Obligations ruleObligations(DeliveryRun run, RunnerApprovalRequest ruling) {
+        String ruleId = ruling == null ? null : blankToNull(ruling.rule());
+        if (ruleId == null) {
+            return null;
+        }
+        return bundleOf(run).rules().stream()
+            .filter(r -> ruleId.equals(r.id()) && RulesEngine.ASK.equals(r.effect()) && r.require() != null)
+            .findFirst()
+            .map(r -> new RulesEngine.Obligations(
+                r.require().approvers() == null || r.require().approvers().isEmpty() ? List.of() : List.of(r.require().approvers()),
+                r.require().signatures() == null ? 1 : Math.max(1, r.require().signatures()),
+                Boolean.TRUE.equals(r.require().separate())))
+            .filter(o -> !o.addsNothing())
+            .orElse(null);
+    }
+
+    private RulesBundle bundleOf(DeliveryRun run) {
+        Project project = run.getIssue().getProject();
+        return rulesService.bundleFor(project.getWorkspace(), new HarnessRulesService.Work(project.getId(), null,
+            run.getStartedBy() == null ? null : run.getStartedBy().getId()));
+    }
+
+    /**
+     * Les personnes qui peuvent signer un accord : la personne qui a délégué pour un accord ordinaire ; sinon les membres
+     * de l'espace qui voient le projet et que l'accord désigne.
+     */
+    private List<User> signers(DeliveryRun run, RulesEngine.Obligations require) {
+        if (RuleApprovers.ordinary(require)) {
+            return run.getStartedBy() == null ? List.of() : List.of(run.getStartedBy());
+        }
+        Project project = run.getIssue().getProject();
+        Long delegator = run.getStartedBy() == null ? null : run.getStartedBy().getId();
+        return workspaceMembers.findByWorkspaceId(project.getWorkspace().getId()).stream()
+            .map(WorkspaceMember::getUser)
+            .filter(u -> visibilityGuard.canView(project, u.getId()))
+            .filter(u -> approvers.maySign(require, project.getWorkspace().getId(), project.getId(), delegator, u.getId()))
+            .toList();
     }
 
     /** État d'une demande ; une demande restée sans réponse au-delà de son échéance passe EXPIRED ici. */
@@ -201,12 +293,37 @@ public class DeliveryActivityService {
         List<Long> projectIds = visibilityGuard.viewableProjectIds(workspace.getId(), userId);
         if (projectIds.isEmpty()) return List.of();
         LocalDateTime now = LocalDateTime.now();
-        return approvalRepository.findOpen(projectIds, userId, DeliveryApprovalStatus.PENDING, now,
-                DeliveryRunStatus.RUNNING, now.minus(settings.heartbeatTimeout())).stream()
-            .map(row -> new DeliveryOpenApprovalResponse(row.getRunId(), row.getIssueId(),
+        LocalDateTime aliveSince = now.minus(settings.heartbeatTimeout());
+        Map<Long, DeliveryOpenApprovalResponse> rows = new LinkedHashMap<>();
+        approvalRepository.findOpen(projectIds, userId, DeliveryApprovalStatus.PENDING, now,
+                DeliveryRunStatus.RUNNING, aliveSince)
+            .forEach(row -> rows.put(row.getRunId(), new DeliveryOpenApprovalResponse(row.getRunId(), row.getIssueId(),
                 row.getSequenceNumber() == null ? null : row.getProjectIdentifier() + "-" + row.getSequenceNumber(),
-                row.getIssueTitle(), row.getProjectId(), row.getRequests()))
-            .toList();
+                row.getIssueTitle(), row.getProjectId(), row.getRequests())));
+        // Les accords qu'une règle de l'entreprise adresse à des personnes désignées (R98) : ceux que cette personne peut
+        // encore signer.
+        for (DeliveryRunApproval approval : approvalRepository.findOpenWithObligations(projectIds,
+                DeliveryApprovalStatus.PENDING, now, DeliveryRunStatus.RUNNING, aliveSince)) {
+            DeliveryRun run = approval.getRun();
+            if (!canSign(run, approval, userId)) continue;
+            Issue issue = run.getIssue();
+            DeliveryOpenApprovalResponse current = rows.get(run.getId());
+            long requests = current == null ? 1 : current.requests() + 1;
+            rows.put(run.getId(), new DeliveryOpenApprovalResponse(run.getId(), issue.getId(),
+                issue.getSequenceNumber() == null ? null : issue.getProject().getIdentifier() + "-" + issue.getSequenceNumber(),
+                issue.getTitle(), issue.getProject().getId(), requests));
+        }
+        return List.copyOf(rows.values());
+    }
+
+    /** Cette personne peut-elle encore répondre à cette demande ? Elle doit pouvoir la signer, et ne pas l'avoir déjà fait. */
+    private boolean canSign(DeliveryRun run, DeliveryRunApproval approval, Long userId) {
+        if (approval.getStatus() != DeliveryApprovalStatus.PENDING) return false;
+        RulesEngine.Obligations require = approval.obligations();
+        Project project = run.getIssue().getProject();
+        Long delegator = run.getStartedBy() == null ? null : run.getStartedBy().getId();
+        if (!approvers.maySign(require, project.getWorkspace().getId(), project.getId(), delegator, userId)) return false;
+        return RuleApprovers.ordinary(require) || !signatureRepository.existsByApprovalIdAndUserId(approval.getId(), userId);
     }
 
     /** Chronologie après {@code after} et demandes du run, si le projet est visible par cette personne. */
@@ -220,13 +337,20 @@ public class DeliveryActivityService {
             .findByRunIdAndSeqGreaterThanOrderBySeqAsc(runId, Math.max(after, 0), PageRequest.of(0, PAGE)).stream()
             .map(e -> new DeliveryRunActivityResponse.Event(e.getSeq(), e.getKind(), e.getTool(), e.getText(), e.getCreatedAt()))
             .toList();
-        boolean delegator = run.getStartedBy() != null && Objects.equals(run.getStartedBy().getId(), userId);
+        Long workspaceId = run.getIssue().getProject().getWorkspace().getId();
         List<DeliveryRunActivityResponse.Approval> approvals = approvalRepository.findByRunIdOrderByCreatedAtAsc(runId).stream()
             .peek(a -> expireIfDue(a, now))
-            .map(a -> new DeliveryRunActivityResponse.Approval(a.getId(), a.getTool(), a.getSummary(), a.getStatus().name(),
-                a.getCreatedAt(), a.getExpiresAt(), a.getDecidedAt(), displayName(a.getDecidedBy()),
-                delegator && a.getStatus() == DeliveryApprovalStatus.PENDING, a.getAskedBy(),
-                a.getAction(), a.getRuleId(), a.getRuleReason(), a.getScope()))
+            .map(a -> {
+                RulesEngine.Obligations require = a.obligations();
+                List<String> signedBy = RuleApprovers.ordinary(require) ? List.of()
+                    : signatureRepository.findByApprovalIdOrderBySignedAtAsc(a.getId()).stream()
+                        .filter(DeliveryRunApprovalSignature::isAllow).map(s -> displayName(s.getUser())).toList();
+                return new DeliveryRunActivityResponse.Approval(a.getId(), a.getTool(), a.getSummary(), a.getStatus().name(),
+                    a.getCreatedAt(), a.getExpiresAt(), a.getDecidedAt(), displayName(a.getDecidedBy()),
+                    canSign(run, a, userId), a.getAskedBy(), a.getAction(), a.getRuleId(), a.getRuleReason(), a.getScope(),
+                    approvers.labels(require, workspaceId), require == null ? 1 : require.signatures(),
+                    require != null && require.separate(), signedBy);
+            })
             .toList();
         return new DeliveryRunActivityResponse(events, approvals);
     }
@@ -252,12 +376,17 @@ public class DeliveryActivityService {
     @Transactional
     public void decide(String slug, Long runId, Long approvalId, boolean allow, boolean forMission, Long userId) {
         DeliveryRun run = scopedRun(slug, runId);
-        visibilityGuard.assertCanView(run.getIssue().getProject(), userId);
-        if (run.getStartedBy() == null || !Objects.equals(run.getStartedBy().getId(), userId)) {
-            throw new ForbiddenException("Only the person who delegated this task can answer: the action runs on their machine.");
-        }
+        Project project = run.getIssue().getProject();
+        visibilityGuard.assertCanView(project, userId);
         DeliveryRunApproval approval = approvalRepository.findByIdAndRunId(approvalId, runId)
             .orElseThrow(() -> new ResourceNotFoundException("Approval request not found"));
+        RulesEngine.Obligations require = approval.obligations();
+        Long delegator = run.getStartedBy() == null ? null : run.getStartedBy().getId();
+        if (!approvers.maySign(require, project.getWorkspace().getId(), project.getId(), delegator, userId)) {
+            throw new ForbiddenException(RuleApprovers.ordinary(require)
+                ? "Only the person who delegated this task can answer: the action runs on their machine."
+                : "Your workspace's rules ask other people to approve this request.");
+        }
         LocalDateTime now = LocalDateTime.now();
         expireIfDue(approval, now);
         if (approval.getStatus() == DeliveryApprovalStatus.EXPIRED || run.getStatus() != DeliveryRunStatus.RUNNING) {
@@ -266,17 +395,52 @@ public class DeliveryActivityService {
         if (approval.getStatus() != DeliveryApprovalStatus.PENDING) {
             throw new BusinessException("This request was already answered.");
         }
+        User person = userRepository.getReferenceById(userId);
+        if (!RuleApprovers.ordinary(require)) {
+            // Une règle de l'entreprise (R98) : chaque personne signe une fois ; un refus suffit, l'accord vient quand les
+            // signatures réunissent ce que la règle demande.
+            if (signatureRepository.existsByApprovalIdAndUserId(approval.getId(), userId)) {
+                throw new BusinessException("You already answered this request.");
+            }
+            signatureRepository.save(DeliveryRunApprovalSignature.builder()
+                .approval(approval).user(person).allow(allow).signedAt(now).build());
+            List<Long> allowed = signatureRepository.findByApprovalIdOrderBySignedAtAsc(approval.getId()).stream()
+                .filter(DeliveryRunApprovalSignature::isAllow)
+                .map(s -> s.getUser() == null ? null : s.getUser().getId())
+                .toList();
+            if (allow && !approvers.complete(require, project.getWorkspace().getId(), project.getId(), allowed)) {
+                Map<String, Object> signed = approvalData(approval);
+                signed.put("decision", "SIGNED");
+                signed.put("signatures", allowed.size());
+                evidenceService.append(run, "human.decision", personActor(run, userId), signed);
+                log.info("Run {} : validation {} signée par {} ({} sur {})", runId, approvalId, userId, allowed.size(),
+                    require.signatures());
+                return;
+            }
+        }
         approval.setStatus(allow ? DeliveryApprovalStatus.ALLOWED : DeliveryApprovalStatus.DENIED);
         approval.setScope(allow && forMission ? SCOPE_MISSION : SCOPE_ONCE);
         approval.setDecidedAt(now);
-        approval.setDecidedBy(userRepository.getReferenceById(userId));
+        approval.setDecidedBy(person);
         approvalRepository.save(approval);
         readNotificationsIfSettled(run);
+        for (User signer : signers(run, require)) {
+            if (!Objects.equals(signer.getId(), delegator)) notificationService.readAgentApprovals(run.getIssue(), signer);
+        }
         Map<String, Object> decided = approvalData(approval);
         decided.put("decision", approval.getStatus().name());
         decided.put("scope", approval.getScope());
-        evidenceService.append(run, "human.decision", new MissionEvidenceService.Actor("person", run.getStartedBy().getEmail()), decided);
+        evidenceService.append(run, "human.decision", personActor(run, userId), decided);
         log.info("Run {} : validation {} {} par {}", runId, approvalId, approval.getStatus(), userId);
+    }
+
+    /** La personne qui décide, telle que le dossier la nomme : son adresse, comme pour la personne qui a délégué. */
+    private MissionEvidenceService.Actor personActor(DeliveryRun run, Long userId) {
+        if (run.getStartedBy() != null && Objects.equals(run.getStartedBy().getId(), userId)) {
+            return new MissionEvidenceService.Actor("person", run.getStartedBy().getEmail());
+        }
+        String email = userRepository.findById(userId).map(User::getEmail).orElse(String.valueOf(userId));
+        return new MissionEvidenceService.Actor("person", email);
     }
 
     // ---------------------------------------------------------------------

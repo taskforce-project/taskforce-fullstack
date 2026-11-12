@@ -98,7 +98,7 @@ public class CortexSourcesService {
             new Source(NOTES, notes.size(), latest(notes.stream().map(KnowledgeNodeRepository.SourceRow::getUpdatedAt))),
             new Source(DOCUMENTS, documents.size(),
                 latest(documents.stream().map(KnowledgeNodeRepository.SourceRow::getUpdatedAt))),
-            connectors(ws.getId())));
+            connectors(ws.getId(), userId)));
     }
 
     /** Ce que portent les projets que la personne voit : la somme de leurs lignes, et le plus récent changement. */
@@ -111,20 +111,21 @@ public class CortexSourcesService {
     }
 
     /**
-     * Les connecteurs de l'espace : les intégrations natives, datées de leur connexion, et les serveurs MCP enregistrés,
-     * datés de leur dernier changement. Un même outil compte une fois.
+     * Les connecteurs que Cortex lit pour cette personne : les intégrations natives de l'espace, datées de leur
+     * connexion, et les serveurs MCP qu'elle utilise (les siens, ceux que l'espace partage ; séance n°22, R154), datés
+     * de leur dernier changement. Un même outil compte une fois.
      */
-    private Source connectors(Long workspaceId) {
+    private Source connectors(Long workspaceId, Long userId) {
         Set<String> keys = new HashSet<>();
         List<LocalDateTime> dates = new ArrayList<>();
         for (Integration integration : integrations.findByWorkspaceId(workspaceId)) {
             keys.add(integration.getProvider().name().toLowerCase(Locale.ROOT));
             dates.add(integration.getConnectedAt());
         }
-        Set<String> servers = mcp.connectedServers(workspaceId).stream()
+        Set<String> servers = mcp.connectedServers(workspaceId, userId).stream()
             .map(WorkspaceMcpService.ConnectedServer::connectorKey)
             .collect(Collectors.toSet());
-        for (ConnectorConnection connection : connections.findByWorkspaceId(workspaceId)) {
+        for (ConnectorConnection connection : connections.findUsable(workspaceId, userId)) {
             if (servers.contains(connection.getConnectorKey())) dates.add(connection.getUpdatedAt());
         }
         keys.addAll(servers);

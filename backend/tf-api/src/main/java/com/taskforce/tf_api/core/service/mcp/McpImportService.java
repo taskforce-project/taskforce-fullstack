@@ -1,9 +1,11 @@
 package com.taskforce.tf_api.core.service.mcp;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
@@ -13,12 +15,18 @@ import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.enums.IssuePriority;
+import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.AiMeter;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.ProjectService;
+import com.taskforce.tf_api.core.service.agent.AgentContext;
+import com.taskforce.tf_api.core.service.agent.CortexGate;
+import com.taskforce.tf_api.core.service.agent.CortexRecordService;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +54,8 @@ public class McpImportService {
     private final LlmClient llm;
     private final ObjectMapper objectMapper;
     private final AiMeter aiMeter; // quota et comptage des tokens de la normalisation
+    private final CortexGate gate;
+    private final CortexRecordService records;
 
     /** Résultat d'un import : le projet créé + le nombre d'issues importées / trouvées. */
     public record ImportResult(Long projectId, String projectIdentifier, String projectName,
@@ -55,15 +65,31 @@ public class McpImportService {
     private record NormalizedIssue(String title, String description, IssuePriority priority) {}
 
     /**
-     * Importe les issues du connecteur MCP {@code connectorKey} dans un nouveau projet {@code targetName}.
+     * Importe les issues du connecteur MCP {@code connectorKey} dans un nouveau projet {@code targetName}, comme tout
+     * autre geste (séance n°22, R158) : par la connexion de la personne ; la lecture dans l'outil, la création du projet
+     * et celle des issues sont jugées par les règles de l'espace et entrent au dossier avant tout effet. Un refus
+     * arrête l'import ; une action demandée est accordée par le clic « Import » de la personne, qui entre au dossier.
      */
     public ImportResult importProject(Workspace ws, Long userId, String connectorKey, String targetName) {
         if (connectorKey == null || connectorKey.isBlank()) throw new BusinessException("connectorKey is required");
         if (targetName == null || targetName.isBlank()) throw new BusinessException("The target project name is required");
 
-        String issuesTool = findIssuesTool(ws.getId(), connectorKey);
-        // L'import est réservé aux gestionnaires (contrôleur, authorizeManager) : écriture admise.
-        String raw = workspaceMcp.execute(ws.getId(), connectorKey + "__" + issuesTool, Map.of(), true);
+        AgentContext ctx = new AgentContext(ws.getSlug(), ws.getId(), userId);
+        String issuesTool = findIssuesTool(ws.getId(), userId, connectorKey);
+        ExternalMcpTool read = workspaceMcp.toolFor(ws.getId(), userId, connectorKey + "__" + issuesTool)
+            .orElseThrow(() -> new BusinessException("\"" + connectorKey + "\" has no tool to list issues"));
+        UUID record = records.open(ctx, "Import " + connectorKey + " into a new project: " + targetName,
+            Map.of("via", "import"));
+        RulesBundle bundle = gate.rulesFor(ctx);
+        // Le geste de la personne, qui a cliqué « Import » : l'acteur est une personne (R157).
+        judgeOrRefuse(record, userId, bundle, read.name(), gate.personFacts(read, "{}"));
+        judgeOrRefuse(record, userId, bundle, "create_project",
+            Map.of("action", "project.create", "tool", "create_project", "actor", "person"));
+        judgeOrRefuse(record, userId, bundle, "create_issue",
+            Map.of("action", "issue.create", "tool", "create_issue", "actor", "person"));
+
+        String raw = read.execute(Map.of(), ctx);
+        result(record, read.name(), "success", raw);
         List<NormalizedIssue> issues = normalize(ws.getId(), raw);
 
         ProjectResponse project = projectService.createProject(ws.getSlug(), userId, projectRequest(targetName));
@@ -71,19 +97,60 @@ public class McpImportService {
         for (NormalizedIssue ni : issues) {
             if (imported >= MAX_IMPORT) break;
             try {
-                issueService.createIssue(ws.getSlug(), project.getId(), issueRequest(ni), userId);
+                // Marquée de son outil : Cortex la lira comme un contenu du dehors (R158).
+                issueService.createIssue(ws.getSlug(), project.getId(), issueRequest(ni), userId, null, connectorKey);
                 imported++;
             } catch (Exception e) {
-                log.warn("Import : issue « {} » ignorée : {}", ni.title(), e.getMessage());
+                log.warn("Import : issue « {} » ignorée : {}", LogSafe.of(ni.title()), LogSafe.of(e.getMessage()));
             }
         }
-        log.info("Import MCP {} → projet {} : {}/{} issues", connectorKey, project.getIdentifier(), imported, issues.size());
+        log.info("Import MCP {} → projet {} : {}/{} issues", LogSafe.of(connectorKey), LogSafe.of(project.getIdentifier()),
+            imported, issues.size());
+        result(record, "create_issue", "success", "Project " + project.getIdentifier() + ": " + imported + " of "
+            + issues.size() + " issues imported.");
         return new ImportResult(project.getId(), project.getIdentifier(), project.getName(), imported, issues.size());
     }
 
-    /** Cherche l'outil « lister les issues » du connecteur, par nom (générique). */
-    private String findIssuesTool(Long workspaceId, String connectorKey) {
-        List<String> tools = workspaceMcp.serverStatuses(workspaceId).stream()
+    /**
+     * La demande puis la décision des règles au dossier ; un refus arrête l'import (la raison de la règle remonte), une
+     * action demandée est accordée par le clic de la personne.
+     */
+    private void judgeOrRefuse(UUID record, Long userId, RulesBundle bundle, String tool, Map<String, String> facts) {
+        append(record, "action.requested", CortexRecordService.Actor.person(userId), Map.of("tool", tool));
+        CortexGate.Verdict verdict = gate.judge(bundle, facts);
+        append(record, "action.decided", CortexRecordService.Actor.rule(verdict.ruleId()),
+            Map.of("effect", verdict.effect(), "facts", verdict.facts()));
+        if (verdict.denied()) {
+            result(record, tool, "refused", verdict.reason());
+            throw new ForbiddenException("The rules of this workspace refuse this import. " + verdict.reason());
+        }
+        if (!verdict.allowed()) {
+            append(record, "human.decision", CortexRecordService.Actor.person(userId),
+                Map.of("tool", tool, "decision", "approved", "arguments", "{}"));
+        }
+    }
+
+    private void append(UUID record, String type, CortexRecordService.Actor actor, Map<String, ?> data) {
+        if (records.append(record, type, actor, data).isEmpty()) {
+            throw new BusinessException("The record of this import is full, so it does not run.");
+        }
+    }
+
+    private void result(UUID record, String tool, String status, String output) {
+        try {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("tool", tool);
+            data.put("status", status);
+            data.put("output", CortexRecordService.shorten(output));
+            records.append(record, "action.result", CortexRecordService.Actor.SERVER, data);
+        } catch (RuntimeException e) {
+            log.warn("Import : resultat de {} non garde au dossier : {}", LogSafe.of(tool), LogSafe.of(e.getMessage()));
+        }
+    }
+
+    /** Cherche l'outil « lister les issues » du connecteur, par nom (générique), parmi ceux que la personne utilise. */
+    private String findIssuesTool(Long workspaceId, Long userId, String connectorKey) {
+        List<String> tools = workspaceMcp.serverStatuses(workspaceId, userId).stream()
             .filter(s -> connectorKey.equals(s.connectorKey()) && s.reachable())
             .findFirst()
             .map(WorkspaceMcpService.McpServerStatus::tools)

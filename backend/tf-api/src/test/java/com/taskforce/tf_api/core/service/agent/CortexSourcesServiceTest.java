@@ -87,14 +87,14 @@ class CortexSourcesServiceTest {
             new Node(12L, NodeType.README, NOV_1), new Node(13L, NodeType.DECISION, NOV_1.plusDays(2))));
         Integration github = Integration.builder().provider(IntegrationProvider.GITHUB).connectedAt(NOV_1.minusDays(9)).build();
         lenient().when(integrations.findByWorkspaceId(1L)).thenReturn(List.of(github));
-        lenient().when(mcp.connectedServers(1L)).thenReturn(List.of(
+        lenient().when(mcp.connectedServers(1L, 7L)).thenReturn(List.of(
             new WorkspaceMcpService.ConnectedServer("linear", null, "https://mcp.linear.app/mcp")));
         ConnectorConnection linear = mock(ConnectorConnection.class);
         lenient().when(linear.getConnectorKey()).thenReturn("linear");
         lenient().when(linear.getUpdatedAt()).thenReturn(NOV_1.minusDays(2));
         ConnectorConnection apiKeyOnly = mock(ConnectorConnection.class);
         lenient().when(apiKeyOnly.getConnectorKey()).thenReturn("notion");
-        lenient().when(connections.findByWorkspaceId(1L)).thenReturn(List.of(linear, apiKeyOnly));
+        lenient().when(connections.findUsable(1L, 7L)).thenReturn(List.of(linear, apiKeyOnly));
     }
 
     private static CortexSourcesResponse.Source source(CortexSourcesResponse response, String key) {
@@ -150,8 +150,8 @@ class CortexSourcesServiceTest {
         when(comments.countByProject(1L)).thenReturn(List.of());
         when(nodes.findSourceRowsByWorkspaceIdAndStatus(1L, NodeStatus.ACTIVE)).thenReturn(List.of());
         when(integrations.findByWorkspaceId(1L)).thenReturn(List.of());
-        when(mcp.connectedServers(1L)).thenReturn(List.of());
-        when(connections.findByWorkspaceId(1L)).thenReturn(List.of());
+        when(mcp.connectedServers(1L, 7L)).thenReturn(List.of());
+        when(connections.findUsable(1L, 7L)).thenReturn(List.of());
 
         CortexSourcesResponse response = service.sources("acme", 7L);
 

@@ -35,13 +35,30 @@ notes in the Brain OS.
 
 ## MCP servers
 
-Any tool with an MCP server can be connected. The catalog lists the official servers that have been tried end to end,
-Linear for now, and any other one can be added by its address. A server connects with one-click OAuth when it supports
-it, or with a token.
-Cortex then uses its tools: reading runs directly, and a change waits for the approval of an owner or an admin.
+Any tool with an MCP server can be connected. The catalog, sorted by what you do (files and storage, knowledge,
+tickets and projects, chat and mail, code, sales, support, finance and HR, design, other), lists the official servers
+that have been tried end to end, Linear for now, and any other one can be added by its address.
 
-On a self-hosted instance, MCP servers on your own network are refused unless you set
-`MCP_ALLOW_PRIVATE_NETWORK=true`.
+Each person connects with her own account and rights; nobody uses another person's connection. An owner or admin can
+share a connection with the workspace, and it shows as shared. **Connect** takes the path the vendor allows: its
+sign-in in your browser when TaskForce can register on its own (dynamic registration or a client metadata document),
+your company's app when the vendor requires one (an owner or admin enters its client ID and secret once, in
+Settings, Integrations), or a key. When a vendor needs its admin first, TaskForce says so in one sentence, with the
+message to send.
+
+Cortex then uses the tools: reading runs directly, and a change waits for your approval (an owner's or admin's
+through a shared connection). TaskForce decides which tools read: a tool it doesn't know asks, whatever the server says
+about it. The list of tools is pinned when you connect: a tool whose description changes waits for your approval
+again. Disconnecting revokes the access at the vendor when it allows it.
+
+On a self-hosted instance:
+
+- the redirect address to register at a vendor is `<TF_API_URL>/api/mcp/oauth/callback`, and the client metadata
+  document is served at `<TF_API_URL>/api/mcp/oauth/client.json` (HTTPS only);
+- your own app at a vendor that requires one goes in `TF_MCP_<KEY>_CLIENT_ID` and `TF_MCP_<KEY>_CLIENT_SECRET`
+  (for example `TF_MCP_ASANA_CLIENT_ID`), or in Settings, Integrations, per workspace;
+- MCP servers on your own network are refused unless you set `MCP_ALLOW_PRIVATE_NETWORK=true`. In the desktop app,
+  a server on your computer connects once you confirm you started it.
 
 ## Webhooks
 

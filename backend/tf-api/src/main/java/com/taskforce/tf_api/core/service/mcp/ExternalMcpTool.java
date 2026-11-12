@@ -5,17 +5,23 @@ import java.util.Map;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.taskforce.tf_api.core.enums.ConnectionScope;
+import com.taskforce.tf_api.core.enums.ToolClass;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 
 /**
  * {@link AgentTool} qui <b>relaie vers un outil d'un serveur MCP externe</b> (Linear & co). Instancié
- * dynamiquement par {@link WorkspaceMcpService} pour chaque outil découvert via {@code tools/list} —
- * ce n'est pas un bean Spring (il dépend du workspace courant et de sa configuration de connecteur).
+ * dynamiquement par {@link WorkspaceMcpService} pour chaque outil découvert via {@code tools/list}, par la connexion
+ * de la personne : ce n'est pas un bean Spring (il dépend de la personne, de son workspace et de sa connexion).
  *
  * <p>Le nom exposé au LLM est <b>namespacé</b> {@code <connecteur>__<outil>} pour éviter toute
  * collision avec les outils internes (ex. {@code search_brain}). À l'exécution, on rouvre une session
- * MCP, on appelle l'outil par son nom d'origine, puis on referme (isolation par appel).
+ * MCP, on appelle l'outil par son nom d'origine, puis on referme (isolation par appel).</p>
+ *
+ * <p>Sa classe (lecture ou écriture) est celle que TaskForce lui donne d'après le préréglage du serveur (séance n°22,
+ * R158), jamais ce que le serveur déclare ; un outil inconnu est une écriture. {@link #shared()} dit s'il passe par une
+ * connexion partagée avec l'espace : une écriture n'y est alors accordée que par un propriétaire ou un administrateur.</p>
  */
 public class ExternalMcpTool implements AgentTool {
 
@@ -26,14 +32,24 @@ public class ExternalMcpTool implements AgentTool {
     private final McpClient.ToolDef def;
     private final ObjectMapper objectMapper;
     private final String namespacedName;
+    private final ToolClass toolClass;
+    private final ConnectionScope scope;
 
-    public ExternalMcpTool(McpClient client, McpClient.ServerRef server,
-                           McpClient.ToolDef def, ObjectMapper objectMapper) {
+    public ExternalMcpTool(McpClient client, McpClient.ServerRef server, McpClient.ToolDef def,
+                           ObjectMapper objectMapper, ToolClass toolClass, ConnectionScope scope) {
         this.client = client;
         this.server = server;
         this.def = def;
         this.objectMapper = objectMapper;
         this.namespacedName = buildName(server.connectorKey(), def.name());
+        this.toolClass = toolClass == null ? ToolClass.WRITE : toolClass;
+        this.scope = scope == null ? ConnectionScope.WORKSPACE : scope;
+    }
+
+    /** Un outil dont TaskForce ne connaît pas la classe : une écriture, par une connexion d'espace. */
+    public ExternalMcpTool(McpClient client, McpClient.ServerRef server, McpClient.ToolDef def,
+                           ObjectMapper objectMapper) {
+        this(client, server, def, objectMapper, ToolClass.WRITE, ConnectionScope.WORKSPACE);
     }
 
     /** {@code <connecteur>__<outil>}, assaini au charset des noms d'outils et borné à 64 caractères. */
@@ -47,9 +63,23 @@ public class ExternalMcpTool implements AgentTool {
         return namespacedName;
     }
 
-    /** Outil de lecture seule (annotation MCP {@code readOnlyHint}) ? Sinon = écriture → confirmation. */
+    /** Le nom de l'outil sur son serveur. */
+    public String originalName() {
+        return def.name();
+    }
+
+    /** Outil de lecture, d'après TaskForce (le préréglage) ? Sinon une écriture, qui demande. */
     public boolean isReadOnly() {
-        return def.readOnly();
+        return toolClass.reads();
+    }
+
+    public ToolClass toolClass() {
+        return toolClass;
+    }
+
+    /** L'outil passe-t-il par une connexion partagée avec l'espace ? */
+    public boolean shared() {
+        return scope == ConnectionScope.WORKSPACE;
     }
 
     /** Le connecteur qui porte l'outil ({@code linear}…) : le fait {@code server} que jugent les règles. */

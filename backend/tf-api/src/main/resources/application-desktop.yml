@@ -151,8 +151,18 @@ integrations:
     client-id: ""
     client-secret: ""
   mcp:
-    # Les serveurs MCP locaux sont le cas normal sur un poste.
+    # Les serveurs MCP locaux sont le cas normal sur un poste (Docker Desktop, Figma) : chacun ne se connecte qu'avec
+    # l'accord explicite de la personne, qui voit son adresse (bonnes pratiques de sécurité MCP).
     allow-private-network: true
+    # OAuth sur l'app desktop (RFC 8252) : le navigateur du système revient sur 127.0.0.1, sur le premier port libre
+    # de 47816 à 47819, servi par la coque (desktop/src/mcp-callback.ts), qui remet le code au backend local. Le
+    # jeton ne passe jamais par notre serveur. Notre document de métadonnées client est celui de l'app desktop,
+    # publié par le serveur hébergé, qui liste ces quatre adresses.
+    oauth:
+      redirect-uri: ${TF_DESKTOP_MCP_REDIRECT_URI:http://127.0.0.1:47816/mcp/callback}
+      app-base: ${TF_DESKTOP_UI_URL:http://127.0.0.1}
+      application-type: native
+      cimd-url: ${TF_DESKTOP_HOSTED_API_URL:https://api.taskforce-project.fr}/api/mcp/oauth/desktop-client.json
 
 taskforce:
   signup:

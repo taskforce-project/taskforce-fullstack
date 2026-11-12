@@ -28,12 +28,14 @@ export async function judgeExit(rules: RulesBundle, facts: Facts, tool: string, 
   const rule = d.rule ? { rule: d.rule.id } : {};
   if (d.effect === "allow") return { go: true, why: `allowed by the rule ${d.rule?.id ?? "?"}`, ...rule };
   if (d.effect === "deny") {
-    const reason = (d.rule?.reason ?? "").replace(/\.\s*$/, "");
+    const reason = (d.rule?.text ?? d.rule?.reason ?? "").replace(/\.\s*$/, "");
     return { go: false, why: `refused by the rule ${d.rule?.id ?? "?"}: ${reason}`, reason, ...rule };
   }
   const allowed = await ask(tool, summary, {
     ...(facts.action ? { action: facts.action } : {}),
-    ...(d.rule ? { rule: d.rule.id, reason: d.rule.reason } : {}),
+    ...(d.rule ? { rule: d.rule.id, reason: d.rule.text ?? d.rule.reason } : {}),
+    // Les faits de la sortie : TaskForce la rejuge, et sait qui peut l'accorder (R98).
+    facts: [facts],
   });
   const asked = d.rule ? `the rule ${d.rule.id} asks` : "no rule covers it";
   return { go: allowed, why: allowed ? `allowed in TaskForce (${asked})` : `not allowed in TaskForce (${asked})`, ...rule };

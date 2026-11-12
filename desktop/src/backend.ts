@@ -1,5 +1,6 @@
 import { join } from "node:path";
 
+import { API_URL } from "./account";
 import type { Account } from "./settings";
 import { log } from "./log";
 import { freePort, waitForOk } from "./net";
@@ -24,6 +25,29 @@ export interface BackendOptions {
   github: { url: string; token: string };
   /** Secret du runner de Claude Code que l'app lance (cf. runner.ts). */
   runnerSecret: string;
+  /** Adresse de retour des connexions aux outils, sur la boucle locale (cf. mcp-callback.ts). */
+  mcpRedirectUri: string;
+}
+
+/** Les clients enregistrés d'avance chez un éditeur, que la personne a mis dans son environnement (chemin B). */
+const PRE_REGISTERED = /^TF_MCP_[A-Z0-9_]+_CLIENT_(ID|SECRET)$/;
+
+/**
+ * Ce que le backend local sait des connexions aux outils (séance n°22, R154) : l'adresse de retour fixe de la coque, et
+ * l'API hébergée qui publie le document de métadonnées client de l'app desktop. Les clients enregistrés
+ * d'avance (`TF_MCP_<CLÉ>_CLIENT_ID`, `..._CLIENT_SECRET`) passent de l'environnement de la personne à celui du
+ * backend : ils restent sur sa machine.
+ */
+export function connectorEnvironment(mcpRedirectUri: string, hostedApi: string = API_URL,
+                                     shell: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const env: Record<string, string> = {
+    TF_DESKTOP_MCP_REDIRECT_URI: mcpRedirectUri,
+    TF_DESKTOP_HOSTED_API_URL: hostedApi,
+  };
+  for (const [name, value] of Object.entries(shell)) {
+    if (value && PRE_REGISTERED.test(name)) env[name] = value;
+  }
+  return env;
 }
 
 /**
@@ -58,6 +82,7 @@ export class Backend {
       TF_DESKTOP_GITHUB_URL: options.github.url,
       TF_DESKTOP_GITHUB_TOKEN: options.github.token,
       TF_DESKTOP_RUNNER_SECRET: options.runnerSecret,
+      ...connectorEnvironment(options.mcpRedirectUri),
     });
     const args = [
       // Une personne, un poste : peu de mémoire, démarrage rapide plutôt que débit maximal. Le tas part petit et rend
