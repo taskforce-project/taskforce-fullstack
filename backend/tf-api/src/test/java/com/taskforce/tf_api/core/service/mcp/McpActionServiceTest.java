@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,7 +22,6 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.HarnessRuleSetRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthorizationService;
-import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.core.service.agent.CortexGate;
 import com.taskforce.tf_api.core.service.agent.CortexRecordService;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
@@ -51,6 +51,9 @@ class McpActionServiceTest {
     @Mock private AuthorizationService authorization;
     @Mock private HarnessRuleSetRepository ruleSets;
     @Mock private WorkspaceRepository workspaces;
+    @Mock private com.taskforce.tf_api.core.repository.WorkspaceMemberRepository members;
+    @Mock private com.taskforce.tf_api.core.repository.ProjectRepository projectRepository;
+    @Mock private com.taskforce.tf_api.core.repository.IssueRepository issueRepository;
     @Mock private McpClient client;
 
     private final ObjectMapper json = new ObjectMapper();
@@ -63,7 +66,7 @@ class McpActionServiceTest {
         lenient().when(workspaces.findById(1L)).thenReturn(Optional.of(ws));
         lenient().when(records.open(any(), any(), any())).thenReturn(RECORD);
         lenient().when(records.append(any(), any(), any(), any())).thenReturn(Optional.of("hash"));
-        service = new McpActionService(workspaceMcp, new CortexGate(new HarnessRulesService(ruleSets), workspaces), records,
+        service = new McpActionService(workspaceMcp, new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projectRepository, issueRepository, json), records,
             authorization, json);
     }
 
@@ -125,7 +128,8 @@ class McpActionServiceTest {
     void refusedByTheRules() throws Exception {
         tool("list_issues", ToolClass.READ, ConnectionScope.PERSONAL);
         CortexGate deny = Mockito.mock(CortexGate.class);
-        when(deny.judge(any(), any(AgentTool.class))).thenReturn(new CortexGate.Verdict("deny", "frozen", "Frozen.", Map.of()));
+        when(deny.judge(any(), Mockito.<String, String>anyMap()))
+            .thenReturn(new CortexGate.Verdict("deny", "frozen", "Frozen.", Map.of()));
         service = new McpActionService(workspaceMcp, deny, records, authorization, json);
 
         McpActionService.ActionResult r = service.run(ws, 7L, "linear__list_issues", Map.of(), true);
@@ -133,6 +137,24 @@ class McpActionServiceTest {
         assertThat(r.status()).isEqualTo("refused");
         assertThat(r.reason()).isEqualTo("Frozen.");
         verify(client, never()).initialize(any());
+    }
+
+    @Test
+    @DisplayName("le geste de la personne : l'acteur est une personne, et un secret dans ses arguments ne part pas (R157)")
+    void theConsoleIsThePersonsGestureAndKeepsSecrets() throws Exception {
+        tool("save_issue", ToolClass.WRITE, ConnectionScope.PERSONAL);
+        String secret = "gh" + "p_" + "a".repeat(36); // écrit en morceaux : un faux jeton, que l'analyse reconnaît
+
+        McpActionService.ActionResult r = service.run(ws, 7L, "linear__save_issue", Map.of("title", secret), true);
+
+        assertThat(r.status()).isEqualTo("refused");
+        verify(client, never()).initialize(any());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> decided = ArgumentCaptor.forClass(Map.class);
+        verify(records).append(eq(RECORD), eq("action.decided"), eq(CortexRecordService.Actor.rule("floor-no-secret")),
+            decided.capture());
+        assertThat(decided.getValue().get("facts")).asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+            .containsEntry("actor", "person").containsEntry("secret", "true");
     }
 
     @Test

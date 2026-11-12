@@ -402,6 +402,17 @@ export const EVAL_ROUTES = {
 } as const;
 
 /**
+ * Les règles de l'entreprise, par couches (R157) : les lire, en écrire une en mots, la vérifier, la retirer, et
+ * « What would happen? ». Backend: @RequestMapping("/api/workspaces/{slug}/rules").
+ */
+export const RULES_ROUTES = {
+  RULES: (slug: string) => `/api/workspaces/${slug}/rules`,
+  DRAFTS: (slug: string) => `/api/workspaces/${slug}/rules/drafts`,
+  RULE: (slug: string, group: string) => `/api/workspaces/${slug}/rules/${encodeURIComponent(group)}`,
+  CHECK: (slug: string) => `/api/workspaces/${slug}/rules/check`,
+} as const;
+
+/**
  * Ce que Cortex peut lire dans un espace (R125), compté et daté, pour le volet « Progress ».
  * Backend: @RequestMapping("/api/workspaces/{slug}/assistant/sources").
  */

@@ -88,7 +88,10 @@ class McpConnectContractTest {
         catalog.build();
         HarnessRuleSetRepository ruleSets = Mockito.mock(HarnessRuleSetRepository.class);
         WorkspaceRepository workspaces = workspaceRepository();
-        gate = new CortexGate(new HarnessRulesService(ruleSets), workspaces);
+        gate = new CortexGate(
+            new HarnessRulesService(ruleSets, Mockito.mock(com.taskforce.tf_api.core.repository.WorkspaceMemberRepository.class)),
+            workspaces, Mockito.mock(com.taskforce.tf_api.core.repository.ProjectRepository.class),
+            Mockito.mock(com.taskforce.tf_api.core.repository.IssueRepository.class), om);
     }
 
     @AfterEach

@@ -60,7 +60,8 @@ public class McpActionService {
         append(record, "action.requested", CortexRecordService.Actor.person(userId),
             Map.of("tool", tool.name(), "arguments", CortexRecordService.shorten(json(arguments))));
         RulesBundle bundle = gate.rulesFor(ctx);
-        CortexGate.Verdict verdict = gate.judge(bundle, tool);
+        // Le geste de la personne elle-même : le socle refuse encore un secret dans ses arguments (R157).
+        CortexGate.Verdict verdict = gate.judge(bundle, gate.personFacts(tool, json(arguments)));
         append(record, "action.decided", CortexRecordService.Actor.rule(verdict.ruleId()),
             Map.of("effect", verdict.effect(), "facts", verdict.facts()));
         if (verdict.denied()) {

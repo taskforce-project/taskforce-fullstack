@@ -2,9 +2,9 @@
 <!--
   Le moteur de règles de backend/tf-api, compilé en JavaScript pour le runner (R90, voie b ; ADR-025 ; TF-J1-1).
 
-  Les sources du moteur sont lues en place dans backend/tf-api, jamais copiées : RulesEngine, RulesBundle, Glob et
-  RulesDigest (les décisions, les motifs, l'empreinte d'un paquet), CanonicalJson et EvidenceChain (le JSON canonique et
-  la chaîne du dossier de preuve). Ce module n'ajoute que l'adaptateur JavaScript (RulesEngineJs, JsValues) et les deux
+  Les sources du moteur sont lues en place dans backend/tf-api, jamais copiées : RulesEngine, RulesFloor, RulesBundle,
+  Glob, SecretScan et RulesDigest (les décisions, le socle, les motifs, les secrets reconnus, l'empreinte d'un paquet),
+  CanonicalJson et EvidenceChain (le JSON canonique et la chaîne du dossier de preuve). Ce module n'ajoute que l'adaptateur JavaScript (RulesEngineJs, JsValues) et les deux
   classes du JDK que la bibliothèque de TeaVM n'a pas (MessageDigest, HexFormat), fournies par substitution.
 
     mvn -B process-classes     (dans ce dossier, avec Java 21 ; sans JDK, dans maven:3.9-eclipse-temurin-21)
@@ -103,6 +103,8 @@
           <includes>
             <include>com/taskforce/rules_engine_js/**</include>
             <include>com/taskforce/tf_api/core/harness/rules/RulesEngine.java</include>
+            <include>com/taskforce/tf_api/core/harness/rules/RulesFloor.java</include>
+            <include>com/taskforce/tf_api/core/harness/rules/SecretScan.java</include>
             <include>com/taskforce/tf_api/core/harness/rules/RulesBundle.java</include>
             <include>com/taskforce/tf_api/core/harness/rules/Glob.java</include>
             <include>com/taskforce/tf_api/core/harness/rules/RulesDigest.java</include>

@@ -1,5 +1,9 @@
 package com.taskforce.tf_api.core.service.agent;
 
+import com.taskforce.tf_api.core.model.Project;
+import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.HarnessRuleSet;
+import com.taskforce.tf_api.core.enums.RuleScope;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,6 +24,9 @@ import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.HarnessRuleSetRepository;
+import com.taskforce.tf_api.core.repository.IssueRepository;
+import com.taskforce.tf_api.core.repository.ProjectRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.mcp.ExternalMcpTool;
 import com.taskforce.tf_api.core.service.mcp.McpClient;
@@ -39,6 +46,9 @@ class CortexGateTest {
 
     @Mock private HarnessRuleSetRepository ruleSets;
     @Mock private WorkspaceRepository workspaces;
+    @Mock private WorkspaceMemberRepository members;
+    @Mock private ProjectRepository projects;
+    @Mock private IssueRepository issues;
 
     private final ObjectMapper json = new ObjectMapper();
     private CortexGate gate;
@@ -46,7 +56,7 @@ class CortexGateTest {
 
     @BeforeEach
     void defaultRules() {
-        gate = new CortexGate(new HarnessRulesService(ruleSets), workspaces);
+        gate = new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projects, issues, json);
         Workspace ws = Workspace.builder().id(1L).slug("acme").name("Acme")
             .owner(User.builder().email("owner@acme.test").build()).build();
         when(workspaces.findById(1L)).thenReturn(Optional.of(ws));
@@ -188,7 +198,7 @@ class CortexGateTest {
         CortexGate.Verdict verdict = gate.judge(defaults, nameless);
 
         assertThat(verdict.effect()).isEqualTo("ask");
-        assertThat(verdict.facts()).containsExactlyEntriesOf(Map.of("tool", ""));
+        assertThat(verdict.facts()).containsExactlyInAnyOrderEntriesOf(Map.of("tool", "", "actor", "agent"));
     }
 
     @Test
@@ -198,5 +208,120 @@ class CortexGateTest {
 
         assertThatThrownBy(() -> gate.rulesFor(new AgentContext("gone", 2L, 7L)))
             .isInstanceOf(ResourceNotFoundException.class);
+    }
+    // ------------------------------------------------------------------ le socle et les couches (R157, R158)
+
+    @Test
+    @DisplayName("un secret dans les arguments : le socle refuse, quel que soit l'outil")
+    void a_secret_in_the_arguments_is_refused() {
+        CortexGate.Verdict verdict = gate.judge(defaults, internal("create_issue"),
+            "{\"title\":\"Deploy\",\"description\":\"token ghp_" + "x".repeat(36) + "\"}", CortexGate.Exposure.none());
+
+        assertThat(verdict.denied()).isTrue();
+        assertThat(verdict.ruleId()).isEqualTo("floor-no-secret");
+        assertThat(verdict.facts()).containsEntry("secret", "true").containsEntry("actor", "agent");
+    }
+
+    @Test
+    @DisplayName("après un outil de l'entreprise lu, avec les notes de l'espace : créer une issue attend la personne")
+    void three_at_once_after_a_company_tool() throws Exception {
+        CortexGate.Exposure exposure = CortexGate.Exposure.of(Map.of("notes", List.of(Map.of("id", 1))));
+        assertThat(exposure.sensitive()).isTrue();
+        assertThat(gate.judge(defaults, internal("create_issue"), "{}", exposure).allowed()).isTrue();
+
+        ExternalMcpTool notion = external("notion", true);
+        exposure.after(notion, CortexGate.facts(notion), "error");
+        assertThat(exposure.untrusted()).isFalse();
+        exposure.after(notion, CortexGate.facts(notion), "success");
+
+        CortexGate.Verdict verdict = gate.judge(defaults, internal("create_issue"), "{}", exposure);
+        assertThat(verdict.effect()).isEqualTo("ask");
+        assertThat(verdict.ruleId()).isEqualTo("floor-three-at-once");
+        assertThat(verdict.facts()).containsEntry("untrusted", "true").containsEntry("sensitive", "true");
+        assertThat(gate.judge(defaults, internal("search_brain"), "{}", exposure).allowed()).isTrue();
+    }
+
+    @Test
+    @DisplayName("une lecture de l'espace rend la réponse sensible ; une réponse sans rien de lu ne l'est pas")
+    void workspace_reads_are_sensitive() {
+        CortexGate.Exposure exposure = CortexGate.Exposure.none();
+        assertThat(exposure.sensitive()).isFalse();
+        exposure.after(Mockito.mock(AgentTool.class), Map.of("action", "issue.read"), "success");
+        assertThat(exposure.sensitive()).isTrue();
+        assertThat(exposure.untrusted()).isFalse();
+        assertThat(CortexGate.Exposure.of(Map.of("screen", "the board")).sensitive()).isTrue();
+        assertThat(CortexGate.Exposure.of(null).sensitive()).isFalse();
+    }
+
+    @Test
+    @DisplayName("les arguments simples d'un outil de l'entreprise sont des faits, qu'un seuil lit")
+    void company_tool_arguments_become_facts() throws Exception {
+        CortexGate.Verdict verdict = gate.judge(defaults, external("stripe", false),
+            "{\"amount\": 7200.50, \"currency\": \"EUR\", \"lines\": [1, 2], \"bad key\": 3}", CortexGate.Exposure.none());
+
+        assertThat(verdict.facts()).containsEntry("arg.amount", "7200.5").containsEntry("arg.currency", "EUR")
+            .doesNotContainKey("arg.lines").doesNotContainKey("arg.bad key");
+        assertThat(gate.judge(defaults, internal("create_issue"), "{\"amount\": 3}", CortexGate.Exposure.none()).facts())
+            .doesNotContainKey("arg.amount");
+    }
+
+    @Test
+    @DisplayName("une règle de l'entreprise qui désigne qui accorde : la décision porte ses obligations, et sa phrase")
+    void a_company_rule_carries_its_obligations() {
+        RulesBundle.Rule finance = new RulesBundle.Rule("ws-accounting",
+            new RulesBundle.Condition("issue.update", null, null, null, null, null, null, null), "reversible-exit", "ask",
+            null, "owner@acme.test", "No change without the finance lead", "2027-05-11", "workspace",
+            "No change without the finance lead", new RulesBundle.Require(List.of("person:42"), null, null));
+        AgentTool update = internal("update_issue");
+        when(update.action()).thenReturn("issue.update");
+
+        CortexGate.Verdict verdict = gate.judge(bundle(finance), update, "{}", CortexGate.Exposure.none());
+
+        assertThat(verdict.effect()).isEqualTo("ask");
+        assertThat(verdict.reason()).isEqualTo("No change without the finance lead");
+        assertThat(verdict.require().approvers()).containsExactly(List.of("person:42"));
+    }
+
+    @Test
+    @DisplayName("le projet que touche un appel : son id, celui de son issue, ou la clé de son issue")
+    void the_project_of_a_call() {
+        AgentContext ctx = new AgentContext("acme", 1L, 7L);
+        Workspace ws = Workspace.builder().id(1L).build();
+        Project accounting = Project.builder().id(12L).workspace(ws).build();
+        when(projects.findByIdAndWorkspaceId(12L, 1L)).thenReturn(Optional.of(accounting));
+        when(projects.findByWorkspaceIdAndIdentifier(1L, "ACC")).thenReturn(Optional.of(accounting));
+        when(issues.findById(55L)).thenReturn(Optional.of(Issue.builder().id(55L).project(accounting).build()));
+        when(issues.findById(56L)).thenReturn(Optional.of(Issue.builder().id(56L)
+            .project(Project.builder().id(99L).workspace(Workspace.builder().id(2L).build()).build()).build()));
+
+        assertThat(gate.projectOf(ctx, "{\"projectId\": 12}")).contains(12L);
+        assertThat(gate.projectOf(ctx, "{\"issueId\": 55}")).contains(12L);
+        assertThat(gate.projectOf(ctx, "{\"issueId\": 56}")).isEmpty();
+        assertThat(gate.projectOf(ctx, "{\"issue\": \"acc-7\"}")).contains(12L);
+        assertThat(gate.projectOf(ctx, "{\"title\": \"x\"}")).isEmpty();
+        assertThat(gate.projectOf(ctx, "not json")).isEmpty();
+        assertThat(gate.projectOf(ctx, null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("les règles du travail en cours : la couche du projet touché s'applique, pas celle d'un autre")
+    void the_rules_of_the_work_at_hand() {
+        Map<String, Object> rule = new java.util.LinkedHashMap<>();
+        rule.put("id", "prj12-no-issues");
+        rule.put("when", Map.of("action", "issue.create"));
+        rule.put("class", "reversible-exit");
+        rule.put("effect", "deny");
+        rule.put("owner", "owner@acme.test");
+        rule.put("reason", "No new issue in accounting.");
+        rule.put("review", "2027-05-11");
+        HarnessRuleSet layer = HarnessRuleSet.builder().version(3).scope(RuleScope.PROJECT)
+            .project(Project.builder().id(12L).build()).rules(List.of(rule)).digest("sha256:" + "c".repeat(64)).build();
+        when(ruleSets.findByWorkspaceIdOrderByVersionDesc(1L)).thenReturn(List.of(layer));
+        AgentContext ctx = new AgentContext("acme", 1L, 7L);
+
+        assertThat(gate.judge(gate.rulesFor(ctx, 12L), internal("create_issue")).denied()).isTrue();
+        assertThat(gate.judge(gate.rulesFor(ctx, 13L), internal("create_issue")).allowed()).isTrue();
+        assertThat(gate.judge(gate.rulesFor(new AgentContext("acme", 1L, 7L, new Screen(12L, null)), null),
+            internal("create_issue")).denied()).isTrue();
     }
 }

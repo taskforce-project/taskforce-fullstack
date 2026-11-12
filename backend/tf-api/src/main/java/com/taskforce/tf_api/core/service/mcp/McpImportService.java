@@ -81,9 +81,12 @@ public class McpImportService {
         UUID record = records.open(ctx, "Import " + connectorKey + " into a new project: " + targetName,
             Map.of("via", "import"));
         RulesBundle bundle = gate.rulesFor(ctx);
-        judgeOrRefuse(record, userId, bundle, read.name(), CortexGate.facts(read));
-        judgeOrRefuse(record, userId, bundle, "create_project", Map.of("action", "project.create", "tool", "create_project"));
-        judgeOrRefuse(record, userId, bundle, "create_issue", Map.of("action", "issue.create", "tool", "create_issue"));
+        // Le geste de la personne, qui a cliqué « Import » : l'acteur est une personne (R157).
+        judgeOrRefuse(record, userId, bundle, read.name(), gate.personFacts(read, "{}"));
+        judgeOrRefuse(record, userId, bundle, "create_project",
+            Map.of("action", "project.create", "tool", "create_project", "actor", "person"));
+        judgeOrRefuse(record, userId, bundle, "create_issue",
+            Map.of("action", "issue.create", "tool", "create_issue", "actor", "person"));
 
         String raw = read.execute(Map.of(), ctx);
         result(record, read.name(), "success", raw);

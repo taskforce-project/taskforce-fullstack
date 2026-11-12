@@ -63,6 +63,9 @@ class McpImportServiceTest {
     @Mock private com.taskforce.tf_api.core.service.AiUsageService aiUsageService;
     @Mock private HarnessRuleSetRepository ruleSets;
     @Mock private WorkspaceRepository workspaces;
+    @Mock private com.taskforce.tf_api.core.repository.WorkspaceMemberRepository members;
+    @Mock private com.taskforce.tf_api.core.repository.ProjectRepository projectRepository;
+    @Mock private com.taskforce.tf_api.core.repository.IssueRepository issueRepository;
     @Mock private CortexRecordService records;
     @Mock private McpClient mcp;
 
@@ -78,7 +81,7 @@ class McpImportServiceTest {
         lenient().when(records.append(any(), any(), any(), any())).thenReturn(Optional.of("hash"));
         service = new McpImportService(workspaceMcp, projectService, issueService, llm, json,
             new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm),
-            new CortexGate(new HarnessRulesService(ruleSets), workspaces), records);
+            new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projectRepository, issueRepository, json), records);
     }
 
     private ExternalMcpTool listTool(ToolClass cls) throws Exception {

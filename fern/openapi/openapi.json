@@ -165,6 +165,10 @@
       "description": "The workspace's MCP server (JSON-RPC over HTTP), for Claude Code with a personal access token."
     },
     {
+      "name": "Rules",
+      "description": "The company's rules in layers above TaskForce's floor: read them, write one in words and check its cases, add or remove it, and see what the rules would decide for an action."
+    },
+    {
       "name": "Dashboard"
     },
     {
@@ -1430,6 +1434,154 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseListString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/rules": {
+      "get": {
+        "tags": [
+          "Rules"
+        ],
+        "operationId": "listRules",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRulesOverview"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Rules"
+        ],
+        "operationId": "addRule",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRuleDraft"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/rules/drafts": {
+      "post": {
+        "tags": [
+          "Rules"
+        ],
+        "operationId": "draftRule",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRuleDraft"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/rules/check": {
+      "post": {
+        "tags": [
+          "Rules"
+        ],
+        "operationId": "checkAction",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRuleCheck"
                 }
               }
             }
@@ -11002,6 +11154,64 @@
         }
       }
     },
+    "/api/workspaces/{slug}/rules/{group}": {
+      "delete": {
+        "tags": [
+          "Rules"
+        ],
+        "operationId": "removeRule",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "[a-z0-9][a-z0-9-]{1,79}"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "workspace|project|process|role|person"
+            }
+          },
+          {
+            "name": "ref",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/projects/{projectId}/issues/{issueId}/worklogs/{worklogId}": {
       "delete": {
         "tags": [
@@ -13464,6 +13674,266 @@
           "timestamp": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "RuleDraftRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "workspace|project|process|role|person"
+          },
+          "ref": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "maxItems": 4,
+            "minItems": 0
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "maxItems": 8,
+            "minItems": 0
+          }
+        },
+        "required": [
+          "scope",
+          "text"
+        ]
+      },
+      "ApiResponseRuleDraft": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RuleDraft"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RuleApprover": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "RuleCaseView": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "facts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "expect": {
+            "type": "string"
+          },
+          "expectApprovers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleApprover"
+            }
+          },
+          "decision": {
+            "$ref": "#/components/schemas/RuleDecision"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      },
+      "RuleDecision": {
+        "type": "object",
+        "properties": {
+          "effect": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "string"
+          },
+          "ruleText": {
+            "type": "string"
+          },
+          "layer": {
+            "type": "string"
+          },
+          "layerName": {
+            "type": "string"
+          },
+          "approvers": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/RuleApprover"
+              }
+            }
+          },
+          "signatures": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "separate": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RuleDraft": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          },
+          "modelCases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleCaseView"
+            }
+          },
+          "broken": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleCaseView"
+            }
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleProblem"
+            }
+          },
+          "approverNeeded": {
+            "type": "string"
+          },
+          "unclear": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RuleProblem": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "RuleCheckRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 0
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "ApiResponseRuleCheck": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RuleCheck"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RuleCheck": {
+        "type": "object",
+        "properties": {
+          "facts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "decision": {
+            "$ref": "#/components/schemas/RuleDecision"
+          },
+          "unclear": {
+            "type": "string"
           }
         }
       },
@@ -18610,6 +19080,17 @@
             "type": "string",
             "maxLength": 500,
             "minLength": 0
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "maxItems": 20,
+            "minItems": 0
           }
         },
         "required": [
@@ -18701,6 +19182,48 @@
           },
           "sensitivity": {
             "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "over": {
+            "$ref": "#/components/schemas/Threshold"
+          }
+        }
+      },
+      "Layer": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "digest": {
+            "type": "string"
+          }
+        }
+      },
+      "Require": {
+        "type": "object",
+        "properties": {
+          "approvers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "signatures": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "separate": {
+            "type": "boolean"
           }
         }
       },
@@ -18730,6 +19253,15 @@
           },
           "review": {
             "type": "string"
+          },
+          "layer": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "require": {
+            "$ref": "#/components/schemas/Require"
           }
         }
       },
@@ -18760,6 +19292,15 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Rule"
+            }
+          },
+          "process": {
+            "type": "string"
+          },
+          "layers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Layer"
             }
           }
         }
@@ -18799,6 +19340,18 @@
           },
           "text": {
             "type": "string"
+          }
+        }
+      },
+      "Threshold": {
+        "type": "object",
+        "properties": {
+          "fact": {
+            "type": "string"
+          },
+          "value": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -20131,6 +20684,266 @@
           "timestamp": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseRulesOverview": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RulesOverview"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DefaultRuleView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "when": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "effect": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "RuleLayerView": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "author": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleStatement"
+            }
+          }
+        }
+      },
+      "RulePart": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "when": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "effect": {
+            "type": "string"
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "RulePerson": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "jobTitle": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "RuleProject": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "canEdit": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RuleStatement": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "effect": {
+            "type": "string"
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RulePart"
+            }
+          },
+          "approvers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleApprover"
+            }
+          },
+          "signatures": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "separate": {
+            "type": "boolean"
+          },
+          "addedBy": {
+            "type": "string"
+          },
+          "addedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleCaseView"
+            }
+          }
+        }
+      },
+      "RuleVersion": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "rules": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "RulesOverview": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "floor": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "defaults": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DefaultRuleView"
+            }
+          },
+          "layers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleLayerView"
+            }
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleVersion"
+            }
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RulePerson"
+            }
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleProject"
+            }
+          },
+          "canEdit": {
+            "type": "boolean"
           }
         }
       },
@@ -21892,6 +22705,28 @@
           },
           "scope": {
             "type": "string"
+          },
+          "waitingFor": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "signatures": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "separate": {
+            "type": "boolean"
+          },
+          "signedBy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

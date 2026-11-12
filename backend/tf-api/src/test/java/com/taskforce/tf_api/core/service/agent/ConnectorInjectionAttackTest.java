@@ -77,6 +77,10 @@ class ConnectorInjectionAttackTest {
     @Mock private CortexUndo undo;
     @Mock private HarnessRuleSetRepository ruleSets;
     @Mock private WorkspaceRepository workspaces;
+    @Mock private com.taskforce.tf_api.core.repository.WorkspaceMemberRepository members;
+    @Mock private com.taskforce.tf_api.core.repository.ProjectRepository projectRepository;
+    @Mock private com.taskforce.tf_api.core.repository.IssueRepository issueRepository;
+    @Mock private com.taskforce.tf_api.core.repository.ProjectMemberRepository projectMembers;
     @Mock private ScreenContext screens;
     @Mock private IssueMaterial material;
     @Mock private com.taskforce.tf_api.core.service.agent.tools.ProjectResolver projects;
@@ -94,7 +98,9 @@ class ConnectorInjectionAttackTest {
         Workspace owned = Workspace.builder().id(1L).slug("acme").name("Acme")
             .owner(User.builder().email("owner@acme.test").build()).build();
         lenient().when(workspaces.findById(1L)).thenReturn(Optional.of(owned));
-        ReflectionTestUtils.setField(service, "gate", new CortexGate(new HarnessRulesService(ruleSets), workspaces));
+        ReflectionTestUtils.setField(service, "gate", new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projectRepository, issueRepository, json));
+        ReflectionTestUtils.setField(service, "approvers",
+            new com.taskforce.tf_api.core.service.rules.RuleApprovers(members, projectMembers));
         ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
         ReflectionTestUtils.setField(service, "maxExternalTools", 20);
         lenient().when(records.open(any(), any(), any())).thenReturn(RECORD);

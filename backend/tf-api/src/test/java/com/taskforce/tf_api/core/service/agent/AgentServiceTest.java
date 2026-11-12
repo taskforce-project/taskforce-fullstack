@@ -38,6 +38,7 @@ import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.HarnessRuleSetRepository;
+import com.taskforce.tf_api.core.service.rules.RuleApprovers;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
@@ -91,6 +92,10 @@ class AgentServiceTest {
     @Mock private CortexUndo undo;
     @Mock private HarnessRuleSetRepository ruleSets;
     @Mock private WorkspaceRepository workspaces;
+    @Mock private com.taskforce.tf_api.core.repository.WorkspaceMemberRepository members;
+    @Mock private com.taskforce.tf_api.core.repository.ProjectMemberRepository projectMembers;
+    @Mock private com.taskforce.tf_api.core.repository.ProjectRepository projectRepository;
+    @Mock private com.taskforce.tf_api.core.repository.IssueRepository issueRepository;
     @Mock private ScreenContext screens;
     @Mock private IssueMaterial material;
     @Mock private com.taskforce.tf_api.core.service.agent.tools.ProjectResolver projects;
@@ -106,7 +111,9 @@ class AgentServiceTest {
         Workspace owned = Workspace.builder().id(1L).slug("acme").name("Acme")
             .owner(User.builder().email("owner@acme.test").build()).build();
         lenient().when(workspaces.findById(1L)).thenReturn(Optional.of(owned));
-        ReflectionTestUtils.setField(service, "gate", new CortexGate(new HarnessRulesService(ruleSets), workspaces));
+        ReflectionTestUtils.setField(service, "gate", new CortexGate(new HarnessRulesService(ruleSets, members),
+            workspaces, projectRepository, issueRepository, new ObjectMapper()));
+        ReflectionTestUtils.setField(service, "approvers", new RuleApprovers(members, projectMembers));
         lenient().when(records.open(any(), any(), any())).thenReturn(RECORD);
         lenient().when(records.append(any(), any(), any(), any())).thenReturn(Optional.of("hash"));
         lenient().when(records.incident(any(), any(), any(), any(), any())).thenReturn(RECORD);
@@ -533,7 +540,8 @@ class AgentServiceTest {
     /** Une règle de l'espace qui refuse tout. */
     private void denyEverything(String reason) {
         CortexGate deny = Mockito.mock(CortexGate.class);
-        when(deny.judge(any(), any(AgentTool.class))).thenReturn(new CortexGate.Verdict("deny", "frozen", reason, Map.of()));
+        lenient().when(deny.projectOf(any(), any())).thenReturn(Optional.empty());
+        when(deny.judge(any(), any(), any(), any())).thenReturn(new CortexGate.Verdict("deny", "frozen", reason, Map.of()));
         ReflectionTestUtils.setField(service, "gate", deny);
     }
 

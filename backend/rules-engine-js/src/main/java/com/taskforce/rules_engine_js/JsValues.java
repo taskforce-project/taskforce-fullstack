@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
+import com.taskforce.tf_api.core.harness.rules.RulesEngine;
 
 /**
  * Les valeurs JavaScript du runner, lues en types du moteur Java, et l'inverse. Rien n'y décide : un paquet de règles
@@ -28,7 +29,9 @@ final class JsValues {
 
     /**
      * Un paquet {@code taskforce-rules/1}. Une condition absente ou nulle n'en pose pas, comme côté serveur ; une règle
-     * sans {@code when} n'a pas de conditions du tout, et le moteur refuse de la juger, comme le serveur.
+     * sans {@code when} n'a pas de conditions du tout, et le moteur refuse de la juger, comme le serveur. La couche d'une
+     * règle, son seuil et ses obligations se lisent comme le serveur les écrit ; les couches du paquet ne servent qu'au
+     * dossier et ne se lisent pas ici.
      */
     static RulesBundle bundle(JSObject b) {
         JSObject rules = member(b, "rules");
@@ -40,13 +43,74 @@ final class JsValues {
             RulesBundle.Condition when = isObject(w)
                 ? new RulesBundle.Condition(string(w, "action"), string(w, "tool"), string(w, "command"),
                     string(w, "path"), string(w, "branch"), string(w, "repoVisibility"), string(w, "server"),
-                    string(w, "sensitivity"))
+                    string(w, "sensitivity"), string(w, "actor"), threshold(member(w, "over")))
                 : null;
             list.add(new RulesBundle.Rule(string(r, "id"), when, string(r, "class"), string(r, "effect"),
-                string(r, "inverse"), string(r, "owner"), string(r, "reason"), string(r, "review")));
+                string(r, "inverse"), string(r, "owner"), string(r, "reason"), string(r, "review"),
+                string(r, "layer"), string(r, "text"), require(member(r, "require"))));
         }
         return new RulesBundle(string(b, "format"), string(b, "workspace"), null, integer(b, "version"),
-            string(b, "digest"), string(b, "issuedAt"), list);
+            string(b, "digest"), string(b, "issuedAt"), list, string(b, "process"), null);
+    }
+
+    /** Un seuil {@code {fact, value}} ; absent, la condition n'en pose pas. */
+    private static RulesBundle.Threshold threshold(JSObject over) {
+        if (!isObject(over)) {
+            return null;
+        }
+        return new RulesBundle.Threshold(string(over, "fact"), (long) number(member(over, "value")));
+    }
+
+    /** Les obligations d'une règle qui demande ; absentes, elle n'en ajoute pas. */
+    private static RulesBundle.Require require(JSObject req) {
+        if (!isObject(req)) {
+            return null;
+        }
+        JSObject approvers = member(req, "approvers");
+        List<String> names = null;
+        if (isArray(approvers)) {
+            int n = length(approvers);
+            names = new ArrayList<>(n);
+            for (int i = 0; i < n; i++) {
+                names.add(itemString(approvers, i));
+            }
+        }
+        int signatures = optionalInteger(req, "signatures");
+        return new RulesBundle.Require(names, signatures < 0 ? null : signatures, flag(req, "separate"));
+    }
+
+    /** Les obligations d'une décision, en valeurs JavaScript : {@code {approvers: string[][], signatures, separate}}. */
+    static JSObject obligations(RulesEngine.Obligations require) {
+        if (require == null) {
+            return null;
+        }
+        JSObject sets = newArray();
+        for (List<String> set : require.approvers()) {
+            JSObject names = newArray();
+            for (String name : set) {
+                push(names, ofString(name));
+            }
+            push(sets, names);
+        }
+        JSObject out = newObject();
+        set(out, "approvers", sets);
+        set(out, "signatures", ofNumber(require.signatures()));
+        set(out, "separate", ofBoolean(require.separate()));
+        return out;
+    }
+
+    /** Une règle du socle, qui n'est dans aucun paquet : un objet comme ceux du paquet, sans conditions. */
+    static JSObject floorRule(RulesBundle.Rule rule) {
+        JSObject out = newObject();
+        set(out, "id", ofString(rule.id()));
+        set(out, "when", newObject());
+        set(out, "class", ofString(rule.actionClass()));
+        set(out, "effect", ofString(rule.effect()));
+        set(out, "inverse", null);
+        set(out, "owner", ofString(rule.owner()));
+        set(out, "reason", ofString(rule.reason()));
+        set(out, "review", ofString(rule.review()));
+        return out;
     }
 
     /** Ce qu'on sait d'une action, par nom de condition ; un fait nul est un fait absent. */
@@ -166,6 +230,18 @@ final class JsValues {
 
     @JSBody(params = { "o", "k" }, script = "return o[k] | 0;")
     private static native int integer(JSObject o, String k);
+
+    @JSBody(params = { "o", "k" }, script = "var v = o[k]; return v === undefined || v === null ? -1 : v | 0;")
+    private static native int optionalInteger(JSObject o, String k);
+
+    @JSBody(params = { "o", "k" }, script = "return o[k] === true;")
+    private static native boolean flag(JSObject o, String k);
+
+    @JSBody(params = "v", script = "return Array.isArray(v);")
+    private static native boolean isArray(JSObject v);
+
+    @JSBody(params = { "o", "i" }, script = "var v = o[i]; return v === undefined || v === null ? null : String(v);")
+    private static native String itemString(JSObject o, int i);
 
     @JSBody(params = { "o", "k" }, script = "return o[k];")
     static native JSObject member(JSObject o, String k);
