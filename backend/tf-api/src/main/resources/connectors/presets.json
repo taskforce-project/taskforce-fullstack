@@ -3,6 +3,33 @@
   "version": 1,
   "presets": [
     {
+      "key": "google-drive",
+      "name": "Google Drive",
+      "category": "FILES_STORAGE",
+      "description": "Docs, Sheets and the files you choose",
+      "website": "https://drive.google.com",
+      "connection": "our-app",
+      "api": {
+        "kind": "google-drive",
+        "issuer": "https://accounts.google.com",
+        "base": "https://www.googleapis.com",
+        "app": "TF_GOOGLE",
+        "authorize": { "access_type": "offline", "prompt": "consent", "include_granted_scopes": "true" }
+      },
+      "scopes": {
+        "read": ["openid", "email", "https://www.googleapis.com/auth/drive.file"],
+        "write": ["openid", "email", "https://www.googleapis.com/auth/drive.file"]
+      },
+      "admin": {
+        "required": false,
+        "text": "If your Google Workspace limits third-party apps, an admin allows TaskForce once in the Google Admin console: Security, Access and data control, API controls, Manage third-party app access.",
+        "link": "https://admin.google.com/ac/owl/list?tab=configuredApps"
+      },
+      "tools": { "read": ["search_files", "read_file"], "write": [] },
+      "sources": ["https://developers.google.com/workspace/drive/api/guides/api-specific-auth", "https://developers.google.com/workspace/drive/picker/guides/overview", "https://developers.google.com/identity/protocols/oauth2/native-app", "https://accounts.google.com/.well-known/openid-configuration"],
+      "unverified": ["the picker inside the desktop app's window", "a loopback return address with a path for a Desktop app client"]
+    },
+    {
       "key": "linear",
       "name": "Linear",
       "category": "TICKETS_PROJECTS",

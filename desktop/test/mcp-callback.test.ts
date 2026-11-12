@@ -137,4 +137,25 @@ describe("connectorEnvironment", () => {
     assert.equal(env.TF_MCP_ASANA_OTHER, undefined);
     assert.equal(env.AWS_SECRET_ACCESS_KEY, undefined);
   });
+
+  it("passes our Google and Microsoft apps, never a Microsoft secret: the desktop app is a public client for Entra", () => {
+    const env = connectorEnvironment("http://127.0.0.1:47816/mcp/callback", "https://api.example.test", {
+      TF_GOOGLE_CLIENT_ID: "g-id",
+      TF_GOOGLE_CLIENT_SECRET: "g-secret",
+      TF_GOOGLE_API_KEY: "g-key",
+      TF_GOOGLE_APP_ID: "123",
+      TF_GOOGLE_OTHER: "no",
+      TF_MICROSOFT_CLIENT_ID: "m-id",
+      TF_MICROSOFT_CLIENT_SECRET: "m-secret",
+      TF_MICROSOFT_TENANT: "common",
+    });
+    assert.equal(env.TF_GOOGLE_CLIENT_ID, "g-id");
+    assert.equal(env.TF_GOOGLE_CLIENT_SECRET, "g-secret");
+    assert.equal(env.TF_GOOGLE_API_KEY, "g-key");
+    assert.equal(env.TF_GOOGLE_APP_ID, "123");
+    assert.equal(env.TF_GOOGLE_OTHER, undefined);
+    assert.equal(env.TF_MICROSOFT_CLIENT_ID, "m-id");
+    assert.equal(env.TF_MICROSOFT_TENANT, "common");
+    assert.equal(env.TF_MICROSOFT_CLIENT_SECRET, undefined);
+  });
 });

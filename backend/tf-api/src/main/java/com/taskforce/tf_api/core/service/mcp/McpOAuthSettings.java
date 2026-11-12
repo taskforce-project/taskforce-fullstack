@@ -58,6 +58,21 @@ public class McpOAuthSettings {
             : cimdUrl.trim();
     }
 
+    /**
+     * Le locataire Microsoft Entra de notre application : {@code common} (comptes professionnels et personnels) par
+     * défaut ; une installation auto-hébergée avec une application d'un seul locataire met le sien
+     * ({@code TF_MICROSOFT_TENANT}).
+     */
+    @Value("${TF_MICROSOFT_TENANT:common}")
+    private String microsoftTenant = "common";
+
+    /** L'émetteur d'une API d'éditeur, avec le locataire de l'instance à la place de {@code {tenant}}. */
+    public String apiIssuer(String issuer) {
+        String tenant = microsoftTenant == null ? "" : microsoftTenant.trim();
+        if (!tenant.matches("[A-Za-z0-9][A-Za-z0-9.-]{0,63}")) tenant = "common";
+        return issuer.replace("{tenant}", tenant);
+    }
+
     /** L'adresse de retour inscrite chez l'éditeur. */
     public String redirectUri() {
         return redirectUri;

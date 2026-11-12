@@ -50,6 +50,9 @@ public class McpTokenService {
     static final String K_CLIENT_SOURCE = "mcpClientSource";
     static final String K_RESOURCE     = "mcpResource";      // = resource (RFC 8707), tel que la PRM le declare
     static final String K_MCP_URL      = "mcpUrl";
+    /** Un outil servi par l'API de son éditeur (Google Drive, Microsoft Graph) : pas de {@code resource}, et ses portées. */
+    static final String K_API          = "apiKind";
+    static final String K_GRANTED      = "apiScope";
     // Clés de WorkspaceMcpService : nom d'un serveur personnalisé, jeton collé et son en-tête.
     static final String K_MCP_NAME      = WorkspaceMcpService.CONFIG_NAME;
     static final String K_PASTED_TOKEN  = WorkspaceMcpService.CONFIG_TOKEN;
@@ -173,6 +176,30 @@ public class McpTokenService {
         if (conn.getId() != null) fresh.remove(conn.getId());
     }
 
+    /**
+     * Marque une connexion servie par l'API de son éditeur ({@code kind}), avec les portées qu'il a vraiment accordées :
+     * l'écriture chez Microsoft dépend de ce que la personne, ou son administrateur, a accepté.
+     */
+    @Transactional
+    public void markApi(ConnectorConnection conn, String kind, String grantedScope) {
+        Map<String, String> config = read(conn.getConfig());
+        config.put(K_API, kind);
+        putOrRemove(config, K_GRANTED, grantedScope);
+        conn.setConfig(write(config));
+        repository.save(conn);
+        if (conn.getId() != null) fresh.remove(conn.getId());
+    }
+
+    /** L'outil de cette connexion est-il servi par l'API de son éditeur ? Son genre, sinon nul. */
+    public static String apiKind(Map<String, String> config) {
+        return config == null ? null : config.get(K_API);
+    }
+
+    /** Les portées que l'éditeur a accordées à cette connexion, séparées par des espaces ; vide s'il ne l'a pas dit. */
+    public String grantedScope(ConnectorConnection conn) {
+        return read(conn.getConfig()).getOrDefault(K_GRANTED, "");
+    }
+
     /** Ce que le retour du navigateur a obtenu, à garder avec les jetons. */
     public record OAuthGrant(String mcpUrl, String name, String issuer, String clientId, String clientSecret,
                              String tokenEndpoint, String revocationEndpoint, String clientSource, String resource) {}
@@ -225,6 +252,9 @@ public class McpTokenService {
         String refresh = tok.path("refresh_token").asText(null);
         if (refresh != null && !refresh.isBlank()) config.put(K_REFRESH, refresh);
         else if (fallbackRefresh != null) config.put(K_REFRESH, fallbackRefresh);
+        // Les portées accordées, que l'éditeur redit au renouvellement (Microsoft) : seulement pour une API d'éditeur.
+        String granted = tok.path("scope").asText(null);
+        if (config.containsKey(K_API) && granted != null && !granted.isBlank()) config.put(K_GRANTED, granted);
         long expiresIn = tok.path("expires_in").asLong(0);
         if (expiresIn > 0) {
             config.put(K_EXPIRES, String.valueOf(System.currentTimeMillis() + expiresIn * 1000));
@@ -239,8 +269,11 @@ public class McpTokenService {
         f.put("refresh_token", refresh);
         if (config.get(K_CLIENT_ID) != null) f.put("client_id", config.get(K_CLIENT_ID));
         if (config.get(K_CLIENT_SECRET) != null) f.put("client_secret", config.get(K_CLIENT_SECRET));
-        String resource = config.get(K_RESOURCE) != null ? config.get(K_RESOURCE) : config.get(K_MCP_URL);
-        if (resource != null) f.put("resource", resource);
+        // L'API d'un éditeur (Google, Entra) refuse le paramètre resource (RFC 8707) : seulement pour un serveur MCP.
+        if (config.get(K_API) == null) {
+            String resource = config.get(K_RESOURCE) != null ? config.get(K_RESOURCE) : config.get(K_MCP_URL);
+            if (resource != null) f.put("resource", resource);
+        }
         return f;
     }
 

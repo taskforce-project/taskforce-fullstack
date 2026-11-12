@@ -107,6 +107,37 @@ public class McpOAuthDiscovery {
             as.path("authorization_response_iss_parameter_supported").asBoolean(false));
     }
 
+    /**
+     * Le serveur d'autorisation d'un outil servi par l'API de son éditeur (Google Drive, Microsoft Graph), sans serveur
+     * MCP devant : sa metadata (RFC 8414, sinon OpenID Connect), avec les mêmes exigences qu'un serveur MCP (l'émetteur qui
+     * se nomme comme on l'a trouvé, PKCE S256). Sans {@code resource} : ces éditeurs n'en veulent pas.
+     */
+    public DiscoveredAuth discoverIssuer(String issuerUrl) {
+        JsonNode as = null;
+        for (String candidate : asMetadataUrls(issuerUrl)) {
+            as = client.getJsonOrNull(candidate);
+            if (as != null && as.isObject()) break;
+            as = null;
+        }
+        if (as == null) throw new NoOAuth(issuerUrl);
+        String issuer = text(as, "issuer");
+        if (issuer == null || !sameIssuer(issuer, issuerUrl)) {
+            throw new BusinessException("The sign-in server " + issuerUrl + " does not identify itself as such: "
+                + "TaskForce does not connect to it.");
+        }
+        String authEp = text(as, "authorization_endpoint");
+        String tokenEp = text(as, "token_endpoint");
+        if (authEp == null || tokenEp == null) {
+            throw new BusinessException("Incomplete OAuth endpoints for " + issuerUrl);
+        }
+        if (!supportsS256(as)) {
+            throw new BusinessException("The sign-in server " + issuerUrl + " does not announce PKCE (S256): "
+                + "TaskForce can't sign in to it safely.");
+        }
+        return new DiscoveredAuth(issuer, authEp, tokenEp, null, null, null, null, text(as, "revocation_endpoint"),
+            false, as.path("authorization_response_iss_parameter_supported").asBoolean(false));
+    }
+
     // -------------------------------------------------------------------------
 
     private JsonNode fetchPrm(String mcpUrl, String header) {

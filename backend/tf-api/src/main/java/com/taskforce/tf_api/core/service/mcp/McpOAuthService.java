@@ -85,6 +85,13 @@ public class McpOAuthService {
         urlGuard = url -> { };
     }
 
+    /** L'émetteur et l'adresse de l'API d'un éditeur, remplacés par ceux d'un faux éditeur (essais de contrat seulement). */
+    private final Map<String, String[]> apiForContractTests = new java.util.concurrent.ConcurrentHashMap<>();
+
+    void pointApiForContractTests(String connectorKey, String issuer, String base) {
+        apiForContractTests.put(connectorKey, new String[] { issuer, base });
+    }
+
     /** Ce que demande une connexion. {@code mcpUrl} : l'adresse d'un serveur ajouté à la main, ou celle que l'entreprise
      *  a créée chez l'éditeur ; nulle pour un préréglage. {@code token} : la clé guidée. */
     public record ConnectRequest(String connectorKey, String name, String mcpUrl, String token, String authHeader,
@@ -113,6 +120,7 @@ public class McpOAuthService {
     @Transactional
     public ConnectOutcome connect(Workspace ws, User person, boolean manager, ConnectRequest req) {
         Optional<ConnectorPreset> preset = catalog.preset(req.connectorKey());
+        if (preset.isPresent() && preset.get().api() != null) return connectApi(ws, person, manager, req, preset.get());
         ConnectionPath path = preset.map(ConnectorPreset::connection).orElse(ConnectionPath.SELF_REGISTRATION);
         String url = preset.filter(p -> p.mcpUrl() != null).map(p -> p.urlFor(req.allowWrites()))
             .orElse(req.mcpUrl() == null ? null : req.mcpUrl().trim());
@@ -151,6 +159,61 @@ public class McpOAuthService {
             }
             return adminStep(preset.orElse(null), manager);
         }
+    }
+
+    /**
+     * Un outil servi par l'API de son éditeur (Google Drive, Microsoft 365), sans serveur MCP : le même geste, la même
+     * connexion par personne et le même retour ; le client est celui de l'entreprise, sinon le nôtre. Sans l'un ni
+     * l'autre, l'étape de l'administrateur : un propriétaire ou un administrateur saisit l'application de l'entreprise.
+     */
+    private ConnectOutcome connectApi(Workspace ws, User person, boolean manager, ConnectRequest req,
+                                      ConnectorPreset preset) {
+        try {
+            return ConnectOutcome.browser(startApi(ws, person.getId(), req, preset));
+        } catch (McpClientRegistrar.NoClient none) {
+            return ConnectOutcome.of(manager ? "company-app" : "admin",
+                "This tool needs an app registered by your admin before anyone can connect.");
+        }
+    }
+
+    /**
+     * Démarre la connexion à l'API d'un éditeur : la metadata de son émetteur, notre client ou celui de l'entreprise,
+     * PKCE S256, les seules portées du préréglage (la lecture par défaut), les paramètres que l'éditeur attend en plus.
+     * Le retour est celui des serveurs MCP ({@link #callback}).
+     */
+    @Transactional
+    public String startApi(Workspace ws, Long userId, ConnectRequest req, ConnectorPreset preset) {
+        ConnectorPreset.Api api = preset.api();
+        String[] fake = apiForContractTests.get(preset.key());
+        String issuer = fake != null ? fake[0] : settings.apiIssuer(api.issuer());
+        String base = fake != null ? fake[1] : api.base();
+        urlGuard.accept(issuer);
+        DiscoveredAuth auth = discovery.discoverIssuer(issuer);
+        urlGuard.accept(auth.authorizationEndpoint());
+        String redirectUri = settings.redirectUri();
+        McpClientRegistrar.RegisteredClient registered = registrar.clientForApi(ws.getId(), preset.key(), api.app());
+
+        String verifier = urlSafe(48);
+        String state = urlSafe(24);
+        String scope = String.join(" ", preset.scopesFor(req.allowWrites()));
+        stateRepository.save(McpOAuthState.builder()
+            .state(state).workspaceId(ws.getId()).userId(userId)
+            .connectorKey(preset.key()).mcpName(null).mcpUrl(base).codeVerifier(verifier)
+            .tokenEndpoint(auth.tokenEndpoint()).clientId(registered.clientId()).clientSecret(registered.clientSecret())
+            .redirectUri(redirectUri).scope(scope).issuer(auth.issuer())
+            .returnTo(sanitizeReturnTo(req.returnTo()))
+            .shared(req.shared()).allowWrites(req.allowWrites()).resource(null)
+            .revocationEndpoint(auth.revocationEndpoint()).clientSource(registered.source())
+            .issRequired(auth.issParameterSupported())
+            .expiresAt(LocalDateTime.now().plus(STATE_TTL))
+            .build());
+        return authorizeUrl(auth.authorizationEndpoint(), registered.clientId(), redirectUri, scope, state,
+            s256(verifier), null, api.authorize());
+    }
+
+    /** L'outil de cette clé est-il servi par l'API de son éditeur ? Son API, sinon nulle. */
+    private ConnectorPreset.Api apiOf(String connectorKey) {
+        return catalog.preset(connectorKey).map(ConnectorPreset::api).orElse(null);
     }
 
     /** L'étape de l'administrateur : l'administrateur saisit l'application de l'entreprise, la personne lui écrit. */
@@ -267,6 +330,8 @@ public class McpOAuthService {
             tokenService.storeInitialTokens(conn, tok, new McpTokenService.OAuthGrant(row.getMcpUrl(), row.getMcpName(),
                 row.getIssuer(), row.getClientId(), row.getClientSecret(), row.getTokenEndpoint(),
                 row.getRevocationEndpoint(), row.getClientSource(), row.getResource()));
+            ConnectorPreset.Api api = apiOf(row.getConnectorKey());
+            if (api != null) tokenService.markApi(conn, api.kind(), tok.path("scope").asText(null));
             // La liste des outils, figée à la connexion (R158).
             conn.setToolsPin(null);
             workspaceMcp.pinQuietly(conn);
@@ -368,12 +433,21 @@ public class McpOAuthService {
             f.put("client_secret", row.getClientSecret());
         }
         f.put("code_verifier", row.getCodeVerifier());
-        f.put("resource", row.getResource() != null ? row.getResource() : row.getMcpUrl());
+        // L'API d'un éditeur (Google, Entra) refuse resource (RFC 8707) : seulement pour un serveur MCP.
+        if (apiOf(row.getConnectorKey()) == null) {
+            f.put("resource", row.getResource() != null ? row.getResource() : row.getMcpUrl());
+        }
         return f;
     }
 
     private String authorizeUrl(String authEp, String clientId, String redirectUri, String scope,
                                 String state, String challenge, String resource) {
+        return authorizeUrl(authEp, clientId, redirectUri, scope, state, challenge, resource, Map.of());
+    }
+
+    /** L'adresse d'autorisation ; {@code resource} nul pour l'API d'un éditeur, {@code extra} ce qu'il attend en plus. */
+    private String authorizeUrl(String authEp, String clientId, String redirectUri, String scope,
+                                String state, String challenge, String resource, Map<String, String> extra) {
         StringBuilder u = new StringBuilder(authEp)
             .append(authEp.contains("?") ? "&" : "?")
             .append("response_type=code")
@@ -381,9 +455,10 @@ public class McpOAuthService {
             .append("&redirect_uri=").append(enc(redirectUri))
             .append("&state=").append(enc(state))
             .append("&code_challenge=").append(enc(challenge))
-            .append("&code_challenge_method=S256")
-            .append("&resource=").append(enc(resource));
+            .append("&code_challenge_method=S256");
+        if (resource != null) u.append("&resource=").append(enc(resource));
         if (scope != null && !scope.isBlank()) u.append("&scope=").append(enc(scope));
+        if (extra != null) extra.forEach((k, v) -> u.append('&').append(enc(k)).append('=').append(enc(v)));
         return u.toString();
     }
 

@@ -138,7 +138,8 @@ public class ConnectorCatalog {
         String key = required(n, "key");
         ConnectionPath connection = ConnectionPath.of(required(n, "connection"));
         String mcpUrl = text(n, "mcpUrl");
-        if (mcpUrl == null && connection != ConnectionPath.SERVER_URL) {
+        ConnectorPreset.Api api = api(key, n.path("api"));
+        if (mcpUrl == null && connection != ConnectionPath.SERVER_URL && api == null) {
             throw new IllegalStateException("Preset " + key + " has no mcpUrl");
         }
         if (mcpUrl != null && !mcpUrl.startsWith("https://")) {
@@ -163,7 +164,21 @@ public class ConnectorCatalog {
                 text(apiKey, "header")) : null,
             Collections.unmodifiableSet(read), Collections.unmodifiableSet(write),
             tried.isObject() ? new ConnectorPreset.Tried(required(tried, "date"), required(tried, "proof")) : null,
-            text(n, "blocked"), list(n.path("sources")), list(n.path("unverified")));
+            text(n, "blocked"), list(n.path("sources")), list(n.path("unverified")), api);
+    }
+
+    /** L'API d'un éditeur que TaskForce sert lui-même : son émetteur et son adresse, en HTTPS. */
+    private static ConnectorPreset.Api api(String key, JsonNode a) {
+        if (a == null || !a.isObject()) return null;
+        String issuer = required(a, "issuer");
+        String base = required(a, "base");
+        if (!issuer.startsWith("https://") || !base.startsWith("https://")) {
+            throw new IllegalStateException("Preset " + key + " must use an HTTPS sign-in server and API");
+        }
+        Map<String, String> authorize = new LinkedHashMap<>();
+        a.path("authorize").fields().forEachRemaining(f -> authorize.put(f.getKey(), f.getValue().asText()));
+        return new ConnectorPreset.Api(required(a, "kind"), issuer, base, required(a, "app"),
+            Collections.unmodifiableMap(authorize));
     }
 
     private static String required(JsonNode n, String field) {

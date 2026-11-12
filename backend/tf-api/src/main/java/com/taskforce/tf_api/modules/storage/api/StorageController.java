@@ -3,6 +3,7 @@ package com.taskforce.tf_api.modules.storage.api;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.modules.storage.domain.StoredDocument;
+import com.taskforce.tf_api.modules.storage.service.GooglePickerService;
 import com.taskforce.tf_api.modules.storage.service.StorageTargetService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -40,6 +42,7 @@ import lombok.RequiredArgsConstructor;
 public class StorageController {
 
     private final StorageTargetService storage;
+    private final GooglePickerService picker;
     private final UserRepository userRepository;
     private final JwtIdentityResolver identityResolver;
 
@@ -102,6 +105,18 @@ public class StorageController {
         Map<String, String> out = new LinkedHashMap<>();
         out.put("url", storage.writer(doc.getKind()).link(doc));
         return ResponseEntity.ok(ApiResponse.success(out));
+    }
+
+    /**
+     * Ce qu'il faut au sélecteur de Google Drive : la clé du navigateur, le projet Google, et le jeton court de la
+     * connexion de la personne elle-même. Jamais gardé en cache.
+     */
+    @GetMapping("/storage/google/picker")
+    public ResponseEntity<ApiResponse<GooglePickerService.PickerConfig>> googlePicker(
+        @PathVariable String slug, @AuthenticationPrincipal Jwt jwt) {
+        Long user = userId(jwt);
+        GooglePickerService.PickerConfig config = picker.config(storage.workspaceId(slug, user), user);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ApiResponse.success(config));
     }
 
     private Long userId(Jwt jwt) {

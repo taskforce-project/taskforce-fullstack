@@ -42,13 +42,13 @@ class ConnectorCatalogTest {
     // ── Intégrité globale ────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("trois natives et 31 préréglages MCP, rien d'autre")
+    @DisplayName("trois natives et 32 préréglages, rien d'autre")
     void troisNativesEtTrenteEtUnPrereglages() {
         assertThat(catalogue.all())
             .filteredOn(d -> d.authType() != ConnectorAuthType.MCP)
             .extracting(ConnectorDescriptor::key)
             .containsExactly("plane", "github", "slack");
-        assertThat(catalogue.all()).filteredOn(d -> d.authType() == ConnectorAuthType.MCP).hasSize(31);
+        assertThat(catalogue.all()).filteredOn(d -> d.authType() == ConnectorAuthType.MCP).hasSize(32);
     }
 
     @Test
@@ -102,8 +102,11 @@ class ConnectorCatalogTest {
             assertThat(d.fields()).isEmpty();
             assertThat(d.capabilities()).containsExactly("mcp");
             assertThat(d.docsUrl()).isNull();
-            // Sauf le serveur que l'entreprise crée chez l'éditeur (Zoho) : son adresse vient de la personne.
-            if (d.preset().connection() != ConnectionPath.SERVER_URL) assertThat(d.mcpSuggestedUrl()).startsWith("https://");
+            // Sauf le serveur que l'entreprise crée chez l'éditeur (Zoho) : son adresse vient de la personne ; et l'API
+            // d'un éditeur que TaskForce sert lui-même (Google Drive), sans serveur MCP.
+            if (d.preset().connection() != ConnectionPath.SERVER_URL && d.preset().api() == null) {
+                assertThat(d.mcpSuggestedUrl()).startsWith("https://");
+            }
         });
     }
 
@@ -223,12 +226,12 @@ class ConnectorCatalogTest {
     // ── Préréglages essayés (TF-J1-3) ────────────────────────────────────────
 
     @Test
-    @DisplayName("un seul préréglage essayé de bout en bout : Linear ; les 30 autres restent déclarés")
+    @DisplayName("un seul préréglage essayé de bout en bout : Linear ; les 31 autres restent déclarés")
     void unSeulPrereglageEssaye() {
         assertThat(catalogue.all()).filteredOn(d -> catalogue.isTriedPreset(d.key()))
             .extracting(ConnectorDescriptor::key).containsExactly("linear");
         assertThat(catalogue.all()).filteredOn(d -> d.authType() == ConnectorAuthType.MCP)
-            .filteredOn(d -> !catalogue.isTriedPreset(d.key())).hasSize(30);
+            .filteredOn(d -> !catalogue.isTriedPreset(d.key())).hasSize(31);
     }
 
     @ParameterizedTest(name = "{0} -> {1}")

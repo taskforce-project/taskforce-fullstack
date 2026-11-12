@@ -169,6 +169,12 @@ public class StorageTargetService {
         return doc;
     }
 
+    /** L'espace de ce slug, si la personne en est membre. */
+    @Transactional(readOnly = true)
+    public Long workspaceId(String slug, Long userId) {
+        return member(slug, userId).getId();
+    }
+
     /** L'écrivain d'une cible. */
     public DocumentWriter writer(StorageKind kind) {
         for (DocumentWriter w : writers) if (w.kind() == kind) return w;
