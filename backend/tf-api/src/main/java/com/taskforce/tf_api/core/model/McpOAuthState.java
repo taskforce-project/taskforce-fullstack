@@ -88,6 +88,36 @@ public class McpOAuthState {
     @Column(name = "return_to", length = 500)
     private String returnTo;
 
+    /**
+     * La connexion sera-t-elle partagee avec l'espace (V126) ? Faux par defaut : elle appartient a qui l'a lancee
+     * ({@link #userId}).
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean shared = false;
+
+    /** L'ecriture a-t-elle ete accordee ? Sinon, les seules portees et l'adresse de la lecture (R158). */
+    @Column(name = "allow_writes", nullable = false)
+    @Builder.Default
+    private boolean allowWrites = false;
+
+    /** L'identifiant du serveur MCP envoye en {@code resource} (RFC 8707), tel que sa PRM le declare. */
+    @Column(columnDefinition = "TEXT")
+    private String resource;
+
+    /** Revocation du jeton chez l'editeur a la deconnexion (RFC 7009), quand il en offre une. */
+    @Column(name = "revocation_endpoint", columnDefinition = "TEXT")
+    private String revocationEndpoint;
+
+    /** D'ou vient le client : company, ours, cimd ou dcr (pour le dire, et pour la deconnexion). */
+    @Column(name = "client_source", length = 16)
+    private String clientSource;
+
+    /** Le serveur d'autorisation annonce-t-il {@code iss} au retour (RFC 9207) ? Alors il est exige. */
+    @Column(name = "iss_required", nullable = false)
+    @Builder.Default
+    private boolean issRequired = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

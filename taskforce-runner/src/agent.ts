@@ -6,6 +6,7 @@ import { ApprovalServer, type ApprovalApi } from "./approvals.js";
 import type { RunnerConfig } from "./config.js";
 import { EventRelay, type EventSink } from "./events.js";
 import type { RulesBundle } from "./harness/engine/rules-engine.js";
+import type { Exposure } from "./harness/exposure.js";
 import { log } from "./log.js";
 import { run, type StdinChannel } from "./proc.js";
 import { buildFollowUpPrompt, buildPrompt, buildReplyPrompt } from "./prompt.js";
@@ -224,6 +225,8 @@ export interface AgentRunOptions {
   mode: AgentMode;
   /** Les règles de la mission, déjà vérifiées par leur empreinte. */
   rules: RulesBundle;
+  /** Ce que la mission a en main pour le socle (R158) : partagé avec les sorties qui suivent le travail de l'agent. */
+  exposure?: Exposure;
   /** Nom de la branche git (mode `repo`) ; absent en mode `repoless`. */
   branch?: string;
   /** Arrêt du runner : Claude Code est arrêté tout de suite, le run finit en échec. */
@@ -254,6 +257,7 @@ export async function runAgent(
   const approvals = new ApprovalServer(api, claim.runId, workDir, {
     waitMs: config.agent.approvalTimeoutMinutes * 60_000,
     rules: opts.rules,
+    exposure: opts.exposure,
     allowedInAdvance: config.agent.extraAllowedTools,
     // Au-delà de ce nombre de changements dans TaskForce sur la mission, chacun se demande (R110).
     maxTaskForceChanges: config.agent.maxTaskForceChanges,

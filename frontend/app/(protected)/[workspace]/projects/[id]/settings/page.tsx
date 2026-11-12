@@ -16,6 +16,7 @@ import {
   Pencil,
   Check,
   X,
+  Scale,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -24,6 +25,8 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { ProjectMembersManager } from "@/components/projects/project-members-manager"
 import { ProjectRepositoryCard } from "@/components/projects/project-repository-card"
+import { RulesPanel } from "@/components/rules/rules-panel"
+import { CONSTANTS_EN } from "@/lib/constants_en"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import {
   Select,
@@ -61,6 +64,8 @@ const SECTIONS = [
   ...(IS_DESKTOP ? [] : [{ key: "members", label: "Members", icon: Users }] as const),
   { key: "labels",       label: "Labels",       icon: Tag },
   { key: "integrations", label: "Integrations", icon: GitBranch },
+  // Les règles de ce projet (R157), au-dessus de celles de l'espace.
+  { key: "rules",        label: CONSTANTS_EN.rules.settingsLabel, icon: Scale },
 ] as const
 
 // ---------------------------------------------------------------------------
@@ -485,6 +490,12 @@ export default function ProjectSettingsPage() {
           </Button>
         </div>
         </div>
+      </section>
+      )}
+
+      {section === "rules" && (
+      <section>
+        <RulesPanel projectId={projectId} slug={workspace} />
       </section>
       )}
 

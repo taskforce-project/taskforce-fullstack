@@ -130,7 +130,10 @@ public class SecurityConfig {
         "/api/integrations/slack/callback",
         // Callback OAuth des serveurs MCP (TF-MCP-02) : le fournisseur y redirige le navigateur ;
         // tout est résolu depuis le `state` (anti-CSRF), aucun JWT possible sur cette redirection.
-        "/api/mcp/oauth/callback"
+        "/api/mcp/oauth/callback",
+        // Nos documents de métadonnées client (CIMD) : le serveur d'autorisation d'un éditeur les lit (TF-J2-12).
+        "/api/mcp/oauth/client.json",
+        "/api/mcp/oauth/desktop-client.json"
     };
 
     // CSP stricte pour une API REST (pas de HTML servi — aucune ressource active autorisée)

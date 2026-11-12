@@ -359,6 +359,16 @@ public class IssueService {
     @Transactional
     public IssueResponse createIssue(String workspaceSlug, Long projectId,
                                      CreateIssueRequest request, Long reporterId, String via) {
+        return createIssue(workspaceSlug, projectId, request, reporterId, via, null);
+    }
+
+    /**
+     * Crée une issue que l'import tire d'un outil de l'entreprise : {@code importedFrom}, la clé de son connecteur
+     * (séance n°22, R158), que Cortex lit comme un contenu du dehors ; null pour une issue écrite dans TaskForce.
+     */
+    @Transactional
+    public IssueResponse createIssue(String workspaceSlug, Long projectId, CreateIssueRequest request, Long reporterId,
+                                     String via, String importedFrom) {
         Project project = resolveWritableProject(workspaceSlug, projectId, reporterId);
 
         User reporter = resolveUser(reporterId);
@@ -415,6 +425,7 @@ public class IssueService {
             .startDate(request.getStartDate() != null ? LocalDate.parse(request.getStartDate()) : null)
             .dueDate(request.getDueDate() != null ? LocalDate.parse(request.getDueDate()) : null)
             .storyPoints(request.getStoryPoints() != null && request.getStoryPoints() > 0 ? request.getStoryPoints() : null)
+            .importedFrom(importedFrom)
             .build();
 
         issue = issueRepository.save(issue);

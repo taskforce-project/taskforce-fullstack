@@ -12,6 +12,8 @@ import com.taskforce.tf_api.core.harness.rules.Glob;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.harness.rules.RulesDigest;
 import com.taskforce.tf_api.core.harness.rules.RulesEngine;
+import com.taskforce.tf_api.core.harness.rules.RulesFloor;
+import com.taskforce.tf_api.core.harness.rules.SecretScan;
 
 /**
  * Le moteur de règles du serveur, exposé au runner en JavaScript : chaque fonction exportée lit les valeurs
@@ -55,6 +57,26 @@ public final class RulesEngineJs {
     public static boolean globMatch(String pattern, String value) {
         try {
             return Glob.matches(pattern, value);
+        } catch (RuntimeException e) {
+            throw error(e);
+        }
+    }
+
+    /** Le fait {@code secret} du socle : le texte porte-t-il un secret d'un format reconnu ({@link SecretScan}) ? */
+    @JSExport
+    public static boolean secretIn(String text) {
+        try {
+            return SecretScan.in(text);
+        } catch (RuntimeException e) {
+            throw error(e);
+        }
+    }
+
+    /** La classe d'une action selon le socle, d'après ses faits ({@link RulesFloor#classOf}) ; null s'ils ne suffisent pas. */
+    @JSExport
+    public static String floorClass(JSObject facts) {
+        try {
+            return RulesFloor.classOf(JsValues.facts(facts));
         } catch (RuntimeException e) {
             throw error(e);
         }
@@ -106,7 +128,11 @@ public final class RulesEngineJs {
         return EvidenceChain.ZERO_HASH;
     }
 
-    /** La règle gagnante est rendue telle que le runner l'a donnée : le même objet, à la même place du paquet. */
+    /**
+     * La règle gagnante est rendue telle que le runner l'a donnée : le même objet, à la même place du paquet. Une règle
+     * du socle, qui n'est dans aucun paquet, est rendue comme un objet neuf ; les obligations d'une décision qui demande
+     * accompagnent la règle.
+     */
     private static JSObject answer(JSObject bundle, RulesBundle rules, RulesEngine.Decision decision) {
         JSObject rule = null;
         if (decision.rule() != null) {
@@ -117,8 +143,11 @@ public final class RulesEngineJs {
                     break;
                 }
             }
+            if (rule == null) {
+                rule = JsValues.floorRule(decision.rule());
+            }
         }
-        return decision(decision.effect(), rule);
+        return decision(decision.effect(), rule, JsValues.obligations(decision.require()));
     }
 
     private static RuntimeException error(RuntimeException e) {
@@ -126,8 +155,8 @@ public final class RulesEngineJs {
         return e;
     }
 
-    @JSBody(params = { "effect", "rule" }, script = "return { effect: effect, rule: rule };")
-    private static native JSObject decision(String effect, JSObject rule);
+    @JSBody(params = { "effect", "rule", "require" }, script = "return { effect: effect, rule: rule, require: require };")
+    private static native JSObject decision(String effect, JSObject rule, JSObject require);
 
     @JSBody(params = "message", script = "throw new Error(message);")
     private static native void raise(String message);

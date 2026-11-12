@@ -28,13 +28,16 @@ import {
   type IntegrationCatalog, type ConnectorView, type PlaneProject, type PlaneStatus, type McpServerStatus,
 } from "@/lib/api/integration-service"
 import { McpActionConsole } from "@/components/integrations/mcp-action-console"
+import { ConnectPanel, pathLabel } from "@/components/integrations/connect-panel"
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
+import { useUserStore } from "@/lib/store/user-store"
 import { DisconnectConfirmDialog, DISCONNECT_CONSEQUENCES } from "@/components/integrations/disconnect-confirm-dialog"
 
 const CAP_LABEL: Record<string, string> = { observe: "Observe", act: "Act", mcp: "MCP" }
 const CAP_DESC: Record<string, string> = {
   observe: "Reads this service's data into TaskForce.",
   act: "Acts in the service from TaskForce.",
-  mcp: "Its tools go live in Cortex: reads run directly, a change waits for the approval of an owner or admin.",
+  mcp: "Its tools go live in Cortex, through your own connection: reads run directly, a change waits for your approval.",
 }
 const AUTH_LABEL: Record<ConnectorView["authType"], string> = { OAUTH2: "OAuth", API_KEY: "API key", MCP: "MCP" }
 const AUTH_HELP: Record<ConnectorView["authType"], string> = {
@@ -42,6 +45,9 @@ const AUTH_HELP: Record<ConnectorView["authType"], string> = {
   API_KEY: "Connect with an API key.",
   MCP: "Through its MCP server: OAuth in one click, an access token, or a custom header.",
 }
+
+/** Une adresse sur la machine ou le réseau local (Docker Desktop, le serveur local de Figma) : l'accord se demande. */
+const LOCAL_URL = /^https?:\/\/(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\]|[^./:]+(:|\/|$))/i
 
 /** Fiche vide d'un serveur MCP ajouté à la main : le backend dérive sa clé `custom-<slug>` du nom saisi. */
 const NEW_CUSTOM_SERVER: ConnectorView = {
@@ -72,6 +78,7 @@ function CatPill({ active, onClick, children }: Readonly<{ active: boolean; onCl
 type DesktopGitHub = DesktopToolsStatus["github"]
 
 type IntegrationTexts = (typeof CONSTANTS_EN)["integrations"]
+type ConnectTexts = (typeof CONSTANTS_EN)["connect"]
 
 /** Une intégration que l'app desktop ne sait pas encore connecter (PC-060) : elle se montre, avec son état, sans le geste. */
 const laterOnDesktop = (tool: ConnectorView, desktop: boolean) => desktop && tool.key === "slack"
@@ -110,10 +117,40 @@ export function connectionOf(
   tool: ConnectorView,
   t: IntegrationTexts,
   desktop: boolean = IS_DESKTOP,
+  c?: ConnectTexts,
 ): { label: string; help: string; canConnect: boolean } {
   if (throughGitHubCli(tool, desktop)) return { label: t.githubCli, help: t.githubCliHelp, canConnect: true }
   if (laterOnDesktop(tool, desktop)) return { label: t.webAppOnly, help: t.slackDesktopHelp, canConnect: false }
+  // Un préréglage dit son chemin en mots de la personne (séance n°22, R154) : un clic, l'administrateur d'abord, une clé.
+  const path = c ? pathLabel(tool, c) : null
+  if (path) return { label: path, help: AUTH_HELP[tool.authType], canConnect: !tool.blocked }
   return { label: AUTH_LABEL[tool.authType], help: AUTH_HELP[tool.authType], canConnect: true }
+}
+
+/** L'état de la connexion que la personne utilise, sur la carte : branché, à reconnecter, en attente, ou le chemin. */
+function CardState({ tool }: Readonly<{ tool: ConnectorView }>) {
+  const t = usePreferencesStore((s) => s.t.integrations)
+  const c = usePreferencesStore((s) => s.t.connect)
+  const shared = tool.scope === "WORKSPACE" ? <span className="text-[10px] text-muted-foreground">{c.shared}</span> : null
+  if (tool.connected) {
+    return (
+      <span className="flex flex-col items-end gap-0.5">
+        <Badge variant="outline" title={tool.accountLabel ? c.connectedAs.replace("{account}", tool.accountLabel) : undefined}
+               className="gap-1 border-shape-green/25 bg-shape-green/10 text-[10px] text-ink-green">
+          <Check className="size-3" /> {c.connected}
+        </Badge>
+        {shared}
+      </span>
+    )
+  }
+  if (tool.state === "NEEDS_RECONNECT" || tool.state === "WAITING_FOR_ADMIN") {
+    return (
+      <Badge variant="outline" className="gap-1 border-shape-yellow/25 bg-shape-yellow/10 text-[10px] text-ink-yellow">
+        <AlertTriangle className="size-3" /> {tool.state === "NEEDS_RECONNECT" ? c.needsReconnecting : c.waitingForAdmin}
+      </Badge>
+    )
+  }
+  return <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">{connectionOf(tool, t, IS_DESKTOP, c).label}</span>
 }
 
 /**
@@ -138,6 +175,14 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   // App desktop : GitHub est connecté quand le GitHub CLI de la personne l'est sur cet ordinateur.
   const desktopGitHub = useDesktopToolsStore((s) => s.status?.github ?? null)
   const refreshDesktopTools = useDesktopToolsStore((s) => s.refresh)
+  // Propriétaire ou administrateur : il partage une source et saisit l'application de l'entreprise (R154).
+  const members = useWorkspaceStore((s) => s.members)
+  const fetchMembers = useWorkspaceStore((s) => s.fetchMembers)
+  const me = useUserStore((s) => s.user)
+  const manager = members.some((m) => String(m.userId) === String(me?.id) && (m.role === "OWNER" || m.role === "ADMIN"))
+  useEffect(() => {
+    if (members.length === 0) void fetchMembers().catch(() => undefined)
+  }, [members.length, fetchMembers])
 
   useEffect(() => {
     if (IS_DESKTOP && useDesktopToolsStore.getState().status === null) void refreshDesktopTools()
@@ -156,6 +201,12 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   }, [slug])
 
   useEffect(() => { refresh() }, [refresh, changes])
+  // Retour du navigateur (l'app desktop ouvre celui du système) : la fenêtre reprend le focus, le catalogue se relit.
+  useEffect(() => {
+    const onFocus = () => refresh()
+    window.addEventListener("focus", onFocus)
+    return () => window.removeEventListener("focus", onFocus)
+  }, [refresh])
 
   const catalog = useMemo(
     () => (loaded ? catalogForThisApp(loaded, t, IS_DESKTOP, desktopGitHub) : null),
@@ -234,10 +285,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
           />
         ) : (
         <>
-        <p className="text-xs text-muted-foreground">
-          Pick an official MCP server below or connect your own. Its tools then go live in Cortex: reads run
-          directly, a change waits for the approval of an owner or admin.
-        </p>
+        <p className="text-xs text-muted-foreground">{t.catalogIntro}</p>
 
         {/* Filtre par statut de connexion, et l'ajout d'un serveur MCP hors catalogue. */}
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -306,6 +354,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
           <ConnectorDialog
             slug={slug}
             tool={dialogTool}
+            manager={manager}
             onClose={() => setDialogTool(null)}
             onChanged={refresh}
           />
@@ -322,7 +371,6 @@ function shownCapabilities(tool: ConnectorView): string[] {
 
 /** Tuile d'un connecteur - clic → fiche détaillée. Logo, état, description, capacités. */
 function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; onOpenDetail: () => void }>) {
-  const t = usePreferencesStore((s) => s.t.integrations)
   const caps = shownCapabilities(tool)
   return (
     <div
@@ -337,13 +385,7 @@ function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; o
         <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted p-2 text-[11px]">
           <BrandLogo slug={tool.key} name={tool.name} className="size-full" />
         </div>
-        {tool.connected ? (
-          <Badge variant="outline" className="gap-1 border-shape-green/25 bg-shape-green/10 text-[10px] text-ink-green">
-            <Check className="size-3" /> Connected
-          </Badge>
-        ) : (
-          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">{connectionOf(tool, t).label}</span>
-        )}
+        <CardState tool={tool} />
       </div>
 
       {/* Nom + description */}
@@ -370,7 +412,8 @@ function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; o
 function ConnectorDetailView({
   tool, categoryLabel, onBack, onConnect,
 }: Readonly<{ tool: ConnectorView; categoryLabel: string; onBack: () => void; onConnect: () => void }>) {
-  const connection = connectionOf(tool, usePreferencesStore((s) => s.t.integrations))
+  const connection = connectionOf(tool, usePreferencesStore((s) => s.t.integrations), IS_DESKTOP,
+    usePreferencesStore((s) => s.t.connect))
   return (
     <div className="flex flex-col gap-6">
       {/* Retour */}
@@ -464,8 +507,8 @@ function ConnectorDetailView({
 
 /** Dialogue de connexion : natives (GitHub, Slack, Plane) et serveurs MCP (préréglage ou ajouté à la main). */
 function ConnectorDialog({
-  slug, tool, onClose, onChanged,
-}: Readonly<{ slug: string; tool: ConnectorView; onClose: () => void; onChanged: () => void }>) {
+  slug, tool, manager, onClose, onChanged,
+}: Readonly<{ slug: string; tool: ConnectorView; manager: boolean; onClose: () => void; onChanged: () => void }>) {
   const isNew = tool.key === NEW_CUSTOM_MCP_KEY
   // Plus large quand la console d'actions d'un serveur MCP est dépliée.
   const [wide, setWide] = useState(false)
@@ -475,7 +518,9 @@ function ConnectorDialog({
         <DialogHeader>
           <DialogTitle>{isNew ? "Connect an MCP server" : tool.name}</DialogTitle>
         </DialogHeader>
-        {tool.authType === "MCP" ? (
+        {tool.authType === "MCP" && tool.connection ? (
+          <ConnectPanel slug={slug} tool={tool} manager={manager} onChanged={onChanged} onWide={setWide} />
+        ) : tool.authType === "MCP" ? (
           <McpServerForm slug={slug} tool={tool} onClose={onClose} onChanged={onChanged} onWide={setWide} />
         ) : tool.key === "plane" ? (
           <PlaneForm slug={slug} tool={tool} onClose={onClose} onChanged={onChanged} />
@@ -705,12 +750,16 @@ function McpServerForm({
 }: PanelProps & Readonly<{ onWide: (wide: boolean) => void }>) {
   const isNew = tool.key === NEW_CUSTOM_MCP_KEY
   const isCustom = tool.category === CUSTOM_MCP_CATEGORY
+  const texts = usePreferencesStore((s) => s.t.connect)
   const [name, setName] = useState(isNew ? "" : tool.name)
   const [mcpUrl, setMcpUrl] = useState(tool.mcpSuggestedUrl ?? "")
   const [authMode, setAuthMode] = useState<"bearer" | "header">("bearer")
   const [withToken, setWithToken] = useState(false)
   const [headerName, setHeaderName] = useState("")
   const [mcpToken, setMcpToken] = useState("")
+  // Un serveur sur cette machine ou le réseau local (app desktop) : la personne voit son adresse et l'accepte.
+  const [localOk, setLocalOk] = useState(false)
+  const local = LOCAL_URL.test(mcpUrl.trim())
   const [status, setStatus] = useState<McpServerStatus | null>(null)
   const [busy, setBusy] = useState(false)
   // Console d'actions (TF-MCP-06) : dépliée sous le statut d'un serveur joignable.
@@ -723,7 +772,6 @@ function McpServerForm({
       .then((list) => {
         const s = list.find((x) => x.connectorKey === tool.key) ?? null
         setStatus(s)
-        if (s) setMcpUrl(s.url)
       })
       .catch(() => { /* pas branché */ })
   }, [isNew, slug, tool.key])
@@ -736,7 +784,7 @@ function McpServerForm({
 
   const nameMissing = isCustom && !name.trim()
   const headerMissing = authMode === "header" && (!headerName.trim() || !mcpToken.trim())
-  const canSubmit = !busy && Boolean(mcpUrl.trim()) && !nameMissing
+  const canSubmit = !busy && Boolean(mcpUrl.trim()) && !nameMissing && (!local || localOk)
 
   async function handleConnect() {
     setBusy(true)
@@ -747,9 +795,10 @@ function McpServerForm({
         mcpUrl: mcpUrl.trim(),
         mcpToken: mcpToken.trim() || undefined,
         headerName: authMode === "header" ? headerName.trim() : undefined,
+        localApproved: local && localOk ? true : undefined,
       })
       const s = isNew
-        ? list.find((x) => x.name === name.trim() && x.url === mcpUrl.trim()) ?? null
+        ? list.find((x) => x.name === name.trim()) ?? null
         : list.find((x) => x.connectorKey === tool.key) ?? null
       const label = isCustom ? name.trim() : tool.name
       if (s?.reachable) toast.success(`${label}: ${s.tools.length} tool(s) live in Cortex`)
@@ -779,10 +828,10 @@ function McpServerForm({
   async function handleDisconnect() {
     setBusy(true)
     try {
-      await disconnectMcpServer(slug, tool.key)
+      const result = await disconnectMcpServer(slug, tool.key, status?.scope === "WORKSPACE")
       setStatus(null)
       setMcpUrl(tool.mcpSuggestedUrl ?? ""); setMcpToken("")
-      toast.success(`${tool.name} disconnected`)
+      toast.success((result.revoked ? texts.disconnectedRevoked : texts.disconnectedHere).replaceAll("{name}", tool.name))
       onChanged()
       if (isCustom) onClose()
     } catch (e) {
@@ -832,8 +881,8 @@ function McpServerForm({
                   onClick={handleDisconnect} disabled={busy}>
             Disconnect
           </Button>
-          <span className="max-w-[55%] self-center truncate text-[11px] text-muted-foreground" title={status.url}>
-            {status.url}
+          <span className="max-w-[55%] self-center truncate text-[11px] text-muted-foreground" title={status.host ?? undefined}>
+            {status.host}
           </span>
         </DialogFooter>
       </div>
@@ -846,7 +895,7 @@ function McpServerForm({
         <Server className="mt-0.5 size-3.5 shrink-0 text-primary" />
         <span>
           {isNew ? "Any tool with an MCP server" : <><span className="font-medium text-foreground">{tool.name}</span>&apos;s MCP server</>}
-          : its tools go live in Cortex. Reads run directly, a change waits for the approval of an owner or admin.
+          {texts.unknownServerTail}
         </span>
       </div>
 
@@ -864,6 +913,12 @@ function McpServerForm({
           {tool.mcpSuggestedUrl ? "Official server, prefilled." : "The address of the server (Streamable HTTP)."}
         </span>
       </label>
+      {local && (
+        <label className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs text-foreground">
+          <input type="checkbox" className="mt-0.5" checked={localOk} onChange={(e) => setLocalOk(e.target.checked)} />
+          <span><span className="font-medium">{texts.localTitle}</span>: {texts.localConfirm}</span>
+        </label>
+      )}
 
       {/* Le jeton, un clic plus loin : OAuth (découverte + DCR + PKCE) reste le geste par défaut, aucun jeton à coller. */}
       {withToken && (

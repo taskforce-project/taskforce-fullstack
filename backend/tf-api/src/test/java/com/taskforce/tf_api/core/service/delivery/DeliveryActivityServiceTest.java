@@ -70,6 +70,10 @@ class DeliveryActivityServiceTest {
     @Mock private BrainAccessGuard access;
     @Mock private NotificationService notificationService;
     @Mock private MissionEvidenceService evidenceService;
+    @Mock private com.taskforce.tf_api.core.repository.HarnessRuleSetRepository ruleSets;
+    @Mock private com.taskforce.tf_api.core.repository.WorkspaceMemberRepository members;
+    @Mock private com.taskforce.tf_api.core.repository.ProjectMemberRepository projectMembers;
+    @Mock private com.taskforce.tf_api.core.repository.DeliveryRunApprovalSignatureRepository signatures;
 
     private DeliveryActivityService service;
     private User delegator;
@@ -80,7 +84,9 @@ class DeliveryActivityServiceTest {
     void setUp() {
         LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15, 10);
         service = new DeliveryActivityService(runRepository, eventRepository, approvalRepository, userRepository,
-            visibilityGuard, access, notificationService, settings, evidenceService);
+            visibilityGuard, access, notificationService, settings, evidenceService,
+            new com.taskforce.tf_api.core.harness.rules.HarnessRulesService(ruleSets, members),
+            new com.taskforce.tf_api.core.service.rules.RuleApprovers(members, projectMembers), signatures, members);
         delegator = User.builder().id(7L).email("ada@taskforce.dev").displayName("Ada").build();
         teammate = User.builder().id(8L).email("linus@taskforce.dev").build();
         Workspace workspace = Workspace.builder().slug("acme").build();
@@ -339,10 +345,13 @@ class DeliveryActivityServiceTest {
 
     @Test
     void a_teammate_cannot_answer_for_the_delegator() {
+        DeliveryRunApproval approval = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        when(approvalRepository.findByIdAndRunId(9L, 100L)).thenReturn(Optional.of(approval));
+
         assertThatThrownBy(() -> service.decide("acme", 100L, 9L, true, 8L))
             .isInstanceOf(ForbiddenException.class)
             .hasMessageContaining("Only the person who delegated");
-        verify(approvalRepository, never()).findByIdAndRunId(any(), any());
+        assertThat(approval.getStatus()).isEqualTo(DeliveryApprovalStatus.PENDING);
     }
 
     static Stream<Arguments> closedRequests() {

@@ -168,6 +168,7 @@ class BrainVisibilityIntegrationTest extends AbstractIntegrationTest {
     @Autowired private UserRepository userRepository;
     @Autowired private WorkspaceRepository workspaceRepository;
     @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
+    @Autowired private com.taskforce.tf_api.core.repository.HarnessRuleSetRepository ruleSetRepository;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private Environment environment;
 
@@ -221,6 +222,7 @@ class BrainVisibilityIntegrationTest extends AbstractIntegrationTest {
         when(llm.isConfigured()).thenReturn(false); // Cortex répond par les notes trouvées
         cortex = new AgentService(access, search, mock(AgentToolRegistry.class), llm, mapper, mock(AiUsageService.class),
             mock(WorkspaceMcpService.class), mock(AuthorizationService.class), mock(CortexGate.class),
+            mock(com.taskforce.tf_api.core.service.rules.RuleApprovers.class),
             mock(CortexRecordService.class), mock(CortexUndo.class),
             mock(com.taskforce.tf_api.core.service.agent.ScreenContext.class),
             mock(com.taskforce.tf_api.core.service.agent.IssueMaterial.class),
@@ -233,7 +235,9 @@ class BrainVisibilityIntegrationTest extends AbstractIntegrationTest {
         TaskforceMcpTools tools = new TaskforceMcpTools(mapper, mock(ProjectService.class), mock(IssueService.class),
             mock(SmartAssignService.class), search, mock(AnalyticsService.class), cortex, gestures,
             mock(com.taskforce.tf_api.core.service.mcpserver.ProjectGestures.class));
-        mcp = new McpServerService(tools, mapper, userRepository, new JwtIdentityResolver(environment));
+        mcp = new McpServerService(tools, mapper, userRepository, new JwtIdentityResolver(environment),
+            new com.taskforce.tf_api.core.harness.rules.HarnessRulesService(ruleSetRepository, workspaceMemberRepository),
+            workspaceRepository, mock(com.taskforce.tf_api.core.service.AuditService.class));
     }
 
     // ------------------------------------------------------------------ fixture

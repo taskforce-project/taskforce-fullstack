@@ -5,6 +5,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -39,6 +40,8 @@ import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage;
 import com.taskforce.tf_api.core.dto.response.ChatTurnResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
+import com.taskforce.tf_api.core.harness.rules.RulesEngine;
+import com.taskforce.tf_api.core.service.rules.RuleApprovers;
 import com.taskforce.tf_api.core.enums.NodeDomain;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Workspace;
@@ -98,6 +101,7 @@ public class AgentService {
     private final WorkspaceMcpService workspaceMcp;
     private final AuthorizationService authorization;
     private final CortexGate          gate;
+    private final RuleApprovers       approvers;
     private final CortexRecordService records;
     private final CortexUndo          undo;
     private final ScreenContext       screens;
@@ -153,15 +157,22 @@ public class AgentService {
         if (tool == null) {
             throw new BusinessException("This action is no longer available.");
         }
-        if (tool instanceof ExternalMcpTool && !authorization.isManager(ws.getId(), userId)) {
-            throw new BusinessException("Only workspace owners and admins can approve a change in an external tool.");
+        // Une écriture par la connexion de la personne, elle l'accorde ; par une connexion partagée avec l'espace, un
+        // propriétaire ou un administrateur (séance n°22, R154 ; OSS-1.5). Ses outils sont ceux de sa connexion.
+        if (tool instanceof ExternalMcpTool external && !external.isReadOnly() && external.shared()
+                && !authorization.isManager(ws.getId(), userId)) {
+            throw new BusinessException("Only workspace owners and admins can approve a change through a connection "
+                + "shared with the workspace.");
         }
+        // Les règles du projet qui avait jugé la proposition (R157), relues : elles ont pu changer depuis.
+        Long project = gate.projectOf(ctx, argsJson).orElseGet(() -> proposedProject(record, toolName));
         if (!records.approve(record, toolName, userId, argsJson)) {
             throw new BusinessException("This action is no longer waiting for your approval.");
         }
-        CortexGate.Verdict verdict = gate.judge(gate.rulesFor(ctx), tool);
+        RulesBundle bundle = gate.rulesFor(ctx, project);
+        CortexGate.Verdict verdict = gate.judge(bundle, tool, argsJson, CortexGate.Exposure.none());
         traceBefore(record, "action.decided", CortexRecordService.Actor.rule(verdict.ruleId()),
-            Map.of("effect", verdict.effect(), "facts", verdict.facts()));
+            decidedData(verdict, bundle, project));
         String status = "success";
         String output;
         CortexGesture.Done done = null;
@@ -169,6 +180,10 @@ public class AgentService {
             if (verdict.denied()) {
                 status = "refused";
                 output = "Not run: the rules of this workspace refuse it. " + verdict.reason();
+            } else if (!verdict.allowed() && !approvers.aloneSuffices(verdict.require(), ws.getId(), project, userId)) {
+                // Une règle de l'entreprise demande l'accord d'autres personnes (R98) : la carte n'y suffit pas.
+                status = "refused";
+                output = waitsForOthers(verdict, ws.getId());
             } else {
                 Map<String, Object> args = objectMapper.readValue(argsJson == null || argsJson.isBlank() ? "{}" : argsJson,
                     new TypeReference<Map<String, Object>>() {});
@@ -944,6 +959,9 @@ public class AgentService {
         if (!issue.isEmpty()) origin.put("issue", CortexRecordService.shorten(issue));
         if (!files.isEmpty()) origin.put("files", files.stream().map(AttachedFile::name).toList());
         if (plan != null) origin.put("plan", plan.id());
+        // Une issue importée d'un outil de l'entreprise sous les yeux de la réponse (séance n°22, R158) : un contenu du
+        // dehors, que le socle compte avant une écriture ou une sortie, et que le dossier garde.
+        if (gate.importedInView(ctx, joined, read == null ? List.of() : read.ids())) origin.put(CortexGate.IMPORTED, true);
         Kernel kernel = new Kernel(ctx, message, origin);
         String answer = toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel,
             reading, loopFit);
@@ -1177,6 +1195,53 @@ public class AgentService {
     }
 
     /**
+     * Une règle de l'entreprise désigne qui accorde, et la personne qui demande ne suffit pas seule (R98) : une carte de la
+     * conversation ne se répond que par elle, donc rien ne se propose ; Cortex dit qui accorde, et pourquoi.
+     */
+    private String waitsForOthers(CortexGate.Verdict verdict, Long workspaceId) {
+        RulesEngine.Obligations require = verdict.require();
+        List<String> who = approvers.names(require, workspaceId);
+        StringBuilder needs = new StringBuilder();
+        if (!who.isEmpty()) needs.append(String.join(", and ", who));
+        if (require != null && require.signatures() > 1) {
+            needs.append(needs.length() == 0 ? "" : ", ").append(require.signatures()).append(" different people");
+        }
+        if (require != null && require.separate()) {
+            needs.append(needs.length() == 0 ? "" : ", ").append("someone other than the person who asked");
+        }
+        return "Not run: the rules of this workspace need the approval of " + (needs.length() == 0 ? "someone else" : needs)
+            + " (" + verdict.reason() + "). Only the person who asked can answer a card in this conversation, so "
+            + "nothing was proposed. Do not try again; tell the user who has to approve it.";
+    }
+
+    /** La décision au dossier : l'effet, les faits, et les règles qui l'ont prise (version, empreinte, projet). */
+    private static Map<String, Object> decidedData(CortexGate.Verdict verdict, RulesBundle bundle, Long project) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("effect", verdict.effect());
+        data.put("facts", verdict.facts());
+        if (bundle == null) return data;
+        Map<String, Object> rules = new LinkedHashMap<>();
+        rules.put("version", bundle.version());
+        if (bundle.digest() != null) rules.put("digest", bundle.digest());
+        if (project != null) rules.put("project", project);
+        data.put("rules", rules);
+        return data;
+    }
+
+    /** Le projet dont les règles ont jugé la proposition de cet outil, tel que le dossier l'a gardé ; null s'il n'y en avait pas. */
+    private Long proposedProject(UUID record, String toolName) {
+        Long project = null;
+        for (ObjectNode event : records.events(record)) {
+            JsonNode data = event.path("data");
+            if ("action.decided".equals(event.path("type").asText()) && toolName.equals(data.path("facts").path("tool").asText())) {
+                JsonNode p = data.path("rules").path("project");
+                project = p.canConvertToLong() ? p.asLong() : null;
+            }
+        }
+        return project;
+    }
+
+    /**
      * La boucle : le modèle appelle des outils ou répond, cinq tours au plus. Un outil qui lit et aboutit entre dans ce que
      * le modèle a lu ({@code reading}, nul au rejeu d'un cas de la banque). Avant chaque appel, {@code fit} fait tenir les
      * messages dans la fenêtre du modèle (TF-J1-13 ; nul au rejeu, dont les cas sont courts).
@@ -1280,7 +1345,7 @@ public class AgentService {
 
         @Override
         public ToolOutcome apply(AgentTool tool, String name, String argsJson) {
-            CortexGate.Verdict verdict = gate.judge(bundle, tool);
+            CortexGate.Verdict verdict = gate.judge(bundle, tool, argsJson, CortexGate.Exposure.none());
             ToolOutcome outcome;
             if (verdict.denied()) {
                 outcome = new ToolOutcome("refused", refusedText(verdict));
@@ -1314,13 +1379,19 @@ public class AgentService {
         private final AgentContext ctx;
         private final String question;
         private final Map<String, Object> origin;
-        private RulesBundle bundle;
+        /** Les règles du travail en cours, par projet touché (R157) : lues une fois par réponse et par projet. */
+        private final Map<Long, RulesBundle> bundles = new HashMap<>();
+        /** Ce que la réponse a déjà lu (R158) : le socle en tient compte avant toute écriture ou sortie. */
+        private final CortexGate.Exposure exposure;
+        private Map<String, String> judgedFacts;
+        private Long judgedProject;
         private UUID record;
 
         Kernel(AgentContext ctx, String question, Map<String, Object> origin) {
             this.ctx = ctx;
             this.question = question;
             this.origin = origin;
+            this.exposure = CortexGate.Exposure.of(origin);
         }
 
         /** Le noyau d'un geste qui reprend après la réponse de la personne : le dossier est celui de sa question. */
@@ -1357,11 +1428,19 @@ public class AgentService {
                     result = refusedText(verdict);
                     status = "refused";
                 } else if (!verdict.allowed()) {
-                    // Demandé : jamais exécuté par le modèle. Une écriture externe ne se propose qu'à qui peut la valider
-                    // (propriétaire ou administrateur, OSS-1.5) ; les autres l'apprennent d'emblée.
-                    if (tool instanceof ExternalMcpTool && !authorization.isManager(ctx.workspaceId(), ctx.userId())) {
-                        result = "Not run: only workspace owners and admins can approve a change in an external "
-                            + "tool. Tell the user that an owner or admin has to make this change.";
+                    // Demandé : jamais exécuté par le modèle. Une règle de l'entreprise qui désigne qui accorde (R98) : la
+                    // carte de la conversation ne se répond que par la personne qui demande ; si elle ne suffit pas seule,
+                    // rien ne se propose, et Cortex dit qui accorde. Une écriture externe ne se propose qu'à qui peut la
+                    // valider : la personne pour sa connexion ; un propriétaire ou un administrateur pour une connexion
+                    // partagée (séance n°22, R154 ; OSS-1.5) ; les autres l'apprennent d'emblée.
+                    if (!approvers.aloneSuffices(verdict.require(), ctx.workspaceId(), judgedProject, ctx.userId())) {
+                        result = waitsForOthers(verdict, ctx.workspaceId());
+                        status = "refused";
+                    } else if (tool instanceof ExternalMcpTool external && external.shared()
+                            && !authorization.isManager(ctx.workspaceId(), ctx.userId())) {
+                        result = "Not run: only workspace owners and admins can approve a change through a connection "
+                            + "shared with the workspace. Tell the user that an owner or admin has to make this "
+                            + "change, or that she can connect the tool with her own account.";
                         status = "error";
                     } else {
                         // La carte dit ce que la personne accorde : l'issue qu'on supprimerait, ce qui partirait avec elle.
@@ -1414,6 +1493,9 @@ public class AgentService {
                 status = "error";
                 done = null;
             }
+            // Ce que l'outil a lu entre dans la réponse (R158) : les gestes suivants le portent dans leurs faits.
+            exposure.after(tool, judgedFacts, status);
+            if ("success".equals(status) && gate.readImported(ctx, judgedFacts, argsJson)) exposure.outside();
             if (asked != null) {
                 return new ToolOutcome(status, result, null, asked(name, argsJson, result, asked), null, asked);
             }
@@ -1465,15 +1547,22 @@ public class AgentService {
             return gesture.preview(objectMapper.readValue(argsJson, new TypeReference<Map<String, Object>>() {}), ctx);
         }
 
-        /** La demande, puis la décision des règles, au dossier avant tout effet : sans dossier, l'action ne part pas. */
+        /**
+         * La demande, puis la décision des règles, au dossier avant tout effet : sans dossier, l'action ne part pas. Les
+         * règles sont celles du projet que l'appel touche (R157), sinon de la conversation ou de l'écran ; le dossier
+         * garde leur version, leur empreinte et ce projet, que l'accord de la personne relira.
+         */
         CortexGate.Verdict judge(AgentTool tool, String argsJson) {
-            if (bundle == null) bundle = gate.rulesFor(ctx);
+            Long project = gate.projectOf(ctx, argsJson).orElse(ctx.project() != null ? ctx.project() : ctx.screen().projectId());
+            RulesBundle bundle = bundles.computeIfAbsent(project, p -> gate.rulesFor(ctx, p));
             if (record == null) record = records.open(ctx, question, withModel(origin));
             traceBefore(record, "action.requested", CortexRecordService.Actor.CORTEX,
                 Map.of("tool", tool.name(), "arguments", CortexRecordService.shorten(argsJson)));
-            CortexGate.Verdict verdict = gate.judge(bundle, tool);
+            CortexGate.Verdict verdict = gate.judge(bundle, tool, argsJson, exposure);
             traceBefore(record, "action.decided", CortexRecordService.Actor.rule(verdict.ruleId()),
-                Map.of("effect", verdict.effect(), "facts", verdict.facts()));
+                decidedData(verdict, bundle, project));
+            judgedFacts = verdict.facts();
+            judgedProject = project;
             return verdict;
         }
 

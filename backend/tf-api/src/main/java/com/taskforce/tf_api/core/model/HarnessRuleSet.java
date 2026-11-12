@@ -7,8 +7,12 @@ import java.util.Map;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import com.taskforce.tf_api.core.enums.RuleScope;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -23,8 +27,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Une version des règles du harnais d'un espace (spécification de la v2, §6), au format des règles de
- * {@code taskforce-rules/1}. Une version ne se modifie jamais : on en écrit une nouvelle, numérotée à la suite.
+ * Une version d'une couche des règles de l'entreprise (R157), au format des règles de {@code taskforce-rules/1} :
+ * l'organisation, un projet, un processus, un rôle ou une personne. Une version ne se modifie jamais (la base le refuse,
+ * V125) : on en écrit une nouvelle, numérotée à la suite dans l'espace, avec son auteur, sa date et son empreinte.
  */
 @Entity
 @Table(name = "harness_rule_sets")
@@ -46,10 +51,41 @@ public class HarnessRuleSet {
     @Column(name = "version", nullable = false)
     private int version;
 
-    /** Les règles, chacune avec son propriétaire, sa raison et sa date de revue. */
+    /** La couche que cette version écrit. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "scope", nullable = false, length = 16)
+    @Builder.Default
+    private RuleScope scope = RuleScope.WORKSPACE;
+
+    /** Le projet d'une couche {@code PROJECT}. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "project_id")
+    private Project project;
+
+    /** La clé du processus d'une couche {@code PROCESS}. */
+    @Column(name = "process_key", length = 80)
+    private String processKey;
+
+    /** Le rôle de l'espace d'une couche {@code ROLE} : {@code OWNER}, {@code ADMIN} ou {@code MEMBER}. */
+    @Column(name = "role", length = 16)
+    private String role;
+
+    /** La personne d'une couche {@code PERSON}. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User person;
+
+    /**
+     * Les règles de la couche, chacune avec son propriétaire, sa raison, sa date de revue, la phrase de la personne qui
+     * l'a écrite et ses cas (R98) ; les cas restent ici, le paquet remis aux agents ne les porte pas.
+     */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "rules", nullable = false, columnDefinition = "jsonb")
     private List<Map<String, Object>> rules;
+
+    /** L'empreinte de ces règles : {@code sha256:} et le SHA-256 de leur JSON canonique. */
+    @Column(name = "digest", length = 71)
+    private String digest;
 
     /** Qui a écrit cette version ; nul si son compte a été supprimé depuis. */
     @ManyToOne(fetch = FetchType.LAZY)

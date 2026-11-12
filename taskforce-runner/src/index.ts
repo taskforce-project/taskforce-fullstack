@@ -24,6 +24,7 @@ import { LiveMissions, pollCommands } from "./commands.js";
 import { loadConfig, type RepoConfig, type RunnerConfig } from "./config.js";
 import { exitFacts, judgeExit, type ExitVerdict } from "./exits.js";
 import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWorktree, reopenWorktree, repoVisibility, resolveRepo, runSetup, type Worktree } from "./git.js";
+import { Exposure } from "./harness/exposure.js";
 import { verifiedBundle } from "./harness/verify.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { log } from "./log.js";
@@ -122,7 +123,9 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       askInTaskForce(api, claim.runId, tool, summary, config.agent.approvalTimeoutMinutes * 60_000, undefined, "runner");
     // Le démarrage lui-même passe par les règles (R33 : pas de mission sur un dépôt public avant S1).
     const visibility = claim.repoFullName ? await repoVisibility(claim.repoFullName) : null;
-    const start = await judgeExit(rules, { action: "mission.start", ...(visibility ? { repoVisibility: visibility } : {}) },
+    // Ce que la mission a en main pour le socle (R158) : les données de l'entreprise, puis ce qu'elle prend du web.
+    const exposure = Exposure.forMission(claim.repoFullName, visibility);
+    const start = await judgeExit(rules, { action: "mission.start", ...(visibility ? { repoVisibility: visibility } : {}), ...exposure.facts() },
       "Start the mission", `Start ${claim.issueKey} on ${claim.repoFullName ?? "a scratch folder"} (${visibility ?? "no repository"})`, ask);
     await traceExit(api, claim.runId, "mission.start", start, "decision");
     if (!start.go) throw new MissionNotStarted(start.reason ? `${start.reason}.` : `This mission does not start: ${start.why}.`);
@@ -143,7 +146,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       const { agentConfig, token } = await startAgentSession(config, api);
       log.info("Claude Code at work (follow it live in TaskForce)...");
       const outcome = await runAgent(agentConfig, claim, worktree.path, token, {
-        mode: "repo", branch: worktree.branch, signal, rules, onWrite: () => changes.touch(), onConversation,
+        mode: "repo", branch: worktree.branch, signal, rules, exposure, onWrite: () => changes.touch(), onConversation,
       }, api);
       logOutcome(outcome);
       // Même en échec, ce que l'agent a écrit se voit : le dossier de travail est gardé.
@@ -188,7 +191,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       } else {
         // Les sorties suivent les règles de la mission (§8.4) : ce qui est demandé attend la personne qui a délégué.
         const where = `${claim.repoFullName} (${visibility ?? "visibility unknown"})`;
-        const push = await judgeExit(rules, exitFacts("git.push", worktree.branch, visibility), "git push",
+        const push = await judgeExit(rules, { ...exitFacts("git.push", worktree.branch, visibility), ...exposure.facts() }, "git push",
           `Push the branch ${worktree.branch} to ${where}`, ask);
         log.info(`Push: ${push.why}`);
         await traceExit(api, claim.runId, "git push", push);
@@ -204,7 +207,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
           let url: string | undefined = followUp?.pullRequestUrl ?? undefined;
           let note = "";
           if (config.openPullRequest && !url) {
-            const pr = await judgeExit(rules, exitFacts("pr.open", worktree.branch, visibility), "gh pr create",
+            const pr = await judgeExit(rules, { ...exitFacts("pr.open", worktree.branch, visibility), ...exposure.facts() }, "gh pr create",
               `Open a pull request from ${worktree.branch} on ${where}`, ask);
             log.info(`Pull request: ${pr.why}`);
             await traceExit(api, claim.runId, "gh pr create", pr);
@@ -237,7 +240,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       const { agentConfig, token } = await startAgentSession(config, api);
       log.info("Claude Code at work on a repo-less task (follow it live in TaskForce)...");
       const outcome = await runAgent(agentConfig, claim, scratch, token, {
-        mode: "repoless", signal, rules, onWrite: () => changes.touch(), onConversation,
+        mode: "repoless", signal, rules, exposure, onWrite: () => changes.touch(), onConversation,
       }, api);
       logOutcome(outcome);
       await changes.finish();

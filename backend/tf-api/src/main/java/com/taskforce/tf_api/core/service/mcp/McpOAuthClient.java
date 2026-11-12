@@ -10,37 +10,88 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.util.LogSafe;
 import com.taskforce.tf_api.shared.security.SsrfGuard;
 
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * Client HTTP minimal du flux OAuth MCP (metadata de decouverte, Dynamic Client Registration,
- * echange et refresh de token). Ecrit sur le JDK {@link HttpClient} (aucune dep ajoutee).
+ * echange, refresh et revocation de token). Ecrit sur le JDK {@link HttpClient} (aucune dep ajoutee).
  *
  * <p><b>Anti-SSRF</b> : chaque URL - fournie par l'utilisateur OU derivee de la metadata d'un
  * serveur tiers - passe par {@link SsrfGuard#assertPublicHttpUrl} AVANT l'appel. Impossible
  * d'atteindre une adresse de bouclage / privee / link-local (metadonnees cloud) / Tailscale, y
- * compris via un nom qui resout en interne (defense contre le DNS rebinding).
+ * compris via un nom qui resout en interne (defense contre le DNS rebinding). La garde ne se leve
+ * jamais en production : seul le constructeur des essais de contrat (faux serveur sur 127.0.0.1)
+ * l'ouvre.
  */
 @Component
 @Slf4j
 public class McpOAuthClient {
 
+    /** Une erreur OAuth rendue par le serveur d'autorisation ({@code error} de RFC 6749, ex. {@code invalid_grant}). */
+    public static class OAuthError extends BusinessException {
+        private final String error;
+        private final int status;
+
+        public OAuthError(String message, String error, int status) {
+            super(message);
+            this.error = error;
+            this.status = status;
+        }
+
+        public String error() {
+            return error;
+        }
+
+        public int status() {
+            return status;
+        }
+
+        /** Le serveur refuse le jeton de renouvellement ou le client : il faut se reconnecter. */
+        public boolean needsReconnect() {
+            return "invalid_grant".equals(error) || "invalid_client".equals(error)
+                || "unauthorized_client".equals(error) || status == 401;
+        }
+    }
+
+    /** Ce que répond un serveur MCP sans jeton : son statut et l'en-tête {@code WWW-Authenticate}. */
+    public record Probe(int status, String wwwAuthenticate) {
+        /** Le serveur demande une connexion OAuth. */
+        public boolean asksForAuth() {
+            return status == 401;
+        }
+
+        /** Le serveur répond sans connexion (serveur public). */
+        public boolean open() {
+            return status / 100 == 2;
+        }
+    }
+
     private final HttpClient http;
     private final ObjectMapper objectMapper;
     private final Duration timeout;
+    private final boolean allowPrivateNetwork;
 
+    @Autowired
     public McpOAuthClient(ObjectMapper objectMapper,
                           @Value("${integrations.mcp.oauth.http-timeout-ms:15000}") long timeoutMs) {
+        this(objectMapper, timeoutMs, false);
+    }
+
+    /** Essais de contrat seulement : un faux serveur d'autorisation sur 127.0.0.1. */
+    McpOAuthClient(ObjectMapper objectMapper, long timeoutMs, boolean allowPrivateNetwork) {
         this.objectMapper = objectMapper;
         this.timeout = Duration.ofMillis(timeoutMs);
+        this.allowPrivateNetwork = allowPrivateNetwork;
         this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     }
 
@@ -51,7 +102,7 @@ public class McpOAuthClient {
             if (r.statusCode() / 100 != 2) return null;
             return objectMapper.readTree(r.body());
         } catch (Exception e) {
-            log.debug("GET metadata {} echoue : {}", url, e.getMessage());
+            log.debug("GET metadata {} echoue : {}", LogSafe.of(url), LogSafe.of(e.getMessage()));
             return null;
         }
     }
@@ -74,16 +125,10 @@ public class McpOAuthClient {
         }
     }
 
-    /** POST form-urlencoded -> JSON (echange du code / refresh). Leve {@link BusinessException} sur echec. */
+    /** POST form-urlencoded -> JSON (echange du code / refresh). Leve {@link OAuthError} sur echec. */
     public JsonNode postForm(String url, Map<String, String> form) {
         try {
-            String body = form.entrySet().stream()
-                .map(e -> enc(e.getKey()) + "=" + enc(e.getValue()))
-                .collect(Collectors.joining("&"));
-            HttpResponse<String> r = send(
-                HttpRequest.newBuilder().POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
-                    .header("Content-Type", "application/x-www-form-urlencoded"),
-                url, "application/json");
+            HttpResponse<String> r = sendForm(url, form);
             JsonNode node = readJson(r);
             requireSuccess(r, node, "token " + url);
             return node;
@@ -95,46 +140,93 @@ public class McpOAuthClient {
     }
 
     /**
-     * Requete MCP non authentifiee ({@code initialize}) pour declencher un {@code 401} et lire
-     * l'en-tete {@code WWW-Authenticate} (qui pointe la Protected Resource Metadata, RFC 9728).
-     * Renvoie la valeur de l'en-tete (peut etre vide), ou {@code null} si pas de 401.
+     * POST form-urlencoded dont seul le statut compte : la revocation (RFC 7009), qui repond 200 meme pour un jeton
+     * deja invalide. Renvoie le statut, ou -1 si le serveur ne repond pas.
      */
-    public String probeWwwAuthenticate(String mcpUrl) {
+    public int postFormStatus(String url, Map<String, String> form) {
+        try {
+            return sendForm(url, form).statusCode();
+        } catch (Exception e) {
+            log.debug("POST {} echoue : {}", LogSafe.of(url), LogSafe.of(e.getMessage()));
+            return -1;
+        }
+    }
+
+    /**
+     * Requete MCP non authentifiee ({@code initialize}) : un {@code 401} et son en-tete {@code WWW-Authenticate}
+     * (qui pointe la Protected Resource Metadata, RFC 9728) disent qu'il faut se connecter ; un {@code 2xx}, que le
+     * serveur est public. Statut -1 si le serveur ne repond pas.
+     */
+    public Probe probe(String mcpUrl) {
         try {
             String init = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":"
-                + "{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},"
+                + "{\"protocolVersion\":\"" + McpClient.PROTOCOL_VERSION + "\",\"capabilities\":{},"
                 + "\"clientInfo\":{\"name\":\"taskforce\",\"version\":\"0.1.0\"}}}";
             HttpResponse<String> r = send(
                 HttpRequest.newBuilder().POST(HttpRequest.BodyPublishers.ofString(init, StandardCharsets.UTF_8))
                     .header("Content-Type", "application/json"),
                 mcpUrl, "application/json, text/event-stream");
-            return r.statusCode() == 401 ? r.headers().firstValue("WWW-Authenticate").orElse("") : null;
+            return new Probe(r.statusCode(), r.headers().firstValue("WWW-Authenticate").orElse(""));
         } catch (Exception e) {
-            log.debug("Probe MCP {} echoue : {}", mcpUrl, e.getMessage());
-            return null;
+            log.debug("Probe MCP {} echoue : {}", LogSafe.of(mcpUrl), LogSafe.of(e.getMessage()));
+            return new Probe(-1, "");
         }
+    }
+
+    /** L'en-tete {@code WWW-Authenticate} d'un 401 (peut etre vide), ou {@code null} si pas de 401. */
+    public String probeWwwAuthenticate(String mcpUrl) {
+        Probe p = probe(mcpUrl);
+        return p.asksForAuth() ? p.wwwAuthenticate() : null;
     }
 
     // -------------------------------------------------------------------------
 
+    private HttpResponse<String> sendForm(String url, Map<String, String> form) throws Exception {
+        String body = form.entrySet().stream()
+            .map(e -> enc(e.getKey()) + "=" + enc(e.getValue()))
+            .collect(Collectors.joining("&"));
+        return send(
+            HttpRequest.newBuilder().POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+                .header("Content-Type", "application/x-www-form-urlencoded"),
+            url, "application/json");
+    }
+
     private HttpResponse<String> send(HttpRequest.Builder b, String url, String accept) throws Exception {
-        SsrfGuard.assertPublicHttpUrl(url); // bloque toute cible interne AVANT l'appel
+        // Bloque toute cible interne AVANT l'appel ; les essais de contrat seuls admettent leur faux serveur local.
+        if (!allowPrivateNetwork) SsrfGuard.assertPublicHttpUrl(url);
         HttpRequest req = b.uri(URI.create(url)).timeout(timeout).header("Accept", accept).build();
         return http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
     }
 
-    private JsonNode readJson(HttpResponse<String> r) throws Exception {
+    private JsonNode readJson(HttpResponse<String> r) {
         String body = r.body();
-        return (body == null || body.isBlank())
-            ? objectMapper.createObjectNode()
-            : objectMapper.readTree(body);
+        if (body == null || body.isBlank()) return objectMapper.createObjectNode();
+        try {
+            return objectMapper.readTree(body);
+        } catch (Exception e) {
+            // Certains serveurs repondent en formulaire (access_token=...&scope=...) malgre l'en-tete Accept.
+            return objectMapper.valueToTree(parseForm(body));
+        }
+    }
+
+    private static Map<String, String> parseForm(String body) {
+        Map<String, String> out = new java.util.LinkedHashMap<>();
+        for (String pair : body.split("&")) {
+            int eq = pair.indexOf('=');
+            if (eq <= 0) continue;
+            out.put(java.net.URLDecoder.decode(pair.substring(0, eq), StandardCharsets.UTF_8),
+                java.net.URLDecoder.decode(pair.substring(eq + 1), StandardCharsets.UTF_8));
+        }
+        return out;
     }
 
     private void requireSuccess(HttpResponse<String> r, JsonNode node, String ctx) {
-        if (r.statusCode() / 100 != 2) {
-            String err = node.path("error").asText(node.path("error_description").asText(""));
-            throw new BusinessException("OAuth " + ctx + " : HTTP " + r.statusCode()
-                + (err.isBlank() ? "" : " (" + err + ")"));
+        // Un 200 qui porte une erreur OAuth (GitHub rend ainsi un code perime) reste un echec.
+        String error = node.path("error").asText("");
+        if (r.statusCode() / 100 != 2 || !error.isBlank()) {
+            String err = error.isBlank() ? node.path("error_description").asText("") : error;
+            throw new OAuthError("OAuth " + ctx + " : HTTP " + r.statusCode() + (err.isBlank() ? "" : " (" + err + ")"),
+                error.isBlank() ? null : error, r.statusCode());
         }
     }
 

@@ -465,7 +465,10 @@ describe("Accorder (R78) : la demande dit sa règle, et un accord peut valoir po
     try {
       await askHook(url, server.token, SEARCH);
       const rule = DEFAULT_RULES.rules.find((r) => r.id === "search-web");
-      assert.deepEqual(asked, [{ tool: "WebSearch", ruling: { action: "web.search", rule: "search-web", reason: rule?.reason } }]);
+      assert.deepEqual(asked, [{ tool: "WebSearch", ruling: {
+        action: "web.search", rule: "search-web", reason: rule?.reason,
+        facts: [{ action: "web.search", tool: "WebSearch" }],
+      } }]);
     } finally {
       await server.stop();
     }

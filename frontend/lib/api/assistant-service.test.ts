@@ -128,11 +128,12 @@ describe('assistant-service: the approval of a proposed action', () => {
     ['{"title":"T"}', { title: 'T' }],
     [null, {}],
   ])('approveAction: without a record, an external write goes through the MCP console route (input %s)', async (input, args) => {
-    vi.mocked(executeMcpAction).mockResolvedValue('Issue saved');
+    vi.mocked(executeMcpAction).mockResolvedValue({ toolRef: 'linear__save_issue', status: 'success', output: 'Issue saved', reason: null });
 
     const result = await approveAction(slug, call({ name: 'linear__save_issue', input }));
 
-    expect(executeMcpAction).toHaveBeenCalledWith(slug, 'linear__save_issue', args);
+    // L'accord de la carte vaut la confirmation : le serveur juge encore par les règles, et garde au dossier.
+    expect(executeMcpAction).toHaveBeenCalledWith(slug, 'linear__save_issue', args, true);
     expect(result).toEqual({ tool: 'linear__save_issue', status: 'success', output: 'Issue saved' });
     expect(apiClient.post).not.toHaveBeenCalled();
   });
