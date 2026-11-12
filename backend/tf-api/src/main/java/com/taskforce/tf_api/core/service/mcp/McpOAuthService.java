@@ -321,14 +321,14 @@ public class McpOAuthService {
      *
      * <p>Le code n'est pas échangé ici : il est gardé avec son {@code state}, et l'adresse de retour porte un jeton à
      * usage unique que seul ce navigateur reçoit ({@code finish}). L'app, connectée, le présente pour finir ; seule la
-     * personne qui a lancé le flux le peut.</p>
+     * personne qui a lancé le flux le peut. Le retour ne retire jamais le flux : un second retour le laisse tel quel, et
+     * un flux qui n'aboutit pas s'efface à son échéance.</p>
      */
     @Transactional
     public String callback(String state, String code, String error, String iss, String errorDescription) {
         McpOAuthState row = (state == null || state.isBlank()) ? null
             : stateRepository.findById(state).orElse(null);
         if (row == null) return settings.appBase() + "/?mcp=error"; // state inconnu/expire : retour generique
-        boolean kept = false;
         try {
             if (error != null && !error.isBlank()) {
                 if (ADMIN_ERRORS.contains(error) || adminRequired(row.getConnectorKey())
@@ -352,13 +352,10 @@ public class McpOAuthService {
             row.setCode(code);
             row.setFinishHash(sha256Hex(finish));
             stateRepository.save(row);
-            kept = true;
             return appRedirect(row, "finish") + "&state=" + enc(row.getState()) + "&finish=" + enc(finish);
         } catch (Exception e) {
             log.warn("Callback OAuth MCP echoue (connector={}) : {}", LogSafe.of(row.getConnectorKey()), LogSafe.of(e.getMessage()));
             return appRedirect(row, "error");
-        } finally {
-            if (!kept) stateRepository.deleteById(row.getState()); // usage unique
         }
     }
 
@@ -369,19 +366,22 @@ public class McpOAuthService {
      * L'app, connectée, finit la connexion revenue du navigateur : seulement avec le jeton que ce navigateur a reçu,
      * seulement pour la personne qui a créé le {@code state}, encore membre de l'espace (et gestionnaire pour une
      * connexion partagée). Puis l'échange du code, les jetons sur sa connexion (ou celle de l'espace), la liste des outils
-     * figée, le cache invalidé. Usage unique : réussi ou non, le flux s'efface.
+     * figée, le cache invalidé. Usage unique : dès que le jeton du retour correspond, réussi ou non, le flux s'efface ; un
+     * mauvais jeton le laisse tel quel.
      */
     @Transactional
     public Completion complete(Long userId, String state, String finish) {
         McpOAuthState row = (state == null || state.isBlank()) ? null
             : stateRepository.findById(state).orElse(null);
         if (row == null) return new Completion("error", null);
+        // Le jeton du retour d'abord : un mauvais jeton, ou un flux qui n'est pas encore revenu, le laisse tel quel.
+        if (row.getCode() == null || row.getFinishHash() == null || finish == null || finish.isBlank()
+                || !MessageDigest.isEqual(sha256Hex(finish).getBytes(StandardCharsets.US_ASCII),
+                    row.getFinishHash().getBytes(StandardCharsets.US_ASCII))) {
+            log.warn("Fin de connexion MCP refusee (connector={}) : retour inconnu", LogSafe.of(row.getConnectorKey()));
+            return new Completion("error", row.getConnectorKey());
+        }
         try {
-            if (row.getCode() == null || row.getFinishHash() == null || finish == null || finish.isBlank()
-                    || !MessageDigest.isEqual(sha256Hex(finish).getBytes(StandardCharsets.US_ASCII),
-                        row.getFinishHash().getBytes(StandardCharsets.US_ASCII))) {
-                throw new BusinessException("retour inconnu");
-            }
             if (userId == null || !userId.equals(row.getUserId())) {
                 throw new BusinessException("le flux a ete lance par une autre personne");
             }
@@ -417,7 +417,7 @@ public class McpOAuthService {
                 LogSafe.of(e.getMessage()));
             return new Completion("error", row.getConnectorKey());
         } finally {
-            stateRepository.deleteById(row.getState()); // usage unique
+            stateRepository.deleteById(row.getState()); // usage unique, dès que le jeton du retour correspond
         }
     }
 

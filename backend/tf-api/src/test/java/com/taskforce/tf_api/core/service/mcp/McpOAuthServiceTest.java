@@ -316,18 +316,45 @@ class McpOAuthServiceTest {
         assertThat(service.complete(USER_ID, "st-2", "any").outcome()).isEqualTo("error");
         assertThat(service.complete(USER_ID, "unknown", "any")).isEqualTo(new McpOAuthService.Completion("error", null));
         verify(client, never()).postForm(anyString(), any());
+        verify(stateRepository, never()).deleteById(anyString());
     }
 
     @Test
-    @DisplayName("callback : un state qui revient deux fois -> erreur, le flux s'efface")
+    @DisplayName("complete : un mauvais jeton laisse le flux tel quel ; le jeton du retour le finit ensuite, puis il s'efface")
+    void aWrongTokenLeavesTheFlowForTheRightOne() throws Exception {
+        McpOAuthState row = openState("st-1");
+        when(stateRepository.findById("st-1")).thenReturn(Optional.of(row));
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+        String finish = finishOf(service.callback("st-1", "code-xyz", null, "https://as.ex"));
+
+        assertThat(service.complete(USER_ID, "st-1", "not-the-token").outcome()).isEqualTo("error");
+        verify(stateRepository, never()).deleteById(anyString());
+        assertThat(row.getCode()).isEqualTo("code-xyz");
+
+        when(authorization.isMember(WS_ID, USER_ID)).thenReturn(true);
+        when(client.postForm(eq("https://as.ex/token"), any())).thenReturn(om.readTree("{\"access_token\":\"AT\"}"));
+        when(workspaceRepository.getReferenceById(WS_ID)).thenReturn(ws);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(person));
+        when(workspaceMcp.ownConnection(ws, person, "linear", false)).thenReturn(ConnectorConnection.builder()
+            .workspace(ws).connectorKey("linear").scope(ConnectionScope.PERSONAL).owner(person).build());
+
+        assertThat(service.complete(USER_ID, "st-1", finish)).isEqualTo(new McpOAuthService.Completion("connected", "linear"));
+        verify(stateRepository).deleteById("st-1");
+    }
+
+    @Test
+    @DisplayName("callback : un state qui revient deux fois -> erreur, le flux reste celui du premier retour")
     void callbackReturnsOnce() {
         McpOAuthState row = openState("st-1");
         when(stateRepository.findById("st-1")).thenReturn(Optional.of(row));
         lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
         service.callback("st-1", "code-xyz", null, "https://as.ex");
+        String firstFinish = row.getFinishHash();
 
         assertThat(service.callback("st-1", "code-2", null, "https://as.ex")).contains("mcp=error");
-        verify(stateRepository).deleteById("st-1");
+        verify(stateRepository, never()).deleteById(anyString());
+        assertThat(row.getCode()).isEqualTo("code-xyz");
+        assertThat(row.getFinishHash()).isEqualTo(firstFinish);
     }
 
     @Test
@@ -338,7 +365,7 @@ class McpOAuthServiceTest {
 
         assertThat(service.callback("st-x", "code", null, "https://evil.ex")).endsWith("mcp=error&connector=linear");
         verify(client, never()).postForm(anyString(), any());
-        verify(stateRepository).deleteById("st-x");
+        verify(stateRepository, never()).deleteById(anyString());
     }
 
     @Test
@@ -373,7 +400,7 @@ class McpOAuthServiceTest {
     }
 
     @Test
-    @DisplayName("callback : refus de la personne -> erreur (UI) + state supprime, pas d'echange")
+    @DisplayName("callback : refus de la personne -> erreur (UI), pas d'échange ; le flux s'efface à son échéance")
     void callbackProviderError() {
         when(stateRepository.findById("st-2")).thenReturn(Optional.of(openState("st-2")));
         lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
@@ -381,7 +408,7 @@ class McpOAuthServiceTest {
         assertThat(service.callback("st-2", null, "access_denied"))
             .isEqualTo("http://localhost:3000/acme/settings?section=integrations&mcp=error&connector=linear");
         verify(client, never()).postForm(anyString(), any());
-        verify(stateRepository).deleteById("st-2");
+        verify(stateRepository, never()).deleteById(anyString());
     }
 
     @Test
