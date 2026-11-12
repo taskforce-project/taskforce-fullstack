@@ -232,7 +232,8 @@ class DeliveryApprovalObligationsTest {
         assertThat(approval.obligations()).isNull(); // la personne qui a délégué répond seule
         assertThat(service.activity("acme", 100L, 0, 7L).approvals().get(0).binding()).isTrue();
 
-        service.decide("acme", 100L, 9L, true, true, 7L);
+        // Ce que le service rend est ce qu'il a enregistré : la réponse à la personne le dit.
+        assertThat(service.decide("acme", 100L, 9L, true, true, 7L)).isEqualTo("ONCE");
 
         assertThat(approval.getStatus()).isEqualTo(DeliveryApprovalStatus.ALLOWED);
         assertThat(approval.getScope()).isEqualTo("ONCE");

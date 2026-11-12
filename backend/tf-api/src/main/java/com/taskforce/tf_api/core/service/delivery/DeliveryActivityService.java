@@ -89,8 +89,8 @@ public class DeliveryActivityService {
     private static final Set<String> EVIDENCE_ONLY = Set.of("decision");
 
     /** La portée d'un accord : une fois, ou pour le reste de la mission (R46). */
-    static final String SCOPE_ONCE = "ONCE";
-    static final String SCOPE_MISSION = "MISSION";
+    public static final String SCOPE_ONCE = "ONCE";
+    public static final String SCOPE_MISSION = "MISSION";
     /** Les règles du socle, que le moteur nomme {@code floor-…}. */
     private static final String FLOOR = "floor-";
 
@@ -417,9 +417,12 @@ public class DeliveryActivityService {
      * Autorise ou refuse une action de l'agent. Réservé à la personne qui a délégué, tant que la demande attend. Un accord
      * {@code forMission} vaut pour le reste de la mission (R46) : le runner ne redemande plus ce que la même règle demande.
      * Une décision qui lie (une couche de l'entreprise, des obligations, le socle) ne s'accorde qu'une fois.
+     *
+     * @return la portée enregistrée ({@link #SCOPE_ONCE} ou {@link #SCOPE_MISSION}), ou nul quand seule la signature est
+     *     enregistrée et que la demande attend encore les autres personnes que la règle désigne
      */
     @Transactional
-    public void decide(String slug, Long runId, Long approvalId, boolean allow, boolean forMission, Long userId) {
+    public String decide(String slug, Long runId, Long approvalId, boolean allow, boolean forMission, Long userId) {
         DeliveryRun run = scopedRun(slug, runId);
         Project project = run.getIssue().getProject();
         visibilityGuard.assertCanView(project, userId);
@@ -461,7 +464,7 @@ public class DeliveryActivityService {
                 evidenceService.append(run, "human.decision", personActor(run, userId), signed);
                 log.info("Run {} : validation {} signée par {} ({} sur {})", runId, approvalId, userId, allowed.size(),
                     require.signatures());
-                return;
+                return null;
             }
         }
         approval.setStatus(allow ? DeliveryApprovalStatus.ALLOWED : DeliveryApprovalStatus.DENIED);
@@ -478,6 +481,7 @@ public class DeliveryActivityService {
         decided.put("scope", approval.getScope());
         evidenceService.append(run, "human.decision", personActor(run, userId), decided);
         log.info("Run {} : validation {} {} par {}", runId, approvalId, approval.getStatus(), userId);
+        return approval.getScope();
     }
 
     /** La personne qui décide, telle que le dossier la nomme : son adresse, comme pour la personne qui a délégué. */
