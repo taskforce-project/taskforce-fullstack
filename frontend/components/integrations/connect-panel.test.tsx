@@ -239,7 +239,7 @@ describe("ConnectPanel", () => {
     expect(pathLabel(notion({ connection: "our-app" }), t)).toBe(t.pathOneClick)
     expect(pathLabel(notion({ connection: "company-app" }), t)).toBe(t.pathAdminFirst)
     expect(pathLabel(notion({ connection: "api-key" }), t)).toBe(t.pathKey)
-    expect(pathLabel(notion({ connection: "server-url" }), t)).toBe(t.pathKey)
+    expect(pathLabel(notion({ connection: "server-url" }), t)).toBe(t.pathAddress)
     expect(pathLabel(notion({ connection: "open" }), t)).toBe(t.pathOpen)
     expect(pathLabel(notion({ connection: null }), t)).toBeNull()
   })
