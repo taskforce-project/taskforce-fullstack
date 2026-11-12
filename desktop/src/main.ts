@@ -74,15 +74,17 @@ if (storeData) app.setPath("userData", storeData);
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on("second-instance", () => {
-    // La fenêtre de l'app, ou l'écran de la coque tant qu'elle n'est pas là.
-    const window = mainWindow ?? BrowserWindow.getAllWindows()[0];
-    if (window) {
-      if (window.isMinimized()) window.restore();
-      window.focus();
-    }
-  });
+  app.on("second-instance", bringToFront);
   app.whenReady().then(main).catch(fatal);
+}
+
+/** La fenêtre de l'app, ou l'écran de la coque tant qu'elle n'est pas là, au premier plan. */
+function bringToFront(): void {
+  const window = mainWindow ?? BrowserWindow.getAllWindows()[0];
+  if (window) {
+    if (window.isMinimized()) window.restore();
+    window.focus();
+  }
 }
 
 async function main(): Promise<void> {
@@ -376,7 +378,8 @@ async function openApp(account: Account, previous: BrowserWindow | null, first: 
   const splash = openScreen(first, previous ? previous.getBounds() : place, previous !== null);
   if (previous) closeWhenShown(splash, previous);
   try {
-    stack = await startStack(account, (text) => showScreen(splash, withNote(first, text)));
+    // Le retour d'une connexion à un outil ramène la fenêtre de l'app : elle y dit « Connected as ... ».
+    stack = await startStack(account, (text) => showScreen(splash, withNote(first, text)), bringToFront);
   } catch (error) {
     log.error(`Start failed: ${(error as Error).stack ?? error}`);
     // L'échec se dit dans l'écran, à la place des étapes : essayer encore, ouvrir les journaux, quitter.
