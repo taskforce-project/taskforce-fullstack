@@ -25,17 +25,19 @@ export function connectorsSummary(lines: readonly ConnectorLine[], t: ConnectorT
 
 /**
  * Les connecteurs connectés du catalogue, ceux à reconnecter d'abord (injoignables, ou dont l'éditeur refuse désormais
- * le jeton : « Needs reconnecting »), puis par nom.
+ * le jeton : « Needs reconnecting »), puis par nom. Une carte à deux accès (GitHub, Slack, Plane : R160) compte une
+ * fois, par l'un ou l'autre.
  */
 export function connectorLines(catalog: IntegrationCatalog, servers: readonly McpServerStatus[]): ConnectorLine[] {
   const unreachable = new Set(servers.filter((server) => !server.reachable).map((server) => server.connectorKey))
   return catalog.categories
     .flatMap((group) => group.tools)
-    .filter((tool) => tool.connected || tool.state === "NEEDS_RECONNECT")
-    .map((tool) => ({
+    .map((tool) => ({ tool, accesses: tool.live ? [tool, tool.live] : [tool] }))
+    .filter(({ accesses }) => accesses.some((a) => a.connected || a.state === "NEEDS_RECONNECT"))
+    .map(({ tool, accesses }) => ({
       key: tool.key,
       name: tool.name,
-      reconnect: unreachable.has(tool.key) || tool.state === "NEEDS_RECONNECT",
+      reconnect: accesses.some((a) => unreachable.has(a.key) || a.state === "NEEDS_RECONNECT"),
     }))
     .sort((a, b) => Number(b.reconnect) - Number(a.reconnect) || a.name.localeCompare(b.name))
 }

@@ -19,7 +19,7 @@ const status = (state: McpServerStatus["state"]): McpServerStatus => ({
 
 describe("useConnectorStore", () => {
   beforeEach(() => {
-    useConnectorStore.setState({ outcomes: {}, busy: null, waiting: null, error: null })
+    useConnectorStore.setState({ outcomes: {}, busy: null, waiting: null, error: null, failure: null })
     vi.clearAllMocks()
   })
 
@@ -43,6 +43,21 @@ describe("useConnectorStore", () => {
 
     expect(await useConnectorStore.getState().connect("acme", "notion", { shared: true })).toBeNull()
     expect(useConnectorStore.getState().error).toBe("Only owners and admins can do this.")
+    // La raison du geste qui a échoué, pour la phrase du panneau (R160).
+    expect(useConnectorStore.getState().failure).toEqual({ key: "notion", kind: "unknown", raw: "Only owners and admins can do this." })
+  })
+
+  it("a new gesture, or forgetting the tool, clears its failure; another tool's stays", async () => {
+    useConnectorStore.setState({ failure: { key: "notion", kind: "unknown", raw: null } })
+    useConnectorStore.getState().forget("linear")
+    expect(useConnectorStore.getState().failure?.key).toBe("notion")
+    useConnectorStore.getState().forget("notion")
+    expect(useConnectorStore.getState().failure).toBeNull()
+
+    useConnectorStore.setState({ failure: { key: "notion", kind: "unknown", raw: null } })
+    vi.mocked(service.connectTool).mockResolvedValue({ next: "connected", authorizeUrl: null, message: null })
+    await useConnectorStore.getState().connect("acme", "notion", {})
+    expect(useConnectorStore.getState().failure).toBeNull()
   })
 
   it("waits until the connection shows up, then stops", async () => {

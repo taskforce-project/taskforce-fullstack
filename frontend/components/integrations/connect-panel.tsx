@@ -13,6 +13,7 @@ import { DisconnectConfirmDialog } from "@/components/integrations/disconnect-co
 import { IS_DESKTOP } from "@/lib/desktop"
 import { fillText } from "@/lib/delivery/result-card"
 import { getMcpServerTools, type ConnectorView, type McpServerStatus, type McpToolInfo } from "@/lib/api/integration-service"
+import { failureSentence, failureStep, type ConnectFailure } from "@/lib/integrations/connect-failure"
 import { useConnectorStore } from "@/lib/store/connector-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { toolLabel } from "@/lib/utils/tool-label"
@@ -30,6 +31,11 @@ type PanelProps = Readonly<{
   /** La console d'actions, dépliée, élargit le dialogue. */
   onWide?: (wide: boolean) => void
 }>
+
+/** Le chemin d'un outil en une phrase simple, pour sa fiche (R160) ; null pour une native ou un serveur ajouté. */
+export function pathSentence(tool: ConnectorView, t: ConnectTexts): string | null {
+  return tool.connection ? fillText(t.pathSentence[tool.connection], { name: tool.name }) : null
+}
 
 /** Le chemin d'un outil tel que la carte le dit (R133 : pas de mot interne). */
 export function pathLabel(tool: ConnectorView, t: ConnectTexts): string | null {
@@ -67,6 +73,8 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
   const waitForConnection = useConnectorStore((s) => s.waitForConnection)
   const stopWaiting = useConnectorStore((s) => s.stopWaiting)
   const forget = useConnectorStore((s) => s.forget)
+  // Le dernier geste de cet outil qui a échoué : la phrase reste dans le panneau, pas dans un toast qui passe (R160).
+  const failure = useConnectorStore((s) => (s.failure?.key === tool.key ? s.failure : null))
   const [shared, setShared] = useState(false)
   const [allowWrites, setAllowWrites] = useState(false)
   // La clé guidée, quand l'éditeur en propose une : un autre chemin que l'administrateur (GitHub, Stripe).
@@ -75,11 +83,7 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
 
   const go = useCallback(async (extra: Parameters<typeof connect>[2] = {}) => {
     const result = await connect(slug, tool.key, { shared, allowWrites, ...extra })
-    if (!result) {
-      const error = useConnectorStore.getState().error
-      toast.error(error ? `${fillText(t.failed, { name })} ${error}` : fillText(t.failed, { name }))
-      return
-    }
+    if (!result) return
     if (result.next === "browser" && result.authorizeUrl) {
       if (IS_DESKTOP) {
         // Le navigateur du système (RFC 8252) ; la fenêtre de l'app reste, et attend le retour sur 127.0.0.1.
@@ -125,29 +129,36 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
     return <ConnectedView slug={slug} tool={tool} manager={manager} onChanged={onChanged} onWide={onWide} />
   }
 
+  // L'étape de l'administrateur : un propriétaire ou un administrateur la fait (l'application de l'entreprise, « Set it
+  // up ») ; un membre l'attend, avec le message à lui envoyer (R160).
+  const adminTurn = tool.state === "NEEDS_SETUP" || (tool.state === "WAITING_FOR_ADMIN" && tool.connection === "company-app")
   const step = byKey ? "key" : outcome?.next
-    ?? (tool.state === "WAITING_FOR_ADMIN" ? (manager && tool.connection === "company-app" ? "company-app" : "admin") : "start")
+    ?? (adminTurn || tool.state === "WAITING_FOR_ADMIN" ? (manager && adminTurn ? "company-app" : "admin") : "start")
   const adminMessage = outcome?.message ?? tool.admin?.text ?? null
+  // La cause d'abord, puis le geste qui la suit (R133 : un échec dit ce qui s'est passé et quoi faire).
+  const note = failure ? <FailureNote failure={failure} name={name} /> : null
+  const withNote = (content: React.ReactNode) => (note ? <div className="flex flex-col gap-3">{note}{content}</div> : content)
 
   if (step === "admin") {
-    return <AdminStep name={name} message={adminMessage} link={tool.admin?.link ?? null} busy={busy} onRetry={() => go()}
-      onUseKey={tool.apiKey ? () => setByKey(true) : undefined} />
+    return withNote(<AdminStep name={name} message={adminMessage} link={tool.admin?.link ?? null} busy={busy} onRetry={() => go()}
+      onUseKey={tool.apiKey ? () => setByKey(true) : undefined} />)
   }
   if (step === "company-app") {
-    return <CompanyAppForm slug={slug} tool={tool} instructions={adminMessage} onSaved={() => go()}
-      onUseKey={tool.apiKey ? () => setByKey(true) : undefined} />
+    return withNote(<CompanyAppForm slug={slug} tool={tool} instructions={adminMessage} onSaved={() => go()}
+      onUseKey={tool.apiKey ? () => setByKey(true) : undefined} />)
   }
   if (step === "key") {
-    return <KeyForm tool={tool} busy={busy} onSubmit={(value) => go(tool.connection === "server-url"
-      ? { mcpUrl: value } : { mcpToken: value })} />
+    return withNote(<KeyForm tool={tool} busy={busy} onSubmit={(value) => go(tool.connection === "server-url"
+      ? { mcpUrl: value } : { mcpToken: value })} />)
   }
   if (step === "local") {
-    return <LocalStep message={outcome?.message ?? null} busy={busy} onApprove={() => go({ localApproved: true })} />
+    return withNote(<LocalStep message={outcome?.message ?? null} busy={busy} onApprove={() => go({ localApproved: true })} />)
   }
 
   const reconnecting = tool.state === "NEEDS_RECONNECT"
   return (
     <div className="flex flex-col gap-3">
+      {note}
       <p className="text-sm text-muted-foreground">
         {reconnecting ? fillText(t.needsReconnectingText, { name }) : fillText(shared ? t.introShared : t.intro, { name })}
       </p>
@@ -172,9 +183,49 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
       <DialogFooter>
         <Button onClick={() => go()} disabled={busy} className="gap-1.5">
           {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
-          {busy ? t.connecting : reconnecting ? t.reconnect : t.connect}
+          {busy ? t.connecting : failure ? t.tryAgain : reconnecting ? t.reconnect : t.connect}
         </Button>
       </DialogFooter>
+    </div>
+  )
+}
+
+/**
+ * Un geste qui n'a pas abouti (R160) : ce qui s'est passé et quoi faire, en une phrase ; où il s'est arrêté, un clic
+ * plus loin ; ce que le serveur a dit, tel quel, à deux clics (R133).
+ */
+export function FailureNote({ failure, name }: Readonly<{ failure: ConnectFailure; name: string }>) {
+  const t = usePreferencesStore((s) => s.t.connect)
+  const [details, setDetails] = useState(false)
+  const [raw, setRaw] = useState(false)
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+      <p role="alert" className="flex items-start gap-2 text-foreground">
+        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
+        <span>{failureSentence(failure, name, t)}</span>
+      </p>
+      <button type="button" aria-expanded={details} onClick={() => setDetails((v) => !v)}
+              className="w-fit text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+        {details ? t.failureHideDetails : t.failureDetails}
+      </button>
+      {details && (
+        <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
+          <p>{failureStep(failure, name, t)}</p>
+          {failure.raw && (
+            <>
+              <button type="button" aria-expanded={raw} onClick={() => setRaw((v) => !v)}
+                      className="w-fit underline-offset-2 hover:text-foreground hover:underline">
+                {raw ? t.failureHideRaw : t.failureRaw}
+              </button>
+              {raw && (
+                <pre tabIndex={0} className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-muted px-2 py-1.5 font-mono text-[11px] text-foreground">
+                  {failure.raw}
+                </pre>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -5,7 +5,7 @@ import { toast } from "sonner"
 import type { ConnectorView } from "@/lib/api/integration-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 import { useConnectorStore } from "@/lib/store/connector-store"
-import { ConnectPanel, pathLabel } from "./connect-panel"
+import { ConnectPanel, pathLabel, pathSentence } from "./connect-panel"
 
 const desktop = vi.hoisted(() => ({ value: false }))
 vi.mock("@/lib/desktop", () => ({ get IS_DESKTOP() { return desktop.value } }))
@@ -46,7 +46,7 @@ describe("ConnectPanel", () => {
     vi.clearAllMocks()
     desktop.value = false
     useConnectorStore.setState({
-      outcomes: {}, busy: null, waiting: null, error: null,
+      outcomes: {}, busy: null, waiting: null, error: null, failure: null,
       connect, waitForConnection, saveCompanyApp, approveTools, disconnect, servers,
     })
     servers.mockResolvedValue([])
@@ -102,13 +102,45 @@ describe("ConnectPanel", () => {
     expect(stopWaiting).toHaveBeenCalled()
   })
 
-  it("says the failure and what to do", async () => {
-    connect.mockResolvedValue(null)
-    useConnectorStore.setState({ error: null })
+  it("a failure stays in the panel: what happened and what to do, then where it stopped, then the server's words (R160)", async () => {
+    const raw = "OAuth DCR https://auth.notion.test/register : HTTP 400 (invalid_redirect_uri)"
+    connect.mockImplementation(async () => {
+      useConnectorStore.setState({ failure: { key: "notion", kind: "CONNECT_REGISTRATION_REFUSED", raw } })
+      return null
+    })
     show(notion())
 
     fireEvent.click(screen.getByRole("button", { name: t.connect }))
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(t.failed.replace("{name}", "Notion")))
+
+    const said = await screen.findByRole("alert")
+    expect(said).toHaveTextContent(t.failures.CONNECT_REGISTRATION_REFUSED.replaceAll("{name}", "Notion"))
+    expect(toast.error).not.toHaveBeenCalled()
+    // Ni code, ni adresse, ni erreur OAuth au premier regard ; « Try again » vient après la cause.
+    expect(screen.queryByText(/invalid_redirect_uri|auth\.notion\.test/)).toBeNull()
+    expect(screen.getByRole("button", { name: t.tryAgain })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole("button", { name: t.failureDetails }))
+    expect(screen.getByText("Where it stopped: registering TaskForce with Notion.")).toBeTruthy()
+    expect(screen.queryByText(raw)).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: t.failureRaw }))
+    expect(screen.getByText(raw)).toBeTruthy()
+
+    // Un autre outil ne montre pas cet échec.
+    useConnectorStore.setState({ failure: { key: "linear", kind: "unknown", raw: null } })
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull())
+  })
+
+  it("an owner or admin sets up a tool that needs the company's app: no wait on his own step (R160)", () => {
+    const slack = notion({ key: "slack-mcp", name: "Slack", connection: "company-app", state: "NEEDS_SETUP",
+      admin: { text: "Create an internal app.", link: null, required: true } })
+    const view = show(slack, true)
+    expect(screen.getByText(t.companyAppTitle)).toBeTruthy()
+    expect(screen.queryByText(t.waitingForAdmin)).toBeNull()
+    view.unmount()
+
+    show({ ...slack, state: "WAITING_FOR_ADMIN" }, false)
+    expect(screen.getByText(t.waitingForAdmin)).toBeTruthy()
+    expect(screen.queryByText(t.companyAppTitle)).toBeNull()
   })
 
   it("waiting for the admin: one sentence, the message to send, the admin page, and try again", async () => {
@@ -242,5 +274,14 @@ describe("ConnectPanel", () => {
     expect(pathLabel(notion({ connection: "server-url" }), t)).toBe(t.pathAddress)
     expect(pathLabel(notion({ connection: "open" }), t)).toBe(t.pathOpen)
     expect(pathLabel(notion({ connection: null }), t)).toBeNull()
+  })
+
+  it("says each path in one plain sentence, never OAuth or MCP (R160)", () => {
+    expect(pathSentence(notion(), t)).toBe("you sign in to Notion in your browser, then come back connected.")
+    expect(pathSentence(notion({ connection: "company-app" }), t))
+      .toBe("an owner or admin of this workspace sets up Notion once, then everyone connects with their own account.")
+    expect(pathSentence(notion({ connection: "api-key" }), t)).toBe("you create a key in Notion and paste it here.")
+    expect(pathSentence(notion({ connection: null }), t)).toBeNull()
+    for (const sentence of Object.values(t.pathSentence)) expect(sentence).not.toMatch(/OAuth|MCP|token|header/)
   })
 })

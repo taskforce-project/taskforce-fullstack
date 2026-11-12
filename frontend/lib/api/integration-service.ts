@@ -322,9 +322,15 @@ export interface ConnectorView {
   blocked?: string | null;
   /** Essayé de bout en bout ; faux sur une instance d'essai, qui montre aussi les autres. */
   tried?: boolean;
+  /**
+   * Le second accès de GitHub, Slack et Plane (R160) : le préréglage du même outil, par lequel Cortex le lit en direct
+   * avec la connexion de chaque personne ; une carte par outil. Absent pour les autres.
+   */
+  live?: ConnectorView | null;
 }
 
-export type ConnectionState = "CONNECTED" | "NEEDS_RECONNECT" | "WAITING_FOR_ADMIN" | "NOT_CONNECTED";
+/** `NEEDS_SETUP` : l'étape de l'administrateur revient à la personne (propriétaire ou administrateur), qui la fait. */
+export type ConnectionState = "CONNECTED" | "NEEDS_RECONNECT" | "WAITING_FOR_ADMIN" | "NEEDS_SETUP" | "NOT_CONNECTED";
 export type ConnectionScope = "PERSONAL" | "WORKSPACE";
 export type ConnectionPath = "self-registration" | "our-app" | "company-app" | "api-key" | "server-url" | "open";
 

@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest"
 
 import type { ConnectorView, IntegrationCatalog } from "@/lib/api/integration-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
-import { catalogForThisApp, connectionOf, filterCatalog, folds, FOLDED_COUNT } from "./integrations-catalog"
+import { cardAction, catalogForThisApp, connectionOf, filterCatalog, folds, FOLDED_COUNT, isConnected } from "./integrations-catalog"
 
 const t = CONSTANTS_EN.integrations
+const c = CONSTANTS_EN.connect
 
 const tool = (key: string, connected: boolean, authType: ConnectorView["authType"] = "OAUTH2") =>
   ({ key, name: key, connected, authType, description: `${key} on the web`, setupHint: "hint" }) as unknown as ConnectorView
@@ -60,24 +61,63 @@ describe("catalogForThisApp", () => {
 })
 
 describe("connectionOf", () => {
+  // Les mots de la personne, jamais « OAuth », « API key » ni « MCP » (R160).
   it.each([
-    ["github", "OAUTH2", false, "OAuth", true],
+    ["github", "OAUTH2", false, "One click", true],
     ["github", "OAUTH2", true, "GitHub CLI", true],
-    ["slack", "OAUTH2", false, "OAuth", true],
+    ["slack", "OAUTH2", false, "One click", true],
     ["slack", "OAUTH2", true, "Web app only", false],
-    ["plane", "API_KEY", true, "API key", true],
-    ["linear", "MCP", true, "MCP", true],
+    ["plane", "API_KEY", true, "Key", true],
+    ["custom-docs", "MCP", true, "Server address", true],
   ] as const)("%s (%s), desktop %s : %s, connectable %s", (key, authType, desktop, label, canConnect) => {
-    expect(connectionOf(tool(key, false, authType), t, desktop)).toMatchObject({ label, canConnect })
+    expect(connectionOf(tool(key, false, authType), t, desktop, c)).toMatchObject({ label, canConnect })
   })
 
   it("dit où vit la connexion GitHub de l'app desktop", () => {
-    expect(connectionOf(tool("github", false), t, true).help).toBe(t.githubCliHelp)
+    expect(connectionOf(tool("github", false), t, true, c).help).toBe(t.githubCliHelp)
+  })
+
+  it("une phrase simple par chemin, qui ne contredit pas le chemin (R160)", () => {
+    expect(connectionOf(tool("github", false), t, false, c).help).toBe("you sign in to github in your browser, then come back connected.")
+    expect(connectionOf(tool("plane", false, "API_KEY"), t, false, c).help).toContain("paste it here")
+    const zoom = { ...tool("zoom", false, "MCP"), name: "Zoom", connection: "company-app" } as ConnectorView
+    expect(connectionOf(zoom, t, false, c)).toEqual({ label: "Admin first",
+      help: "an owner or admin of this workspace sets up Zoom once, then everyone connects with their own account.", canConnect: true })
   })
 
   it("un outil que l'éditeur ferme encore ne se connecte pas", () => {
     const figma = { ...tool("figma", false, "MCP"), connection: "our-app", blocked: "Waitlist." } as ConnectorView
-    expect(connectionOf(figma, t, false, CONSTANTS_EN.connect)).toMatchObject({ label: "One click", canConnect: false })
+    expect(connectionOf(figma, t, false, c)).toMatchObject({ label: "One click", canConnect: false })
+  })
+})
+
+describe("une carte par outil, et « Connect » depuis la carte (R160)", () => {
+  const live = (patch: Partial<ConnectorView> = {}) =>
+    ({ ...tool("slack-mcp", false, "MCP"), connection: "company-app", state: "NOT_CONNECTED", ...patch }) as ConnectorView
+  const slack = (patch: Partial<ConnectorView> = {}) => ({ ...tool("slack", false), live: live(), ...patch }) as ConnectorView
+
+  it("une carte est branchée par sa native ou par son second accès", () => {
+    expect(isConnected(slack())).toBe(false)
+    expect(isConnected(slack({ connected: true }))).toBe(true)
+    expect(isConnected(slack({ live: live({ connected: true, state: "CONNECTED" }) }))).toBe(true)
+    const both = { total: 1, connected: 1, categories: [{ category: "chat", label: "Chat", tools: [slack({ live: live({ connected: true }) })] }] } as IntegrationCatalog
+    expect(filterCatalog(both, { query: "", category: "all", status: "connected" })).toHaveLength(1)
+    expect(catalogForThisApp(both, t, true, null).connected).toBe(1)
+  })
+
+  it.each([
+    ["à connecter", tool("linear", false, "MCP"), "Connect"],
+    ["branché", tool("linear", true, "MCP"), "Manage"],
+    ["l'étape de l'administrateur lui revient", { ...tool("zoom", false, "MCP"), state: "NEEDS_SETUP" }, "Set it up"],
+    ["à reconnecter", { ...tool("notion", false, "MCP"), state: "NEEDS_RECONNECT" }, "Reconnect"],
+    ["fermé par l'éditeur", { ...tool("figma", false, "MCP"), connection: "our-app", blocked: "Waitlist." }, null],
+  ] as [string, ConnectorView, string | null][])("%s : %s", (_label, item, expected) => {
+    expect(cardAction(item, t, false, c)).toBe(expected)
+  })
+
+  it("Slack dans l'app desktop : la native ne se connecte pas ici, son second accès oui", () => {
+    expect(cardAction(tool("slack", false), t, true, c)).toBeNull()
+    expect(cardAction(slack(), t, true, c)).toBe("Connect")
   })
 })
 

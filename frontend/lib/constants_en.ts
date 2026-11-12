@@ -855,6 +855,17 @@ export const CONSTANTS_EN = {
     // The catalog's first sentence (TF-J2-12): one connection per person, the address for a tool not listed
     catalogIntro: "Connect the tools you use, each with your own account. Cortex reads them directly and asks you before any change. A tool that isn't listed connects by the address of its MCP server.",
     slackDesktopHelp: "Slack can't be connected in the desktop app yet.",
+    // The card (R160): "Connect" opens the connection directly; the detail page stays for "Learn more"
+    learnMore: "Learn more",
+    learnMoreAbout: "Learn more about {name}",
+    manage: "Manage",
+    setUp: "Set it up",
+    // What a tool can do, on its detail page: one plain line each (R160)
+    capabilities: {
+      observe: { label: "Observe", text: "Reads this service's data into TaskForce." },
+      act: { label: "Act", text: "Acts in the service from TaskForce." },
+      mcp: { label: "Cortex", text: "Cortex reads it and asks before any change." },
+    },
   },
 
   // The catalog of tools (R153, Claude's connectors directory): with more than a hundred tools, each category
@@ -886,6 +897,24 @@ export const CONSTANTS_EN = {
     pathKey: "Key",
     pathAddress: "Server address",
     pathOpen: "No sign-in",
+    // The detail page's "Connection" line: one plain sentence per path (R160)
+    pathSentence: {
+      "self-registration": "you sign in to {name} in your browser, then come back connected.",
+      "our-app": "you sign in to {name} in your browser, then come back connected.",
+      "company-app": "an owner or admin of this workspace sets up {name} once, then everyone connects with their own account.",
+      "api-key": "you create a key in {name} and paste it here.",
+      "server-url": "your company creates its {name} server, and you paste its address here.",
+      open: "{name} needs no sign-in, so it connects in one click.",
+      oauth: "you sign in to {name} in your browser, then come back connected.",
+      key: "you create a key in {name} and paste it here, with your workspace's name.",
+      custom: "Cortex reads it through the address you gave.",
+    },
+    // GitHub, Slack and Plane: the second access, inside their card, named by what it adds (R160)
+    liveTitle: "Cortex reads {name}",
+    liveText: "With your own account, Cortex reads {name} in your conversations. It asks you before any change.",
+    liveConnect: "Connect for Cortex",
+    liveBack: "Back to {name}",
+    nativeConnected: "{name} is connected for this workspace.",
     // Options before connecting
     shareWithWorkspace: "Share with the workspace",
     shareWithWorkspaceHelp: "Everyone in the workspace reads {name} through your account. Use it for a shared source only.",
@@ -948,6 +977,37 @@ export const CONSTANTS_EN = {
     // Failures say what happened and what to do
     failed: "{name} wasn't connected. Try again.",
     failedAdmin: "Only owners and admins can do this.",
+    // A failed connection, in the panel (R160): what happened and what to do first, where it stopped one click away,
+    // the server's own words two clicks away. Keyed by the reason the server gives.
+    failures: {
+      CONNECT_OFFICIAL_SERVER_ONLY: "{name} only connects to its own server, so TaskForce didn't use this address. Connect {name} from its card, without an address.",
+      CONNECT_ADDRESS_NOT_ALLOWED: "This address points inside a private network, which TaskForce doesn't reach from here. Use the tool's public address, or the desktop app for a server on your computer.",
+      CONNECT_NO_SIGN_IN: "{name} offers no sign-in that TaskForce can use. Connect with a key if {name} gives you one.",
+      CONNECT_SIGN_IN_UNREACHABLE: "{name}'s sign-in didn't answer. Check your connection, then try again in a moment.",
+      CONNECT_SIGN_IN_UNTRUSTED: "{name}'s sign-in didn't identify itself as expected, so TaskForce stopped to keep your account safe. Try again later, and tell your admin if it happens again.",
+      CONNECT_SIGN_IN_UNSUPPORTED: "{name}'s sign-in lacks what TaskForce needs to connect safely. Connect with a key if {name} gives you one.",
+      CONNECT_REGISTRATION_REFUSED: "{name} refused to register TaskForce, so its sign-in couldn't open. Ask your {name} admin whether outside apps may connect, or connect with a key.",
+      network: "TaskForce's server can't be reached, so {name} wasn't connected. Check your connection, then try again.",
+      forbidden: "Only owners and admins can do this. Ask one of them to connect {name}.",
+      unknown: "{name} wasn't connected, and TaskForce can't tell why. Try again; if it fails again, show the details to your admin.",
+    },
+    failureSteps: {
+      CONNECT_OFFICIAL_SERVER_ONLY: "checking the address",
+      CONNECT_ADDRESS_NOT_ALLOWED: "checking the address",
+      CONNECT_NO_SIGN_IN: "finding {name}'s sign-in",
+      CONNECT_SIGN_IN_UNREACHABLE: "reaching {name}'s sign-in",
+      CONNECT_SIGN_IN_UNTRUSTED: "checking {name}'s sign-in",
+      CONNECT_SIGN_IN_UNSUPPORTED: "checking {name}'s sign-in",
+      CONNECT_REGISTRATION_REFUSED: "registering TaskForce with {name}",
+      network: "reaching TaskForce's server",
+      forbidden: "checking your role in this workspace",
+      unknown: "connecting {name}",
+    },
+    failureDetails: "Details",
+    failureHideDetails: "Hide the details",
+    failureStep: "Where it stopped: {step}.",
+    failureRaw: "Show what the server said",
+    failureHideRaw: "Hide what the server said",
     // The return from the browser (web app)
     returnedConnected: "{name} is connected.",
     returnedAdmin: "{name} needs your admin first. Open it in Integrations to see what to send.",
