@@ -1235,6 +1235,13 @@ export const CONSTANTS_EN = {
     proposes: "Cortex proposes to {what}. Nothing changes until you approve it.",
     proposesThis: "do this",
     proposesExternal: "Cortex proposes an action in {service}. Nothing is sent until you approve it.",
+    // The card of an action in a connected tool (R160): the action in words and its main values, the arguments one
+    // click away under "Details"
+    proposesExternalAction: "Cortex proposes to {action} in {service}{values}. Nothing is sent until you approve it.",
+    proposesUse: "use \"{action}\"",
+    details: "Details",
+    hideDetails: "Hide the details",
+    detailsLabel: "What Cortex will send",
     // Saving a document (R156): what and where, before the person approves.
     proposesSave: "Cortex proposes to save \"{title}\" {where}. Nothing is saved until you approve it.",
     saveWhere: {

@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest"
 
 import type { AssistantAnswer, AssistantRead, AssistantToolCall } from "@/lib/api/assistant-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
-import { didWork, outcomeLine, plainOutput, proposalLine, serviceOf, stepLine, toolWords, workedLine, workedTime, workSentences } from "./work-lines"
+import {
+  actionArguments, actionWords, didWork, mainValues, outcomeLine, plainOutput, proposalLine, serviceOf, stepLine, toolWords,
+  workedLine, workedTime, workSentences,
+} from "./work-lines"
 
 const t = CONSTANTS_EN.thread
 const read = (patch: Partial<AssistantRead> = {}): AssistantRead => ({ issues: [], boards: [], tools: [], notes: 0, ...patch })
@@ -130,7 +133,11 @@ describe("workSentences : ce qui a été lu et fait, en phrases, jamais un nom d
 })
 
 describe("serviceOf et toolWords", () => {
-  it.each([["linear__save_issue", "Linear"], ["my-app__x", "My app"], ["create_issue", null], ["__x", null]])("%s : %s", (tool, expected) => {
+  it.each([
+    ["linear__save_issue", "Linear"], ["my-app__x", "My App"], ["create_issue", null], ["__x", null],
+    // Le second accès de GitHub (R160) et un serveur ajouté à la main se disent par leur nom.
+    ["github-mcp__issue_write", "GitHub"], ["microsoft-365__post_message", "Microsoft 365"], ["custom-team-docs__search", "Team Docs"],
+  ])("%s : %s", (tool, expected) => {
     expect(serviceOf(tool)).toBe(expected)
   })
 
@@ -163,9 +170,21 @@ describe("proposalLine : la carte d'une action demandée, sans nom d'outil", () 
     ["delegate_issue", "Cortex proposes to hand this issue to an agent. Nothing changes until you approve it."],
     ["create_note", "Cortex proposes to write this note. Nothing changes until you approve it."],
     ["list_issues", "Cortex proposes to do this. Nothing changes until you approve it."],
-    ["linear__save_issue", "Cortex proposes an action in Linear. Nothing is sent until you approve it."],
+    ["linear__save_issue", "Cortex proposes to save an issue in Linear. Nothing is sent until you approve it."],
+    ["linear__", "Cortex proposes an action in Linear. Nothing is sent until you approve it."],
   ])("%s", (tool, expected) => {
     expect(proposalLine(tool, t)).toBe(expected)
+  })
+
+  // Une action dans un outil connecté (R160) : l'action en mots et ses valeurs principales, jamais un identifiant.
+  it("names the action and its main values, never an id", () => {
+    const issue = JSON.stringify({ title: "Fix VAT rounding in the monthly ledger", teamId: "e3b0c442-98fc-1c14",
+      assigneeId: "usr_8f2a", priority: 2 })
+    expect(proposalLine("linear__create_issue", t, issue)).toBe(
+      "Cortex proposes to create an issue in Linear: \"Fix VAT rounding in the monthly ledger\", priority 2. Nothing is sent until you approve it.")
+    const post = JSON.stringify({ teamId: "19:abc@thread.tacv2", channel: "finance", text: "Summary of the board meeting" })
+    expect(proposalLine("microsoft-365__post_channel_message", t, post)).toBe(
+      "Cortex proposes to post a channel message in Microsoft 365: channel \"finance\", text \"Summary of the board meeting\". Nothing is sent until you approve it.")
   })
 
   // Ranger un document (R156) : quoi et où, avant l'accord.
@@ -177,6 +196,44 @@ describe("proposalLine : la carte d'une action demandée, sans nom d'outil", () 
       "Cortex proposes to save \"Plan\" on this computer, in C:\\Docs. Nothing is saved until you approve it."],
   ])("save_document %o", (args, expected) => {
     expect(proposalLine("save_document", t, JSON.stringify(args))).toBe(expected)
+  })
+
+  it.each([
+    ["linear__create_issue", "create an issue"],
+    ["github-mcp__merge_pull_request", "merge a pull request"],
+    ["github-mcp__push_files", "use \"Push files\""],
+    ["github-mcp__create_or_update_file", "create or update file"],
+    ["github-mcp__assign_copilot_to_issue", "assign copilot to issue"],
+    ["slack-mcp__search_messages", "search messages"],
+    ["notion__update_pages", "update pages"],
+    ["box__upload", "upload"],
+    ["gmail__send_email", "send an email"],
+  ])("actionWords %s : %s", (tool, expected) => {
+    expect(actionWords(tool, serviceOf(tool) ?? "", t)).toBe(expected)
+  })
+
+  it("keeps three short values at most, the title first, and reads only an object", () => {
+    const long = "x".repeat(80)
+    expect(mainValues(JSON.stringify({ priority: 1, name: "Q3 plan", channel: "ops", text: long, note: "late" })))
+      .toEqual(["\"Q3 plan\"", "priority 1", "channel \"ops\""])
+    expect(mainValues(JSON.stringify({ body: long }))).toEqual([`body "${"x".repeat(59)}…"`])
+    // Une phrase longue s'arrête sur un mot entier, sans la ponctuation qui le suivait.
+    expect(mainValues(JSON.stringify({ text: "Board meeting, 12 November 2026: Q3 VAT summary approved; the ledger fix ships next week." })))
+      .toEqual(["text \"Board meeting, 12 November 2026: Q3 VAT summary approved…\""])
+    expect(mainValues(JSON.stringify({ url: "https://a.example", done: true, items: [1] }))).toEqual([])
+    expect(mainValues("[1, 2]")).toEqual([])
+    expect(mainValues("{not json")).toEqual([])
+    expect(mainValues(null)).toEqual([])
+  })
+
+  it("lists every argument for Details, each with its name in words", () => {
+    expect(actionArguments(JSON.stringify({ title: "Fix", teamId: "e3b0", labels: ["vat"], empty: "", none: null })))
+      .toEqual([
+        { label: "Title", value: "Fix" },
+        { label: "Team id", value: "e3b0" },
+        { label: "Labels", value: "[\"vat\"]" },
+      ])
+    expect(actionArguments(undefined)).toEqual([])
   })
 
   it("save_document without readable arguments says the general sentence", () => {

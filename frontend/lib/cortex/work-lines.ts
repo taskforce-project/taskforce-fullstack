@@ -1,6 +1,7 @@
 import type { AssistantAnswer, AssistantToolCall } from "@/lib/api/assistant-service"
 import type { CONSTANTS_EN } from "@/lib/constants_en"
 import { fillText } from "@/lib/delivery/result-card"
+import { toolLabel } from "@/lib/utils/tool-label"
 
 // ---------------------------------------------------------------------------
 // Ce que Cortex fait et a fait, en mots (R137, séance n°20). Le serveur annonce ses étapes et garde ses gestes, avec leurs
@@ -25,12 +26,19 @@ interface ToolWords {
   proposes?: string
 }
 
-/** Le connecteur d'un outil externe (`linear__save_issue`), avec sa majuscule ; null pour un outil de TaskForce. */
+/** Les noms que la casse ne suffit pas à dire. */
+const BRANDS: Readonly<Record<string, string>> = { github: "GitHub", gitlab: "GitLab", hubspot: "HubSpot" }
+
+/**
+ * Le connecteur d'un outil externe (`linear__save_issue`), en mots : « Linear », « Microsoft 365 », « GitHub » pour
+ * `github-mcp` (le second accès de GitHub, R160) ; null pour un outil de TaskForce.
+ */
 export function serviceOf(tool: string): string | null {
   const at = tool.indexOf("__")
   if (at <= 0) return null
-  const name = tool.slice(0, at).replace(/[-_]+/g, " ").trim()
-  return name ? name.charAt(0).toUpperCase() + name.slice(1) : null
+  const words = tool.slice(0, at).replace(/^custom-/, "").replace(/-mcp$/, "").split(/[-_\s]+/).filter(Boolean)
+  if (words.length === 0) return null
+  return words.map((word) => BRANDS[word] ?? word.charAt(0).toUpperCase() + word.slice(1)).join(" ")
 }
 
 /** Les mots d'un outil : les siens, ceux d'un connecteur, ou des mots généraux pour un outil que cette version ne connaît pas. */
@@ -202,6 +210,119 @@ export function proposalLine(tool: string, t: ThreadTexts, input?: string | null
     if (save) return save
   }
   const service = serviceOf(tool)
-  if (service) return fillText(t.proposesExternal, { service })
+  if (service) {
+    // L'action en mots et ses valeurs principales (R160) : « Cortex proposes to create an issue in Linear: "…" ».
+    const action = actionWords(tool, service, t)
+    if (!action) return fillText(t.proposesExternal, { service })
+    const values = mainValues(input)
+    return fillText(t.proposesExternalAction, { action, service, values: values.length > 0 ? `: ${values.join(", ")}` : "" })
+  }
   return fillText(t.proposes, { what: toolWords(tool, t).proposes ?? t.proposesThis })
+}
+
+// ---------------------------------------------------------------------------
+// L'action d'un outil connecté, en mots (R160) : son verbe et ce sur quoi elle porte, ses valeurs principales, puis ses
+// arguments un clic plus loin. Jamais le nom technique au premier regard (R133).
+// ---------------------------------------------------------------------------
+
+/** Les verbes d'une action qui porte sur une chose : « create an issue », « post a channel message ». */
+const ACT_VERBS = new Set([
+  "add", "approve", "archive", "assign", "book", "cancel", "close", "comment", "create", "delete", "draft", "edit",
+  "fork", "invite", "merge", "move", "open", "post", "publish", "reject", "remove", "rename", "reply", "request", "run",
+  "save", "schedule", "send", "set", "share", "start", "stop", "submit", "trigger", "update", "upload", "write",
+])
+/** Ces verbes lisent ou cherchent : sans article (« search code », « list issues »). */
+const BARE_VERBS = new Set(["search", "list", "get", "read", "fetch", "find", "query", "look"])
+const NO_ARTICLE = new Set(["a", "an", "the", "or", "and", "to", "from", "in", "on", "of", "for", "my", "your", "all", "each"])
+
+/**
+ * L'action d'un outil externe en mots : `linear__create_issue` donne « create an issue », `slack__search_messages`
+ * « search messages » ; un nom qui ne commence pas par un verbe connu se dit `use "Issue write"`. Vide sans nom.
+ */
+export function actionWords(tool: string, service: string, t: ThreadTexts): string {
+  const label = toolLabel(tool.slice(tool.indexOf("__") + 2), service).trim()
+  if (!label) return ""
+  const [first, ...rest] = label.split(" ")
+  const verb = first.toLowerCase()
+  if (BARE_VERBS.has(verb) || (ACT_VERBS.has(verb) && rest.length === 0)) return [verb, ...rest].join(" ")
+  if (!ACT_VERBS.has(verb)) return fillText(t.proposesUse, { action: label })
+  const last = rest[rest.length - 1]
+  const plural = /s$/i.test(last) && !/ss$/i.test(last)
+  const article = !plural && rest.length <= 2 && !NO_ARTICLE.has(rest[0].toLowerCase()) && !/^\d/.test(rest[0])
+    ? (/^[aeiou]/i.test(rest[0]) ? "an " : "a ")
+    : ""
+  return `${verb} ${article}${rest.join(" ")}`
+}
+
+/** Les arguments d'un geste, quand ils se lisent : un objet JSON, sinon null. */
+function argsOf(input: string | null | undefined): Record<string, unknown> | null {
+  if (!input) return null
+  try {
+    const args: unknown = JSON.parse(input)
+    return args && typeof args === "object" && !Array.isArray(args) ? (args as Record<string, unknown>) : null
+  } catch {
+    return null
+  }
+}
+
+/** Le nom d'un argument en mots : `assigneeId` donne « assignee id », `due_date` « due date ». */
+function argWords(key: string): string {
+  return key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").split(/[\s_\-.]+/).filter(Boolean).map((w) => w.toLowerCase()).join(" ")
+}
+
+const TITLE_KEYS = new Set(["title", "name", "subject", "summary"])
+const ID_WORD = /(^| )(id|ids|uuid|guid|token|cursor|url|uri|href|key|secret|password)$/
+
+/** Une valeur qui identifie plutôt qu'elle ne dit : un id, une adresse, un jeton opaque (« e3b0c442-98fc-1c14 »). */
+function identifies(key: string, value: unknown): boolean {
+  if (ID_WORD.test(argWords(key))) return true
+  return typeof value === "string" && !/\s/.test(value) && value.length >= 12 && /\d/.test(value)
+}
+
+/** Une valeur longue s'arrête avant 60 caractères, sur un mot entier quand elle en a, puis « … ». */
+function short(text: string): string {
+  if (text.length <= 60) return text
+  const cut = text.slice(0, 59)
+  const space = cut.lastIndexOf(" ")
+  return `${(space > 40 ? cut.slice(0, space) : cut).replace(/[\s,;:.]+$/, "")}…`
+}
+
+/**
+ * Ce que l'action dit d'elle au premier regard : son titre entre guillemets, puis des valeurs courtes avec leur nom
+ * (« priority 2 », « channel "finance" »), trois au plus, jamais un identifiant.
+ */
+export function mainValues(input: string | null | undefined): string[] {
+  const args = argsOf(input)
+  if (!args) return []
+  const said = Object.entries(args)
+    .filter(([, value]) => (typeof value === "string" && value.trim() !== "") || typeof value === "number")
+    .filter(([key, value]) => !identifies(key, value))
+  const quoted = (value: unknown) => (typeof value === "number" ? String(value) : `"${short(String(value).trim())}"`)
+  const title = said.find(([key]) => TITLE_KEYS.has(key.toLowerCase()))
+  const others = said.filter((entry) => entry !== title)
+  return [
+    ...(title ? [quoted(title[1])] : []),
+    ...others.map(([key, value]) => `${argWords(key)} ${quoted(value)}`),
+  ].slice(0, 3)
+}
+
+/** Un argument d'une action, tel que « Details » le montre : son nom en mots, sa valeur. */
+export interface ActionArgument {
+  label: string
+  value: string
+}
+
+/** Les arguments d'une action, un clic plus loin (R160) : chacun avec son nom en mots et sa valeur entière. */
+export function actionArguments(input: string | null | undefined): ActionArgument[] {
+  const args = argsOf(input)
+  if (!args) return []
+  return Object.entries(args)
+    .filter(([, value]) => value !== null && value !== undefined && value !== "")
+    .map(([key, value]) => {
+      const words = argWords(key)
+      return {
+        label: words ? words.charAt(0).toUpperCase() + words.slice(1) : key,
+        value: typeof value === "string" ? value : JSON.stringify(value),
+      }
+    })
 }

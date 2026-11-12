@@ -94,6 +94,24 @@ describe("AgentChat : le fil", () => {
     expect(await screen.findByText("Done. Delegated SOLO-151.")).toBeInTheDocument()
   })
 
+  it("une action dans un outil connecté dit ce qui sera fait, ses arguments sous Details, le bouton tel quel (R160)", () => {
+    const input = JSON.stringify({ title: "Fix VAT rounding in the monthly ledger", teamId: "e3b0c442-98fc-1c14", priority: 2 })
+    show([said("u1", "Crée l'issue"), replied("a1", { toolCalls: [call("linear__create_issue", "pending", { input })] })])
+
+    expect(screen.getByText("Cortex proposes to create an issue in Linear: \"Fix VAT rounding in the monthly ledger\", priority 2. "
+      + "Nothing is sent until you approve it.")).toBeInTheDocument()
+    expect(screen.queryByText(/linear__create_issue|e3b0c442/)).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument()
+
+    const details = screen.getByRole("button", { name: "Details" })
+    expect(details).toHaveAttribute("aria-expanded", "false")
+    fireEvent.click(details)
+    const sent = screen.getByLabelText("What Cortex will send")
+    expect(sent).toHaveTextContent("Team id")
+    expect(sent).toHaveTextContent("e3b0c442-98fc-1c14")
+    expect(screen.getByRole("button", { name: "Hide the details" })).toHaveAttribute("aria-expanded", "true")
+  })
+
   it("après la carte de questions, ce que le geste a fait se dit en une phrase", async () => {
     vi.mocked(answerQuestion).mockResolvedValue(call("create_project", "success", { output: "Project created in TaskForce: R113 \"Recette 113\" (id 31). Its new private repository me/recette-113 is linked." }))
     show([said("u1", "Crée un projet"), replied("a1", {

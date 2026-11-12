@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { Fragment, useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
 import { useReducedMotion } from "framer-motion"
 import {
@@ -15,7 +15,7 @@ import {
   type AssistantAnswer, type AssistantToolCall,
 } from "@/lib/api/assistant-service"
 import { getErrorMessage } from "@/lib/api/client"
-import { outcomeLine, plainOutput, proposalLine } from "@/lib/cortex/work-lines"
+import { actionArguments, outcomeLine, plainOutput, proposalLine, serviceOf } from "@/lib/cortex/work-lines"
 import { useCortexWork } from "@/lib/hooks/use-cortex-work"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { useCortexStore } from "@/lib/store/cortex-store"
@@ -94,6 +94,9 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
   const [state, setState] = useState<"idle" | "running" | "success" | "refused" | "error">("idle")
   const [output, setOutput] = useState<string | null>(null)
   const [result, setResult] = useState<AssistantActionResult | null>(null)
+  // Une action dans un outil connecté : ses arguments, un clic plus loin, sous « Details » (R160).
+  const [details, setDetails] = useState(false)
+  const args = serviceOf(call.name) ? actionArguments(call.input) : []
   const noteDone = useCortexStore((s) => s.noteDone)
   const t = usePreferencesStore((s) => s.t.thread)
   const outcome = { success: t.outcomeDone, refused: "", error: t.outcomeFailed }
@@ -119,7 +122,25 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
 
   return (
     <div className="my-2 flex flex-col gap-2 border border-shape-yellow/35 bg-shape-yellow/[0.06] p-2.5 text-xs">
-      <p className="text-muted-foreground">{proposalLine(call.name, t, call.input)}</p>
+      <p className="text-foreground">{proposalLine(call.name, t, call.input)}</p>
+      {args.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <button type="button" aria-expanded={details} onClick={() => setDetails((v) => !v)}
+                  className="w-fit text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+            {details ? t.hideDetails : t.details}
+          </button>
+          {details && (
+            <dl aria-label={t.detailsLabel} className="grid grid-cols-[minmax(0,max-content)_minmax(0,1fr)] gap-x-3 gap-y-1">
+              {args.map((arg) => (
+                <Fragment key={arg.label}>
+                  <dt className="text-muted-foreground">{arg.label}</dt>
+                  <dd className="whitespace-pre-wrap break-words text-foreground">{arg.value}</dd>
+                </Fragment>
+              ))}
+            </dl>
+          )}
+        </div>
+      )}
       {state === "idle" || state === "running" ? (
         <button
           type="button"
