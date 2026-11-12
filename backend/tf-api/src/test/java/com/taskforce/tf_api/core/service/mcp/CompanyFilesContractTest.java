@@ -118,7 +118,7 @@ class CompanyFilesContractTest {
         McpOAuthClient http = new McpOAuthClient(om, 5000, true);
         McpClient mcp = new McpClient(om, 2000, 5000, true);
         ConnectorConnectionRepository repo = connections();
-        tokens = new McpTokenService(http, repo, om, catalog);
+        tokens = new McpTokenService(http, repo, om, catalog, apps());
         workspaceMcp = new WorkspaceMcpService(repo, mcp, om, tokens, catalog);
         ReflectionTestUtils.setField(workspaceMcp, "cacheTtlMs", 0L);
         CompanyApiHttp api = new CompanyApiHttp(om, true);

@@ -27,7 +27,8 @@ import lombok.extern.slf4j.Slf4j;
  * (inscription du client) et de la séance n°22 (R154) :
  *
  * <ol>
- *   <li><b>un client enregistré d'avance</b>, chez l'émetteur que le préréglage épingle seulement : celui de
+ *   <li><b>un client enregistré d'avance</b>, chez l'émetteur épinglé seulement (celui que désigne le serveur officiel
+ *       du préréglage, ou, pour un serveur que l'entreprise tient, celui épinglé sur son application) : celui de
  *       l'entreprise, quand son administrateur l'a saisi pour cet espace (chemin C, le plus précis), sinon le nôtre, lu
  *       dans les variables d'environnement {@code TF_MCP_<CLÉ>_CLIENT_ID} et {@code TF_MCP_<CLÉ>_CLIENT_SECRET}
  *       (chemin B ; jamais dans le dépôt) ;</li>
@@ -71,23 +72,28 @@ public class McpClientRegistrar {
     private final Map<String, Long> cimdChecked = new ConcurrentHashMap<>();
 
     /**
-     * Le client à présenter. {@code pinnedIssuer} : le serveur d'autorisation est celui que le préréglage épingle, celui
-     * que désigne son serveur officiel ; seul celui-là reçoit un client enregistré d'avance (l'application de
-     * l'entreprise, ou la nôtre) et son secret. Tout autre émetteur passe par CIMD ou l'inscription dynamique, sans secret
-     * de l'entreprise ni de TaskForce.
+     * Le client à présenter. {@code officialServer} : le serveur joint est le serveur officiel du préréglage, et son
+     * émetteur est celui que le préréglage épingle ; l'application de l'entreprise, puis la nôtre, s'y présentent. Pour un
+     * outil sans serveur officiel (un serveur que l'entreprise crée ou tient), seule l'application de l'entreprise se
+     * présente, à l'émetteur épinglé sur elle ; tant qu'aucun ne l'est, à la connexion d'un propriétaire ou d'un
+     * administrateur ({@code manager}), qui l'épingle en aboutissant ({@link #pinCompanyIssuer}). Tout autre émetteur passe
+     * par CIMD ou l'inscription dynamique, sans secret de l'entreprise ni de TaskForce.
      */
     @Transactional
     public RegisteredClient clientFor(Long workspaceId, String connectorKey, DiscoveredAuth auth, String redirectUri,
-                                      boolean pinnedIssuer) {
+                                      boolean officialServer, boolean manager) {
         // 1. Un client enregistré d'avance, chez l'émetteur épinglé seulement : celui de l'entreprise, puis le nôtre.
-        if (pinnedIssuer) {
-            ConnectorApp company = connectorKey == null ? null
-                : apps.findByWorkspaceIdAndConnectorKey(workspaceId, connectorKey).orElse(null);
+        ConnectorApp company = connectorKey == null ? null
+            : apps.findByWorkspaceIdAndConnectorKey(workspaceId, connectorKey).orElse(null);
+        if (officialServer) {
             if (company != null) {
                 return new RegisteredClient(company.getClientId(), blankToNull(company.getClientSecret()), COMPANY);
             }
             RegisteredClient ours = ours(connectorKey);
             if (ours != null) return ours;
+        } else if (company != null
+                && (company.getIssuer() != null ? sameIssuer(company.getIssuer(), auth.issuer()) : manager)) {
+            return new RegisteredClient(company.getClientId(), blankToNull(company.getClientSecret()), COMPANY);
         }
         // 2. Notre document de métadonnées, quand le serveur l'accepte et qu'il répond comme il faut.
         String cimd = settings.cimdUrl();
@@ -131,6 +137,34 @@ public class McpClientRegistrar {
         String id = blankToNull(environment.getProperty(prefix + "_CLIENT_ID"));
         if (id == null) return null;
         return new RegisteredClient(id, blankToNull(environment.getProperty(prefix + "_CLIENT_SECRET")), OURS);
+    }
+
+    /**
+     * Épingle sur l'application de l'entreprise l'émetteur d'une connexion qui a abouti par elle, pour un outil sans
+     * serveur officiel, quand elle n'en a pas encore : les connexions suivantes ne la présentent qu'à lui.
+     */
+    @Transactional
+    public void pinCompanyIssuer(Long workspaceId, String connectorKey, String issuer) {
+        if (issuer == null || issuer.isBlank()) return;
+        apps.findByWorkspaceIdAndConnectorKey(workspaceId, connectorKey)
+            .filter(app -> app.getIssuer() == null)
+            .ifPresent(app -> {
+                app.setIssuer(issuer);
+                apps.save(app);
+            });
+    }
+
+    /** Deux adresses d'émetteur désignent-elles le même, aux barres finales près ? */
+    static boolean sameIssuer(String a, String b) {
+        if (a == null || b == null) return false;
+        return trailingSlashes(a).equals(trailingSlashes(b));
+    }
+
+    private static String trailingSlashes(String url) {
+        String v = url.strip();
+        int end = v.length();
+        while (end > 0 && v.charAt(end - 1) == '/') end--;
+        return v.substring(0, end);
     }
 
     /** Oublie une inscription dynamique que le serveur ne reconnaît plus (elle se refait à la connexion suivante). */

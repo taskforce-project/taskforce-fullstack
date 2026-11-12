@@ -56,4 +56,12 @@ public class ConnectorApp extends AuditableEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "saved_by")
     private User savedBy;
+
+    /**
+     * Le serveur d'autorisation auquel l'application se présente, avec son secret, pour un outil sans serveur officiel
+     * (V130) : épinglé à la première connexion d'un propriétaire ou d'un administrateur qui aboutit par elle ; nul tant
+     * qu'aucune n'a abouti, et pour un outil qui a un serveur officiel (son émetteur est celui de ce serveur).
+     */
+    @Column(columnDefinition = "TEXT")
+    private String issuer;
 }

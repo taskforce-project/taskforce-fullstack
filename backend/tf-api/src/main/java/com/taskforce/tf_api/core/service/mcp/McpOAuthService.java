@@ -262,10 +262,11 @@ public class McpOAuthService {
         // exotique type javascript:). Les autres endpoints sont deja gardes au moment du fetch serveur.
         urlGuard.accept(auth.authorizationEndpoint());
         String redirectUri = settings.redirectUri();
-        // L'émetteur épinglé : celui que désigne le serveur officiel du préréglage. Lui seul reçoit un client enregistré.
-        boolean pinned = catalog.preset(server.connectorKey()).map(p -> p.serves(mcpUrl)).orElse(false);
-        McpClientRegistrar.RegisteredClient registered =
-            registrar.clientFor(ws.getId(), server.connectorKey(), auth, redirectUri, pinned);
+        // L'émetteur épinglé : celui que désigne le serveur officiel du préréglage, ou, pour un serveur que l'entreprise
+        // tient, celui épinglé sur son application. Lui seul reçoit un client enregistré.
+        boolean official = catalog.preset(server.connectorKey()).map(p -> p.serves(mcpUrl)).orElse(false);
+        McpClientRegistrar.RegisteredClient registered = registrar.clientFor(ws.getId(), server.connectorKey(), auth,
+            redirectUri, official, userId != null && authorization.isManager(ws.getId(), userId));
 
         String verifier = urlSafe(48);
         String state = urlSafe(24);
@@ -403,6 +404,13 @@ public class McpOAuthService {
             conn.setToolsPin(null);
             workspaceMcp.pinQuietly(conn);
             workspaceMcp.invalidate(row.getWorkspaceId());
+            // Un serveur que l'entreprise tient : la première connexion d'un propriétaire ou d'un administrateur qui aboutit
+            // par l'application de l'entreprise épingle son émetteur sur elle.
+            if (McpClientRegistrar.COMPANY.equals(row.getClientSource()) && api == null
+                    && !catalog.preset(row.getConnectorKey()).map(p -> p.serves(row.getMcpUrl())).orElse(false)
+                    && authorization.isManager(row.getWorkspaceId(), userId)) {
+                registrar.pinCompanyIssuer(row.getWorkspaceId(), row.getConnectorKey(), row.getIssuer());
+            }
             return new Completion("connected", row.getConnectorKey());
         } catch (Exception e) {
             log.warn("Fin de connexion MCP echouee (connector={}) : {}", LogSafe.of(row.getConnectorKey()),

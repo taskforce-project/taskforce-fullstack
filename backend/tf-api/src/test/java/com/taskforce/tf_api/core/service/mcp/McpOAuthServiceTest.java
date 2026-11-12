@@ -33,6 +33,7 @@ import com.taskforce.tf_api.shared.exception.BusinessException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -117,7 +118,7 @@ class McpOAuthServiceTest {
         when(discovery.discover("https://mcp.linear.app/mcp/readonly")).thenReturn(auth(true));
         // Le serveur officiel du préréglage : son émetteur est épinglé.
         when(registrar.clientFor(eq(WS_ID), eq("linear"), any(), eq("http://localhost:8080/api/mcp/oauth/callback"),
-                eq(true)))
+                eq(true), eq(false)))
             .thenReturn(new McpClientRegistrar.RegisteredClient("cid-123", null, McpClientRegistrar.DCR));
 
         String url = service.start(ws, USER_ID, "linear", null, "https://mcp.linear.app/mcp", "/acme?import=linear");
@@ -146,7 +147,8 @@ class McpOAuthServiceTest {
         when(workspaceMcp.resolveServer(WS_ID, "custom-docs", "Docs")).thenReturn(new ServerIdentity("custom-docs", "Docs"));
         when(discovery.discover(anyString())).thenReturn(auth(false));
         // Un serveur sans préréglage : aucun émetteur épinglé, donc aucun client enregistré d'avance.
-        when(registrar.clientFor(any(), any(), any(), any(), eq(false))).thenThrow(new McpClientRegistrar.NoClient("none"));
+        when(registrar.clientFor(any(), any(), any(), any(), eq(false), anyBoolean()))
+            .thenThrow(new McpClientRegistrar.NoClient("none"));
 
         assertThatThrownBy(() -> service.start(ws, USER_ID, "custom-docs", "Docs", "https://203.0.113.10/mcp", null))
             .isInstanceOf(McpClientRegistrar.NoClient.class);
@@ -249,6 +251,40 @@ class McpOAuthServiceTest {
         verify(workspaceMcp).pinQuietly(conn);
         verify(workspaceMcp).invalidate(WS_ID);
         verify(stateRepository).deleteById("st-1");
+        verify(registrar, never()).pinCompanyIssuer(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("complete : un outil sans serveur officiel, fini par l'application de l'entreprise -> l'émetteur s'épingle "
+        + "sur elle quand un propriétaire ou un administrateur aboutit, jamais pour un membre")
+    void aManagerConnectionPinsTheIssuerOfTheCompanyApp() throws Exception {
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+        when(authorization.isMember(WS_ID, USER_ID)).thenReturn(true);
+        when(client.postForm(eq("https://as.ex/token"), any())).thenReturn(om.readTree("{\"access_token\":\"AT\"}"));
+        when(workspaceRepository.getReferenceById(WS_ID)).thenReturn(ws);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(person));
+        when(workspaceMcp.ownConnection(ws, person, "glean", false)).thenAnswer(inv -> ConnectorConnection.builder()
+            .workspace(ws).connectorKey("glean").scope(ConnectionScope.PERSONAL).owner(person).build());
+        java.util.function.Function<String, McpOAuthState> glean = state -> {
+            McpOAuthState row = openState(state);
+            row.setConnectorKey("glean");
+            row.setMcpUrl("https://203.0.113.20/mcp");
+            row.setClientSource(McpClientRegistrar.COMPANY);
+            when(stateRepository.findById(state)).thenReturn(Optional.of(row));
+            return row;
+        };
+
+        glean.apply("st-m");
+        String memberFinish = finishOf(service.callback("st-m", "code-m", null, "https://as.ex"));
+        when(authorization.isManager(WS_ID, USER_ID)).thenReturn(false);
+        assertThat(service.complete(USER_ID, "st-m", memberFinish).outcome()).isEqualTo("connected");
+        verify(registrar, never()).pinCompanyIssuer(any(), any(), any());
+
+        glean.apply("st-g");
+        String managerFinish = finishOf(service.callback("st-g", "code-g", null, "https://as.ex"));
+        when(authorization.isManager(WS_ID, USER_ID)).thenReturn(true);
+        assertThat(service.complete(USER_ID, "st-g", managerFinish).outcome()).isEqualTo("connected");
+        verify(registrar).pinCompanyIssuer(WS_ID, "glean", "https://as.ex");
     }
 
     @Test

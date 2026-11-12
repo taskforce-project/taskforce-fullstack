@@ -122,7 +122,7 @@ class McpConnectContractTest {
         McpOAuthClient http = new McpOAuthClient(om, 5000, true);
         McpClient mcp = new McpClient(om, 2000, 5000, true);
         ConnectorConnectionRepository connections = connections();
-        tokens = new McpTokenService(http, connections, om, catalog);
+        tokens = new McpTokenService(http, connections, om, catalog, apps());
         workspaceMcp = new WorkspaceMcpService(connections, mcp, om, tokens, catalog);
         ReflectionTestUtils.setField(workspaceMcp, "cacheTtlMs", 60_000L);
         McpClientRegistrar registrar = new McpClientRegistrar(apps(), registrationRepository(), http, settings, env);

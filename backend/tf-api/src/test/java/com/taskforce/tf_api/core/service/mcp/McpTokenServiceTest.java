@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.service.mcp;
 
 import java.util.Map;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,7 +13,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.enums.ConnectionState;
+import com.taskforce.tf_api.core.model.ConnectorApp;
 import com.taskforce.tf_api.core.model.ConnectorConnection;
+import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.repository.ConnectorAppRepository;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 
@@ -36,6 +40,7 @@ class McpTokenServiceTest {
 
     @Mock private McpOAuthClient client;
     @Mock private ConnectorConnectionRepository repository;
+    @Mock private ConnectorAppRepository apps;
 
     private final ObjectMapper om = new ObjectMapper();
     private McpTokenService service;
@@ -44,7 +49,7 @@ class McpTokenServiceTest {
     void setup() {
         ConnectorCatalog catalog = new ConnectorCatalog();
         catalog.build();
-        service = new McpTokenService(client, repository, om, catalog);
+        service = new McpTokenService(client, repository, om, catalog, apps);
     }
 
     private ConnectorConnection conn(String config) {
@@ -224,6 +229,38 @@ class McpTokenServiceTest {
         assertThat(form.getAllValues().get(0)).containsEntry("client_secret", "registered-secret");
         assertThat(form.getAllValues().get(1)).doesNotContainKey("client_secret").containsEntry("client_id", "cid");
         assertThat(form.getAllValues().get(2)).doesNotContainKey("client_secret");
+    }
+
+    @Test
+    @DisplayName("refresh : un outil sans serveur officiel, le secret de l'entreprise part vers l'émetteur épinglé sur son "
+        + "application ; une connexion faite avant l'épinglage garde l'émetteur qu'elle a gardé")
+    void theCompanySecretOfAToolWithoutOfficialServerGoesToItsPinnedIssuer() throws Exception {
+        Workspace ws = Workspace.builder().id(1L).build();
+        ConnectorApp app = ConnectorApp.builder().connectorKey("glean").clientId("cid").build();
+        when(apps.findByWorkspaceIdAndConnectorKey(1L, "glean")).thenReturn(Optional.of(app));
+        when(client.postForm(eq("https://as.ex/token"), any()))
+            .thenReturn(om.readTree("{\"access_token\":\"NEW\",\"expires_in\":3600}"));
+
+        // Rien d'épinglé encore : la connexion continue de se renouveler, avec l'émetteur gardé à sa connexion.
+        ConnectorConnection before = registered(10L, "glean", "company", "https://203.0.113.20/mcp");
+        before.setWorkspace(ws);
+        service.validAccessToken(before);
+        // Épinglé sur l'application : le même émetteur, aux barres finales près, reçoit le secret ; un autre, jamais.
+        app.setIssuer("https://as.ex/");
+        ConnectorConnection same = registered(11L, "glean", "company", "https://203.0.113.20/mcp");
+        same.setWorkspace(ws);
+        service.validAccessToken(same);
+        app.setIssuer("https://other.ex");
+        ConnectorConnection other = registered(12L, "glean", "company", "https://203.0.113.20/mcp");
+        other.setWorkspace(ws);
+        service.validAccessToken(other);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, String>> form = ArgumentCaptor.forClass(Map.class);
+        verify(client, times(3)).postForm(eq("https://as.ex/token"), form.capture());
+        assertThat(form.getAllValues().get(0)).containsEntry("client_secret", "registered-secret");
+        assertThat(form.getAllValues().get(1)).containsEntry("client_secret", "registered-secret");
+        assertThat(form.getAllValues().get(2)).doesNotContainKey("client_secret").containsEntry("client_id", "cid");
     }
 
     @Test
