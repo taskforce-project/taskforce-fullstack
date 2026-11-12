@@ -544,7 +544,7 @@ class AgentServiceTest {
         // Une réponse juge par les règles du travail ; le rejeu d'un cas, par celles de l'espace.
         lenient().when(deny.judgeWork(any(), any(), any(), any(), any(), any()))
             .thenReturn(new CortexGate.Judged(refused, null, null));
-        lenient().when(deny.judge(any(), any(), any(), any())).thenReturn(refused);
+        lenient().when(deny.judge(any(), any(), any(), any(), any())).thenReturn(refused);
         ReflectionTestUtils.setField(service, "gate", deny);
     }
 

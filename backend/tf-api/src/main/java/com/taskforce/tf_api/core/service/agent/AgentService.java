@@ -1013,7 +1013,7 @@ public class AgentService {
         // Le plan de la question, comme dans une réponse (R117) : la banque dit s'il est suivi.
         List<Map<String, Object>> messages = withHistory(systemPrompt(CortexPlans.forRequest(replayCase.question()).orElse(null),
             "", notes, List.of(), replayCase.askedOn()), List.of(), replayCase.question());
-        ReplayStep step = new ReplayStep(replayCase, gate.rulesFor(ctx));
+        ReplayStep step = new ReplayStep(replayCase, gate.rulesFor(ctx), ctx);
         llm.beginUsageCapture();
         try {
             String answer = toolLoop(messages, tools.toolDefinitions(List.of()), List.of(), new ArrayList<>(),
@@ -1345,16 +1345,18 @@ public class AgentService {
     private final class ReplayStep implements ToolStep {
         private final ReplayCase replayCase;
         private final RulesBundle bundle;
+        private final AgentContext ctx;
         private final List<ReplayOutcome.ReplayCall> calls = new ArrayList<>();
 
-        ReplayStep(ReplayCase replayCase, RulesBundle bundle) {
+        ReplayStep(ReplayCase replayCase, RulesBundle bundle, AgentContext ctx) {
             this.replayCase = replayCase;
             this.bundle = bundle;
+            this.ctx = ctx;
         }
 
         @Override
         public ToolOutcome apply(AgentTool tool, String name, String argsJson) {
-            CortexGate.Verdict verdict = gate.judge(bundle, tool, argsJson, CortexGate.Exposure.none());
+            CortexGate.Verdict verdict = gate.judge(bundle, tool, argsJson, CortexGate.Exposure.none(), ctx);
             ToolOutcome outcome;
             if (verdict.denied()) {
                 outcome = new ToolOutcome("refused", refusedText(verdict));

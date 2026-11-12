@@ -35,6 +35,7 @@ import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 /**
@@ -333,6 +334,21 @@ class CortexGateTest {
         assertThat(verdict.effect()).isEqualTo("ask");
         assertThat(verdict.reason()).isEqualTo("No change without the finance lead");
         assertThat(verdict.require().approvers()).containsExactly(List.of("person:42"));
+    }
+
+    @Test
+    @DisplayName("ce qu'un outil dit de son appel entre dans ses faits, jamais l'acteur ni un fait du socle")
+    void a_tool_gives_its_server_only() {
+        AgentTool gesture = internal("save_document");
+        when(gesture.action()).thenReturn("mcp.write");
+        when(gesture.facts(any(), any())).thenReturn(Map.of("server", "google-drive", "actor", "person",
+            "untrusted", "false"));
+        AgentContext ctx = new AgentContext("acme", 1L, 7L);
+
+        CortexGate.Verdict verdict = gate.judge(defaults, gesture, "{}", CortexGate.Exposure.none(), ctx);
+
+        assertThat(verdict.facts()).containsEntry("server", "google-drive").containsEntry("actor", "agent")
+            .doesNotContainKey("untrusted");
     }
 
     @Test

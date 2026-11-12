@@ -268,10 +268,36 @@ public class CortexGate {
      * que la réponse a déjà lu), puis la règle la plus stricte qui les couvre, couches de l'entreprise et socle compris.
      */
     public Verdict judge(RulesBundle bundle, AgentTool tool, String argsJson, Exposure exposure) {
+        return judge(bundle, tool, argsJson, exposure, null);
+    }
+
+    /**
+     * Comme {@link #judge(RulesBundle, AgentTool, String, Exposure)}, avec ce que l'outil dit lui-même de cet appel dans
+     * ce contexte ({@link AgentTool#facts}) : le connecteur où {@code save_document} rangerait, par exemple.
+     */
+    public Verdict judge(RulesBundle bundle, AgentTool tool, String argsJson, Exposure exposure, AgentContext ctx) {
         Map<String, String> facts = facts(tool);
+        if (ctx != null) {
+            facts.putAll(toolFacts(tool, argsJson, ctx));
+        }
         facts.putAll(floorFacts(tool, argsJson, exposure));
         return judge(bundle, facts);
     }
+
+    /** Ce qu'un appel a pour lui-même dans les mots du contrat : seulement les faits que le moteur connaît. */
+    private Map<String, String> toolFacts(AgentTool tool, String argsJson, AgentContext ctx) {
+        JsonNode args = args(argsJson);
+        Map<String, Object> parsed = args == null ? Map.of()
+            : objectMapper.convertValue(args, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+        Map<String, String> out = new LinkedHashMap<>();
+        tool.facts(parsed, ctx).forEach((k, v) -> {
+            if (TOOL_FACTS.contains(k) && v != null) out.put(k, v);
+        });
+        return out;
+    }
+
+    /** Ce qu'un outil peut dire de lui-même : jamais l'acteur, ni les faits que le socle produit. */
+    private static final Set<String> TOOL_FACTS = Set.of("server");
 
     /**
      * Juge un geste par ses faits, quand il n'est pas un outil de Cortex : un outil lancé par la personne depuis la
@@ -308,14 +334,14 @@ public class CortexGate {
     public Judged judgeWork(AgentContext ctx, Long project, AgentTool tool, String argsJson, Exposure exposure,
                             Function<Long, RulesBundle> bundles) {
         RulesBundle bundle = bundles.apply(project);
-        Verdict verdict = judge(bundle, tool, argsJson, exposure);
+        Verdict verdict = judge(bundle, tool, argsJson, exposure, ctx);
         Optional<Long> named = tool instanceof ExternalMcpTool ? Optional.empty()
             : projectOf(ctx, argsJson).filter(p -> !p.equals(project));
         if (named.isEmpty()) {
             return new Judged(verdict, bundle, project);
         }
         RulesBundle there = bundles.apply(named.get());
-        Verdict other = judge(there, tool, argsJson, exposure);
+        Verdict other = judge(there, tool, argsJson, exposure, ctx);
         Verdict kept = stricter(verdict, other);
         return kept == other ? new Judged(other, there, named.get()) : new Judged(kept, bundle, project);
     }

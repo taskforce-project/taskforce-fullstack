@@ -39,6 +39,8 @@ public class DocumentStorageService {
     static final int MAX_TITLE = 200;
     static final String PLACE_CHANGED = "Where this workspace saves documents changed after Cortex proposed it. Nothing "
         + "was saved: ask Cortex again to save it in the new place.";
+    static final String PLACE_UNKNOWN = "This approval doesn't say where the document goes. Nothing was saved: ask Cortex "
+        + "again to save it.";
 
     private final StorageTargetService targets;
     private final StoredDocumentRepository documents;
@@ -47,8 +49,8 @@ public class DocumentStorageService {
     private final ProjectVisibilityGuard visibility;
 
     /**
-     * Ce qu'on range : le titre et le texte Markdown, le projet, l'endroit que la carte a montré ({@code place}, nul
-     * quand rien n'a été montré) et qui l'a écrit ({@code via}).
+     * Ce qu'on range : le titre et le texte Markdown, le projet, l'endroit que la carte a montré ({@code place}, sans
+     * lequel rien ne s'écrit) et qui l'a écrit ({@code via}).
      */
     public record SaveRequest(Long projectId, String title, String content, String place, String via) {}
 
@@ -64,7 +66,11 @@ public class DocumentStorageService {
         }
         Long projectId = project(ctx, req.projectId());
         StorageTarget target = targets.effective(ctx.workspaceId(), projectId).target();
-        if (req.place() != null && !req.place().isBlank() && !req.place().equals(target.place())) {
+        // L'accord vaut pour l'endroit que la carte a montré, et pour lui seul : sans cet endroit, rien ne s'écrit.
+        if (req.place() == null || req.place().isBlank()) {
+            throw new BusinessException(PLACE_UNKNOWN);
+        }
+        if (!req.place().equals(target.place())) {
             throw new BusinessException(PLACE_CHANGED);
         }
         DocumentWriter writer = targets.writer(target.getKind());

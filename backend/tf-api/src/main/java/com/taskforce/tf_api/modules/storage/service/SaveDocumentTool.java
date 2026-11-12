@@ -19,9 +19,10 @@ import lombok.RequiredArgsConstructor;
  * choisi (séance n°22, R156).
  *
  * <p>Ranger hors de la conversation est une sortie (R93) : l'outil se juge comme une écriture dans un outil de
- * l'entreprise ({@code mcp.write}), quelle que soit la cible. La table demande, et le socle garde la sortie d'un agent
- * pour une personne (R157) : Cortex propose une carte et rien ne s'écrit avant l'accord. La carte porte ce qui sera écrit
- * et où ({@link #ask}) ; à l'accord, un endroit qui a changé depuis est refusé.</p>
+ * l'entreprise ({@code mcp.write}), quelle que soit la cible, avec le connecteur de la cible pour fait {@code server}. La
+ * table demande, et le socle garde la sortie d'un agent pour une personne (R157) : Cortex propose une carte et rien ne
+ * s'écrit avant l'accord. La carte porte ce qui sera écrit et où ({@link #ask}) ; à l'accord, un endroit qui a changé
+ * depuis, ou qui manque, est refusé.</p>
  */
 @Component
 @RequiredArgsConstructor
@@ -59,6 +60,17 @@ public class SaveDocumentTool implements CortexGesture {
     @Override
     public String action() {
         return "mcp.write";
+    }
+
+    /**
+     * Le fait {@code server} : le connecteur de la cible où le document irait (Google Drive, Microsoft 365), qu'une règle
+     * sur ce connecteur couvre donc ; aucun pour le serveur de TaskForce et la machine.
+     */
+    @Override
+    public Map<String, String> facts(Map<String, Object> args, AgentContext ctx) {
+        if (ctx == null || ctx.workspaceId() == null) return Map.of();
+        String connector = targets.effective(ctx.workspaceId(), projectOf(args, ctx)).target().getKind().connectorKey();
+        return connector == null ? Map.of() : Map.of("server", connector);
     }
 
     /** La carte : le titre, le texte, le projet, et l'endroit où il ira, que l'accord reprend tel quel. */
