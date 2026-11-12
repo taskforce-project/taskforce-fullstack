@@ -59,11 +59,9 @@ public class FindIntegrationTool implements AgentTool {
             for (ConnectorView c : group.tools()) {
                 if (matches(c, group, query)) {
                     // Un outil que l'éditeur ferme encore (liste d'attente, liste de clients) se dit tel quel : Cortex
-                    // n'invite pas à le connecter (R15).
-                    hits.add("- " + c.name() + " (" + group.label() + ") : "
-                        + (c.connected() ? "already connected"
-                            : c.blocked() != null ? "listed, NOT available to connect yet: " + c.blocked()
-                            : "available, NOT connected"));
+                    // n'invite pas à le connecter (R15). Une native dit aussi son second accès, ses outils en direct.
+                    hits.add("- " + c.name() + " (" + group.label() + ") : " + stateOf(c)
+                        + (c.live() == null ? "" : "; its live tools for Cortex: " + stateOf(c.live())));
                     if (hits.size() >= MAX_HITS) break;
                 }
             }
@@ -79,6 +77,12 @@ public class FindIntegrationTool implements AgentTool {
         for (String h : hits) sb.append("\n").append(h);
         sb.append("\nTo connect one: Settings > Integrations.");
         return sb.toString();
+    }
+
+    private static String stateOf(ConnectorView c) {
+        return c.connected() ? "already connected"
+            : c.blocked() != null ? "listed, NOT available to connect yet: " + c.blocked()
+            : "available, NOT connected";
     }
 
     private static boolean matches(ConnectorView c, CategoryGroup group, String query) {

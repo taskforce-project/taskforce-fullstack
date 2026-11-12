@@ -22,7 +22,9 @@ public record IntegrationCatalogResponse(
     /**
      * Un outil du catalogue enrichi de l'état de la connexion de la personne (séance n°22, R154).
      *
-     * @param state       {@code CONNECTED}, {@code NEEDS_RECONNECT}, {@code WAITING_FOR_ADMIN} ou {@code NOT_CONNECTED}
+     * @param state       {@code CONNECTED}, {@code NEEDS_RECONNECT}, {@code WAITING_FOR_ADMIN}, {@code NEEDS_SETUP}
+     *                    (l'étape de l'administrateur revient à la personne, propriétaire ou administrateur) ou
+     *                    {@code NOT_CONNECTED}
      * @param accountLabel le compte chez l'éditeur (« Connected as ... ») ; nul quand l'éditeur ne le dit pas
      * @param scope       {@code PERSONAL} (sa connexion) ou {@code WORKSPACE} (partagée) ; nul sans connexion
      * @param connection  le chemin de connexion du préréglage ; nul pour une native
@@ -30,6 +32,8 @@ public record IntegrationCatalogResponse(
      * @param writeChoice l'éditeur sépare la lecture de l'écriture : la personne peut n'accorder que la lecture
      * @param blocked     pourquoi l'éditeur ferme la porte aujourd'hui ; nul sinon
      * @param tried       l'outil a été essayé de bout en bout (faux sur une instance d'essai qui montre les autres)
+     * @param live        le second accès d'une native : le préréglage MCP du même outil, par lequel Cortex le lit en
+     *                    direct avec la connexion de chaque personne ; nul pour les autres (une carte par outil)
      */
     public record ConnectorView(
         String key,
@@ -54,15 +58,27 @@ public record IntegrationCatalogResponse(
         boolean companyApp,
         boolean writeChoice,
         String blocked,
-        boolean tried
+        boolean tried,
+        ConnectorView live
     ) {
+        /** Une fiche sans second accès. */
+        public ConnectorView(String key, String name, String category, String authType, boolean connected,
+                             List<ConnectorField> fields, List<String> capabilities, String description,
+                             String docsUrl, String setupHint, String websiteUrl, String mcpSuggestedUrl, String state,
+                             String accountLabel, String scope, String connection, AdminStep admin, KeyGuide apiKey,
+                             boolean companyApp, boolean writeChoice, String blocked, boolean tried) {
+            this(key, name, category, authType, connected, fields, capabilities, description, docsUrl, setupHint,
+                websiteUrl, mcpSuggestedUrl, state, accountLabel, scope, connection, admin, apiKey, companyApp,
+                writeChoice, blocked, tried, null);
+        }
+
         /** Une fiche sans connexion MCP (natives, essais) : non connectée, sans chemin. */
         public ConnectorView(String key, String name, String category, String authType, boolean connected,
                              List<ConnectorField> fields, List<String> capabilities, String description,
                              String docsUrl, String setupHint, String websiteUrl, String mcpSuggestedUrl) {
             this(key, name, category, authType, connected, fields, capabilities, description, docsUrl, setupHint,
                 websiteUrl, mcpSuggestedUrl, connected ? "CONNECTED" : "NOT_CONNECTED", null, null, null, null, null,
-                false, false, null, true);
+                false, false, null, true, null);
         }
     }
 }

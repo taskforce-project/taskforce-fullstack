@@ -45,6 +45,16 @@ public class ConnectorCatalog {
     /** Le fichier des préréglages, dans les ressources du backend. */
     static final String PRESETS = "connectors/presets.json";
 
+    /**
+     * Le second accès d'une native (revue des écrans de J2, séance n°23, R160) : le préréglage MCP du même outil, par
+     * lequel Cortex le lit en direct avec la connexion de chaque personne. Une carte par outil : la native le porte, il
+     * n'a pas la sienne.
+     */
+    private static final Map<String, String> LIVE_ACCESS = Map.of(
+        "github", "github-mcp",
+        "slack", "slack-mcp",
+        "plane", "plane-mcp");
+
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final Map<String, ConnectorDescriptor> byKey = new LinkedHashMap<>();
@@ -98,6 +108,18 @@ public class ConnectorCatalog {
     /** Préréglage de serveur MCP ? (faux pour une intégration native et pour une clé inconnue) */
     public boolean isMcpPreset(String key) {
         return byKey(key).map(d -> d.authType() == ConnectorAuthType.MCP).orElse(false);
+    }
+
+    /** Le second accès de cette native, quand elle en a un : le préréglage MCP du même outil. */
+    public Optional<ConnectorDescriptor> liveAccessOf(String nativeKey) {
+        return Optional.ofNullable(nativeKey == null ? null : LIVE_ACCESS.get(nativeKey)).flatMap(this::byKey)
+            .filter(d -> d.preset() != null);
+    }
+
+    /** Ce préréglage est-il le second accès d'une native, montré dans sa carte plutôt qu'à côté ? */
+    public boolean isLiveAccess(String key) {
+        return key != null && LIVE_ACCESS.entrySet().stream()
+            .anyMatch(e -> e.getValue().equals(key) && byKey.containsKey(e.getKey()));
     }
 
     /** Préréglage essayé de bout en bout ? (faux pour une native, une clé inconnue et un préréglage jamais essayé) */
