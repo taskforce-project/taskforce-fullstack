@@ -212,11 +212,27 @@
       "expect": { "effect": "ask", "rule": "write-company-tools", "require": null }
     },
     {
-      "name": "a threshold on a field: a value that isn't a number never matches",
+      "name": "a threshold on a field: a value that isn't a number counts as exceeded",
       "rules": [
         { "id": "no-big-refunds", "layer": "workspace", "when": { "action": "mcp.write", "over": { "fact": "arg.amount", "value": 100000 } }, "class": "irreversible", "effect": "deny", "inverse": null, "owner": "admin@example.com", "reason": "No refund above 100,000 through an agent.", "review": "2027-05-11" }
       ],
       "facts": { "action": "mcp.write", "server": "stripe", "arg.amount": "250 000" },
+      "expect": { "effect": "deny", "rule": "no-big-refunds", "require": null }
+    },
+    {
+      "name": "a threshold on a field: a missing value counts as exceeded when the rule's other conditions match",
+      "rules": [
+        { "id": "quotes-over-5000", "layer": "workspace", "when": { "action": "mcp.write", "server": "invoices", "over": { "fact": "arg.amount", "value": 5000 } }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "Any quote above 5,000 needs the owner's signature, and whoever prepared it can't give it.", "review": "2027-05-11", "require": { "approvers": ["role:owner"], "separate": true } }
+      ],
+      "facts": { "action": "mcp.write", "server": "invoices" },
+      "expect": { "effect": "ask", "rule": "quotes-over-5000", "require": { "approvers": [["role:owner"]], "signatures": 1, "separate": true } }
+    },
+    {
+      "name": "a threshold on a field: a missing value doesn't make the rule apply when its other conditions don't match",
+      "rules": [
+        { "id": "quotes-over-5000", "layer": "workspace", "when": { "action": "mcp.write", "server": "invoices", "over": { "fact": "arg.amount", "value": 5000 } }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "Any quote above 5,000 needs the owner's signature, and whoever prepared it can't give it.", "review": "2027-05-11", "require": { "approvers": ["role:owner"], "separate": true } }
+      ],
+      "facts": { "action": "mcp.write", "server": "crm" },
       "expect": { "effect": "ask", "rule": "write-company-tools", "require": null }
     },
     {

@@ -180,10 +180,14 @@ public final class RulesEngine {
         return when.over() == null || above(facts.get(when.over().fact()), when.over().value());
     }
 
-    /** Un fait chiffré au-delà du seuil : un nombre écrit en chiffres (signe, point décimal), sinon la condition ne tient pas. */
+    /**
+     * Un fait chiffré au-delà du seuil : un nombre écrit en chiffres (signe, point décimal) plus grand que le seuil. Le
+     * seuil se lit après les autres conditions de la règle : quand elles tiennent et que le fait manque ou n'est pas un
+     * nombre, le seuil compte comme dépassé.
+     */
     static boolean above(String fact, long threshold) {
         if (fact == null || !isNumber(fact)) {
-            return false;
+            return true;
         }
         return new BigDecimal(fact).compareTo(BigDecimal.valueOf(threshold)) > 0;
     }

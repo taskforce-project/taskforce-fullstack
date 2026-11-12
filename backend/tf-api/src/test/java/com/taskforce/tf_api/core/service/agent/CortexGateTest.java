@@ -308,6 +308,17 @@ class CortexGateTest {
     }
 
     @Test
+    @DisplayName("les nombres des objets imbriqués se lisent aussi, sous leur nom ; le plus fort compte pour un seuil")
+    void nested_numbers_are_read_for_a_threshold() throws Exception {
+        CortexGate.Verdict verdict = gate.judge(defaults, external("stripe", false),
+            "{\"amount\": 10, \"payment\": {\"amount\": 9000, \"meta\": {\"fee\": 2.50}}, \"note\": {\"text\": \"x\"}}",
+            CortexGate.Exposure.none());
+
+        assertThat(verdict.facts()).containsEntry("arg.amount", "9000").containsEntry("arg.fee", "2.5")
+            .doesNotContainKey("arg.text").doesNotContainKey("arg.payment");
+    }
+
+    @Test
     @DisplayName("une règle de l'entreprise qui désigne qui accorde : la décision porte ses obligations, et sa phrase")
     void a_company_rule_carries_its_obligations() {
         RulesBundle.Rule finance = new RulesBundle.Rule("ws-accounting",

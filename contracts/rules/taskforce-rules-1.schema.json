@@ -186,7 +186,7 @@
             "fact",
             "value"
           ],
-          "description": "A threshold: the condition holds when the named fact is a number greater than value.",
+          "description": "A threshold: the condition holds when the named fact is a number greater than value, or when the fact is missing or isn't a number (the threshold then counts as exceeded).",
           "properties": {
             "fact": {
               "type": "string",

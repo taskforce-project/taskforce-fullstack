@@ -402,7 +402,8 @@ public class CortexGate {
 
     /**
      * Les faits du socle et des seuils (R157, R158) : l'acteur, le secret dans les arguments, ce que la réponse a déjà
-     * lu ; pour un outil de l'entreprise, ses arguments simples ({@code arg.<nom>}), qu'un seuil peut lire.
+     * lu ; pour un outil de l'entreprise, ses arguments simples ({@code arg.<nom>}) et les nombres de ses objets
+     * imbriqués, qu'un seuil peut lire.
      */
     Map<String, String> floorFacts(AgentTool tool, String argsJson, Exposure exposure) {
         Map<String, String> facts = new LinkedHashMap<>();
@@ -418,14 +419,57 @@ public class CortexGate {
         }
         JsonNode args = tool instanceof ExternalMcpTool ? args(argsJson) : null;
         if (args != null) {
-            args.fields().forEachRemaining(f -> {
-                String value = argument(f.getValue());
-                if (value != null && f.getKey().matches("[A-Za-z0-9_]{1,40}")) {
-                    facts.put("arg." + f.getKey(), value);
-                }
-            });
+            arguments(args, facts, 0);
         }
         return facts;
+    }
+
+    /** La profondeur des objets imbriqués dont un nombre se lit encore ({@code {"payment": {"amount": 5000}}}). */
+    private static final int MAX_DEPTH = 4;
+
+    /**
+     * Les arguments simples d'un outil de l'entreprise, sous leur nom ({@code arg.<nom>}) : ceux du premier niveau, et les
+     * nombres des objets imbriqués. Deux valeurs sous le même nom : la plus forte pour un seuil (une valeur qui n'est pas
+     * un nombre, sinon le plus grand nombre).
+     */
+    private static void arguments(JsonNode node, Map<String, String> facts, int depth) {
+        node.fields().forEachRemaining(f -> {
+            JsonNode value = f.getValue();
+            if (!f.getKey().matches("[A-Za-z0-9_]{1,40}")) {
+                return;
+            }
+            if (value.isObject()) {
+                if (depth < MAX_DEPTH) {
+                    arguments(value, facts, depth + 1);
+                }
+                return;
+            }
+            String read = depth == 0 ? argument(value) : value.isNumber() ? argument(value) : null;
+            if (read != null) {
+                facts.merge("arg." + f.getKey(), read, CortexGate::strongerForAThreshold);
+            }
+        });
+    }
+
+    /** De deux valeurs d'un même argument, celle qui compte le plus pour un seuil. */
+    private static String strongerForAThreshold(String a, String b) {
+        BigDecimal x = number(a);
+        BigDecimal y = number(b);
+        if (x == null) {
+            return a;
+        }
+        if (y == null) {
+            return b;
+        }
+        return x.compareTo(y) >= 0 ? a : b;
+    }
+
+    private static BigDecimal number(String value) {
+        try {
+            return new BigDecimal(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /** Un argument simple, en texte : un nombre en chiffres (sans exposant), un mot ; rien pour un objet ou une liste. */
