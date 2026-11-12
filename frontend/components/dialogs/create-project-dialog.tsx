@@ -50,7 +50,7 @@ interface CreateProjectDialogProps {
 type Mode = "blank" | "import" | "file"
 
 /** Catégorie des outils depuis lesquels on peut importer un projet (des issues). */
-const PM_CATEGORY = "PROJECT_MANAGEMENT"
+const PM_CATEGORY = "TICKETS_PROJECTS"
 
 // ---------------------------------------------------------------------------
 // CreateProjectDialog - deux modes : projet vierge, ou import d'un projet depuis un outil connecté

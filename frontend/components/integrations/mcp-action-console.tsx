@@ -91,7 +91,11 @@ export function McpActionConsole({
     setValues(init)
   }
 
-  async function run() {
+  /**
+   * Lance l'outil. Le serveur le juge par les règles de l'espace et le garde au dossier (R158) : une action qu'elles
+   * demandent revient « confirm », la console la montre à confirmer ; `confirmed` part avec la confirmation.
+   */
+  async function run(confirmed = false) {
     if (!selected) return
     const missing = fields.filter((f) => f.required && !(values[f.key] ?? "").trim())
     if (missing.length > 0) {
@@ -105,8 +109,16 @@ export function McpActionConsole({
         const v = coerce(spec, values[key] ?? "")
         if (v !== undefined) args[key] = v
       }
-      const output = await executeMcpAction(slug, `${connectorKey}__${selected.name}`, args)
-      setResult(output)
+      const res = await executeMcpAction(slug, `${connectorKey}__${selected.name}`, args, confirmed)
+      if (res.status === "confirm") {
+        setConfirming(true)
+        return
+      }
+      if (res.status === "refused") {
+        toast.error(res.reason ?? "The rules of this workspace refuse this action.")
+        return
+      }
+      setResult(res.output ?? "")
     } catch (e) {
       toast.error(getErrorMessage(e) || "The action failed.")
     } finally {
@@ -116,7 +128,7 @@ export function McpActionConsole({
 
   function onRunClick() {
     if (!selected) return
-    if (selected.readOnly) run()
+    if (selected.readOnly) void run()
     else setConfirming(true)
   }
 
@@ -246,7 +258,7 @@ export function McpActionConsole({
             </span>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setConfirming(false)}>Cancel</Button>
-              <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={run} disabled={running}>
+              <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => run(true)} disabled={running}>
                 {running ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />} Run anyway
               </Button>
             </div>

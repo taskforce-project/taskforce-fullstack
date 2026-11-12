@@ -541,6 +541,13 @@ export const INTEGRATION_ROUTES = {
   MCP_OAUTH_START:   (slug: string, key: string) => `/api/workspaces/${slug}/mcp/servers/${key}/oauth/start`,
   /** Import d'un projet externe (TF-MCP-04) : issues d'un connecteur MCP → projet natif */
   MCP_IMPORT:        (slug: string) => `/api/workspaces/${slug}/mcp/import`,
+  /** Le geste « Connect » d'un outil (TF-J2-12) : le serveur choisit le chemin et dit la suite */
+  MCP_CONNECT:       (slug: string, key: string) => `/api/workspaces/${slug}/mcp/servers/${key}/connect`,
+  /** Redonner l'accord aux outils qui ont changé depuis la connexion (R158) */
+  MCP_TOOLS_APPROVE: (slug: string, key: string) => `/api/workspaces/${slug}/mcp/servers/${key}/tools/approve`,
+  /** Les applications d'entreprise (chemin C) : lister, enregistrer, retirer */
+  MCP_APPS:          (slug: string) => `/api/workspaces/${slug}/mcp/apps`,
+  MCP_APP:           (slug: string, key: string) => `/api/workspaces/${slug}/mcp/apps/${key}`,
   /** Plane (connecteur clé API → ingestion Brain OS) */
   PLANE_STATUS:      (slug: string) => `/api/workspaces/${slug}/integrations/plane/status`,
   PLANE_CONNECT:     (slug: string) => `/api/workspaces/${slug}/integrations/plane/connect`,

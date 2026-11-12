@@ -566,6 +566,93 @@ export const CONSTANTS_EN = {
     slackDesktopHelp: "Slack can't be connected in the desktop app yet.",
   },
 
+  // Connecting a tool (TF-J2-12, session 22 R154): one gesture for the person, the vendor's path behind it.
+  connect: {
+    // What a connection gives, in one sentence
+    intro: "Cortex reads {name} with your own account and rights. It asks you before any change.",
+    introShared: "Shared with the workspace: everyone reads {name} through this connection. A change waits for an owner or admin.",
+    // The card and the detail: the state of the connection the person uses
+    connected: "Connected",
+    connectedAs: "Connected as {account}",
+    connectedWithYourAccount: "Connected with your account",
+    needsReconnecting: "Needs reconnecting",
+    needsReconnectingText: "{name} no longer accepts this connection. Reconnect to keep reading it.",
+    waitingForAdmin: "Waiting for your admin",
+    notConnected: "Not connected",
+    yours: "Yours",
+    shared: "Shared with the workspace",
+    // The paths, as the card says them
+    pathOneClick: "One click",
+    pathAdminFirst: "Admin first",
+    pathKey: "Key",
+    pathOpen: "No sign-in",
+    // Options before connecting
+    shareWithWorkspace: "Share with the workspace",
+    shareWithWorkspaceHelp: "Everyone in the workspace reads {name} through your account. Use it for a shared source only.",
+    allowChanges: "Also let Cortex propose changes",
+    allowChangesHelp: "Read only by default. With changes, you still approve each one.",
+    // The gesture
+    connect: "Connect",
+    reconnect: "Reconnect",
+    connecting: "Connecting…",
+    tryAgain: "Try again",
+    cancel: "Cancel",
+    // The browser step (desktop app: the system browser)
+    browserTitle: "Finish in your browser",
+    browserText: "Sign in to {name} in the browser window that opened, then come back here.",
+    // The admin step
+    adminTitle: "Your admin needs to act first",
+    adminText: "{name} needs its admin before anyone can connect. Send this to your admin:",
+    adminNote: "If {name} refuses the connection:",
+    copyMessage: "Copy the message",
+    copied: "Copied",
+    openAdminPage: "Open the admin page",
+    // The company's app (path C), entered once by an owner or admin
+    companyAppTitle: "Your company's app",
+    companyAppText: "Create the app at {name} as described below, then enter its details here once. Everyone in the workspace then connects with their own account.",
+    clientId: "Client ID",
+    clientSecret: "Client secret",
+    clientSecretKept: "A secret is saved. Leave empty to keep it.",
+    redirectAddress: "Redirect address to register",
+    saveAndConnect: "Save and connect",
+    companyAppSaved: "Your company's app is saved.",
+    // The guided key (path D)
+    keyTitle: "Connect with a key",
+    keyLabel: "Key",
+    serverAddressLabel: "Your server's address",
+    createKey: "Where to create it",
+    // A server on this computer or the local network
+    localTitle: "A server on your computer",
+    localConfirm: "I started this server myself",
+    // Connected: what Cortex can do, and what changed
+    whatCortexCanDo: "What Cortex can do here",
+    reads: "Reads",
+    asksFirst: "Asks you first",
+    toolsChanged: "{count} tools changed since you connected. They stay off until you approve them.",
+    toolChanged: "1 tool changed since you connected. It stays off until you approve it.",
+    review: "Review",
+    approveChanges: "Approve the changes",
+    changesApproved: "The changes are approved.",
+    unreachable: "{name} can't be reached right now.",
+    // The action console, two clicks away
+    runAction: "Run an action",
+    hideActions: "Hide actions",
+    // Disconnecting revokes at the vendor (R154)
+    disconnect: "Disconnect",
+    disconnectConsequence: "Cortex stops reading {name} through this connection, and TaskForce asks {name} to revoke its access.",
+    disconnectedRevoked: "Disconnected. Your access was revoked at {name}.",
+    disconnectedHere: "Disconnected here. {name} doesn't let TaskForce revoke the access: remove TaskForce in your {name} settings.",
+    // Not available
+    notAvailable: "Not available yet",
+    // Failures say what happened and what to do
+    failed: "{name} wasn't connected. Try again.",
+    failedAdmin: "Only owners and admins can do this.",
+    // The return from the browser (web app)
+    returnedConnected: "{name} is connected.",
+    returnedAdmin: "{name} needs your admin first. Open it in Integrations to see what to send.",
+    returnedError: "{name} wasn't connected. Try again, and accept the access.",
+  },
+
   // App shell - the person's menu, the composer, workspaces (rendered on every authenticated screen).
   shell: {
     // What the footer held, in the person's menu
