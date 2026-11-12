@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.modules.storage.api;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.CacheControl;
@@ -14,12 +15,15 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.modules.storage.domain.StoredDocument;
+import com.taskforce.tf_api.core.service.mcp.MicrosoftGraphApi;
 import com.taskforce.tf_api.modules.storage.service.GooglePickerService;
+import com.taskforce.tf_api.modules.storage.service.MicrosoftFoldersService;
 import com.taskforce.tf_api.modules.storage.service.StorageTargetService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -43,6 +47,7 @@ public class StorageController {
 
     private final StorageTargetService storage;
     private final GooglePickerService picker;
+    private final MicrosoftFoldersService microsoftFolders;
     private final UserRepository userRepository;
     private final JwtIdentityResolver identityResolver;
 
@@ -117,6 +122,21 @@ public class StorageController {
         Long user = userId(jwt);
         GooglePickerService.PickerConfig config = picker.config(storage.workspaceId(slug, user), user);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ApiResponse.success(config));
+    }
+
+    /**
+     * Les dossiers de OneDrive et de SharePoint où ranger, par la connexion « Microsoft 365 » de la personne : sans
+     * endroit, son OneDrive et les bibliothèques des sites qu'elle suit ; sinon les dossiers de cet endroit.
+     */
+    @GetMapping("/storage/microsoft/folders")
+    public ResponseEntity<ApiResponse<List<MicrosoftGraphApi.Place>>> microsoftFolders(
+        @PathVariable String slug,
+        @RequestParam(required = false) @Size(max = 400) String driveId,
+        @RequestParam(required = false) @Size(max = 400) String itemId,
+        @AuthenticationPrincipal Jwt jwt) {
+        Long user = userId(jwt);
+        return ResponseEntity.ok(ApiResponse.success(
+            microsoftFolders.folders(storage.workspaceId(slug, user), user, driveId, itemId)));
     }
 
     private Long userId(Jwt jwt) {

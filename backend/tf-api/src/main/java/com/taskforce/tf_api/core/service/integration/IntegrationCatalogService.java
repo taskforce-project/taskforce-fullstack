@@ -118,7 +118,7 @@ public class IntegrationCatalogService {
             state = ConnectionState.WAITING_FOR_ADMIN.name();
         }
         AdminStep admin = p == null || p.admin() == null ? null
-            : new AdminStep(adminText(p.admin().text()), p.admin().link(), p.admin().required());
+            : new AdminStep(adminText(p.admin().text()), adminLink(p), p.admin().required());
         KeyGuide key = p == null || p.apiKey() == null ? null : new KeyGuide(p.apiKey().hint(), p.apiKey().link());
         boolean writeChoice = p != null && (p.readUrl() != null || !p.scopesFor(false).equals(p.scopesFor(true)));
         return new ConnectorView(d.key(), d.name(), d.category().name(), d.authType().name(), connected, d.fields(),
@@ -126,6 +126,17 @@ public class IntegrationCatalogService {
             state, server == null ? null : server.accountLabel(), server == null ? null : server.scope().name(),
             p == null ? null : p.connection().wire(), admin, key, companyApp, writeChoice,
             p == null ? null : p.blocked(), p == null || p.isTried());
+    }
+
+    /**
+     * La page de l'administrateur ; celle qui porte l'identifiant de notre application (l'accord de l'administrateur
+     * chez Microsoft) le reçoit de l'instance, et n'est pas montrée quand l'instance n'en a pas (TF-J2-14).
+     */
+    private String adminLink(ConnectorPreset p) {
+        String link = p.admin().link();
+        if (link == null || !link.contains("{clientId}")) return link;
+        String id = p.api() == null ? null : oauthSettings.apiClientId(p.api().app());
+        return id == null ? null : link.replace("{clientId}", java.net.URLEncoder.encode(id, java.nio.charset.StandardCharsets.UTF_8));
     }
 
     private String adminText(String text) {

@@ -66,6 +66,23 @@ public class McpOAuthSettings {
     @Value("${TF_MICROSOFT_TENANT:common}")
     private String microsoftTenant = "common";
 
+    private org.springframework.core.env.Environment environment;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setEnvironment(org.springframework.core.env.Environment environment) {
+        this.environment = environment;
+    }
+
+    /**
+     * L'identifiant de notre application chez un éditeur servi par son API ({@code <préfixe>_CLIENT_ID}), pour le lien de
+     * la page de son administrateur ; nul quand l'instance ne l'a pas.
+     */
+    public String apiClientId(String envPrefix) {
+        if (environment == null || envPrefix == null) return null;
+        String id = environment.getProperty(envPrefix + "_CLIENT_ID");
+        return id == null || id.isBlank() ? null : id.trim();
+    }
+
     /** L'émetteur d'une API d'éditeur, avec le locataire de l'instance à la place de {@code {tenant}}. */
     public String apiIssuer(String issuer) {
         String tenant = microsoftTenant == null ? "" : microsoftTenant.trim();

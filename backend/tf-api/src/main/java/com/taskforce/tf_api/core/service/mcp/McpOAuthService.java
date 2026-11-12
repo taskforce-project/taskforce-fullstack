@@ -304,12 +304,22 @@ public class McpOAuthService {
      */
     @Transactional
     public String callback(String state, String code, String error, String iss) {
+        return callback(state, code, error, iss, null);
+    }
+
+    /**
+     * Le retour, avec la description de l'erreur que l'éditeur donne : chez Microsoft, le code {@code AADSTS} dit si
+     * c'est l'administrateur de l'entreprise qui doit accorder d'abord (TF-J2-14). Jamais montrée à la personne.
+     */
+    @Transactional
+    public String callback(String state, String code, String error, String iss, String errorDescription) {
         McpOAuthState row = (state == null || state.isBlank()) ? null
             : stateRepository.findById(state).orElse(null);
         if (row == null) return settings.appBase() + "/?mcp=error"; // state inconnu/expire : retour generique
         try {
             if (error != null && !error.isBlank()) {
-                if (ADMIN_ERRORS.contains(error) || adminRequired(row.getConnectorKey())) {
+                if (ADMIN_ERRORS.contains(error) || adminRequired(row.getConnectorKey())
+                        || microsoftAdminFirst(row.getConnectorKey(), errorDescription)) {
                     markWaitingForAdmin(row);
                     return appRedirect(row, "admin");
                 }
@@ -373,6 +383,20 @@ public class McpOAuthService {
         connections.save(conn);
         workspaceMcp.invalidate(row.getWorkspaceId());
     }
+
+    /**
+     * Microsoft refuse parce que la politique de l'entreprise réserve ces permissions à son administrateur : AADSTS65001
+     * (pas d'accord donné), 90094 et 90095 (l'accord de l'administrateur est requis), 900941 (une application dont
+     * l'éditeur n'est pas vérifié, quand l'entreprise juge le risque). Seulement pour Microsoft Graph.
+     */
+    private boolean microsoftAdminFirst(String connectorKey, String description) {
+        ConnectorPreset.Api api = apiOf(connectorKey);
+        if (api == null || !"microsoft-graph".equals(api.kind()) || description == null) return false;
+        return MICROSOFT_ADMIN.matcher(description).find();
+    }
+
+    private static final java.util.regex.Pattern MICROSOFT_ADMIN =
+        java.util.regex.Pattern.compile("AADSTS(65001|90094|90095|900941)\\b");
 
     private boolean adminRequired(String connectorKey) {
         return catalog.preset(connectorKey).map(p -> p.admin() != null && p.admin().required()).orElse(false);
