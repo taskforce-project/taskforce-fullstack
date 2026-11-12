@@ -264,6 +264,19 @@ class DeliveryApprovalObligationsTest {
     }
 
     @Test
+    @DisplayName("les faits du runner se jugent avec actor=agent, quoi qu'ils disent")
+    void theRunnersFactsAreJudgedAsAnAgent() {
+        companyRule(Map.of("action", "file.write", "actor", "agent"), Map.of("approvers", List.of("person:42")));
+        RunnerApprovalRequest saysPerson = new RunnerApprovalRequest("Edit", "src/accounting/ledger.ts", "agent",
+            "file.write", "ws-rule", CEO_RULE, List.of(Map.of("action", "file.write", "tool", "Edit",
+                "path", "src/accounting/ledger.ts", "actor", "person")));
+
+        service.openApproval(run, "Edit", "src/accounting/ledger.ts", false, saysPerson);
+
+        assertThat(opened().getApprovers()).containsExactly(List.of("person:42"));
+    }
+
+    @Test
     @DisplayName("un runner plus ancien, sans les faits : les obligations de la règle qu'il nomme")
     void anOlderRunnerNamesTheRule() {
         companyRule(Map.of("action", "file.write", "path", "**/accounting/**"), Map.of("approvers", List.of("person:42")));

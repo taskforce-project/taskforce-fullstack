@@ -219,6 +219,8 @@ public class DeliveryActivityService {
                     if (k != null && v != null) clean.put(k, v);
                 });
             }
+            // Ce que le runner demande, c'est un agent qui le fait : jugé comme tel, quoi que disent ses faits (R157).
+            clean.put("actor", "agent");
             facts.add(clean);
         }
         return facts;
