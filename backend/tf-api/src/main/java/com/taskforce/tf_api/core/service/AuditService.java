@@ -35,6 +35,14 @@ public class AuditService {
     public static final String GDPR_EXPORT       = "GDPR_EXPORT";
     public static final String GDPR_DELETE       = "GDPR_DELETE";
     public static final String REDISTRIBUTION_APPLY = "REDISTRIBUTION_APPLY";
+    /**
+     * Ce qui engage tout l'espace auprès de ses outils (séance n°23, R160) : l'application de l'entreprise saisie ou
+     * retirée, une connexion partagée faite ou défaite, l'endroit où TaskForce range ce qu'il écrit. Le détail dit ce
+     * qui a changé ({@code change}), jamais un secret, un jeton, ni l'adresse entière d'un serveur.
+     */
+    public static final String COMPANY_APP_CHANGED = "COMPANY_APP_CHANGED";
+    public static final String SHARED_CONNECTION_CHANGED = "SHARED_CONNECTION_CHANGED";
+    public static final String STORAGE_TARGET_CHANGED = "STORAGE_TARGET_CHANGED";
 
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,6 +21,7 @@ import com.taskforce.tf_api.core.repository.ProjectMemberRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.AuditService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.modules.storage.domain.StorageKind;
@@ -60,6 +62,7 @@ public class StorageTargetService {
     private final AuthorizationService authorization;
     private final UserRepository users;
     private final List<DocumentWriter> writers;
+    private final AuditService audit;
 
     /** La cible qui vaut, et d'où elle vient : {@code project}, {@code workspace} ou {@code default}. */
     public record Resolved(StorageTarget target, String from) {}
@@ -146,6 +149,11 @@ public class StorageTargetService {
         row.setLocalPath(checked.getLocalPath());
         row.setChosenBy(userId);
         targets.save(row);
+        Map<String, Object> details = changeDetails("chosen", projectId);
+        details.put("storage", kind.wire());
+        if (row.getConnectorKey() != null) details.put("connectorKey", row.getConnectorKey());
+        if (row.getFolderName() != null) details.put("folderName", row.getFolderName());
+        record(ws, userId, projectId, details);
         return overview(slug, userId, projectId);
     }
 
@@ -155,8 +163,14 @@ public class StorageTargetService {
         Workspace ws = member(slug, userId);
         Project project = projectId == null ? null : visibleProject(ws, projectId, userId);
         requireEdit(ws, project, userId);
-        (projectId == null ? targets.findByWorkspaceIdAndProjectIdIsNull(ws.getId())
-            : targets.findByWorkspaceIdAndProjectId(ws.getId(), projectId)).ifPresent(targets::delete);
+        Optional<StorageTarget> chosen = projectId == null ? targets.findByWorkspaceIdAndProjectIdIsNull(ws.getId())
+            : targets.findByWorkspaceIdAndProjectId(ws.getId(), projectId);
+        chosen.ifPresent(row -> {
+            targets.delete(row);
+            Map<String, Object> details = changeDetails("reset", projectId);
+            details.put("previous", row.getKind().wire());
+            record(ws, userId, projectId, details);
+        });
         return overview(slug, userId, projectId);
     }
 
@@ -268,5 +282,23 @@ public class StorageTargetService {
 
     private static String blank(String s) {
         return s == null || s.isBlank() ? null : s.strip();
+    }
+
+    /** Le début du détail d'un choix : ce qui a changé, et pour quoi (l'espace, ou un projet). */
+    private static Map<String, Object> changeDetails(String change, Long projectId) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("change", change);
+        details.put("scope", projectId == null ? "workspace" : "project");
+        if (projectId != null) details.put("projectId", projectId);
+        return details;
+    }
+
+    /**
+     * L'endroit choisi entre au journal de l'espace (séance n°23, R160) : la cible, le connecteur et le nom du dossier,
+     * jamais le chemin d'un dossier de la machine ni un identifiant chez l'éditeur.
+     */
+    private void record(Workspace ws, Long userId, Long projectId, Map<String, Object> details) {
+        audit.record(ws.getId(), userId, AuditService.STORAGE_TARGET_CHANGED, "storage_target",
+            projectId == null ? null : String.valueOf(projectId), details);
     }
 }

@@ -260,6 +260,39 @@ class McpOAuthServiceTest {
     }
 
     @Test
+    @DisplayName("complete : une connexion partagée qui aboutit entre au journal de l'espace, sans jeton ; la sienne, non")
+    void aSharedConnectionThatSucceedsIsRecorded() throws Exception {
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+        when(authorization.isMember(WS_ID, USER_ID)).thenReturn(true);
+        when(authorization.isManager(WS_ID, USER_ID)).thenReturn(true);
+        when(client.postForm(eq("https://as.ex/token"), any()))
+            .thenReturn(om.readTree("{\"access_token\":\"AT-secret\",\"refresh_token\":\"RT-secret\"}"));
+        when(workspaceRepository.getReferenceById(WS_ID)).thenReturn(ws);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(person));
+        when(workspaceMcp.ownConnection(eq(ws), eq(person), eq("linear"), anyBoolean())).thenAnswer(inv ->
+            ConnectorConnection.builder().workspace(ws).connectorKey("linear").build());
+        McpOAuthState own = openState("st-own");
+        McpOAuthState shared = openState("st-shared");
+        shared.setShared(true);
+        shared.setAllowWrites(true);
+        when(stateRepository.findById("st-own")).thenReturn(Optional.of(own));
+        when(stateRepository.findById("st-shared")).thenReturn(Optional.of(shared));
+
+        assertThat(service.complete(USER_ID, "st-own", finishOf(service.callback("st-own", "c-1", null, "https://as.ex")))
+            .outcome()).isEqualTo("connected");
+        verify(workspaceMcp, never()).recordShared(any(), any(), any(), any());
+
+        assertThat(service.complete(USER_ID, "st-shared",
+            finishOf(service.callback("st-shared", "c-2", null, "https://as.ex"))).outcome()).isEqualTo("connected");
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<java.util.Map<String, Object>> details = ArgumentCaptor.forClass(java.util.Map.class);
+        verify(workspaceMcp).recordShared(eq(WS_ID), eq(USER_ID), eq("linear"), details.capture());
+        assertThat(details.getValue()).containsEntry("change", "connected").containsEntry("via", "oauth")
+            .containsEntry("host", "203.0.113.10").containsEntry("writes", true);
+        assertThat(details.getValue().toString()).doesNotContain("AT-secret").doesNotContain("RT-secret");
+    }
+
+    @Test
     @DisplayName("complete : un outil sans serveur officiel, fini par l'application de l'entreprise -> l'émetteur s'épingle "
         + "sur elle quand un propriétaire ou un administrateur aboutit, jamais pour un membre")
     void aManagerConnectionPinsTheIssuerOfTheCompanyApp() throws Exception {

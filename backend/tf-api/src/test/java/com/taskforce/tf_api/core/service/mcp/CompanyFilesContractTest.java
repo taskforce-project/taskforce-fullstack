@@ -123,7 +123,8 @@ class CompanyFilesContractTest {
         lenient().when(members.isMember(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
             .thenReturn(true);
         lenient().when(members.isManager(WS, ada.getId())).thenReturn(true);
-        workspaceMcp = new WorkspaceMcpService(repo, mcp, om, tokens, catalog, members);
+        workspaceMcp = new WorkspaceMcpService(repo, mcp, om, tokens, catalog, members,
+            Mockito.mock(com.taskforce.tf_api.core.service.AuditService.class));
         ReflectionTestUtils.setField(workspaceMcp, "cacheTtlMs", 0L);
         CompanyApiHttp api = new CompanyApiHttp(om, true);
         drive = new GoogleDriveApi(api);
@@ -584,7 +585,8 @@ class CompanyFilesContractTest {
                     new ServerDocumentWriter(Mockito.mock(com.taskforce.tf_api.modules.ged.service.ObjectStorage.class)),
                     new MachineDocumentWriter(desktop),
                     new GoogleDriveDocumentWriter(access, connections, drive),
-                    new OneDriveDocumentWriter(access, connections, graph)));
+                    new OneDriveDocumentWriter(access, connections, graph)),
+                Mockito.mock(com.taskforce.tf_api.core.service.AuditService.class));
             CortexRecordService records = Mockito.mock(CortexRecordService.class);
             lenient().when(records.open(any(), anyString(), any())).thenAnswer(i -> {
                 trace.add(new ArrayList<>(List.of("mission.started")));

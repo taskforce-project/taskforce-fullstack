@@ -1,6 +1,8 @@
 package com.taskforce.tf_api.core.service.mcp;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,6 +11,7 @@ import com.taskforce.tf_api.core.model.ConnectorApp;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.ConnectorAppRepository;
+import com.taskforce.tf_api.core.service.AuditService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 import com.taskforce.tf_api.shared.exception.BusinessException;
@@ -20,7 +23,7 @@ import lombok.RequiredArgsConstructor;
  * L'application de l'entreprise chez un éditeur (chemin C, séance n°22 R154) : son administrateur la crée dans son
  * tenant, puis saisit une fois ici son identifiant et son secret (chiffré au repos, jamais rendu par l'API). Elle vaut
  * pour tout l'espace : seuls ses propriétaires et administrateurs la voient, la saisissent et la retirent, et le service
- * le vérifie lui-même (règle 3).
+ * le vérifie lui-même (règle 3). Chaque saisie et chaque retrait entrent au journal de l'espace, sans le secret.
  */
 @Service
 @RequiredArgsConstructor
@@ -35,6 +38,7 @@ public class ConnectorAppService {
     private final ConnectorAppRepository apps;
     private final ConnectorCatalog catalog;
     private final AuthorizationService authorization;
+    private final AuditService audit;
 
     /** Les applications d'entreprise de l'espace, pour un propriétaire ou un administrateur. */
     @Transactional(readOnly = true)
@@ -63,11 +67,20 @@ public class ConnectorAppService {
         if (secret.length() > MAX_SECRET) throw new BusinessException("This client secret is too long");
         ConnectorApp app = apps.findByWorkspaceIdAndConnectorKey(ws.getId(), connectorKey)
             .orElseGet(() -> ConnectorApp.builder().workspace(ws).connectorKey(connectorKey).build());
-        if (app.getClientId() != null && !app.getClientId().equals(id)) app.setIssuer(null);
+        boolean otherApp = app.getClientId() != null && !app.getClientId().equals(id);
+        if (otherApp) app.setIssuer(null);
         app.setClientId(id);
         if (!secret.isEmpty()) app.setClientSecret(secret);
         app.setSavedBy(admin);
         apps.save(app);
+        // Au journal de l'espace : l'identifiant, qui n'est pas un secret (RFC 6749, 2.2) ; du secret, seulement s'il a changé.
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("change", "saved");
+        details.put("connectorKey", connectorKey);
+        details.put("clientId", id);
+        details.put("secretChanged", !secret.isEmpty());
+        details.put("issuerCleared", otherApp);
+        audit.record(ws.getId(), admin.getId(), AuditService.COMPANY_APP_CHANGED, "connector_app", connectorKey, details);
         return new CompanyApp(connectorKey, id, app.getClientSecret() != null && !app.getClientSecret().isBlank());
     }
 
@@ -78,5 +91,7 @@ public class ConnectorAppService {
         ConnectorApp app = apps.findByWorkspaceIdAndConnectorKey(workspaceId, connectorKey)
             .orElseThrow(() -> new ResourceNotFoundException("No company app for " + connectorKey));
         apps.delete(app);
+        audit.record(workspaceId, userId, AuditService.COMPANY_APP_CHANGED, "connector_app", connectorKey,
+            Map.of("change", "removed", "connectorKey", connectorKey));
     }
 }

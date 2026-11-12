@@ -2,6 +2,7 @@ package com.taskforce.tf_api.modules.storage.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +20,7 @@ import com.taskforce.tf_api.core.repository.ProjectMemberRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.AuditService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.modules.ged.service.ObjectStorage;
@@ -34,6 +36,8 @@ import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,6 +58,7 @@ class StorageTargetServiceTest {
     private final ProjectVisibilityGuard visibility = Mockito.mock(ProjectVisibilityGuard.class);
     private final AuthorizationService authorization = Mockito.mock(AuthorizationService.class);
     private final UserRepository users = Mockito.mock(UserRepository.class);
+    private final AuditService audit = Mockito.mock(AuditService.class);
     private final Project project = Project.builder().id(30L).build();
 
     private StorageTargetService service;
@@ -74,7 +79,31 @@ class StorageTargetServiceTest {
             .displayName("Ada").build()));
         when(targets.save(any())).thenAnswer(i -> i.getArgument(0));
         service = new StorageTargetService(targets, documents, workspaces, projects, members, visibility, authorization,
-            users, List.of(new ServerDocumentWriter(Mockito.mock(ObjectStorage.class)), new MachineDocumentWriter(false)));
+            users, List.of(new ServerDocumentWriter(Mockito.mock(ObjectStorage.class)), new MachineDocumentWriter(false)),
+            audit);
+    }
+
+    @Test
+    @DisplayName("choisir l'endroit, puis revenir au choix du dessus, entre au journal de l'espace")
+    void choosingIsRecorded() {
+        service.choose("acme", ADA, null, new StorageTargetService.TargetRequest("server", null, null, null));
+        StorageTarget own = StorageTarget.builder().workspaceId(WS).projectId(30L).kind(StorageKind.SERVER).build();
+        when(targets.findByWorkspaceIdAndProjectId(WS, 30L)).thenReturn(Optional.of(own));
+        service.reset("acme", BOB, 30L);
+        // Rien à défaire : rien n'entre au journal.
+        service.reset("acme", ADA, null);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> details = ArgumentCaptor.forClass(Map.class);
+        verify(audit).record(eq(WS), eq(ADA), eq(AuditService.STORAGE_TARGET_CHANGED), eq("storage_target"), isNull(),
+            details.capture());
+        assertThat(details.getValue()).containsEntry("change", "chosen").containsEntry("scope", "workspace")
+            .containsEntry("storage", "server");
+        verify(audit).record(eq(WS), eq(BOB), eq(AuditService.STORAGE_TARGET_CHANGED), eq("storage_target"), eq("30"),
+            details.capture());
+        assertThat(details.getValue()).containsEntry("change", "reset").containsEntry("scope", "project")
+            .containsEntry("projectId", 30L).containsEntry("previous", "server");
+        Mockito.verifyNoMoreInteractions(audit);
     }
 
     @Test

@@ -27,6 +27,7 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
+import com.taskforce.tf_api.core.service.AuditService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
@@ -59,6 +60,7 @@ class WorkspaceMcpServiceTest {
     @Mock private McpClient client;
     @Mock private McpTokenService tokenService; // OAuth (TF-MCP-02) : non-OAuth par défaut en test (isOAuth=false)
     @Mock private WorkspaceMemberRepository members;
+    @Mock private AuditService audit;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private WorkspaceMcpService service;
@@ -78,7 +80,7 @@ class WorkspaceMcpServiceTest {
         lenient().when(members.findByWorkspaceIdAndUserId(1L, 8L))
             .thenReturn(Optional.of(WorkspaceMember.builder().role(WorkspaceRole.MEMBER).build()));
         service = new WorkspaceMcpService(repository, client, objectMapper, tokenService, catalog,
-            new AuthorizationService(members));
+            new AuthorizationService(members), audit);
         ReflectionTestUtils.setField(service, "cacheTtlMs", 60_000L);
     }
 
@@ -640,6 +642,43 @@ class WorkspaceMcpServiceTest {
         assertThat(result.revoked()).isTrue();
         assertThat(result.revocable()).isTrue();
         verify(repository).delete(conn);
+    }
+
+    @Test
+    @DisplayName("une connexion partagée faite puis défaite entre au journal : l'hôte, jamais le jeton ni l'adresse entière")
+    void a_shared_connection_is_recorded_without_its_secret() {
+        // Comme l'adresse d'un serveur Zoho, la clé est dans le chemin (une adresse IP publique : aucun nom à résoudre).
+        String secretUrl = "https://203.0.113.10:8443/mcp/k3y-in-the-path/message";
+        when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(1L, "custom-zoho-crm"))
+            .thenReturn(Optional.empty());
+
+        WorkspaceMcpService.ServerIdentity id = service.connectServer(ws, ada,
+            request("custom", "Zoho CRM", secretUrl, "tok-very-secret", null, null, true, false));
+        ConnectorConnection shared = ConnectorConnection.builder().id(5L).connectorKey(id.connectorKey())
+            .config("{\"mcpUrl\":\"" + secretUrl + "\",\"mcpToken\":\"tok-very-secret\"}").scope(ConnectionScope.WORKSPACE)
+            .build();
+        when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(1L, id.connectorKey()))
+            .thenReturn(Optional.of(shared));
+        service.disconnectServer(1L, 7L, id.connectorKey(), true);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> details = ArgumentCaptor.forClass(Map.class);
+        verify(audit, times(2)).record(eq(1L), eq(7L), eq(AuditService.SHARED_CONNECTION_CHANGED),
+            eq("connector_connection"), eq("custom-zoho-crm"), details.capture());
+        assertThat(details.getAllValues().get(0)).containsEntry("change", "connected").containsEntry("name", "Zoho CRM")
+            .containsEntry("host", "203.0.113.10:8443").containsEntry("via", "key");
+        assertThat(details.getAllValues().get(1)).containsEntry("change", "disconnected");
+        assertThat(details.getAllValues().toString()).doesNotContain("tok-very-secret").doesNotContain("k3y-in-the-path");
+    }
+
+    @Test
+    @DisplayName("sa propre connexion n'entre pas au journal de l'espace")
+    void a_personal_connection_is_not_recorded() {
+        when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerId(1L, "linear", 7L)).thenReturn(Optional.empty());
+
+        service.connectServer(ws, ada, request("linear", null, "https://mcp.linear.app/mcp", "tok", null, null, false, false));
+
+        org.mockito.Mockito.verifyNoInteractions(audit);
     }
 
     @Test

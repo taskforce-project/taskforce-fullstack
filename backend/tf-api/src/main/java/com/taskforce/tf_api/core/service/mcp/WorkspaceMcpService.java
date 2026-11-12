@@ -32,6 +32,7 @@ import com.taskforce.tf_api.core.model.ConnectorConnection;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
+import com.taskforce.tf_api.core.service.AuditService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
@@ -146,6 +147,8 @@ public class WorkspaceMcpService {
     private final ConnectorCatalog catalog;
     /** Sa propre connexion : un membre ; une connexion partagée : un propriétaire ou un administrateur (règle 3). */
     private final AuthorizationService authorization;
+    /** Une connexion partagée faite ou défaite entre au journal de l'espace (séance n°23, R160). */
+    private final AuditService audit;
 
     @Value("${integrations.mcp.tools-cache-ttl-ms:60000}")
     private long cacheTtlMs;
@@ -317,7 +320,33 @@ public class WorkspaceMcpService {
         repository.save(conn);
         pinQuietly(conn);
         invalidate(ws.getId());
+        if (req.shared()) {
+            recordShared(ws.getId(), person.getId(), id.connectorKey(), sharedDetails("connected", id, mcpUrl,
+                token.isEmpty() ? "address" : "key"));
+        }
         return id;
+    }
+
+    /**
+     * Ce qu'une connexion partagée faite garde au journal : l'outil, le nom d'un serveur ajouté à la main, l'hôte du
+     * serveur (jamais son adresse entière : celle d'un serveur Zoho vaut une clé), et comment elle s'est faite. Jamais un
+     * jeton.
+     */
+    static Map<String, Object> sharedDetails(String change, ServerIdentity id, String url, String via) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("change", change);
+        details.put("connectorKey", id.connectorKey());
+        if (id.name() != null) details.put("name", id.name());
+        String host = host(url);
+        if (host != null) details.put("host", host);
+        details.put("via", via);
+        return details;
+    }
+
+    /** Une connexion partagée faite ou défaite, au journal de l'espace (best-effort, cf. {@link AuditService}). */
+    void recordShared(Long workspaceId, Long userId, String connectorKey, Map<String, Object> details) {
+        audit.record(workspaceId, userId, AuditService.SHARED_CONNECTION_CHANGED, "connector_connection", connectorKey,
+            details);
     }
 
     /**
@@ -383,6 +412,14 @@ public class WorkspaceMcpService {
         boolean revoked = revocable && tokenService.revoke(conn);
         repository.delete(conn);
         invalidate(workspaceId);
+        if (shared) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("change", "disconnected");
+            details.put("connectorKey", connectorKey);
+            details.put("revoked", revoked);
+            details.put("revocable", revocable);
+            recordShared(workspaceId, userId, connectorKey, details);
+        }
         return new DisconnectResult(revoked, revocable);
     }
 

@@ -1,11 +1,13 @@
 package com.taskforce.tf_api.core.service.mcp;
 
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -16,6 +18,7 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.ConnectorAppRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
+import com.taskforce.tf_api.core.service.AuditService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
@@ -23,6 +26,7 @@ import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -38,6 +42,7 @@ class ConnectorAppServiceTest {
 
     @Mock private ConnectorAppRepository apps;
     @Mock private WorkspaceMemberRepository members;
+    @Mock private AuditService audit;
 
     private final Workspace ws = Workspace.builder().id(1L).slug("acme").build();
     private final User ada = User.builder().id(7L).email("ada@acme.test").build();
@@ -53,7 +58,34 @@ class ConnectorAppServiceTest {
             .thenReturn(Optional.of(WorkspaceMember.builder().role(WorkspaceRole.ADMIN).build()));
         lenient().when(members.findByWorkspaceIdAndUserId(1L, 8L))
             .thenReturn(Optional.of(WorkspaceMember.builder().role(WorkspaceRole.MEMBER).build()));
-        service = new ConnectorAppService(apps, catalog, new AuthorizationService(members));
+        service = new ConnectorAppService(apps, catalog, new AuthorizationService(members), audit);
+    }
+
+    @Test
+    @DisplayName("saisir puis retirer l'application de l'entreprise entre au journal de l'espace, jamais avec le secret")
+    void savingAndRemovingAreRecordedWithoutTheSecret() {
+        ConnectorApp app = ConnectorApp.builder().id(3L).workspace(ws).connectorKey("slack-mcp").build();
+        when(apps.findByWorkspaceIdAndConnectorKey(1L, "slack-mcp")).thenReturn(Optional.empty(), Optional.of(app));
+
+        service.save(ws, ada, "slack-mcp", "1234.5678", "xoxs-very-secret");
+        service.remove(1L, 7L, "slack-mcp");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> details = ArgumentCaptor.forClass(Map.class);
+        verify(audit, org.mockito.Mockito.times(2)).record(eq(1L), eq(7L), eq(AuditService.COMPANY_APP_CHANGED),
+            eq("connector_app"), eq("slack-mcp"), details.capture());
+        assertThat(details.getAllValues().get(0)).containsEntry("change", "saved").containsEntry("clientId", "1234.5678")
+            .containsEntry("secretChanged", true);
+        assertThat(details.getAllValues().get(1)).containsEntry("change", "removed");
+        assertThat(details.getAllValues().toString()).doesNotContain("xoxs-very-secret");
+        verify(apps).delete(app);
+    }
+
+    @Test
+    @DisplayName("un membre refusé n'écrit rien au journal")
+    void aRefusalIsNotRecorded() {
+        assertThatThrownBy(() -> service.save(ws, bob, "slack-mcp", "cid", "s")).isInstanceOf(ForbiddenException.class);
+        org.mockito.Mockito.verifyNoInteractions(audit);
     }
 
     @Test

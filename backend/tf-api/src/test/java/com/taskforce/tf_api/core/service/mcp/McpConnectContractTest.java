@@ -126,7 +126,8 @@ class McpConnectContractTest {
         AuthorizationService members = Mockito.mock(AuthorizationService.class);
         lenient().when(members.isMember(anyLong(), anyLong())).thenReturn(true);
         lenient().when(members.isManager(anyLong(), anyLong())).thenReturn(true);
-        workspaceMcp = new WorkspaceMcpService(connections, mcp, om, tokens, catalog, members);
+        workspaceMcp = new WorkspaceMcpService(connections, mcp, om, tokens, catalog, members,
+            Mockito.mock(com.taskforce.tf_api.core.service.AuditService.class));
         ReflectionTestUtils.setField(workspaceMcp, "cacheTtlMs", 60_000L);
         McpClientRegistrar registrar = new McpClientRegistrar(apps(), registrationRepository(), http, settings, env);
         UserRepository users = Mockito.mock(UserRepository.class);
