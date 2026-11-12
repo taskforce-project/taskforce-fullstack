@@ -425,21 +425,30 @@ public class McpOAuthService {
 
     /** La connexion que le retour remplit : celle de la personne qui a lancé le flux, ou celle de l'espace. */
     private ConnectorConnection connectionFor(McpOAuthState row) {
+        return connectionFor(row, true);
+    }
+
+    /**
+     * La connexion de ce flux : celle de la personne qui l'a lancé, ou celle de l'espace. {@code madeNow} : la personne
+     * la fait maintenant ; sinon, une connexion déjà gardée garde la personne qui l'a faite (une ligne neuve est à elle).
+     */
+    private ConnectorConnection connectionFor(McpOAuthState row, boolean madeNow) {
         Workspace ws = workspaceRepository.getReferenceById(row.getWorkspaceId());
         User person = row.getUserId() == null ? null : userRepository.findById(row.getUserId()).orElse(null);
         if (person == null && !row.isShared()) throw new BusinessException("la personne n'existe plus");
         ConnectorConnection conn = workspaceMcp.ownConnection(ws, person, row.getConnectorKey(), row.isShared());
-        if (person != null) conn.setConnectedBy(person);
+        if (person != null && (madeNow || conn.getId() == null)) conn.setConnectedBy(person);
         return conn;
     }
 
     /**
      * L'éditeur attend son administrateur : la connexion le dit, jusqu'au prochain essai. Une connexion qui marche reste
-     * telle quelle ; une connexion déjà gardée (à refaire, par exemple) ne change que d'état, ses jetons restent avec elle
-     * et sa déconnexion les révoque ; une connexion neuve n'a que son adresse, sans jeton.
+     * telle quelle ; une connexion déjà gardée (à refaire, par exemple) ne change que d'état, ses jetons et la personne qui
+     * l'a faite restent avec elle, et sa déconnexion révoque les jetons ; une connexion neuve n'a que son adresse, sans
+     * jeton.
      */
     private void markWaitingForAdmin(McpOAuthState row) {
-        ConnectorConnection conn = connectionFor(row);
+        ConnectorConnection conn = connectionFor(row, false);
         if (conn.getId() != null && conn.getState() == ConnectionState.CONNECTED) return; // une connexion qui marche reste
         if (conn.getId() == null) {
             Map<String, String> config = new LinkedHashMap<>();

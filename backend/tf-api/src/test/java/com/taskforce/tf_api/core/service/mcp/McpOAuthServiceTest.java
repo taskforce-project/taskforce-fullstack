@@ -423,8 +423,30 @@ class McpOAuthServiceTest {
 
         assertThat(service.callback("st-a", null, "admin_approval_required")).contains("mcp=admin");
         assertThat(conn.getState()).isEqualTo(ConnectionState.WAITING_FOR_ADMIN);
+        assertThat(conn.getConnectedBy()).isSameAs(person); // une connexion neuve est à la personne qui l'a lancée
         verify(connections).save(conn);
         verify(client, never()).postForm(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("callback : l'administrateur attendu sur une connexion de l'espace déjà gardée -> la personne qui l'a faite reste")
+    void anAdminAnswerKeepsWhoMadeTheConnection() {
+        McpOAuthState row = openState("st-s");
+        row.setShared(true);
+        when(stateRepository.findById("st-s")).thenReturn(Optional.of(row));
+        when(workspaceRepository.getReferenceById(WS_ID)).thenReturn(ws);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(person));
+        User maker = User.builder().id(USER_ID + 1).email("b@acme.test").build();
+        ConnectorConnection conn = ConnectorConnection.builder().id(41L).workspace(ws).connectorKey("linear")
+            .scope(ConnectionScope.WORKSPACE).connectedBy(maker).config("{}").state(ConnectionState.NEEDS_RECONNECT).build();
+        when(workspaceMcp.ownConnection(ws, person, "linear", true)).thenReturn(conn);
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+
+        assertThat(service.callback("st-s", null, "admin_approval_required")).contains("mcp=admin");
+
+        assertThat(conn.getState()).isEqualTo(ConnectionState.WAITING_FOR_ADMIN);
+        assertThat(conn.getConnectedBy()).isSameAs(maker);
+        verify(connections).save(conn);
     }
 
     @Test
