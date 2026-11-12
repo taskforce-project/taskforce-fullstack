@@ -169,6 +169,10 @@
       "description": "The company's rules in layers above TaskForce's floor: read them, write one in words and check its cases, add or remove it, and see what the rules would decide for an action."
     },
     {
+      "name": "Storage",
+      "description": "Where TaskForce saves what it writes, for the workspace and for a project: TaskForce, a folder on the computer, Google Drive, OneDrive or SharePoint; the documents saved and their link; what Google's picker and the OneDrive folder browser need."
+    },
+    {
       "name": "Dashboard"
     },
     {
@@ -273,6 +277,225 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/storage": {
+      "get": {
+        "tags": [
+          "Storage"
+        ],
+        "operationId": "workspaceStorage",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOverview"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Storage"
+        ],
+        "operationId": "chooseWorkspaceStorage",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageTargetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOverview"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Storage"
+        ],
+        "operationId": "resetWorkspaceStorage",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOverview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/projects/{projectId}/storage": {
+      "get": {
+        "tags": [
+          "Storage"
+        ],
+        "operationId": "projectStorage",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOverview"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Storage"
+        ],
+        "operationId": "chooseProjectStorage",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageTargetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOverview"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Storage"
+        ],
+        "operationId": "resetProjectStorage",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOverview"
                 }
               }
             }
@@ -8584,6 +8807,125 @@
         }
       }
     },
+    "/api/workspaces/{slug}/storage/microsoft/folders": {
+      "get": {
+        "tags": [
+          "Storage"
+        ],
+        "operationId": "microsoftFolders",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "driveId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 400,
+              "minLength": 0
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 400,
+              "minLength": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListPlace"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/storage/google/picker": {
+      "get": {
+        "tags": [
+          "Storage"
+        ],
+        "operationId": "googlePicker",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePickerConfig"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/storage/documents/{documentId}/link": {
+      "get": {
+        "tags": [
+          "Storage"
+        ],
+        "operationId": "documentLink",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/skills": {
       "get": {
         "tags": [
@@ -12160,6 +12502,165 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "StorageTargetRequest": {
+        "type": "object",
+        "properties": {
+          "storage": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "server|machine|google-drive|onedrive"
+          },
+          "folderId": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 0
+          },
+          "driveId": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 0
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "storage"
+        ]
+      },
+      "ApiResponseOverview": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Overview"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Choice": {
+        "type": "object",
+        "properties": {
+          "storage": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        }
+      },
+      "DocumentView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "storage": {
+            "type": "string"
+          },
+          "folderName": {
+            "type": "string"
+          },
+          "webUrl": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "savedAt": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "savedFor": {
+            "type": "string"
+          },
+          "approvedBy": {
+            "type": "string"
+          }
+        }
+      },
+      "Overview": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/TargetView"
+          },
+          "inherited": {
+            "$ref": "#/components/schemas/TargetView"
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Choice"
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentView"
+            }
+          }
+        }
+      },
+      "TargetView": {
+        "type": "object",
+        "properties": {
+          "storage": {
+            "type": "string"
+          },
+          "folderId": {
+            "type": "string"
+          },
+          "driveId": {
+            "type": "string"
+          },
+          "folderName": {
+            "type": "string"
+          },
+          "folderUrl": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "chosenBy": {
+            "type": "string"
           }
         }
       },
@@ -20663,6 +21164,76 @@
           "timestamp": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseListPlace": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Place"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Place": {
+        "type": "object",
+        "properties": {
+          "driveId": {
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponsePickerConfig": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PickerConfig"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PickerConfig": {
+        "type": "object",
+        "properties": {
+          "developerKey": {
+            "type": "string"
+          },
+          "appId": {
+            "type": "string"
+          },
+          "accessToken": {
+            "type": "string"
           }
         }
       },
