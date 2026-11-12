@@ -434,6 +434,47 @@ class CortexGateTest {
         assertThat(write.project()).isEqualTo(12L);
     }
 
+    /** La couche d'un projet : une nouvelle issue s'y accorde par le responsable du projet. */
+    private static HarnessRuleSet theLeadApproves(long project) {
+        Map<String, Object> rule = new java.util.LinkedHashMap<>();
+        rule.put("id", "prj" + project + "-lead-approves");
+        rule.put("when", Map.of("action", "issue.create"));
+        rule.put("class", "reversible-exit");
+        rule.put("effect", "ask");
+        rule.put("owner", "owner@acme.test");
+        rule.put("reason", "The project's lead approves new issues.");
+        rule.put("review", "2027-05-11");
+        rule.put("require", Map.of("approvers", List.of("project-lead")));
+        return HarnessRuleSet.builder().version((int) project).scope(RuleScope.PROJECT)
+            .project(Project.builder().id(project).build()).rules(List.of(rule)).digest("sha256:" + "e".repeat(64)).build();
+    }
+
+    @Test
+    @DisplayName("deux projets dont les règles désignent qui accorde : chacun se lit chez lui, jamais dans le seul projet du travail")
+    void the_approvers_of_each_project_are_read_in_that_project() {
+        when(ruleSets.findByWorkspaceIdOrderByVersionDesc(1L)).thenReturn(List.of(theLeadApproves(13), theLeadApproves(12)));
+        Workspace ws = Workspace.builder().id(1L).build();
+        when(projects.findByIdAndWorkspaceId(12L, 1L)).thenReturn(Optional.of(Project.builder().id(12L).workspace(ws).build()));
+        when(members.findByWorkspaceIdAndUserId(1L, 7L)).thenReturn(Optional.of(
+            com.taskforce.tf_api.core.model.WorkspaceMember.builder().role(com.taskforce.tf_api.core.enums.WorkspaceRole.MEMBER)
+                .build()));
+        // La personne est responsable du projet de la conversation (13), pas de celui que l'outil nomme (12).
+        com.taskforce.tf_api.core.repository.ProjectMemberRepository projectMembers =
+            Mockito.mock(com.taskforce.tf_api.core.repository.ProjectMemberRepository.class);
+        when(projectMembers.findByProjectIdAndUserId(13L, 7L)).thenReturn(Optional.of(
+            com.taskforce.tf_api.core.model.ProjectMember.builder().role(com.taskforce.tf_api.core.enums.ProjectRole.LEAD)
+                .build()));
+        com.taskforce.tf_api.core.service.rules.RuleApprovers approvers =
+            new com.taskforce.tf_api.core.service.rules.RuleApprovers(members, projectMembers);
+        AgentContext inThirteen = new AgentContext("acme", 1L, 7L, new Screen(13L, null));
+
+        CortexGate.Judged judged = gate.judgeWork(inThirteen, 13L, internal("create_issue"), "{\"projectId\": 12}",
+            CortexGate.Exposure.none(), p -> gate.rulesFor(inThirteen, p));
+
+        assertThat(judged.checks()).extracting(CortexGate.Check::project).containsExactly(13L, 12L);
+        assertThat(judged.aloneSuffices(approvers, 1L, 7L)).isFalse();
+    }
+
     @Test
     @DisplayName("un outil de TaskForce qui nomme un autre projet : jugé avec les deux, la décision la plus stricte l'emporte")
     void a_taskforce_tool_that_names_a_project_is_judged_by_both() {

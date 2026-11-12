@@ -28,6 +28,7 @@ import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.mcp.ExternalMcpTool;
+import com.taskforce.tf_api.core.service.rules.RuleApprovers;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -316,8 +317,27 @@ public class CortexGate {
         return rule.text() != null && !rule.text().isBlank() ? rule.text() : rule.reason();
     }
 
-    /** Ce que les règles du travail ont décidé d'un appel : la décision, le paquet et le projet qui l'ont prise. */
-    public record Judged(Verdict verdict, RulesBundle bundle, Long project) {
+    /** Ce qu'un accord doit réunir, et le projet où cela se lit : le responsable de ce projet y accorde. */
+    public record Check(RulesEngine.Obligations require, Long project) {
+    }
+
+    /**
+     * Ce que les règles du travail ont décidé d'un appel : la décision, le paquet et le projet qui l'ont prise, et, pour
+     * chaque projet dont les règles demandent, ce qu'un accord doit y réunir.
+     */
+    public record Judged(Verdict verdict, RulesBundle bundle, Long project, List<Check> checks) {
+
+        public Judged(Verdict verdict, RulesBundle bundle, Long project) {
+            this(verdict, bundle, project, List.of(new Check(verdict.require(), project)));
+        }
+
+        /**
+         * La personne qui a préparé l'action suffit-elle seule à l'accorder ? Dans chaque projet dont les règles demandent,
+         * avec les obligations de ce projet et ceux qui y accordent.
+         */
+        public boolean aloneSuffices(RuleApprovers approvers, Long workspaceId, Long preparer) {
+            return checks.stream().allMatch(c -> approvers.aloneSuffices(c.require(), workspaceId, c.project(), preparer));
+        }
     }
 
     /** Le projet du travail en cours : celui de la conversation, sinon celui de l'écran ; jamais un argument d'outil. */
@@ -343,7 +363,16 @@ public class CortexGate {
         RulesBundle there = bundles.apply(named.get());
         Verdict other = judge(there, tool, argsJson, exposure, ctx);
         Verdict kept = stricter(verdict, other);
-        return kept == other ? new Judged(other, there, named.get()) : new Judged(kept, bundle, project);
+        // Chaque projet dont les règles demandent garde ses obligations : ceux qui accordent se lisent chez lui.
+        List<Check> checks = new ArrayList<>();
+        if (RulesEngine.ASK.equals(verdict.effect())) {
+            checks.add(new Check(verdict.require(), project));
+        }
+        if (RulesEngine.ASK.equals(other.effect())) {
+            checks.add(new Check(other.require(), named.get()));
+        }
+        return kept == other ? new Judged(other, there, named.get(), List.copyOf(checks))
+            : new Judged(kept, bundle, project, List.copyOf(checks));
     }
 
     /**

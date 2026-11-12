@@ -183,8 +183,7 @@ public class AgentService {
             if (verdict.denied()) {
                 status = "refused";
                 output = "Not run: the rules of this workspace refuse it. " + verdict.reason();
-            } else if (!verdict.allowed() && !approvers.aloneSuffices(verdict.require(), ws.getId(), judged.project(),
-                    userId)) {
+            } else if (!verdict.allowed() && !judged.aloneSuffices(approvers, ws.getId(), userId)) {
                 // Une règle de l'entreprise demande l'accord d'autres personnes (R98) : la carte n'y suffit pas.
                 status = "refused";
                 output = waitsForOthers(verdict, ws.getId());
@@ -1395,7 +1394,8 @@ public class AgentService {
         /** Ce que la réponse a déjà lu (R158) : le socle en tient compte avant toute écriture ou sortie. */
         private final CortexGate.Exposure exposure;
         private Map<String, String> judgedFacts;
-        private Long judgedProject;
+        /** La dernière décision des règles du travail, avec ce qu'un accord doit réunir dans chaque projet. */
+        private CortexGate.Judged lastJudged;
         private UUID record;
 
         Kernel(AgentContext ctx, String question, Map<String, Object> origin) {
@@ -1444,7 +1444,7 @@ public class AgentService {
                     // rien ne se propose, et Cortex dit qui accorde. Une écriture externe ne se propose qu'à qui peut la
                     // valider : la personne pour sa connexion ; un propriétaire ou un administrateur pour une connexion
                     // partagée (séance n°22, R154 ; OSS-1.5) ; les autres l'apprennent d'emblée.
-                    if (!approvers.aloneSuffices(verdict.require(), ctx.workspaceId(), judgedProject, ctx.userId())) {
+                    if (!lastJudged.aloneSuffices(approvers, ctx.workspaceId(), ctx.userId())) {
                         result = waitsForOthers(verdict, ctx.workspaceId());
                         status = "refused";
                     } else if (tool instanceof ExternalMcpTool external && external.shared()
@@ -1575,7 +1575,7 @@ public class AgentService {
             traceBefore(record, "action.decided", CortexRecordService.Actor.rule(verdict.ruleId()),
                 decidedData(verdict, judged.bundle(), project, judged.project()));
             judgedFacts = verdict.facts();
-            judgedProject = judged.project();
+            lastJudged = judged;
             return verdict;
         }
 
