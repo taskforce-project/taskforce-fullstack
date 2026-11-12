@@ -354,7 +354,10 @@ function ConnectedView({ slug, tool, manager, onChanged, onWide }: PanelProps) {
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2 rounded-md border border-shape-green/25 bg-shape-green/10 p-3 text-sm text-ink-green">
         <Check className="size-4 shrink-0" />
-        <span>{tool.accountLabel ? fillText(t.connectedAs, { account: tool.accountLabel }) : t.connectedWithYourAccount}</span>
+        <span>
+          {tool.accountLabel ? fillText(t.connectedAs, { account: tool.accountLabel })
+            : shared ? t.connected : t.connectedWithYourAccount}
+        </span>
         <span className="ml-auto text-xs text-muted-foreground">{shared ? t.shared : t.yours}</span>
       </div>
       {status && !status.reachable && (

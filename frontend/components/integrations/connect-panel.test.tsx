@@ -214,7 +214,9 @@ describe("ConnectPanel", () => {
     show(notion({ connected: true, state: "CONNECTED", scope: "WORKSPACE" }), false)
 
     expect(screen.getByText(t.shared)).toBeTruthy()
-    expect(screen.getByText(t.connectedWithYourAccount)).toBeTruthy()
+    // Une source partagée n'est pas « votre compte » : la personne lit par la connexion de l'espace.
+    expect(screen.getByText(t.connected)).toBeTruthy()
+    expect(screen.queryByText(t.connectedWithYourAccount)).toBeNull()
     expect(screen.queryByRole("button", { name: t.disconnect })).toBeNull()
   })
 

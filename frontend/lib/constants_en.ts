@@ -609,7 +609,7 @@ export const CONSTANTS_EN = {
     openAdminPage: "Open the admin page",
     // The company's app (path C), entered once by an owner or admin
     companyAppTitle: "Your company's app",
-    companyAppText: "Create the app at {name} as described below, then enter its details here once. Everyone in the workspace then connects with their own account.",
+    companyAppText: "Create the app in {name} as described below, then enter its details here once. Everyone in the workspace then connects with their own account.",
     clientId: "Client ID",
     clientSecret: "Client secret",
     clientSecretKept: "A secret is saved. Leave empty to keep it.",
