@@ -49,7 +49,9 @@ public class ConnectorAppService {
     /**
      * Enregistre (ou remplace) l'application de l'entreprise pour un outil du catalogue, par un propriétaire ou un
      * administrateur. Un secret vide garde celui déjà saisi : l'écran ne le montre jamais, la personne n'a pas à le
-     * retaper pour changer l'identifiant.
+     * retaper pour changer l'identifiant. Un autre identifiant est une autre application : l'émetteur épinglé sur
+     * l'ancienne (V130) s'efface, et la prochaine connexion d'un propriétaire ou d'un administrateur qui aboutit par elle
+     * l'épingle de nouveau ({@link McpClientRegistrar#pinCompanyIssuer}).
      */
     @Transactional
     public CompanyApp save(Workspace ws, User admin, String connectorKey, String clientId, String clientSecret) {
@@ -61,6 +63,7 @@ public class ConnectorAppService {
         if (secret.length() > MAX_SECRET) throw new BusinessException("This client secret is too long");
         ConnectorApp app = apps.findByWorkspaceIdAndConnectorKey(ws.getId(), connectorKey)
             .orElseGet(() -> ConnectorApp.builder().workspace(ws).connectorKey(connectorKey).build());
+        if (app.getClientId() != null && !app.getClientId().equals(id)) app.setIssuer(null);
         app.setClientId(id);
         if (!secret.isEmpty()) app.setClientSecret(secret);
         app.setSavedBy(admin);
