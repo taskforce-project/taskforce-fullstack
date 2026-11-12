@@ -33,10 +33,12 @@ import com.taskforce.tf_api.core.repository.McpOAuthRegistrationRepository;
 import com.taskforce.tf_api.core.repository.McpOAuthStateRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.core.service.agent.CortexGate;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
+import com.taskforce.tf_api.core.service.integration.ConnectorPreset;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -84,8 +86,8 @@ class McpConnectContractTest {
     @BeforeEach
     void start() throws Exception {
         vendor = new FakeVendor();
-        catalog = new ConnectorCatalog();
-        catalog.build();
+        // Le préréglage essayé a pour serveur officiel le faux éditeur : ses classes et ses clients y valent.
+        catalog = servedBy(KEY, vendor.mcpUrl());
         HarnessRuleSetRepository ruleSets = Mockito.mock(HarnessRuleSetRepository.class);
         WorkspaceRepository workspaces = workspaceRepository();
         gate = new CortexGate(
@@ -99,23 +101,56 @@ class McpConnectContractTest {
         vendor.close();
     }
 
+    /** Le catalogue, où le préréglage {@code key} a pour serveur officiel {@code officialUrl} (le faux éditeur). */
+    static ConnectorCatalog servedBy(String key, String officialUrl) {
+        ConnectorCatalog served = new ConnectorCatalog() {
+            @Override
+            public Optional<ConnectorPreset> preset(String asked) {
+                return super.preset(asked).map(p -> key.equals(asked) ? new ConnectorPreset(p.key(), p.name(),
+                    p.category(), p.description(), p.website(), officialUrl, null, p.connection(), p.scopes(), p.admin(),
+                    p.apiKey(), p.readTools(), p.writeTools(), p.tried(), p.blocked(), p.sources(), p.unverified(),
+                    p.api()) : p);
+            }
+        };
+        served.build();
+        return served;
+    }
+
     // ── Le montage des vrais services ────────────────────────────────────────
 
     private McpOAuthService services(McpOAuthSettings settings) {
         McpOAuthClient http = new McpOAuthClient(om, 5000, true);
         McpClient mcp = new McpClient(om, 2000, 5000, true);
         ConnectorConnectionRepository connections = connections();
-        tokens = new McpTokenService(http, connections, om);
+        tokens = new McpTokenService(http, connections, om, catalog, apps());
         workspaceMcp = new WorkspaceMcpService(connections, mcp, om, tokens, catalog);
         ReflectionTestUtils.setField(workspaceMcp, "cacheTtlMs", 60_000L);
         McpClientRegistrar registrar = new McpClientRegistrar(apps(), registrationRepository(), http, settings, env);
         UserRepository users = Mockito.mock(UserRepository.class);
         lenient().when(users.findById(7L)).thenReturn(Optional.of(ada));
         lenient().when(users.findById(8L)).thenReturn(Optional.of(bob));
+        AuthorizationService members = Mockito.mock(AuthorizationService.class);
+        lenient().when(members.isMember(anyLong(), anyLong())).thenReturn(true);
+        lenient().when(members.isManager(anyLong(), anyLong())).thenReturn(true);
         McpOAuthService oauth = new McpOAuthService(new McpOAuthDiscovery(http), http, stateRepository(),
-            workspaceRepository(), users, tokens, workspaceMcp, registrar, settings, catalog, apps(), connections, om);
+            workspaceRepository(), users, tokens, workspaceMcp, registrar, settings, catalog, apps(), connections, om,
+            members);
         oauth.allowLocalServersForContractTests();
         return oauth;
+    }
+
+    /** Un paramètre de l'adresse de retour vers l'app. */
+    static String param(String redirect, String name) {
+        return FakeVendor.query(java.net.URI.create(redirect).getRawQuery()).get(name);
+    }
+
+    /**
+     * L'app, connectée comme {@code person}, finit la connexion revenue du navigateur : rend {@code mcp=<issue>}, ou
+     * l'adresse de retour telle quelle quand il n'y a rien à finir (un refus, l'administrateur).
+     */
+    static String finish(McpOAuthService oauth, User person, String redirect) {
+        if (!redirect.contains("mcp=finish")) return redirect;
+        return "mcp=" + oauth.complete(person.getId(), param(redirect, "state"), param(redirect, "finish")).outcome();
     }
 
     private static McpOAuthSettings server() {
@@ -127,12 +162,12 @@ class McpConnectContractTest {
             "http://127.0.0.1:47900", "TaskForce", "native", cimd);
     }
 
-    /** Un geste « Connect » complet : le début du flux, le navigateur qui accepte, le retour. */
+    /** Un geste « Connect » complet : le début du flux, le navigateur qui accepte, le retour, la fin dans l'app. */
     private String connect(McpOAuthService oauth, User person, boolean shared) {
         String url = oauth.start(ws, person.getId(), new McpOAuthService.ConnectRequest(KEY, null, vendor.mcpUrl(), null,
             null, shared, false, false, null), vendor.mcpUrl());
         Map<String, String> back = vendor.approve(url);
-        return oauth.callback(back.get("state"), back.get("code"), null, back.get("iss"));
+        return finish(oauth, person, oauth.callback(back.get("state"), back.get("code"), null, back.get("iss")));
     }
 
     // ── Découverte et inscription ────────────────────────────────────────────
@@ -157,9 +192,15 @@ class McpConnectContractTest {
     void dynamicRegistrationOnTheServer() {
         McpOAuthService oauth = services(server());
 
-        String redirect = connect(oauth, ada, false);
+        String url = oauth.start(ws, ada.getId(), new McpOAuthService.ConnectRequest(KEY, null, vendor.mcpUrl(), null,
+            null, false, false, false, null), vendor.mcpUrl());
+        Map<String, String> back = vendor.approve(url);
+        String redirect = oauth.callback(back.get("state"), back.get("code"), null, back.get("iss"));
 
-        assertThat(redirect).isEqualTo("http://app.test/acme/settings?section=integrations&mcp=connected&connector=linear");
+        // Le retour garde le code et renvoie vers l'app, qui finit : rien n'est échangé avant elle.
+        assertThat(redirect).startsWith("http://app.test/acme/settings?section=integrations&mcp=finish&connector=linear&state=");
+        assertThat(vendor.tokenRequests).isEmpty();
+        assertThat(finish(oauth, ada, redirect)).isEqualTo("mcp=connected");
         assertThat(vendor.registrations).singleElement().satisfies(r -> {
             assertThat(r.path("application_type").asText()).isEqualTo("web");
             assertThat(r.path("redirect_uris").get(0).asText()).isEqualTo("http://127.0.0.1:8080/api/mcp/oauth/callback");
@@ -189,10 +230,29 @@ class McpConnectContractTest {
 
         assertThat(back.get("redirect_uri")).isEqualTo("http://127.0.0.1:47816/mcp/callback");
         assertThat(vendor.registrations.get(0).path("application_type").asText()).isEqualTo("native");
+        // La coque ramène l'app sur la page du retour, où l'app connectée finit, comme sur le web.
+        assertThat(redirect).startsWith("http://127.0.0.1:47900/acme/settings").contains("mcp=finish");
+        assertThat(finish(oauth, ada, redirect)).isEqualTo("mcp=connected");
         assertThat(vendor.tokenRequests.get(0)).containsEntry("redirect_uri", "http://127.0.0.1:47816/mcp/callback")
             .doesNotContainKey("client_secret");
-        assertThat(redirect).startsWith("http://127.0.0.1:47900/acme/settings").contains("mcp=connected");
         assertThat(only(KEY, ada).getState()).isEqualTo(ConnectionState.CONNECTED);
+    }
+
+    @Test
+    @DisplayName("la fin d'une connexion est liée à la personne qui l'a lancée : une autre personne connectée ne la finit pas")
+    void anotherPersonCannotFinish() {
+        McpOAuthService oauth = services(server());
+        String url = oauth.start(ws, ada.getId(), new McpOAuthService.ConnectRequest(KEY, null, vendor.mcpUrl(), null,
+            null, false, false, false, null), vendor.mcpUrl());
+        Map<String, String> back = vendor.approve(url);
+        String redirect = oauth.callback(back.get("state"), back.get("code"), null, back.get("iss"));
+
+        assertThat(finish(oauth, bob, redirect)).isEqualTo("mcp=error");
+        assertThat(vendor.tokenRequests).isEmpty();
+        assertThat(rows).isEmpty();
+        // Usage unique : le flux s'est effacé, la personne qui l'a lancé le refait.
+        assertThat(finish(oauth, ada, redirect)).isEqualTo("mcp=error");
+        assertThat(vendor.tokenRequests).isEmpty();
     }
 
     @Test
@@ -256,7 +316,8 @@ class McpConnectContractTest {
         Map<String, String> back = vendor.approve(url);
         states.get(back.get("state")).setCodeVerifier("not-the-verifier");
 
-        assertThat(oauth.callback(back.get("state"), back.get("code"), null, back.get("iss"))).contains("mcp=error");
+        assertThat(finish(oauth, ada, oauth.callback(back.get("state"), back.get("code"), null, back.get("iss"))))
+            .contains("mcp=error");
         assertThat(rows).isEmpty();
     }
 

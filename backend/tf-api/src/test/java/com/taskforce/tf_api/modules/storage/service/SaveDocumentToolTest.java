@@ -128,6 +128,65 @@ class SaveDocumentToolTest {
     }
 
     @Test
+    @DisplayName("ranger porte le fait server, le connecteur de la cible : une règle sur ce connecteur le couvre")
+    void aSaveCarriesTheConnectorOfItsTarget() {
+        WorkspaceRepository workspaces = Mockito.mock(WorkspaceRepository.class);
+        when(workspaces.findById(WS)).thenReturn(Optional.of(Workspace.builder().id(WS).slug("acme").build()));
+        CortexGate gate = new CortexGate(new HarnessRulesService(Mockito.mock(HarnessRuleSetRepository.class),
+            Mockito.mock(WorkspaceMemberRepository.class)), workspaces, projects, Mockito.mock(IssueRepository.class),
+            new ObjectMapper());
+        String args = "{\"title\":\"r\",\"content\":\"c\"}";
+
+        current = StorageTarget.builder().workspaceId(WS).kind(StorageKind.GOOGLE_DRIVE).folderId("f1").build();
+        assertThat(gate.judge(gate.rulesFor(ctx), tool, args, CortexGate.Exposure.none(), ctx).facts())
+            .containsEntry("action", "mcp.write").containsEntry("server", "google-drive");
+        current = StorageTarget.builder().workspaceId(WS).kind(StorageKind.ONEDRIVE).driveId("d").folderId("i").build();
+        assertThat(gate.judge(gate.rulesFor(ctx), tool, args, CortexGate.Exposure.none(), ctx).facts())
+            .containsEntry("server", "microsoft-365");
+        current = StorageTarget.server(WS);
+        assertThat(gate.judge(gate.rulesFor(ctx), tool, args, CortexGate.Exposure.none(), ctx).facts())
+            .doesNotContainKey("server");
+    }
+
+    @Test
+    @DisplayName("un accord sans l'endroit que la carte a montré : rien ne s'écrit")
+    void anApprovalWithoutThePlaceSavesNothing() {
+        assertThatThrownBy(() -> tool.perform(Map.of("title", "Weekly report", "content", "# Week"), ctx))
+            .isInstanceOf(BusinessException.class).hasMessage(DocumentStorageService.PLACE_UNKNOWN);
+        assertThatThrownBy(() -> tool.perform(Map.of("title", "Weekly report", "content", "# Week", "place", " "), ctx))
+            .isInstanceOf(BusinessException.class).hasMessage(DocumentStorageService.PLACE_UNKNOWN);
+        verify(records, never()).open(any(), anyString(), any());
+        verify(objects, never()).upload(anyString(), any(), anyLong(), anyString());
+    }
+
+    @Test
+    @DisplayName("un titre qui est le nom d'un périphérique de Windows donne un autre nom de fichier")
+    void windowsDeviceNamesAreRenamed() {
+        assertThat(DocumentWriter.DocumentFile.fileName("CON", ".md")).isEqualTo("Document CON.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("nul", ".md")).isEqualTo("Document nul.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("Com1.draft", ".md")).isEqualTo("Document Com1.draft.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("LPT9", ".md")).isEqualTo("Document LPT9.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("AUX ", ".md")).isEqualTo("Document AUX.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("PRN.", ".md")).isEqualTo("Document PRN.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("Console notes", ".md")).isEqualTo("Console notes.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("COM10", ".md")).isEqualTo("COM10.md");
+    }
+
+    @Test
+    @DisplayName("les autres noms que Windows réserve : COM0, LPT0, les chiffres en exposant, CONIN$ et CONOUT$")
+    void everyWindowsDeviceNameIsRenamed() {
+        assertThat(DocumentWriter.DocumentFile.fileName("COM0", ".md")).isEqualTo("Document COM0.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("lpt0.notes", ".md")).isEqualTo("Document lpt0.notes.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("COM¹", ".md")).isEqualTo("Document COM¹.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("COM²", ".md")).isEqualTo("Document COM².md");
+        assertThat(DocumentWriter.DocumentFile.fileName("LPT³", ".md")).isEqualTo("Document LPT³.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("conin$", ".md")).isEqualTo("Document conin$.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("CONOUT$.log", ".md")).isEqualTo("Document CONOUT$.log.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("CONOUT", ".md")).isEqualTo("CONOUT.md");
+        assertThat(DocumentWriter.DocumentFile.fileName("COM⁴", ".md")).isEqualTo("COM⁴.md");
+    }
+
+    @Test
     @DisplayName("un document vide ou sans titre ne se range pas")
     void emptyRefused() {
         assertThatThrownBy(() -> tool.perform(Map.of("title", "r", "content", " "), ctx))

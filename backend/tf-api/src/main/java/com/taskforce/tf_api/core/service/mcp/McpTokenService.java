@@ -11,8 +11,12 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.enums.ConnectionState;
+import com.taskforce.tf_api.core.model.ConnectorApp;
 import com.taskforce.tf_api.core.model.ConnectorConnection;
+import com.taskforce.tf_api.core.repository.ConnectorAppRepository;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
+import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
+import com.taskforce.tf_api.core.service.integration.ConnectorPreset;
 import com.taskforce.tf_api.shared.util.LogSafe;
 
 import lombok.RequiredArgsConstructor;
@@ -23,7 +27,8 @@ import lombok.extern.slf4j.Slf4j;
  * <b>refresh automatique</b> (avant expiration) et <b>révocation</b> chez l'éditeur (RFC 7009). Les tokens vivent
  * dans le {@code config} JSON <b>chiffre</b> de la {@link ConnectorConnection}, avec l'émetteur qui les a rendus :
  * ils ne servent qu'au serveur pour lequel ils ont été obtenus, et le renouvellement passe par l'endpoint de cet
- * émetteur.
+ * émetteur. Le secret d'un client enregistré d'avance (celui de l'entreprise, ou le nôtre) ne part, au renouvellement
+ * comme à la révocation, que vers l'émetteur épinglé ({@link #secretGoesTo}).
  *
  * <p>Un renouvellement garde le nouveau jeton de renouvellement quand l'éditeur le fait tourner (norme MCP : un client
  * public doit suivre la rotation) ; deux renouvellements de la même connexion ne se croisent pas, sinon le second
@@ -64,6 +69,8 @@ public class McpTokenService {
     private final McpOAuthClient client;
     private final ConnectorConnectionRepository repository;
     private final ObjectMapper objectMapper;
+    private final ConnectorCatalog catalog;
+    private final ConnectorAppRepository apps;
 
     /** Un verrou par connexion : deux renouvellements ne présentent jamais le même jeton tourné. */
     private final Map<Long, Object> locks = new ConcurrentHashMap<>();
@@ -122,7 +129,7 @@ public class McpTokenService {
                 return config.get(K_ACCESS); // pas de refresh possible : on tente le token courant
             }
             try {
-                JsonNode tok = client.postForm(config.get(K_TOKEN_EP), refreshForm(config, refresh));
+                JsonNode tok = client.postForm(config.get(K_TOKEN_EP), refreshForm(conn, config, refresh));
                 applyTokens(config, tok, refresh);
                 String written = write(config);
                 conn.setConfig(written);
@@ -215,10 +222,43 @@ public class McpTokenService {
         if (!isOAuth(config) || endpoint == null || endpoint.isBlank()) return false;
         boolean revoked = false;
         String refresh = config.get(K_REFRESH);
-        if (refresh != null && !refresh.isBlank()) revoked = revokeOne(endpoint, config, refresh, "refresh_token");
-        revoked |= revokeOne(endpoint, config, config.get(K_ACCESS), "access_token");
+        if (refresh != null && !refresh.isBlank()) revoked = revokeOne(endpoint, conn, config, refresh, "refresh_token");
+        revoked |= revokeOne(endpoint, conn, config, config.get(K_ACCESS), "access_token");
         if (conn.getId() != null) fresh.remove(conn.getId());
         return revoked;
+    }
+
+    /**
+     * Le secret gardé avec la connexion part-il vers son serveur d'autorisation ? Celui de l'entreprise ou le nôtre,
+     * seulement vers l'émetteur épinglé : celui du serveur officiel du préréglage, ou l'émetteur de l'API de l'éditeur que
+     * TaskForce sert ; pour un serveur que l'entreprise tient, celui épinglé sur son application, et pour une connexion
+     * faite avant cet épinglage, l'émetteur qu'elle a gardé à sa connexion. Un secret d'inscription dynamique est celui que
+     * cet émetteur a lui-même rendu.
+     */
+    boolean secretGoesTo(ConnectorConnection conn, Map<String, String> config) {
+        String source = config.get(K_CLIENT_SOURCE);
+        if (!McpClientRegistrar.COMPANY.equals(source) && !McpClientRegistrar.OURS.equals(source)) return true;
+        ConnectorPreset preset = catalog.preset(conn.getConnectorKey()).orElse(null);
+        if (preset == null) return false;
+        if (config.get(K_API) != null) return preset.api() != null && preset.api().kind().equals(config.get(K_API));
+        if (preset.hasOfficialServer()) return preset.serves(config.get(K_MCP_URL));
+        if (!McpClientRegistrar.COMPANY.equals(source)) return false;
+        String recorded = config.get(K_OAUTH_ISSUER);
+        String pinned = conn.getWorkspace() == null ? null : apps
+            .findByWorkspaceIdAndConnectorKey(conn.getWorkspace().getId(), conn.getConnectorKey())
+            .map(ConnectorApp::getIssuer).orElse(null);
+        return McpClientRegistrar.sameIssuer(pinned != null ? pinned : recorded, recorded);
+    }
+
+    private void putSecret(Map<String, String> form, ConnectorConnection conn, Map<String, String> config) {
+        String secret = config.get(K_CLIENT_SECRET);
+        if (secret == null) return;
+        if (secretGoesTo(conn, config)) {
+            form.put("client_secret", secret);
+        } else {
+            log.warn("Secret du client de '{}' non envoye : il ne part que vers l'emetteur epingle",
+                LogSafe.of(conn.getConnectorKey()));
+        }
     }
 
     /** Peut-on révoquer cette connexion chez l'éditeur ? */
@@ -229,13 +269,14 @@ public class McpTokenService {
 
     // -------------------------------------------------------------------------
 
-    private boolean revokeOne(String endpoint, Map<String, String> config, String token, String hint) {
+    private boolean revokeOne(String endpoint, ConnectorConnection conn, Map<String, String> config, String token,
+                              String hint) {
         if (token == null || token.isBlank()) return false;
         Map<String, String> f = new LinkedHashMap<>();
         f.put("token", token);
         f.put("token_type_hint", hint);
         if (config.get(K_CLIENT_ID) != null) f.put("client_id", config.get(K_CLIENT_ID));
-        if (config.get(K_CLIENT_SECRET) != null) f.put("client_secret", config.get(K_CLIENT_SECRET));
+        putSecret(f, conn, config);
         int status = client.postFormStatus(endpoint, f);
         return status / 100 == 2;
     }
@@ -263,12 +304,12 @@ public class McpTokenService {
         }
     }
 
-    private Map<String, String> refreshForm(Map<String, String> config, String refresh) {
+    private Map<String, String> refreshForm(ConnectorConnection conn, Map<String, String> config, String refresh) {
         Map<String, String> f = new LinkedHashMap<>();
         f.put("grant_type", "refresh_token");
         f.put("refresh_token", refresh);
         if (config.get(K_CLIENT_ID) != null) f.put("client_id", config.get(K_CLIENT_ID));
-        if (config.get(K_CLIENT_SECRET) != null) f.put("client_secret", config.get(K_CLIENT_SECRET));
+        putSecret(f, conn, config);
         // L'API d'un éditeur (Google, Entra) refuse le paramètre resource (RFC 8707) : seulement pour un serveur MCP.
         if (config.get(K_API) == null) {
             String resource = config.get(K_RESOURCE) != null ? config.get(K_RESOURCE) : config.get(K_MCP_URL);

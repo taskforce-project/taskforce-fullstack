@@ -24,6 +24,7 @@ import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
 import com.taskforce.tf_api.core.repository.McpOAuthStateRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 import com.taskforce.tf_api.core.service.mcp.McpOAuthDiscovery.DiscoveredAuth;
 import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService.ServerIdentity;
@@ -32,6 +33,7 @@ import com.taskforce.tf_api.shared.exception.BusinessException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -64,6 +66,7 @@ class McpOAuthServiceTest {
     @Mock private McpClientRegistrar registrar;
     @Mock private ConnectorAppRepository apps;
     @Mock private ConnectorConnectionRepository connections;
+    @Mock private AuthorizationService authorization;
 
     private final ObjectMapper om = new ObjectMapper();
     private final Workspace ws = Workspace.builder().id(WS_ID).slug("acme").build();
@@ -77,7 +80,13 @@ class McpOAuthServiceTest {
         McpOAuthSettings settings = new McpOAuthSettings("http://localhost:8080", "", "http://localhost:3000",
             "TaskForce", "web", "");
         service = new McpOAuthService(discovery, client, stateRepository, workspaceRepository, userRepository,
-            tokenService, workspaceMcp, registrar, settings, catalog, apps, connections, om);
+            tokenService, workspaceMcp, registrar, settings, catalog, apps, connections, om, authorization);
+    }
+
+    /** Le jeton {@code finish} que l'adresse de retour porte. */
+    private static String finishOf(String redirect) {
+        return java.net.URLDecoder.decode(redirect.replaceAll(".*[?&]finish=([^&]+).*", "$1"),
+            java.nio.charset.StandardCharsets.UTF_8);
     }
 
     private DiscoveredAuth auth(boolean issSupported) {
@@ -103,12 +112,16 @@ class McpOAuthServiceTest {
     @Test
     @DisplayName("start : client du registrar, les seules portées de lecture du préréglage, PKCE et resource")
     void startBuildsAuthorizeUrl() {
+        service.allowLocalServersForContractTests(); // aucun nom résolu dans l'essai
         when(workspaceMcp.resolveServer(WS_ID, "linear", null)).thenReturn(new ServerIdentity("linear", null));
-        when(discovery.discover("https://203.0.113.10/mcp")).thenReturn(auth(true));
-        when(registrar.clientFor(eq(WS_ID), eq("linear"), any(), eq("http://localhost:8080/api/mcp/oauth/callback")))
+        // La lecture seule du serveur officiel : l'écriture n'est pas accordée.
+        when(discovery.discover("https://mcp.linear.app/mcp/readonly")).thenReturn(auth(true));
+        // Le serveur officiel du préréglage : son émetteur est épinglé.
+        when(registrar.clientFor(eq(WS_ID), eq("linear"), any(), eq("http://localhost:8080/api/mcp/oauth/callback"),
+                eq(true), eq(false)))
             .thenReturn(new McpClientRegistrar.RegisteredClient("cid-123", null, McpClientRegistrar.DCR));
 
-        String url = service.start(ws, USER_ID, "linear", null, "https://203.0.113.10/mcp", "/acme?import=linear");
+        String url = service.start(ws, USER_ID, "linear", null, "https://mcp.linear.app/mcp", "/acme?import=linear");
 
         ArgumentCaptor<McpOAuthState> captor = ArgumentCaptor.forClass(McpOAuthState.class);
         verify(stateRepository).save(captor.capture());
@@ -131,13 +144,39 @@ class McpOAuthServiceTest {
     @Test
     @DisplayName("start : aucun chemin d'inscription -> l'erreur du registrar remonte, aucun state")
     void startWithoutAnyClientFails() {
-        when(workspaceMcp.resolveServer(WS_ID, "linear", null)).thenReturn(new ServerIdentity("linear", null));
+        when(workspaceMcp.resolveServer(WS_ID, "custom-docs", "Docs")).thenReturn(new ServerIdentity("custom-docs", "Docs"));
         when(discovery.discover(anyString())).thenReturn(auth(false));
-        when(registrar.clientFor(any(), any(), any(), any())).thenThrow(new McpClientRegistrar.NoClient("none"));
+        // Un serveur sans préréglage : aucun émetteur épinglé, donc aucun client enregistré d'avance.
+        when(registrar.clientFor(any(), any(), any(), any(), eq(false), anyBoolean()))
+            .thenThrow(new McpClientRegistrar.NoClient("none"));
 
-        assertThatThrownBy(() -> service.start(ws, USER_ID, "linear", null, "https://203.0.113.10/mcp", null))
+        assertThatThrownBy(() -> service.start(ws, USER_ID, "custom-docs", "Docs", "https://203.0.113.10/mcp", null))
             .isInstanceOf(McpClientRegistrar.NoClient.class);
         verify(stateRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("start : la clé d'un préréglage avec une autre adresse que son serveur officiel -> refus, aucun appel")
+    void startRefusesAnotherServerForAPreset() {
+        assertThatThrownBy(() -> service.start(ws, USER_ID, "linear", null, "https://203.0.113.10/mcp", null))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("official server");
+        assertThatThrownBy(() -> service.start(ws, USER_ID, "google-drive", null, "https://203.0.113.10/mcp", null))
+            .isInstanceOf(BusinessException.class);
+        verifyNoInteractions(discovery, client, registrar);
+        verify(stateRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("connect : la clé d'un préréglage avec une autre adresse, jeton ou pas -> refus, rien d'enregistré")
+    void connectRefusesAnotherServerForAPreset() {
+        assertThatThrownBy(() -> service.connect(ws, person, false, new McpOAuthService.ConnectRequest("linear", null,
+            "https://203.0.113.10/mcp", "tok", null, false, false, false, null))).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.connect(ws, person, false, new McpOAuthService.ConnectRequest("linear", null,
+            "https://203.0.113.10/mcp", null, null, false, false, false, null))).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.connect(ws, person, true, new McpOAuthService.ConnectRequest("microsoft-365",
+            null, "https://203.0.113.10/", null, null, false, false, false, null))).isInstanceOf(BusinessException.class);
+        verify(workspaceMcp, never()).connectServer(any(), any(), any());
+        verifyNoInteractions(discovery, client, registrar);
     }
 
     @Test
@@ -163,9 +202,32 @@ class McpOAuthServiceTest {
 
     // =========================================================================
     @Test
-    @DisplayName("callback OK : echange le code, garde jetons et compte sur la connexion de la personne, redirige connected")
-    void callbackSuccess() throws Exception {
-        when(stateRepository.findById("st-1")).thenReturn(Optional.of(openState("st-1")));
+    @DisplayName("callback OK : garde le code avec son state, n'échange rien, renvoie vers l'app avec un jeton à usage unique")
+    void callbackKeepsTheCodeForTheApp() {
+        McpOAuthState row = openState("st-1");
+        when(stateRepository.findById("st-1")).thenReturn(Optional.of(row));
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+
+        String redirect = service.callback("st-1", "code-xyz", null, "https://as.ex");
+
+        assertThat(redirect).startsWith(
+            "http://localhost:3000/acme/settings?section=integrations&mcp=finish&connector=linear&state=st-1&finish=");
+        assertThat(finishOf(redirect)).hasSizeGreaterThanOrEqualTo(32);
+        assertThat(row.getCode()).isEqualTo("code-xyz");
+        assertThat(row.getFinishHash()).hasSize(64).isNotEqualTo(finishOf(redirect));
+        verify(stateRepository).save(row);
+        verify(client, never()).postForm(anyString(), any());
+        verify(stateRepository, never()).deleteById(anyString());
+    }
+
+    @Test
+    @DisplayName("complete : la personne qui a lancé le flux, avec le jeton du retour -> échange, jetons et compte sur sa connexion")
+    void completeExchangesForThePersonWhoStarted() throws Exception {
+        McpOAuthState row = openState("st-1");
+        when(stateRepository.findById("st-1")).thenReturn(Optional.of(row));
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+        String finish = finishOf(service.callback("st-1", "code-xyz", null, "https://as.ex"));
+        when(authorization.isMember(WS_ID, USER_ID)).thenReturn(true);
         when(client.postForm(eq("https://as.ex/token"), any())).thenReturn(om.readTree(
             "{\"access_token\":\"AT\",\"refresh_token\":\"RT\",\"expires_in\":3600,\"owner\":{\"user\":{\"name\":\"Ada\"}}}"));
         when(workspaceRepository.getReferenceById(WS_ID)).thenReturn(ws);
@@ -173,11 +235,14 @@ class McpOAuthServiceTest {
         ConnectorConnection conn = ConnectorConnection.builder().workspace(ws).connectorKey("linear")
             .scope(ConnectionScope.PERSONAL).owner(person).build();
         when(workspaceMcp.ownConnection(ws, person, "linear", false)).thenReturn(conn);
-        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
 
-        String redirect = service.callback("st-1", "code-xyz", null, "https://as.ex");
+        McpOAuthService.Completion done = service.complete(USER_ID, "st-1", finish);
 
-        assertThat(redirect).isEqualTo("http://localhost:3000/acme/settings?section=integrations&mcp=connected&connector=linear");
+        assertThat(done).isEqualTo(new McpOAuthService.Completion("connected", "linear"));
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<java.util.Map<String, String>> form = ArgumentCaptor.forClass(java.util.Map.class);
+        verify(client).postForm(eq("https://as.ex/token"), form.capture());
+        assertThat(form.getValue()).containsEntry("code", "code-xyz").containsEntry("code_verifier", "verifier");
         ArgumentCaptor<McpTokenService.OAuthGrant> grant = ArgumentCaptor.forClass(McpTokenService.OAuthGrant.class);
         verify(tokenService).storeInitialTokens(eq(conn), any(), grant.capture());
         assertThat(grant.getValue().issuer()).isEqualTo("https://as.ex");
@@ -186,6 +251,110 @@ class McpOAuthServiceTest {
         verify(workspaceMcp).pinQuietly(conn);
         verify(workspaceMcp).invalidate(WS_ID);
         verify(stateRepository).deleteById("st-1");
+        verify(registrar, never()).pinCompanyIssuer(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("complete : un outil sans serveur officiel, fini par l'application de l'entreprise -> l'émetteur s'épingle "
+        + "sur elle quand un propriétaire ou un administrateur aboutit, jamais pour un membre")
+    void aManagerConnectionPinsTheIssuerOfTheCompanyApp() throws Exception {
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+        when(authorization.isMember(WS_ID, USER_ID)).thenReturn(true);
+        when(client.postForm(eq("https://as.ex/token"), any())).thenReturn(om.readTree("{\"access_token\":\"AT\"}"));
+        when(workspaceRepository.getReferenceById(WS_ID)).thenReturn(ws);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(person));
+        when(workspaceMcp.ownConnection(ws, person, "glean", false)).thenAnswer(inv -> ConnectorConnection.builder()
+            .workspace(ws).connectorKey("glean").scope(ConnectionScope.PERSONAL).owner(person).build());
+        java.util.function.Function<String, McpOAuthState> glean = state -> {
+            McpOAuthState row = openState(state);
+            row.setConnectorKey("glean");
+            row.setMcpUrl("https://203.0.113.20/mcp");
+            row.setClientSource(McpClientRegistrar.COMPANY);
+            when(stateRepository.findById(state)).thenReturn(Optional.of(row));
+            return row;
+        };
+
+        glean.apply("st-m");
+        String memberFinish = finishOf(service.callback("st-m", "code-m", null, "https://as.ex"));
+        when(authorization.isManager(WS_ID, USER_ID)).thenReturn(false);
+        assertThat(service.complete(USER_ID, "st-m", memberFinish).outcome()).isEqualTo("connected");
+        verify(registrar, never()).pinCompanyIssuer(any(), any(), any());
+
+        glean.apply("st-g");
+        String managerFinish = finishOf(service.callback("st-g", "code-g", null, "https://as.ex"));
+        when(authorization.isManager(WS_ID, USER_ID)).thenReturn(true);
+        assertThat(service.complete(USER_ID, "st-g", managerFinish).outcome()).isEqualTo("connected");
+        verify(registrar).pinCompanyIssuer(WS_ID, "glean", "https://as.ex");
+    }
+
+    @Test
+    @DisplayName("complete : une autre personne connectée, même avec le jeton du retour -> refus, rien d'échangé, le flux s'efface")
+    void completeIsBoundToThePersonWhoStarted() {
+        McpOAuthState row = openState("st-1");
+        when(stateRepository.findById("st-1")).thenReturn(Optional.of(row));
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+        String finish = finishOf(service.callback("st-1", "code-xyz", null, "https://as.ex"));
+
+        McpOAuthService.Completion done = service.complete(USER_ID + 1, "st-1", finish);
+
+        assertThat(done.outcome()).isEqualTo("error");
+        verify(client, never()).postForm(anyString(), any());
+        verify(tokenService, never()).storeInitialTokens(any(), any(), any());
+        verify(stateRepository).deleteById("st-1");
+    }
+
+    @Test
+    @DisplayName("complete : la personne qui a lancé le flux, sans le jeton du retour ou avant le retour -> refus, rien d'échangé")
+    void completeNeedsTheTokenOfTheReturn() {
+        McpOAuthState returned = openState("st-1");
+        when(stateRepository.findById("st-1")).thenReturn(Optional.of(returned));
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+        service.callback("st-1", "code-xyz", null, "https://as.ex");
+        when(stateRepository.findById("st-2")).thenReturn(Optional.of(openState("st-2")));
+
+        assertThat(service.complete(USER_ID, "st-1", "not-the-token").outcome()).isEqualTo("error");
+        assertThat(service.complete(USER_ID, "st-2", "any").outcome()).isEqualTo("error");
+        assertThat(service.complete(USER_ID, "unknown", "any")).isEqualTo(new McpOAuthService.Completion("error", null));
+        verify(client, never()).postForm(anyString(), any());
+        verify(stateRepository, never()).deleteById(anyString());
+    }
+
+    @Test
+    @DisplayName("complete : un mauvais jeton laisse le flux tel quel ; le jeton du retour le finit ensuite, puis il s'efface")
+    void aWrongTokenLeavesTheFlowForTheRightOne() throws Exception {
+        McpOAuthState row = openState("st-1");
+        when(stateRepository.findById("st-1")).thenReturn(Optional.of(row));
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+        String finish = finishOf(service.callback("st-1", "code-xyz", null, "https://as.ex"));
+
+        assertThat(service.complete(USER_ID, "st-1", "not-the-token").outcome()).isEqualTo("error");
+        verify(stateRepository, never()).deleteById(anyString());
+        assertThat(row.getCode()).isEqualTo("code-xyz");
+
+        when(authorization.isMember(WS_ID, USER_ID)).thenReturn(true);
+        when(client.postForm(eq("https://as.ex/token"), any())).thenReturn(om.readTree("{\"access_token\":\"AT\"}"));
+        when(workspaceRepository.getReferenceById(WS_ID)).thenReturn(ws);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(person));
+        when(workspaceMcp.ownConnection(ws, person, "linear", false)).thenReturn(ConnectorConnection.builder()
+            .workspace(ws).connectorKey("linear").scope(ConnectionScope.PERSONAL).owner(person).build());
+
+        assertThat(service.complete(USER_ID, "st-1", finish)).isEqualTo(new McpOAuthService.Completion("connected", "linear"));
+        verify(stateRepository).deleteById("st-1");
+    }
+
+    @Test
+    @DisplayName("callback : un state qui revient deux fois -> erreur, le flux reste celui du premier retour")
+    void callbackReturnsOnce() {
+        McpOAuthState row = openState("st-1");
+        when(stateRepository.findById("st-1")).thenReturn(Optional.of(row));
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+        service.callback("st-1", "code-xyz", null, "https://as.ex");
+        String firstFinish = row.getFinishHash();
+
+        assertThat(service.callback("st-1", "code-2", null, "https://as.ex")).contains("mcp=error");
+        verify(stateRepository, never()).deleteById(anyString());
+        assertThat(row.getCode()).isEqualTo("code-xyz");
+        assertThat(row.getFinishHash()).isEqualTo(firstFinish);
     }
 
     @Test
@@ -196,7 +365,7 @@ class McpOAuthServiceTest {
 
         assertThat(service.callback("st-x", "code", null, "https://evil.ex")).endsWith("mcp=error&connector=linear");
         verify(client, never()).postForm(anyString(), any());
-        verify(stateRepository).deleteById("st-x");
+        verify(stateRepository, never()).deleteById(anyString());
     }
 
     @Test
@@ -212,19 +381,14 @@ class McpOAuthServiceTest {
     }
 
     @Test
-    @DisplayName("callback OK : returnTo present -> redirige vers ce chemin (retour fluide)")
-    void callbackHonorsReturnTo() throws Exception {
+    @DisplayName("callback OK : returnTo present -> redirige vers ce chemin (retour fluide), où l'app finit")
+    void callbackHonorsReturnTo() {
         McpOAuthState row = openState("st-rt");
         row.setReturnTo("/acme?import=linear");
         when(stateRepository.findById("st-rt")).thenReturn(Optional.of(row));
-        when(client.postForm(eq("https://as.ex/token"), any())).thenReturn(om.readTree("{\"access_token\":\"AT\"}"));
-        when(workspaceRepository.getReferenceById(WS_ID)).thenReturn(ws);
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(person));
-        when(workspaceMcp.ownConnection(ws, person, "linear", false))
-            .thenReturn(ConnectorConnection.builder().workspace(ws).connectorKey("linear").build());
 
         assertThat(service.callback("st-rt", "code-xyz", null, null))
-            .isEqualTo("http://localhost:3000/acme?import=linear&mcp=connected&connector=linear");
+            .startsWith("http://localhost:3000/acme?import=linear&mcp=finish&connector=linear&state=st-rt&finish=");
     }
 
     @Test
@@ -236,7 +400,7 @@ class McpOAuthServiceTest {
     }
 
     @Test
-    @DisplayName("callback : refus de la personne -> erreur (UI) + state supprime, pas d'echange")
+    @DisplayName("callback : refus de la personne -> erreur (UI), pas d'échange ; le flux s'efface à son échéance")
     void callbackProviderError() {
         when(stateRepository.findById("st-2")).thenReturn(Optional.of(openState("st-2")));
         lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
@@ -244,7 +408,7 @@ class McpOAuthServiceTest {
         assertThat(service.callback("st-2", null, "access_denied"))
             .isEqualTo("http://localhost:3000/acme/settings?section=integrations&mcp=error&connector=linear");
         verify(client, never()).postForm(anyString(), any());
-        verify(stateRepository).deleteById("st-2");
+        verify(stateRepository, never()).deleteById(anyString());
     }
 
     @Test
@@ -259,8 +423,51 @@ class McpOAuthServiceTest {
 
         assertThat(service.callback("st-a", null, "admin_approval_required")).contains("mcp=admin");
         assertThat(conn.getState()).isEqualTo(ConnectionState.WAITING_FOR_ADMIN);
+        assertThat(conn.getConnectedBy()).isSameAs(person); // une connexion neuve est à la personne qui l'a lancée
         verify(connections).save(conn);
         verify(client, never()).postForm(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("callback : l'administrateur attendu sur une connexion de l'espace déjà gardée -> la personne qui l'a faite reste")
+    void anAdminAnswerKeepsWhoMadeTheConnection() {
+        McpOAuthState row = openState("st-s");
+        row.setShared(true);
+        when(stateRepository.findById("st-s")).thenReturn(Optional.of(row));
+        when(workspaceRepository.getReferenceById(WS_ID)).thenReturn(ws);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(person));
+        User maker = User.builder().id(USER_ID + 1).email("b@acme.test").build();
+        ConnectorConnection conn = ConnectorConnection.builder().id(41L).workspace(ws).connectorKey("linear")
+            .scope(ConnectionScope.WORKSPACE).connectedBy(maker).config("{}").state(ConnectionState.NEEDS_RECONNECT).build();
+        when(workspaceMcp.ownConnection(ws, person, "linear", true)).thenReturn(conn);
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+
+        assertThat(service.callback("st-s", null, "admin_approval_required")).contains("mcp=admin");
+
+        assertThat(conn.getState()).isEqualTo(ConnectionState.WAITING_FOR_ADMIN);
+        assertThat(conn.getConnectedBy()).isSameAs(maker);
+        verify(connections).save(conn);
+    }
+
+    @Test
+    @DisplayName("callback : l'administrateur attendu sur une connexion à refaire -> seul son état change, ses jetons restent")
+    void anAdminAnswerOnAConnectionToRedoChangesOnlyItsState() {
+        when(stateRepository.findById("st-r")).thenReturn(Optional.of(openState("st-r")));
+        when(workspaceRepository.getReferenceById(WS_ID)).thenReturn(ws);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(person));
+        String config = "{\"mcpUrl\":\"https://mcp.linear.app/mcp\",\"mcpOAuthIssuer\":\"https://as.ex\","
+            + "\"mcpAccessToken\":\"AT\",\"mcpRefreshToken\":\"RT\",\"mcpRevocationEndpoint\":\"https://as.ex/revoke\"}";
+        ConnectorConnection conn = ConnectorConnection.builder().id(40L).workspace(ws).connectorKey("linear")
+            .config(config).state(ConnectionState.NEEDS_RECONNECT).build();
+        when(workspaceMcp.ownConnection(ws, person, "linear", false)).thenReturn(conn);
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+
+        assertThat(service.callback("st-r", null, "admin_approval_required")).contains("mcp=admin");
+
+        assertThat(conn.getState()).isEqualTo(ConnectionState.WAITING_FOR_ADMIN);
+        assertThat(conn.getConfig()).isEqualTo(config); // les jetons restent, la déconnexion saura les révoquer
+        verify(connections).save(conn);
+        verify(tokenService, never()).revoke(any());
     }
 
     // =========================================================================

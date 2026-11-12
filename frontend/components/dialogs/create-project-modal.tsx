@@ -5,6 +5,7 @@ import { toast } from "sonner"
 
 import { CreateProjectDialog } from "@/components/dialogs/create-project-dialog"
 import { useCreateProjectStore } from "@/lib/store/create-project-store"
+import { useIntegrationStore } from "@/lib/store/integration-store"
 
 /**
  * Modal GLOBAL de création de projet - monté une seule fois dans l'`AppShell`, piloté par
@@ -13,13 +14,15 @@ import { useCreateProjectStore } from "@/lib/store/create-project-store"
  * sans navigation.
  *
  * <p>Retour OAuth <b>fluide</b> (TF-MCP-04) : quand on connecte un outil depuis le wizard d'import, le
- * callback renvoie sur `…?import=<connector>&mcp=connected` ; cet effet rouvre alors le modal en mode
- * import avec l'outil présélectionné, puis nettoie l'URL - l'utilisateur ne repasse jamais par Settings.</p>
+ * callback renvoie sur `…?import=<connector>&mcp=finish` ; cet effet finit la connexion (l'app, connectée), rouvre
+ * alors le modal en mode import avec l'outil présélectionné, puis nettoie l'URL - l'utilisateur ne repasse jamais par
+ * Settings.</p>
  */
 export function CreateProjectModal() {
   const open = useCreateProjectStore((s) => s.open)
   const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
   const closeCreateProject = useCreateProjectStore((s) => s.closeCreateProject)
+  const finishConnection = useIntegrationStore((s) => s.finishConnection)
 
   // Même retour fluide pour GitHub connecté depuis la section « dépôt de code » : le callback renvoie sur
   // `…?newProject=repo&github=connected`, on rouvre la création là où elle en était (brouillon restauré).
@@ -47,17 +50,22 @@ export function CreateProjectModal() {
     const src = params.get("import")
     const mcp = params.get("mcp")
     if (!src) return
-    if (mcp === "connected") {
-      openCreateProject({ importSource: src })
-      toast.success("Tool connected - pick it and import")
-    } else if (mcp === "error") {
-      toast.error("Connection failed - try again")
+    const said = (outcome: string | null) => {
+      if (outcome === "connected") {
+        openCreateProject({ importSource: src })
+        toast.success("Tool connected - pick it and import")
+      } else if (outcome === "error") {
+        toast.error("Connection failed - try again")
+      }
     }
-    params.delete("import")
-    params.delete("mcp")
+    // Le retour du navigateur a gardé le code : l'app, connectée, finit la connexion de la personne qui l'a lancée.
+    const finishing = finishConnection(params)
+    if (finishing) void finishing.then(({ outcome }) => said(outcome))
+    else said(mcp)
+    for (const key of ["import", "mcp", "connector", "state", "finish"]) params.delete(key)
     const q = params.toString()
     window.history.replaceState({}, "", window.location.pathname + (q ? `?${q}` : ""))
-  }, [openCreateProject])
+  }, [openCreateProject, finishConnection])
 
   return <CreateProjectDialog open={open} onOpenChange={(o) => { if (!o) closeCreateProject() }} />
 }

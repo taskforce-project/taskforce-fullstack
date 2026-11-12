@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiFunction;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +18,9 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.taskforce.tf_api.core.enums.ConnectionScope;
 import com.taskforce.tf_api.core.model.ConnectorConnection;
+import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 import com.taskforce.tf_api.core.service.mcp.CompanyConnections.Usable;
 import com.taskforce.tf_api.shared.exception.BusinessException;
@@ -67,12 +70,22 @@ public class CompanyApiTools {
         byKind.put(MICROSOFT_GRAPH, microsoft());
     }
 
-    /** Les outils d'une connexion servie par l'API de son éditeur ; aucun pour un genre que TaskForce ne sert pas. */
-    public List<ExternalMcpTool> toolsFor(ConnectorConnection conn, String kind) {
+    /**
+     * Les conversations de Teams de la personne qui a fait la connexion : par une connexion partagée avec l'espace, elles
+     * ne se servent jamais aux autres membres.
+     */
+    static final Set<String> PERSONAL_CHATS = Set.of("list_chats", "read_chat", "post_chat_message");
+
+    /**
+     * Les outils d'une connexion servie par l'API de son éditeur, pour cette personne ; aucun pour un genre que TaskForce
+     * ne sert pas.
+     */
+    public List<ExternalMcpTool> toolsFor(ConnectorConnection conn, String kind, Long userId) {
         List<ExternalMcpTool> out = new ArrayList<>();
         Long id = conn.getId();
         String base = connections.of(conn).base();
         for (Spec spec : byKind.getOrDefault(kind, List.of())) {
+            if (!servedTo(conn, spec.name(), userId)) continue;
             McpClient.ToolDef def = new McpClient.ToolDef(spec.name(), spec.description(), spec.schema(), false);
             out.add(new CompanyApiTool(conn.getConnectorKey(), base, def, objectMapper,
                 catalog.classOf(conn.getConnectorKey(), spec.name()), conn.getScope(),
@@ -81,14 +94,25 @@ public class CompanyApiTools {
         return out;
     }
 
-    /** Les outils d'un genre, pour l'écran : nom, description, arguments et classe. */
-    public List<WorkspaceMcpService.McpToolInfo> infos(String connectorKey, String kind) {
+    /** Les outils d'une connexion, pour l'écran de cette personne : nom, description, arguments et classe. */
+    public List<WorkspaceMcpService.McpToolInfo> infos(ConnectorConnection conn, String kind, Long userId) {
         List<WorkspaceMcpService.McpToolInfo> out = new ArrayList<>();
         for (Spec spec : byKind.getOrDefault(kind, List.of())) {
+            if (!servedTo(conn, spec.name(), userId)) continue;
             out.add(new WorkspaceMcpService.McpToolInfo(spec.name(), spec.description(), spec.schema(),
-                catalog.classOf(connectorKey, spec.name()).reads()));
+                catalog.classOf(conn.getConnectorKey(), spec.name()).reads()));
         }
         return out;
+    }
+
+    /**
+     * Cet outil se sert-il à cette personne par cette connexion ? Les conversations d'une personne restent les siennes :
+     * par une connexion partagée avec l'espace, seulement à qui l'a faite.
+     */
+    static boolean servedTo(ConnectorConnection conn, String tool, Long userId) {
+        if (!PERSONAL_CHATS.contains(tool) || conn.getScope() != ConnectionScope.WORKSPACE) return true;
+        User by = conn.getConnectedBy();
+        return by != null && by.getId() != null && by.getId().equals(userId);
     }
 
     // --- Google Drive ------------------------------------------------------

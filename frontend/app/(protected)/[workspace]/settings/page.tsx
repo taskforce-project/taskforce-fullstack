@@ -1964,6 +1964,7 @@ export default function SettingsPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const openSettings = useSettingsStore((s) => s.openSettings)
+  const finishConnection = useIntegrationStore((s) => s.finishConnection)
   const workspace = typeof params.workspace === "string" ? params.workspace : ""
 
   useEffect(() => {
@@ -1978,9 +1979,16 @@ export default function SettingsPage() {
     if (github === "error") toast.error("GitHub wasn't connected. Try again, and accept the access on GitHub.", { id: "oauth-github" })
     if (slack === "connected") toast.success("Slack connected successfully!", { id: "oauth-slack" })
     if (slack === "error") toast.error("Slack wasn't connected. Try again, and allow the access on Slack.", { id: "oauth-slack" })
-    if (mcp === "connected") toast.success(CONSTANTS_EN.connect.returnedConnected.replace("{name}", tool), { id: "oauth-mcp" })
-    if (mcp === "admin") toast.warning(CONSTANTS_EN.connect.returnedAdmin.replace("{name}", tool), { id: "oauth-mcp" })
-    if (mcp === "error") toast.error(CONSTANTS_EN.connect.returnedError.replace("{name}", tool), { id: "oauth-mcp" })
+    const said = (outcome: string | null) => {
+      if (outcome === "connected") toast.success(CONSTANTS_EN.connect.returnedConnected.replace("{name}", tool), { id: "oauth-mcp" })
+      if (outcome === "admin") toast.warning(CONSTANTS_EN.connect.returnedAdmin.replace("{name}", tool), { id: "oauth-mcp" })
+      if (outcome === "error") toast.error(CONSTANTS_EN.connect.returnedError.replace("{name}", tool), { id: "oauth-mcp" })
+    }
+    // Le retour du navigateur a gardé le code : l'app, connectée, finit la connexion de la personne qui l'a lancée, et
+    // le catalogue, déjà ouvert, se relit quand elle aboutit.
+    const finishing = finishConnection(new URLSearchParams(searchParams.toString()))
+    if (finishing) void finishing.then(({ outcome }) => said(outcome))
+    else said(mcp)
     const target = github || slack || mcp
       ? "integrations"
       : section && SECTIONS.some((s) => s.key === section)
@@ -1988,7 +1996,7 @@ export default function SettingsPage() {
         : undefined
     openSettings(target)
     router.replace(workspace ? `/${workspace}/dashboard` : "/")
-  }, [searchParams, openSettings, router, workspace])
+  }, [searchParams, openSettings, finishConnection, router, workspace])
 
   return null
 }

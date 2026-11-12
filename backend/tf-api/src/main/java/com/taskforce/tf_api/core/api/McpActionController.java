@@ -97,8 +97,9 @@ public class McpActionController {
 
     /**
      * Connecte (ou reconfigure) un serveur MCP par son adresse, avec ou sans clé ; renvoie les statuts frais. Clé d'un
-     * préréglage du catalogue, {@code custom} pour un nouveau serveur personnalisé (nom obligatoire), ou la clé
-     * {@code custom-…} d'un serveur personnalisé existant. Un serveur local demande {@code localApproved}.
+     * préréglage du catalogue (son serveur officiel seulement), {@code custom} pour un nouveau serveur personnalisé (nom
+     * obligatoire), ou la clé {@code custom-…} d'un serveur personnalisé existant. Un serveur local demande
+     * {@code localApproved}.
      */
     @PostMapping("/servers")
     public ResponseEntity<ApiResponse<List<WorkspaceMcpService.McpServerStatus>>> connect(
@@ -168,7 +169,10 @@ public class McpActionController {
         return ResponseEntity.ok(ApiResponse.success(workspaceMcp.serverStatuses(ws.getId(), userId)));
     }
 
-    /** Démarre l'OAuth d'un serveur MCP par son adresse : renvoie l'URL d'autorisation (le front y envoie le navigateur). */
+    /**
+     * Démarre l'OAuth d'un serveur MCP par son adresse : renvoie l'URL d'autorisation (le front y envoie le navigateur).
+     * La clé d'un préréglage ne mène qu'à son serveur officiel : une autre adresse est refusée.
+     */
     @PostMapping("/servers/{connectorKey}/oauth/start")
     public ResponseEntity<ApiResponse<Map<String, String>>> oauthStart(
         @PathVariable String slug,

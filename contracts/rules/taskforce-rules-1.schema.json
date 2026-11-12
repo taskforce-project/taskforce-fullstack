@@ -118,7 +118,7 @@
         },
         "layer": {
           "$ref": "#/$defs/layerScope",
-          "description": "The company layer the rule comes from; absent for TaskForce's own table. A layer only makes the decision stricter: its allow never counts."
+          "description": "The company layer the rule comes from; absent for TaskForce's own table. A layer only makes the decision stricter: its allow never counts. A layer never decides harness.change, the action TaskForce owns: only its own table does."
         },
         "text": {
           "type": "string",
@@ -186,7 +186,7 @@
             "fact",
             "value"
           ],
-          "description": "A threshold: the condition holds when the named fact is a number greater than value.",
+          "description": "A threshold: the condition holds when the named fact is a number greater than value, or when the fact is missing or isn't a number (the threshold then counts as exceeded).",
           "properties": {
             "fact": {
               "type": "string",

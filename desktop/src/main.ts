@@ -87,6 +87,17 @@ function bringToFront(): void {
   }
 }
 
+/**
+ * Le retour d'une connexion à un outil : la fenêtre de l'app revient au premier plan, sur la page du retour, où l'app,
+ * connectée, finit la connexion (seule la personne qui l'a lancée le peut), comme sur le web. Une page de l'app
+ * seulement : un chemin sur l'origine de la fenêtre.
+ */
+function returnFromTool(path: string | null): void {
+  bringToFront();
+  if (!path || !path.startsWith("/") || path.startsWith("//") || !stack || !mainWindow || mainWindow.isDestroyed()) return;
+  void mainWindow.loadURL(stack.origin + path);
+}
+
 async function main(): Promise<void> {
   initLog(appLogDir());
   log.info(`TaskForce ${app.getVersion()} starting (${process.platform}, Electron ${process.versions.electron})`);
@@ -378,8 +389,8 @@ async function openApp(account: Account, previous: BrowserWindow | null, first: 
   const splash = openScreen(first, previous ? previous.getBounds() : place, previous !== null);
   if (previous) closeWhenShown(splash, previous);
   try {
-    // Le retour d'une connexion à un outil ramène la fenêtre de l'app : elle y dit « Connected as ... ».
-    stack = await startStack(account, (text) => showScreen(splash, withNote(first, text)), bringToFront);
+    // Le retour d'une connexion à un outil ramène la fenêtre de l'app, sur la page où elle finit la connexion.
+    stack = await startStack(account, (text) => showScreen(splash, withNote(first, text)), returnFromTool);
   } catch (error) {
     log.error(`Start failed: ${(error as Error).stack ?? error}`);
     // L'échec se dit dans l'écran, à la place des étapes : essayer encore, ouvrir les journaux, quitter.

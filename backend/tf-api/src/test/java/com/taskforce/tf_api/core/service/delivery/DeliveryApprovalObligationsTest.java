@@ -159,6 +159,7 @@ class DeliveryApprovalObligationsTest {
         approval.setId(9L);
         approval.setCreatedAt(LocalDateTime.now());
         lenient().when(approvalRepository.findByIdAndRunId(9L, 100L)).thenReturn(Optional.of(approval));
+        lenient().when(approvalRepository.findByIdAndRunIdForUpdate(9L, 100L)).thenReturn(Optional.of(approval));
         lenient().when(approvalRepository.findByRunIdOrderByCreatedAtAsc(100L)).thenReturn(List.of(approval));
         return approval;
     }
@@ -220,6 +221,25 @@ class DeliveryApprovalObligationsTest {
     }
 
     @Test
+    @DisplayName("une règle de l'entreprise lie : accordée « pour la mission », elle ne vaut qu'une fois, et l'écran le sait")
+    void aCompanyRuleIsAllowedOnceOnly() {
+        companyRule(Map.of("action", "file.write", "path", "**/accounting/**"), Map.of());
+        service.openApproval(run, "Edit", "src/accounting/ledger.ts", false, editInAccounting());
+        DeliveryRunApproval approval = opened();
+        when(userRepository.getReferenceById(7L)).thenReturn(delegator);
+
+        assertThat(approval.isBinding()).isTrue();
+        assertThat(approval.obligations()).isNull(); // la personne qui a délégué répond seule
+        assertThat(service.activity("acme", 100L, 0, 7L).approvals().get(0).binding()).isTrue();
+
+        // Ce que le service rend est ce qu'il a enregistré : la réponse à la personne le dit.
+        assertThat(service.decide("acme", 100L, 9L, true, true, 7L)).isEqualTo("ONCE");
+
+        assertThat(approval.getStatus()).isEqualTo(DeliveryApprovalStatus.ALLOWED);
+        assertThat(approval.getScope()).isEqualTo("ONCE");
+    }
+
+    @Test
     @DisplayName("un refus d'une personne qui peut signer suffit")
     void oneRefusalIsEnough() {
         companyRule(Map.of("action", "file.write"), Map.of("signatures", 2));
@@ -242,6 +262,19 @@ class DeliveryApprovalObligationsTest {
 
         assertThat(response.status()).isEqualTo("DENIED");
         verify(notificationService, never()).notifyAgentApproval(any(), any(), anyString(), anyString(), eq(false));
+    }
+
+    @Test
+    @DisplayName("les faits du runner se jugent avec actor=agent, quoi qu'ils disent")
+    void theRunnersFactsAreJudgedAsAnAgent() {
+        companyRule(Map.of("action", "file.write", "actor", "agent"), Map.of("approvers", List.of("person:42")));
+        RunnerApprovalRequest saysPerson = new RunnerApprovalRequest("Edit", "src/accounting/ledger.ts", "agent",
+            "file.write", "ws-rule", CEO_RULE, List.of(Map.of("action", "file.write", "tool", "Edit",
+                "path", "src/accounting/ledger.ts", "actor", "person")));
+
+        service.openApproval(run, "Edit", "src/accounting/ledger.ts", false, saysPerson);
+
+        assertThat(opened().getApprovers()).containsExactly(List.of("person:42"));
     }
 
     @Test

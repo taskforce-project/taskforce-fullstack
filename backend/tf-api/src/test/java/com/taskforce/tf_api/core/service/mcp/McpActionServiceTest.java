@@ -24,6 +24,11 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.agent.CortexGate;
 import com.taskforce.tf_api.core.service.agent.CortexRecordService;
+import com.taskforce.tf_api.core.service.rules.RuleApprovers;
+import com.taskforce.tf_api.core.enums.RuleScope;
+import com.taskforce.tf_api.core.enums.WorkspaceRole;
+import com.taskforce.tf_api.core.model.HarnessRuleSet;
+import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -67,7 +72,11 @@ class McpActionServiceTest {
         lenient().when(records.open(any(), any(), any())).thenReturn(RECORD);
         lenient().when(records.append(any(), any(), any(), any())).thenReturn(Optional.of("hash"));
         service = new McpActionService(workspaceMcp, new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projectRepository, issueRepository, json), records,
-            authorization, json);
+            authorization, json, approvers());
+    }
+
+    private RuleApprovers approvers() {
+        return new RuleApprovers(members, Mockito.mock(com.taskforce.tf_api.core.repository.ProjectMemberRepository.class));
     }
 
     private ExternalMcpTool tool(String name, ToolClass cls, ConnectionScope scope) throws Exception {
@@ -124,13 +133,39 @@ class McpActionServiceTest {
     }
 
     @Test
+    @DisplayName("une règle qui désigne qui accorde : la confirmation d'un membre ne suffit pas, rien ne part (R98)")
+    void theApproversARuleNamesAreEnforced() throws Exception {
+        tool("save_issue", ToolClass.WRITE, ConnectionScope.PERSONAL);
+        Map<String, Object> rule = new java.util.LinkedHashMap<>();
+        rule.put("id", "ws-owner-for-linear");
+        rule.put("when", Map.of("action", "mcp.write", "server", "linear"));
+        rule.put("class", "irreversible");
+        rule.put("effect", "ask");
+        rule.put("owner", "owner@acme.test");
+        rule.put("reason", "The owner approves every change in Linear.");
+        rule.put("review", "2027-05-11");
+        rule.put("require", Map.of("approvers", java.util.List.of("role:owner")));
+        when(ruleSets.findByWorkspaceIdOrderByVersionDesc(1L)).thenReturn(java.util.List.of(HarnessRuleSet.builder()
+            .version(2).scope(RuleScope.WORKSPACE).rules(java.util.List.of(rule)).digest("sha256:" + "d".repeat(64)).build()));
+        lenient().when(members.findByWorkspaceIdAndUserId(1L, 7L)).thenReturn(Optional.of(
+            WorkspaceMember.builder().role(WorkspaceRole.MEMBER).build()));
+
+        McpActionService.ActionResult r = service.run(ws, 7L, "linear__save_issue", Map.of("title", "x"), true);
+
+        assertThat(r.status()).isEqualTo("refused");
+        assertThat(r.reason()).contains("the workspace's owner").contains("The owner approves every change in Linear.");
+        verify(client, never()).initialize(any());
+        verify(records, never()).append(eq(RECORD), eq("human.decision"), any(), any());
+    }
+
+    @Test
     @DisplayName("les règles refusent : rien ne part, le refus et sa raison sont rendus")
     void refusedByTheRules() throws Exception {
         tool("list_issues", ToolClass.READ, ConnectionScope.PERSONAL);
         CortexGate deny = Mockito.mock(CortexGate.class);
         when(deny.judge(any(), Mockito.<String, String>anyMap()))
             .thenReturn(new CortexGate.Verdict("deny", "frozen", "Frozen.", Map.of()));
-        service = new McpActionService(workspaceMcp, deny, records, authorization, json);
+        service = new McpActionService(workspaceMcp, deny, records, authorization, json, approvers());
 
         McpActionService.ActionResult r = service.run(ws, 7L, "linear__list_issues", Map.of(), true);
 

@@ -303,6 +303,11 @@ export interface DeliveryRunApproval {
   separate?: boolean;
   /** Qui a déjà accordé, quand il en faut plusieurs. */
   signedBy?: string[];
+  /**
+   * La décision lie : une règle de l'entreprise, une règle qui porte des obligations (qui accorde, des signatures, un
+   * seuil), ou le socle. L'accord n'y vaut qu'une fois : l'écran n'offre pas « pour cette mission ».
+   */
+  binding?: boolean;
 }
 
 export interface DeliveryRunActivity {

@@ -235,18 +235,23 @@ class DeliveryControllerWebMvcTest {
             .andExpect(status().isNotFound());
     }
 
-    @ParameterizedTest(name = "POST approval : {0} {1} -> autorisé={2}, pour la mission={3}")
+    @ParameterizedTest(name = "POST approval : {0} {1} -> autorisé={2}, pour la mission={3}, enregistré {4}")
     @CsvSource(delimiter = '|', value = {
-        "ALLOW |         | true  | false | Action allowed",
-        "ALLOW | ONCE    | true  | false | Action allowed",
-        "ALLOW | MISSION | true  | true  | Allowed for this mission", // R46 : le reste de la mission
-        "DENY  |         | false | false | Action denied",
-        "DENY  | MISSION | false | false | Action denied",            // un refus vaut une fois
+        "ALLOW |         | true  | false | ONCE    | Allowed once",
+        "ALLOW | ONCE    | true  | false | ONCE    | Allowed once",
+        "ALLOW | MISSION | true  | true  | MISSION | Allowed for this mission", // R46 : le reste de la mission
+        "ALLOW | MISSION | true  | true  | ONCE    | Allowed once",             // une décision qui lie vaut une fois
+        "ALLOW |         | true  | false |         | Approval recorded: the request waits for the other approvers",
+        "DENY  |         | false | false | ONCE    | Action denied",
+        "DENY  | MISSION | false | false | ONCE    | Action denied",            // un refus vaut une fois
     })
-    void decide_200(String decision, String scope, boolean allow, boolean forMission, String message) throws Exception {
+    void decide_200(String decision, String scope, boolean allow, boolean forMission, String stored, String message)
+            throws Exception {
         var a = auth();
         String body = scope == null ? "{\"decision\":\"" + decision + "\"}"
             : "{\"decision\":\"" + decision + "\",\"scope\":\"" + scope + "\"}";
+        // La réponse dit ce que le service a enregistré, pas seulement ce que la personne a demandé.
+        when(activityService.decide("acme", 100L, 9L, allow, forMission, 7L)).thenReturn(stored);
 
         mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/approvals/9").with(a)
                 .contentType(MediaType.APPLICATION_JSON).content(body))

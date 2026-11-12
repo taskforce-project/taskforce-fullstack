@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.service.mcp;
 
 import java.util.Map;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,8 +13,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.enums.ConnectionState;
+import com.taskforce.tf_api.core.model.ConnectorApp;
 import com.taskforce.tf_api.core.model.ConnectorConnection;
+import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.repository.ConnectorAppRepository;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
+import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -35,13 +40,16 @@ class McpTokenServiceTest {
 
     @Mock private McpOAuthClient client;
     @Mock private ConnectorConnectionRepository repository;
+    @Mock private ConnectorAppRepository apps;
 
     private final ObjectMapper om = new ObjectMapper();
     private McpTokenService service;
 
     @BeforeEach
     void setup() {
-        service = new McpTokenService(client, repository, om);
+        ConnectorCatalog catalog = new ConnectorCatalog();
+        catalog.build();
+        service = new McpTokenService(client, repository, om, catalog, apps);
     }
 
     private ConnectorConnection conn(String config) {
@@ -193,5 +201,82 @@ class McpTokenServiceTest {
         assertThat(service.revoke(conn("{\"mcpUrl\":\"https://x/mcp\",\"mcpToken\":\"k\"}"))).isFalse();
         assertThat(service.canRevoke(Map.of("mcpUrl", "u"))).isFalse();
         verifyNoInteractions(client);
+    }
+
+    // ── Le secret d'un client enregistré d'avance ne part que vers l'émetteur du préréglage ─────────────────
+
+    private static ConnectorConnection registered(long id, String key, String source, String mcpUrl) {
+        return ConnectorConnection.builder().id(id).connectorKey(key).config("{\"mcpUrl\":\"" + mcpUrl + "\","
+            + "\"mcpOAuthIssuer\":\"https://as.ex\",\"mcpAccessToken\":\"OLD\",\"mcpRefreshToken\":\"RT\","
+            + "\"mcpExpiresAt\":\"1000\",\"mcpTokenEndpoint\":\"https://as.ex/token\","
+            + "\"mcpRevocationEndpoint\":\"https://as.ex/revoke\",\"mcpClientId\":\"cid\","
+            + "\"mcpClientSecret\":\"registered-secret\",\"mcpClientSource\":\"" + source + "\"}").build();
+    }
+
+    @Test
+    @DisplayName("refresh : le secret de l'entreprise part vers le serveur officiel du préréglage, jamais vers un autre")
+    void aRegisteredSecretOnlyGoesToThePinnedIssuer() throws Exception {
+        when(client.postForm(eq("https://as.ex/token"), any()))
+            .thenReturn(om.readTree("{\"access_token\":\"NEW\",\"expires_in\":3600}"));
+
+        service.validAccessToken(registered(5L, "linear", "company", "https://mcp.linear.app/mcp"));
+        service.validAccessToken(registered(6L, "linear", "company", "https://203.0.113.10/mcp"));
+        service.validAccessToken(registered(7L, "custom-docs", "ours", "https://203.0.113.10/mcp"));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, String>> form = ArgumentCaptor.forClass(Map.class);
+        verify(client, times(3)).postForm(eq("https://as.ex/token"), form.capture());
+        assertThat(form.getAllValues().get(0)).containsEntry("client_secret", "registered-secret");
+        assertThat(form.getAllValues().get(1)).doesNotContainKey("client_secret").containsEntry("client_id", "cid");
+        assertThat(form.getAllValues().get(2)).doesNotContainKey("client_secret");
+    }
+
+    @Test
+    @DisplayName("refresh : un outil sans serveur officiel, le secret de l'entreprise part vers l'émetteur épinglé sur son "
+        + "application ; une connexion faite avant l'épinglage garde l'émetteur qu'elle a gardé")
+    void theCompanySecretOfAToolWithoutOfficialServerGoesToItsPinnedIssuer() throws Exception {
+        Workspace ws = Workspace.builder().id(1L).build();
+        ConnectorApp app = ConnectorApp.builder().connectorKey("glean").clientId("cid").build();
+        when(apps.findByWorkspaceIdAndConnectorKey(1L, "glean")).thenReturn(Optional.of(app));
+        when(client.postForm(eq("https://as.ex/token"), any()))
+            .thenReturn(om.readTree("{\"access_token\":\"NEW\",\"expires_in\":3600}"));
+
+        // Rien d'épinglé encore : la connexion continue de se renouveler, avec l'émetteur gardé à sa connexion.
+        ConnectorConnection before = registered(10L, "glean", "company", "https://203.0.113.20/mcp");
+        before.setWorkspace(ws);
+        service.validAccessToken(before);
+        // Épinglé sur l'application : le même émetteur, aux barres finales près, reçoit le secret ; un autre, jamais.
+        app.setIssuer("https://as.ex/");
+        ConnectorConnection same = registered(11L, "glean", "company", "https://203.0.113.20/mcp");
+        same.setWorkspace(ws);
+        service.validAccessToken(same);
+        app.setIssuer("https://other.ex");
+        ConnectorConnection other = registered(12L, "glean", "company", "https://203.0.113.20/mcp");
+        other.setWorkspace(ws);
+        service.validAccessToken(other);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, String>> form = ArgumentCaptor.forClass(Map.class);
+        verify(client, times(3)).postForm(eq("https://as.ex/token"), form.capture());
+        assertThat(form.getAllValues().get(0)).containsEntry("client_secret", "registered-secret");
+        assertThat(form.getAllValues().get(1)).containsEntry("client_secret", "registered-secret");
+        assertThat(form.getAllValues().get(2)).doesNotContainKey("client_secret").containsEntry("client_id", "cid");
+    }
+
+    @Test
+    @DisplayName("revoke : même règle, le secret de l'entreprise ne part pas vers un autre émetteur ; celui de DCR reste")
+    void revocationFollowsTheSameRule() {
+        when(client.postFormStatus(eq("https://as.ex/revoke"), anyMap())).thenReturn(200);
+
+        service.revoke(registered(8L, "linear", "company", "https://203.0.113.10/mcp"));
+        service.revoke(registered(9L, "custom-docs", "dcr", "https://203.0.113.10/mcp"));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, String>> form = ArgumentCaptor.forClass(Map.class);
+        verify(client, times(4)).postFormStatus(eq("https://as.ex/revoke"), form.capture());
+        assertThat(form.getAllValues().subList(0, 2)).allSatisfy(f -> assertThat(f).doesNotContainKey("client_secret"));
+        // Le secret d'une inscription dynamique est celui que cet émetteur a lui-même rendu.
+        assertThat(form.getAllValues().subList(2, 4))
+            .allSatisfy(f -> assertThat(f).containsEntry("client_secret", "registered-secret"));
     }
 }

@@ -73,10 +73,11 @@ class RuleValidatorTest {
     }
 
     @Test
-    @DisplayName("sans action, une condition doit valoir pour au moins une action")
-    void withoutAction() {
-        assertThat(RuleValidator.check(rule(Map.of("path", "**/accounting/**"), "ask", null), MEMBERS)).isEmpty();
-        assertThat(codes(rule(Map.of("path", "x", "branch", "main"), "ask", null))).containsExactly("neverApplies");
+    @DisplayName("une règle de l'entreprise nomme son action : sans elle, elle couvrirait aussi celle que TaskForce garde")
+    void withoutActionIsRefused() {
+        assertThat(codes(rule(Map.of("path", "**/accounting/**"), "ask", null))).containsExactly("noAction");
+        assertThat(codes(rule(Map.of("actor", "person"), "deny", null))).containsExactly("noAction");
+        assertThat(codes(rule(Map.of("path", "x", "branch", "main"), "ask", null))).containsExactly("noAction");
     }
 
     @Test

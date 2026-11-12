@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { describe, it } from "node:test";
 
 import { connectorEnvironment } from "../src/backend";
-import { MCP_CALLBACK_PATH, MCP_CALLBACK_PORTS, McpCallback, outcomeOf, page, type CallbackOutcome } from "../src/mcp-callback";
+import { appPathOf, MCP_CALLBACK_PATH, MCP_CALLBACK_PORTS, McpCallback, outcomeOf, page, type CallbackOutcome } from "../src/mcp-callback";
 import { freePort } from "../src/net";
 
 /** Un faux backend local : il répond au retour comme le vrai (302 vers l'app), et garde ce qu'il a reçu. */
@@ -32,6 +32,7 @@ function fetchPage(url: string): Promise<{ status: number; body: string }> {
 
 describe("outcomeOf", () => {
   const cases: [string | undefined, CallbackOutcome][] = [
+    ["http://127.0.0.1:47900/acme/settings?section=integrations&mcp=finish&connector=linear&state=s&finish=f", "finish"],
     ["http://127.0.0.1:47900/acme/settings?section=integrations&mcp=connected&connector=linear", "connected"],
     ["http://127.0.0.1:47900/acme/settings?mcp=admin&connector=slack-mcp", "admin"],
     ["http://127.0.0.1:47900/acme/settings?mcp=error", "error"],
@@ -44,8 +45,18 @@ describe("outcomeOf", () => {
   }
 });
 
+describe("appPathOf", () => {
+  it("keeps the page of the app and its query, never another origin", () => {
+    assert.equal(appPathOf("http://127.0.0.1:47900/acme/settings?mcp=finish&state=s&finish=f"),
+      "/acme/settings?mcp=finish&state=s&finish=f");
+    assert.equal(appPathOf("https://elsewhere.example/acme?import=linear&mcp=finish"), "/acme?import=linear&mcp=finish");
+    assert.equal(appPathOf(undefined), null);
+  });
+});
+
 describe("page", () => {
   it("says what happened, light and dark, with nothing personal in it", () => {
+    assert.match(page("finish"), /Back to TaskForce/);
     assert.match(page("connected"), /You're connected/);
     assert.match(page("admin"), /admin needs to approve TaskForce/);
     assert.match(page("error"), /didn't finish/);
@@ -59,11 +70,12 @@ describe("McpCallback", () => {
     assert.equal(MCP_CALLBACK_PATH, "/mcp/callback");
   });
 
-  it("hands the code to the local backend, shows the end page and brings TaskForce back", async () => {
-    const backend = await fakeBackend("http://127.0.0.1:47900/acme/settings?section=integrations&mcp=connected&connector=linear");
-    const done: CallbackOutcome[] = [];
+  it("hands the code to the local backend, then brings TaskForce back on the page where the app finishes", async () => {
+    const backend = await fakeBackend(
+      "http://127.0.0.1:47900/acme/settings?section=integrations&mcp=finish&connector=linear&state=s-1&finish=f-1");
+    const done: [CallbackOutcome, string | null][] = [];
     const port = await freePort();
-    const callback = new McpCallback((outcome) => done.push(outcome), [port]);
+    const callback = new McpCallback((outcome, path) => done.push([outcome, path]), [port]);
     try {
       const redirectUri = await callback.start();
       assert.equal(redirectUri, `http://127.0.0.1:${port}/mcp/callback`);
@@ -72,10 +84,29 @@ describe("McpCallback", () => {
       const res = await fetchPage(`${redirectUri}?code=c-1&state=s-1&iss=https%3A%2F%2Fas.example`);
 
       assert.equal(res.status, 200);
-      assert.match(res.body, /You're connected/);
+      assert.match(res.body, /Back to TaskForce/);
       assert.equal(backend.seen.path, "/api/mcp/oauth/callback?code=c-1&state=s-1&iss=https%3A%2F%2Fas.example");
       assert.equal(backend.seen.host, `127.0.0.1:${backend.port}`);
-      assert.deepEqual(done, ["connected"]);
+      assert.deepEqual(done, [["finish", "/acme/settings?section=integrations&mcp=finish&connector=linear&state=s-1&finish=f-1"]]);
+    } finally {
+      await callback.stop();
+      backend.server.close();
+    }
+  });
+
+  it("an answer that needs the admin brings TaskForce back without a page to finish", async () => {
+    const backend = await fakeBackend("http://127.0.0.1:47900/acme/settings?mcp=admin&connector=slack-mcp");
+    const done: [CallbackOutcome, string | null][] = [];
+    const port = await freePort();
+    const callback = new McpCallback((outcome, path) => done.push([outcome, path]), [port]);
+    try {
+      const redirectUri = await callback.start();
+      callback.connect(backend.port);
+
+      const res = await fetchPage(`${redirectUri}?error=admin_approval_required&state=s-2`);
+
+      assert.match(res.body, /admin needs to approve TaskForce/);
+      assert.deepEqual(done, [["admin", null]]);
     } finally {
       await callback.stop();
       backend.server.close();

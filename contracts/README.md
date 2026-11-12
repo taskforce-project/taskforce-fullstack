@@ -31,7 +31,9 @@ compiles the module again from the Java sources and refuses a difference with th
 2. A rule matches when every condition in its `when` matches. Text conditions are globs, matched against the whole
    value: `*` matches any run of characters but `/`, `**` any run of characters, `{a,b}` one of its comma-separated
    alternatives (no nesting), and every other character itself. A missing fact never matches a condition that needs
-   it. Enumerated conditions (`action`, `repoVisibility`, `sensitivity`) match by equality.
+   it. Enumerated conditions (`action`, `repoVisibility`, `sensitivity`) match by equality. A threshold (`over`) is
+   read last: when the rule's other conditions match and its fact is missing or isn't a number, the threshold counts
+   as exceeded.
 3. Of the matching rules, `deny` beats `ask`, which beats `allow`. The decision names the rule that won; among rules of
    the same effect, the first in the bundle wins.
 4. No matching rule: the action is unknown and the decision is `ask` (invariant 3). Nothing else is implied.
