@@ -22,9 +22,12 @@ import com.taskforce.tf_api.core.enums.ConnectionScope;
 import com.taskforce.tf_api.core.enums.ConnectionState;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.ToolClass;
+import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
+import com.taskforce.tf_api.core.harness.rules.RulesEngine;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.HarnessRuleSetRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.IssueService;
@@ -32,7 +35,9 @@ import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.core.service.agent.CortexGate;
 import com.taskforce.tf_api.core.service.agent.CortexRecordService;
+import com.taskforce.tf_api.core.service.rules.RuleApprovers;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -69,6 +74,7 @@ class McpImportServiceTest {
     @Mock private com.taskforce.tf_api.core.repository.IssueRepository issueRepository;
     @Mock private CortexRecordService records;
     @Mock private McpClient mcp;
+    @Mock private com.taskforce.tf_api.core.repository.ProjectMemberRepository projectMembers;
 
     private McpImportService service;
     private final ObjectMapper json = new ObjectMapper();
@@ -82,7 +88,12 @@ class McpImportServiceTest {
         lenient().when(records.append(any(), any(), any(), any())).thenReturn(Optional.of("hash"));
         service = new McpImportService(workspaceMcp, projectService, issueService, llm, json,
             new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm),
-            new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projectRepository, issueRepository, json), records);
+            new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projectRepository, issueRepository, json), records,
+            approvers());
+    }
+
+    private RuleApprovers approvers() {
+        return new RuleApprovers(members, projectMembers);
     }
 
     private ExternalMcpTool listTool(ToolClass cls) throws Exception {
@@ -160,12 +171,40 @@ class McpImportServiceTest {
         CortexGate deny = Mockito.mock(CortexGate.class);
         when(deny.judge(any(), any(Map.class))).thenReturn(new CortexGate.Verdict("deny", "frozen", "Imports are frozen.", Map.of()));
         service = new McpImportService(workspaceMcp, projectService, issueService, llm, json,
-            new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm), deny, records);
+            new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm), deny, records, approvers());
 
         assertThatThrownBy(() -> service.importProject(ws, 7L, "linear", "X")).hasMessageContaining("Imports are frozen.");
         verify(mcp, never()).callTool(any(), any(), any());
         verify(projectService, never()).createProject(anyString(), anyLong(), any());
         verify(records).append(eq(RECORD), eq("action.result"), any(), any());
+    }
+
+    @Test
+    @DisplayName("import : une règle qui désigne qui accorde vaut comme dans la console ; un membre seul n'y suffit pas")
+    @SuppressWarnings("unchecked")
+    void the_approvers_a_rule_designates_are_enforced() throws Exception {
+        connectorWithTools("list_issues");
+        ExternalMcpTool tool = listTool(ToolClass.READ);
+        when(workspaceMcp.toolFor(10L, 7L, "linear__list_issues")).thenReturn(Optional.of(tool));
+        CortexGate gate = Mockito.mock(CortexGate.class);
+        when(gate.personFacts(any(), any())).thenReturn(Map.of("action", "mcp.read"));
+        CortexGate.Verdict ownerOnly = new CortexGate.Verdict("ask", "ws-owner-projects", "Only the owner creates projects.",
+            Map.of(), new RulesEngine.Obligations(List.of(List.of("role:owner")), 1, false));
+        when(gate.judge(any(), any(Map.class))).thenAnswer(inv -> "project.create".equals(
+            ((Map<String, String>) inv.getArgument(1)).get("action")) ? ownerOnly
+            : new CortexGate.Verdict("allow", "read-company-tools", "Read.", Map.of()));
+        when(members.findByWorkspaceIdAndUserId(10L, 7L)).thenReturn(Optional.of(
+            WorkspaceMember.builder().workspace(ws).role(WorkspaceRole.MEMBER).build()));
+        service = new McpImportService(workspaceMcp, projectService, issueService, llm, json,
+            new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm), gate, records, approvers());
+
+        assertThatThrownBy(() -> service.importProject(ws, 7L, "linear", "X"))
+            .isInstanceOf(ForbiddenException.class)
+            .hasMessageContaining("the workspace's owner").hasMessageContaining("Only the owner creates projects.");
+        verify(mcp, never()).callTool(any(), any(), any());
+        verify(projectService, never()).createProject(anyString(), anyLong(), any());
+        verify(records).append(eq(RECORD), eq("action.result"), any(), any());
+        verify(records, never()).append(eq(RECORD), eq("human.decision"), any(), any());
     }
 
     @Test

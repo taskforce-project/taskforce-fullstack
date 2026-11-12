@@ -19,6 +19,7 @@ import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
+import com.taskforce.tf_api.core.harness.rules.RulesEngine;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.AiMeter;
 import com.taskforce.tf_api.core.service.IssueService;
@@ -27,6 +28,7 @@ import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.CortexGate;
 import com.taskforce.tf_api.core.service.agent.CortexRecordService;
+import com.taskforce.tf_api.core.service.rules.RuleApprovers;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.util.LogSafe;
@@ -59,6 +61,7 @@ public class McpImportService {
     private final AiMeter aiMeter; // quota et comptage des tokens de la normalisation
     private final CortexGate gate;
     private final CortexRecordService records;
+    private final RuleApprovers approvers;
 
     /** Résultat d'un import : le projet créé + le nombre d'issues importées / trouvées. */
     public record ImportResult(Long projectId, String projectIdentifier, String projectName,
@@ -83,10 +86,10 @@ public class McpImportService {
             Map.of("via", "import"));
         RulesBundle bundle = gate.rulesFor(ctx);
         // Le geste de la personne, qui a cliqué « Import » : l'acteur est une personne (R157).
-        judgeOrRefuse(record, userId, bundle, read.name(), gate.personFacts(read, "{}"));
-        judgeOrRefuse(record, userId, bundle, "create_project",
+        judgeOrRefuse(record, ws.getId(), userId, bundle, read.name(), gate.personFacts(read, "{}"));
+        judgeOrRefuse(record, ws.getId(), userId, bundle, "create_project",
             Map.of("action", "project.create", "tool", "create_project", "actor", "person"));
-        judgeOrRefuse(record, userId, bundle, "create_issue",
+        judgeOrRefuse(record, ws.getId(), userId, bundle, "create_issue",
             Map.of("action", "issue.create", "tool", "create_issue", "actor", "person"));
 
         String raw = read.execute(Map.of(), ctx);
@@ -114,9 +117,11 @@ public class McpImportService {
 
     /**
      * La demande puis la décision des règles au dossier ; un refus arrête l'import (la raison de la règle remonte), une
-     * action demandée est accordée par le clic de la personne.
+     * action demandée est accordée par le clic de la personne, comme dans la console : seulement quand elle suffit seule
+     * aux personnes que la règle désigne (R98). Sinon l'import ne part pas, et la réponse dit qui doit accorder.
      */
-    private void judgeOrRefuse(UUID record, Long userId, RulesBundle bundle, String tool, Map<String, String> facts) {
+    private void judgeOrRefuse(UUID record, Long workspaceId, Long userId, RulesBundle bundle, String tool,
+                               Map<String, String> facts) {
         append(record, "action.requested", CortexRecordService.Actor.person(userId), Map.of("tool", tool));
         CortexGate.Verdict verdict = gate.judge(bundle, facts);
         append(record, "action.decided", CortexRecordService.Actor.rule(verdict.ruleId()),
@@ -126,9 +131,28 @@ public class McpImportService {
             throw new ForbiddenException("The rules of this workspace refuse this import. " + verdict.reason());
         }
         if (!verdict.allowed()) {
+            if (!approvers.aloneSuffices(verdict.require(), workspaceId, null, userId)) {
+                String reason = waitsForOthers(verdict, workspaceId);
+                result(record, tool, "refused", reason);
+                throw new ForbiddenException(reason);
+            }
             append(record, "human.decision", CortexRecordService.Actor.person(userId),
                 Map.of("tool", tool, "decision", "approved", "arguments", "{}"));
         }
+    }
+
+    /** Qui doit accorder, en mots, comme la console le dit : l'import ne part pas sans ces personnes. */
+    private String waitsForOthers(CortexGate.Verdict verdict, Long workspaceId) {
+        RulesEngine.Obligations require = verdict.require();
+        StringBuilder needs = new StringBuilder(String.join(", and ", approvers.names(require, workspaceId)));
+        if (require != null && require.signatures() > 1) {
+            needs.append(needs.isEmpty() ? "" : ", ").append(require.signatures()).append(" different people");
+        }
+        if (require != null && require.separate()) {
+            needs.append(needs.isEmpty() ? "" : ", ").append("someone other than you");
+        }
+        return "Your workspace's rules need the approval of " + (needs.isEmpty() ? "someone else" : needs)
+            + " for this import (" + verdict.reason() + "), so it doesn't run.";
     }
 
     private void append(UUID record, String type, CortexRecordService.Actor actor, Map<String, ?> data) {
