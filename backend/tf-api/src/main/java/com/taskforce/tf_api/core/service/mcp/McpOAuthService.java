@@ -425,17 +425,23 @@ public class McpOAuthService {
         return conn;
     }
 
-    /** L'éditeur attend son administrateur : la connexion le dit, sans jeton, jusqu'au prochain essai. */
+    /**
+     * L'éditeur attend son administrateur : la connexion le dit, jusqu'au prochain essai. Une connexion qui marche reste
+     * telle quelle ; une connexion déjà gardée (à refaire, par exemple) ne change que d'état, ses jetons restent avec elle
+     * et sa déconnexion les révoque ; une connexion neuve n'a que son adresse, sans jeton.
+     */
     private void markWaitingForAdmin(McpOAuthState row) {
         ConnectorConnection conn = connectionFor(row);
         if (conn.getId() != null && conn.getState() == ConnectionState.CONNECTED) return; // une connexion qui marche reste
-        Map<String, String> config = new LinkedHashMap<>();
-        config.put(WorkspaceMcpService.CONFIG_URL, row.getMcpUrl());
-        if (row.getMcpName() != null) config.put(WorkspaceMcpService.CONFIG_NAME, row.getMcpName());
-        try {
-            conn.setConfig(objectMapper.writeValueAsString(config));
-        } catch (Exception e) {
-            conn.setConfig("{}");
+        if (conn.getId() == null) {
+            Map<String, String> config = new LinkedHashMap<>();
+            config.put(WorkspaceMcpService.CONFIG_URL, row.getMcpUrl());
+            if (row.getMcpName() != null) config.put(WorkspaceMcpService.CONFIG_NAME, row.getMcpName());
+            try {
+                conn.setConfig(objectMapper.writeValueAsString(config));
+            } catch (Exception e) {
+                conn.setConfig("{}");
+            }
         }
         conn.setState(ConnectionState.WAITING_FOR_ADMIN);
         connections.save(conn);

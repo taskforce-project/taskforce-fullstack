@@ -364,6 +364,27 @@ class McpOAuthServiceTest {
         verify(client, never()).postForm(anyString(), any());
     }
 
+    @Test
+    @DisplayName("callback : l'administrateur attendu sur une connexion à refaire -> seul son état change, ses jetons restent")
+    void anAdminAnswerOnAConnectionToRedoChangesOnlyItsState() {
+        when(stateRepository.findById("st-r")).thenReturn(Optional.of(openState("st-r")));
+        when(workspaceRepository.getReferenceById(WS_ID)).thenReturn(ws);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(person));
+        String config = "{\"mcpUrl\":\"https://mcp.linear.app/mcp\",\"mcpOAuthIssuer\":\"https://as.ex\","
+            + "\"mcpAccessToken\":\"AT\",\"mcpRefreshToken\":\"RT\",\"mcpRevocationEndpoint\":\"https://as.ex/revoke\"}";
+        ConnectorConnection conn = ConnectorConnection.builder().id(40L).workspace(ws).connectorKey("linear")
+            .config(config).state(ConnectionState.NEEDS_RECONNECT).build();
+        when(workspaceMcp.ownConnection(ws, person, "linear", false)).thenReturn(conn);
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+
+        assertThat(service.callback("st-r", null, "admin_approval_required")).contains("mcp=admin");
+
+        assertThat(conn.getState()).isEqualTo(ConnectionState.WAITING_FOR_ADMIN);
+        assertThat(conn.getConfig()).isEqualTo(config); // les jetons restent, la déconnexion saura les révoquer
+        verify(connections).save(conn);
+        verify(tokenService, never()).revoke(any());
+    }
+
     // =========================================================================
     @Test
     @DisplayName("connect : un outil qui exige l'application de l'entreprise -> admin pour un membre, company-app pour un admin")
