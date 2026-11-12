@@ -105,9 +105,19 @@ class HarnessLayersContractTest {
         assertThat(RulesFloor.classOf(facts)).isEqualTo(expected);
     }
 
+    /** Le texte d'un échantillon : ses morceaux mis bout à bout quand il porte un secret, pour qu'aucun scanner ne le prenne pour un vrai. */
+    private static String sampleOf(JsonNode c) {
+        if (!c.has("parts")) {
+            return c.get("text").asText();
+        }
+        StringBuilder text = new StringBuilder();
+        c.get("parts").forEach(part -> text.append(part.asText()));
+        return text.toString();
+    }
+
     static Stream<Arguments> secrets() {
         return items(contract("rules/layer-cases.json").get("secrets")).map(c -> Arguments.of(
-            c.get("text").asText(), c.get("secret").asBoolean()));
+            sampleOf(c), c.get("secret").asBoolean()));
     }
 
     @ParameterizedTest(name = "« {0} » : {1}")

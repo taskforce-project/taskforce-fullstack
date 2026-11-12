@@ -26,8 +26,11 @@ interface LayerCase {
 interface LayerCases {
   cases: LayerCase[];
   floorClasses: Array<{ facts: Facts; class: string | null }>;
-  secrets: Array<{ text: string; secret: boolean }>;
+  secrets: Array<{ text?: string; parts?: string[]; secret: boolean }>;
 }
+
+// Un échantillon qui porte un secret est écrit en morceaux, mis bout à bout ici, pour qu'aucun scanner ne le prenne pour un vrai.
+const sampleOf = (c: LayerCases["secrets"][number]): string => c.parts?.join("") ?? c.text ?? "";
 
 const defaults = contract<RulesBundle>("rules/default.rules.json");
 const layerCases = contract<LayerCases>("rules/layer-cases.json");
@@ -52,7 +55,8 @@ describe("contrat des règles par couches : les cas partagés, comme le serveur"
   }
 
   for (const c of layerCases.secrets) {
-    it(`« ${c.text.slice(0, 40)} » ${c.secret ? "porte" : "ne porte pas"} un secret`, () => assert.equal(secretIn(c.text), c.secret));
+    const text = sampleOf(c);
+    it(`« ${text.slice(0, 40)} » ${c.secret ? "porte" : "ne porte pas"} un secret`, () => assert.equal(secretIn(text), c.secret));
   }
 
   it("une règle du socle rendue par le moteur est un objet complet, sans conditions", () => {

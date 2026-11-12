@@ -1,5 +1,5 @@
 {
-  "description": "Shared cases of the rules in layers (R157) and of the floor: the server (Java) and the runner (the same engine compiled to JavaScript) must give exactly these answers. Each case's rules come before default.rules.json in the bundle, as the server orders the layers (the most precise first), unless replace is true: then they are the whole bundle, like a table stored before the layers. expect.require is null when the decision adds no obligation.",
+  "description": "Shared cases of the rules in layers (R157) and of the floor: the server (Java) and the runner (the same engine compiled to JavaScript) must give exactly these answers. Each case's rules come before default.rules.json in the bundle, as the server orders the layers (the most precise first), unless replace is true: then they are the whole bundle, like a table stored before the layers. expect.require is null when the decision adds no obligation. A sample of secrets that carries one is written in parts, joined by the tests, so that no secret scanner of the repository takes it for a real token.",
   "cases": [
     {
       "name": "the workspace layer asks for what TaskForce allows",
@@ -256,9 +256,9 @@
     { "facts": { "tool": "PowerShell" }, "class": null }
   ],
   "secrets": [
-    { "text": "curl -H \"Authorization: Bearer tfp_0123456789abcdefghijABCDEFGHIJ0123456789xyz\" https://example.com", "secret": true },
-    { "text": "git remote set-url origin https://ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx@github.com/acme/app.git", "secret": true },
-    { "text": "Session: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0LXVzZXIifQ.c2lnbmF0dXJlLWZha2U", "secret": true },
+    { "parts": ["curl -H \"Authorization: Bearer tfp_", "0123456789abcdefghijABCDEFGHIJ0123456789xyz\" https://example.com"], "secret": true },
+    { "parts": ["git remote set-url origin https://ghp_", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx@github.com/acme/app.git"], "secret": true },
+    { "parts": ["Session: eyJhbGciOiJIUzI1NiJ9", ".eyJzdWIiOiJ0ZXN0LXVzZXIifQ", ".c2lnbmF0dXJlLWZha2U"], "secret": true },
     { "text": "The token starts with ghp_ and is kept in the vault.", "secret": false },
     { "text": "sk-short is not a key", "secret": false },
     { "text": "npm test && git status", "secret": false },
