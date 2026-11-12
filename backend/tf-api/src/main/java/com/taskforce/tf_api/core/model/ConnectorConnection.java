@@ -29,7 +29,7 @@ import lombok.Setter;
  * Une connexion à un outil du catalogue, sur un workspace : stockage <b>générique</b>, découplé de l'enum
  * {@code IntegrationProvider} (réservé à GitHub/Slack/Plane, qui ont un comportement dédié).
  *
- * <p>Depuis V124 (séance n°22, R154), une connexion appartient à une personne ({@link ConnectionScope#PERSONAL},
+ * <p>Depuis V126 (séance n°22, R154), une connexion appartient à une personne ({@link ConnectionScope#PERSONAL},
  * {@code owner}) : Cortex et chaque geste fait pour elle passent par sa connexion, et personne d'autre ne s'en sert.
  * Une connexion d'espace ({@link ConnectionScope#WORKSPACE}, sans {@code owner}) n'existe que pour une source
  * partagée. L'unicité : une connexion d'espace par outil, une connexion personnelle par outil et par personne.</p>
@@ -73,7 +73,7 @@ public class ConnectorConnection extends AuditableEntity {
     @JoinColumn(name = "owner_id")
     private User owner;
 
-    /** Personnelle ou partagée avec l'espace ; les lignes d'avant V124 sont des connexions d'espace. */
+    /** Personnelle ou partagée avec l'espace ; les lignes d'avant V126 sont des connexions d'espace. */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     @Builder.Default

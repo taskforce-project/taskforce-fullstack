@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Une connexion par personne contre un <b>vrai Postgres</b> (V124, séance n°22 R154) : les tests unitaires mockent ce
+ * Une connexion par personne contre un <b>vrai Postgres</b> (V126, séance n°22 R154) : les tests unitaires mockent ce
  * dépôt, ils ne prouvent ni les index uniques partiels, ni la contrainte qui lie la portée au propriétaire, ni la requête
  * qui rend à une personne ses connexions et celles de l'espace, jamais celles d'une autre.
  */
@@ -98,7 +98,7 @@ class ConnectorConnectionRepositoryIntegrationTest extends AbstractIntegrationTe
     }
 
     @Test
-    @DisplayName("une ligne d'avant V124 (sans portée ni propriétaire) devient une connexion d'espace")
+    @DisplayName("une ligne d'avant V126 (sans portée ni propriétaire) devient une connexion d'espace")
     void legacyRowsAreWorkspaceConnections() {
         jdbc.update("INSERT INTO connector_connection (workspace_id, connector_key, config, created_at, updated_at) "
             + "VALUES (?, 'linear', '{}', NOW(), NOW())", ws.getId());
@@ -135,7 +135,7 @@ class ConnectorConnectionRepositoryIntegrationTest extends AbstractIntegrationTe
     }
 
     @Test
-    @DisplayName("les issues importées : la colonne de V124 et les requêtes que le socle lit (R158)")
+    @DisplayName("les issues importées : la colonne de V126 et les requêtes que le socle lit (R158)")
     void importedIssuesColumnAndQueries() {
         Integer column = jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.columns "
             + "WHERE table_name = 'issues' AND column_name = 'imported_from'", Integer.class);

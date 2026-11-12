@@ -89,7 +89,7 @@ public class McpOAuthState {
     private String returnTo;
 
     /**
-     * La connexion sera-t-elle partagee avec l'espace (V124) ? Faux par defaut : elle appartient a qui l'a lancee
+     * La connexion sera-t-elle partagee avec l'espace (V126) ? Faux par defaut : elle appartient a qui l'a lancee
      * ({@link #userId}).
      */
     @Column(nullable = false)

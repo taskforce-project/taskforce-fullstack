@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.taskforce.tf_api.core.model.ConnectorApp;
 
-/** Les applications d'entreprise saisies par l'administrateur d'un espace (V124, chemin C). */
+/** Les applications d'entreprise saisies par l'administrateur d'un espace (V126, chemin C). */
 public interface ConnectorAppRepository extends JpaRepository<ConnectorApp, Long> {
 
     Optional<ConnectorApp> findByWorkspaceIdAndConnectorKey(Long workspaceId, String connectorKey);

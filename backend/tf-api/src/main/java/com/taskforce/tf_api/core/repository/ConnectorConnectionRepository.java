@@ -10,7 +10,7 @@ import org.springframework.data.repository.query.Param;
 import com.taskforce.tf_api.core.model.ConnectorConnection;
 
 /**
- * Les connexions aux outils (V61, V124). Une personne ne voit et n'utilise que les siennes et celles que l'espace
+ * Les connexions aux outils (V61, V126). Une personne ne voit et n'utilise que les siennes et celles que l'espace
  * partage ({@link #findUsable}) : jamais la connexion personnelle d'une autre.
  */
 public interface ConnectorConnectionRepository extends JpaRepository<ConnectorConnection, Long> {

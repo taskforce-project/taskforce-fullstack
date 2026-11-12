@@ -1,5 +1,5 @@
 -- ============================================================
--- V124 -- une connexion par personne, l'application de l'entreprise, les inscriptions par emetteur
+-- V126 -- une connexion par personne, l'application de l'entreprise, les inscriptions par emetteur
 -- (TF-J2-12, TF-J2-13 ; seance n°22 du Conseil, R154 et R158)
 -- ============================================================
 -- Depend de : V61 (connector_connection), V82 (mcp_oauth_states), V16 (issues), V13 (workspaces), V1 (users).
