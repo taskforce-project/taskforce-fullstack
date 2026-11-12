@@ -72,9 +72,26 @@ describe("AddRuleDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: "Check the rule" }))
 
     expect(await screen.findByText(/can only make TaskForce stricter/)).toBeInTheDocument()
-    expect(screen.getByText("A case doesn't hold, so TaskForce won't add the rule as it is written.")).toBeInTheDocument()
+    // Aucun cas n'a été joué : le refus finit sur sa raison, sans accuser « un cas » (R160).
+    expect(screen.queryByText("A case doesn't hold, so TaskForce won't add the rule as it is written.")).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Add the rule" })).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument()
+  })
+
+  it("only a case that was played and broke is blamed: a missing approver ends on its own reason (R160)", async () => {
+    draftRule.mockResolvedValueOnce(draft({ passed: false, cases: [], problems: [{ code: "badApprover", detail: null }] }))
+    open()
+    await write(CEO_RULE)
+    await userEvent.click(screen.getByRole("button", { name: "Check the rule" }))
+
+    expect(await screen.findByText("TaskForce doesn't know who should approve. Choose them below.")).toBeInTheDocument()
+    expect(screen.queryByText(/A case doesn't hold/)).not.toBeInTheDocument()
+
+    // Un cas joué qui casse : la ligne le dit.
+    draftRule.mockResolvedValueOnce(draft({ passed: false, cases: [{ ...draft().cases[0]!, passed: false }] }))
+    await write(`${CEO_RULE}.`)
+    await userEvent.click(screen.getByRole("button", { name: "Check the rule" }))
+    expect(await screen.findByText("A case doesn't hold, so TaskForce won't add the rule as it is written.")).toBeInTheDocument()
   })
 
   it("when TaskForce doesn't know who approves, it asks, then checks the same rule again without the model", async () => {
