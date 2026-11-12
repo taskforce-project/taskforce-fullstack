@@ -469,7 +469,8 @@ function ConnectorCard({ tool, onOpenDetail, onConnect }: Readonly<{
       <div className="flex items-center justify-between gap-2">
         {action ? (
           <Button size="sm" variant="outline" className="relative z-10 h-7 gap-1.5 px-2.5 text-xs" onClick={onConnect}>
-            {isConnected(tool) ? null : <Plug className="size-3.5" />} {action}
+            {!isConnected(tool) && <Plug className="size-3.5" />}
+            {action}
           </Button>
         ) : <span />}
         <button
