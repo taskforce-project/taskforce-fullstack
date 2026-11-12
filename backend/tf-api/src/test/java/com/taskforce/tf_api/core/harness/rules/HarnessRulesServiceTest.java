@@ -167,6 +167,33 @@ class HarnessRulesServiceTest {
     }
 
     @Test
+    @DisplayName("la couche du rôle ADMIN vaut aussi pour un propriétaire, comme role:admin ; la sienne passe d'abord")
+    void theAdminLayerAlsoCoversOwners() {
+        HarnessRuleSet admins = row(RuleScope.ROLE, 2, List.of(rule("role-admin-ask-deletes", "issue.delete", "ask")));
+        admins.setRole("ADMIN");
+        HarnessRuleSet owners = row(RuleScope.ROLE, 3, List.of(rule("role-owner-ask-deletes", "issue.delete", "ask")));
+        owners.setRole("OWNER");
+        HarnessRuleSet membersLayer = row(RuleScope.ROLE, 4, List.of(rule("role-member-ask-deletes", "issue.delete", "ask")));
+        membersLayer.setRole("MEMBER");
+        add(admins);
+        add(owners);
+        add(membersLayer);
+        when(members.findByWorkspaceIdAndUserId(9L, 7L))
+            .thenReturn(Optional.of(WorkspaceMember.builder().role(WorkspaceRole.OWNER).build()));
+        when(members.findByWorkspaceIdAndUserId(9L, 8L))
+            .thenReturn(Optional.of(WorkspaceMember.builder().role(WorkspaceRole.ADMIN).build()));
+
+        RulesBundle forOwner = service.bundleFor(workspace, new Work(null, null, 7L));
+        RulesBundle forAdmin = service.bundleFor(workspace, new Work(null, null, 8L));
+
+        assertThat(forOwner.rules()).extracting(RulesBundle.Rule::id)
+            .containsSubsequence("role-owner-ask-deletes", "role-admin-ask-deletes")
+            .doesNotContain("role-member-ask-deletes");
+        assertThat(forAdmin.rules()).extracting(RulesBundle.Rule::id).contains("role-admin-ask-deletes")
+            .doesNotContain("role-owner-ask-deletes", "role-member-ask-deletes");
+    }
+
+    @Test
     @DisplayName("la version en vigueur d'une couche est sa dernière ; les autres couches gardent la leur")
     void theLatestVersionOfALayerWins() {
         add(row(RuleScope.WORKSPACE, 3, List.of(rule("ws-ask-comments", "comment.create", "ask"))));
