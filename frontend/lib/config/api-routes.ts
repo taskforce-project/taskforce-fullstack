@@ -413,6 +413,16 @@ export const RULES_ROUTES = {
 } as const;
 
 /**
+ * Où TaskForce range ce qu'il écrit (R156) : la cible de l'espace et celle d'un projet, les documents rangés et leur
+ * lien. Backend: @RequestMapping("/api/workspaces/{slug}") de StorageController.
+ */
+export const STORAGE_ROUTES = {
+  WORKSPACE: (slug: string) => `/api/workspaces/${slug}/storage`,
+  PROJECT: (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/storage`,
+  DOCUMENT_LINK: (slug: string, documentId: number) => `/api/workspaces/${slug}/storage/documents/${documentId}/link`,
+} as const;
+
+/**
  * Ce que Cortex peut lire dans un espace (R125), compté et daté, pour le volet « Progress ».
  * Backend: @RequestMapping("/api/workspaces/{slug}/assistant/sources").
  */

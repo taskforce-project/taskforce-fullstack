@@ -119,7 +119,7 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
 
   return (
     <div className="my-2 flex flex-col gap-2 border border-shape-yellow/35 bg-shape-yellow/[0.06] p-2.5 text-xs">
-      <p className="text-muted-foreground">{proposalLine(call.name, t)}</p>
+      <p className="text-muted-foreground">{proposalLine(call.name, t, call.input)}</p>
       {state === "idle" || state === "running" ? (
         <button
           type="button"

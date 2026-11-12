@@ -176,8 +176,31 @@ export function outcomeLine(call: Pick<AssistantToolCall, "status" | "output">, 
   }
 }
 
+/**
+ * Ranger un document (R156) : la carte dit quoi et où, d'après ses arguments (le titre, la cible, le dossier) ; null
+ * quand ils ne le disent pas.
+ */
+function saveProposal(input: string | null | undefined, t: ThreadTexts): string | null {
+  if (!input) return null
+  try {
+    const args = JSON.parse(input) as Record<string, unknown>
+    const title = typeof args.title === "string" && args.title.trim() ? args.title.trim() : null
+    const places = t.saveWhere as Readonly<Record<string, string | undefined>>
+    const place = typeof args.storage === "string" ? places[args.storage] : undefined
+    if (!title || !place) return null
+    const folder = typeof args.folder === "string" && args.folder.trim() ? args.folder.trim() : null
+    return fillText(t.proposesSave, { title, where: folder ? fillText(t.saveWhereFolder, { where: place, folder }) : place })
+  } catch {
+    return null
+  }
+}
+
 /** Ce que dit la carte d'une action qui attend l'accord de la personne, sans le nom de son outil. */
-export function proposalLine(tool: string, t: ThreadTexts): string {
+export function proposalLine(tool: string, t: ThreadTexts, input?: string | null): string {
+  if (tool === "save_document") {
+    const save = saveProposal(input, t)
+    if (save) return save
+  }
   const service = serviceOf(tool)
   if (service) return fillText(t.proposesExternal, { service })
   return fillText(t.proposes, { what: toolWords(tool, t).proposes ?? t.proposesThis })

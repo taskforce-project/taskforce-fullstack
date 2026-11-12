@@ -513,6 +513,16 @@ function registerIpc(): void {
     else await restartApp(restart);
   });
   ipcMain.handle("desktop:open-logs", () => shell.openPath(appLogDir()));
+  // Le dossier où TaskForce range ce qu'il écrit (séance n°22, R156) : choisi par la personne, dans la boîte du système.
+  ipcMain.handle("desktop:choose-folder", async (event) => {
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const options: Electron.OpenDialogOptions = {
+      title: "Where TaskForce saves documents",
+      properties: ["openDirectory", "createDirectory"],
+    };
+    const chosen = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
+    return chosen.canceled || chosen.filePaths.length === 0 ? null : chosen.filePaths[0];
+  });
   // Copies de la base faites avant chaque mise à jour (cf. backup.ts).
   ipcMain.handle("desktop:open-backups", () => {
     if (!stack) return undefined;
