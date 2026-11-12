@@ -431,7 +431,7 @@ public class WorkspaceMcpService {
             if (conn.getState() != ConnectionState.CONNECTED) continue;
             String api = McpTokenService.apiKind(readConfig(conn.getConfig()));
             if (api != null) {
-                if (apiTools != null) tools.addAll(apiTools.toolsFor(conn, api));
+                if (apiTools != null) tools.addAll(apiTools.toolsFor(conn, api, userId));
                 continue;
             }
             McpClient.ServerRef ref = toServerRef(conn);
@@ -519,7 +519,7 @@ public class WorkspaceMcpService {
             String api = McpTokenService.apiKind(config);
             if (api != null) {
                 List<String> names = apiTools == null ? List.of()
-                    : apiTools.infos(conn.getConnectorKey(), api).stream().map(McpToolInfo::name).toList();
+                    : apiTools.infos(conn, api, userId).stream().map(McpToolInfo::name).toList();
                 out.add(new McpServerStatus(conn.getConnectorKey(), name, host(url), conn.getScope(), conn.getState(),
                     conn.getAccountLabel(), true, names, List.of(), null));
                 continue;
@@ -553,7 +553,7 @@ public class WorkspaceMcpService {
         ConnectorConnection conn = connectionFor(workspaceId, userId, connectorKey)
             .orElseThrow(() -> new ResourceNotFoundException("MCP connector not connected: " + connectorKey));
         String api = McpTokenService.apiKind(readConfig(conn.getConfig()));
-        if (api != null) return apiTools == null ? List.of() : apiTools.infos(connectorKey, api);
+        if (api != null) return apiTools == null ? List.of() : apiTools.infos(conn, api, userId);
         McpClient.ServerRef ref = toServerRef(conn);
         if (ref == null) throw new BusinessException("The connector " + connectorKey + " is not an MCP server (mcpUrl missing)");
         Set<String> allow = allowList(conn);

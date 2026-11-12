@@ -136,6 +136,7 @@ class CompanyFilesContractTest {
         AuthorizationService members = Mockito.mock(AuthorizationService.class);
         lenient().when(members.isMember(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
             .thenReturn(true);
+        lenient().when(members.isManager(WS, ada.getId())).thenReturn(true);
         McpOAuthService service = new McpOAuthService(new McpOAuthDiscovery(http), http, stateRepository(),
             workspaceRepository(), users, tokens, workspaceMcp, registrar, settings, catalog, apps(), repo, om, members);
         service.allowLocalServersForContractTests();
@@ -364,6 +365,24 @@ class CompanyFilesContractTest {
     }
 
     // ── Teams, sur la même connexion ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("Microsoft 365 partagé avec l'espace : les canaux pour tous, les conversations de la personne pour elle seule")
+    void aSharedConnectionKeepsItsChatsToItsPerson() {
+        McpOAuthService.ConnectOutcome outcome = oauth.connect(ws, ada, true, new McpOAuthService.ConnectRequest(
+            "microsoft-365", null, null, null, null, true, false, false, null));
+        Map<String, String> back = microsoft.approve(outcome.authorizeUrl(), false);
+        assertThat(McpConnectContractTest.finish(oauth, ada, oauth.callback(back.get("state"), back.get("code"), null,
+            null, null))).isEqualTo("mcp=connected");
+        assertThat(rows).singleElement().satisfies(c -> assertThat(c.getScope()).isEqualTo(ConnectionScope.WORKSPACE));
+
+        assertThat(toolsOf(bob)).extracting(AgentTool::name)
+            .contains("microsoft-365__list_teams", "microsoft-365__read_channel", "microsoft-365__search_files")
+            .doesNotContain("microsoft-365__list_chats", "microsoft-365__read_chat", "microsoft-365__post_chat_message");
+        assertThat(workspaceMcp.serverTools(WS, bob.getId(), "microsoft-365")).extracting(WorkspaceMcpService.McpToolInfo::name)
+            .doesNotContain("list_chats", "read_chat", "post_chat_message");
+        assertThat(toolsOf(ada)).extracting(AgentTool::name).contains("microsoft-365__list_chats", "microsoft-365__read_chat");
+    }
 
     @Test
     @DisplayName("Teams : Cortex lit les canaux et les conversations, cités ; poster est une écriture qui attend une personne")
