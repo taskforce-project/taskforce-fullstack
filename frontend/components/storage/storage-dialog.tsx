@@ -14,6 +14,7 @@ import { fillText } from "@/lib/delivery/result-card"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useStorageStore } from "@/lib/store/storage-store"
 import { cn } from "@/lib/utils"
+import { MicrosoftFolderDialog } from "./microsoft-folder-dialog"
 import type { StorageTexts } from "./storage-panel"
 
 /** Le dossier choisi : chez l'éditeur (son identifiant, et le lecteur chez Microsoft), ou sur l'ordinateur. */
@@ -43,11 +44,14 @@ export function StorageDialog({ slug, projectId, overview, onClose }: Readonly<{
 }>) {
   const t = usePreferencesStore((s) => s.t.storage)
   const chooseStorage = useStorageStore((s) => s.chooseStorage)
+  const pickGoogle = useStorageStore((s) => s.pickGoogle)
   const saving = useStorageStore((s) => s.saving)
   const current = overview.target
   const [kind, setKind] = useState<StorageKind>(current.storage)
   const [folder, setFolder] = useState<ChosenFolder | null>(() => initialFolder(current))
   const [picking, setPicking] = useState(false)
+  // Le choix d'un dossier de OneDrive ou de SharePoint, dans son propre dialogue.
+  const [browsing, setBrowsing] = useState(false)
   const choice = overview.choices.find((c) => c.storage === kind)
   const ready = choice?.state === "ready"
   const canSave = ready && (!needsFolder(kind) || folder !== null) && !saving
@@ -58,13 +62,29 @@ export function StorageDialog({ slug, projectId, overview, onClose }: Readonly<{
   }
 
   async function pick() {
+    if (kind === "onedrive") {
+      setBrowsing(true)
+      return
+    }
     setPicking(true)
     try {
-      const chosen = await chooseFolder(kind)
+      const chosen = kind === "google-drive" ? await googleFolder() : await chooseFolder(kind)
       if (chosen) setFolder(chosen)
     } finally {
       setPicking(false)
     }
+  }
+
+  /** Le sélecteur de Google, sur les dossiers : TaskForce n'atteindra que celui-ci (drive.file). */
+  async function googleFolder(): Promise<ChosenFolder | null> {
+    const picked = await pickGoogle(slug, "folder", t.folders.title)
+    if (!picked) {
+      const error = useStorageStore.getState().error
+      if (error) toast.error(error === "picker" ? t.pickerFailed : error)
+      return null
+    }
+    const first = picked[0]
+    return first ? { folderId: first.id, label: first.name } : null
   }
 
   async function save() {
@@ -80,6 +100,13 @@ export function StorageDialog({ slug, projectId, overview, onClose }: Readonly<{
     } else {
       toast.error(useStorageStore.getState().error ?? t.failed)
     }
+  }
+
+  if (browsing) {
+    return (
+      <MicrosoftFolderDialog slug={slug} onClose={() => setBrowsing(false)}
+        onPick={(chosen) => { setFolder(chosen); setBrowsing(false) }} />
+    )
   }
 
   return (

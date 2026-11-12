@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import * as service from "../api/storage-service"
+import * as picker from "../storage/google-picker"
 import type { StorageOverview } from "../api/storage-service"
 import { useStorageStore } from "./storage-store"
 
@@ -9,7 +10,10 @@ vi.mock("../api/storage-service", () => ({
   chooseStorage: vi.fn(),
   resetStorage: vi.fn(),
   getDocumentLink: vi.fn(),
+  getGooglePicker: vi.fn(),
+  getMicrosoftFolders: vi.fn(),
 }))
+vi.mock("../storage/google-picker", () => ({ pickFromGoogleDrive: vi.fn() }))
 vi.mock("../api/client", () => ({
   getErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }))
@@ -62,6 +66,29 @@ describe("storage-store", () => {
     vi.mocked(service.resetStorage).mockRejectedValueOnce(new Error("Only owners"))
     expect(await useStorageStore.getState().resetStorage("acme", null)).toBeNull()
     expect(useStorageStore.getState()).toMatchObject({ saving: false, error: "Only owners" })
+  })
+
+  it("opens Google's picker with the person's own config, or null with the reason", async () => {
+    const config = { developerKey: "k", appId: "1", accessToken: "t" }
+    vi.mocked(service.getGooglePicker).mockResolvedValueOnce(config)
+    vi.mocked(picker.pickFromGoogleDrive).mockResolvedValueOnce([{ id: "f", name: "Reports", url: null, mimeType: null }])
+    expect(await useStorageStore.getState().pickGoogle("acme", "folder", "Choose a folder"))
+      .toEqual([{ id: "f", name: "Reports", url: null, mimeType: null }])
+    expect(picker.pickFromGoogleDrive).toHaveBeenCalledWith(config, "folder", "Choose a folder")
+
+    vi.mocked(service.getGooglePicker).mockRejectedValueOnce(new Error("Connect Google Drive first"))
+    expect(await useStorageStore.getState().pickGoogle("acme", "files", "x")).toBeNull()
+    expect(useStorageStore.getState().error).toBe("Connect Google Drive first")
+  })
+
+  it("lists the folders of a Microsoft 365 place, or null with the reason", async () => {
+    const folders = [{ driveId: "d", itemId: "root", name: "OneDrive", kind: "drive" as const }]
+    vi.mocked(service.getMicrosoftFolders).mockResolvedValueOnce(folders)
+    expect(await useStorageStore.getState().microsoftFolders("acme")).toEqual(folders)
+
+    vi.mocked(service.getMicrosoftFolders).mockRejectedValueOnce(new Error("Connect Microsoft 365 first"))
+    expect(await useStorageStore.getState().microsoftFolders("acme", "d", "i")).toBeNull()
+    expect(useStorageStore.getState().error).toBe("Connect Microsoft 365 first")
   })
 
   it("gives a document's link, or null", async () => {

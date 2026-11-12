@@ -4,11 +4,15 @@ import { getErrorMessage } from "../api/client";
 import {
   chooseStorage,
   getDocumentLink,
+  getGooglePicker,
+  getMicrosoftFolders,
   getStorage,
   resetStorage,
+  type MicrosoftFolder,
   type StorageOverview,
   type StorageTargetRequest,
 } from "../api/storage-service";
+import { pickFromGoogleDrive, type PickedItem, type PickerMode } from "../storage/google-picker";
 
 // ---------------------------------------------------------------------------
 // Où TaskForce range ce qu'il écrit (R156). Un domaine = un store. Erreurs avalées : chaque action rend null, et la
@@ -33,6 +37,13 @@ interface StorageState {
   resetStorage: (slug: string, projectId: number | null) => Promise<StorageOverview | null>;
   /** Le lien d'un document rangé ; null s'il n'y en a pas, ou si le serveur n'a pas pu le donner. */
   documentLink: (slug: string, documentId: number) => Promise<string | null>;
+  /**
+   * Ouvre le sélecteur de Google Drive : un dossier où ranger, ou des fichiers que Cortex pourra lire. Rend ce que la
+   * personne a choisi ; null quand elle ferme, ou quand le sélecteur n'a pas pu s'ouvrir (la raison dans `error`).
+   */
+  pickGoogle: (slug: string, mode: PickerMode, title: string) => Promise<PickedItem[] | null>;
+  /** Les dossiers d'un endroit de Microsoft 365 (sans endroit : OneDrive et SharePoint) ; null si le serveur n'a pas pu. */
+  microsoftFolders: (slug: string, driveId?: string, itemId?: string) => Promise<MicrosoftFolder[] | null>;
 }
 
 const keyOf = (slug: string, projectId: number | null) => `${slug}:${projectId ?? ""}`;
@@ -85,6 +96,26 @@ export const useStorageStore = create<StorageState>((set) => ({
   documentLink: async (slug, documentId) => {
     try {
       return await getDocumentLink(slug, documentId);
+    } catch (error) {
+      set({ error: getErrorMessage(error) });
+      return null;
+    }
+  },
+
+  microsoftFolders: async (slug, driveId, itemId) => {
+    try {
+      return await getMicrosoftFolders(slug, driveId, itemId);
+    } catch (error) {
+      set({ error: getErrorMessage(error) });
+      return null;
+    }
+  },
+
+  pickGoogle: async (slug, mode, title) => {
+    set({ error: null });
+    try {
+      const config = await getGooglePicker(slug);
+      return await pickFromGoogleDrive(config, mode, title);
     } catch (error) {
       set({ error: getErrorMessage(error) });
       return null;

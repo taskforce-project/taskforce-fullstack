@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { apiClient } from "./client"
-import { chooseStorage, getDocumentLink, getStorage, resetStorage } from "./storage-service"
+import { chooseStorage, getDocumentLink, getGooglePicker, getMicrosoftFolders, getStorage, resetStorage } from "./storage-service"
 
 vi.mock("./client", () => ({
   apiClient: { get: vi.fn(), put: vi.fn(), delete: vi.fn() },
@@ -35,6 +35,23 @@ describe("storage-service", () => {
       { storage: "onedrive", driveId: "d", folderId: "f" })
     expect(await resetStorage("acme", null)).toEqual(OVERVIEW)
     expect(apiClient.delete).toHaveBeenCalledWith("/api/workspaces/acme/storage")
+  })
+
+  it("asks for what Google's picker needs", async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope({ developerKey: "k", appId: "1", accessToken: "t" }))
+
+    expect(await getGooglePicker("acme")).toEqual({ developerKey: "k", appId: "1", accessToken: "t" })
+    expect(apiClient.get).toHaveBeenCalledWith("/api/workspaces/acme/storage/google/picker")
+  })
+
+  it("lists Microsoft 365 folders, from the top or inside a folder", async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope([]))
+
+    await getMicrosoftFolders("acme")
+    expect(apiClient.get).toHaveBeenCalledWith("/api/workspaces/acme/storage/microsoft/folders", { params: {} })
+    await getMicrosoftFolders("acme", "d1", "i1")
+    expect(apiClient.get).toHaveBeenLastCalledWith("/api/workspaces/acme/storage/microsoft/folders",
+      { params: { driveId: "d1", itemId: "i1" } })
   })
 
   it("asks for the link that opens a saved document", async () => {

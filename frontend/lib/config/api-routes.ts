@@ -420,6 +420,8 @@ export const STORAGE_ROUTES = {
   WORKSPACE: (slug: string) => `/api/workspaces/${slug}/storage`,
   PROJECT: (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/storage`,
   DOCUMENT_LINK: (slug: string, documentId: number) => `/api/workspaces/${slug}/storage/documents/${documentId}/link`,
+  GOOGLE_PICKER: (slug: string) => `/api/workspaces/${slug}/storage/google/picker`,
+  MICROSOFT_FOLDERS: (slug: string) => `/api/workspaces/${slug}/storage/microsoft/folders`,
 } as const;
 
 /**

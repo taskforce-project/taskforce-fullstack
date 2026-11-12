@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DialogFooter } from "@/components/ui/dialog"
 import { McpActionConsole } from "@/components/integrations/mcp-action-console"
+import { GoogleDriveFiles } from "@/components/storage/google-drive-files"
 import { DisconnectConfirmDialog } from "@/components/integrations/disconnect-confirm-dialog"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { fillText } from "@/lib/delivery/result-card"
@@ -366,6 +367,8 @@ function ConnectedView({ slug, tool, manager, onChanged, onWide }: PanelProps) {
         </span>
         <span className="ml-auto text-xs text-muted-foreground">{shared ? t.shared : t.yours}</span>
       </div>
+      {/* Google Drive, avec drive.file : Cortex ne lit que ce que la personne choisit ici (TF-J2-14). */}
+      {tool.key === "google-drive" && !shared && <GoogleDriveFiles slug={slug} />}
       {status && !status.reachable && (
         <p className="flex items-start gap-2 text-xs text-ink-yellow">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" /> {fillText(t.unreachable, { name: tool.name })}

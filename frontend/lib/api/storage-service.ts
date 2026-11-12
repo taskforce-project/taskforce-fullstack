@@ -5,6 +5,7 @@
  */
 import { apiClient } from "./client"
 import { STORAGE_ROUTES } from "../config/api-routes"
+import type { GooglePickerConfig } from "../storage/google-picker"
 
 export type StorageKind = "server" | "machine" | "google-drive" | "onedrive"
 
@@ -79,6 +80,33 @@ export async function chooseStorage(slug: string, projectId: number | null,
 
 export async function resetStorage(slug: string, projectId: number | null): Promise<StorageOverview> {
   const res = await apiClient.delete<{ data: StorageOverview }>(route(slug, projectId))
+  return res.data.data
+}
+
+/**
+ * Ce qu'il faut au sélecteur de Google Drive : la clé du navigateur, le projet Google, et le jeton court de la connexion
+ * de la personne elle-même (jamais celle de l'espace).
+ */
+export async function getGooglePicker(slug: string): Promise<GooglePickerConfig> {
+  const res = await apiClient.get<{ data: GooglePickerConfig }>(STORAGE_ROUTES.GOOGLE_PICKER(slug))
+  return res.data.data
+}
+
+/** Un endroit de OneDrive ou de SharePoint : le OneDrive de la personne, une bibliothèque SharePoint, un dossier. */
+export interface MicrosoftFolder {
+  driveId: string
+  itemId: string
+  name: string
+  kind: "drive" | "library" | "folder"
+}
+
+/**
+ * Les dossiers d'un endroit de Microsoft 365, par la connexion de la personne : sans endroit, son OneDrive et les
+ * bibliothèques des sites SharePoint qu'elle suit.
+ */
+export async function getMicrosoftFolders(slug: string, driveId?: string, itemId?: string): Promise<MicrosoftFolder[]> {
+  const params = driveId && itemId ? { driveId, itemId } : {}
+  const res = await apiClient.get<{ data: MicrosoftFolder[] }>(STORAGE_ROUTES.MICROSOFT_FOLDERS(slug), { params })
   return res.data.data
 }
 
