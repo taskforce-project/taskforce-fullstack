@@ -26,10 +26,24 @@ describe("BrandLogo", () => {
     expect(BRAND_LOGOS["anthropic"]).toBe("single");
   });
 
-  it("une marque vendorisée garde son logo", () => {
-    const { container } = render(<BrandLogo slug="cursor" name="Cursor" />);
+  it("une marque vendorisée en deux variantes garde son logo clair et sombre", () => {
+    const { container } = render(<BrandLogo slug="github" name="GitHub" />);
 
-    expect(BRAND_LOGOS["cursor"]).toBeDefined();
-    expect(container.querySelector("img")).not.toBeNull();
+    expect(BRAND_LOGOS["github"]).toBe("themed");
+    const sources = [...container.querySelectorAll("img")].map((img) => img.getAttribute("src"));
+    expect(sources).toEqual(["/logos/github-light.svg", "/logos/github-dark.svg"]);
+  });
+
+  it.each([
+    // [clé, nom affiché] : des marques absentes de SVGL, venues de Simple Icons, d'une seule couleur
+    ["plane", "Plane"],
+    ["hubspot", "HubSpot"],
+  ])("« %s » vient de Simple Icons : un masque peint de la couleur du texte, lisible dans les deux thèmes", (slug, name) => {
+    render(<BrandLogo slug={slug} name={name} />);
+
+    expect(BRAND_LOGOS[slug]).toBe("mono");
+    const logo = screen.getByRole("img", { name });
+    expect(logo.tagName).toBe("SPAN");
+    expect(logo.getAttribute("style")).toContain(`/logos/${slug}.svg`);
   });
 });
