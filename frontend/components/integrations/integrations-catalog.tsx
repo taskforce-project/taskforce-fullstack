@@ -285,10 +285,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
           />
         ) : (
         <>
-        <p className="text-xs text-muted-foreground">
-          Connect the tools you use, each with your own account. Cortex reads them directly and asks you before any
-          change. A tool that isn't listed connects by the address of its MCP server.
-        </p>
+        <p className="text-xs text-muted-foreground">{t.catalogIntro}</p>
 
         {/* Filtre par statut de connexion, et l'ajout d'un serveur MCP hors catalogue. */}
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -898,8 +895,7 @@ function McpServerForm({
         <Server className="mt-0.5 size-3.5 shrink-0 text-primary" />
         <span>
           {isNew ? "Any tool with an MCP server" : <><span className="font-medium text-foreground">{tool.name}</span>&apos;s MCP server</>}
-          : its tools go live in Cortex, through your own connection. TaskForce doesn't know them yet, so Cortex asks
-          you before using any of them.
+          {texts.unknownServerTail}
         </span>
       </div>
 

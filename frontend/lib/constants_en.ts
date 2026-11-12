@@ -782,6 +782,8 @@ export const CONSTANTS_EN = {
     githubCliSignedInNoLogin: "Connected with GitHub CLI on this computer.",
     githubCliPurpose: "Sign in to GitHub so that your agent can clone the repository, push its branch and open its pull request.",
     webAppOnly: "Web app only",
+    // The catalog's first sentence (TF-J2-12): one connection per person, the address for a tool not listed
+    catalogIntro: "Connect the tools you use, each with your own account. Cortex reads them directly and asks you before any change. A tool that isn't listed connects by the address of its MCP server.",
     slackDesktopHelp: "Slack can't be connected in the desktop app yet.",
   },
 
@@ -790,6 +792,8 @@ export const CONSTANTS_EN = {
     // What a connection gives, in one sentence
     intro: "Cortex reads {name} with your own account and rights. It asks you before any change.",
     introShared: "Shared with the workspace: everyone reads {name} through this connection. A change waits for an owner or admin.",
+    // After "Any tool with an MCP server" or "<tool>'s MCP server", for a server TaskForce has no preset for
+    unknownServerTail: ": its tools go live in Cortex, through your own connection. TaskForce doesn't know them yet, so Cortex asks you before using any of them.",
     // The card and the detail: the state of the connection the person uses
     connected: "Connected",
     connectedAs: "Connected as {account}",
